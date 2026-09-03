@@ -1,0 +1,148 @@
+{
+  "schema_version": "1.0",
+  "kind": "flowmarshal_r1_runtime_receipt",
+  "gate": "R1",
+  "run_id": "r1-20260902T080734Z-357e39e1",
+  "started_at": "2026-09-02T08:07:34.601863Z",
+  "completed_at": "2026-09-02T08:07:37.151613Z",
+  "decision": "NO-GO",
+  "current_stage": "thread_read",
+  "environment": {
+    "type": "local",
+    "workspace": "D:\\codex\\flowmarshal",
+    "codex_home": "C:\\Users\\sjs95\\.codex",
+    "executable": "C:\\Users\\sjs95\\.codex\\packages\\standalone\\releases\\0.151.0-x86_64-pc-windows-msvc\\bin\\codex.exe",
+    "exit_code": 0,
+    "version": "codex-cli 0.151.0",
+    "stderr": "",
+    "sdk_version": "0.147.0"
+  },
+  "checks": {
+    "initialize": {
+      "status": "pass",
+      "summary": "첫 App Server initialize/initialized가 완료됨",
+      "evidence": {}
+    },
+    "permission_preflight": {
+      "status": "pass",
+      "summary": "task 생성 전에 로컬 full-access/never 유효 정책을 확인함",
+      "evidence": {
+        "active_profile": ":danger-full-access",
+        "approval_policy": "never"
+      }
+    },
+    "model_inventory": {
+      "status": "pass",
+      "summary": "model/list에서 현재 기본 모델과 지원 추론 수준을 선택함",
+      "evidence": {
+        "model_id": "gpt-5.6-sol",
+        "reasoning_effort": "low"
+      }
+    },
+    "thread_start": {
+      "status": "pass",
+      "summary": "정상 사용자 권한에서 실제 Runner thread가 시작됨",
+      "evidence": {
+        "thread_id": "01a06128-c11e-7d73-9333-7f2abf1460e7",
+        "session_id": "01a06128-c11e-7d73-9333-7f2abf1460e7"
+      }
+    },
+    "instruction_sources": {
+      "status": "pass",
+      "summary": "전역·프로젝트 AGENTS.md가 정상 Runner 입력으로 로드됨",
+      "evidence": {
+        "instruction_sources": [
+          "C:\\Users\\sjs95\\.codex\\AGENTS.md",
+          "D:\\codex\\flowmarshal\\AGENTS.md"
+        ]
+      }
+    },
+    "thread_turn_separation": {
+      "status": "pass",
+      "summary": "thread/start와 turn/start가 분리되어 있음",
+      "evidence": {
+        "turns_before": 0
+      }
+    },
+    "turn_start": {
+      "status": "pass",
+      "summary": "실제 Runner turn이 시작됨",
+      "evidence": {
+        "thread_id": "01a06128-c11e-7d73-9333-7f2abf1460e7",
+        "turn_id": "01a06128-c56f-7641-bf57-45c9f93b4084"
+      }
+    },
+    "thread_read": {
+      "status": "fail",
+      "summary": "Runner turn의 종료 상태가 completed가 아닙니다: 'interrupted'",
+      "evidence": {
+        "code": "TURN_NOT_COMPLETED"
+      }
+    }
+  },
+  "receipts": {
+    "initialize_first": {
+      "response_digest": "sha256:4dd3407dace90d1d4cb8703bd9ccfc94ee21dc9142d9ca23923e13df0dbc1cce"
+    },
+    "execution_policy": {
+      "environment": "local",
+      "approval_policy": "never",
+      "default_permissions": ":danger-full-access",
+      "selected_profile_allowed": true,
+      "config_digest": "sha256:9f487d2aa08ebb52fe2b52ac63f7efa595f414580ef7a03e8b55d86b2eee94e6",
+      "profile_catalog_digest": "sha256:69b84ba576775830ce29c176d134b160fbd8f5a96b3b8a63d23161f66d138af2"
+    },
+    "model_selection": {
+      "model_id": "gpt-5.6-sol",
+      "catalog_model": "gpt-5.6-sol",
+      "reasoning_effort": "low",
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ],
+      "selection_basis": "model/list의 visible catalog 기본 모델",
+      "effort_basis": "R1 최소 검사용으로 지원 목록의 low 선택",
+      "catalog_count": 7,
+      "catalog_digest": "sha256:467b3dab0e6202685c3ef26b6aafd9e0e87224bd8dbf8bbc20bfe840866daef5"
+    },
+    "thread_start": {
+      "thread_id": "01a06128-c11e-7d73-9333-7f2abf1460e7",
+      "session_id": "01a06128-c11e-7d73-9333-7f2abf1460e7",
+      "active_permission_profile": ":danger-full-access",
+      "approval_policy": "never",
+      "cwd": "D:\\codex\\flowmarshal",
+      "runtime_workspace_roots": [
+        "D:\\codex\\flowmarshal"
+      ],
+      "model_id": "gpt-5.6-sol",
+      "reasoning_effort": "max",
+      "instruction_sources": [
+        "C:\\Users\\sjs95\\.codex\\AGENTS.md",
+        "D:\\codex\\flowmarshal\\AGENTS.md"
+      ],
+      "response_digest": "sha256:613c1927943cb41cd75d25897b502cfd227fd57ecf0a0c1dad711c212f85b9b9",
+      "request_digest": "sha256:7539d1542a8b96dee1aeb1aa79a7300763c8b6d40b103fa90b40e7e264c4f0d7"
+    },
+    "thread_name_set": true,
+    "turn_start": {
+      "thread_id": "01a06128-c11e-7d73-9333-7f2abf1460e7",
+      "turn_id": "01a06128-c56f-7641-bf57-45c9f93b4084",
+      "model_id": "gpt-5.6-sol",
+      "reasoning_effort": "low",
+      "permission_profile": ":danger-full-access",
+      "approval_policy": "never",
+      "request_digest": "sha256:d539a66d006a8f5ddc8d099dde9e85c5ae3bec8f5eb0910c69d3c7f6c5421acf",
+      "response_digest": "sha256:4fa2361574cf2364eae45dec2b5d791ea29c3d164d61249488654ea7ad73a8bb"
+    }
+  },
+  "error": {
+    "code": "TURN_NOT_COMPLETED",
+    "type": "RuntimeProbeError",
+    "message": "Runner turn의 종료 상태가 completed가 아닙니다: 'interrupted'",
+    "stage": "thread_read"
+  }
+}

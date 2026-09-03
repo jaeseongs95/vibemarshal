@@ -1,0 +1,13 @@
+{
+  "error": {
+    "message": "thread settings provenance가 요청과 다릅니다: {'reasoningEffort': ('max', 'high')}",
+    "reason_code": "PROFILE_PROVENANCE_MISSING",
+    "type": "ProfileProbeError"
+  },
+  "gate": "0C",
+  "partial_records": [],
+  "run_id": "profile-20260902-r2",
+  "schema_version": "1.0",
+  "status": "NO-GO",
+  "task": "FM-0C-1"
+}

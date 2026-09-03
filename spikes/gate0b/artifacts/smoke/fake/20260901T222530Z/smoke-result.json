@@ -1,0 +1,87 @@
+{
+  "run_id": "20260901T222530Z",
+  "runtime": "fake",
+  "project_id": "project_3d8f1f5a39c64d218ba341bf28b74702",
+  "revision_id": "revision_d6267c95012f4298ab727bfbc336cd92",
+  "execution_profile": {
+    "model_role": "fast",
+    "reasoning_effort": "low"
+  },
+  "outcome": {
+    "project_id": "project_3d8f1f5a39c64d218ba341bf28b74702",
+    "status": "completed",
+    "reason_code": "ALL_CRITERIA_VERIFIED",
+    "work_item_id": "work_c6f7d7b5186d487c8bf4d10108bde65e",
+    "attempt_id": "attempt_5a007e6e7df54f6cadaa7b67ffbde450",
+    "intent_id": null,
+    "thread_id": "external_thread_dde2a20c37e0473aa78a65445e432690",
+    "turn_id": "external_turn_5dcab5bbc26b43e387a30b454b2fea4e"
+  },
+  "ledger_verification": {
+    "schema_revision": 1,
+    "overall": "GO",
+    "checks": [
+      {
+        "check_id": "sqlite_integrity",
+        "passed": true,
+        "summary": "SQLite 무결성과 외래 키가 정상입니다.",
+        "details": []
+      },
+      {
+        "check_id": "schema_contract",
+        "passed": true,
+        "summary": "Gate 0B 내부 schema revision 1 계약이 갖춰졌습니다.",
+        "details": []
+      },
+      {
+        "check_id": "plan_invariants",
+        "passed": true,
+        "summary": "PlanRevision 단일 활성화·digest·dependency 불변식이 정상입니다.",
+        "details": []
+      },
+      {
+        "check_id": "execution_invariants",
+        "passed": true,
+        "summary": "Attempt·intent·slot·write lease 중복 방지 불변식이 정상입니다.",
+        "details": []
+      },
+      {
+        "check_id": "recovery_invariants",
+        "passed": true,
+        "summary": "unknown 효과가 격리되고 복구 lineage가 보존됩니다.",
+        "details": []
+      },
+      {
+        "check_id": "access_invariants",
+        "passed": true,
+        "summary": "추가 입력은 읽기 전용이며 승인 nonce와 입력 drift가 통제됩니다.",
+        "details": []
+      },
+      {
+        "check_id": "evidence_invariants",
+        "passed": true,
+        "summary": "완료 판정에 필요한 content-addressed evidence가 모두 유효합니다.",
+        "details": []
+      },
+      {
+        "check_id": "history_chain",
+        "passed": true,
+        "summary": "append-only history hash chain이 정상입니다.",
+        "details": []
+      },
+      {
+        "check_id": "state_attestations",
+        "passed": true,
+        "summary": "권위 상태의 최신 attestation이 원시 행과 일치합니다.",
+        "details": []
+      },
+      {
+        "check_id": "database_guards",
+        "passed": true,
+        "summary": "상태 전이·append-only·unknown 차단 DB guard가 설치됐습니다.",
+        "details": []
+      }
+    ]
+  },
+  "workspace": "spikes\\gate0b\\artifacts\\smoke\\fake\\20260901T222530Z\\workspace"
+}

@@ -1,0 +1,89 @@
+{
+  "audit_schema_version": "1.0",
+  "audit_id": "native-windows-read-exception-20260902",
+  "status": "temporary-exception-active",
+  "summary": "native Windows permission profile의 미등록 외부 읽기 차단 결함에 한해 조건부 임시 호환성 예외를 승인하고, 엄격 설정과 카나리를 유지한다.",
+  "recorded_at": "2026-09-01T20:48:23.5885759Z",
+  "affected_run_id": "gate0a-readiness-v3",
+  "source_schema_version": "1.2",
+  "target_schema_version": "1.3",
+  "preimage_available": true,
+  "decision": {
+    "exception_id": "native-windows-read-boundary-20260901",
+    "target_policy": "등록된 외부 참조만 읽고 미등록 외부 경로는 차단한다.",
+    "temporary_policy": "native Windows 카나리가 미등록 읽기 가능 상태를 재현할 때 해당 읽기만 호환성 예외로 받아들인다.",
+    "rationale": "FlowMarshal은 프로젝트 밖의 로그·요구사항·참고 자료를 정상 입력으로 다뤄야 하며, 현재 런타임 결함만으로 전체 제품 검증을 중단하는 비용이 과도하다.",
+    "security_interpretation": "현재 native Windows sandbox는 파일 내용의 완전한 비밀 보장 경계가 아니라 승인되지 않은 변경과 외부 통신으로부터 사용자 환경을 보호하는 손상 방지 경계로 취급한다.",
+    "registration_still_required": true,
+    "confidentiality_boundary_claimed": false
+  },
+  "exception_scope": {
+    "allowed": [
+      "미등록 외부 경로의 읽기가 런타임 결함 때문에 성공하는 경우"
+    ],
+    "not_relaxed": [
+      "작업 루트 밖 쓰기",
+      "승인된 외부 참조 쓰기",
+      "FlowMarshal 보호 경로 읽기와 쓰기",
+      "읽기 전용 제어 파일 쓰기",
+      "sandboxed command 네트워크",
+      "Web Search, MCP, Plugin, Connector, Browser/Computer Use 표면",
+      "서버 승인 요청 fail-closed 처리"
+    ]
+  },
+  "retained_controls": {
+    "root_deny_configuration": true,
+    "declared_reference_read_grant": true,
+    "protected_path_explicit_deny": true,
+    "undeclared_read_canary": true,
+    "ambiguous_read_result_fails_closed": true
+  },
+  "review": {
+    "calendar_expiration": null,
+    "trigger": "지원 Codex 런타임 변경 또는 미등록 외부 읽기 카나리의 strict_read_isolation 전환",
+    "actions": [
+      "지원 런타임이 바뀌면 고정 런타임과 최신 런타임에서 같은 카나리를 다시 실행한다.",
+      "카나리가 strict_read_isolation으로 바뀌면 임시 예외가 사용되지 않았음을 기록하고 정책 개정으로 예외를 제거한다.",
+      "읽기 상태가 엄격 차단과 호환성 읽기 중 어느 쪽인지 불명확하면 Gate 0A-P를 실패 처리한다.",
+      "쓰기·보호 경로·네트워크·외부 표면 중 하나라도 깨지면 예외와 무관하게 Gate 0A-P를 실패 처리한다."
+    ]
+  },
+  "evidence": [
+    {
+      "kind": "pinned-runtime-recheck",
+      "runtime": "codex-cli 0.147.0",
+      "status": "pass",
+      "read_mode": "temporary_native_windows_broad_read",
+      "path": "spikes/gate0a/artifacts/permission-rechecks/fm0ap-live-20260901-11-approved-read-exception/attempt-result.json",
+      "sha256": "26ff798bfb3a576b233d84f9b3b21c4d38d86834f301e7353f0d61ca40305ea4"
+    },
+    {
+      "kind": "latest-runtime-record-only-recheck",
+      "runtime": "codex-cli 0.152.0",
+      "status": "pass",
+      "read_mode": "temporary_native_windows_broad_read",
+      "path": "spikes/gate0a/artifacts/permission-rechecks/fm0ap-research-20260901-12-codex-0152-approved-exception/attempt-result.json",
+      "sha256": "a66129cbab57b1cd5be895b164f89d57b622537c64f649d1070447760ac5ca21"
+    },
+    {
+      "kind": "schema-migration-receipt",
+      "status": "recorded",
+      "path": "spikes/gate0a/artifacts/legacy/gate0a-gate0a-readiness-v3-schema-1.2-ce8022e901d9-migration-receipt.json",
+      "sha256": "2e7256cea30c2c5b879613900b11c5c3504719b63c85aeb354dcc4b26b7608cf"
+    }
+  ],
+  "disclosed_failed_attempt": {
+    "recheck_id": "fm0ap-live-20260901-10-approved-read-exception",
+    "status": "fail",
+    "reason": "수동으로 잘못 입력한 존재하지 않는 Desktop task ID 때문에 external_surfaces_disabled 검사만 실행 오류가 났다. 파일 권한 카나리 실패가 아니다.",
+    "path": "spikes/gate0a/artifacts/permission-rechecks/fm0ap-live-20260901-10-approved-read-exception/attempt-result.json",
+    "sha256": "73282047a702eb0baa826f74cf52590eafc42598bbd394cb38bce678b1206529"
+  },
+  "official_basis": [
+    "https://learn.chatgpt.com/docs/sandboxing",
+    "https://learn.chatgpt.com/docs/windows/windows-sandbox",
+    "https://learn.chatgpt.com/docs/permissions",
+    "https://learn.chatgpt.com/docs/app-server",
+    "https://learn.chatgpt.com/docs/changelog"
+  ]
+}

@@ -1,0 +1,805 @@
+{
+  "error": {
+    "message": "runner 제한 profile에서 필수 전역 AGENTS.md를 읽지 못했습니다.",
+    "reason_code": "GLOBAL_INSTRUCTION_UNREADABLE",
+    "type": "ProfileProbeError"
+  },
+  "gate": "0C",
+  "host_invariants": {
+    "config_after": {
+      "exists": true,
+      "file_id": [
+        12891117985148912799,
+        21110623253581924
+      ],
+      "sha256": "sha256:2b2982271779ecb59acb42440da393306785fd37411b0078d32d380f4c33ccf5",
+      "size": 12611
+    },
+    "config_before": {
+      "exists": true,
+      "file_id": [
+        12891117985148912799,
+        21110623253581924
+      ],
+      "sha256": "sha256:2b2982271779ecb59acb42440da393306785fd37411b0078d32d380f4c33ccf5",
+      "size": 12611
+    },
+    "sandbox_after_digest": "sha256:767b88f239511fc80f75c85b9f9742ff9bea034f94b372490a70f687aef5f4ff",
+    "sandbox_before_digest": "sha256:767b88f239511fc80f75c85b9f9742ff9bea034f94b372490a70f687aef5f4ff",
+    "unchanged": true
+  },
+  "profile_set": {
+    "definitions": [
+      {
+        "description": "FlowMarshal Gate 0C r2 planner targeted-state protection",
+        "extends": ":read-only",
+        "filesystem_rules": [
+          {
+            "access": "deny",
+            "selector": ":root"
+          },
+          {
+            "access": "read",
+            "selector": ":minimal"
+          },
+          {
+            "access": "deny",
+            "selector": ":tmpdir"
+          },
+          {
+            "access": "deny",
+            "selector": ":slash_tmp"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\*.sqlite*"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\.*codex-global-state.json*"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\.chatgpt-projects"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\.sandbox-secrets"
+          },
+          {
+            "access": "read",
+            "selector": "C:\\Users\\sjs95\\.codex\\AGENTS.md"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\archived_sessions"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\attachments"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\auth.json"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\automations"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\browser"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\computer-use"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\dictation-history"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\pets"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\plans"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\session_index.jsonl"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\sessions"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\thread-writer-locks"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\transcription-history.jsonl"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\visualizations"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\artifacts\\control"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\control"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\approved.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\broaden_profile.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\external_tools.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\force_validator.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\forge_approval.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\forge_success.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\ignore_contract.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\inject_check.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\modify_control_plane.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\read_unregistered.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\write_outside.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\broaden_profile.py"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\external_tools.py"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\force_validator.py"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\forge_approval.py"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\forge_success.py"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\ignore_contract.py"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\inject_check.py"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\modify_control_plane.py"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\read_unregistered.py"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\write_outside.py"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\broaden_profile.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\external_tools.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\force_validator.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\forge_approval.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\forge_success.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\ignore_contract.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\inject_check.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\modify_control_plane.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\read_unregistered.txt"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\write_outside.txt"
+          }
+        ],
+        "network_enabled": false,
+        "profile_id": "flowmarshal_gate0c_planner",
+        "role": "planner",
+        "workspace_access": "read",
+        "workspace_roots": []
+      },
+      {
+        "description": "FlowMarshal Gate 0C r2 runner single write root",
+        "extends": ":read-only",
+        "filesystem_rules": [
+          {
+            "access": "deny",
+            "selector": ":root"
+          },
+          {
+            "access": "read",
+            "selector": ":minimal"
+          },
+          {
+            "access": "deny",
+            "selector": ":tmpdir"
+          },
+          {
+            "access": "deny",
+            "selector": ":slash_tmp"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\*.sqlite*"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\.*codex-global-state.json*"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\.chatgpt-projects"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\.sandbox-secrets"
+          },
+          {
+            "access": "read",
+            "selector": "C:\\Users\\sjs95\\.codex\\AGENTS.md"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\archived_sessions"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\attachments"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\auth.json"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\automations"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\browser"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\computer-use"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\dictation-history"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\pets"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\plans"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\session_index.jsonl"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\sessions"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\thread-writer-locks"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\transcription-history.jsonl"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\visualizations"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\artifacts\\control"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\control"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\approved.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\broaden_profile.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\external_tools.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\force_validator.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\forge_approval.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\forge_success.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\ignore_contract.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\inject_check.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\modify_control_plane.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\read_unregistered.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\write_outside.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\broaden_profile.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\external_tools.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\force_validator.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\forge_approval.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\forge_success.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\ignore_contract.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\inject_check.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\modify_control_plane.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\read_unregistered.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\write_outside.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\broaden_profile.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\external_tools.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\force_validator.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\forge_approval.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\forge_success.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\ignore_contract.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\inject_check.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\modify_control_plane.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\read_unregistered.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\write_outside.txt"
+          },
+          {
+            "access": "write",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\work"
+          }
+        ],
+        "network_enabled": false,
+        "profile_id": "flowmarshal_gate0c_runner",
+        "role": "runner",
+        "workspace_access": "write",
+        "workspace_roots": [
+          "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference",
+          "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src",
+          "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output"
+        ]
+      },
+      {
+        "description": "FlowMarshal Gate 0C r2 validator targeted-state protection",
+        "extends": ":read-only",
+        "filesystem_rules": [
+          {
+            "access": "deny",
+            "selector": ":root"
+          },
+          {
+            "access": "read",
+            "selector": ":minimal"
+          },
+          {
+            "access": "deny",
+            "selector": ":tmpdir"
+          },
+          {
+            "access": "deny",
+            "selector": ":slash_tmp"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\*.sqlite*"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\.*codex-global-state.json*"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\.chatgpt-projects"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\.sandbox-secrets"
+          },
+          {
+            "access": "read",
+            "selector": "C:\\Users\\sjs95\\.codex\\AGENTS.md"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\archived_sessions"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\attachments"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\auth.json"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\automations"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\browser"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\computer-use"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\dictation-history"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\pets"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\plans"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\session_index.jsonl"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\sessions"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\thread-writer-locks"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\transcription-history.jsonl"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex\\visualizations"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\artifacts\\control"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\control"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\approved.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\broaden_profile.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\external_tools.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\force_validator.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\forge_approval.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\forge_success.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\ignore_contract.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\inject_check.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\modify_control_plane.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\read_unregistered.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\write_outside.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\broaden_profile.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\external_tools.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\force_validator.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\forge_approval.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\forge_success.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\ignore_contract.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\inject_check.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\modify_control_plane.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\read_unregistered.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src\\write_outside.py"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\broaden_profile.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\external_tools.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\force_validator.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\forge_approval.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\forge_success.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\ignore_contract.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\inject_check.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\modify_control_plane.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\read_unregistered.txt"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output\\write_outside.txt"
+          }
+        ],
+        "network_enabled": false,
+        "profile_id": "flowmarshal_gate0c_validator",
+        "role": "validator",
+        "workspace_access": "read",
+        "workspace_roots": [
+          "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference",
+          "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src",
+          "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output"
+        ]
+      }
+    ],
+    "schema_version": "1.0"
+  },
+  "profile_set_digest": "sha256:19f2a560ef65dde347089bd307443a719e13acc3722b923371a5b0bf9b796ff8",
+  "recorded_at": "2026-09-02T05:34:13.816354Z",
+  "run_id": "profile-20260902-r7",
+  "runtime": {
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "codex-cli 0.151.0"
+  },
+  "schema_version": "1.0",
+  "service_name": "flowmarshal_gate0c",
+  "status": "NO-GO",
+  "task": "FM-0C-1"
+}

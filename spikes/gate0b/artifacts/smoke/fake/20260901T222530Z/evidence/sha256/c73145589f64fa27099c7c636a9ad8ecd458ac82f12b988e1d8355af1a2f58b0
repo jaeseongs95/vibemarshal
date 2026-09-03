@@ -1,0 +1,1 @@
+{"criterion_id":"marker","details":{"expected_digest":"sha256:ba1a7cd4033f5ec4b5c06aa8c0b4da96960ce664c5fe1ae241d61e1a916e369f","path":"D:\\codex\\flowmarshal\\spikes\\gate0b\\artifacts\\smoke\\fake\\20260901T222530Z\\workspace\\gate0b-smoke.txt","predicate":"contains:GATE0B_SMOKE_OK"},"passed":true,"verification_type":"artifact"}

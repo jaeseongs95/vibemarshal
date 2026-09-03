@@ -1,0 +1,74 @@
+{
+  "schema_version": "1.0",
+  "kind": "fm_0a_r_desktop_interop_attempt",
+  "verification_id": "fm0ar-live-20260901-02-system",
+  "status": "error",
+  "checked_at": "2026-09-01T13:13:24.927496Z",
+  "runtime": {
+    "name": "desktop-system",
+    "executable": "C:\\Users\\sjs95\\.codex\\packages\\standalone\\releases\\0.151.0-x86_64-pc-windows-msvc\\bin\\codex.exe",
+    "version": {
+      "exit_code": 0,
+      "stdout": "codex-cli 0.151.0",
+      "stderr": ""
+    }
+  },
+  "checks": {
+    "project_grouping_correct": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "ValidationError",
+          "message": "50 validation errors for ThreadReadResponse\nthread.turns.2.items.0.UserMessageThreadItem.content\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.UserMessageThreadItem.type\n  Input should be 'userMessage' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.HookPromptThreadItem.fragments\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.HookPromptThreadItem.type\n  Input should be 'hookPrompt' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.AgentMessageThreadItem.text\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.AgentMessageThreadItem.type\n  Input should be 'agentMessage' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.PlanThreadItem.text\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.PlanThreadItem.type\n  Input should be 'plan' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.ReasoningThreadItem.type\n  Input s"
+        }
+      }
+    },
+    "sdk_resume_visible_in_desktop": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "ValidationError",
+          "message": "50 validation errors for ThreadReadResponse\nthread.turns.2.items.0.UserMessageThreadItem.content\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.UserMessageThreadItem.type\n  Input should be 'userMessage' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.HookPromptThreadItem.fragments\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.HookPromptThreadItem.type\n  Input should be 'hookPrompt' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.AgentMessageThreadItem.text\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.AgentMessageThreadItem.type\n  Input should be 'agentMessage' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.PlanThreadItem.text\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.PlanThreadItem.type\n  Input should be 'plan' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.ReasoningThreadItem.type\n  Input s"
+        }
+      }
+    },
+    "desktop_turn_visible_to_sdk": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "ValidationError",
+          "message": "50 validation errors for ThreadReadResponse\nthread.turns.2.items.0.UserMessageThreadItem.content\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.UserMessageThreadItem.type\n  Input should be 'userMessage' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.HookPromptThreadItem.fragments\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.HookPromptThreadItem.type\n  Input should be 'hookPrompt' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.AgentMessageThreadItem.text\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.AgentMessageThreadItem.type\n  Input should be 'agentMessage' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.PlanThreadItem.text\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.PlanThreadItem.type\n  Input should be 'plan' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.ReasoningThreadItem.type\n  Input s"
+        }
+      }
+    },
+    "desktop_thread_sdk_read_resume": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "ValidationError",
+          "message": "50 validation errors for ThreadReadResponse\nthread.turns.2.items.0.UserMessageThreadItem.content\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.UserMessageThreadItem.type\n  Input should be 'userMessage' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.HookPromptThreadItem.fragments\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.HookPromptThreadItem.type\n  Input should be 'hookPrompt' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.AgentMessageThreadItem.text\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.AgentMessageThreadItem.type\n  Input should be 'agentMessage' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.PlanThreadItem.text\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.PlanThreadItem.type\n  Input should be 'plan' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.ReasoningThreadItem.type\n  Input s"
+        }
+      }
+    },
+    "concurrent_access_consistent": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "ValidationError",
+          "message": "50 validation errors for ThreadReadResponse\nthread.turns.2.items.0.UserMessageThreadItem.content\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.UserMessageThreadItem.type\n  Input should be 'userMessage' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.HookPromptThreadItem.fragments\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.HookPromptThreadItem.type\n  Input should be 'hookPrompt' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.AgentMessageThreadItem.text\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.AgentMessageThreadItem.type\n  Input should be 'agentMessage' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.PlanThreadItem.text\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.PlanThreadItem.type\n  Input should be 'plan' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.ReasoningThreadItem.type\n  Input s"
+        }
+      }
+    }
+  },
+  "sdk_state": {},
+  "error": {
+    "type": "ValidationError",
+    "message": "50 validation errors for ThreadReadResponse\nthread.turns.2.items.0.UserMessageThreadItem.content\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.UserMessageThreadItem.type\n  Input should be 'userMessage' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.HookPromptThreadItem.fragments\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.HookPromptThreadItem.type\n  Input should be 'hookPrompt' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.AgentMessageThreadItem.text\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.AgentMessageThreadItem.type\n  Input should be 'agentMessage' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.PlanThreadItem.text\n  Field required [type=missing, input_value={'type': 'functionCallOut...>\\n</codex_delegation>'}, input_type=dict]\n    For further information visit https://errors.pydantic.dev/2.13/v/missing\nthread.turns.2.items.0.PlanThreadItem.type\n  Input should be 'plan' [type=literal_error, input_value='functionCallOutput', input_type=str]\n    For further information visit https://errors.pydantic.dev/2.13/v/literal_error\nthread.turns.2.items.0.ReasoningThreadItem.type\n  Input s"
+  },
+  "approval_requests": []
+}

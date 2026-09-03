@@ -1,0 +1,43 @@
+{
+  "audit_schema_version": "1.0",
+  "audit_id": "schema-1.1-evidence-loss-20260901",
+  "status": "acknowledged-loss",
+  "summary": "Gate 0A schema 1.1 결과가 schema 1.2로 변환될 때 원문 JSON과 보고서가 별도 보관되지 않았다.",
+  "recorded_at": "2026-09-01T13:01:10.159882Z",
+  "affected_run_id": "gate0a-readiness-v3",
+  "source_schema_version": "1.1",
+  "target_schema_version": "1.2",
+  "preimage_available": false,
+  "known_previous_decision": {
+    "overall": "SETUP_REQUIRED",
+    "runtime": "GO",
+    "permission": "SETUP_REQUIRED"
+  },
+  "current_reclassified_decision": {
+    "overall": "SETUP_REQUIRED",
+    "runtime": "PENDING-INTEROP-CHECK",
+    "permission": "SETUP_REQUIRED"
+  },
+  "current_artifacts_at_detection": {
+    "results_sha256": "e2925d0216a6f02481f005e8bafc4034a52dd6d91500b6f0b7c369e5114fb508",
+    "report_sha256": "a72e6a3861a3cd047f0bed3d124aa2fc92c71dbb5336644c01d0e52eaf89c46e"
+  },
+  "causal_task": {
+    "thread_id": "01a05ce6-1d24-7422-b5f2-a26e0b049211",
+    "turn_id": "01a05cec-b9aa-7012-b7bf-87ef03cb5c15"
+  },
+  "evidence_basis": [
+    "해당 task 기록의 변환 전 보고서 조회와 최종 응답",
+    "같은 task 기록의 schema 1.2 코드·문서·결과 파일 변경 내역",
+    "workspace legacy 폴더에 schema 1.0 원본만 존재한다는 현재 검사"
+  ],
+  "limitations": [
+    "schema 1.1 결과 JSON과 보고서의 원문 바이트 및 SHA-256은 현재 workspace에서 복구하지 못했다.",
+    "known_previous_decision은 task 기록으로 확인했지만 원본 artifact digest로 검증할 수 없다."
+  ],
+  "remediation": {
+    "historical_loss_is_not_rewritten": true,
+    "future_migrations_archive_preimage": true,
+    "future_migrations_record_previous_decision_and_hashes": true
+  }
+}

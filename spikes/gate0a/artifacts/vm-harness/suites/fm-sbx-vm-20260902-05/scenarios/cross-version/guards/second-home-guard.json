@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "kind": "disposable_windows_vm_second_home_rejection",
+  "suite_id": "fm-sbx-vm-20260902-05",
+  "scenario": "cross-version",
+  "attempt_id": "second-home-guard",
+  "recorded_at": "2026-09-02T02:57:09.529222Z",
+  "status": "rejected",
+  "reason_code": "HOST_PROVISIONING_FORBIDDEN",
+  "claimed_home": "C:\\FlowMarshal-VM\\cross-version-home",
+  "requested_home": "C:\\FlowMarshal-VM\\must-be-rejected",
+  "runtime_started": false,
+  "setup_api_called": false,
+  "secret_contents_read": false
+}

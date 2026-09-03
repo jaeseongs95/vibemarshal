@@ -1,0 +1,748 @@
+{
+  "runtime": {
+    "name": "desktop-system",
+    "role": "Codex Desktop/시스템 런타임",
+    "executable": "C:\\Users\\sjs95\\.codex\\packages\\standalone\\releases\\0.151.0-x86_64-pc-windows-msvc\\bin\\codex.exe",
+    "version": {
+      "exit_code": 0,
+      "stdout": "codex-cli 0.151.0",
+      "stderr": ""
+    }
+  },
+  "started_at": "2026-09-01T23:52:20.579548Z",
+  "checks": {
+    "approvals_fail_closed": {
+      "status": "pass",
+      "summary": "모든 알려진 서버 승인/입력 요청이 명시적 거절 응답으로 매핑됨",
+      "evidence": {
+        "responses": {
+          "item/commandExecution/requestApproval": {
+            "decision": "decline"
+          },
+          "item/fileChange/requestApproval": {
+            "decision": "decline"
+          },
+          "item/permissions/requestApproval": {
+            "permissions": {},
+            "scope": "turn",
+            "strictAutoReview": true
+          },
+          "item/tool/requestUserInput": {
+            "answers": {}
+          },
+          "mcpServer/elicitation/request": {
+            "action": "decline",
+            "content": null
+          }
+        }
+      }
+    },
+    "permission_configuration": {
+      "status": "pass",
+      "summary": "permission profile 전용 설정이 확인됨",
+      "evidence": {
+        "legacy_key_paths": [],
+        "default_permissions": "flowmarshal_gate0a",
+        "profile_present": true
+      }
+    },
+    "windows_elevated_sandbox": {
+      "status": "pass",
+      "summary": "Windows elevated sandbox가 유효 설정으로 확인됨",
+      "evidence": {
+        "effective_mode": "elevated"
+      }
+    },
+    "windows_sandbox_operational": {
+      "status": "pass",
+      "summary": "elevated Windows sandbox에서 command/exec 프로세스를 시작함",
+      "evidence": {
+        "command": {
+          "rpc_ok": true,
+          "duration_ms": 406,
+          "response": {
+            "exitCode": 0,
+            "stdout": "<CANARY_TOKEN_REDACTED>\r\n",
+            "stderr": ""
+          }
+        }
+      }
+    },
+    "permission_profile_supported": {
+      "status": "pass",
+      "summary": "permission profile이 런타임에 등록되고 허용됨",
+      "evidence": {
+        "profile_id": "flowmarshal_gate0a",
+        "profile_entry": {
+          "id": "flowmarshal_gate0a",
+          "description": null,
+          "allowed": true
+        }
+      }
+    },
+    "workspace_read_allowed": {
+      "status": "pass",
+      "summary": "작업 루트: 승인된 읽기가 허용됨",
+      "evidence": {
+        "token_exposed": true,
+        "command": {
+          "rpc_ok": true,
+          "duration_ms": 406,
+          "response": {
+            "exitCode": 0,
+            "stdout": "<CANARY_TOKEN_REDACTED>\r\n",
+            "stderr": ""
+          }
+        }
+      }
+    },
+    "declared_reference_read_allowed": {
+      "status": "pass",
+      "summary": "승인된 외부 참조: 승인된 읽기가 허용됨",
+      "evidence": {
+        "token_exposed": true,
+        "command": {
+          "rpc_ok": true,
+          "duration_ms": 407,
+          "response": {
+            "exitCode": 0,
+            "stdout": "<CANARY_TOKEN_REDACTED>\r\n",
+            "stderr": ""
+          }
+        }
+      }
+    },
+    "undeclared_path_read_policy": {
+      "status": "pass",
+      "summary": "미등록 외부 경로: Windows 읽기 차단 결함에 대한 승인된 임시 호환성 예외를 적용함",
+      "evidence": {
+        "mode": "temporary_native_windows_broad_read",
+        "strict_boundary_enforced": false,
+        "temporary_exception_used": true,
+        "token_exposed": true,
+        "exception_id": "native-windows-read-boundary-20260901",
+        "review_trigger": "지원 Codex 런타임 변경 또는 미등록 외부 읽기 카나리의 strict_read_isolation 전환",
+        "configured_default": "deny",
+        "command": {
+          "rpc_ok": true,
+          "duration_ms": 390,
+          "response": {
+            "exitCode": 0,
+            "stdout": "<CANARY_TOKEN_REDACTED>\r\n",
+            "stderr": ""
+          }
+        }
+      }
+    },
+    "protected_path_read_blocked": {
+      "status": "pass",
+      "summary": "FlowMarshal 보호 경로: 미승인 읽기가 차단됨",
+      "evidence": {
+        "token_exposed": false,
+        "command": {
+          "rpc_ok": true,
+          "duration_ms": 438,
+          "response": {
+            "exitCode": 1,
+            "stdout": "",
+            "stderr": "Get-Content : 'C:\\Users\\sjs95\\AppData\\Local\\FlowMarshal\\Gate0A\\fm0ap-host-system-20260902-02\\desktop-system\\protected-r\r\nead.txt' 경로에 대한 액세스가 거부되었습니다.\r\n위치 줄:1 문자:32\r\n+ ... nce='Stop'; Get-Content -LiteralPath 'C:\\Users\\sjs95\\AppData\\Local\\Fl ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : PermissionDenied: (C:\\Users\\sjs95\\...tected-read.txt:String) [Get-Content], Unauthorized \r\n   AccessException\r\n    + FullyQualifiedErrorId : GetContentReaderUnauthorizedAccessError,Microsoft.PowerShell.Commands.GetContentCommand\r\n \r\n"
+          }
+        }
+      }
+    },
+    "control_file_read_allowed": {
+      "status": "pass",
+      "summary": "작업 계약 제어 파일: 승인된 읽기가 허용됨",
+      "evidence": {
+        "token_exposed": true,
+        "command": {
+          "rpc_ok": true,
+          "duration_ms": 390,
+          "response": {
+            "exitCode": 0,
+            "stdout": "<CANARY_TOKEN_REDACTED>\r\n",
+            "stderr": ""
+          }
+        }
+      }
+    },
+    "workspace_write_allowed": {
+      "status": "pass",
+      "summary": "워크스페이스 내부 쓰기 성공",
+      "evidence": {
+        "target_exists": true,
+        "command": {
+          "rpc_ok": true,
+          "duration_ms": 391,
+          "response": {
+            "exitCode": 0,
+            "stdout": "INSIDE_WRITE_OK\r\n\r\n",
+            "stderr": ""
+          }
+        }
+      }
+    },
+    "declared_reference_write_blocked": {
+      "status": "pass",
+      "summary": "승인된 외부 참조: 쓰기가 차단됨",
+      "evidence": {
+        "target_exists": false,
+        "command": {
+          "rpc_ok": true,
+          "duration_ms": 453,
+          "response": {
+            "exitCode": 1,
+            "stdout": "",
+            "stderr": "Set-Content : 'D:\\codex\\flowmarshal-gate0a-canary\\fm0ap-host-system-20260902-02\\desktop-system\\declared-reference\\refer\r\nence-write-must-not-exist.txt' 경로에 대한 액세스가 거부되었습니다.\r\n위치 줄:1 문자:32\r\n+ ... nce='Stop'; Set-Content -LiteralPath 'D:\\codex\\flowmarshal-gate0a-can ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : PermissionDenied: (D:\\codex\\flowma...t-not-exist.txt:String) [Set-Content], Unauthorized \r\n   AccessException\r\n    + FullyQualifiedErrorId : GetContentWriterUnauthorizedAccessError,Microsoft.PowerShell.Commands.SetContentCommand\r\n \r\n"
+          }
+        }
+      }
+    },
+    "undeclared_path_write_blocked": {
+      "status": "pass",
+      "summary": "미승인 외부 경로: 쓰기가 차단됨",
+      "evidence": {
+        "target_exists": false,
+        "command": {
+          "rpc_ok": true,
+          "duration_ms": 438,
+          "response": {
+            "exitCode": 1,
+            "stdout": "",
+            "stderr": "Set-Content : 'D:\\FlowMarshal-Gate0A-Canary\\fm0ap-host-system-20260902-02\\desktop-system\\undeclared\\undeclared-write-mu\r\nst-not-exist.txt' 경로에 대한 액세스가 거부되었습니다.\r\n위치 줄:1 문자:32\r\n+ ... nce='Stop'; Set-Content -LiteralPath 'D:\\FlowMarshal-Gate0A-Canary\\fm ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : PermissionDenied: (D:\\FlowMarshal-...t-not-exist.txt:String) [Set-Content], Unauthorized \r\n   AccessException\r\n    + FullyQualifiedErrorId : GetContentWriterUnauthorizedAccessError,Microsoft.PowerShell.Commands.SetContentCommand\r\n \r\n"
+          }
+        }
+      }
+    },
+    "protected_path_write_blocked": {
+      "status": "pass",
+      "summary": "FlowMarshal 보호 경로: 쓰기가 차단됨",
+      "evidence": {
+        "target_exists": false,
+        "command": {
+          "rpc_ok": true,
+          "duration_ms": 453,
+          "response": {
+            "exitCode": 1,
+            "stdout": "",
+            "stderr": "Set-Content : 'C:\\Users\\sjs95\\AppData\\Local\\FlowMarshal\\Gate0A\\fm0ap-host-system-20260902-02\\desktop-system\\protected-w\r\nrite-must-not-exist.txt' 경로에 대한 액세스가 거부되었습니다.\r\n위치 줄:1 문자:32\r\n+ ... nce='Stop'; Set-Content -LiteralPath 'C:\\Users\\sjs95\\AppData\\Local\\Fl ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : PermissionDenied: (C:\\Users\\sjs95\\...t-not-exist.txt:String) [Set-Content], Unauthorized \r\n   AccessException\r\n    + FullyQualifiedErrorId : GetContentWriterUnauthorizedAccessError,Microsoft.PowerShell.Commands.SetContentCommand\r\n \r\n"
+          }
+        }
+      }
+    },
+    "control_file_write_blocked": {
+      "status": "pass",
+      "summary": "작업 계약 제어 파일: 읽기 전용 파일 수정이 차단됨",
+      "evidence": {
+        "unchanged": true,
+        "command": {
+          "rpc_ok": true,
+          "duration_ms": 453,
+          "response": {
+            "exitCode": 1,
+            "stdout": "",
+            "stderr": "Set-Content : 'D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\fm0ap-host-system-20260902-02\\desktop-system\\workspace\r\n\\flowmarshal.toml' 경로에 대한 액세스가 거부되었습니다.\r\n위치 줄:1 문자:32\r\n+ ... nce='Stop'; Set-Content -LiteralPath 'D:\\codex\\flowmarshal\\spikes\\gat ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : NotSpecified: (:) [Set-Content], UnauthorizedAccessException\r\n    + FullyQualifiedErrorId : System.UnauthorizedAccessException,Microsoft.PowerShell.Commands.SetContentCommand\r\n \r\n"
+          }
+        }
+      }
+    },
+    "command_network_blocked": {
+      "status": "pass",
+      "summary": "명령 네트워크가 차단됨",
+      "evidence": {
+        "network_reached": false,
+        "command": {
+          "rpc_ok": true,
+          "duration_ms": 437,
+          "response": {
+            "exitCode": 23,
+            "stdout": "NETWORK_BLOCKED\r\n",
+            "stderr": ""
+          }
+        }
+      }
+    },
+    "external_surfaces_disabled": {
+      "status": "pass",
+      "summary": "Web Search/MCP/Plugin/Connector 및 Browser·Computer Use 진입 표면이 비활성화됨",
+      "evidence": {
+        "web_search_disabled": true,
+        "apps_feature_disabled": true,
+        "plugins_feature_disabled": true,
+        "browser_computer_features_disabled": true,
+        "mcp_configuration_disabled": true,
+        "mcp_inventory_disabled": true,
+        "apps_inventory_disabled": true
+      }
+    },
+    "sandbox_state_unchanged": {
+      "status": "pass",
+      "summary": "권한 재검사 전후 샌드박스 상태가 동일함",
+      "evidence": {
+        "reason_code": null
+      }
+    },
+    "artifact_safety": {
+      "status": "pass",
+      "summary": "프로젝트 artifacts에 Codex 인증·상태 저장소가 없음",
+      "evidence": {
+        "violations": []
+      }
+    }
+  },
+  "evidence": {
+    "permission_initialize": {
+      "serverInfo": null,
+      "userAgent": "Codex Desktop/0.151.0 (Windows 10.0.26200; x86_64) dumb (flowmarshal_gate0a; 0.1.0)",
+      "platformFamily": "windows",
+      "platformOs": "windows"
+    },
+    "configuration_preflight": {
+      "check": {
+        "status": "pass",
+        "summary": "permission profile 전용 설정이 확인됨",
+        "evidence": {
+          "legacy_key_paths": [],
+          "default_permissions": "flowmarshal_gate0a",
+          "profile_present": true
+        }
+      },
+      "requested_profile": "flowmarshal_gate0a",
+      "authoritative_codex_home": "C:\\Users\\sjs95\\.codex",
+      "authentication_copied": false,
+      "config_observation": {
+        "ok": true,
+        "result": {
+          "config": {
+            "web_search": "disabled",
+            "features": {
+              "apps": false,
+              "plugins": false,
+              "remote_plugin": false,
+              "skill_mcp_dependency_install": false,
+              "multi_agent": false,
+              "in_app_browser": false,
+              "browser_use": false,
+              "browser_use_full_cdp_access": false,
+              "browser_use_external": false,
+              "computer_use": false,
+              "plugin_sharing": false
+            },
+            "windows": {
+              "sandbox": "elevated"
+            },
+            "legacy_sandbox_present": false,
+            "legacy_sandbox_key_paths": [],
+            "default_permissions": "flowmarshal_gate0a",
+            "permission_profile": {
+              "id": "flowmarshal_gate0a",
+              "present": true,
+              "extends": ":workspace",
+              "filesystem": {
+                "glob_scan_max_depth": null,
+                ":minimal": "read",
+                ":root": "deny",
+                ":slash_tmp": "deny",
+                ":tmpdir": "deny",
+                ":workspace_roots": {
+                  ".": "write",
+                  "flowmarshal.toml": "read"
+                },
+                "C:\\Users\\sjs95\\.codex": "deny",
+                "C:\\Users\\sjs95\\AppData\\Local\\FlowMarshal\\Gate0A\\fm0ap-host-system-20260902-02\\desktop-system": "deny",
+                "D:\\codex\\flowmarshal-gate0a-canary\\fm0ap-host-system-20260902-02\\desktop-system\\declared-reference": "read"
+              },
+              "network_enabled": false
+            }
+          }
+        }
+      }
+    },
+    "windows_sandbox_readiness": {
+      "ok": true,
+      "result": {
+        "status": "ready"
+      }
+    },
+    "permission_profile_inventory": {
+      "data": [
+        {
+          "id": ":read-only",
+          "description": null,
+          "allowed": true
+        },
+        {
+          "id": ":workspace",
+          "description": null,
+          "allowed": true
+        },
+        {
+          "id": ":danger-full-access",
+          "description": null,
+          "allowed": true
+        },
+        {
+          "id": "flowmarshal_gate0a",
+          "description": null,
+          "allowed": true
+        }
+      ],
+      "nextCursor": null
+    },
+    "sandbox": {
+      "workspace": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\fm0ap-host-system-20260902-02\\desktop-system\\workspace",
+      "authoritative_codex_home": "C:\\Users\\sjs95\\.codex",
+      "declared_reference_root": "D:\\codex\\flowmarshal-gate0a-canary\\fm0ap-host-system-20260902-02\\desktop-system\\declared-reference",
+      "undeclared_root": "D:\\FlowMarshal-Gate0A-Canary\\fm0ap-host-system-20260902-02\\desktop-system\\undeclared",
+      "protected_root": "C:\\Users\\sjs95\\AppData\\Local\\FlowMarshal\\Gate0A\\fm0ap-host-system-20260902-02\\desktop-system",
+      "control_file": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\fm0ap-host-system-20260902-02\\desktop-system\\workspace\\flowmarshal.toml",
+      "canary_hashes": {
+        "workspace": "0c05363af848b43ecfc4fa6ecfb1322d9766d0eaead45e7ae0289cd80c668067",
+        "declared_reference": "8241addaa95a62e1561fbe0954d6f493fb0a1c47549639f7316544ac67c4ddc6",
+        "undeclared": "8adff56656fd3202f10a624ea7f8d1b7ea77e414efc303cb488527f58bd7f3a6",
+        "protected": "34c644601030c38cb3a30596fdf4cbfd34c0db5b63346a67bf16ed90578d3b71",
+        "control": "0de9a930d82dabc1c20a417aee5dfa6a186b856b6e556e41cc8b853404667bb9"
+      },
+      "permission_profile_id": "flowmarshal_gate0a",
+      "permission_profile_inventory": {
+        "data": [
+          {
+            "id": ":read-only",
+            "description": null,
+            "allowed": true
+          },
+          {
+            "id": ":workspace",
+            "description": null,
+            "allowed": true
+          },
+          {
+            "id": ":danger-full-access",
+            "description": null,
+            "allowed": true
+          },
+          {
+            "id": "flowmarshal_gate0a",
+            "description": null,
+            "allowed": true
+          }
+        ],
+        "nextCursor": null
+      },
+      "fallback_policy_used": false,
+      "read_policy_contract": {
+        "policy_version": "1.0",
+        "target_mode": "strict_registered_read",
+        "configured_default": "deny",
+        "temporary_exception": {
+          "id": "native-windows-read-boundary-20260901",
+          "status": "allowed_only_when_native_windows_canary_confirms_broad_read",
+          "approved_on": "2026-09-01",
+          "reason": "native Windows permission profile의 :root=deny가 미등록 외부 경로의 상속 읽기 권한을 현재 차단하지 못하는 런타임 결함",
+          "review_trigger": "지원 Codex 런타임 변경 또는 미등록 외부 읽기 카나리의 strict_read_isolation 전환"
+        },
+        "retained_hard_boundaries": [
+          "workspace_outside_write_blocked",
+          "protected_path_read_write_blocked",
+          "command_network_blocked",
+          "external_tool_surfaces_disabled"
+        ],
+        "retained_future_controls": [
+          "root_deny_configuration",
+          "registered_reference_read_grant",
+          "undeclared_read_canary"
+        ]
+      }
+    },
+    "runtime_surface_preflight": {
+      "check": {
+        "status": "pass",
+        "summary": "다음 runtime 세션에서 모든 구성 MCP 서버를 비활성화하도록 고정함",
+        "evidence": {
+          "server_names": [
+            "cua_repl",
+            "node_repl"
+          ],
+          "override_count": 2
+        }
+      },
+      "mcp_disable_overrides": [
+        "mcp_servers.cua_repl.enabled=false",
+        "mcp_servers.node_repl.enabled=false"
+      ]
+    },
+    "external_surfaces": {
+      "storage_sanitized": true,
+      "effective_config": {
+        "ok": true,
+        "result": {
+          "config": {
+            "web_search": "disabled",
+            "features": {
+              "apps": false,
+              "plugins": false,
+              "remote_plugin": false,
+              "skill_mcp_dependency_install": false,
+              "multi_agent": false,
+              "in_app_browser": false,
+              "browser_use": false,
+              "browser_use_full_cdp_access": false,
+              "browser_use_external": false,
+              "computer_use": false,
+              "plugin_sharing": false
+            },
+            "windows": {
+              "sandbox": "elevated"
+            },
+            "legacy_sandbox_present": false,
+            "legacy_sandbox_key_paths": [],
+            "default_permissions": ":danger-full-access",
+            "permission_profile": {
+              "id": "flowmarshal_gate0a",
+              "present": false,
+              "extends": null,
+              "filesystem": {},
+              "network_enabled": null
+            }
+          }
+        }
+      },
+      "features": {
+        "ok": true,
+        "result": {
+          "data": [
+            {
+              "name": "web_search_request",
+              "enabled": false,
+              "defaultEnabled": false,
+              "stage": "deprecated"
+            },
+            {
+              "name": "standalone_web_search",
+              "enabled": false,
+              "defaultEnabled": false,
+              "stage": "underDevelopment"
+            },
+            {
+              "name": "multi_agent",
+              "enabled": false,
+              "defaultEnabled": true,
+              "stage": "stable"
+            },
+            {
+              "name": "apps",
+              "enabled": false,
+              "defaultEnabled": true,
+              "stage": "stable"
+            },
+            {
+              "name": "plugins",
+              "enabled": false,
+              "defaultEnabled": true,
+              "stage": "stable"
+            },
+            {
+              "name": "in_app_browser",
+              "enabled": false,
+              "defaultEnabled": true,
+              "stage": "stable"
+            },
+            {
+              "name": "browser_use",
+              "enabled": false,
+              "defaultEnabled": true,
+              "stage": "stable"
+            },
+            {
+              "name": "browser_use_full_cdp_access",
+              "enabled": false,
+              "defaultEnabled": true,
+              "stage": "stable"
+            },
+            {
+              "name": "browser_use_external",
+              "enabled": false,
+              "defaultEnabled": true,
+              "stage": "stable"
+            },
+            {
+              "name": "computer_use",
+              "enabled": false,
+              "defaultEnabled": true,
+              "stage": "stable"
+            },
+            {
+              "name": "remote_plugin",
+              "enabled": false,
+              "defaultEnabled": true,
+              "stage": "stable"
+            },
+            {
+              "name": "plugin_sharing",
+              "enabled": false,
+              "defaultEnabled": true,
+              "stage": "stable"
+            },
+            {
+              "name": "skill_mcp_dependency_install",
+              "enabled": false,
+              "defaultEnabled": true,
+              "stage": "stable"
+            }
+          ]
+        }
+      },
+      "mcp": {
+        "ok": true,
+        "result": {
+          "data": [
+            {
+              "name": "cua_repl",
+              "authStatus": "unsupported",
+              "toolCount": 0,
+              "serverInfoPresent": false
+            },
+            {
+              "name": "node_repl",
+              "authStatus": "unsupported",
+              "toolCount": 0,
+              "serverInfoPresent": false
+            }
+          ]
+        }
+      },
+      "apps": {
+        "ok": true,
+        "result": {
+          "apps": [
+            {
+              "id": "connector_20205bf7d4e99a89d7154bb849718324",
+              "runtimeName": "Sites",
+              "enabled": false,
+              "callable": false
+            },
+            {
+              "id": "connector_2128aebfecb84f64a069897515042a44",
+              "runtimeName": "Gmail",
+              "enabled": false,
+              "callable": false
+            },
+            {
+              "id": "connector_5f3c8c41a1e54ad7a76272c89e2554fa",
+              "runtimeName": "Google Drive",
+              "enabled": false,
+              "callable": false
+            },
+            {
+              "id": "connector_76869538009648d5b282a4bb21c3d157",
+              "runtimeName": "GitHub",
+              "enabled": false,
+              "callable": false
+            },
+            {
+              "id": "connector_openai_codex_document_control",
+              "runtimeName": "Codex Document Control",
+              "enabled": false,
+              "callable": false
+            },
+            {
+              "id": "connector_openai_hotline",
+              "runtimeName": "Hotline",
+              "enabled": false,
+              "callable": false
+            },
+            {
+              "id": "connector_openai_plugin_management",
+              "runtimeName": "Plugin Management",
+              "enabled": false,
+              "callable": false
+            },
+            {
+              "id": "connector_openai_safety_settings",
+              "runtimeName": "Safety Settings",
+              "enabled": false,
+              "callable": false
+            }
+          ]
+        }
+      }
+    },
+    "sandbox_state_fingerprint": {
+      "before": {
+        "accounts": [
+          {
+            "Name": "CodexSandboxOffline",
+            "SID": "S-1-5-21-1305047063-3637200140-4012965305-1006",
+            "Enabled": true,
+            "PasswordLastSet": "2026-09-01T23:15:23.4831042Z"
+          },
+          {
+            "Name": "CodexSandboxOnline",
+            "SID": "S-1-5-21-1305047063-3637200140-4012965305-1007",
+            "Enabled": true,
+            "PasswordLastSet": "2026-09-01T23:15:23.5072875Z"
+          }
+        ],
+        "accounts_error": null,
+        "setup_marker": {
+          "exists": true,
+          "mtime_ns": 1788304524404888100,
+          "size": 255,
+          "error": null,
+          "sha256": "e052b5a1272d2a180e22cacd138123b668e7cd8705810b625964206628528994"
+        },
+        "secrets_directory": {
+          "exists": true,
+          "mtime_ns": 1788304523515295600,
+          "file_count": 1,
+          "error": null
+        }
+      },
+      "after": {
+        "accounts": [
+          {
+            "Name": "CodexSandboxOffline",
+            "SID": "S-1-5-21-1305047063-3637200140-4012965305-1006",
+            "Enabled": true,
+            "PasswordLastSet": "2026-09-01T23:15:23.4831042Z"
+          },
+          {
+            "Name": "CodexSandboxOnline",
+            "SID": "S-1-5-21-1305047063-3637200140-4012965305-1007",
+            "Enabled": true,
+            "PasswordLastSet": "2026-09-01T23:15:23.5072875Z"
+          }
+        ],
+        "accounts_error": null,
+        "setup_marker": {
+          "exists": true,
+          "mtime_ns": 1788304524404888100,
+          "size": 255,
+          "error": null,
+          "sha256": "e052b5a1272d2a180e22cacd138123b668e7cd8705810b625964206628528994"
+        },
+        "secrets_directory": {
+          "exists": true,
+          "mtime_ns": 1788304523515295600,
+          "file_count": 1,
+          "error": null
+        }
+      },
+      "secret_contents_read": false
+    },
+    "approval_requests": [],
+    "session_isolation": {
+      "authoritative_codex_home": "C:\\Users\\sjs95\\.codex",
+      "permission_authentication_copied": false,
+      "permission_model_turns_created": false,
+      "runtime_thread_id_for_surface_read": "01a05f61-e589-77b2-b71d-785fdc0149bf"
+    }
+  },
+  "completed_at": "2026-09-01T23:52:25.944645Z",
+  "status": "pass",
+  "schema_version": "1.0",
+  "kind": "fm_0a_p_permission_recheck",
+  "recheck_id": "fm0ap-host-system-20260902-02",
+  "source_gate_run_id": "gate0a-readiness-v3",
+  "checked_at": "2026-09-01T23:52:25.944645Z"
+}

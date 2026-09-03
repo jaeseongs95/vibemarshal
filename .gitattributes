@@ -1,0 +1,2 @@
+# 동결 source·artifact의 SHA-256과 PowerShell BOM을 checkout 간 그대로 보존한다.
+* -text

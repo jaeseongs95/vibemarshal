@@ -1,0 +1,16 @@
+{
+  "schema_version": "1.0",
+  "kind": "fm_0a_r_trusted_desktop_observation",
+  "challenge_nonce": "02951ff6-ea57-4ca2-9faa-1f2c67928d45",
+  "thread_id": "01a05bdf-2894-7b20-8498-3ae44f299b79",
+  "observed_at": "2026-09-01T13:19:20.7495167Z",
+  "thread_found": true,
+  "project_id": "f520be5c-fdb1-4bb5-9bfc-7044e37aa96e",
+  "observed_cwd": "D:\\codex\\자동화템플릿",
+  "sdk_marker_visible": true,
+  "sdk_turn_id": "01a05d1f-5d93-7251-9a66-d66d983c7474",
+  "status_during_sdk_wait": "notLoaded",
+  "desktop_turn_id_visible": true,
+  "checked_via": "Codex Desktop read_thread + list_threads",
+  "desktop_version": null
+}

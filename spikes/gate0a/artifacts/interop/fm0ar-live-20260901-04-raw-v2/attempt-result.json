@@ -1,0 +1,96 @@
+{
+  "schema_version": "1.0",
+  "kind": "fm_0a_r_desktop_interop_attempt",
+  "verification_id": "fm0ar-live-20260901-04-raw-v2",
+  "status": "error",
+  "checked_at": "2026-09-01T13:17:20.726227Z",
+  "runtime": {
+    "name": "desktop-system",
+    "executable": "C:\\Users\\sjs95\\.codex\\packages\\standalone\\releases\\0.151.0-x86_64-pc-windows-msvc\\bin\\codex.exe",
+    "version": {
+      "exit_code": 0,
+      "stdout": "codex-cli 0.151.0",
+      "stderr": ""
+    }
+  },
+  "checks": {
+    "project_grouping_correct": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "InvalidRequestError",
+          "message": "JSON-RPC error -32600: thread 01a05bef-e780-7712-86ab-88a8b070550f already has an active writer",
+          "code": -32600,
+          "rpc_message": "thread 01a05bef-e780-7712-86ab-88a8b070550f already has an active writer",
+          "data": null
+        }
+      }
+    },
+    "sdk_resume_visible_in_desktop": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "InvalidRequestError",
+          "message": "JSON-RPC error -32600: thread 01a05bef-e780-7712-86ab-88a8b070550f already has an active writer",
+          "code": -32600,
+          "rpc_message": "thread 01a05bef-e780-7712-86ab-88a8b070550f already has an active writer",
+          "data": null
+        }
+      }
+    },
+    "desktop_turn_visible_to_sdk": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "InvalidRequestError",
+          "message": "JSON-RPC error -32600: thread 01a05bef-e780-7712-86ab-88a8b070550f already has an active writer",
+          "code": -32600,
+          "rpc_message": "thread 01a05bef-e780-7712-86ab-88a8b070550f already has an active writer",
+          "data": null
+        }
+      }
+    },
+    "desktop_thread_sdk_read_resume": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "InvalidRequestError",
+          "message": "JSON-RPC error -32600: thread 01a05bef-e780-7712-86ab-88a8b070550f already has an active writer",
+          "code": -32600,
+          "rpc_message": "thread 01a05bef-e780-7712-86ab-88a8b070550f already has an active writer",
+          "data": null
+        }
+      }
+    },
+    "concurrent_access_consistent": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "InvalidRequestError",
+          "message": "JSON-RPC error -32600: thread 01a05bef-e780-7712-86ab-88a8b070550f already has an active writer",
+          "code": -32600,
+          "rpc_message": "thread 01a05bef-e780-7712-86ab-88a8b070550f already has an active writer",
+          "data": null
+        }
+      }
+    }
+  },
+  "sdk_state": {
+    "read_thread_id": "01a05bef-e780-7712-86ab-88a8b070550f",
+    "desktop_marker_visible_before": true,
+    "turn_count_before": 9
+  },
+  "error": {
+    "type": "InvalidRequestError",
+    "message": "JSON-RPC error -32600: thread 01a05bef-e780-7712-86ab-88a8b070550f already has an active writer",
+    "code": -32600,
+    "rpc_message": "thread 01a05bef-e780-7712-86ab-88a8b070550f already has an active writer",
+    "data": null
+  },
+  "approval_requests": []
+}

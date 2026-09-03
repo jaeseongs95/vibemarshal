@@ -1,0 +1,40 @@
+{
+  "schema_version": "1.0",
+  "kind": "flowmarshal_external_windows_vm_execution_decision",
+  "recorded_at": "2026-09-02T10:00:47+09:00",
+  "selected_environment": "separate-disposable-windows-vm",
+  "status": "READY_FOR_VM_TRANSFER",
+  "local_host": {
+    "windows_features_changed": false,
+    "hyper_v_changed": false,
+    "sandbox_setup_api_called": false,
+    "connected_codex_hosts": [
+      "local"
+    ]
+  },
+  "handoff_bundle": {
+    "path": "spikes/gate0a/artifacts/vm-harness/handoff/flowmarshal-external-windows-vm-20260902-100047.zip",
+    "sha256": "a01f2103d2595d59ff218ff896ff5166ab3ca444ebc2dcbff206f58634e866b7",
+    "file_count": 28,
+    "verified": true,
+    "contains_codex_home": false,
+    "contains_authentication": false,
+    "contains_sandbox_secrets": false
+  },
+  "remaining_external_input": {
+    "reason_code": "EXTERNAL_VM_ACCESS_REQUIRED",
+    "description": "Codex에 연결된 별도 Windows 호스트와 승인된 VM 공급자·구독이 없어 실제 VM 생성과 원격 실행은 시작하지 않았다.",
+    "accepted_inputs": [
+      "기존 Windows VM의 SSH 또는 WinRM 접속 방법",
+      "연결된 별도 Codex Windows 호스트",
+      "사용할 VM 공급자·구독 또는 프로젝트·예산·폐기 정책",
+      "VM 운영자가 번들을 실행해 반환한 증거 공유 폴더"
+    ]
+  },
+  "gate_effect": {
+    "gate0a_permission": "NO-GO",
+    "gate0a_overall": "NO-GO",
+    "gate0b_overall": "BLOCKED/NO-GO",
+    "reason": "실제 외부 VM suite와 폐기 증거가 아직 없음"
+  }
+}

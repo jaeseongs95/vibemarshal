@@ -1,0 +1,234 @@
+{
+  "schema_version": "1.0",
+  "kind": "flowmarshal_r1_runtime_receipt",
+  "gate": "R1",
+  "run_id": "r1-20260902T081113Z-51e2d5b8",
+  "started_at": "2026-09-02T08:11:13.517045Z",
+  "completed_at": "2026-09-02T08:11:19.637642Z",
+  "decision": "GO",
+  "current_stage": "completed",
+  "environment": {
+    "type": "local",
+    "workspace": "D:\\codex\\flowmarshal",
+    "codex_home": "C:\\Users\\sjs95\\.codex",
+    "executable": "C:\\Users\\sjs95\\.codex\\packages\\standalone\\releases\\0.151.0-x86_64-pc-windows-msvc\\bin\\codex.exe",
+    "exit_code": 0,
+    "version": "codex-cli 0.151.0",
+    "stderr": "",
+    "sdk_version": "0.147.0"
+  },
+  "checks": {
+    "initialize": {
+      "status": "pass",
+      "summary": "첫 App Server initialize/initialized가 완료됨",
+      "evidence": {}
+    },
+    "permission_preflight": {
+      "status": "pass",
+      "summary": "task 생성 전에 로컬 full-access/never 유효 정책을 확인함",
+      "evidence": {
+        "active_profile": ":danger-full-access",
+        "approval_policy": "never"
+      }
+    },
+    "model_inventory": {
+      "status": "pass",
+      "summary": "model/list에서 현재 기본 모델과 지원 추론 수준을 선택함",
+      "evidence": {
+        "model_id": "gpt-5.6-sol",
+        "reasoning_effort": "low"
+      }
+    },
+    "thread_start": {
+      "status": "pass",
+      "summary": "정상 사용자 권한에서 실제 Runner thread가 시작됨",
+      "evidence": {
+        "thread_id": "01a0612c-135f-72f0-b73b-aa16417f4a67",
+        "session_id": "01a0612c-135f-72f0-b73b-aa16417f4a67"
+      }
+    },
+    "instruction_sources": {
+      "status": "pass",
+      "summary": "전역·프로젝트 AGENTS.md가 정상 Runner 입력으로 로드됨",
+      "evidence": {
+        "instruction_sources": [
+          "C:\\Users\\sjs95\\.codex\\AGENTS.md",
+          "D:\\codex\\flowmarshal\\AGENTS.md"
+        ]
+      }
+    },
+    "thread_turn_separation": {
+      "status": "pass",
+      "summary": "thread/start와 turn/start가 분리되어 있음",
+      "evidence": {
+        "turns_before": 0
+      }
+    },
+    "turn_start": {
+      "status": "pass",
+      "summary": "실제 Runner turn이 시작됨",
+      "evidence": {
+        "thread_id": "01a0612c-135f-72f0-b73b-aa16417f4a67",
+        "turn_id": "01a0612c-176d-7251-9c01-7afc4b657418"
+      }
+    },
+    "thread_read": {
+      "status": "pass",
+      "summary": "thread/read에서 완료 turn과 구조화 결과를 관측함",
+      "evidence": {
+        "turn_id": "01a0612c-176d-7251-9c01-7afc4b657418",
+        "turn_status": "completed",
+        "marker_matched": true
+      }
+    },
+    "thread_resume": {
+      "status": "pass",
+      "summary": "새 App Server에서 같은 thread/session binding을 읽고 재개함",
+      "evidence": {
+        "thread_id": "01a0612c-135f-72f0-b73b-aa16417f4a67",
+        "session_id": "01a0612c-135f-72f0-b73b-aa16417f4a67",
+        "persisted_turn_count": 1
+      }
+    }
+  },
+  "receipts": {
+    "initialize_first": {
+      "response_digest": "sha256:4dd3407dace90d1d4cb8703bd9ccfc94ee21dc9142d9ca23923e13df0dbc1cce"
+    },
+    "execution_policy": {
+      "environment": "local",
+      "approval_policy": "never",
+      "default_permissions": ":danger-full-access",
+      "selected_profile_allowed": true,
+      "config_digest": "sha256:443b3d61f2d24cfaf8a75f2f21ae97a1f11ccbf17859e0845fc5726f2fc8ce75",
+      "profile_catalog_digest": "sha256:69b84ba576775830ce29c176d134b160fbd8f5a96b3b8a63d23161f66d138af2"
+    },
+    "model_selection": {
+      "model_id": "gpt-5.6-sol",
+      "catalog_model": "gpt-5.6-sol",
+      "reasoning_effort": "low",
+      "supported_efforts": [
+        "low",
+        "medium",
+        "high",
+        "xhigh",
+        "max",
+        "ultra"
+      ],
+      "selection_basis": "model/list의 visible catalog 기본 모델",
+      "effort_basis": "R1 최소 검사용으로 지원 목록의 low 선택",
+      "catalog_count": 7,
+      "catalog_digest": "sha256:467b3dab0e6202685c3ef26b6aafd9e0e87224bd8dbf8bbc20bfe840866daef5"
+    },
+    "thread_start": {
+      "thread_id": "01a0612c-135f-72f0-b73b-aa16417f4a67",
+      "session_id": "01a0612c-135f-72f0-b73b-aa16417f4a67",
+      "active_permission_profile": ":danger-full-access",
+      "approval_policy": "never",
+      "cwd": "D:\\codex\\flowmarshal",
+      "runtime_workspace_roots": [
+        "D:\\codex\\flowmarshal"
+      ],
+      "model_id": "gpt-5.6-sol",
+      "reasoning_effort": "max",
+      "instruction_sources": [
+        "C:\\Users\\sjs95\\.codex\\AGENTS.md",
+        "D:\\codex\\flowmarshal\\AGENTS.md"
+      ],
+      "response_digest": "sha256:518621c840dc3d96ca152f55c8b94819e49a029e6a0cddacee13dd5534a3dc0a",
+      "request_digest": "sha256:7539d1542a8b96dee1aeb1aa79a7300763c8b6d40b103fa90b40e7e264c4f0d7"
+    },
+    "thread_name_set": true,
+    "turn_start": {
+      "thread_id": "01a0612c-135f-72f0-b73b-aa16417f4a67",
+      "turn_id": "01a0612c-176d-7251-9c01-7afc4b657418",
+      "model_id": "gpt-5.6-sol",
+      "reasoning_effort": "low",
+      "permission_profile": ":danger-full-access",
+      "approval_policy": "never",
+      "request_digest": "sha256:4402b80464870e79f08b3818ad2fc290708e4c4f09ec768ffcdf13983769ad78",
+      "response_digest": "sha256:f6fe45766dec2be23e959e0128f2909875caea294f8c2e671cfb09eea7b27b2b"
+    },
+    "thread_read": {
+      "thread_id": "01a0612c-135f-72f0-b73b-aa16417f4a67",
+      "turn_id": "01a0612c-176d-7251-9c01-7afc4b657418",
+      "turn_status": "completed",
+      "notification_methods": [
+        "turn/started",
+        "item/started",
+        "item/completed",
+        "item/started",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/agentMessage/delta",
+        "item/completed",
+        "thread/tokenUsage/updated",
+        "turn/completed"
+      ],
+      "completion_notification_digest": "sha256:f493ed9c27578ea1f9de4460ecbb8b45f3461998ab986b2e68e9cc1496ba262e",
+      "turn_count": 1,
+      "item_types": [
+        "userMessage",
+        "agentMessage"
+      ],
+      "read_response_digest": "sha256:d0002487e1484a4e930a48da8e2188c90d710bf7eca9f6973dee53ff1dec110c",
+      "marker_matched": true,
+      "output_digest": "sha256:4a5c258912a52a4641aee1459462ee82092e161603401b89c5dfeb48b976d8c0"
+    },
+    "first_session_unexpected_requests": [],
+    "initialize_second": {
+      "response_digest": "sha256:4dd3407dace90d1d4cb8703bd9ccfc94ee21dc9142d9ca23923e13df0dbc1cce"
+    },
+    "thread_resume": {
+      "thread_id": "01a0612c-135f-72f0-b73b-aa16417f4a67",
+      "session_id": "01a0612c-135f-72f0-b73b-aa16417f4a67",
+      "active_permission_profile": ":danger-full-access",
+      "approval_policy": "never",
+      "cwd": "D:\\codex\\flowmarshal",
+      "runtime_workspace_roots": [
+        "D:\\codex\\flowmarshal"
+      ],
+      "model_id": "gpt-5.6-sol",
+      "reasoning_effort": "max",
+      "instruction_sources": [
+        "C:\\Users\\sjs95\\.codex\\AGENTS.md",
+        "D:\\codex\\flowmarshal\\AGENTS.md"
+      ],
+      "response_digest": "sha256:0fefbb9b0085b2421504b2e2d15d76203ad56772ff4db7abb9d80442e33840ec",
+      "request_digest": "sha256:9d29c82fdbd3694c972c58e001bfd1439554cb58b88beda19fcf3d2c00cd62e9",
+      "read_before_resume_digest": "sha256:008c976df315b354293e978e979d200923710980e4dd9ca6d137cfd32a636a60",
+      "persisted_turn_count": 1
+    },
+    "second_session_unexpected_requests": []
+  },
+  "error": null
+}

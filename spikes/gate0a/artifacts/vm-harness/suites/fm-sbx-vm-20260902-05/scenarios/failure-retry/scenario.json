@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "kind": "disposable_windows_vm_scenario_contract",
+  "suite_id": "fm-sbx-vm-20260902-05",
+  "scenario": "failure-retry",
+  "created_at": "2026-09-02T02:58:41.271272Z",
+  "authoritative_codex_home": "C:\\FlowMarshal-VM\\failure-retry-home",
+  "environment_guard": "--environment disposable-vm",
+  "environment_confirmation": "FLOWMARSHAL_DISPOSABLE_WINDOWS_VM=1",
+  "vm_identity": {
+    "recognized_virtual_machine": true,
+    "manufacturer": "innotek GmbH",
+    "model": "VirtualBox",
+    "hypervisor_present": true,
+    "error": null
+  },
+  "initial_fingerprint": {
+    "accounts": [
+      {
+        "Name": "CodexSandboxOffline",
+        "Missing": true
+      },
+      {
+        "Name": "CodexSandboxOnline",
+        "Missing": true
+      }
+    ],
+    "accounts_error": null,
+    "setup_marker": {
+      "exists": false,
+      "error": null
+    },
+    "secrets_directory": {
+      "exists": false,
+      "mtime_ns": null,
+      "file_count": 0,
+      "error": null
+    }
+  },
+  "initial_state_clean": true,
+  "secret_contents_read": false
+}

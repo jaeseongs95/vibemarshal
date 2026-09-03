@@ -1,0 +1,158 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-09-02T05:35:17.5911539Z",
+  "gate": "0C",
+  "plan_revision_id": "flowmarshal-gate0c-r2",
+  "overall": "NO-GO",
+  "narrow_file_default_deny_result": "GO",
+  "reason_codes": [
+    "RUNNER_INSTRUCTION_BOOTSTRAP_BLOCKED",
+    "APPROVED_REFERENCE_READ_BLOCKED",
+    "NETWORK_ISOLATION_FAILED",
+    "ACTUAL_E2E_SKIPPED_FAIL_CLOSED"
+  ],
+  "answer_to_user_concern": {
+    "agents_md_is_approved_input": true,
+    "global_agents_direct_read_passed": true,
+    "unregistered_canary_was_explicitly_listed": false,
+    "unregistered_canary_default_deny_passed": true,
+    "summary": "AGENTS.md 같은 시작 입력과 사전 승인 파일은 허용 목록에 포함하는 것이 맞다. 수정 시험에서는 프로필 규칙에 전혀 없는 외부 canary가 :root=deny만으로 차단됐다."
+  },
+  "final_profile": {
+    "profile_set_digest": "sha256:19f2a560ef65dde347089bd307443a719e13acc3722b923371a5b0bf9b796ff8",
+    "approval_policy": "never",
+    "network_enabled": false,
+    "reference_manifest_mode": "registered roots plus exact existing files",
+    "unregistered_canary_in_rules": false
+  },
+  "probe_matrix": [
+    {
+      "probe_id": "runner_read_global_instruction",
+      "expected": "allow_read",
+      "actual_exit_code": 0,
+      "passed": true
+    },
+    {
+      "probe_id": "runner_read_auth_state",
+      "expected": "deny_read",
+      "actual_exit_code": 77,
+      "passed": true
+    },
+    {
+      "probe_id": "runner_read_reference",
+      "expected": "allow_read",
+      "actual_exit_code": 77,
+      "passed": false
+    },
+    {
+      "probe_id": "runner_read_unregistered",
+      "expected": "deny_read_by_default",
+      "actual_exit_code": 77,
+      "explicit_profile_rule": false,
+      "passed": true
+    },
+    {
+      "probe_id": "runner_read_control",
+      "expected": "deny_read",
+      "actual_exit_code": 77,
+      "passed": true
+    },
+    {
+      "probe_id": "runner_read_authority_ledger",
+      "expected": "deny_read",
+      "actual_exit_code": 77,
+      "passed": true
+    },
+    {
+      "probe_id": "runner_write_single_root",
+      "expected": "allow_write",
+      "actual_exit_code": 0,
+      "passed": true
+    },
+    {
+      "probe_id": "runner_write_reference",
+      "expected": "deny_write",
+      "actual_exit_code": 77,
+      "passed": true
+    },
+    {
+      "probe_id": "runner_write_control",
+      "expected": "deny_write",
+      "actual_exit_code": 77,
+      "passed": true
+    },
+    {
+      "probe_id": "runner_write_authority_root",
+      "expected": "deny_write",
+      "actual_exit_code": 77,
+      "passed": true
+    },
+    {
+      "probe_id": "runner_network_loopback",
+      "expected": "deny_network",
+      "actual_exit_code": 0,
+      "network_request_observed": true,
+      "passed": false
+    }
+  ],
+  "profile_provenance": {
+    "status": "NO-GO",
+    "failed_role": "runner",
+    "reason_code": "GLOBAL_INSTRUCTION_UNREADABLE",
+    "interpretation": "최종 제한 프로필에서도 Runner thread/start가 AGENTS.md instruction chain 로드 단계에서 실패했다. command probe에서 전역 AGENTS.md 직접 읽기는 성공했으므로 파일 허용 여부와 thread bootstrap 실패는 구분한다."
+  },
+  "actual_e2e": {
+    "status": "SKIPPED",
+    "reason": "구조 경계와 profile provenance가 모두 통과한 경우에만 Planner-Runner-Validator 실제 E2E를 실행한다는 fail-closed 조건을 만족하지 못했다."
+  },
+  "host_safety": {
+    "config_and_sandbox_unchanged": true,
+    "new_trust_entries_created": false,
+    "existing_trust_entries_modified_or_removed": false,
+    "artifact_safety_violations": []
+  },
+  "ledger_verification": {
+    "database": "spikes/gate0c/artifacts/control/gate0c-r2.sqlite3",
+    "task_state": "failed",
+    "attempt_count": 9,
+    "evidence_count": 9,
+    "passed_checks": [
+      "sqlite_integrity",
+      "schema_contract",
+      "append_only_guards",
+      "approved_plan_integrity",
+      "authority_row_digests",
+      "evidence_integrity",
+      "history_chain",
+      "prerequisite_gates",
+      "current_host_invariant",
+      "historical_host_invariant"
+    ]
+  },
+  "validation": {
+    "compileall": "PASS",
+    "unittest": {
+      "status": "PASS",
+      "tests_run": 140
+    },
+    "pip_check": "PASS"
+  },
+  "artifacts": {
+    "plan": {
+      "path": "docs/gate0c-retest-plan.md",
+      "sha256": "180399475948eec6df5cef395ac27d6f757549345795673321cf9f1c9737fa57"
+    },
+    "final_profile_probe": {
+      "path": "spikes/gate0c/artifacts/profile-provenance-r2g.json",
+      "sha256": "ddc2afacb3a44be66d9151bb02311b3fc5e3f7891ed6a328949d99260853aed8"
+    },
+    "final_boundary_probe": {
+      "path": "spikes/gate0c/artifacts/boundary-retest-r2g.json",
+      "sha256": "82e574fe383c1daf7fc2c260f523139844b2e0a29b3a0f35f7acaf73555e6465"
+    },
+    "ledger": {
+      "path": "spikes/gate0c/artifacts/control/gate0c-r2.sqlite3",
+      "sha256": "1fcab12c12b5abe30c62140cfb8eccc14d79d4faf945732bc97cef65908f6026"
+    }
+  }
+}

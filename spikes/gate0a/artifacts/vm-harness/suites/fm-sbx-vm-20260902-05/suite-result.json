@@ -1,0 +1,161 @@
+{
+  "schema_version": "1.0",
+  "kind": "disposable_windows_vm_sandbox_suite_result",
+  "suite_id": "fm-sbx-vm-20260902-05",
+  "evaluated_at": "2026-09-02T03:01:05.639815Z",
+  "status": "GO",
+  "reason_code": null,
+  "gate_restoration_allowed": true,
+  "checks": [
+    {
+      "id": "current-first_clean_start",
+      "status": "pass",
+      "summary": "current-first가 인식된 VM의 깨끗한 상태에서 시작했습니다.",
+      "evidence": {
+        "contract_matches": true,
+        "clean": true,
+        "recognized_virtual_machine": true
+      }
+    },
+    {
+      "id": "cross-version_clean_start",
+      "status": "pass",
+      "summary": "cross-version가 인식된 VM의 깨끗한 상태에서 시작했습니다.",
+      "evidence": {
+        "contract_matches": true,
+        "clean": true,
+        "recognized_virtual_machine": true
+      }
+    },
+    {
+      "id": "failure-retry_clean_start",
+      "status": "pass",
+      "summary": "failure-retry가 인식된 VM의 깨끗한 상태에서 시작했습니다.",
+      "evidence": {
+        "contract_matches": true,
+        "clean": true,
+        "recognized_virtual_machine": true
+      }
+    },
+    {
+      "id": "current_first_setup",
+      "status": "pass",
+      "summary": "깨끗한 VM에서 현재 Codex 최초 설정을 확인했습니다.",
+      "evidence": {
+        "attempts": 1,
+        "final_status": "completed"
+      }
+    },
+    {
+      "id": "cross_version_setup",
+      "status": "pass",
+      "summary": "같은 홈에서 구버전 설정 뒤 현재 버전 호환성 확인을 통과했습니다.",
+      "evidence": {
+        "attempts": 2,
+        "pinned_version": "codex-cli 0.147.0",
+        "system_version": "codex-cli 0.151.0"
+      }
+    },
+    {
+      "id": "second_home_guard",
+      "status": "pass",
+      "summary": "두 번째 authoritative home 요청을 런타임 시작 전에 차단했습니다.",
+      "evidence": {
+        "guard_records": 1
+      }
+    },
+    {
+      "id": "limited_failure_retry",
+      "status": "pass",
+      "summary": "결정적 실패 뒤 같은 홈에서 한 번만 재시도해 성공했습니다.",
+      "evidence": {
+        "attempts": 2
+      }
+    },
+    {
+      "id": "artifact_safety",
+      "status": "pass",
+      "summary": "VM 증거 폴더에 Codex 비밀·인증·상태 DB가 없습니다.",
+      "evidence": {
+        "violations": []
+      }
+    },
+    {
+      "id": "vm_disposal",
+      "status": "pass",
+      "summary": "검사 뒤 VM 초기화 또는 폐기 증거를 확인했습니다.",
+      "evidence": {
+        "action": "disposed",
+        "provider": "Oracle VirtualBox 7.2.16"
+      }
+    }
+  ],
+  "source_manifest": [
+    {
+      "path": "imports/cross-version-export.json",
+      "bytes": 1013,
+      "sha256": "f4549307354c7138202d097cd50a825d89536553cc1d333ed6ce8f9cdcbf5b33"
+    },
+    {
+      "path": "imports/current-first-export.json",
+      "bytes": 662,
+      "sha256": "f5000c74cfa671a622238250152a4cb210732ad83ea1ba4994730a5e7c1e8763"
+    },
+    {
+      "path": "imports/failure-retry-export.json",
+      "bytes": 840,
+      "sha256": "5fae3c05d35d425398311bfe179bddb494489d82addf1fa2441eeab932c8429f"
+    },
+    {
+      "path": "lifecycle/disposal.json",
+      "bytes": 563,
+      "sha256": "8534fc9a4e0f98ed98157e32a1355695466331051d042670b088c022dacbeed1"
+    },
+    {
+      "path": "scenarios/cross-version/attempts/current-runtime-01/setup-result.json",
+      "bytes": 2557,
+      "sha256": "def10ac6cf6348f5fdcea0910af8d4d8e75ac5a6d3be1432380ccbaab5f0cab9"
+    },
+    {
+      "path": "scenarios/cross-version/attempts/old-runtime-01/setup-result.json",
+      "bytes": 2188,
+      "sha256": "e699bf32019c65a105e115a3c3c120319fd25f631e224c4aaf7a3acb4b5ded26"
+    },
+    {
+      "path": "scenarios/cross-version/guards/second-home-guard.json",
+      "bytes": 524,
+      "sha256": "fc4fd4254e837e71ecfd7c001e35aa01ad87d09748ef17059a801ece37e5efd8"
+    },
+    {
+      "path": "scenarios/cross-version/scenario.json",
+      "bytes": 1074,
+      "sha256": "ab9720f6ce232656eec52c1dec0955dabe7be3e9cdb518f6c7c9394719a20555"
+    },
+    {
+      "path": "scenarios/current-first/attempts/current-first-01/setup-result.json",
+      "bytes": 2158,
+      "sha256": "f58b5dc6fbead0e970c894cca52bb02c2615783624850689ced1aa3b59452e0d"
+    },
+    {
+      "path": "scenarios/current-first/scenario.json",
+      "bytes": 1074,
+      "sha256": "928e5e200710267f51a6cfe0b2bf768db17644874888775d620a2b4bb41d85b3"
+    },
+    {
+      "path": "scenarios/failure-retry/attempts/injected-failure-01/setup-result.json",
+      "bytes": 1793,
+      "sha256": "079091dc0646f151d75d2302c95e81f96bdb33fc50384693fe8322c50ae43118"
+    },
+    {
+      "path": "scenarios/failure-retry/attempts/retry-01/setup-result.json",
+      "bytes": 2150,
+      "sha256": "a22fc752d619a0f01c3f246959f0983b9b22c528d37674b15d79f742e8f3369a"
+    },
+    {
+      "path": "scenarios/failure-retry/scenario.json",
+      "bytes": 1074,
+      "sha256": "8f77ac11902f611d9d439f44fa266f694c447e4ecb5b3b3560f12fee75ba2a68"
+    }
+  ],
+  "secret_contents_read": false
+}

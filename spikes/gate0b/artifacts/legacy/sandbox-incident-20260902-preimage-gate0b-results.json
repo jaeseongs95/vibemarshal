@@ -1,0 +1,159 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-09-01T22:26:54.0785529Z",
+  "gate": "0B",
+  "overall": "GO",
+  "decision": "영속 원장, 불변 승인 계획, 실행 의도, 읽기 자료 승인, evidence 기반 완료와 crash 복구의 최소 권위 Core가 구현되고 합성·실제 Codex 검증을 통과했다.",
+  "prerequisite": {
+    "gate": "0A",
+    "status": "GO",
+    "source": "spikes/gate0a/artifacts/gate0a-results.json"
+  },
+  "runtime_versions": {
+    "python_sdk": "openai-codex 0.147.0",
+    "desktop_codex_cli": "codex-cli 0.151.0",
+    "pydantic": "2.13.5"
+  },
+  "implementation": {
+    "schema_revision": 1,
+    "execution_mode": "serial_one_slot",
+    "parallel_schema_only": true,
+    "components": [
+      "PlanRevision과 WorkItem DAG",
+      "Attempt, execution slot과 write lease",
+      "RuntimeActionIntent와 external binding",
+      "ResourceDefinition, AccessRequest와 read-only AccessGrant",
+      "HumanControlAuthority HMAC proof와 replay 방지",
+      "content-addressed evidence",
+      "원장 sidecar·evidence·승인 capability 자동 보호 등록",
+      "append-only history hash chain과 state attestation",
+      "startup unknown quarantine와 명시적 recovery",
+      "독립 Gate0BVerifier",
+      "내부 기술 CLI",
+      "FakeAgentRuntime과 CodexAppServerRuntime"
+    ]
+  },
+  "tests": {
+    "command": ".\\.venv\\Scripts\\python.exe -m unittest discover -s tests -v",
+    "total": 63,
+    "passed": 63,
+    "failed": 0,
+    "gate0a_regression_included": true,
+    "covered_crash_windows": [
+      "reservation commit 뒤",
+      "CREATE_THREAD 외부 효과 뒤 receipt 저장 전",
+      "CREATE_THREAD receipt 저장 뒤",
+      "START_TURN 외부 효과 뒤 receipt 저장 전",
+      "START_TURN receipt 저장 뒤"
+    ],
+    "tamper_tests": [
+      "원시 SQLite 권위 행 변조 탐지",
+      "evidence 파일 변조 탐지"
+    ]
+  },
+  "independent_verifier": {
+    "overall": "GO",
+    "check_count": 10,
+    "passed": 10,
+    "checks": [
+      "sqlite_integrity",
+      "schema_contract",
+      "plan_invariants",
+      "execution_invariants",
+      "recovery_invariants",
+      "access_invariants",
+      "evidence_invariants",
+      "history_chain",
+      "state_attestations",
+      "database_guards"
+    ]
+  },
+  "fake_smoke": {
+    "status": "GO",
+    "run_id": "20260901T222530Z",
+    "artifact_root": "spikes/gate0b/artifacts/smoke/fake/20260901T222530Z",
+    "result_sha256": "5976910cbacf4f0923bc2a0a2fc29397a6dade9f8de8799e0ab2fc336abe12f6",
+    "ledger_sha256": "19a804a7d62cef0e4af93ee4d1ed92c1990a94aaeb1bd73dfaa22019940cdec3",
+    "outcome": "completed",
+    "ledger_verification": "GO"
+  },
+  "real_codex_smoke": {
+    "status": "GO",
+    "run_id": "20260901T222537Z",
+    "artifact_root": "spikes/gate0b/artifacts/smoke/real/20260901T222537Z",
+    "result_sha256": "02b4c321f4fa08715ef6ad0da417871ff541047c4c54ad25749172b93de63044",
+    "ledger_sha256": "f75cbbdcc4e8e82f30d1d5867bdfc7926773df2357dab3f2d0a586a737510a07",
+    "project_id": "project_6c54ece386274f71bddb7545ea05aeeb",
+    "revision_id": "revision_d81793d1a9fc46eaba307e2e0ac2a79b",
+    "attempt_id": "attempt_50cd3c3f73b240a39dac73be4690cced",
+    "thread_id": "01a05f13-f3ae-7110-966c-4edb0c5873ea",
+    "turn_id": "01a05f13-f6f1-76b0-9547-ae665cfe217b",
+    "execution_profile": {
+      "model_role": "fast",
+      "model_id": "gpt-5.6-luna",
+      "reasoning_effort": "low"
+    },
+    "validation_profile": {
+      "model_role": "balanced",
+      "reasoning_effort": "medium"
+    },
+    "outcome": "completed",
+    "ledger_verification": "GO",
+    "response_message_digest": "sha256:80cdc57ec356d4c15ca63f2f074456bb9e7606a2de933790ea4f153a06ae9587",
+    "response_content_stored_in_ledger": false
+  },
+  "development_attempts": [
+    {
+      "run_ids": [
+        "20260901T215431Z",
+        "20260901T215508Z",
+        "20260901T215538Z"
+      ],
+      "outcome": "runtime_initialization_failed_before_complete_artifact",
+      "cause": "Desktop 전용 cua_repl MCP 설정을 고정 SDK 런타임 parser가 해석하지 못함",
+      "resolution": "사용자 config를 수정하지 않고 실행별 override에서 모든 MCP를 비활성·inert 형태로 고정",
+      "artifact_gap": "이전 smoke 구현은 초기화 전 오류를 result로 기록하지 못했다. 현재 구현은 이 경우도 smoke-result.json을 남기며 단위 검사를 추가했다."
+    },
+    {
+      "run_ids": [
+        "20260901T215751Z",
+        "20260901T220346Z",
+        "20260901T220721Z"
+      ],
+      "outcome": "interrupted_or_failed",
+      "cause": "별도 resume 또는 별도 App Server reader가 실행 중 turn 소유권에 영향을 줌",
+      "resolution": "turn을 시작한 같은 App Server 연결의 순수 thread/read 관측으로 변경"
+    },
+    {
+      "run_ids": [
+        "20260901T220754Z"
+      ],
+      "outcome": "SMOKE_TIMEOUT",
+      "cause": "파일 도구를 포함한 smoke가 제한 시간 안에 끝나지 않음",
+      "resolution": "Gate 0B가 검증할 원장·thread·turn·모델·evidence 경계에 맞춰 도구 없는 고정 응답 smoke로 축소. 파일·sandbox primitive는 Gate 0A 증거를 사용한다."
+    }
+  ],
+  "file_access_decision": {
+    "application_policy": "등록된 workspace와 read-only 참고 자료만 WorkItem 계약에 포함하고, 추가 자료는 AccessRequest와 새 Attempt를 거친다.",
+    "native_windows_read_exception": "active",
+    "exception_scope": "미등록 외부 읽기의 OS 수준 차단만 임시 예외이며, 제품 계약상 임의 탐색은 허용하지 않는다.",
+    "not_relaxed": [
+      "프로젝트 밖 쓰기",
+      "보호 경로 읽기와 쓰기",
+      "제어 capability 노출",
+      "외부 기능과 command network"
+    ],
+    "revisit_trigger": "지원 Codex 런타임 변경 또는 strict_read_isolation 카나리 통과"
+  },
+  "deferred_to_later_gates": [
+    "Planner의 기능 분해와 모델·추론 수준 자동 배정",
+    "Planner·Runner·Validation Runner 최종 역할 격리",
+    "reparse point·junction·ADS·device path·hardlink 공격 테스트",
+    "prompt injection end-to-end 테스트",
+    "자동 실패 분류·재시도·모델 fallback",
+    "안전한 병렬 실행",
+    "scheduler와 장기 무인 운영",
+    "공개 CLI/API schema와 migration 호환성",
+    "Skill·Starter Template·배포 구조"
+  ]
+}

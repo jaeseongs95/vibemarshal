@@ -1,0 +1,92 @@
+{
+  "schema_version": "1.0",
+  "kind": "fm_0a_r_desktop_interop_attempt",
+  "verification_id": "fm0ar-live-20260901-01",
+  "status": "error",
+  "checked_at": "2026-09-01T13:12:59.275019Z",
+  "runtime": {
+    "name": "sdk-pinned",
+    "executable": "D:\\codex\\flowmarshal\\.venv\\Lib\\site-packages\\codex_cli_bin\\bin\\codex.exe",
+    "version": {
+      "exit_code": 0,
+      "stdout": "codex-cli 0.147.0",
+      "stderr": ""
+    }
+  },
+  "checks": {
+    "project_grouping_correct": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "InternalRpcError",
+          "message": "JSON-RPC error -32603: failed to deserialize stored thread item fco_01a05d19-c8dd-7e51-a11c-d7d3d55e20d9: unknown variant `functionCallOutput`, expected one of `userMessage`, `hookPrompt`, `agentMessage`, `plan`, `reasoning`, `commandExecution`, `fileChange`, `mcpToolCall`, `dynamicToolCall`, `collabAgentToolCall`, `subAgentActivity`, `webSearch`, `imageView`, `sleep`, `imageGeneration`, `enteredReviewMode`, `exitedReviewMode`, `contextCompaction` at line 1 column 28",
+          "code": -32603,
+          "rpc_message": "failed to deserialize stored thread item fco_01a05d19-c8dd-7e51-a11c-d7d3d55e20d9: unknown variant `functionCallOutput`, expected one of `userMessage`, `hookPrompt`, `agentMessage`, `plan`, `reasoning`, `commandExecution`, `fileChange`, `mcpToolCall`, `dynamicToolCall`, `collabAgentToolCall`, `subAgentActivity`, `webSearch`, `imageView`, `sleep`, `imageGeneration`, `enteredReviewMode`, `exitedReviewMode`, `contextCompaction` at line 1 column 28",
+          "data": null
+        }
+      }
+    },
+    "sdk_resume_visible_in_desktop": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "InternalRpcError",
+          "message": "JSON-RPC error -32603: failed to deserialize stored thread item fco_01a05d19-c8dd-7e51-a11c-d7d3d55e20d9: unknown variant `functionCallOutput`, expected one of `userMessage`, `hookPrompt`, `agentMessage`, `plan`, `reasoning`, `commandExecution`, `fileChange`, `mcpToolCall`, `dynamicToolCall`, `collabAgentToolCall`, `subAgentActivity`, `webSearch`, `imageView`, `sleep`, `imageGeneration`, `enteredReviewMode`, `exitedReviewMode`, `contextCompaction` at line 1 column 28",
+          "code": -32603,
+          "rpc_message": "failed to deserialize stored thread item fco_01a05d19-c8dd-7e51-a11c-d7d3d55e20d9: unknown variant `functionCallOutput`, expected one of `userMessage`, `hookPrompt`, `agentMessage`, `plan`, `reasoning`, `commandExecution`, `fileChange`, `mcpToolCall`, `dynamicToolCall`, `collabAgentToolCall`, `subAgentActivity`, `webSearch`, `imageView`, `sleep`, `imageGeneration`, `enteredReviewMode`, `exitedReviewMode`, `contextCompaction` at line 1 column 28",
+          "data": null
+        }
+      }
+    },
+    "desktop_turn_visible_to_sdk": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "InternalRpcError",
+          "message": "JSON-RPC error -32603: failed to deserialize stored thread item fco_01a05d19-c8dd-7e51-a11c-d7d3d55e20d9: unknown variant `functionCallOutput`, expected one of `userMessage`, `hookPrompt`, `agentMessage`, `plan`, `reasoning`, `commandExecution`, `fileChange`, `mcpToolCall`, `dynamicToolCall`, `collabAgentToolCall`, `subAgentActivity`, `webSearch`, `imageView`, `sleep`, `imageGeneration`, `enteredReviewMode`, `exitedReviewMode`, `contextCompaction` at line 1 column 28",
+          "code": -32603,
+          "rpc_message": "failed to deserialize stored thread item fco_01a05d19-c8dd-7e51-a11c-d7d3d55e20d9: unknown variant `functionCallOutput`, expected one of `userMessage`, `hookPrompt`, `agentMessage`, `plan`, `reasoning`, `commandExecution`, `fileChange`, `mcpToolCall`, `dynamicToolCall`, `collabAgentToolCall`, `subAgentActivity`, `webSearch`, `imageView`, `sleep`, `imageGeneration`, `enteredReviewMode`, `exitedReviewMode`, `contextCompaction` at line 1 column 28",
+          "data": null
+        }
+      }
+    },
+    "desktop_thread_sdk_read_resume": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "InternalRpcError",
+          "message": "JSON-RPC error -32603: failed to deserialize stored thread item fco_01a05d19-c8dd-7e51-a11c-d7d3d55e20d9: unknown variant `functionCallOutput`, expected one of `userMessage`, `hookPrompt`, `agentMessage`, `plan`, `reasoning`, `commandExecution`, `fileChange`, `mcpToolCall`, `dynamicToolCall`, `collabAgentToolCall`, `subAgentActivity`, `webSearch`, `imageView`, `sleep`, `imageGeneration`, `enteredReviewMode`, `exitedReviewMode`, `contextCompaction` at line 1 column 28",
+          "code": -32603,
+          "rpc_message": "failed to deserialize stored thread item fco_01a05d19-c8dd-7e51-a11c-d7d3d55e20d9: unknown variant `functionCallOutput`, expected one of `userMessage`, `hookPrompt`, `agentMessage`, `plan`, `reasoning`, `commandExecution`, `fileChange`, `mcpToolCall`, `dynamicToolCall`, `collabAgentToolCall`, `subAgentActivity`, `webSearch`, `imageView`, `sleep`, `imageGeneration`, `enteredReviewMode`, `exitedReviewMode`, `contextCompaction` at line 1 column 28",
+          "data": null
+        }
+      }
+    },
+    "concurrent_access_consistent": {
+      "status": "error",
+      "summary": "FM-0A-R 검증 절차가 완료되지 않음",
+      "evidence": {
+        "error": {
+          "type": "InternalRpcError",
+          "message": "JSON-RPC error -32603: failed to deserialize stored thread item fco_01a05d19-c8dd-7e51-a11c-d7d3d55e20d9: unknown variant `functionCallOutput`, expected one of `userMessage`, `hookPrompt`, `agentMessage`, `plan`, `reasoning`, `commandExecution`, `fileChange`, `mcpToolCall`, `dynamicToolCall`, `collabAgentToolCall`, `subAgentActivity`, `webSearch`, `imageView`, `sleep`, `imageGeneration`, `enteredReviewMode`, `exitedReviewMode`, `contextCompaction` at line 1 column 28",
+          "code": -32603,
+          "rpc_message": "failed to deserialize stored thread item fco_01a05d19-c8dd-7e51-a11c-d7d3d55e20d9: unknown variant `functionCallOutput`, expected one of `userMessage`, `hookPrompt`, `agentMessage`, `plan`, `reasoning`, `commandExecution`, `fileChange`, `mcpToolCall`, `dynamicToolCall`, `collabAgentToolCall`, `subAgentActivity`, `webSearch`, `imageView`, `sleep`, `imageGeneration`, `enteredReviewMode`, `exitedReviewMode`, `contextCompaction` at line 1 column 28",
+          "data": null
+        }
+      }
+    }
+  },
+  "sdk_state": {},
+  "error": {
+    "type": "InternalRpcError",
+    "message": "JSON-RPC error -32603: failed to deserialize stored thread item fco_01a05d19-c8dd-7e51-a11c-d7d3d55e20d9: unknown variant `functionCallOutput`, expected one of `userMessage`, `hookPrompt`, `agentMessage`, `plan`, `reasoning`, `commandExecution`, `fileChange`, `mcpToolCall`, `dynamicToolCall`, `collabAgentToolCall`, `subAgentActivity`, `webSearch`, `imageView`, `sleep`, `imageGeneration`, `enteredReviewMode`, `exitedReviewMode`, `contextCompaction` at line 1 column 28",
+    "code": -32603,
+    "rpc_message": "failed to deserialize stored thread item fco_01a05d19-c8dd-7e51-a11c-d7d3d55e20d9: unknown variant `functionCallOutput`, expected one of `userMessage`, `hookPrompt`, `agentMessage`, `plan`, `reasoning`, `commandExecution`, `fileChange`, `mcpToolCall`, `dynamicToolCall`, `collabAgentToolCall`, `subAgentActivity`, `webSearch`, `imageView`, `sleep`, `imageGeneration`, `enteredReviewMode`, `exitedReviewMode`, `contextCompaction` at line 1 column 28",
+    "data": null
+  },
+  "approval_requests": []
+}

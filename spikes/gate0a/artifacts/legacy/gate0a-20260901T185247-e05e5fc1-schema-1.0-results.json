@@ -1,0 +1,2158 @@
+{
+  "schema_version": "1.0",
+  "project": "FlowMarshal",
+  "gate": "0A",
+  "run_id": "20260901T185247-e05e5fc1",
+  "started_at": "2026-09-01T09:52:47.163336Z",
+  "host": {
+    "platform": "Windows-11-10.0.26200-SP0",
+    "python": "3.12.13 (main, Aug  7 2026, 02:26:41) [MSC v.1944 64 bit (AMD64)]",
+    "python_executable": "D:\\codex\\flowmarshal\\.venv\\Scripts\\python.exe",
+    "sdk_version": "0.147.0",
+    "project_root": "D:\\codex\\flowmarshal",
+    "config_overrides": [
+      "web_search=\"disabled\"",
+      "features.apps=false",
+      "features.plugins=false",
+      "features.remote_plugin=false",
+      "features.skill_mcp_dependency_install=false",
+      "features.multi_agent=false",
+      "features.js_repl=false",
+      "features.in_app_browser=false",
+      "features.browser_use=false",
+      "features.browser_use_full_cdp_access=false",
+      "features.browser_use_external=false",
+      "features.computer_use=false",
+      "features.plugin_sharing=false",
+      "mcp_servers={}",
+      "mcp_servers.node_repl.enabled=false",
+      "mcp_servers.cua_repl.enabled=false",
+      "plugins.codex-app-tools@openai-bundled.enabled=false",
+      "plugins.codex-context-continuity@personal.enabled=false",
+      "default_permissions=\"flowmarshal_gate0a\"",
+      "permissions.flowmarshal_gate0a.filesystem={\":root\"=\"deny\",\":minimal\"=\"read\",\":workspace_roots\"={\".\"=\"write\"},\":tmpdir\"=\"deny\",\":slash_tmp\"=\"deny\"}",
+      "permissions.flowmarshal_gate0a.network.enabled=false"
+    ]
+  },
+  "runtimes": [
+    {
+      "name": "sdk-pinned",
+      "role": "openai-codex 패키지 동봉 런타임",
+      "executable": "D:\\codex\\flowmarshal\\.venv\\Lib\\site-packages\\codex_cli_bin\\bin\\codex.exe",
+      "version": {
+        "exit_code": 0,
+        "stdout": "codex-cli 0.147.0",
+        "stderr": ""
+      },
+      "started_at": "2026-09-01T09:52:47.256746Z",
+      "checks": {
+        "approvals_fail_closed": {
+          "status": "pass",
+          "summary": "모든 알려진 서버 승인/입력 요청이 명시적 거절 응답으로 매핑됨",
+          "evidence": {
+            "responses": {
+              "item/commandExecution/requestApproval": {
+                "decision": "decline"
+              },
+              "item/fileChange/requestApproval": {
+                "decision": "decline"
+              },
+              "item/permissions/requestApproval": {
+                "permissions": {},
+                "scope": "turn",
+                "strictAutoReview": true
+              },
+              "item/tool/requestUserInput": {
+                "answers": {}
+              },
+              "mcpServer/elicitation/request": {
+                "action": "decline",
+                "content": null
+              }
+            }
+          }
+        },
+        "initialize": {
+          "status": "pass",
+          "summary": "initialize 요청과 initialized 알림 완료",
+          "evidence": {
+            "response": {
+              "serverInfo": null,
+              "userAgent": "Codex Desktop/0.147.0 (Windows 10.0.26200; x86_64) dumb (flowmarshal_gate0a; 0.1.0)",
+              "platformFamily": "windows",
+              "platformOs": "windows"
+            }
+          }
+        },
+        "restricted_policy_supported": {
+          "status": "pass",
+          "summary": "제한 permission profile이 수락되고 내부 읽기가 성공함",
+          "evidence": {
+            "profile_id": "flowmarshal_gate0a",
+            "profile_entry": {
+              "id": "flowmarshal_gate0a",
+              "description": null,
+              "allowed": true
+            },
+            "command": {
+              "rpc_ok": true,
+              "duration_ms": 375,
+              "response": {
+                "exitCode": 0,
+                "stdout": "<CANARY_TOKEN_REDACTED>\r\n",
+                "stderr": ""
+              }
+            }
+          }
+        },
+        "restricted_project_outside_read": {
+          "status": "fail",
+          "summary": "프로젝트 밖: 읽기 경계가 깨짐",
+          "evidence": {
+            "token_exposed": true,
+            "command": {
+              "rpc_ok": true,
+              "duration_ms": 359,
+              "response": {
+                "exitCode": 0,
+                "stdout": "<CANARY_TOKEN_REDACTED>\r\n",
+                "stderr": ""
+              }
+            }
+          }
+        },
+        "restricted_localappdata_read": {
+          "status": "fail",
+          "summary": "LocalAppData: 읽기 경계가 깨짐",
+          "evidence": {
+            "token_exposed": true,
+            "command": {
+              "rpc_ok": true,
+              "duration_ms": 375,
+              "response": {
+                "exitCode": 0,
+                "stdout": "<CANARY_TOKEN_REDACTED>\r\n",
+                "stderr": ""
+              }
+            }
+          }
+        },
+        "inside_workspace_write": {
+          "status": "pass",
+          "summary": "워크스페이스 내부 쓰기 성공",
+          "evidence": {
+            "target_exists": true,
+            "command": {
+              "rpc_ok": true,
+              "duration_ms": 344,
+              "response": {
+                "exitCode": 0,
+                "stdout": "INSIDE_WRITE_OK\r\n\r\n",
+                "stderr": ""
+              }
+            }
+          }
+        },
+        "outside_project_write_blocked": {
+          "status": "pass",
+          "summary": "프로젝트 밖: 쓰기가 차단됨",
+          "evidence": {
+            "target_exists": false,
+            "command": {
+              "rpc_ok": true,
+              "duration_ms": 407,
+              "response": {
+                "exitCode": 1,
+                "stdout": "",
+                "stderr": "Set-Content : 'D:\\codex\\flowmarshal-gate0a-canary\\20260901T185247-e05e5fc1\\sdk-pinned\\outside-write-must-not-exist.txt'\r\n 경로에 대한 액세스가 거부되었습니다.\r\n위치 줄:1 문자:32\r\n+ ... nce='Stop'; Set-Content -LiteralPath 'D:\\codex\\flowmarshal-gate0a-can ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : PermissionDenied: (D:\\codex\\flowma...t-not-exist.txt:String) [Set-Content], Unauthorized \r\n   AccessException\r\n    + FullyQualifiedErrorId : GetContentWriterUnauthorizedAccessError,Microsoft.PowerShell.Commands.SetContentCommand\r\n \r\n"
+              }
+            }
+          }
+        },
+        "localappdata_write_blocked": {
+          "status": "pass",
+          "summary": "LocalAppData: 쓰기가 차단됨",
+          "evidence": {
+            "target_exists": false,
+            "command": {
+              "rpc_ok": true,
+              "duration_ms": 406,
+              "response": {
+                "exitCode": 1,
+                "stdout": "",
+                "stderr": "Set-Content : 'C:\\Users\\sjs95\\AppData\\Local\\FlowMarshal\\Gate0A\\20260901T185247-e05e5fc1\\sdk-pinned\\localappdata-write-m\r\nust-not-exist.txt' 경로에 대한 액세스가 거부되었습니다.\r\n위치 줄:1 문자:32\r\n+ ... nce='Stop'; Set-Content -LiteralPath 'C:\\Users\\sjs95\\AppData\\Local\\Fl ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : PermissionDenied: (C:\\Users\\sjs95\\...t-not-exist.txt:String) [Set-Content], Unauthorized \r\n   AccessException\r\n    + FullyQualifiedErrorId : GetContentWriterUnauthorizedAccessError,Microsoft.PowerShell.Commands.SetContentCommand\r\n \r\n"
+              }
+            }
+          }
+        },
+        "command_network_blocked": {
+          "status": "pass",
+          "summary": "명령 네트워크가 차단됨",
+          "evidence": {
+            "network_reached": false,
+            "command": {
+              "rpc_ok": true,
+              "duration_ms": 406,
+              "response": {
+                "exitCode": 23,
+                "stdout": "NETWORK_BLOCKED\r\n",
+                "stderr": ""
+              }
+            }
+          }
+        },
+        "thread_turn_separation": {
+          "status": "pass",
+          "summary": "thread/start 직후 turn이 생성되지 않음",
+          "evidence": {
+            "turns_before_turn_start": 0
+          }
+        },
+        "turn_execution": {
+          "status": "pass",
+          "summary": "turn/start로 시작한 최소 turn이 완료됨",
+          "evidence": {
+            "turn_id": "01a05c62-c557-78e3-b790-746c4ec7ab19",
+            "completion_status": "completed"
+          }
+        },
+        "external_surfaces_disabled": {
+          "status": "pass",
+          "summary": "Web Search/MCP/Plugin/Connector 및 Browser·Computer Use 진입 표면이 비활성화됨",
+          "evidence": {
+            "web_search_disabled": true,
+            "apps_feature_disabled": true,
+            "plugins_feature_disabled": true,
+            "browser_computer_features_disabled": true,
+            "mcp_inventory_disabled": true,
+            "apps_inventory_disabled": true
+          }
+        },
+        "windows_elevated_sandbox": {
+          "status": "pass",
+          "summary": "Windows elevated sandbox가 유효 설정으로 확인됨",
+          "evidence": {
+            "effective_mode": "elevated"
+          }
+        },
+        "persisted_thread_listed": {
+          "status": "pass",
+          "summary": "재시작 후 thread/list에서 저장 task를 찾음",
+          "evidence": {
+            "listed_count": 1,
+            "target_found": true
+          }
+        },
+        "resume_after_restart": {
+          "status": "pass",
+          "summary": "App Server 재시작 후 thread/read와 thread/resume 성공",
+          "evidence": {
+            "read_turn_count": 1,
+            "resumed_thread_id": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0"
+          }
+        },
+        "interrupt": {
+          "status": "pass",
+          "summary": "turn/interrupt가 in-flight turn을 interrupted 상태로 종료함",
+          "evidence": {
+            "turn_id": "01a05c62-e73f-7c43-9077-80bf0e259fea",
+            "rpc_ok": true,
+            "rpc_error": null,
+            "saw_turn_started": true,
+            "completion_status": "interrupted"
+          }
+        }
+      },
+      "evidence": {
+        "sandbox": {
+          "workspace": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\20260901T185247-e05e5fc1\\sdk-pinned\\workspace",
+          "project_outside_canary": "D:\\codex\\flowmarshal-gate0a-canary\\20260901T185247-e05e5fc1\\sdk-pinned\\outside-read.txt",
+          "localappdata_canary": "C:\\Users\\sjs95\\AppData\\Local\\FlowMarshal\\Gate0A\\20260901T185247-e05e5fc1\\sdk-pinned\\localappdata-read.txt",
+          "canary_hashes": {
+            "inside": "72adf0b66d87466f66f73623b2fca1e6329cf0705add0abec1dd7c49f49ad662",
+            "project_outside": "54a2494ac23a78b1e68836159b91686705ad2cc91bc59ed17991129e7934ddc2",
+            "localappdata": "fb7d8119316fc345b4c9add18d21a17d6eff11dd2bd7b0c722b206a2aa85eae8"
+          },
+          "permission_profile_id": "flowmarshal_gate0a",
+          "permission_profile_inventory": {
+            "data": [
+              {
+                "id": ":read-only",
+                "description": null,
+                "allowed": true
+              },
+              {
+                "id": ":workspace",
+                "description": null,
+                "allowed": true
+              },
+              {
+                "id": ":danger-full-access",
+                "description": null,
+                "allowed": true
+              },
+              {
+                "id": "flowmarshal_gate0a",
+                "description": null,
+                "allowed": true
+              }
+            ],
+            "nextCursor": null
+          },
+          "fallback_policy_used": false
+        },
+        "first_session": {
+          "thread_id": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+          "thread_start": {
+            "approvalPolicy": "on-request",
+            "approvalsReviewer": "user",
+            "cwd": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\20260901T185247-e05e5fc1\\sdk-pinned\\workspace",
+            "instructionSources": [
+              "C:\\Users\\sjs95\\.codex\\AGENTS.md"
+            ],
+            "model": "gpt-5.6-sol",
+            "modelProvider": "openai",
+            "reasoningEffort": "max",
+            "sandbox": {
+              "excludeSlashTmp": true,
+              "excludeTmpdirEnvVar": true,
+              "networkAccess": false,
+              "type": "workspaceWrite",
+              "writableRoots": []
+            },
+            "serviceTier": "default",
+            "thread": {
+              "agentNickname": null,
+              "agentRole": null,
+              "cliVersion": "0.147.0",
+              "createdAt": 1788256370,
+              "cwd": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\20260901T185247-e05e5fc1\\sdk-pinned\\workspace",
+              "ephemeral": false,
+              "forkedFromId": null,
+              "gitInfo": null,
+              "id": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+              "modelProvider": "openai",
+              "name": null,
+              "parentThreadId": null,
+              "path": "C:\\Users\\sjs95\\.codex\\sessions\\2026\\09\\01\\rollout-2026-09-01T18-52-50-01a05c62-bd9b-7ad3-a021-d1df7fa950b0.jsonl",
+              "preview": "",
+              "recencyAt": 1788256370,
+              "section": null,
+              "sectionEnteredAt": null,
+              "sessionId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+              "source": "vscode",
+              "status": {
+                "type": "idle"
+              },
+              "threadSource": null,
+              "turns": [],
+              "updatedAt": 1788256370
+            }
+          },
+          "name_set": {},
+          "thread_title": "FlowMarshal Gate 0A sdk-pinned 20260901",
+          "turn_id": "01a05c62-c557-78e3-b790-746c4ec7ab19",
+          "turn_wait": {
+            "completed": true,
+            "event": {
+              "method": "turn/completed",
+              "payload": {
+                "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                "turn": {
+                  "completedAt": 1788256374,
+                  "durationMs": 2759,
+                  "error": null,
+                  "id": "01a05c62-c557-78e3-b790-746c4ec7ab19",
+                  "items": [
+                    {
+                      "id": "msg_02ba7c3cc82ffe7f016a96a0769bcc87d0a4791841100eb914",
+                      "memoryCitation": null,
+                      "phase": "final_answer",
+                      "text": "{\"status\":\"GATE0A_OK\"}",
+                      "type": "agentMessage"
+                    }
+                  ],
+                  "itemsView": "summary",
+                  "startedAt": 1788256372,
+                  "status": "completed"
+                }
+              }
+            },
+            "events": [
+              {
+                "method": "turn/started",
+                "payload": {
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turn": {
+                    "completedAt": null,
+                    "durationMs": null,
+                    "error": null,
+                    "id": "01a05c62-c557-78e3-b790-746c4ec7ab19",
+                    "items": [],
+                    "itemsView": "notLoaded",
+                    "startedAt": 1788256372,
+                    "status": "inProgress"
+                  }
+                }
+              },
+              {
+                "method": "item/started",
+                "payload": {
+                  "item": {
+                    "clientId": null,
+                    "content": [
+                      {
+                        "text": "도구를 사용하지 말고 GATE0A_OK 한 줄만 답하세요.",
+                        "text_elements": [],
+                        "type": "text"
+                      }
+                    ],
+                    "id": "01a05c62-c7fc-7d92-9c5c-c2ca2baa1f4d",
+                    "type": "userMessage"
+                  },
+                  "startedAtMs": 1788256372732,
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-c557-78e3-b790-746c4ec7ab19"
+                }
+              },
+              {
+                "method": "item/completed",
+                "payload": {
+                  "completedAtMs": 1788256372732,
+                  "item": {
+                    "clientId": null,
+                    "content": [
+                      {
+                        "text": "도구를 사용하지 말고 GATE0A_OK 한 줄만 답하세요.",
+                        "text_elements": [],
+                        "type": "text"
+                      }
+                    ],
+                    "id": "01a05c62-c7fc-7d92-9c5c-c2ca2baa1f4d",
+                    "type": "userMessage"
+                  },
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-c557-78e3-b790-746c4ec7ab19"
+                }
+              },
+              {
+                "method": "item/started",
+                "payload": {
+                  "item": {
+                    "id": "msg_02ba7c3cc82ffe7f016a96a0769bcc87d0a4791841100eb914",
+                    "memoryCitation": null,
+                    "phase": "final_answer",
+                    "text": "",
+                    "type": "agentMessage"
+                  },
+                  "startedAtMs": 1788256374512,
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-c557-78e3-b790-746c4ec7ab19"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "{\"",
+                  "itemId": "msg_02ba7c3cc82ffe7f016a96a0769bcc87d0a4791841100eb914",
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-c557-78e3-b790-746c4ec7ab19"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "status",
+                  "itemId": "msg_02ba7c3cc82ffe7f016a96a0769bcc87d0a4791841100eb914",
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-c557-78e3-b790-746c4ec7ab19"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "\":\"",
+                  "itemId": "msg_02ba7c3cc82ffe7f016a96a0769bcc87d0a4791841100eb914",
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-c557-78e3-b790-746c4ec7ab19"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "G",
+                  "itemId": "msg_02ba7c3cc82ffe7f016a96a0769bcc87d0a4791841100eb914",
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-c557-78e3-b790-746c4ec7ab19"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "ATE",
+                  "itemId": "msg_02ba7c3cc82ffe7f016a96a0769bcc87d0a4791841100eb914",
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-c557-78e3-b790-746c4ec7ab19"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "0",
+                  "itemId": "msg_02ba7c3cc82ffe7f016a96a0769bcc87d0a4791841100eb914",
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-c557-78e3-b790-746c4ec7ab19"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "A",
+                  "itemId": "msg_02ba7c3cc82ffe7f016a96a0769bcc87d0a4791841100eb914",
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-c557-78e3-b790-746c4ec7ab19"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "_OK",
+                  "itemId": "msg_02ba7c3cc82ffe7f016a96a0769bcc87d0a4791841100eb914",
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-c557-78e3-b790-746c4ec7ab19"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "\"}",
+                  "itemId": "msg_02ba7c3cc82ffe7f016a96a0769bcc87d0a4791841100eb914",
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-c557-78e3-b790-746c4ec7ab19"
+                }
+              },
+              {
+                "method": "item/completed",
+                "payload": {
+                  "completedAtMs": 1788256374813,
+                  "item": {
+                    "id": "msg_02ba7c3cc82ffe7f016a96a0769bcc87d0a4791841100eb914",
+                    "memoryCitation": null,
+                    "phase": "final_answer",
+                    "text": "{\"status\":\"GATE0A_OK\"}",
+                    "type": "agentMessage"
+                  },
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-c557-78e3-b790-746c4ec7ab19"
+                }
+              },
+              {
+                "method": "thread/tokenUsage/updated",
+                "payload": {
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "tokenUsage": {
+                    "last": {
+                      "cacheWriteInputTokens": 0,
+                      "cachedInputTokens": 0,
+                      "inputTokens": 10764,
+                      "outputTokens": 19,
+                      "reasoningOutputTokens": 0,
+                      "totalTokens": 10783
+                    },
+                    "modelContextWindow": 258400,
+                    "total": {
+                      "cacheWriteInputTokens": 0,
+                      "cachedInputTokens": 0,
+                      "inputTokens": 10764,
+                      "outputTokens": 19,
+                      "reasoningOutputTokens": 0,
+                      "totalTokens": 10783
+                    }
+                  },
+                  "turnId": "01a05c62-c557-78e3-b790-746c4ec7ab19"
+                }
+              },
+              {
+                "method": "turn/completed",
+                "payload": {
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turn": {
+                    "completedAt": 1788256374,
+                    "durationMs": 2759,
+                    "error": null,
+                    "id": "01a05c62-c557-78e3-b790-746c4ec7ab19",
+                    "items": [
+                      {
+                        "id": "msg_02ba7c3cc82ffe7f016a96a0769bcc87d0a4791841100eb914",
+                        "memoryCitation": null,
+                        "phase": "final_answer",
+                        "text": "{\"status\":\"GATE0A_OK\"}",
+                        "type": "agentMessage"
+                      }
+                    ],
+                    "itemsView": "summary",
+                    "startedAt": 1788256372,
+                    "status": "completed"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "external_surfaces": {
+          "storage_sanitized": true,
+          "effective_config": {
+            "ok": true,
+            "result": {
+              "config": {
+                "web_search": "disabled",
+                "features": {
+                  "apps": false,
+                  "plugins": false,
+                  "remote_plugin": false,
+                  "skill_mcp_dependency_install": false,
+                  "multi_agent": false,
+                  "in_app_browser": false,
+                  "browser_use": false,
+                  "browser_use_full_cdp_access": false,
+                  "browser_use_external": false,
+                  "computer_use": false,
+                  "plugin_sharing": false
+                },
+                "windows": {
+                  "sandbox": "elevated"
+                },
+                "default_permissions": "flowmarshal_gate0a",
+                "permission_profile": {
+                  "id": "flowmarshal_gate0a",
+                  "extends": null,
+                  "filesystem": {
+                    "glob_scan_max_depth": null,
+                    ":minimal": "read",
+                    ":root": "deny",
+                    ":slash_tmp": "deny",
+                    ":tmpdir": "deny",
+                    ":workspace_roots": {
+                      ".": "write"
+                    }
+                  },
+                  "network_enabled": false
+                }
+              }
+            }
+          },
+          "features": {
+            "ok": true,
+            "result": {
+              "data": [
+                {
+                  "name": "web_search_request",
+                  "enabled": false,
+                  "defaultEnabled": false,
+                  "stage": "deprecated"
+                },
+                {
+                  "name": "standalone_web_search",
+                  "enabled": false,
+                  "defaultEnabled": false,
+                  "stage": "underDevelopment"
+                },
+                {
+                  "name": "multi_agent",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "apps",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "plugins",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "in_app_browser",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "browser_use",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "browser_use_full_cdp_access",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "browser_use_external",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "computer_use",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "remote_plugin",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "plugin_sharing",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "skill_mcp_dependency_install",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                }
+              ]
+            }
+          },
+          "mcp": {
+            "ok": true,
+            "result": {
+              "data": [
+                {
+                  "name": "cua_repl",
+                  "runtimeStatus": null,
+                  "toolCount": 0
+                },
+                {
+                  "name": "node_repl",
+                  "runtimeStatus": null,
+                  "toolCount": 0
+                }
+              ]
+            }
+          },
+          "apps": {
+            "ok": true,
+            "result": {
+              "apps": [
+                {
+                  "id": "connector_20205bf7d4e99a89d7154bb849718324",
+                  "runtimeName": "Sites",
+                  "enabled": false,
+                  "callable": false
+                },
+                {
+                  "id": "connector_2128aebfecb84f64a069897515042a44",
+                  "runtimeName": "Gmail",
+                  "enabled": false,
+                  "callable": false
+                },
+                {
+                  "id": "connector_5f3c8c41a1e54ad7a76272c89e2554fa",
+                  "runtimeName": "Google Drive",
+                  "enabled": false,
+                  "callable": false
+                },
+                {
+                  "id": "connector_76869538009648d5b282a4bb21c3d157",
+                  "runtimeName": "GitHub",
+                  "enabled": false,
+                  "callable": false
+                },
+                {
+                  "id": "connector_openai_codex_document_control",
+                  "runtimeName": "Codex Document Control",
+                  "enabled": false,
+                  "callable": false
+                },
+                {
+                  "id": "connector_openai_hotline",
+                  "runtimeName": "Hotline",
+                  "enabled": false,
+                  "callable": false
+                },
+                {
+                  "id": "connector_openai_plugin_management",
+                  "runtimeName": "Plugin Management",
+                  "enabled": false,
+                  "callable": false
+                },
+                {
+                  "id": "connector_openai_safety_settings",
+                  "runtimeName": "Safety Settings",
+                  "enabled": false,
+                  "callable": false
+                }
+              ]
+            }
+          }
+        },
+        "restart_initialize": {
+          "serverInfo": null,
+          "userAgent": "Codex Desktop/0.147.0 (Windows 10.0.26200; x86_64) dumb (flowmarshal_gate0a; 0.1.0)",
+          "platformFamily": "windows",
+          "platformOs": "windows"
+        },
+        "second_session": {
+          "thread_list_ids": [
+            "01a05c62-bd9b-7ad3-a021-d1df7fa950b0"
+          ],
+          "thread_list_sources": {
+            "01a05c62-bd9b-7ad3-a021-d1df7fa950b0": "vscode"
+          },
+          "thread_read_after_restart": {
+            "thread": {
+              "agentNickname": null,
+              "agentRole": null,
+              "cliVersion": "0.147.0",
+              "createdAt": 1788256370,
+              "cwd": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\20260901T185247-e05e5fc1\\sdk-pinned\\workspace",
+              "ephemeral": false,
+              "forkedFromId": null,
+              "gitInfo": null,
+              "id": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+              "modelProvider": "openai",
+              "name": "FlowMarshal Gate 0A sdk-pinned 20260901",
+              "parentThreadId": null,
+              "path": "C:\\Users\\sjs95\\.codex\\sessions\\2026\\09\\01\\rollout-2026-09-01T18-52-50-01a05c62-bd9b-7ad3-a021-d1df7fa950b0.jsonl",
+              "preview": "도구를 사용하지 말고 GATE0A_OK 한 줄만 답하세요.",
+              "recencyAt": 1788256372,
+              "section": null,
+              "sectionEnteredAt": null,
+              "sessionId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+              "source": "vscode",
+              "status": {
+                "type": "notLoaded"
+              },
+              "threadSource": null,
+              "turns": [
+                {
+                  "completedAt": 1788256374,
+                  "durationMs": 2759,
+                  "error": null,
+                  "id": "01a05c62-c557-78e3-b790-746c4ec7ab19",
+                  "items": [
+                    {
+                      "clientId": null,
+                      "content": [
+                        {
+                          "text": "도구를 사용하지 말고 GATE0A_OK 한 줄만 답하세요.",
+                          "text_elements": [],
+                          "type": "text"
+                        }
+                      ],
+                      "id": "item-1",
+                      "type": "userMessage"
+                    },
+                    {
+                      "id": "item-2",
+                      "memoryCitation": null,
+                      "phase": "final_answer",
+                      "text": "{\"status\":\"GATE0A_OK\"}",
+                      "type": "agentMessage"
+                    }
+                  ],
+                  "itemsView": "full",
+                  "startedAt": 1788256372,
+                  "status": "completed"
+                }
+              ],
+              "updatedAt": 1788256374
+            }
+          },
+          "thread_resume_after_restart": {
+            "approvalPolicy": "never",
+            "approvalsReviewer": "user",
+            "cwd": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\20260901T185247-e05e5fc1\\sdk-pinned\\workspace",
+            "instructionSources": [
+              "C:\\Users\\sjs95\\.codex\\AGENTS.md"
+            ],
+            "model": "gpt-5.6-sol",
+            "modelProvider": "openai",
+            "reasoningEffort": "low",
+            "sandbox": {
+              "excludeSlashTmp": true,
+              "excludeTmpdirEnvVar": true,
+              "networkAccess": false,
+              "type": "workspaceWrite",
+              "writableRoots": []
+            },
+            "serviceTier": "default",
+            "thread": {
+              "agentNickname": null,
+              "agentRole": null,
+              "cliVersion": "0.147.0",
+              "createdAt": 1788256370,
+              "cwd": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\20260901T185247-e05e5fc1\\sdk-pinned\\workspace",
+              "ephemeral": false,
+              "forkedFromId": null,
+              "gitInfo": null,
+              "id": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+              "modelProvider": "openai",
+              "name": "FlowMarshal Gate 0A sdk-pinned 20260901",
+              "parentThreadId": null,
+              "path": "\\\\?\\C:\\Users\\sjs95\\.codex\\sessions\\2026\\09\\01\\rollout-2026-09-01T18-52-50-01a05c62-bd9b-7ad3-a021-d1df7fa950b0.jsonl",
+              "preview": "도구를 사용하지 말고 GATE0A_OK 한 줄만 답하세요.",
+              "recencyAt": 1788256372,
+              "section": null,
+              "sectionEnteredAt": null,
+              "sessionId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+              "source": "vscode",
+              "status": {
+                "type": "idle"
+              },
+              "threadSource": null,
+              "turns": [
+                {
+                  "completedAt": 1788256374,
+                  "durationMs": 2759,
+                  "error": null,
+                  "id": "01a05c62-c557-78e3-b790-746c4ec7ab19",
+                  "items": [
+                    {
+                      "clientId": null,
+                      "content": [
+                        {
+                          "text": "도구를 사용하지 말고 GATE0A_OK 한 줄만 답하세요.",
+                          "text_elements": [],
+                          "type": "text"
+                        }
+                      ],
+                      "id": "item-1",
+                      "type": "userMessage"
+                    },
+                    {
+                      "id": "item-2",
+                      "memoryCitation": null,
+                      "phase": "final_answer",
+                      "text": "{\"status\":\"GATE0A_OK\"}",
+                      "type": "agentMessage"
+                    }
+                  ],
+                  "itemsView": "full",
+                  "startedAt": 1788256372,
+                  "status": "completed"
+                }
+              ],
+              "updatedAt": 1788256370
+            }
+          },
+          "interrupt_wait": {
+            "completed": true,
+            "event": {
+              "method": "turn/completed",
+              "payload": {
+                "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                "turn": {
+                  "completedAt": 1788256380,
+                  "durationMs": 29,
+                  "error": null,
+                  "id": "01a05c62-e73f-7c43-9077-80bf0e259fea",
+                  "items": [],
+                  "itemsView": "notLoaded",
+                  "startedAt": 1788256380,
+                  "status": "interrupted"
+                }
+              }
+            },
+            "events": [
+              {
+                "method": "turn/started",
+                "payload": {
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turn": {
+                    "completedAt": null,
+                    "durationMs": null,
+                    "error": null,
+                    "id": "01a05c62-e73f-7c43-9077-80bf0e259fea",
+                    "items": [],
+                    "itemsView": "notLoaded",
+                    "startedAt": 1788256380,
+                    "status": "inProgress"
+                  }
+                }
+              },
+              {
+                "method": "item/started",
+                "payload": {
+                  "item": {
+                    "clientId": null,
+                    "content": [
+                      {
+                        "text": "이 메시지에는 응답하지 말고 대기하세요. 이 turn은 즉시 interrupt 검사를 받습니다.",
+                        "text_elements": [],
+                        "type": "text"
+                      }
+                    ],
+                    "id": "01a05c62-e759-7a32-90be-1830e43b0672",
+                    "type": "userMessage"
+                  },
+                  "startedAtMs": 1788256380761,
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-e73f-7c43-9077-80bf0e259fea"
+                }
+              },
+              {
+                "method": "item/completed",
+                "payload": {
+                  "completedAtMs": 1788256380761,
+                  "item": {
+                    "clientId": null,
+                    "content": [
+                      {
+                        "text": "이 메시지에는 응답하지 말고 대기하세요. 이 turn은 즉시 interrupt 검사를 받습니다.",
+                        "text_elements": [],
+                        "type": "text"
+                      }
+                    ],
+                    "id": "01a05c62-e759-7a32-90be-1830e43b0672",
+                    "type": "userMessage"
+                  },
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turnId": "01a05c62-e73f-7c43-9077-80bf0e259fea"
+                }
+              },
+              {
+                "method": "turn/completed",
+                "payload": {
+                  "threadId": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+                  "turn": {
+                    "completedAt": 1788256380,
+                    "durationMs": 29,
+                    "error": null,
+                    "id": "01a05c62-e73f-7c43-9077-80bf0e259fea",
+                    "items": [],
+                    "itemsView": "notLoaded",
+                    "startedAt": 1788256380,
+                    "status": "interrupted"
+                  }
+                }
+              }
+            ],
+            "saw_turn_started": true,
+            "interrupt_rpc_ok": true,
+            "interrupt_rpc_error": null
+          }
+        },
+        "approval_requests": [
+          {
+            "method": "item/commandExecution/requestApproval",
+            "received_at": "2026-09-01T09:52:47.281165Z"
+          },
+          {
+            "method": "item/fileChange/requestApproval",
+            "received_at": "2026-09-01T09:52:47.281165Z"
+          },
+          {
+            "method": "item/permissions/requestApproval",
+            "received_at": "2026-09-01T09:52:47.281165Z"
+          },
+          {
+            "method": "item/tool/requestUserInput",
+            "received_at": "2026-09-01T09:52:47.281165Z"
+          },
+          {
+            "method": "mcpServer/elicitation/request",
+            "received_at": "2026-09-01T09:52:47.281165Z"
+          }
+        ]
+      },
+      "thread_id": "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+      "thread_title": "FlowMarshal Gate 0A sdk-pinned 20260901",
+      "completed_at": "2026-09-01T09:53:00.815343Z"
+    },
+    {
+      "name": "desktop-system",
+      "role": "Codex Desktop/시스템 런타임",
+      "executable": "C:\\Users\\sjs95\\.codex\\packages\\standalone\\releases\\0.151.0-x86_64-pc-windows-msvc\\bin\\codex.exe",
+      "version": {
+        "exit_code": 0,
+        "stdout": "codex-cli 0.151.0",
+        "stderr": ""
+      },
+      "started_at": "2026-09-01T09:53:00.820343Z",
+      "checks": {
+        "approvals_fail_closed": {
+          "status": "pass",
+          "summary": "모든 알려진 서버 승인/입력 요청이 명시적 거절 응답으로 매핑됨",
+          "evidence": {
+            "responses": {
+              "item/commandExecution/requestApproval": {
+                "decision": "decline"
+              },
+              "item/fileChange/requestApproval": {
+                "decision": "decline"
+              },
+              "item/permissions/requestApproval": {
+                "permissions": {},
+                "scope": "turn",
+                "strictAutoReview": true
+              },
+              "item/tool/requestUserInput": {
+                "answers": {}
+              },
+              "mcpServer/elicitation/request": {
+                "action": "decline",
+                "content": null
+              }
+            }
+          }
+        },
+        "initialize": {
+          "status": "pass",
+          "summary": "initialize 요청과 initialized 알림 완료",
+          "evidence": {
+            "response": {
+              "serverInfo": null,
+              "userAgent": "Codex Desktop/0.151.0 (Windows 10.0.26200; x86_64) dumb (flowmarshal_gate0a; 0.1.0)",
+              "platformFamily": "windows",
+              "platformOs": "windows"
+            }
+          }
+        },
+        "restricted_policy_supported": {
+          "status": "pass",
+          "summary": "제한 permission profile이 수락되고 내부 읽기가 성공함",
+          "evidence": {
+            "profile_id": "flowmarshal_gate0a",
+            "profile_entry": {
+              "id": "flowmarshal_gate0a",
+              "description": null,
+              "allowed": true
+            },
+            "command": {
+              "rpc_ok": true,
+              "duration_ms": 375,
+              "response": {
+                "exitCode": 0,
+                "stdout": "<CANARY_TOKEN_REDACTED>\r\n",
+                "stderr": ""
+              }
+            }
+          }
+        },
+        "restricted_project_outside_read": {
+          "status": "fail",
+          "summary": "프로젝트 밖: 읽기 경계가 깨짐",
+          "evidence": {
+            "token_exposed": true,
+            "command": {
+              "rpc_ok": true,
+              "duration_ms": 375,
+              "response": {
+                "exitCode": 0,
+                "stdout": "<CANARY_TOKEN_REDACTED>\r\n",
+                "stderr": ""
+              }
+            }
+          }
+        },
+        "restricted_localappdata_read": {
+          "status": "fail",
+          "summary": "LocalAppData: 읽기 경계가 깨짐",
+          "evidence": {
+            "token_exposed": true,
+            "command": {
+              "rpc_ok": true,
+              "duration_ms": 375,
+              "response": {
+                "exitCode": 0,
+                "stdout": "<CANARY_TOKEN_REDACTED>\r\n",
+                "stderr": ""
+              }
+            }
+          }
+        },
+        "inside_workspace_write": {
+          "status": "pass",
+          "summary": "워크스페이스 내부 쓰기 성공",
+          "evidence": {
+            "target_exists": true,
+            "command": {
+              "rpc_ok": true,
+              "duration_ms": 359,
+              "response": {
+                "exitCode": 0,
+                "stdout": "INSIDE_WRITE_OK\r\n\r\n",
+                "stderr": ""
+              }
+            }
+          }
+        },
+        "outside_project_write_blocked": {
+          "status": "pass",
+          "summary": "프로젝트 밖: 쓰기가 차단됨",
+          "evidence": {
+            "target_exists": false,
+            "command": {
+              "rpc_ok": true,
+              "duration_ms": 422,
+              "response": {
+                "exitCode": 1,
+                "stdout": "",
+                "stderr": "Set-Content : 'D:\\codex\\flowmarshal-gate0a-canary\\20260901T185247-e05e5fc1\\desktop-system\\outside-write-must-not-exist.\r\ntxt' 경로에 대한 액세스가 거부되었습니다.\r\n위치 줄:1 문자:32\r\n+ ... nce='Stop'; Set-Content -LiteralPath 'D:\\codex\\flowmarshal-gate0a-can ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : PermissionDenied: (D:\\codex\\flowma...t-not-exist.txt:String) [Set-Content], Unauthorized \r\n   AccessException\r\n    + FullyQualifiedErrorId : GetContentWriterUnauthorizedAccessError,Microsoft.PowerShell.Commands.SetContentCommand\r\n \r\n"
+              }
+            }
+          }
+        },
+        "localappdata_write_blocked": {
+          "status": "pass",
+          "summary": "LocalAppData: 쓰기가 차단됨",
+          "evidence": {
+            "target_exists": false,
+            "command": {
+              "rpc_ok": true,
+              "duration_ms": 422,
+              "response": {
+                "exitCode": 1,
+                "stdout": "",
+                "stderr": "Set-Content : 'C:\\Users\\sjs95\\AppData\\Local\\FlowMarshal\\Gate0A\\20260901T185247-e05e5fc1\\desktop-system\\localappdata-wri\r\nte-must-not-exist.txt' 경로에 대한 액세스가 거부되었습니다.\r\n위치 줄:1 문자:32\r\n+ ... nce='Stop'; Set-Content -LiteralPath 'C:\\Users\\sjs95\\AppData\\Local\\Fl ...\r\n+                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\r\n    + CategoryInfo          : PermissionDenied: (C:\\Users\\sjs95\\...t-not-exist.txt:String) [Set-Content], Unauthorized \r\n   AccessException\r\n    + FullyQualifiedErrorId : GetContentWriterUnauthorizedAccessError,Microsoft.PowerShell.Commands.SetContentCommand\r\n \r\n"
+              }
+            }
+          }
+        },
+        "command_network_blocked": {
+          "status": "pass",
+          "summary": "명령 네트워크가 차단됨",
+          "evidence": {
+            "network_reached": false,
+            "command": {
+              "rpc_ok": true,
+              "duration_ms": 422,
+              "response": {
+                "exitCode": 23,
+                "stdout": "NETWORK_BLOCKED\r\n",
+                "stderr": ""
+              }
+            }
+          }
+        },
+        "thread_turn_separation": {
+          "status": "pass",
+          "summary": "thread/start 직후 turn이 생성되지 않음",
+          "evidence": {
+            "turns_before_turn_start": 0
+          }
+        },
+        "turn_execution": {
+          "status": "pass",
+          "summary": "turn/start로 시작한 최소 turn이 완료됨",
+          "evidence": {
+            "turn_id": "01a05c62-f9a7-7531-bb4a-055f4a475a11",
+            "completion_status": "completed"
+          }
+        },
+        "external_surfaces_disabled": {
+          "status": "pass",
+          "summary": "Web Search/MCP/Plugin/Connector 및 Browser·Computer Use 진입 표면이 비활성화됨",
+          "evidence": {
+            "web_search_disabled": true,
+            "apps_feature_disabled": true,
+            "plugins_feature_disabled": true,
+            "browser_computer_features_disabled": true,
+            "mcp_inventory_disabled": true,
+            "apps_inventory_disabled": true
+          }
+        },
+        "windows_elevated_sandbox": {
+          "status": "pass",
+          "summary": "Windows elevated sandbox가 유효 설정으로 확인됨",
+          "evidence": {
+            "effective_mode": "elevated"
+          }
+        },
+        "persisted_thread_listed": {
+          "status": "pass",
+          "summary": "재시작 후 thread/list에서 저장 task를 찾음",
+          "evidence": {
+            "listed_count": 1,
+            "target_found": true
+          }
+        },
+        "resume_after_restart": {
+          "status": "pass",
+          "summary": "App Server 재시작 후 thread/read와 thread/resume 성공",
+          "evidence": {
+            "read_turn_count": 1,
+            "resumed_thread_id": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744"
+          }
+        },
+        "interrupt": {
+          "status": "pass",
+          "summary": "turn/interrupt가 in-flight turn을 interrupted 상태로 종료함",
+          "evidence": {
+            "turn_id": "01a05c63-2243-7361-8ae7-01a862601c70",
+            "rpc_ok": true,
+            "rpc_error": null,
+            "saw_turn_started": true,
+            "completion_status": "interrupted"
+          }
+        }
+      },
+      "evidence": {
+        "sandbox": {
+          "workspace": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\20260901T185247-e05e5fc1\\desktop-system\\workspace",
+          "project_outside_canary": "D:\\codex\\flowmarshal-gate0a-canary\\20260901T185247-e05e5fc1\\desktop-system\\outside-read.txt",
+          "localappdata_canary": "C:\\Users\\sjs95\\AppData\\Local\\FlowMarshal\\Gate0A\\20260901T185247-e05e5fc1\\desktop-system\\localappdata-read.txt",
+          "canary_hashes": {
+            "inside": "8fb6c1cf64f053a8605ad2fbb372e017382ab60b25f5e073f31c9071bd32536d",
+            "project_outside": "e36700a9b88ac7a7257bd6829151e3fb451d2dec87651c94910685239287673b",
+            "localappdata": "ff8bb1f4ef5f1aecc18a826b646a3d14a3c31e8d74f9c7f7cc9f054044326bd1"
+          },
+          "permission_profile_id": "flowmarshal_gate0a",
+          "permission_profile_inventory": {
+            "data": [
+              {
+                "id": ":read-only",
+                "description": null,
+                "allowed": true
+              },
+              {
+                "id": ":workspace",
+                "description": null,
+                "allowed": true
+              },
+              {
+                "id": ":danger-full-access",
+                "description": null,
+                "allowed": true
+              },
+              {
+                "id": "flowmarshal_gate0a",
+                "description": null,
+                "allowed": true
+              }
+            ],
+            "nextCursor": null
+          },
+          "fallback_policy_used": false
+        },
+        "first_session": {
+          "thread_id": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+          "thread_start": {
+            "approvalPolicy": "on-request",
+            "approvalsReviewer": "user",
+            "cwd": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\20260901T185247-e05e5fc1\\desktop-system\\workspace",
+            "instructionSources": [
+              "C:\\Users\\sjs95\\.codex\\AGENTS.md"
+            ],
+            "model": "gpt-5.6-sol",
+            "modelProvider": "openai",
+            "reasoningEffort": "max",
+            "sandbox": {
+              "excludeSlashTmp": true,
+              "excludeTmpdirEnvVar": true,
+              "networkAccess": false,
+              "type": "workspaceWrite",
+              "writableRoots": []
+            },
+            "serviceTier": "default",
+            "thread": {
+              "agentNickname": null,
+              "agentRole": null,
+              "cliVersion": "0.151.0",
+              "createdAt": 1788256384,
+              "cwd": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\20260901T185247-e05e5fc1\\desktop-system\\workspace",
+              "ephemeral": false,
+              "forkedFromId": null,
+              "gitInfo": null,
+              "id": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+              "modelProvider": "openai",
+              "name": null,
+              "parentThreadId": null,
+              "path": "C:\\Users\\sjs95\\.codex\\sessions\\2026\\09\\01\\rollout-2026-09-01T18-53-03-01a05c62-f2fd-7b52-9bdc-b47e64cf7744.jsonl",
+              "preview": "",
+              "recencyAt": 1788256384,
+              "section": null,
+              "sectionEnteredAt": null,
+              "sessionId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+              "source": "vscode",
+              "status": {
+                "type": "idle"
+              },
+              "threadSource": null,
+              "turns": [],
+              "updatedAt": 1788256384
+            }
+          },
+          "name_set": {},
+          "thread_title": "FlowMarshal Gate 0A desktop-system 20260901",
+          "turn_id": "01a05c62-f9a7-7531-bb4a-055f4a475a11",
+          "turn_wait": {
+            "completed": true,
+            "event": {
+              "method": "turn/completed",
+              "payload": {
+                "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                "turn": {
+                  "completedAt": 1788256389,
+                  "durationMs": 3675,
+                  "error": null,
+                  "id": "01a05c62-f9a7-7531-bb4a-055f4a475a11",
+                  "items": [
+                    {
+                      "id": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                      "memoryCitation": null,
+                      "phase": "final_answer",
+                      "text": "{\"status\":\"GATE0A_OK\"}",
+                      "type": "agentMessage"
+                    }
+                  ],
+                  "itemsView": "summary",
+                  "startedAt": 1788256385,
+                  "status": "completed"
+                }
+              }
+            },
+            "events": [
+              {
+                "method": "turn/started",
+                "payload": {
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turn": {
+                    "completedAt": null,
+                    "durationMs": null,
+                    "error": null,
+                    "id": "01a05c62-f9a7-7531-bb4a-055f4a475a11",
+                    "items": [],
+                    "itemsView": "notLoaded",
+                    "startedAt": 1788256385,
+                    "status": "inProgress"
+                  }
+                }
+              },
+              {
+                "method": "item/started",
+                "payload": {
+                  "item": {
+                    "clientId": null,
+                    "content": [
+                      {
+                        "text": "도구를 사용하지 말고 GATE0A_OK 한 줄만 답하세요.",
+                        "text_elements": [],
+                        "type": "text"
+                      }
+                    ],
+                    "id": "01a05c62-fda5-79b1-84f6-aae5c57c3017",
+                    "type": "userMessage"
+                  },
+                  "startedAtMs": 1788256386469,
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c62-f9a7-7531-bb4a-055f4a475a11"
+                }
+              },
+              {
+                "method": "item/completed",
+                "payload": {
+                  "completedAtMs": 1788256386469,
+                  "item": {
+                    "clientId": null,
+                    "content": [
+                      {
+                        "text": "도구를 사용하지 말고 GATE0A_OK 한 줄만 답하세요.",
+                        "text_elements": [],
+                        "type": "text"
+                      }
+                    ],
+                    "id": "01a05c62-fda5-79b1-84f6-aae5c57c3017",
+                    "type": "userMessage"
+                  },
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c62-f9a7-7531-bb4a-055f4a475a11"
+                }
+              },
+              {
+                "method": "item/started",
+                "payload": {
+                  "item": {
+                    "id": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                    "memoryCitation": null,
+                    "phase": "final_answer",
+                    "text": "",
+                    "type": "agentMessage"
+                  },
+                  "startedAtMs": 1788256388850,
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c62-f9a7-7531-bb4a-055f4a475a11"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "{\"",
+                  "itemId": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c62-f9a7-7531-bb4a-055f4a475a11"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "status",
+                  "itemId": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c62-f9a7-7531-bb4a-055f4a475a11"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "\":\"",
+                  "itemId": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c62-f9a7-7531-bb4a-055f4a475a11"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "G",
+                  "itemId": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c62-f9a7-7531-bb4a-055f4a475a11"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "ATE",
+                  "itemId": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c62-f9a7-7531-bb4a-055f4a475a11"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "0",
+                  "itemId": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c62-f9a7-7531-bb4a-055f4a475a11"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "A",
+                  "itemId": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c62-f9a7-7531-bb4a-055f4a475a11"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "_OK",
+                  "itemId": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c62-f9a7-7531-bb4a-055f4a475a11"
+                }
+              },
+              {
+                "method": "item/agentMessage/delta",
+                "payload": {
+                  "delta": "\"}",
+                  "itemId": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c62-f9a7-7531-bb4a-055f4a475a11"
+                }
+              },
+              {
+                "method": "item/completed",
+                "payload": {
+                  "completedAtMs": 1788256389099,
+                  "item": {
+                    "id": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                    "memoryCitation": null,
+                    "phase": "final_answer",
+                    "text": "{\"status\":\"GATE0A_OK\"}",
+                    "type": "agentMessage"
+                  },
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c62-f9a7-7531-bb4a-055f4a475a11"
+                }
+              },
+              {
+                "method": "thread/tokenUsage/updated",
+                "payload": {
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "tokenUsage": {
+                    "last": {
+                      "cacheWriteInputTokens": 0,
+                      "cachedInputTokens": 0,
+                      "inputTokens": 10981,
+                      "outputTokens": 19,
+                      "reasoningOutputTokens": 0,
+                      "totalTokens": 11000
+                    },
+                    "modelContextWindow": 258400,
+                    "total": {
+                      "cacheWriteInputTokens": 0,
+                      "cachedInputTokens": 0,
+                      "inputTokens": 10981,
+                      "outputTokens": 19,
+                      "reasoningOutputTokens": 0,
+                      "totalTokens": 11000
+                    }
+                  },
+                  "turnId": "01a05c62-f9a7-7531-bb4a-055f4a475a11"
+                }
+              },
+              {
+                "method": "turn/completed",
+                "payload": {
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turn": {
+                    "completedAt": 1788256389,
+                    "durationMs": 3675,
+                    "error": null,
+                    "id": "01a05c62-f9a7-7531-bb4a-055f4a475a11",
+                    "items": [
+                      {
+                        "id": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                        "memoryCitation": null,
+                        "phase": "final_answer",
+                        "text": "{\"status\":\"GATE0A_OK\"}",
+                        "type": "agentMessage"
+                      }
+                    ],
+                    "itemsView": "summary",
+                    "startedAt": 1788256385,
+                    "status": "completed"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "external_surfaces": {
+          "storage_sanitized": true,
+          "effective_config": {
+            "ok": true,
+            "result": {
+              "config": {
+                "web_search": "disabled",
+                "features": {
+                  "apps": false,
+                  "plugins": false,
+                  "remote_plugin": false,
+                  "skill_mcp_dependency_install": false,
+                  "multi_agent": false,
+                  "in_app_browser": false,
+                  "browser_use": false,
+                  "browser_use_full_cdp_access": false,
+                  "browser_use_external": false,
+                  "computer_use": false,
+                  "plugin_sharing": false
+                },
+                "windows": {
+                  "sandbox": "elevated"
+                },
+                "default_permissions": "flowmarshal_gate0a",
+                "permission_profile": {
+                  "id": "flowmarshal_gate0a",
+                  "extends": null,
+                  "filesystem": {
+                    "glob_scan_max_depth": null,
+                    ":minimal": "read",
+                    ":root": "deny",
+                    ":slash_tmp": "deny",
+                    ":tmpdir": "deny",
+                    ":workspace_roots": {
+                      ".": "write"
+                    }
+                  },
+                  "network_enabled": false
+                }
+              }
+            }
+          },
+          "features": {
+            "ok": true,
+            "result": {
+              "data": [
+                {
+                  "name": "web_search_request",
+                  "enabled": false,
+                  "defaultEnabled": false,
+                  "stage": "deprecated"
+                },
+                {
+                  "name": "standalone_web_search",
+                  "enabled": false,
+                  "defaultEnabled": false,
+                  "stage": "underDevelopment"
+                },
+                {
+                  "name": "multi_agent",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "apps",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "plugins",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "in_app_browser",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "browser_use",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "browser_use_full_cdp_access",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "browser_use_external",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "computer_use",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "remote_plugin",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "plugin_sharing",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                },
+                {
+                  "name": "skill_mcp_dependency_install",
+                  "enabled": false,
+                  "defaultEnabled": true,
+                  "stage": "stable"
+                }
+              ]
+            }
+          },
+          "mcp": {
+            "ok": true,
+            "result": {
+              "data": [
+                {
+                  "name": "cua_repl",
+                  "runtimeStatus": "disabled",
+                  "toolCount": 0
+                },
+                {
+                  "name": "node_repl",
+                  "runtimeStatus": "disabled",
+                  "toolCount": 0
+                }
+              ]
+            }
+          },
+          "apps": {
+            "ok": true,
+            "result": {
+              "apps": [
+                {
+                  "id": "connector_20205bf7d4e99a89d7154bb849718324",
+                  "runtimeName": "Sites",
+                  "enabled": false,
+                  "callable": false
+                },
+                {
+                  "id": "connector_2128aebfecb84f64a069897515042a44",
+                  "runtimeName": "Gmail",
+                  "enabled": false,
+                  "callable": false
+                },
+                {
+                  "id": "connector_5f3c8c41a1e54ad7a76272c89e2554fa",
+                  "runtimeName": "Google Drive",
+                  "enabled": false,
+                  "callable": false
+                },
+                {
+                  "id": "connector_76869538009648d5b282a4bb21c3d157",
+                  "runtimeName": "GitHub",
+                  "enabled": false,
+                  "callable": false
+                },
+                {
+                  "id": "connector_openai_codex_document_control",
+                  "runtimeName": "Codex Document Control",
+                  "enabled": false,
+                  "callable": false
+                },
+                {
+                  "id": "connector_openai_hotline",
+                  "runtimeName": "Hotline",
+                  "enabled": false,
+                  "callable": false
+                },
+                {
+                  "id": "connector_openai_plugin_management",
+                  "runtimeName": "Plugin Management",
+                  "enabled": false,
+                  "callable": false
+                },
+                {
+                  "id": "connector_openai_safety_settings",
+                  "runtimeName": "Safety Settings",
+                  "enabled": false,
+                  "callable": false
+                }
+              ]
+            }
+          }
+        },
+        "restart_initialize": {
+          "serverInfo": null,
+          "userAgent": "Codex Desktop/0.151.0 (Windows 10.0.26200; x86_64) dumb (flowmarshal_gate0a; 0.1.0)",
+          "platformFamily": "windows",
+          "platformOs": "windows"
+        },
+        "second_session": {
+          "thread_list_ids": [
+            "01a05c62-f2fd-7b52-9bdc-b47e64cf7744"
+          ],
+          "thread_list_sources": {
+            "01a05c62-f2fd-7b52-9bdc-b47e64cf7744": "vscode"
+          },
+          "thread_read_after_restart": {
+            "thread": {
+              "agentNickname": null,
+              "agentRole": null,
+              "cliVersion": "0.151.0",
+              "createdAt": 1788256383,
+              "cwd": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\20260901T185247-e05e5fc1\\desktop-system\\workspace",
+              "ephemeral": false,
+              "forkedFromId": null,
+              "gitInfo": null,
+              "id": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+              "modelProvider": "openai",
+              "name": "FlowMarshal Gate 0A desktop-system 20260901",
+              "parentThreadId": null,
+              "path": "C:\\Users\\sjs95\\.codex\\sessions\\2026\\09\\01\\rollout-2026-09-01T18-53-03-01a05c62-f2fd-7b52-9bdc-b47e64cf7744.jsonl",
+              "preview": "도구를 사용하지 말고 GATE0A_OK 한 줄만 답하세요.",
+              "recencyAt": 1788256385,
+              "section": null,
+              "sectionEnteredAt": null,
+              "sessionId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+              "source": "vscode",
+              "status": {
+                "type": "notLoaded"
+              },
+              "threadSource": null,
+              "turns": [
+                {
+                  "completedAt": 1788256389,
+                  "durationMs": 3675,
+                  "error": null,
+                  "id": "01a05c62-f9a7-7531-bb4a-055f4a475a11",
+                  "items": [
+                    {
+                      "clientId": null,
+                      "content": [
+                        {
+                          "text": "도구를 사용하지 말고 GATE0A_OK 한 줄만 답하세요.",
+                          "text_elements": [],
+                          "type": "text"
+                        }
+                      ],
+                      "id": "01a05c62-fda5-79b1-84f6-aae5c57c3017",
+                      "type": "userMessage"
+                    },
+                    {
+                      "id": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                      "memoryCitation": null,
+                      "phase": "final_answer",
+                      "text": "{\"status\":\"GATE0A_OK\"}",
+                      "type": "agentMessage"
+                    }
+                  ],
+                  "itemsView": "full",
+                  "startedAt": 1788256385,
+                  "status": "completed"
+                }
+              ],
+              "updatedAt": 1788256389
+            }
+          },
+          "thread_resume_after_restart": {
+            "approvalPolicy": "on-request",
+            "approvalsReviewer": "user",
+            "cwd": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\20260901T185247-e05e5fc1\\desktop-system\\workspace",
+            "instructionSources": [
+              "C:\\Users\\sjs95\\.codex\\AGENTS.md"
+            ],
+            "model": "gpt-5.6-sol",
+            "modelProvider": "openai",
+            "reasoningEffort": "low",
+            "sandbox": {
+              "excludeSlashTmp": true,
+              "excludeTmpdirEnvVar": true,
+              "networkAccess": false,
+              "type": "workspaceWrite",
+              "writableRoots": []
+            },
+            "serviceTier": "default",
+            "thread": {
+              "agentNickname": null,
+              "agentRole": null,
+              "cliVersion": "0.151.0",
+              "createdAt": 1788256383,
+              "cwd": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\runs\\20260901T185247-e05e5fc1\\desktop-system\\workspace",
+              "ephemeral": false,
+              "forkedFromId": null,
+              "gitInfo": null,
+              "id": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+              "modelProvider": "openai",
+              "name": "FlowMarshal Gate 0A desktop-system 20260901",
+              "parentThreadId": null,
+              "path": "C:\\Users\\sjs95\\.codex\\sessions\\2026\\09\\01\\rollout-2026-09-01T18-53-03-01a05c62-f2fd-7b52-9bdc-b47e64cf7744.jsonl",
+              "preview": "도구를 사용하지 말고 GATE0A_OK 한 줄만 답하세요.",
+              "recencyAt": 1788256385,
+              "section": null,
+              "sectionEnteredAt": null,
+              "sessionId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+              "source": "vscode",
+              "status": {
+                "type": "idle"
+              },
+              "threadSource": null,
+              "turns": [
+                {
+                  "completedAt": 1788256389,
+                  "durationMs": 3675,
+                  "error": null,
+                  "id": "01a05c62-f9a7-7531-bb4a-055f4a475a11",
+                  "items": [
+                    {
+                      "clientId": null,
+                      "content": [
+                        {
+                          "text": "도구를 사용하지 말고 GATE0A_OK 한 줄만 답하세요.",
+                          "text_elements": [],
+                          "type": "text"
+                        }
+                      ],
+                      "id": "01a05c62-fda5-79b1-84f6-aae5c57c3017",
+                      "type": "userMessage"
+                    },
+                    {
+                      "id": "msg_00cec34fe4eb7865016a96a084f2c087d0bdd567bafacc7296",
+                      "memoryCitation": null,
+                      "phase": "final_answer",
+                      "text": "{\"status\":\"GATE0A_OK\"}",
+                      "type": "agentMessage"
+                    }
+                  ],
+                  "itemsView": "full",
+                  "startedAt": 1788256385,
+                  "status": "completed"
+                }
+              ],
+              "updatedAt": 1788256389
+            }
+          },
+          "interrupt_wait": {
+            "completed": true,
+            "event": {
+              "method": "turn/completed",
+              "payload": {
+                "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                "turn": {
+                  "completedAt": 1788256395,
+                  "durationMs": 37,
+                  "error": null,
+                  "id": "01a05c63-2243-7361-8ae7-01a862601c70",
+                  "items": [],
+                  "itemsView": "notLoaded",
+                  "startedAt": 1788256395,
+                  "status": "interrupted"
+                }
+              }
+            },
+            "events": [
+              {
+                "method": "turn/started",
+                "payload": {
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turn": {
+                    "completedAt": null,
+                    "durationMs": null,
+                    "error": null,
+                    "id": "01a05c63-2243-7361-8ae7-01a862601c70",
+                    "items": [],
+                    "itemsView": "notLoaded",
+                    "startedAt": 1788256395,
+                    "status": "inProgress"
+                  }
+                }
+              },
+              {
+                "method": "item/started",
+                "payload": {
+                  "item": {
+                    "clientId": null,
+                    "content": [
+                      {
+                        "text": "이 메시지에는 응답하지 말고 대기하세요. 이 turn은 즉시 interrupt 검사를 받습니다.",
+                        "text_elements": [],
+                        "type": "text"
+                      }
+                    ],
+                    "id": "01a05c63-2260-77d3-9e01-9e2eb0baa182",
+                    "type": "userMessage"
+                  },
+                  "startedAtMs": 1788256395872,
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c63-2243-7361-8ae7-01a862601c70"
+                }
+              },
+              {
+                "method": "item/completed",
+                "payload": {
+                  "completedAtMs": 1788256395872,
+                  "item": {
+                    "clientId": null,
+                    "content": [
+                      {
+                        "text": "이 메시지에는 응답하지 말고 대기하세요. 이 turn은 즉시 interrupt 검사를 받습니다.",
+                        "text_elements": [],
+                        "type": "text"
+                      }
+                    ],
+                    "id": "01a05c63-2260-77d3-9e01-9e2eb0baa182",
+                    "type": "userMessage"
+                  },
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turnId": "01a05c63-2243-7361-8ae7-01a862601c70"
+                }
+              },
+              {
+                "method": "turn/completed",
+                "payload": {
+                  "threadId": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+                  "turn": {
+                    "completedAt": 1788256395,
+                    "durationMs": 37,
+                    "error": null,
+                    "id": "01a05c63-2243-7361-8ae7-01a862601c70",
+                    "items": [],
+                    "itemsView": "notLoaded",
+                    "startedAt": 1788256395,
+                    "status": "interrupted"
+                  }
+                }
+              }
+            ],
+            "saw_turn_started": true,
+            "interrupt_rpc_ok": true,
+            "interrupt_rpc_error": null
+          }
+        },
+        "approval_requests": [
+          {
+            "method": "item/commandExecution/requestApproval",
+            "received_at": "2026-09-01T09:53:00.845343Z"
+          },
+          {
+            "method": "item/fileChange/requestApproval",
+            "received_at": "2026-09-01T09:53:00.845343Z"
+          },
+          {
+            "method": "item/permissions/requestApproval",
+            "received_at": "2026-09-01T09:53:00.845343Z"
+          },
+          {
+            "method": "item/tool/requestUserInput",
+            "received_at": "2026-09-01T09:53:00.845343Z"
+          },
+          {
+            "method": "mcpServer/elicitation/request",
+            "received_at": "2026-09-01T09:53:00.845343Z"
+          }
+        ]
+      },
+      "thread_id": "01a05c62-f2fd-7b52-9bdc-b47e64cf7744",
+      "thread_title": "FlowMarshal Gate 0A desktop-system 20260901",
+      "completed_at": "2026-09-01T09:53:15.936684Z"
+    }
+  ],
+  "desktop_visibility": {
+    "status": "pass",
+    "checked_at": "2026-09-01T09:53:56.524711Z",
+    "checked_via": "Codex Desktop list_threads (host local)",
+    "visible_thread_ids": [
+      "01a05c62-bd9b-7ad3-a021-d1df7fa950b0",
+      "01a05c62-f2fd-7b52-9bdc-b47e64cf7744"
+    ],
+    "missing_thread_ids": [],
+    "unclassified_thread_ids": []
+  },
+  "gate_decision": {
+    "status": "NO-GO",
+    "reason": "필수 런타임 검사를 모두 통과한 조합이 없음",
+    "candidate_runtimes": [],
+    "blocking_failures": [
+      {
+        "runtime": "sdk-pinned",
+        "check": "restricted_project_outside_read",
+        "status": "fail",
+        "summary": "프로젝트 밖: 읽기 경계가 깨짐"
+      },
+      {
+        "runtime": "sdk-pinned",
+        "check": "restricted_localappdata_read",
+        "status": "fail",
+        "summary": "LocalAppData: 읽기 경계가 깨짐"
+      },
+      {
+        "runtime": "desktop-system",
+        "check": "restricted_project_outside_read",
+        "status": "fail",
+        "summary": "프로젝트 밖: 읽기 경계가 깨짐"
+      },
+      {
+        "runtime": "desktop-system",
+        "check": "restricted_localappdata_read",
+        "status": "fail",
+        "summary": "LocalAppData: 읽기 경계가 깨짐"
+      }
+    ]
+  },
+  "completed_at": "2026-09-01T09:53:15.945575Z"
+}

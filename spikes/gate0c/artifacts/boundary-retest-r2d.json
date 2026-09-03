@@ -1,0 +1,44 @@
+{
+  "artifact_safety_violations": [],
+  "classification": "HARNESS_CONFIGURATION_BLOCKED",
+  "completed_at": "2026-09-02T05:28:36.803580Z",
+  "error": {
+    "message": "Codex process closed stdout. stderr_tail=Error: error loading default config after config error: filesystem glob path `D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference\\**` only supports `deny` access; use an exact path or trailing `/**` for `read` subtree access",
+    "reason_code": "UNEXPECTED_ERROR",
+    "type": "TransportClosedError"
+  },
+  "gate": "0C",
+  "host_invariants": {
+    "config_after": {
+      "exists": true,
+      "file_id": [
+        12891117985148912799,
+        21110623253581924
+      ],
+      "sha256": "sha256:2b2982271779ecb59acb42440da393306785fd37411b0078d32d380f4c33ccf5",
+      "size": 12611
+    },
+    "config_before": {
+      "exists": true,
+      "file_id": [
+        12891117985148912799,
+        21110623253581924
+      ],
+      "sha256": "sha256:2b2982271779ecb59acb42440da393306785fd37411b0078d32d380f4c33ccf5",
+      "size": 12611
+    },
+    "sandbox_after_digest": "sha256:767b88f239511fc80f75c85b9f9742ff9bea034f94b372490a70f687aef5f4ff",
+    "sandbox_before_digest": "sha256:767b88f239511fc80f75c85b9f9742ff9bea034f94b372490a70f687aef5f4ff",
+    "unchanged": true
+  },
+  "probes": [],
+  "profile_set_digest": "sha256:c66b4f4c9e99f4cb338e67c7fe48a1f8e78c296bde51661f911418b85e748d3b",
+  "reason_codes": [
+    "UNEXPECTED_ERROR"
+  ],
+  "run_id": "profile-20260902-r7",
+  "schema_version": "1.0",
+  "started_at": "2026-09-02T05:28:36.075189Z",
+  "status": "NO-GO",
+  "task": "FM-0C-1-boundary-retest"
+}

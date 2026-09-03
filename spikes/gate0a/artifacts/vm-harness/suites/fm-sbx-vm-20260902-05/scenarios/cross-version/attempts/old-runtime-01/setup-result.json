@@ -1,0 +1,89 @@
+{
+  "schema_version": "1.0",
+  "kind": "disposable_windows_vm_sandbox_setup_attempt",
+  "suite_id": "fm-sbx-vm-20260902-05",
+  "scenario": "cross-version",
+  "attempt_id": "old-runtime-01",
+  "sequence": 1,
+  "recorded_at": "2026-09-02T02:57:01.956633Z",
+  "status": "completed",
+  "runtime": {
+    "name": "sdk-pinned",
+    "executable": "C:\\FlowMarshalV5\\Bundle\\.venv\\Lib\\site-packages\\codex_cli_bin\\bin\\codex.exe",
+    "version": {
+      "exit_code": 0,
+      "stdout": "codex-cli 0.147.0",
+      "stderr": ""
+    }
+  },
+  "authoritative_codex_home": "C:\\FlowMarshal-VM\\cross-version-home",
+  "readiness_before": {
+    "ok": true,
+    "result": {
+      "status": "updateRequired"
+    }
+  },
+  "readiness_after": {
+    "ok": true,
+    "result": {
+      "status": "ready"
+    }
+  },
+  "error": null,
+  "setup_api_called": true,
+  "fingerprint_before": {
+    "accounts": [
+      {
+        "Name": "CodexSandboxOffline",
+        "Missing": true
+      },
+      {
+        "Name": "CodexSandboxOnline",
+        "Missing": true
+      }
+    ],
+    "accounts_error": null,
+    "setup_marker": {
+      "exists": false,
+      "error": null
+    },
+    "secrets_directory": {
+      "exists": false,
+      "mtime_ns": null,
+      "file_count": 0,
+      "error": null
+    }
+  },
+  "fingerprint_after": {
+    "accounts": [
+      {
+        "Name": "CodexSandboxOffline",
+        "SID": "S-1-5-21-1598227186-1164737607-598007915-1002",
+        "Enabled": true,
+        "PasswordLastSet": "2026-09-02T02:56:58.3733869Z"
+      },
+      {
+        "Name": "CodexSandboxOnline",
+        "SID": "S-1-5-21-1598227186-1164737607-598007915-1003",
+        "Enabled": true,
+        "PasswordLastSet": "2026-09-02T02:56:58.4060877Z"
+      }
+    ],
+    "accounts_error": null,
+    "setup_marker": {
+      "exists": true,
+      "mtime_ns": 1788317818871302700,
+      "size": 255,
+      "error": null,
+      "sha256": "ee1f3854bb969b22ea17c30d7e7e4e04ff66302f39296dcafc3a67f676d82a3b"
+    },
+    "secrets_directory": {
+      "exists": true,
+      "mtime_ns": 1788317818423137600,
+      "file_count": 1,
+      "error": null
+    }
+  },
+  "secret_contents_read": false,
+  "vm_reset_required_after_suite": true
+}

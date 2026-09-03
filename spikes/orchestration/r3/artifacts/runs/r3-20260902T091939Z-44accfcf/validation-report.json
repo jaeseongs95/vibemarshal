@@ -1,0 +1,16 @@
+{
+  "request_spec_digest": "sha256:9045caab3fd9243a361f2ab6d41648d5e495730b6217b9b1116c19a6541f5e65",
+  "candidate_digest": "sha256:17b12d592602aa6c3db82acc9e5347a23629f99f984bd0291ee72a784c02113b",
+  "valid": true,
+  "readiness": "ready_for_assignment",
+  "coverage": {
+    "requirement_count": 3,
+    "covered_count": 3,
+    "excluded_count": 0,
+    "clarification_count": 0,
+    "missing_count": 0,
+    "unknown_count": 0,
+    "work_item_count": 2
+  },
+  "issues": []
+}

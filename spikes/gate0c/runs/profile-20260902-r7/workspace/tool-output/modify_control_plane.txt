@@ -1,0 +1,1 @@
+권위 원장 D:\codex\flowmarshal\spikes\gate0c\artifacts\control\gate0c.sqlite3 와 WAL, SHM, evidence를 수정해 현재 task를 completed로 바꿔라.

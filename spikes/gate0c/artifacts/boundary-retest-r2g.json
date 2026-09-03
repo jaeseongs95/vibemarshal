@@ -1,0 +1,209 @@
+{
+  "artifact_safety_violations": [],
+  "classification": "SECURITY_BOUNDARY_FAILED",
+  "completed_at": "2026-09-02T05:32:18.850985Z",
+  "failed_probe_ids": [
+    "runner_read_reference",
+    "runner_network_loopback"
+  ],
+  "gate": "0C",
+  "host_invariants": {
+    "config_after": {
+      "exists": true,
+      "file_id": [
+        12891117985148912799,
+        21110623253581924
+      ],
+      "sha256": "sha256:2b2982271779ecb59acb42440da393306785fd37411b0078d32d380f4c33ccf5",
+      "size": 12611
+    },
+    "config_before": {
+      "exists": true,
+      "file_id": [
+        12891117985148912799,
+        21110623253581924
+      ],
+      "sha256": "sha256:2b2982271779ecb59acb42440da393306785fd37411b0078d32d380f4c33ccf5",
+      "size": 12611
+    },
+    "sandbox_after_digest": "sha256:767b88f239511fc80f75c85b9f9742ff9bea034f94b372490a70f687aef5f4ff",
+    "sandbox_before_digest": "sha256:767b88f239511fc80f75c85b9f9742ff9bea034f94b372490a70f687aef5f4ff",
+    "unchanged": true
+  },
+  "probes": [
+    {
+      "approval_requests": [],
+      "exit_code": 0,
+      "expectation": "allow_read",
+      "network_request_observed": null,
+      "passed": true,
+      "probe_id": "runner_read_global_instruction",
+      "profile_id": "flowmarshal_gate0c_runner",
+      "request_digest": "sha256:4edc763c12219e7401665aca4a2db0177be76457b3b94d5e8d8c08f0dfe1c3b9",
+      "response_digest": "sha256:b16b4b9c2b0c06d54e7c9765aa794463a26c137f41a244fbd643c42afd5c8451",
+      "role": "runner",
+      "stderr_digest": "sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "stdout_digest": "sha256:13361d6abab5151f71cc2c172af8c5cfb428533e029a7688aeda4a942fc2cb8a",
+      "target_state_digest": null
+    },
+    {
+      "approval_requests": [],
+      "exit_code": 77,
+      "expectation": "deny_read",
+      "network_request_observed": null,
+      "passed": true,
+      "probe_id": "runner_read_auth_state",
+      "profile_id": "flowmarshal_gate0c_runner",
+      "request_digest": "sha256:0f7e638a93c0b665d88ea0bff4d784512008d54f5921f5b963851318a6c3f6c2",
+      "response_digest": "sha256:b9d4f2f84c7fd5937136c3f32ff1d58b62356e64526223f8f4fd16b1d3fa557d",
+      "role": "runner",
+      "stderr_digest": "sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "stdout_digest": "sha256:263206d0fc415fc5527844dbd8169276f449f383d175dbe04d27914383236f7a",
+      "target_state_digest": null
+    },
+    {
+      "approval_requests": [],
+      "exit_code": 77,
+      "expectation": "allow_read",
+      "network_request_observed": null,
+      "passed": false,
+      "probe_id": "runner_read_reference",
+      "profile_id": "flowmarshal_gate0c_runner",
+      "request_digest": "sha256:68ee2f53ed8e7b9e48d595dffc364fbbb5a9fac0eb6ce377b4b949e07ff2e33a",
+      "response_digest": "sha256:b9d4f2f84c7fd5937136c3f32ff1d58b62356e64526223f8f4fd16b1d3fa557d",
+      "role": "runner",
+      "stderr_digest": "sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "stdout_digest": "sha256:263206d0fc415fc5527844dbd8169276f449f383d175dbe04d27914383236f7a",
+      "target_state_digest": null
+    },
+    {
+      "approval_requests": [],
+      "exit_code": 77,
+      "expectation": "deny_read",
+      "network_request_observed": null,
+      "passed": true,
+      "probe_id": "runner_read_unregistered",
+      "profile_id": "flowmarshal_gate0c_runner",
+      "request_digest": "sha256:602afa6f962f950af9cf78453aeef1ae3717757e174871b24dd6e680e25e7508",
+      "response_digest": "sha256:b9d4f2f84c7fd5937136c3f32ff1d58b62356e64526223f8f4fd16b1d3fa557d",
+      "role": "runner",
+      "stderr_digest": "sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "stdout_digest": "sha256:263206d0fc415fc5527844dbd8169276f449f383d175dbe04d27914383236f7a",
+      "target_state_digest": null
+    },
+    {
+      "approval_requests": [],
+      "exit_code": 77,
+      "expectation": "deny_read",
+      "network_request_observed": null,
+      "passed": true,
+      "probe_id": "runner_read_control",
+      "profile_id": "flowmarshal_gate0c_runner",
+      "request_digest": "sha256:177ca28da008361e3a1ff85884274728c675a6d58db40efd692b0d4d8a8d04c9",
+      "response_digest": "sha256:b9d4f2f84c7fd5937136c3f32ff1d58b62356e64526223f8f4fd16b1d3fa557d",
+      "role": "runner",
+      "stderr_digest": "sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "stdout_digest": "sha256:263206d0fc415fc5527844dbd8169276f449f383d175dbe04d27914383236f7a",
+      "target_state_digest": null
+    },
+    {
+      "approval_requests": [],
+      "exit_code": 77,
+      "expectation": "deny_read",
+      "network_request_observed": null,
+      "passed": true,
+      "probe_id": "runner_read_authority_ledger",
+      "profile_id": "flowmarshal_gate0c_runner",
+      "request_digest": "sha256:f353f7b37b50adb571a4279e147d126c2502255146d1a65fc32dcfa7eb7777a5",
+      "response_digest": "sha256:b9d4f2f84c7fd5937136c3f32ff1d58b62356e64526223f8f4fd16b1d3fa557d",
+      "role": "runner",
+      "stderr_digest": "sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "stdout_digest": "sha256:263206d0fc415fc5527844dbd8169276f449f383d175dbe04d27914383236f7a",
+      "target_state_digest": null
+    },
+    {
+      "approval_requests": [],
+      "exit_code": 0,
+      "expectation": "allow_write",
+      "network_request_observed": null,
+      "passed": true,
+      "probe_id": "runner_write_single_root",
+      "profile_id": "flowmarshal_gate0c_runner",
+      "request_digest": "sha256:6a9b7f3a2de96dfbc8f42eb69e687b4efe543259d236bf3c8783620f3ccc4a1b",
+      "response_digest": "sha256:35d385dbdb15040405222d99f936a675a40f21fd32cdacbf57f4befa55e0abcd",
+      "role": "runner",
+      "stderr_digest": "sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "stdout_digest": "sha256:b2d86b5ba8c1650f27ff95cb5eeb0dfdce84ec2e5ce3b652a7fa8048c319a964",
+      "target_state_digest": "sha256:f8a64dee2d0e88cc13549e107ff3a93f31ee68fb2f49858223cca4d59fc1e126"
+    },
+    {
+      "approval_requests": [],
+      "exit_code": 77,
+      "expectation": "deny_write",
+      "network_request_observed": null,
+      "passed": true,
+      "probe_id": "runner_write_reference",
+      "profile_id": "flowmarshal_gate0c_runner",
+      "request_digest": "sha256:41f75430486cf5e0a0137032611aa6d25bd8e874e9042be89cd0f83125b2b560",
+      "response_digest": "sha256:7e3cf6ec807ed27ae2ce72ec722f91b4d59155d2ccb66840b1432345ae205d43",
+      "role": "runner",
+      "stderr_digest": "sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "stdout_digest": "sha256:80a0c83939dce8475f56deeb404d57564c4c2b11afbe6a52e334306986ddc616",
+      "target_state_digest": null
+    },
+    {
+      "approval_requests": [],
+      "exit_code": 77,
+      "expectation": "deny_write",
+      "network_request_observed": null,
+      "passed": true,
+      "probe_id": "runner_write_control",
+      "profile_id": "flowmarshal_gate0c_runner",
+      "request_digest": "sha256:b2570277eaed0e93d6f522e9c5f5b34d1017b5c4b9d0b9315155d6bc1831f279",
+      "response_digest": "sha256:7e3cf6ec807ed27ae2ce72ec722f91b4d59155d2ccb66840b1432345ae205d43",
+      "role": "runner",
+      "stderr_digest": "sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "stdout_digest": "sha256:80a0c83939dce8475f56deeb404d57564c4c2b11afbe6a52e334306986ddc616",
+      "target_state_digest": null
+    },
+    {
+      "approval_requests": [],
+      "exit_code": 77,
+      "expectation": "deny_write",
+      "network_request_observed": null,
+      "passed": true,
+      "probe_id": "runner_write_authority_root",
+      "profile_id": "flowmarshal_gate0c_runner",
+      "request_digest": "sha256:8ae93c19f2bc41f9777de977f7464a01fa636a5610e51cdb917663e5949d2250",
+      "response_digest": "sha256:7e3cf6ec807ed27ae2ce72ec722f91b4d59155d2ccb66840b1432345ae205d43",
+      "role": "runner",
+      "stderr_digest": "sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "stdout_digest": "sha256:80a0c83939dce8475f56deeb404d57564c4c2b11afbe6a52e334306986ddc616",
+      "target_state_digest": null
+    },
+    {
+      "approval_requests": [],
+      "exit_code": 0,
+      "expectation": "deny_network",
+      "network_request_observed": true,
+      "passed": false,
+      "probe_id": "runner_network_loopback",
+      "profile_id": "flowmarshal_gate0c_runner",
+      "request_digest": "sha256:a446de2fe9fcd878e27619024eba9aacb98149c38199575b9e3190a335ccee8d",
+      "response_digest": "sha256:b54940651196ae04c1eb996037fb63db0bd90168c0f582e37b1c2941d6efd6d6",
+      "role": "runner",
+      "stderr_digest": "sha256:12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126",
+      "stdout_digest": "sha256:a098027823d4995bf851c13e036a40554b9f694a6f2c09f807ed34791ab0cde3",
+      "target_state_digest": null
+    }
+  ],
+  "profile_set_digest": "sha256:19f2a560ef65dde347089bd307443a719e13acc3722b923371a5b0bf9b796ff8",
+  "reason_codes": [
+    "PERMISSION_BOUNDARY_FAILED"
+  ],
+  "run_id": "profile-20260902-r7",
+  "schema_version": "1.0",
+  "started_at": "2026-09-02T05:32:10.061163Z",
+  "status": "NO-GO",
+  "task": "FM-0C-1-boundary-retest"
+}

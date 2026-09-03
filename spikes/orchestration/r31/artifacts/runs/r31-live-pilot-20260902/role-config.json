@@ -1,0 +1,35 @@
+{
+  "configuration_id": "r31-forward-hypothesis-20260902-v1",
+  "preferences": [
+    {
+      "role": "purpose_resolver",
+      "preferred_model_ids": ["gpt-5.6-luna"],
+      "preferred_effort": "medium"
+    },
+    {
+      "role": "intent_reviewer",
+      "preferred_model_ids": ["gpt-5.6-terra"],
+      "preferred_effort": "high"
+    },
+    {
+      "role": "candidate_generator",
+      "preferred_model_ids": ["gpt-5.6-luna"],
+      "preferred_effort": "medium"
+    },
+    {
+      "role": "hard_gate_reviewer",
+      "preferred_model_ids": ["gpt-5.6-terra"],
+      "preferred_effort": "high"
+    },
+    {
+      "role": "critical_reviewer",
+      "preferred_model_ids": ["gpt-5.6-sol"],
+      "preferred_effort": "xhigh"
+    },
+    {
+      "role": "scorer_selector",
+      "preferred_model_ids": ["gpt-5.6-terra"],
+      "preferred_effort": "high"
+    }
+  ]
+}

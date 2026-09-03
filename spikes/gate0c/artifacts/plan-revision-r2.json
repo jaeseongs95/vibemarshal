@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "plan_revision_id": "flowmarshal-gate0c-r2",
+  "supersedes": "flowmarshal-gate0c-r1",
+  "status": "approved",
+  "approved_at": "2026-09-02T14:12:20.1901362+09:00",
+  "approval_source": {
+    "kind": "explicit_user_message",
+    "text": "다시 테스트해"
+  },
+  "document": {
+    "path": "docs/gate0c-retest-plan.md",
+    "sha256": "180399475948eec6df5cef395ac27d6f757549345795673321cf9f1c9737fa57"
+  },
+  "retest_contract": {
+    "synthetic_run_id": "profile-20260902-r7",
+    "global_agents": "approved_policy_input",
+    "codex_home_blanket_deny": false,
+    "sensitive_codex_state": "targeted_deny",
+    "approval_policy": "never",
+    "external_surfaces": "disabled",
+    "existing_trust_entries": "read_only_baseline",
+    "trust_entry_cleanup": false,
+    "real_user_data_persistence": false
+  },
+  "model_assignments": {
+    "profile_probe": ["gpt-5.6-sol", "high"],
+    "runtime_runner": ["gpt-5.6-sol", "high"],
+    "runtime_validator": ["gpt-5.6-sol", "xhigh"]
+  }
+}

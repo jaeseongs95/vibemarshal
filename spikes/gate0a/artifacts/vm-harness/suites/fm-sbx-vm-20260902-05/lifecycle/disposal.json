@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "kind": "disposable_windows_vm_lifecycle_attestation",
+  "suite_id": "fm-sbx-vm-20260902-05",
+  "recorded_at": "2026-09-02T03:01:04.905057Z",
+  "action": "disposed",
+  "provider": "Oracle VirtualBox 7.2.16",
+  "vm_identifier": "246a5d7a-af7f-49cc-8f30-5efa6351d917",
+  "evidence_reference": "virtualbox-unregistervm-delete:246a5d7a-af7f-49cc-8f30-5efa6351d917:2026-09-02T03:00:21.3805120Z",
+  "attestation": "검사에 사용한 VM을 마지막 Attempt 뒤 초기화하거나 폐기했습니다.",
+  "secret_contents_read": false
+}

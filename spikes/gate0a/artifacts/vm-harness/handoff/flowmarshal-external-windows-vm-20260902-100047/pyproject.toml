@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flowmarshal-gate0a-spike"
+version = "0.1.0"
+description = "FlowMarshal Gate 0A Codex SDK/App Server/Desktop 호환성 스파이크"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "openai-codex==0.147.0",
+  "pydantic==2.13.5",
+]
+
+[project.scripts]
+flowmarshal-gate0a = "flowmarshal_gate0a.probe:main"
+flowmarshal-gate0b = "flowmarshal.gate0b.cli:main"
+flowmarshal-vm-handoff = "flowmarshal.vm_handoff:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

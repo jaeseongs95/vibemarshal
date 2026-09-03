@@ -1,0 +1,86 @@
+{
+  "schema_version": "1.0",
+  "project_id": "project_02c83ff1591e410cb583830c19c099ff",
+  "project_name": "R3 합성 Planner 프로젝트",
+  "project_root": "D:\\codex\\flowmarshal\\spikes\\orchestration\\r3\\artifacts\\runs\\r3-20260902T091939Z-44accfcf\\synthetic-project",
+  "project_description": "요구사항 coverage와 WorkItem DAG 검증용 합성 프로젝트",
+  "request_summary": "두 기능을 순서 있는 WorkItem으로 분해하고 검사 계획을 만든다.",
+  "parent_revision_id": null,
+  "requirements": [
+    {
+      "requirement_id": "req.foundation",
+      "statement": "기초 기능을 독립적으로 구현한다.",
+      "source": "user",
+      "priority": "must",
+      "source_refs": []
+    },
+    {
+      "requirement_id": "req.integration",
+      "statement": "기초 기능과 연결되는 통합 기능을 구현한다.",
+      "source": "reference",
+      "priority": "must",
+      "source_refs": [
+        "approved-reference"
+      ]
+    },
+    {
+      "requirement_id": "req.instructions",
+      "statement": "프로젝트 지침을 모든 작업에 적용한다.",
+      "source": "project_instruction",
+      "priority": "must",
+      "source_refs": [
+        "project-agents"
+      ]
+    }
+  ],
+  "context_sources": [
+    {
+      "source_id": "project-agents",
+      "kind": "project_instructions",
+      "path": "D:\\codex\\flowmarshal\\spikes\\orchestration\\r3\\artifacts\\runs\\r3-20260902T091939Z-44accfcf\\synthetic-project\\AGENTS.md",
+      "purpose": "모든 WorkItem에 적용되는 프로젝트 지침",
+      "content": "모든 사용자 산출물은 한국어로 작성하고 검사를 생략하지 않는다.\n",
+      "content_digest": "sha256:fd9774c0252717e4ea987fcd052725679fdd5adf73e31cedaad66e507ce1547a",
+      "required_for_all_work_items": true,
+      "truncated": false
+    },
+    {
+      "source_id": "approved-reference",
+      "kind": "external_reference",
+      "path": "D:\\codex\\flowmarshal\\spikes\\orchestration\\r3\\artifacts\\runs\\r3-20260902T091939Z-44accfcf\\approved-reference.md",
+      "purpose": "사용자가 승인한 외부 요구사항",
+      "content": "기초 기능을 먼저 구현한 뒤 통합 기능을 연결하고 검사한다.\n",
+      "content_digest": "sha256:3388f9bff889ec4a7483bd9232a0007619367501589d0a7613c3313218b7213f",
+      "required_for_all_work_items": false,
+      "truncated": false
+    }
+  ],
+  "available_validations": [
+    {
+      "capability_id": "python-tests",
+      "check_type": "command",
+      "description": "신뢰된 Python unittest 명령",
+      "deterministic": true,
+      "configuration": {
+        "command_id": "python-unittest"
+      }
+    }
+  ],
+  "product_capabilities": [
+    "RequestSpec 구조화",
+    "PlanDraft 후보 생성",
+    "deterministic coverage validation"
+  ],
+  "out_of_scope": [
+    "모델 배정",
+    "계획 활성화",
+    "실제 Codex Runner 호출"
+  ],
+  "planning_limits": {
+    "max_work_items": 30,
+    "max_requirements_per_work_item": 5,
+    "max_work_items_per_requirement": 4,
+    "max_change_targets_per_work_item": 12,
+    "min_objective_characters": 12
+  }
+}

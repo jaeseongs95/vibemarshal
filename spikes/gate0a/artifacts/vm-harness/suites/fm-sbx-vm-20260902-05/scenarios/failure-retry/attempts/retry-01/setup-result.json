@@ -1,0 +1,89 @@
+{
+  "schema_version": "1.0",
+  "kind": "disposable_windows_vm_sandbox_setup_attempt",
+  "suite_id": "fm-sbx-vm-20260902-05",
+  "scenario": "failure-retry",
+  "attempt_id": "retry-01",
+  "sequence": 2,
+  "recorded_at": "2026-09-02T02:58:53.797030Z",
+  "status": "completed",
+  "runtime": {
+    "name": "desktop-system",
+    "executable": "C:\\FlowMarshalV4\\CodexRuntime\\bin\\codex.exe",
+    "version": {
+      "exit_code": 0,
+      "stdout": "codex-cli 0.151.0",
+      "stderr": ""
+    }
+  },
+  "authoritative_codex_home": "C:\\FlowMarshal-VM\\failure-retry-home",
+  "readiness_before": {
+    "ok": true,
+    "result": {
+      "status": "updateRequired"
+    }
+  },
+  "readiness_after": {
+    "ok": true,
+    "result": {
+      "status": "ready"
+    }
+  },
+  "error": null,
+  "setup_api_called": true,
+  "fingerprint_before": {
+    "accounts": [
+      {
+        "Name": "CodexSandboxOffline",
+        "Missing": true
+      },
+      {
+        "Name": "CodexSandboxOnline",
+        "Missing": true
+      }
+    ],
+    "accounts_error": null,
+    "setup_marker": {
+      "exists": false,
+      "error": null
+    },
+    "secrets_directory": {
+      "exists": false,
+      "mtime_ns": null,
+      "file_count": 0,
+      "error": null
+    }
+  },
+  "fingerprint_after": {
+    "accounts": [
+      {
+        "Name": "CodexSandboxOffline",
+        "SID": "S-1-5-21-1598227186-1164737607-598007915-1002",
+        "Enabled": true,
+        "PasswordLastSet": "2026-09-02T02:58:50.1295579Z"
+      },
+      {
+        "Name": "CodexSandboxOnline",
+        "SID": "S-1-5-21-1598227186-1164737607-598007915-1003",
+        "Enabled": true,
+        "PasswordLastSet": "2026-09-02T02:58:50.1637690Z"
+      }
+    ],
+    "accounts_error": null,
+    "setup_marker": {
+      "exists": true,
+      "mtime_ns": 1788317930678654400,
+      "size": 255,
+      "error": null,
+      "sha256": "b8093b53e825f032e466bff4029252d2b6e423c5268d0028d064984123b113c8"
+    },
+    "secrets_directory": {
+      "exists": true,
+      "mtime_ns": 1788317930179975400,
+      "file_count": 1,
+      "error": null
+    }
+  },
+  "secret_contents_read": false,
+  "vm_reset_required_after_suite": true
+}

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=75"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flowmarshal-engine"
+version = "0.2.0a1"
+description = "검증 가능한 계획·분배·추적을 위한 FlowMarshal 개발 엔진"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "openai-codex==0.147.0",
+  "pydantic==2.13.5",
+]
+
+[project.scripts]
+flowmarshal-gate0a = "flowmarshal_gate0a.probe:main"
+flowmarshal-gate0b = "flowmarshal.gate0b.cli:main"
+flowmarshal-gate0c = "flowmarshal.gate0c.cli:main"
+flowmarshal-runtime-r1 = "flowmarshal.orchestration.runtime_probe:main"
+flowmarshal-core-r2-smoke = "flowmarshal.core.smoke:main"
+flowmarshal-planner-r3-smoke = "flowmarshal.planning.smoke:main"
+flowmarshal-planner-r31-smoke = "flowmarshal.planning.r31_smoke:main"
+flowmarshal-planner-r31-live-smoke = "flowmarshal.planning.r31_live_smoke:main"
+flowmarshal-planner-r31-eval = "flowmarshal.planning.r31_eval_cli:main"
+flowmarshal-vm-handoff = "flowmarshal.vm_handoff:main"
+flowmarshal-engine = "flowmarshal.engine.cli:main"
+flowmarshal-engine-smoke = "flowmarshal.engine.smoke:main"
+flowmarshal-engine-eval = "flowmarshal.engine.eval_cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

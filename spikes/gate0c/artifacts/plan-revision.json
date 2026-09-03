@@ -1,0 +1,37 @@
+{
+  "schema_version": 1,
+  "plan_revision_id": "flowmarshal-gate0c-r1",
+  "status": "approved",
+  "approved_at": "2026-09-02T12:37:09.8233498+09:00",
+  "approval_source": {
+    "kind": "explicit_user_message",
+    "text": "권장안대로 처리해줘"
+  },
+  "document": {
+    "path": "docs/gate0c-implementation-plan.md",
+    "sha256": "40537914598b2ae8d16e1005b243f30508797abcc2f256ec22b623f185556782"
+  },
+  "approved_exception": {
+    "service_name": "flowmarshal_gate0c",
+    "synthetic_run_root": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs",
+    "permission_profiles": [
+      "flowmarshal_gate0c_planner",
+      "flowmarshal_gate0c_runner",
+      "flowmarshal_gate0c_validator"
+    ],
+    "approval_policy": "never",
+    "external_surfaces": "disabled",
+    "user_configuration_mutation": false,
+    "real_user_data": false
+  },
+  "model_assignments": {
+    "FM-0C-1": {"executor": ["gpt-5.6-sol", "high"], "validator": ["gpt-5.6-sol", "xhigh"]},
+    "FM-0C-2": {"executor": ["gpt-5.6-sol", "xhigh"], "validator": ["gpt-5.6-sol", "xhigh"]},
+    "FM-0C-3": {"executor": ["gpt-5.6-sol", "high"], "validator": ["gpt-5.6-sol", "xhigh"]},
+    "FM-0C-4": {"executor": ["gpt-5.6-sol", "xhigh"], "validator": ["gpt-5.6-sol", "xhigh"]},
+    "FM-0C-5": {"executor": ["gpt-5.6-sol", "xhigh"], "validator": ["gpt-5.6-sol", "xhigh"]},
+    "FM-0C-6": {"executor": ["gpt-5.6-sol", "xhigh"], "validator": ["gpt-5.6-sol", "xhigh"]},
+    "FM-0C-7": {"executor": ["gpt-5.6-sol", "high"], "validator": ["gpt-5.6-sol", "xhigh"]},
+    "FM-0C-8": {"executor": ["gpt-5.6-terra", "high"], "validator": ["gpt-5.6-sol", "xhigh"]}
+  }
+}

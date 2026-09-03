@@ -1,0 +1,41 @@
+{
+  "schema_version": "1.0",
+  "kind": "disposable_windows_vm_host_capability_observation",
+  "recorded_at": "2026-09-02T00:34:51.8818927Z",
+  "host": {
+    "os": "Microsoft Windows 11 Pro",
+    "version": "10.0.26200",
+    "build": "26200",
+    "manufacturer": "ASUS",
+    "model": "System Product Name",
+    "hypervisor_present": true
+  },
+  "observations": {
+    "hyper_v_cmdlets_available": false,
+    "windows_sandbox_executable_available": false,
+    "virtualbox_available": false,
+    "vmware_available": false,
+    "multipass_available": false,
+    "docker_cli_available": true,
+    "docker_daemon_available": false,
+    "wsl_distributions": [
+      {
+        "name": "docker-desktop",
+        "state": "Stopped",
+        "version": 2
+      }
+    ],
+    "optional_feature_queries": {
+      "Microsoft-Hyper-V-All": "elevation_required",
+      "Containers-DisposableClientVM": "elevation_required",
+      "VirtualMachinePlatform": "elevation_required"
+    }
+  },
+  "conclusion": {
+    "status": "NO_READY_DISPOSABLE_WINDOWS_VM",
+    "reason": "현재 사용할 수 있는 Windows VM 실행기나 기존 VM이 없으며 WSL/Docker는 Windows 로컬 사용자와 방화벽을 포함한 컴퓨터 전역 provisioning 검사를 대체하지 못한다.",
+    "gate_effect": "Gate0A-P와 Gate0B 전체 판정을 계속 NO-GO로 유지한다."
+  },
+  "host_changes_made": false,
+  "secret_contents_read": false
+}

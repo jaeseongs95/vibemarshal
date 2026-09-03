@@ -1,0 +1,150 @@
+{
+  "schema_version": "1.0",
+  "kind": "flowmarshal_external_windows_vm_bundle",
+  "created_at": "2026-09-02T01:00:47.279262Z",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 12380,
+      "sha256": "de5a11d1dbdc61a6abc97ff1cf2f3ce4b6ee811bd5e98b63be7a91fba9c449f4"
+    },
+    {
+      "path": "docs/windows-sandbox-vm-revalidation.md",
+      "bytes": 6623,
+      "sha256": "a4503cad5df16179fc44e62e66d5dd4adfd7a30996f68601ae9f5e6041296193"
+    },
+    {
+      "path": "docs/windows-vm-external-handoff.md",
+      "bytes": 6006,
+      "sha256": "fd473884544135b1af3bd4211e16abf06fb6b32d9861f3e483326ede4b68c619"
+    },
+    {
+      "path": "pyproject.toml",
+      "bytes": 579,
+      "sha256": "1d88b7c120248b4265ee6edce21a9e0925f7f4dc72a4adf34c26753f2517577b"
+    },
+    {
+      "path": "requirements.lock",
+      "bytes": 97,
+      "sha256": "ee2ede529b14683b5a0c5859d38d499a5bb41344d09a0a76a431f2f5ff0d9bed"
+    },
+    {
+      "path": "scripts/windows-vm/Complete-FlowMarshalVmSuite.ps1",
+      "bytes": 1599,
+      "sha256": "791d914da79a43ae007335f04cec94eafbb1ddbd970d5f809b2df94f0d26d172"
+    },
+    {
+      "path": "scripts/windows-vm/FlowMarshalVm.Common.ps1",
+      "bytes": 4075,
+      "sha256": "afd6ced6ef844f589296aebcddc84d7cf2fbdd9d0c67ea5901751112b94ab386"
+    },
+    {
+      "path": "scripts/windows-vm/Initialize-FlowMarshalVm.ps1",
+      "bytes": 1914,
+      "sha256": "4507b97654a6c5b03ff7002e57e04e5d4805c9e8aa53d9c865049fbcda50f165"
+    },
+    {
+      "path": "scripts/windows-vm/Invoke-FlowMarshalVmScenario.ps1",
+      "bytes": 4438,
+      "sha256": "8b5bbe154ed02cddf6dae69402eb79f086d4562c59bb4c17b9bc35ae8bb876ea"
+    },
+    {
+      "path": "src/flowmarshal/__init__.py",
+      "bytes": 161,
+      "sha256": "1ca4fc93f24dbbc146724eea97778fa5e6e486a869a5a56dcc9b1042ecc55c00"
+    },
+    {
+      "path": "src/flowmarshal/adapters/__init__.py",
+      "bytes": 388,
+      "sha256": "e7e699b746e421ab129772b45f51e11841774daccc533d86c3913e0517fb756e"
+    },
+    {
+      "path": "src/flowmarshal/adapters/authority.py",
+      "bytes": 6311,
+      "sha256": "33c73f49e735f9025b0dd569359132d716b30c9ddc1699a15adbb770965b4e1e"
+    },
+    {
+      "path": "src/flowmarshal/adapters/evidence.py",
+      "bytes": 2707,
+      "sha256": "6d57e50d5aa58f1e3dfa48bb5c2fa76f9268732722abdc87b92beadee6bc1105"
+    },
+    {
+      "path": "src/flowmarshal/adapters/runtime.py",
+      "bytes": 14716,
+      "sha256": "4dd2beb67d5a7f52bc3dac462e5301246e052591f5b7279d32487d320114b166"
+    },
+    {
+      "path": "src/flowmarshal/adapters/sqlite.py",
+      "bytes": 56330,
+      "sha256": "96d49e2708998385b0d7819a1ddfcd1eeb6bc03abed2e32fa3179585ea9409ce"
+    },
+    {
+      "path": "src/flowmarshal/application.py",
+      "bytes": 80309,
+      "sha256": "9a1e13038b74c630471e49f6c7ebc571a7b561c9e08178ca5b6d3fd503471cc6"
+    },
+    {
+      "path": "src/flowmarshal/canonical.py",
+      "bytes": 1730,
+      "sha256": "64b74f58b66f513bdcd124d49c8cc9da64eb1df28182225d502cdede10f09282"
+    },
+    {
+      "path": "src/flowmarshal/domain.py",
+      "bytes": 13034,
+      "sha256": "652a4a7988cdfffe7d55c4c35a3eb2fc19a271f2946606c2685cca9a532916b5"
+    },
+    {
+      "path": "src/flowmarshal/gate0b/__init__.py",
+      "bytes": 53,
+      "sha256": "b8e3f040de9c53a976f4b9dd8e6de269a8be87fe0ba23179de9f9aa12f9e67c7"
+    },
+    {
+      "path": "src/flowmarshal/gate0b/cli.py",
+      "bytes": 23388,
+      "sha256": "89dde145c7afdcdf7b76f0bf52d4320e73e7ce5142f1a3c06b2c0f4b775c7059"
+    },
+    {
+      "path": "src/flowmarshal/gate0b/verifier.py",
+      "bytes": 27312,
+      "sha256": "74f39427e21f7ca614b76294e28c92a622baf55dc471a2a795f64ec5e8f6625c"
+    },
+    {
+      "path": "src/flowmarshal/ports.py",
+      "bytes": 2343,
+      "sha256": "71a0d0ee315fe970b4f7a8521cd2dfbcf38761f728ac11a4f4c7c346bc94a898"
+    },
+    {
+      "path": "src/flowmarshal/time.py",
+      "bytes": 200,
+      "sha256": "e031fd1a63a00f9ce18e032cfea87e1986bc472a601fa8d0e460b6cd3ff9d841"
+    },
+    {
+      "path": "src/flowmarshal/vm_handoff.py",
+      "bytes": 22519,
+      "sha256": "207f7cc8a2cac42b325b3542055428d61e51f4219163a95ecd482e43f5bf720c"
+    },
+    {
+      "path": "src/flowmarshal/vm_sandbox_suite.py",
+      "bytes": 20952,
+      "sha256": "ab2d8e5681bb6df82fee7d7e1862bcf75abbf7e201c8f70f55cf7c62733aa4be"
+    },
+    {
+      "path": "src/flowmarshal/windows_sandbox.py",
+      "bytes": 17170,
+      "sha256": "de2da62a207fe34fc285756c0ce07e5aa49431622d89aa8d1bae93806d5480b8"
+    },
+    {
+      "path": "src/flowmarshal_gate0a/__init__.py",
+      "bytes": 71,
+      "sha256": "600062ce0798ffce4d06c5a1375d2847bc1721dff29c787af537eb0f18d1bad9"
+    },
+    {
+      "path": "src/flowmarshal_gate0a/probe.py",
+      "bytes": 175257,
+      "sha256": "b83390de0cc64e73bc962027cfe69b27583a53af0b5b37371ada1defd9fcedfa"
+    }
+  ],
+  "contains_codex_home": false,
+  "contains_authentication": false,
+  "contains_sandbox_secrets": false
+}

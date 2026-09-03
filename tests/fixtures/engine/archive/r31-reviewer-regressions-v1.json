@@ -1,0 +1,115 @@
+{
+  "schema_version": "1.0",
+  "source_baseline": "R3.1 campaign 10, 150/150 cells, final FAIL",
+  "fixtures": [
+    {
+      "fixture_id": "P11-adversarial",
+      "opaque_case_ref": "case-11a1d4e5229a4f10",
+      "suite": "plan_quality",
+      "artifact": {
+        "request": "의미 있게 다른 복구 전략 후보를 비교한다.",
+        "candidates": [
+          {"ref": "candidate-a", "strategy": "checkpoint resume", "dag": ["inspect", "resume", "validate"]},
+          {"ref": "candidate-b", "strategy": "checkpoint resume", "dag": ["inspect", "resume", "validate"]}
+        ]
+      },
+      "expected_admissible": false,
+      "critical": true,
+      "required_finding_codes": ["DUPLICATE_STRATEGY", "DIVERSITY_FAILURE"],
+      "allowed_correlated_codes": [],
+      "known_r31_failure": "결함 두 개를 찾고도 일부 seed에서 admissible로 판정했다."
+    },
+    {
+      "fixture_id": "P01-clean",
+      "opaque_case_ref": "case-01c1ea4b393baf21",
+      "suite": "plan_quality",
+      "artifact": {
+        "request": "중복 trigger에서도 task가 한 번만 시작되게 한다.",
+        "plan": {
+          "intent": "dispatch 전에 CAS로 저장",
+          "receipt": "thread binding에 원자적으로 결속",
+          "recovery": "receipt가 불명확하면 기존 binding을 먼저 조회",
+          "validation": "동일 idempotency key에서 thread 하나임을 검사"
+        }
+      },
+      "expected_admissible": true,
+      "critical": false,
+      "required_finding_codes": [],
+      "allowed_correlated_codes": [],
+      "known_r31_failure": "clean plan에 NON_IDEMPOTENT와 RECOVERY_GAP을 과잉 진단했다."
+    },
+    {
+      "fixture_id": "P05-clean",
+      "opaque_case_ref": "case-05c1ea9f41c2d8b7",
+      "suite": "plan_quality",
+      "artifact": {
+        "request": "secret을 환경에서 주입하고 로그에 노출하지 않는다.",
+        "plan": {
+          "secret_source": "environment reference",
+          "redaction_validation": "captured log scan",
+          "recovery": "missing secret이면 효과 없이 중단"
+        }
+      },
+      "expected_admissible": true,
+      "critical": false,
+      "required_finding_codes": [],
+      "allowed_correlated_codes": [],
+      "known_r31_failure": "유효 clean case에서 최초 출력과 1회 복구 출력 모두 schema 검증에 실패했다."
+    },
+    {
+      "fixture_id": "P03-adversarial",
+      "opaque_case_ref": "case-03ad9e2742c5f8a1",
+      "suite": "plan_quality",
+      "artifact": {"symptom": "migration이 검증보다 먼저 destructive cutover를 수행한다."},
+      "expected_admissible": false,
+      "critical": true,
+      "required_finding_codes": ["MIGRATION_ORDER_INVALID"],
+      "allowed_correlated_codes": ["CONTRACT_BREAK", "DATA_LOSS_RISK", "REGRESSION_MISSING"],
+      "known_r31_failure": "직접 증거보다 많은 상관 결함을 함께 붙여 precision을 낮췄다."
+    },
+    {
+      "fixture_id": "P07-adversarial",
+      "opaque_case_ref": "case-07ad22f04ac91e63",
+      "suite": "plan_quality",
+      "artifact": {"symptom": "검증 결과 없이 완료 상태를 기록한다."},
+      "expected_admissible": false,
+      "critical": true,
+      "required_finding_codes": ["VERIFICATION_GAP"],
+      "allowed_correlated_codes": ["AUTHORITY_GAP"],
+      "known_r31_failure": "한 증상에서 파생한 결함 코드를 별도 증거 없이 확장했다."
+    },
+    {
+      "fixture_id": "P08-adversarial",
+      "opaque_case_ref": "case-08ad83b5e914a2c0",
+      "suite": "plan_quality",
+      "artifact": {"symptom": "대규모 scan을 제한 없이 실행하고 checkpoint가 없다."},
+      "expected_admissible": false,
+      "critical": true,
+      "required_finding_codes": ["UNBOUNDED_SCAN"],
+      "allowed_correlated_codes": ["RESOURCE_RISK", "HUMAN_CHECKPOINT_MISSING"],
+      "known_r31_failure": "NON_IDEMPOTENT 등 직접 증거 없는 상관 결함까지 추가했다."
+    },
+    {
+      "fixture_id": "P09-adversarial",
+      "opaque_case_ref": "case-09ad0f2348b8d5c1",
+      "suite": "plan_quality",
+      "artifact": {"symptom": "모든 로컬 읽기에 사용자 승인을 반복 요구한다."},
+      "expected_admissible": false,
+      "critical": false,
+      "required_finding_codes": ["OVER_GATED"],
+      "allowed_correlated_codes": ["EXECUTION_FRICTION"],
+      "known_r31_failure": "검증 결함을 별도 증거 없이 함께 진단해 precision을 낮췄다."
+    },
+    {
+      "fixture_id": "P12-adversarial",
+      "opaque_case_ref": "case-12adbc318a72e940",
+      "suite": "plan_quality",
+      "artifact": {"symptom": "실패 후 같은 입력으로 무제한 재계획한다."},
+      "expected_admissible": false,
+      "critical": true,
+      "required_finding_codes": ["RECOVERY_GAP"],
+      "allowed_correlated_codes": ["NON_IDEMPOTENT"],
+      "known_r31_failure": "동일 증상에서 여러 결함을 중복 계상했다."
+    }
+  ]
+}

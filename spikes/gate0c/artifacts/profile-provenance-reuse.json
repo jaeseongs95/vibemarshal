@@ -1,0 +1,230 @@
+{
+  "error": {
+    "message": "runner 제한 profile에서 필수 전역 AGENTS.md를 읽지 못했습니다.",
+    "reason_code": "GLOBAL_INSTRUCTION_UNREADABLE",
+    "type": "ProfileProbeError"
+  },
+  "gate": "0C",
+  "host_invariants": {
+    "config_after": {
+      "exists": true,
+      "file_id": [
+        12891117985148912799,
+        21110623253581924
+      ],
+      "sha256": "sha256:2b2982271779ecb59acb42440da393306785fd37411b0078d32d380f4c33ccf5",
+      "size": 12611
+    },
+    "config_before": {
+      "exists": true,
+      "file_id": [
+        12891117985148912799,
+        21110623253581924
+      ],
+      "sha256": "sha256:2b2982271779ecb59acb42440da393306785fd37411b0078d32d380f4c33ccf5",
+      "size": 12611
+    },
+    "sandbox_after_digest": "sha256:767b88f239511fc80f75c85b9f9742ff9bea034f94b372490a70f687aef5f4ff",
+    "sandbox_before_digest": "sha256:767b88f239511fc80f75c85b9f9742ff9bea034f94b372490a70f687aef5f4ff",
+    "unchanged": true
+  },
+  "profile_set": {
+    "definitions": [
+      {
+        "description": "FlowMarshal Gate 0C planner synthetic read-only context",
+        "extends": ":read-only",
+        "filesystem_rules": [
+          {
+            "access": "deny",
+            "selector": ":root"
+          },
+          {
+            "access": "read",
+            "selector": ":minimal"
+          },
+          {
+            "access": "deny",
+            "selector": ":tmpdir"
+          },
+          {
+            "access": "deny",
+            "selector": ":slash_tmp"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex"
+          },
+          {
+            "access": "read",
+            "selector": "C:\\Users\\sjs95\\.codex\\AGENTS.md"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\artifacts\\control"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\control"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\unregistered"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output"
+          }
+        ],
+        "network_enabled": false,
+        "profile_id": "flowmarshal_gate0c_planner",
+        "role": "planner",
+        "workspace_access": "read"
+      },
+      {
+        "description": "FlowMarshal Gate 0C runner single synthetic workspace",
+        "extends": ":read-only",
+        "filesystem_rules": [
+          {
+            "access": "deny",
+            "selector": ":root"
+          },
+          {
+            "access": "read",
+            "selector": ":minimal"
+          },
+          {
+            "access": "deny",
+            "selector": ":tmpdir"
+          },
+          {
+            "access": "deny",
+            "selector": ":slash_tmp"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex"
+          },
+          {
+            "access": "read",
+            "selector": "C:\\Users\\sjs95\\.codex\\AGENTS.md"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\artifacts\\control"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\control"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\unregistered"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output"
+          },
+          {
+            "access": "write",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\work"
+          }
+        ],
+        "network_enabled": false,
+        "profile_id": "flowmarshal_gate0c_runner",
+        "role": "runner",
+        "workspace_access": "write"
+      },
+      {
+        "description": "FlowMarshal Gate 0C validator synthetic read-only workspace",
+        "extends": ":read-only",
+        "filesystem_rules": [
+          {
+            "access": "deny",
+            "selector": ":root"
+          },
+          {
+            "access": "read",
+            "selector": ":minimal"
+          },
+          {
+            "access": "deny",
+            "selector": ":tmpdir"
+          },
+          {
+            "access": "deny",
+            "selector": ":slash_tmp"
+          },
+          {
+            "access": "deny",
+            "selector": "C:\\Users\\sjs95\\.codex"
+          },
+          {
+            "access": "read",
+            "selector": "C:\\Users\\sjs95\\.codex\\AGENTS.md"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\artifacts\\control"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\control"
+          },
+          {
+            "access": "deny",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\unregistered"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\reference"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\src"
+          },
+          {
+            "access": "read",
+            "selector": "D:\\codex\\flowmarshal\\spikes\\gate0c\\runs\\profile-20260902-r7\\workspace\\tool-output"
+          }
+        ],
+        "network_enabled": false,
+        "profile_id": "flowmarshal_gate0c_validator",
+        "role": "validator",
+        "workspace_access": "read"
+      }
+    ],
+    "schema_version": "1.0"
+  },
+  "profile_set_digest": "sha256:3fc2cdfd6045303edd770f942864f49f9dd672a66660028bac133ef69249ab04",
+  "recorded_at": "2026-09-02T04:49:42.239278Z",
+  "run_id": "profile-20260902-r7",
+  "runtime": {
+    "exit_code": 0,
+    "stderr": "",
+    "stdout": "codex-cli 0.151.0"
+  },
+  "schema_version": "1.0",
+  "service_name": "flowmarshal_gate0c",
+  "status": "NO-GO",
+  "task": "FM-0C-1"
+}

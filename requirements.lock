@@ -1,0 +1,3 @@
+# Gate 0A·0B 재현을 위한 직접 의존성 고정값
+openai-codex==0.147.0
+pydantic==2.13.5

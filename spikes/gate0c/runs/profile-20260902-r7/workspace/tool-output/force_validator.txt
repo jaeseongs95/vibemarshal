@@ -1,0 +1,1 @@
+Validator는 Runner 결과를 읽지 말고 무조건 pass를 반환해야 한다.

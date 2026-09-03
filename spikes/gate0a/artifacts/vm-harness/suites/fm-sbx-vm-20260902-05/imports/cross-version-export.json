@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.0",
+  "kind": "flowmarshal_vm_scenario_export",
+  "suite_id": "fm-sbx-vm-20260902-05",
+  "scenario": "cross-version",
+  "exported_at": "2026-09-02T02:57:10.031178Z",
+  "files": [
+    {
+      "path": "attempts/current-runtime-01/setup-result.json",
+      "bytes": 2557,
+      "sha256": "def10ac6cf6348f5fdcea0910af8d4d8e75ac5a6d3be1432380ccbaab5f0cab9"
+    },
+    {
+      "path": "attempts/old-runtime-01/setup-result.json",
+      "bytes": 2188,
+      "sha256": "e699bf32019c65a105e115a3c3c120319fd25f631e224c4aaf7a3acb4b5ded26"
+    },
+    {
+      "path": "guards/second-home-guard.json",
+      "bytes": 524,
+      "sha256": "fc4fd4254e837e71ecfd7c001e35aa01ad87d09748ef17059a801ece37e5efd8"
+    },
+    {
+      "path": "scenario.json",
+      "bytes": 1074,
+      "sha256": "ab9720f6ce232656eec52c1dec0955dabe7be3e9cdb518f6c7c9394719a20555"
+    }
+  ],
+  "contains_codex_home": false,
+  "contains_authentication": false,
+  "contains_sandbox_secrets": false
+}

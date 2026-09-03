@@ -1,0 +1,36 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+build/
+dist/
+**/node_modules/
+**/.sandbox-bin/
+.flowmarshal-engine/
+.flowmarshal-engine-eval/
+
+# Gate 0A 실행 중 생성되는 합성 증거
+spikes/gate0a/artifacts/runs/
+
+# Codex 인증·샌드박스·세션 상태는 프로젝트 산출물로 보관하지 않는다.
+**/.sandbox-secrets/
+**/auth.json
+**/state_*.sqlite*
+**/goals_*.sqlite*
+**/logs_*.sqlite*
+**/memories_*.sqlite*
+**/queue_*.sqlite*
+
+# 로컬 runtime 복제본·DB·lock·합성 canary는 원격 source와 분리한다.
+spikes/gate0a/artifacts/permission-codex-home/
+spikes/gate0a/artifacts/diagnostics/isolated-permission-home/
+spikes/gate0c/runs/**/unregistered/
+**/.*.lock
+*.db
+*.sqlite
+*.sqlite3
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite3-wal
+*.sqlite3-shm

@@ -1,0 +1,369 @@
+{
+  "schema_version": "1.0",
+  "kind": "flowmarshal_r3_planner_receipt",
+  "gate": "R3",
+  "run_id": "r3-20260902T092930Z-5112125a",
+  "started_at": "2026-09-02T09:29:30.668705Z",
+  "completed_at": "2026-09-02T09:29:30.735211Z",
+  "decision": "GO",
+  "scope": {
+    "actual_codex_runner": false,
+    "generator": "static strict-schema candidate",
+    "next_runtime_integration": "R5/R8"
+  },
+  "checks": {
+    "request_and_context_contract": {
+      "status": "pass",
+      "summary": "AGENTS.md·승인 참고자료의 내용과 digest를 정상 Planner 입력으로 구성함",
+      "evidence": {
+        "request_spec_digest": "sha256:0639cc3ed84df4c2b9d67386714449aed1a4ffe221ace97fa145c5d8415bc8b4",
+        "context_sources": [
+          {
+            "source_id": "project-agents",
+            "kind": "project_instructions",
+            "content_digest": "sha256:e247e23e8fbc831854cc676d9c8f0e07db6bb12ccdba08a75dd86656f5bbc6e4",
+            "required_for_all_work_items": true
+          },
+          {
+            "source_id": "approved-reference",
+            "kind": "external_reference",
+            "content_digest": "sha256:6d8849007298827fe174280b48ec1d02aaf08b33964227d04b8a9fa887931a98",
+            "required_for_all_work_items": false
+          }
+        ]
+      }
+    },
+    "valid_plan_candidate": {
+      "status": "pass",
+      "summary": "모든 요구사항을 추적하는 strict PlanDraft DAG 후보를 생성·검증함",
+      "evidence": {
+        "candidate_digest": "sha256:d64e9f4b9bc50e753d1081a3831b9fc0931742914178f06a64ed82096c2da0c9",
+        "validation_report_digest": "sha256:b7f0daa57c4c2669f0482706ab5c1123de2499cd147ecbcd85669e12f8636553",
+        "readiness": "ready_for_assignment",
+        "coverage": {
+          "requirement_count": 3,
+          "covered_count": 3,
+          "excluded_count": 0,
+          "clarification_count": 0,
+          "missing_count": 0,
+          "unknown_count": 0,
+          "work_item_count": 2
+        }
+      }
+    },
+    "deterministic_rejection_matrix": {
+      "status": "pass",
+      "summary": "요구사항 누락·cycle·무검증 작업·무순서 변경 충돌을 재현 가능하게 거부함",
+      "evidence": {
+        "cases": {
+          "missing_requirement": {
+            "boundary": "deterministic_validation",
+            "error_code": "PLAN_CANDIDATE_INVALID",
+            "issue_codes": [
+              "REQUIREMENT_COVERAGE_MISSING"
+            ],
+            "report_digest": "sha256:1a7f83173b147ba0e92a86e1c62f6fbb45f751582f240dc74e2683980a1361e2"
+          },
+          "dependency_cycle": {
+            "boundary": "strict_schema",
+            "error_code": "PLANNER_OUTPUT_SCHEMA_INVALID"
+          },
+          "missing_validation": {
+            "boundary": "strict_schema",
+            "error_code": "PLANNER_OUTPUT_SCHEMA_INVALID"
+          },
+          "unordered_change_conflict": {
+            "boundary": "deterministic_validation",
+            "error_code": "PLAN_CANDIDATE_INVALID",
+            "issue_codes": [
+              "CHANGE_CONFLICT_UNORDERED"
+            ],
+            "report_digest": "sha256:b8015e0844dd4528e9a987280be1ea173fa005fc5caaa84e4cc6ecd809f7e817"
+          }
+        }
+      }
+    },
+    "candidate_only_boundary": {
+      "status": "pass",
+      "summary": "Planner는 원장을 받지 않고 후보만 반환하며 trusted import 뒤에도 draft로 남음",
+      "evidence": {
+        "plan_count_after_planner": 0,
+        "imported_revision_id": "revision_12508714cecf4eb3be8eca9109c3b366",
+        "imported_revision_status": "draft",
+        "active_revision_id": null,
+        "activation_without_assignment_rejected": true
+      }
+    }
+  },
+  "receipts": {
+    "request_spec": {
+      "schema_version": "1.0",
+      "project_id": "project_3ec8347739ac4e9daeeed0addd285133",
+      "project_name": "R3 합성 Planner 프로젝트",
+      "project_root": "d:\\codex\\flowmarshal\\spikes\\orchestration\\r3\\artifacts\\runs\\r3-20260902t092930z-5112125a\\synthetic-project",
+      "project_description": "요구사항 coverage와 WorkItem DAG 검증용 합성 프로젝트",
+      "user_request": "기초 기능을 먼저 구현하고 통합 기능을 연결하되 프로젝트 지침을 모든 작업에 적용해줘.",
+      "request_summary": "두 기능을 순서 있는 WorkItem으로 분해하고 검사 계획을 만든다.",
+      "parent_revision_id": null,
+      "requirements": [
+        {
+          "requirement_id": "req.foundation",
+          "statement": "기초 기능을 독립적으로 구현한다.",
+          "source": "user",
+          "priority": "must",
+          "source_refs": []
+        },
+        {
+          "requirement_id": "req.integration",
+          "statement": "기초 기능과 연결되는 통합 기능을 구현한다.",
+          "source": "reference",
+          "priority": "must",
+          "source_refs": [
+            "approved-reference"
+          ]
+        },
+        {
+          "requirement_id": "req.instructions",
+          "statement": "프로젝트 지침을 모든 작업에 적용한다.",
+          "source": "project_instruction",
+          "priority": "must",
+          "source_refs": [
+            "project-agents"
+          ]
+        }
+      ],
+      "context_sources": [
+        {
+          "source_id": "project-agents",
+          "kind": "project_instructions",
+          "path": "d:\\codex\\flowmarshal\\spikes\\orchestration\\r3\\artifacts\\runs\\r3-20260902t092930z-5112125a\\synthetic-project\\agents.md",
+          "purpose": "모든 WorkItem에 적용되는 프로젝트 지침",
+          "content": "모든 사용자 산출물은 한국어로 작성하고 검사를 생략하지 않는다.\r\n",
+          "content_digest": "sha256:e247e23e8fbc831854cc676d9c8f0e07db6bb12ccdba08a75dd86656f5bbc6e4",
+          "required_for_all_work_items": true,
+          "truncated": false
+        },
+        {
+          "source_id": "approved-reference",
+          "kind": "external_reference",
+          "path": "d:\\codex\\flowmarshal\\spikes\\orchestration\\r3\\artifacts\\runs\\r3-20260902t092930z-5112125a\\approved-reference.md",
+          "purpose": "사용자가 승인한 외부 요구사항",
+          "content": "기초 기능을 먼저 구현한 뒤 통합 기능을 연결하고 검사한다.\r\n",
+          "content_digest": "sha256:6d8849007298827fe174280b48ec1d02aaf08b33964227d04b8a9fa887931a98",
+          "required_for_all_work_items": false,
+          "truncated": false
+        }
+      ],
+      "available_validations": [
+        {
+          "capability_id": "python-tests",
+          "check_type": "command",
+          "description": "신뢰된 Python unittest 명령",
+          "deterministic": true,
+          "configuration": {
+            "command_id": "python-unittest"
+          }
+        }
+      ],
+      "product_capabilities": [
+        "RequestSpec 구조화",
+        "PlanDraft 후보 생성",
+        "deterministic coverage validation"
+      ],
+      "out_of_scope": [
+        "모델 배정",
+        "계획 활성화",
+        "실제 Codex Runner 호출"
+      ],
+      "planning_limits": {
+        "max_work_items": 30,
+        "max_requirements_per_work_item": 5,
+        "max_work_items_per_requirement": 4,
+        "max_change_targets_per_work_item": 12,
+        "min_objective_characters": 12
+      }
+    },
+    "plan_candidate": {
+      "project_id": "project_3ec8347739ac4e9daeeed0addd285133",
+      "request_summary": "두 기능을 순서 있는 WorkItem으로 분해하고 검사 계획을 만든다.",
+      "parent_revision_id": null,
+      "request_spec_digest": "sha256:0639cc3ed84df4c2b9d67386714449aed1a4ffe221ace97fa145c5d8415bc8b4",
+      "work_items": [
+        {
+          "client_ref": "foundation",
+          "title": "R3 foundation",
+          "objective": "foundation 범위의 산출물을 독립적으로 구현하고 등록 검사를 통과시킨다.",
+          "dependencies": [],
+          "context_sources": [
+            "project-agents",
+            "approved-reference"
+          ],
+          "expected_changes": [
+            "src/foundation.py"
+          ],
+          "out_of_scope": [
+            "모델 배정",
+            "계획 활성화",
+            "Worker 실행"
+          ],
+          "deliverables": [
+            "src/foundation.py"
+          ],
+          "acceptance_criteria": [
+            "foundation 관련 등록 검사가 통과한다."
+          ],
+          "validations": [
+            {
+              "criterion_id": "foundation.tests",
+              "check_type": "command",
+              "capability_id": "python-tests",
+              "specification": {
+                "command_id": "python-unittest"
+              }
+            }
+          ],
+          "execution_requirements": {
+            "network": "normal"
+          },
+          "assignment": null
+        },
+        {
+          "client_ref": "integration",
+          "title": "R3 integration",
+          "objective": "integration 범위의 산출물을 독립적으로 구현하고 등록 검사를 통과시킨다.",
+          "dependencies": [
+            "foundation"
+          ],
+          "context_sources": [
+            "project-agents",
+            "approved-reference"
+          ],
+          "expected_changes": [
+            "src/integration.py"
+          ],
+          "out_of_scope": [
+            "모델 배정",
+            "계획 활성화",
+            "Worker 실행"
+          ],
+          "deliverables": [
+            "src/integration.py"
+          ],
+          "acceptance_criteria": [
+            "integration 관련 등록 검사가 통과한다."
+          ],
+          "validations": [
+            {
+              "criterion_id": "integration.tests",
+              "check_type": "command",
+              "capability_id": "python-tests",
+              "specification": {
+                "command_id": "python-unittest"
+              }
+            }
+          ],
+          "execution_requirements": {
+            "network": "normal"
+          },
+          "assignment": null
+        }
+      ],
+      "requirement_coverage": [
+        {
+          "requirement_id": "req.foundation",
+          "disposition": "work_items",
+          "work_item_refs": [
+            "foundation"
+          ],
+          "rationale": "기초 구현 작업이 직접 충족한다.",
+          "clarification_id": null,
+          "requires_user_confirmation": false
+        },
+        {
+          "requirement_id": "req.integration",
+          "disposition": "work_items",
+          "work_item_refs": [
+            "integration"
+          ],
+          "rationale": "통합 구현과 검사가 직접 충족한다.",
+          "clarification_id": null,
+          "requires_user_confirmation": false
+        },
+        {
+          "requirement_id": "req.instructions",
+          "disposition": "work_items",
+          "work_item_refs": [
+            "foundation",
+            "integration"
+          ],
+          "rationale": "두 작업 모두 project-agents를 필수 입력으로 사용한다.",
+          "clarification_id": null,
+          "requires_user_confirmation": false
+        }
+      ],
+      "clarifications": [],
+      "planning_notes": [
+        "Assignment는 R4에서 추가한다."
+      ]
+    },
+    "validation_report": {
+      "request_spec_digest": "sha256:0639cc3ed84df4c2b9d67386714449aed1a4ffe221ace97fa145c5d8415bc8b4",
+      "candidate_digest": "sha256:d64e9f4b9bc50e753d1081a3831b9fc0931742914178f06a64ed82096c2da0c9",
+      "valid": true,
+      "readiness": "ready_for_assignment",
+      "coverage": {
+        "requirement_count": 3,
+        "covered_count": 3,
+        "excluded_count": 0,
+        "clarification_count": 0,
+        "missing_count": 0,
+        "unknown_count": 0,
+        "work_item_count": 2
+      },
+      "issues": []
+    },
+    "generation": {
+      "request_digest": "sha256:e81132307f9e89075451c9697e4d2095a413ee78adc64b987609910ec0c8e91b",
+      "receipt": {
+        "adapter": "r3-static-candidate",
+        "case": "valid"
+      },
+      "call_count": 1,
+      "output_schema_digest": "sha256:b564396df5bbd0f1357115b1910d2ee332ca44c8ce0d8843cf0d7872762ff9de"
+    },
+    "invalid_matrix": {
+      "missing_requirement": {
+        "boundary": "deterministic_validation",
+        "error_code": "PLAN_CANDIDATE_INVALID",
+        "issue_codes": [
+          "REQUIREMENT_COVERAGE_MISSING"
+        ],
+        "report_digest": "sha256:1a7f83173b147ba0e92a86e1c62f6fbb45f751582f240dc74e2683980a1361e2"
+      },
+      "dependency_cycle": {
+        "boundary": "strict_schema",
+        "error_code": "PLANNER_OUTPUT_SCHEMA_INVALID"
+      },
+      "missing_validation": {
+        "boundary": "strict_schema",
+        "error_code": "PLANNER_OUTPUT_SCHEMA_INVALID"
+      },
+      "unordered_change_conflict": {
+        "boundary": "deterministic_validation",
+        "error_code": "PLAN_CANDIDATE_INVALID",
+        "issue_codes": [
+          "CHANGE_CONFLICT_UNORDERED"
+        ],
+        "report_digest": "sha256:b8015e0844dd4528e9a987280be1ea173fa005fc5caaa84e4cc6ecd809f7e817"
+      }
+    },
+    "core_draft": {
+      "database": "D:\\codex\\flowmarshal\\spikes\\orchestration\\r3\\artifacts\\runs\\r3-20260902T092930Z-5112125a\\core.sqlite3",
+      "project_id": "project_3ec8347739ac4e9daeeed0addd285133",
+      "revision_id": "revision_12508714cecf4eb3be8eca9109c3b366",
+      "status": "draft",
+      "active_revision_id": null
+    }
+  },
+  "error": null
+}

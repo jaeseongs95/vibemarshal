@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "kind": "local_disposable_windows_vm_execution_record",
+  "recorded_at": "2026-09-02T03:11:52.3456600Z",
+  "status": "completed",
+  "host": {
+    "provider": "Oracle VirtualBox 7.2.16",
+    "provider_version_output": "7.2.16r174877",
+    "host_windows_sandbox_or_hyper_v_features_modified": false,
+    "host_codex_setup_start_called": false
+  },
+  "installation_media": {
+    "product": "Windows 11 IoT Enterprise LTSC 2024 Evaluation x64",
+    "path": "D:\\VirtualMachines\\FlowMarshal\\assets\\Windows11IoTEnterpriseLTSC2024Eval-x64-en-us.iso",
+    "sha256": "2cee70bd183df42b92a2e0da08cc2bb7a2a9ce3a3841955a012c0f77aeb3cb29"
+  },
+  "vm": {
+    "name": "FlowMarshal-Disposable-Win11",
+    "identifier": "246a5d7a-af7f-49cc-8f30-5efa6351d917",
+    "action": "disposed",
+    "registered_after_disposal": false,
+    "remaining_virtual_disk_or_config_files": 0,
+    "disposal_reference": "virtualbox-unregistervm-delete:246a5d7a-af7f-49cc-8f30-5efa6351d917:2026-09-02T03:00:21.3805120Z"
+  },
+  "suite": {
+    "suite_id": "fm-sbx-vm-20260902-05",
+    "status": "GO",
+    "gate_restoration_allowed": true,
+    "result_path": "spikes/gate0a/artifacts/vm-harness/suites/fm-sbx-vm-20260902-05/suite-result.json",
+    "result_sha256": "85a388ce3a4d6356f8e483aa9b3d1277a3157d5747202c519a542ebf046bd308",
+    "secret_contents_read": false
+  },
+  "retained_for_reuse": {
+    "virtualbox": true,
+    "evaluation_iso": true,
+    "payload_path": "D:\\VirtualMachines\\FlowMarshal\\payload",
+    "latest_handoff_bundle": "spikes/gate0a/artifacts/vm-harness/handoff/flowmarshal-external-windows-vm-20260902-115146.zip",
+    "latest_handoff_bundle_sha256": "66473cdf8205091e9f6ff6ad3123c8519b14e1c3be077f48b05fd4a60c46f8c4"
+  },
+  "cleanup": {
+    "remaining_secret_files": 0,
+    "diagnostic_screenshots_retained": 18,
+    "diagnostic_screenshots_are_gate_evidence": false
+  },
+  "security_note": "VirtualBox unattended dry-run 출력에 최초 임시 암호가 한 번 표시됐지만 실제 설치 전에 회전했고, 해당 값은 실제 VM에 사용되지 않았다. 최종 임시 평문·DPAPI 자격증명 파일은 삭제했으며 VM도 폐기했다."
+}

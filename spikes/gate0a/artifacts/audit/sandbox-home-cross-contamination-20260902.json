@@ -1,0 +1,130 @@
+{
+  "schema_version": "1.0",
+  "audit_id": "sandbox-home-cross-contamination-20260902",
+  "kind": "sandbox_home_cross_contamination",
+  "status": "resolved",
+  "recorded_at": "2026-09-01T23:35:17.9345339Z",
+  "resolved_at": "2026-09-02T03:01:05.639815Z",
+  "summary": "프로젝트 내부 임시 CODEX_HOME에서 elevated Windows sandbox provisioning을 실행해 컴퓨터 전역 샌드박스 사용자 상태와 실제 사용자 홈의 marker·secret 상태가 분리됐다.",
+  "reason_code": "SANDBOX_HOME_CROSS_CONTAMINATION",
+  "affected_run_id": "gate0a-readiness-v3",
+  "source_schema_version": "1.3",
+  "preimage_available": true,
+  "confirmed_facts": [
+    "Gate0A setup-sandbox가 프로젝트 artifacts의 permission-codex-home을 CODEX_HOME으로 지정했다.",
+    "해당 App Server가 windowsSandbox/setupStart elevated를 호출했다.",
+    "그 뒤 실제 사용자 홈에서 sandbox users missing or incompatible 오류가 반복됐다.",
+    "실제 사용자 홈을 지정한 수동 복구 시각에 setup marker, secrets와 두 로컬 샌드박스 사용자의 PasswordLastSet이 함께 갱신됐다."
+  ],
+  "secret_contents_read": false,
+  "gate_override": {
+    "gate0a_runtime": "GO",
+    "gate0a_permission": "GO",
+    "gate0a_overall": "GO",
+    "gate0b_core_verification": "GO",
+    "gate0b_overall": "GO"
+  },
+  "preimages": {
+    "gate0a_results": {
+      "sha256": "6854bfc1f446cefee6b2d4d2369ed34302095716799f5c49731fadf6d72da981",
+      "path": "spikes/gate0a/artifacts/legacy/sandbox-incident-20260902-preimage-gate0a-results.json"
+    },
+    "gate0a_report": {
+      "sha256": "0c7d05cda2fde7c693241fe52687bc8f509eeea8dd02e318e912407a5be80039",
+      "path": "spikes/gate0a/artifacts/legacy/sandbox-incident-20260902-preimage-gate0a-report.md"
+    },
+    "gate0b_results": {
+      "sha256": "b81fa3d54ac258279817e34103dca156000c23130de2de89ac2c90076c67479d",
+      "path": "spikes/gate0b/artifacts/legacy/sandbox-incident-20260902-preimage-gate0b-results.json"
+    },
+    "gate0b_report": {
+      "sha256": "27a72d6de0e7479897280842fb215ba90a798edae46ebe6211fbd10fb8e415f2",
+      "path": "spikes/gate0b/artifacts/legacy/sandbox-incident-20260902-preimage-gate0b-report.md"
+    }
+  },
+  "legacy_secret_cleanup": {
+    "path": "D:\\codex\\flowmarshal\\spikes\\gate0a\\artifacts\\permission-codex-home\\.sandbox-secrets",
+    "under_expected_legacy_home": true,
+    "file_count_before": 1,
+    "created_at_utc": "2026-09-01T13:22:44.2180904Z",
+    "modified_at_utc": "2026-09-01T13:22:44.2191304Z",
+    "status": "moved_to_windows_recycle_bin",
+    "completed_at": "2026-09-01T23:45:58.3802547Z",
+    "legacy_secret_exists_after": false,
+    "legacy_log_and_marker_preserved": true,
+    "actual_user_home_touched": false
+  },
+  "forensic_quarantine": {
+    "path": "D:\\codex\\flowmarshal-forensic-quarantine\\sandbox-home-cross-contamination-20260902",
+    "moved_codex_state_database_files": 45,
+    "contents_read_or_hashed": false,
+    "files_marked_read_only": true,
+    "legacy_log_and_marker_kept_in_place_read_only": true,
+    "artifact_safety_violations_after": 0
+  },
+  "host_revalidation": {
+    "sandbox_status": "READY",
+    "status_query_fingerprint_unchanged": true,
+    "setup_sandbox_host_guard": "EXTERNAL_SETUP_REQUIRED/HOST_PROVISIONING_FORBIDDEN",
+    "permission_attempts": [
+      {
+        "recheck_id": "fm0ap-host-system-20260902-01",
+        "status": "fail",
+        "cause": "복구 전 실행 ID의 canary workspace를 재사용해 삭제·재생성된 샌드박스 사용자 SID와 오래된 ACL이 맞지 않음",
+        "sandbox_state_unchanged": true,
+        "resolution": "각 permission recheck가 자체 고유 canary 경로를 사용하도록 수정"
+      },
+      {
+        "recheck_id": "fm0ap-host-system-20260902-02",
+        "status": "pass",
+        "runtime": "codex-cli 0.151.0",
+        "all_permission_checks_passed": true,
+        "sandbox_state_unchanged": true,
+        "artifact_safety": "pass"
+      }
+    ],
+    "gate0b_real_smoke": {
+      "run_id": "20260901T235045Z",
+      "status": "pass",
+      "sandbox_preflight": "READY",
+      "sandbox_command_succeeded": true,
+      "ledger_verification": "GO"
+    },
+    "disposable_vm_revalidation": {
+      "status": "passed_and_disposed",
+      "harness_schema_version": "1.0",
+      "required_scenarios": [
+        "current-first",
+        "cross-version",
+        "failure-retry"
+      ],
+      "host_capability_evidence": "spikes/gate0a/artifacts/vm-harness/host-capability-20260902.json",
+      "suite_id": "fm-sbx-vm-20260902-05",
+      "suite_result": "spikes/gate0a/artifacts/vm-harness/suites/fm-sbx-vm-20260902-05/suite-result.json",
+      "provider": "Oracle VirtualBox 7.2.16",
+      "vm_identifier": "246a5d7a-af7f-49cc-8f30-5efa6351d917",
+      "vm_disposed": true,
+      "gate_restoration_allowed": true
+    }
+  },
+  "resolution": {
+    "status": "verified",
+    "host_sandbox_status": "READY",
+    "vm_suite_id": "fm-sbx-vm-20260902-05",
+    "vm_suite_status": "GO",
+    "current_first": "pass",
+    "cross_version": "pass",
+    "second_home_guard": "pass",
+    "limited_failure_retry": "pass",
+    "artifact_safety": "pass",
+    "vm_disposal": "pass",
+    "regression_tests": "93/93 pass",
+    "secret_contents_read": false
+  },
+  "revalidation_requirements": [
+    "호스트 system Codex와 authoritative home 준비상태 사전검사",
+    "권한 카나리 전후 샌드박스 계정·marker·secret 메타데이터 무변경",
+    "폐기 가능한 Windows VM의 provisioning·버전 교차 시나리오",
+    "Gate0B 실제 sandbox command smoke"
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "schema_version": "1.0",
+  "kind": "disposable_windows_vm_sandbox_setup_attempt",
+  "suite_id": "fm-sbx-vm-20260902-05",
+  "scenario": "current-first",
+  "attempt_id": "current-first-01",
+  "sequence": 1,
+  "recorded_at": "2026-09-02T02:55:18.900040Z",
+  "status": "completed",
+  "runtime": {
+    "name": "desktop-system",
+    "executable": "C:\\FlowMarshalV4\\CodexRuntime\\bin\\codex.exe",
+    "version": {
+      "exit_code": 0,
+      "stdout": "codex-cli 0.151.0",
+      "stderr": ""
+    }
+  },
+  "authoritative_codex_home": "C:\\FlowMarshal-VM\\current-first-home",
+  "readiness_before": {
+    "ok": true,
+    "result": {
+      "status": "updateRequired"
+    }
+  },
+  "readiness_after": {
+    "ok": true,
+    "result": {
+      "status": "ready"
+    }
+  },
+  "error": null,
+  "setup_api_called": true,
+  "fingerprint_before": {
+    "accounts": [
+      {
+        "Name": "CodexSandboxOffline",
+        "Missing": true
+      },
+      {
+        "Name": "CodexSandboxOnline",
+        "Missing": true
+      }
+    ],
+    "accounts_error": null,
+    "setup_marker": {
+      "exists": false,
+      "error": null
+    },
+    "secrets_directory": {
+      "exists": false,
+      "mtime_ns": null,
+      "file_count": 0,
+      "error": null
+    }
+  },
+  "fingerprint_after": {
+    "accounts": [
+      {
+        "Name": "CodexSandboxOffline",
+        "SID": "S-1-5-21-1598227186-1164737607-598007915-1002",
+        "Enabled": true,
+        "PasswordLastSet": "2026-09-02T02:55:15.5576708Z"
+      },
+      {
+        "Name": "CodexSandboxOnline",
+        "SID": "S-1-5-21-1598227186-1164737607-598007915-1003",
+        "Enabled": true,
+        "PasswordLastSet": "2026-09-02T02:55:15.5888036Z"
+      }
+    ],
+    "accounts_error": null,
+    "setup_marker": {
+      "exists": true,
+      "mtime_ns": 1788317716040025600,
+      "size": 252,
+      "error": null,
+      "sha256": "df373f6a9a0879aef5333be6b1622e51b520cb6bb3cd7954f001a14b30d20ea0"
+    },
+    "secrets_directory": {
+      "exists": true,
+      "mtime_ns": 1788317715603611400,
+      "file_count": 1,
+      "error": null
+    }
+  },
+  "secret_contents_read": false,
+  "vm_reset_required_after_suite": true
+}

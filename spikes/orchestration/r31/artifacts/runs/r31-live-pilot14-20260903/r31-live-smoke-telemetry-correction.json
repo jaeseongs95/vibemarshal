@@ -1,0 +1,10 @@
+{
+  "basis": "model_call_receipts[*].usage에서 name=total.totalTokens인 14개 값을 합산",
+  "corrected_field": "total_tokens",
+  "corrected_value": 457098,
+  "model_call_count": 14,
+  "original_value": 0,
+  "receipt_schema": "flowmarshal.planner-r31.live-smoke-telemetry-correction.v1",
+  "semantic_qualification_unchanged": true,
+  "source_receipt_sha256": "sha256:e80a078449817a90f667d7a97e61297ef2a329e4f9ce86752f7a04c74306ab22"
+}

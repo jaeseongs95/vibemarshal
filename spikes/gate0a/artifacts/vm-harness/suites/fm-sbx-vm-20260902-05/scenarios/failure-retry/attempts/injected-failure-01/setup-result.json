@@ -1,0 +1,76 @@
+{
+  "schema_version": "1.0",
+  "kind": "disposable_windows_vm_sandbox_setup_attempt",
+  "suite_id": "fm-sbx-vm-20260902-05",
+  "scenario": "failure-retry",
+  "attempt_id": "injected-failure-01",
+  "sequence": 1,
+  "recorded_at": "2026-09-02T02:58:45.413325Z",
+  "status": "failed",
+  "runtime": {
+    "name": "desktop-system",
+    "executable": "C:\\FlowMarshalV4\\CodexRuntime\\bin\\codex.exe",
+    "version": {
+      "exit_code": 0,
+      "stdout": "codex-cli 0.151.0",
+      "stderr": ""
+    }
+  },
+  "authoritative_codex_home": "C:\\FlowMarshal-VM\\failure-retry-home",
+  "readiness_before": null,
+  "readiness_after": null,
+  "error": {
+    "reason_code": "VM_TEST_INJECTED_SETUP_FAILURE",
+    "type": "InjectedFailure",
+    "message": "제한된 재시도 경로 검증을 위한 결정적 결함 주입"
+  },
+  "setup_api_called": false,
+  "fingerprint_before": {
+    "accounts": [
+      {
+        "Name": "CodexSandboxOffline",
+        "Missing": true
+      },
+      {
+        "Name": "CodexSandboxOnline",
+        "Missing": true
+      }
+    ],
+    "accounts_error": null,
+    "setup_marker": {
+      "exists": false,
+      "error": null
+    },
+    "secrets_directory": {
+      "exists": false,
+      "mtime_ns": null,
+      "file_count": 0,
+      "error": null
+    }
+  },
+  "fingerprint_after": {
+    "accounts": [
+      {
+        "Name": "CodexSandboxOffline",
+        "Missing": true
+      },
+      {
+        "Name": "CodexSandboxOnline",
+        "Missing": true
+      }
+    ],
+    "accounts_error": null,
+    "setup_marker": {
+      "exists": false,
+      "error": null
+    },
+    "secrets_directory": {
+      "exists": false,
+      "mtime_ns": null,
+      "file_count": 0,
+      "error": null
+    }
+  },
+  "secret_contents_read": false,
+  "vm_reset_required_after_suite": true
+}

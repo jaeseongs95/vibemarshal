@@ -1,0 +1,123 @@
+{
+  "checks": [
+    {
+      "check_id": "sqlite_integrity",
+      "details": [],
+      "passed": true,
+      "summary": "SQLite 무결성과 외래 키가 정상입니다."
+    },
+    {
+      "check_id": "schema_contract",
+      "details": [],
+      "passed": true,
+      "summary": "Gate 0C schema revision 3 계약이 갖춰졌습니다."
+    },
+    {
+      "check_id": "append_only_guards",
+      "details": [],
+      "passed": true,
+      "summary": "모든 권위·evidence 표에 update/delete 차단 trigger가 있습니다."
+    },
+    {
+      "check_id": "approved_plan_integrity",
+      "details": [],
+      "passed": true,
+      "summary": "승인 PlanRevision·task 정의와 원문 digest가 일치합니다."
+    },
+    {
+      "check_id": "authority_row_digests",
+      "details": [],
+      "passed": true,
+      "summary": "권위 상태 행의 canonical digest가 모두 일치합니다."
+    },
+    {
+      "check_id": "evidence_integrity",
+      "details": [],
+      "passed": true,
+      "summary": "content-addressed evidence가 원장과 일치합니다."
+    },
+    {
+      "check_id": "history_chain",
+      "details": [],
+      "passed": true,
+      "summary": "append-only history hash chain이 연속적입니다."
+    },
+    {
+      "check_id": "prerequisite_gates",
+      "details": [],
+      "passed": true,
+      "summary": "Gate 0A와 Gate 0B 권위 결과가 계속 GO입니다."
+    },
+    {
+      "check_id": "profile_provenance",
+      "details": [
+        "profile probe status='NO-GO', reason='GLOBAL_INSTRUCTION_UNREADABLE'"
+      ],
+      "passed": false,
+      "summary": "필수 profile provenance가 실패·누락됐습니다."
+    },
+    {
+      "check_id": "current_host_invariant",
+      "details": [],
+      "passed": true,
+      "summary": "최종 엄격 probe는 사용자 config와 sandbox 상태를 변경하지 않았습니다."
+    },
+    {
+      "check_id": "historical_host_invariant",
+      "details": [
+        "evidence_fm0c1_prior_trust_mutation: 합성 trust entry 5개가 사용자 config에 남아 있음"
+      ],
+      "passed": false,
+      "summary": "이전 진단 실행에서 사용자 config 변경이 발생했습니다."
+    },
+    {
+      "check_id": "task_completion",
+      "details": [
+        "FM-0C-1: 'failed'",
+        "FM-0C-2: 'blocked'",
+        "FM-0C-3: 'blocked'",
+        "FM-0C-4: 'blocked'",
+        "FM-0C-5: 'blocked'",
+        "FM-0C-6: 'blocked'",
+        "FM-0C-7: 'blocked'",
+        "FM-0C-8: 'blocked'"
+      ],
+      "passed": false,
+      "summary": "승인된 Gate 0C task가 모두 완료되지 않았습니다."
+    },
+    {
+      "check_id": "actual_runtime_completion",
+      "details": [
+        "성공 runtime receipt 누락: planner",
+        "성공 runtime receipt 누락: runner",
+        "성공 runtime receipt 누락: validator",
+        "성공 Core validation receipt가 없습니다."
+      ],
+      "passed": false,
+      "summary": "실제 세 역할 E2E·Core validation 증거가 없습니다."
+    }
+  ],
+  "gate": "0C",
+  "generated_at": "2026-09-02T04:57:19.922243Z",
+  "overall": "NO-GO",
+  "reason_codes": [
+    "ACTUAL_RUNTIME_COMPLETION",
+    "BLOCKED_BY_FAILED_DEPENDENCY",
+    "GLOBAL_INSTRUCTION_UNREADABLE",
+    "HISTORICAL_HOST_INVARIANT",
+    "PROFILE_PROVENANCE",
+    "TASK_COMPLETION"
+  ],
+  "schema_revision": 3,
+  "schema_version": "1.0",
+  "task_states": {
+    "FM-0C-1": "failed",
+    "FM-0C-2": "blocked",
+    "FM-0C-3": "blocked",
+    "FM-0C-4": "blocked",
+    "FM-0C-5": "blocked",
+    "FM-0C-6": "blocked",
+    "FM-0C-7": "blocked",
+    "FM-0C-8": "blocked"
+  }
+}

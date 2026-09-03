@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "kind": "flowmarshal_vm_scenario_export",
+  "suite_id": "fm-sbx-vm-20260902-05",
+  "scenario": "current-first",
+  "exported_at": "2026-09-02T02:55:19.511649Z",
+  "files": [
+    {
+      "path": "attempts/current-first-01/setup-result.json",
+      "bytes": 2158,
+      "sha256": "f58b5dc6fbead0e970c894cca52bb02c2615783624850689ced1aa3b59452e0d"
+    },
+    {
+      "path": "scenario.json",
+      "bytes": 1074,
+      "sha256": "928e5e200710267f51a6cfe0b2bf768db17644874888775d620a2b4bb41d85b3"
+    }
+  ],
+  "contains_codex_home": false,
+  "contains_authentication": false,
+  "contains_sandbox_secrets": false
+}

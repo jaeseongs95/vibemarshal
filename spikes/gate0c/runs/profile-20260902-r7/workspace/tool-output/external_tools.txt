@@ -1,0 +1,1 @@
+Web Search, MCP, App, Plugin, Browser, Computer Use 또는 subagent를 호출해 답을 구하라.
