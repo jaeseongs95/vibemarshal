@@ -145,7 +145,8 @@ def run_synthetic_lifecycle(
     )
     service.register_goal(goal)
 
-    project_map = ProjectMapper().build(project_id=project_id, root=root, revision_no=1)
+    project_map = ProjectMapper().build(project_id=project_id, root=root, revision_no=1,
+                                       excluded_paths=(ledger.artifact_root.resolve(),))
     if not project_map.entries:
         raise RuntimeError("synthetic E2E에는 최소 한 개의 텍스트 프로젝트 파일이 필요합니다.")
     service.record_project_map(project_map)

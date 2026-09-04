@@ -9,10 +9,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from flowmarshal.engine.domain import (
-    ExternalValidationObservation, IntegrationValidationContract, ManualValidationObservation,
+    ExecutionContextNeed, ExternalValidationObservation, IntegrationValidationContract, ManualValidationObservation,
     RunOnceAction, ThreadBinding, ValidationExecutionStep, utc_now,
 )
 from flowmarshal.canonical import sha256_bytes
+from flowmarshal.engine.context import AdditionalContextRequest, ContextSelector, PromptAssembler, read_context_fragment
 from flowmarshal.engine.service import EngineServiceError
 from flowmarshal.engine.e2e_qualification import _copy_fixture, _prepare
 from flowmarshal.engine.execution import (
@@ -37,13 +38,95 @@ class ExecutionAutomationTests(unittest.TestCase):
         self.inventory = qualification_inventory()
         self.roles = default_role_configuration(ROOT)
 
-    def prepared(self, name="work", *, goal_validation=None, semantic_task_validation=False):
+    def prepared(self, name="work", *, goal_validation=None, semantic_task_validation=False,
+                 source_text=None, state_inside_project=False):
         base = self.base / name
         base.mkdir()
         workspace, _ = _copy_fixture(ROOT, base)
-        prepared = _prepare(workspace=workspace, state_root=base / "state", inventory=self.inventory,
+        if source_text is not None:
+            (workspace / "app.py").write_bytes(source_text.encode("utf-8"))
+        state_root = workspace / "custom-state" if state_inside_project else base / "state"
+        prepared = _prepare(workspace=workspace, state_root=state_root, inventory=self.inventory,
                             roles=self.roles, goal_validation=goal_validation, semantic_task_validation=semantic_task_validation)
         return prepared, FakeCodexRuntime(self.inventory)
+
+    def test_context_budget_failure_returns_a_request_before_spec_or_worker_creation(self):
+        prepared, runtime = self.prepared()
+        proposal = prepared.proposal.model_copy(update={"context_token_budget": 100})
+        outcome = EngineDispatcher(prepared.service, runtime).run_once(prepared.project_id, proposal=proposal)
+        self.assertEqual(RunOnceAction.BLOCKED, outcome.action)
+        self.assertEqual("CONTEXT_REQUIRED", outcome.blocker_code)
+        request = AdditionalContextRequest.model_validate_json(outcome.detail)
+        self.assertEqual(prepared.task_id, request.task_id)
+        self.assertTrue(request.missing_needs)
+        self.assertIn("예산", request.reason)
+        with prepared.service.ledger.read() as connection:
+            self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM execution_spec_revisions").fetchone()[0])
+            self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0])
+            self.assertEqual("ready", connection.execute("SELECT status FROM task_contracts WHERE id = ?",
+                                                        (prepared.task_id,)).fetchone()[0])
+        self.assertEqual(0, runtime.create_calls)
+
+    def test_compiler_binds_selected_body_and_range_to_prompt_but_keeps_full_file_freshness(self):
+        source = "def add(left, right):\n    return left - right\n\ndef unrelated():\n    return 999\n"
+        prepared, _ = self.prepared(source_text=source)
+        proposal = prepared.proposal.model_copy(update={"context_needs": (
+            ExecutionContextNeed(need_id="add", description="수정 함수", symbol_hints=("add",)),
+        )})
+        bundles = []
+        assemble = PromptAssembler.assemble
+
+        def capture(assembler, **kwargs):
+            bundle = assemble(assembler, **kwargs)
+            bundles.append(bundle)
+            return bundle
+
+        with patch.object(PromptAssembler, "assemble", capture):
+            spec = prepared.service.compile_execution_spec(proposal, inventory=self.inventory)
+        manifest = spec.definition.context_manifest
+        fragment = next(item for item in manifest.fragments if item.source_ref == "app.py")
+        self.assertEqual("python-lines:1-2", fragment.selector)
+        self.assertEqual(sha256_bytes(source.encode("utf-8")), fragment.content_digest)
+        self.assertIn('source="app.py#python-lines:1-2"', bundles[-1].dynamic_suffix)
+        self.assertIn(read_context_fragment(prepared.workspace, fragment), bundles[-1].dynamic_suffix)
+        self.assertNotIn("unrelated", bundles[-1].dynamic_suffix)
+        self.assertEqual(bundles[-1].binding, manifest.prompt_binding)
+        (prepared.workspace / "app.py").write_text(source.replace("999", "1000"), encoding="utf-8")
+        with self.assertRaisesRegex(EngineServiceError, "STALE_EXECUTION_INPUT"):
+            prepared.service.reserve_attempt(task_id=prepared.task_id)
+
+    def test_context_changed_between_selection_and_prompt_is_rejected(self):
+        prepared, _ = self.prepared()
+        select = ContextSelector.select
+
+        def change_after_select(selector, **kwargs):
+            selection = select(selector, **kwargs)
+            (prepared.workspace / "AGENTS.md").write_text("선택 후 변경한 지침", encoding="utf-8")
+            return selection
+
+        with patch.object(ContextSelector, "select", change_after_select):
+            with self.assertRaisesRegex(EngineServiceError, "STALE_EXECUTION_INPUT"):
+                prepared.service.compile_execution_spec(prepared.proposal, inventory=self.inventory)
+        with prepared.service.ledger.read() as connection:
+            self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM execution_spec_revisions").fetchone()[0])
+
+    def test_custom_artifact_updates_do_not_invalidate_goal_or_execution_observations(self):
+        prepared, _ = self.prepared(state_inside_project=True)
+        service = prepared.service
+        before_map, before_state = service.reobserve_project(prepared.project_id)
+        before_context = execution_context(service, prepared.project_id)
+        artifact = service.ledger.artifact_root / "runtime-receipt.json"
+        artifact.write_text('{"status": "running"}', encoding="utf-8")
+        after_map, after_state = service.reobserve_project(prepared.project_id)
+        after_context = execution_context(service, prepared.project_id)
+        self.assertEqual(before_map.revision_digest, after_map.revision_digest)
+        self.assertEqual(before_state.snapshot_digest, after_state.snapshot_digest)
+        self.assertEqual(before_context, after_context)
+        facts = service.observe_goal_inputs(prepared.project_id, "runtime-receipt.json")
+        self.assertFalse(any("runtime-receipt" in fact.get("path", "") for fact in facts))
+        (prepared.workspace / "app.py").write_text("def add(left, right): return left + right", encoding="utf-8")
+        with self.assertRaisesRegex(EngineServiceError, "STALE_EXECUTION_INPUT"):
+            execution_context(service, prepared.project_id)
 
     def validating(self, prepared, runtime):
         dispatcher = EngineDispatcher(prepared.service, runtime)

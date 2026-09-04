@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from ..canonical import canonical_json, sha256_bytes, sha256_digest
+from .context import AdditionalContextRequest
 from .domain import (
     ApprovalClass,
     AttemptKind,
@@ -67,6 +68,12 @@ from .planning import (
 
 class EngineServiceError(RuntimeError):
     pass
+
+
+class ContextRequiredError(EngineServiceError):
+    def __init__(self, request: AdditionalContextRequest) -> None:
+        self.request = request
+        super().__init__("CONTEXT_REQUIRED: " + canonical_json(request))
 
 
 def _dt(value: str | None) -> datetime | None:
@@ -451,6 +458,7 @@ class EngineService:
             revision_no=1,
             registered_references=(item.path for item in sources if item.kind is ContextSourceRegistrationKind.REFERENCE),
             instruction_sources=(item.path for item in sources if item.kind is ContextSourceRegistrationKind.INSTRUCTION),
+            excluded_paths=(self.ledger.artifact_root.resolve(),),
         )
         return goal_context_observations(project_map, source_request)
 
@@ -500,6 +508,7 @@ class EngineService:
                 for item in sources
                 if item.kind is ContextSourceRegistrationKind.INSTRUCTION
             ),
+            excluded_paths=(self.ledger.artifact_root.resolve(),),
         )
         if current_map is None or observed_map.semantic_digest != current_map.semantic_digest:
             project_map = observed_map
@@ -1091,7 +1100,7 @@ class EngineService:
     ) -> TaskExecutionSpecRevision:
         """비권위 운영 상세 후보를 현재 authority revision들에 결속한다."""
 
-        from .context import ContextSelector, PromptAssembler
+        from .context import ContextSelector, PromptAssembler, read_context_fragment
 
         with self.ledger.read() as connection:
             task_row = connection.execute(
@@ -1247,31 +1256,29 @@ class EngineService:
             task_instruction=task.objective,
             reference_blocks=(),
         )
-        selection = ContextSelector().select(
-            project_map=project_map,
-            task=task,
-            prompt_binding=preliminary_prompt.binding,
-            needs=proposal.context_needs,
-            token_budget=proposal.context_token_budget,
-        )
+        try:
+            selection = ContextSelector().select(
+                project_map=project_map,
+                task=task,
+                prompt_binding=preliminary_prompt.binding,
+                needs=proposal.context_needs,
+                token_budget=proposal.context_token_budget,
+            )
+        except ValueError as error:
+            raise EngineServiceError(str(error)) from error
         if selection.manifest is None:
             request = selection.additional_context_request
-            raise EngineServiceError(
-                "CONTEXT_REQUIRED: "
-                + canonical_json(request)  # type: ignore[arg-type]
-            )
+            assert request is not None
+            raise ContextRequiredError(request)
         reference_blocks: list[tuple[str, str]] = []
         for fragment in selection.manifest.fragments:
-            source_path = Path(fragment.source_ref)
-            if not source_path.is_absolute():
-                source_path = root / source_path
             try:
                 reference_blocks.append(
-                    (fragment.source_ref, source_path.read_text(encoding="utf-8"))
+                    (f"{fragment.source_ref}#{fragment.selector}", read_context_fragment(root, fragment))
                 )
-            except (OSError, UnicodeError) as error:
+            except (OSError, ValueError) as error:
                 raise EngineServiceError(
-                    f"Context fragment를 읽을 수 없습니다: {fragment.source_ref}"
+                    f"Context fragment를 읽을 수 없습니다: {fragment.source_ref}: {error}"
                 ) from error
         final_prompt = PromptAssembler().assemble(
             static_policy=(

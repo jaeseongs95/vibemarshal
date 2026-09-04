@@ -117,6 +117,7 @@ def execution_context(service: EngineService, project_id: str) -> dict[str, Any]
         project_id=project_id, root=project_map.root, revision_no=project_map.revision_no,
         registered_references=(item.path for item in sources if item.kind.value == "reference"),
         instruction_sources=(item.path for item in sources if item.kind.value == "instruction"),
+        excluded_paths=(service.ledger.artifact_root.resolve(),),
     )
     if observed_map.semantic_digest != project_map.semantic_digest:
         raise EngineServiceError("STALE_EXECUTION_INPUT: Project Map과 현재 파일 관찰이 다릅니다.")

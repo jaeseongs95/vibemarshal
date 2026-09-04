@@ -39,7 +39,7 @@ from .domain import (
     utc_now,
 )
 from .models import ModelCapability, ModelInventory
-from .service import EngineService, EngineServiceError
+from .service import ContextRequiredError, EngineService, EngineServiceError
 
 
 REQUIRED_PERMISSION_PROFILE = ":danger-full-access"
@@ -808,7 +808,13 @@ class EngineDispatcher:
             root = Path(project["root"])
             self._verify_policy(root)
             inventory = self.runtime.list_models()
-            spec = self.service.compile_execution_spec(proposal, inventory=inventory)
+            try:
+                spec = self.service.compile_execution_spec(proposal, inventory=inventory)
+            except ContextRequiredError as error:
+                return RunOnceOutcome(
+                    action=RunOnceAction.BLOCKED, project_id=project_id, task_id=ready["id"],
+                    blocker_code="CONTEXT_REQUIRED", detail=error.request.model_dump_json(),
+                )
             return RunOnceOutcome(
                 action=RunOnceAction.MATERIALIZED,
                 project_id=project_id,

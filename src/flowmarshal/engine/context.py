@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -37,6 +38,8 @@ DEFAULT_IGNORED_DIRECTORIES = frozenset(
         ".mypy_cache",
         ".pytest_cache",
         ".ruff_cache",
+        ".flowmarshal-engine",
+        ".flowmarshal-engine-eval",
         "dist",
         "build",
     }
@@ -145,21 +148,30 @@ def _is_probably_text(path: Path, content: bytes) -> bool:
     return False
 
 
-def _python_symbols(text: str) -> tuple[str, ...]:
+def _python_symbol_ranges(text: str) -> dict[str, tuple[tuple[int, int], ...]] | None:
     try:
         tree = ast.parse(text)
     except (SyntaxError, ValueError):
-        return ()
-    found: list[str] = []
-    for node in ast.walk(tree):
+        return None
+    found: dict[str, list[tuple[int, int]]] = {}
+
+    def visit(node: ast.AST, parents: tuple[str, ...] = ()) -> None:
         if isinstance(node, (ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef)):
-            found.append(node.name)
-    return tuple(sorted(set(found)))
+            start = min((node.lineno, *(item.lineno for item in node.decorator_list)))
+            span = (start, node.end_lineno or node.lineno)
+            for name in {node.name, ".".join((*parents, node.name))}:
+                found.setdefault(name, []).append(span)
+            parents = (*parents, node.name)
+        for child in ast.iter_child_nodes(node):
+            visit(child, parents)
+
+    visit(tree)
+    return {name: tuple(spans) for name, spans in found.items()}
 
 
 def _symbols(path: Path, text: str) -> tuple[str, ...]:
     if path.suffix.casefold() == ".py":
-        return _python_symbols(text)
+        return tuple(sorted(_python_symbol_ranges(text) or {}))
     if path.suffix.casefold() in {".js", ".jsx", ".ts", ".tsx"}:
         return tuple(sorted(set(_JS_SYMBOL.findall(text))))
     return ()
@@ -199,21 +211,29 @@ class ProjectMapper:
         revision_no: int,
         registered_references: Iterable[Path | str] = (),
         instruction_sources: Iterable[Path | str] = (),
+        excluded_paths: Iterable[Path | str] = (),
     ) -> ProjectMapRevision:
         resolved_root = Path(root).resolve()
         explicit_instructions = {Path(item).resolve() for item in instruction_sources}
         references = {Path(item).resolve() for item in registered_references}
+        excluded = tuple((resolved_root / item).resolve() for item in excluded_paths)
+
+        def is_excluded(path: Path) -> bool:
+            resolved = path.resolve()
+            return any(resolved == item or item in resolved.parents for item in excluded)
+
         candidates: list[tuple[Path, bool]] = []
-        for path in sorted(resolved_root.rglob("*"), key=lambda item: item.as_posix()):
-            if not path.is_file():
-                continue
-            try:
-                relative_parts = path.relative_to(resolved_root).parts
-            except ValueError:
-                continue
-            if any(part in self.ignored_directories for part in relative_parts[:-1]):
-                continue
-            candidates.append((path, False))
+        # 운영 디렉터리는 탐색 자체를 가지치기하고 명시적으로 등록한 입력만 별도로 추가한다.
+        for directory, directories, filenames in os.walk(resolved_root):
+            current = Path(directory)
+            directories[:] = sorted(name for name in directories
+                                    if name.casefold() not in self.ignored_directories
+                                    and not is_excluded(current / name))
+            for name in filenames:
+                path = current / name
+                if path.is_file() and not is_excluded(path):
+                    candidates.append((path, False))
+        candidates.sort(key=lambda item: item[0].as_posix())
         known_paths = {item[0] for item in candidates}
         for path in sorted(references | explicit_instructions, key=lambda item: item.as_posix()):
             if path not in known_paths:
@@ -222,7 +242,8 @@ class ProjectMapper:
         entries: list[ProjectMapEntry] = []
         instruction_refs: list[str] = []
         for path, external_reference in candidates:
-            if not path.is_file() or path.stat().st_size > self.max_file_bytes:
+            instruction = path.name.casefold() == "agents.md" or path in explicit_instructions
+            if not path.is_file() or (not instruction and path.stat().st_size > self.max_file_bytes):
                 continue
             content = path.read_bytes()
             if not _is_probably_text(path, content):
@@ -231,7 +252,6 @@ class ProjectMapper:
                 text = content.decode("utf-8")
             except UnicodeDecodeError:
                 continue
-            instruction = path.name.casefold() == "agents.md" or path in explicit_instructions
             is_reference = external_reference or path in references
             try:
                 display_path = path.relative_to(resolved_root).as_posix()
@@ -322,6 +342,76 @@ def goal_context_observations(
     return tuple(facts)
 
 
+def _read_context_source(root: Path | str, source_ref: str, expected_digest: str) -> str:
+    content = (Path(root) / source_ref).read_bytes()
+    if sha256_bytes(content) != expected_digest:
+        raise ValueError(f"STALE_EXECUTION_INPUT: Context source가 Project Map 이후 바뀌었습니다: {source_ref}")
+    return content.decode("utf-8")
+
+
+def _merge_ranges(ranges: Iterable[tuple[int, int]]) -> tuple[tuple[int, int], ...]:
+    merged: list[tuple[int, int]] = []
+    for start, end in sorted(set(ranges)):
+        if merged and start <= merged[-1][1] + 1:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], end))
+        else:
+            merged.append((start, end))
+    return tuple(merged)
+
+
+def _range_selector(ranges: tuple[tuple[int, int], ...] | None) -> str:
+    return "whole-file" if ranges is None else "python-lines:" + ",".join(f"{start}-{end}" for start, end in ranges)
+
+
+def _range_content(text: str, ranges: tuple[tuple[int, int], ...] | None) -> str:
+    if ranges is None:
+        return text
+    lines = _source_lines(text)
+    return "\n".join("".join(lines[start - 1:end]) for start, end in ranges)
+
+
+def _source_lines(text: str) -> list[str]:
+    # AST와 같은 CR/LF 행만 세며 문자열 안의 Unicode separator는 행으로 나누지 않는다.
+    return [line for line in re.findall(r"[^\r\n]*(?:\r\n|\r|\n|$)", text) if line]
+
+
+def read_context_fragment(root: Path | str, fragment: ContextFragmentRef) -> str:
+    """파일 전체의 freshness를 검사한 뒤 선택·예산 산정과 동일한 본문을 복원한다."""
+    text = _read_context_source(root, fragment.source_ref, fragment.content_digest)
+    if fragment.selector == "whole-file":
+        return text
+    if not re.fullmatch(r"python-lines:[1-9][0-9]*-[1-9][0-9]*(?:,[1-9][0-9]*-[1-9][0-9]*)*", fragment.selector):
+        raise ValueError(f"지원하지 않는 Context selector입니다: {fragment.selector}")
+    ranges = tuple(tuple(map(int, span.split("-"))) for span in fragment.selector.split(":", 1)[1].split(","))
+    line_count = len(_source_lines(text))
+    if (any(start > end or end > line_count for start, end in ranges)
+            or ranges != _merge_ranges(ranges)):
+        raise ValueError(f"Context selector 행 범위가 유효하지 않습니다: {fragment.selector}")
+    return _range_content(text, ranges)
+
+
+@dataclass(frozen=True)
+class _ContextCandidate:
+    entry: ProjectMapEntry
+    text: str
+    ranges: tuple[tuple[int, int], ...] | None
+    reasons: frozenset[str]
+
+    def __post_init__(self) -> None:
+        # 범위를 잘라 누락시키지 않고 전체 파일로 확장해 예산을 다시 평가한다.
+        if len(_range_selector(self.ranges)) > 2000:
+            object.__setattr__(self, "ranges", None)
+
+    @property
+    def token_estimate(self) -> int:
+        # 실제 선택 문자열의 UTF-8 byte / 4 휴리스틱이며 provider 실측 사용량이 아니다.
+        return max(1, (len(_range_content(self.text, self.ranges).encode("utf-8")) + 3) // 4)
+
+    def merge(self, other: "_ContextCandidate") -> "_ContextCandidate":
+        ranges = None if self.ranges is None or other.ranges is None else _merge_ranges((*self.ranges, *other.ranges))
+        return _ContextCandidate(self.entry, self.text, ranges, self.reasons | other.reasons)
+
+
 @dataclass(frozen=True)
 class ContextSelector:
     default_token_budget: int = 12_000
@@ -332,114 +422,140 @@ class ContextSelector:
         project_map: ProjectMapRevision,
         task: TaskContract,
         prompt_binding: PromptBinding,
-        needs: tuple[ContextNeed, ...],
+        needs: tuple[ExecutionContextNeed, ...],
         token_budget: int | None = None,
     ) -> ContextSelection:
-        budget = token_budget or self.default_token_budget
+        budget = self.default_token_budget if token_budget is None else token_budget
+        if budget < 0:
+            raise ValueError("Context token 예산은 음수일 수 없습니다.")
         entries = {entry.entry_id: entry for entry in project_map.entries}
-        selected: dict[str, tuple[ProjectMapEntry, int, set[str]]] = {}
-        missing: list[ContextNeed] = []
+        sources: dict[str, tuple[str, dict[str, tuple[tuple[int, int], ...]] | None]] = {}
 
-        # AGENTS.md 같은 승인된 instruction source는 모든 작업의 정상 입력이다.
-        for ref in project_map.instruction_source_refs:
-            entry = entries[ref]
-            selected[ref] = (entry, 1000, {"project instruction"})
+        def candidate(entry: ProjectMapEntry, need: ExecutionContextNeed) -> tuple[_ContextCandidate | None, set[str]]:
+            if entry.entry_id not in sources:
+                text = _read_context_source(project_map.root, entry.path, entry.content_digest)
+                symbols = _python_symbol_ranges(text) if Path(entry.path).suffix.casefold() == ".py" else None
+                sources[entry.entry_id] = (text, symbols)
+            text, symbols = sources[entry.entry_id]
+            represented = set(need.symbol_hints)
+            ranges = None
+            if need.symbol_hints and symbols is not None:
+                represented = {hint for hint in need.symbol_hints
+                               if any(hint.casefold() == symbol.casefold() for symbol in symbols)}
+                ranges = _merge_ranges(span for symbol, spans in symbols.items()
+                                       if any(symbol.casefold() == hint.casefold() for hint in represented)
+                                       for span in spans)
+                if not ranges:
+                    return None, set()
+            if entry.kind is ProjectMapEntryKind.INSTRUCTION:
+                ranges = None
+            return _ContextCandidate(entry, text, ranges, frozenset((need.need_id,))), represented
 
-        for need in needs:
-            matched: list[ProjectMapEntry] = []
-            for entry in project_map.entries:
-                path = entry.path.casefold()
-                symbols = {item.casefold() for item in entry.symbols}
-                tags = {item.casefold() for item in entry.tags}
-                path_match = any(hint.casefold() in path for hint in need.path_hints)
-                symbol_match = any(hint.casefold() in symbols for hint in need.symbol_hints)
-                tag_match = any(hint.casefold() in tags for hint in need.tag_hints)
-                if path_match or symbol_match or tag_match:
-                    matched.append(entry)
-            if need.required and not matched:
-                missing.append(need)
-            for entry in matched:
-                current = selected.get(entry.entry_id)
-                reasons = set() if current is None else set(current[2])
-                reasons.add(need.need_id)
-                score = 900 if need.required else 500
-                if entry.kind is ProjectMapEntryKind.TEST:
-                    score += 25
-                selected[entry.entry_id] = (entry, max(score, current[1] if current else 0), reasons)
+        def resolve(need: ExecutionContextNeed, explicit_ref: str | None = None):
+            matched: dict[str, _ContextCandidate] = {}
+            represented: set[str] = set()
+            unreadable: list[str] = []
+            for entry in (entries[explicit_ref],) if explicit_ref else project_map.entries:
+                path_match = any(hint.casefold() in entry.path.casefold() for hint in need.path_hints)
+                symbol_match = any(hint.casefold() == symbol.casefold()
+                                   for hint in need.symbol_hints for symbol in entry.symbols)
+                tag_match = any(hint.casefold() == tag.casefold() for hint in need.tag_hints for tag in entry.tags)
+                if not (explicit_ref or path_match or symbol_match or tag_match):
+                    continue
+                try:
+                    selected, found = candidate(entry, need)
+                except (OSError, UnicodeError):
+                    unreadable.append(entry.path)
+                    continue
+                if selected is not None:
+                    matched[entry.entry_id] = selected
+                    represented.update(found)
+            if unreadable:
+                return matched, "Context source를 읽을 수 없습니다: " + ", ".join(unreadable)
+            if not matched or set(need.symbol_hints) - represented:
+                return matched, "요청한 source·symbol을 Project Map과 실제 본문에서 찾지 못했습니다."
+            return matched, None
 
-        if missing:
-            return ContextSelection(
-                additional_context_request=AdditionalContextRequest(
-                    task_id=task.task_id,
-                    missing_needs=tuple(missing),
-                    reason="필수 Context를 Project Map에서 찾지 못해 추측 실행을 중단했습니다.",
-                )
-            )
+        required_needs: list[ContextNeed] = []
+        required_entries: dict[str, set[str]] = {}
+        candidates: dict[str, _ContextCandidate] = {}
+        failures: dict[str, str] = {}
+        # 정책과 필수 need를 먼저 합친다. 선택적 전체 파일이 필수 symbol 예산을 부풀릴 수 없다.
+        policies = [(ContextNeed(need_id=_entry_id("policy", ref), description="필수 프로젝트 지침",
+                                 path_hints=(entries[ref].path,)), ref)
+                    for ref in project_map.instruction_source_refs]
+        for need, ref in [*policies, *((item, None) for item in needs if item.required)]:
+            required_needs.append(ContextNeed(**need.model_dump()))
+            matched, problem = resolve(need, ref)
+            required_entries[need.need_id] = set(matched)
+            if problem:
+                failures[need.need_id] = problem
+            for entry_id, item in matched.items():
+                candidates[entry_id] = candidates[entry_id].merge(item) if entry_id in candidates else item
 
-        ranked = sorted(
-            selected.values(),
-            key=lambda item: (-item[1], item[0].path.casefold()),
-        )
-        fragments: list[ContextFragmentRef] = []
-        rationale: list[str] = []
+        def rank(item: _ContextCandidate) -> tuple[int, str]:
+            return (0 if item.entry.entry_id in project_map.instruction_source_refs
+                    else 1 if item.entry.kind is ProjectMapEntryKind.TEST else 2, item.entry.path.casefold())
+
+        selected: dict[str, _ContextCandidate] = {}
         used = 0
-        for entry, _score, reasons in ranked:
-            estimate = max(1, min(4000, self._token_estimate(project_map, entry)))
-            if used + estimate > budget and entry.entry_id not in project_map.instruction_source_refs:
+        for item in sorted(candidates.values(), key=rank):
+            estimate = item.token_estimate
+            if used + estimate <= budget:
+                selected[item.entry.entry_id] = item
+                used += estimate
+        for need in required_needs:
+            omitted = required_entries[need.need_id] - set(selected)
+            if omitted and need.need_id not in failures:
+                failures[need.need_id] = f"Context 예산 {budget} 초과로 필수 본문을 포함하지 못했습니다: " + ", ".join(
+                    sorted(entries[ref].path for ref in omitted))
+        if failures:
+            return ContextSelection(additional_context_request=AdditionalContextRequest(
+                task_id=task.task_id,
+                missing_needs=tuple(need for need in required_needs if need.need_id in failures),
+                reason="; ".join(f"{need_id}: {reason}" for need_id, reason in failures.items())[:3000],
+            ))
+
+        for need in (item for item in needs if not item.required):
+            matched, problem = resolve(need)
+            if problem:
                 continue
+            for item in sorted(matched.values(), key=rank):
+                entry_id = item.entry.entry_id
+                current = selected.get(entry_id)
+                combined = item if current is None else current.merge(item)
+                extra = combined.token_estimate - (0 if current is None else current.token_estimate)
+                if used + extra <= budget:
+                    selected[entry_id] = combined
+                    used += extra
+
+        if not selected:
+            return ContextSelection(additional_context_request=AdditionalContextRequest(
+                task_id=task.task_id,
+                missing_needs=(ContextNeed(need_id="project_context", description="작업을 수행할 최소 프로젝트 문맥"),),
+                reason="예산 내 선택 가능한 Context fragment가 없습니다.",
+            ))
+        fragments = []
+        rationale = []
+        for item in sorted(selected.values(), key=rank):
+            entry = item.entry
+            selector = _range_selector(item.ranges)
             source_kind = {
                 ProjectMapEntryKind.INSTRUCTION: ContextSourceKind.POLICY,
                 ProjectMapEntryKind.TEST: ContextSourceKind.TEST,
                 ProjectMapEntryKind.REFERENCE: ContextSourceKind.REFERENCE,
             }.get(entry.kind, ContextSourceKind.CODE)
-            fragments.append(
-                ContextFragmentRef(
-                    fragment_id=_entry_id("fragment", f"{task.task_id}:{entry.entry_id}"),
-                    source_kind=source_kind,
-                    source_ref=entry.path,
-                    content_digest=entry.content_digest,
-                    selector="whole-file" if not entry.symbols else "indexed-symbol-context",
-                    token_estimate=estimate,
-                    immutable=entry.kind in {
-                        ProjectMapEntryKind.INSTRUCTION,
-                        ProjectMapEntryKind.REFERENCE,
-                    },
-                )
-            )
-            used += estimate
-            rationale.extend(f"{entry.path}: {reason}" for reason in sorted(reasons))
-
-        if not fragments:
-            fallback = ContextNeed(
-                need_id="project_context",
-                description="작업을 수행할 최소 프로젝트 문맥",
-                required=True,
-            )
-            return ContextSelection(
-                additional_context_request=AdditionalContextRequest(
-                    task_id=task.task_id,
-                    missing_needs=(fallback,),
-                    reason="선택 가능한 Context fragment가 없습니다.",
-                )
-            )
-        manifest = ContextManifest(
-            context_pack_id=new_id("context_pack"),
-            fragments=tuple(fragments),
-            prompt_binding=prompt_binding,
-            total_token_estimate=used,
-            selection_rationale=tuple(sorted(set(rationale))) or ("project instruction",),
-        )
-        return ContextSelection(manifest=manifest)
-
-    @staticmethod
-    def _token_estimate(project_map: ProjectMapRevision, entry: ProjectMapEntry) -> int:
-        path = Path(entry.path)
-        if not path.is_absolute():
-            path = Path(project_map.root) / path
-        try:
-            return (path.stat().st_size + 3) // 4
-        except OSError:
-            return 1
+            fragments.append(ContextFragmentRef(
+                fragment_id=_entry_id("fragment", f"{task.task_id}:{entry.entry_id}"),
+                source_kind=source_kind, source_ref=entry.path, content_digest=entry.content_digest,
+                selector=selector, token_estimate=item.token_estimate,
+                immutable=entry.kind in {ProjectMapEntryKind.INSTRUCTION, ProjectMapEntryKind.REFERENCE},
+            ))
+            rationale.extend(f"{entry.path}#{selector}: {reason}" for reason in sorted(item.reasons))
+        return ContextSelection(manifest=ContextManifest(
+            context_pack_id=new_id("context_pack"), fragments=tuple(fragments), prompt_binding=prompt_binding,
+            total_token_estimate=used, selection_rationale=tuple(sorted(set(rationale))),
+        ))
 
 
 class PromptAssembler:

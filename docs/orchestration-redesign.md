@@ -119,6 +119,8 @@ File Manifest → Symbol Index → module/test/build 관계 → ProjectMapRevisi
 
 Map 전체 revision digest와 planning 의미에 영향을 주는 semantic digest를 분리한다. Goal에 필요한 사실만 `StateSnapshot`으로 투영하고 각 사실에 evidence, freshness와 invalidation 조건을 둔다.
 
+`.flowmarshal-engine`, `.flowmarshal-engine-eval`과 설정된 artifact root는 일반 source 탐색에서 제외한다. 같은 제외 정책을 Goal 관찰, State 재관측과 실행 준비 freshness 검사에 적용하여 운영 로그 추가로 Project Map이 바뀌지 않게 한다. 해당 위치의 자료라도 명시적으로 등록한 참고자료·지침은 입력에 포함한다. 필수 지침은 일반 파일 크기 제한 때문에 조용히 생략하지 않는다.
+
 ### 5.3 Context Pack
 
 prompt는 다음 네 영역으로 분리해 version과 digest를 남긴다.
@@ -133,6 +135,12 @@ Static Policy Prefix
 프로젝트 파일, 전역·프로젝트 `AGENTS.md`, 등록 참고자료와 이전 Task 산출물은 정상 입력이다. 파일별 AccessGrant를 만들지 않는다. 문서나 저장소 안의 명령문은 분석할 데이터이며 현재 사용자 지시나 활성 계약보다 높은 실행 권위를 갖지 않는다.
 
 Context가 부족하면 모델이 추측하지 않고 필요한 source, selector와 이유를 담은 구조화된 추가 Context 요청을 반환한다.
+
+정책과 required need를 먼저 선택하고 예산 적용 후에도 해당 need가 요구한 모든 매칭 source·symbol의 본문이 남아 있는지 확인한다. 한 need의 여러 path hint로 찾은 필수 자료도 일부만 포함해 성공으로 처리하지 않는다. 정책은 예산을 초과해 강제로 넣지 않으며, 선택적 전체 파일 요청이 필수 symbol의 범위를 확장해 예산을 소진하지 않도록 한다. 부족하면 누락 need와 이유를 포함한 `AdditionalContextRequest`를 반환하고 Execution Spec·Attempt·Worker를 생성하지 않는다. Task 분할이 필요하면 Plan revision 제안으로 다루며 자동으로 계약을 바꾸지 않는다.
+
+Python symbol은 AST의 실제 정의 범위를 선택한다. decorator·async 함수·클래스·한정된 메서드 이름을 포함하고 겹치는 범위를 합친다. selector는 1기반 양끝 포함 `python-lines:start-end[,start-end]`를 사용한다. 경로만 요청하거나 지원하지 않는 형식·파싱 불가 파일은 `whole-file`로 표시한다. 유효한 Python에서 요청한 symbol이 없으면 경로만 일치한다는 이유로 충족했다고 간주하지 않는다. 범위가 selector 표현 한도를 넘으면 내용 일부를 버리지 않고 전체 파일로 확장해 예산을 다시 검사한다.
+
+Context fragment의 `content_digest`는 파일 전체의 byte digest를 유지한다. 선택과 Prompt 조립이 같은 범위 복원 함수를 사용하고 source·selector·실제 본문을 Prompt binding에 결속한다. 선택 이후 파일이 바뀌면 조립과 실행 예약을 차단한다. `token_estimate`는 선택 문자열의 UTF-8 byte 수를 4로 나눈 올림값이며 4,000-token 상한으로 자르지 않는다. 이는 Context 본문에 대한 휴리스틱으로, Prompt의 다른 영역이나 provider 실측 사용량을 대신하지 않는다.
 
 ## 6. Skeleton-first Planning
 

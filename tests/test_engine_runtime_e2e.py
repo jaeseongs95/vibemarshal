@@ -64,6 +64,21 @@ class EngineRuntimeE2ETests(unittest.TestCase):
         self.assertNotIn("from ..core", source)
         self.assertNotIn("from ..planning", source)
 
+    def test_custom_artifact_policy_copy_is_excluded_from_synthetic_lifecycle(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            project = base / "project"
+            project.mkdir()
+            (project / "AGENTS.md").write_text("합성 지침", encoding="utf-8")
+            (project / "app.py").write_text("value = 1\n", encoding="utf-8")
+            artifacts = project / "custom-artifacts"
+            artifacts.mkdir()
+            (artifacts / "AGENTS.md").write_text("운영 복사본" * 10000, encoding="utf-8")
+            status = run_synthetic_lifecycle(project_root=project, database_path=base / "state.sqlite3",
+                                              artifact_root=artifacts)
+        self.assertEqual("completed", status["project"]["run_state"])
+        self.assertTrue(status["history_valid"])
+
     def test_required_runtime_policy_is_full_access_without_approval(self) -> None:
         self.assertEqual(":danger-full-access", REQUIRED_PERMISSION_PROFILE)
         self.assertEqual("never", REQUIRED_APPROVAL_POLICY)
