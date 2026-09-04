@@ -289,6 +289,7 @@ class PlanValidationScopeRegressionTests(unittest.TestCase):
                     "affected_task_refs": ["task_fix_add"],
                     "remediable": True,
                 }],
+                "ratings": None,
             }
         runner = ScriptedStructuredRoleRunner({
             "skeleton_generator": [_skeleton_response()],
@@ -378,13 +379,13 @@ class PlanValidationScopeRegressionTests(unittest.TestCase):
                 self.assertNotIn("task_ids", draft_coverage_schema)
                 envelope_schema = calls["compact_plan_reviewer"].output_schema
                 self.assertEqual({"review", "inspection"}, set(envelope_schema["properties"]))
-                plan_review_schema = envelope_schema["$defs"]["PlanReviewDraft"]
+                plan_review_schema = envelope_schema["properties"]["review"]["anyOf"][0]
                 base_review_schema = ReviewDraft.model_json_schema()
                 self.assertEqual(
                     set(base_review_schema["properties"]),
                     set(plan_review_schema["properties"]),
                 )
-                self.assertEqual(base_review_schema.get("required"), plan_review_schema.get("required"))
+                self.assertEqual(["findings", "ratings"], plan_review_schema.get("required"))
                 self.assertEqual(
                     ReviewDraft.model_validate({"findings": [], "ratings": _ratings()}).model_dump(),
                     PlanReviewDraft.model_validate({"findings": [], "ratings": _ratings()}).model_dump(),

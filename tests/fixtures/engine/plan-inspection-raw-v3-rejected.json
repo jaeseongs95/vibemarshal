@@ -1,0 +1,554 @@
+{
+  "fixture_revision": "r-s06-10-v3-rejected-raw-response",
+  "provenance": {
+    "run_root": ".flowmarshal-engine-eval/runs/r-s06-10-20260905-v3",
+    "call": "calls/01-compact_plan_reviewer",
+    "terminal_digest": "sha256:aa430693964cc7073adf5914be5d512b089cda9c99499372b240c5b3b8f8ee24",
+    "failed_digest": "sha256:96670168055d043cbb988380a27fa8fd5beab3c0ac1fe10b83819e52498b3777",
+    "request_digest": "sha256:e0a3c9ada90246e9f548f1c725629f62d9d5f083858f6c5a9986af109d42bbd3",
+    "output_schema_digest": "sha256:ca83c39aec4fda7c51eb540aa80864df510a6377146f48049d869671f52416c5",
+    "developer_instructions_digest": "sha256:7bd79ff0fe5ee0257edb2a2049a0f6d37c1e990cccee9a77ef880cd576000560",
+    "raw_response_digest": "sha256:d5c98013049a6bb2065f8d391efd26a7f98c66fabf470e84d9fe13f2eab12af9",
+    "schema_failure": "finding이 없으면 fitness rating이 필요합니다."
+  },
+  "raw_response": {
+    "review": {
+      "findings": [],
+      "ratings": null
+    },
+    "inspection": {
+      "citations": [
+        {
+          "citation_id": "c1",
+          "source_ref": "source:goal",
+          "selector": "/constraints/2/statement",
+          "quote": "실제 unittest·파일 변경 범위 확인·분리된 Validator의 직접 evidence 검토를 Task 검증에 포함하고, 모든 Task 검증 후 별도 Goal Test를 수행한다."
+        },
+        {
+          "citation_id": "c2",
+          "source_ref": "artifact:plan_contract",
+          "selector": "/definition/tasks/0/validations/0/statement",
+          "quote": "등록된 oracle.py의 task phase를 실제 실행하여 현재 프로젝트 파일 집합, test_app.py·AGENTS.md의 보존 해시, add 본문 밖 AST, 공개 함수명·인자명·int 입력 및 반환 annotation·시그니처와 기존 unittest 통과를 검사한다."
+        },
+        {
+          "citation_id": "c3",
+          "source_ref": "artifact:plan_contract",
+          "selector": "/definition/tasks/0/validations/1/statement",
+          "quote": "기존 test_app.py의 unittest를 동일 workspace에서 새 프로세스로 실제 실행하여 기존 unittest가 통과하는지 확인한다."
+        },
+        {
+          "citation_id": "c4",
+          "source_ref": "artifact:plan_contract",
+          "selector": "/definition/tasks/0/validations/2/statement",
+          "quote": "Task 변경 결과의 파일 집합과 diff를 직접 검사하여 변경이 app.py의 add 구현에만 한정되고 test_app.py와 AGENTS.md의 원본 내용, 프로젝트 파일 추가·삭제 및 의존성 변경이 없는지 확인한다."
+        },
+        {
+          "citation_id": "c5",
+          "source_ref": "artifact:plan_contract",
+          "selector": "/definition/tasks/0/validations/3/statement",
+          "quote": "실행 역할과 분리된 Validator가 Task의 직접 file·diff evidence를 검토하여 app.py의 add 구현 변경이 요구된 동작·공개 호출 계약·최소 수정 범위를 충족하는지 독립적으로 판단하고 검토 결과를 제출한다."
+        },
+        {
+          "citation_id": "c6",
+          "source_ref": "source:goal",
+          "selector": "/hard_acceptance/0/validation_intent",
+          "quote": "등록된 oracle.py의 task 및 goal phase와 기존 unittest를 사용해 동작 결과를 검증한다. goal phase에서는 위치·키워드 인자 호출을 포함한 고정 정수 쌍을 새로 검사한다."
+        },
+        {
+          "citation_id": "c7",
+          "source_ref": "source:goal",
+          "selector": "/hard_acceptance/1/validation_intent",
+          "quote": "oracle.py가 실제 함수 annotation·시그니처와 위치·키워드 호출 결과를 검사한다."
+        },
+        {
+          "citation_id": "c8",
+          "source_ref": "source:goal",
+          "selector": "/hard_acceptance/2/validation_intent",
+          "quote": "동일 workspace에서 Python unittest를 새 프로세스로 실행해 통과 여부를 확인한다."
+        },
+        {
+          "citation_id": "c9",
+          "source_ref": "source:goal",
+          "selector": "/hard_acceptance/3/validation_intent",
+          "quote": "oracle.py를 task phase와 goal phase로 구분해 실행한다. Goal evidence는 새 command·test·file·diff evidence를 사용하고 task_id는 null로 유지하며 Task evidence를 복사하지 않는다."
+        },
+        {
+          "citation_id": "c10",
+          "source_ref": "artifact:plan_contract",
+          "selector": "/definition/integration_validations/0/statement",
+          "quote": "모든 Task 검증 완료 후 Core가 동일 workspace에서 oracle.py의 goal phase를 새로 실행하여 고정된 양수·음수·0 정수 쌍을 위치 인자와 키워드 인자로 호출하고 합산 결과를 비교하며, 공개 함수명 add, left·right 인자명, int annotation, int 반환 annotation과 위치·키워드 호출 계약을 독립적으로 검사한다."
+        },
+        {
+          "citation_id": "c11",
+          "source_ref": "artifact:plan_contract",
+          "selector": "/definition/integration_validations/1/statement",
+          "quote": "모든 Task 검증 완료 후 Core가 동일 workspace에서 기존 unittest를 별도 새 프로세스로 다시 실행하여 기존 unittest 통과 여부를 독립적으로 확인한다."
+        },
+        {
+          "citation_id": "c12",
+          "source_ref": "artifact:plan_contract",
+          "selector": "/definition/integration_validations/2/statement",
+          "quote": "모든 Task 검증 완료 후 Core가 동일 workspace의 새 file·diff evidence를 사용하여 app.py의 add 구현 외 변경이 없고 test_app.py와 AGENTS.md가 보존되며 프로젝트 파일 추가·삭제가 없는지 독립적으로 검사한다."
+        },
+        {
+          "citation_id": "c13",
+          "source_ref": "project:entry_ad363844d3392d9ef718d2d6",
+          "selector": "/content",
+          "quote": "기존 도구를 `--phase task --workspace <작업 복사본>`으로 실행하면 현재 프로젝트 파일 집합, 테스트·AGENTS.md 초기 byte 해시, add 본문 밖 AST, 실제 함수 annotation·시그니처와 기존 unittest를 직접 검사한다."
+        },
+        {
+          "citation_id": "c14",
+          "source_ref": "project:entry_ad363844d3392d9ef718d2d6",
+          "selector": "/content",
+          "quote": "같은 기존 도구를 `--phase goal --workspace <동일 작업 복사본>`으로 새로 실행한다. Task 단계 검사를 다시 수행하면서 아래 정수 쌍 각각을 위치 인자와 키워드 인자로 호출하여 결과를 비교한다."
+        }
+      ],
+      "ac_validation_rows": [
+        {
+          "criterion_id": "ac_001",
+          "validation_id": "val_task_add_behavior_contract",
+          "relation": "explicit_procedure",
+          "basis_refs": [
+            "c6",
+            "c2",
+            "c13"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_001",
+          "validation_id": "val_task_unittest",
+          "relation": "explicit_procedure",
+          "basis_refs": [
+            "c6",
+            "c3",
+            "c8"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_001",
+          "validation_id": "val_task_scope_preservation",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c6",
+            "c4"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_001",
+          "validation_id": "val_task_validator_review",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c6",
+            "c5"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_001",
+          "validation_id": "val_goal_independent_behavior_contract",
+          "relation": "explicit_procedure",
+          "basis_refs": [
+            "c6",
+            "c10",
+            "c14"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_001",
+          "validation_id": "val_goal_independent_unittest",
+          "relation": "explicit_procedure",
+          "basis_refs": [
+            "c6",
+            "c11",
+            "c8"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_001",
+          "validation_id": "val_goal_independent_scope_preservation",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c6",
+            "c12"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_002",
+          "validation_id": "val_task_add_behavior_contract",
+          "relation": "explicit_procedure",
+          "basis_refs": [
+            "c7",
+            "c2",
+            "c13"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_002",
+          "validation_id": "val_task_unittest",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c7",
+            "c3"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_002",
+          "validation_id": "val_task_scope_preservation",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c7",
+            "c4"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_002",
+          "validation_id": "val_task_validator_review",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c7",
+            "c5"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_002",
+          "validation_id": "val_goal_independent_behavior_contract",
+          "relation": "explicit_procedure",
+          "basis_refs": [
+            "c7",
+            "c10",
+            "c14"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_002",
+          "validation_id": "val_goal_independent_unittest",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c7",
+            "c11"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_002",
+          "validation_id": "val_goal_independent_scope_preservation",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c7",
+            "c12"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_003",
+          "validation_id": "val_task_add_behavior_contract",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c8",
+            "c2"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_003",
+          "validation_id": "val_task_unittest",
+          "relation": "explicit_procedure",
+          "basis_refs": [
+            "c8",
+            "c3"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_003",
+          "validation_id": "val_task_scope_preservation",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c8",
+            "c4"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_003",
+          "validation_id": "val_task_validator_review",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c8",
+            "c5"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_003",
+          "validation_id": "val_goal_independent_behavior_contract",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c8",
+            "c10"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_003",
+          "validation_id": "val_goal_independent_unittest",
+          "relation": "explicit_procedure",
+          "basis_refs": [
+            "c8",
+            "c11"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_003",
+          "validation_id": "val_goal_independent_scope_preservation",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c8",
+            "c12"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_004",
+          "validation_id": "val_task_add_behavior_contract",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c9",
+            "c2"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_004",
+          "validation_id": "val_task_unittest",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c9",
+            "c3"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_004",
+          "validation_id": "val_task_scope_preservation",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c9",
+            "c4"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_004",
+          "validation_id": "val_task_validator_review",
+          "relation": "optional_or_unrelated",
+          "basis_refs": [
+            "c9",
+            "c5"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_004",
+          "validation_id": "val_goal_independent_behavior_contract",
+          "relation": "explicit_procedure",
+          "basis_refs": [
+            "c9",
+            "c10",
+            "c14"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_004",
+          "validation_id": "val_goal_independent_unittest",
+          "relation": "explicit_procedure",
+          "basis_refs": [
+            "c9",
+            "c11"
+          ],
+          "finding_codes": []
+        },
+        {
+          "criterion_id": "ac_004",
+          "validation_id": "val_goal_independent_scope_preservation",
+          "relation": "explicit_procedure",
+          "basis_refs": [
+            "c9",
+            "c12"
+          ],
+          "finding_codes": []
+        }
+      ],
+      "constraint_task_rows": [
+        {
+          "constraint_id": "constraint_001",
+          "task_ref": "task_change_add",
+          "applicability": "not_applicable",
+          "validation_ids": [],
+          "basis_refs": [
+            "c1"
+          ],
+          "finding_codes": []
+        },
+        {
+          "constraint_id": "constraint_002",
+          "task_ref": "task_change_add",
+          "applicability": "not_applicable",
+          "validation_ids": [],
+          "basis_refs": [
+            "c1"
+          ],
+          "finding_codes": []
+        },
+        {
+          "constraint_id": "constraint_003",
+          "task_ref": "task_change_add",
+          "applicability": "required",
+          "validation_ids": [
+            "val_task_add_behavior_contract",
+            "val_task_unittest",
+            "val_task_scope_preservation",
+            "val_task_validator_review"
+          ],
+          "basis_refs": [
+            "c1",
+            "c2",
+            "c3",
+            "c4",
+            "c5"
+          ],
+          "finding_codes": []
+        }
+      ],
+      "validation_rows": [
+        {
+          "validation_id": "val_task_add_behavior_contract",
+          "claim_ref": "c2",
+          "mechanisms": [
+            {
+              "tool": "oracle.py",
+              "phase": "task",
+              "basis_refs": [
+                "c13"
+              ]
+            }
+          ],
+          "separate_check_refs": [],
+          "assessment": "supported",
+          "finding_codes": []
+        },
+        {
+          "validation_id": "val_task_unittest",
+          "claim_ref": "c3",
+          "mechanisms": [
+            {
+              "tool": "Python unittest",
+              "phase": "new process",
+              "basis_refs": [
+                "c3",
+                "c13"
+              ]
+            }
+          ],
+          "separate_check_refs": [],
+          "assessment": "supported",
+          "finding_codes": []
+        },
+        {
+          "validation_id": "val_task_scope_preservation",
+          "claim_ref": "c4",
+          "mechanisms": [
+            {
+              "tool": "file·diff 검사",
+              "phase": null,
+              "basis_refs": [
+                "c4"
+              ]
+            }
+          ],
+          "separate_check_refs": [],
+          "assessment": "supported",
+          "finding_codes": []
+        },
+        {
+          "validation_id": "val_task_validator_review",
+          "claim_ref": "c5",
+          "mechanisms": [
+            {
+              "tool": "독립 Validator",
+              "phase": null,
+              "basis_refs": [
+                "c5"
+              ]
+            }
+          ],
+          "separate_check_refs": [],
+          "assessment": "supported",
+          "finding_codes": []
+        },
+        {
+          "validation_id": "val_goal_independent_behavior_contract",
+          "claim_ref": "c10",
+          "mechanisms": [
+            {
+              "tool": "oracle.py",
+              "phase": "goal",
+              "basis_refs": [
+                "c14"
+              ]
+            }
+          ],
+          "separate_check_refs": [],
+          "assessment": "supported",
+          "finding_codes": []
+        },
+        {
+          "validation_id": "val_goal_independent_unittest",
+          "claim_ref": "c11",
+          "mechanisms": [
+            {
+              "tool": "Python unittest",
+              "phase": "new process",
+              "basis_refs": [
+                "c11"
+              ]
+            }
+          ],
+          "separate_check_refs": [],
+          "assessment": "supported",
+          "finding_codes": []
+        },
+        {
+          "validation_id": "val_goal_independent_scope_preservation",
+          "claim_ref": "c12",
+          "mechanisms": [
+            {
+              "tool": "file·diff 검사",
+              "phase": null,
+              "basis_refs": [
+                "c12"
+              ]
+            }
+          ],
+          "separate_check_refs": [],
+          "assessment": "supported",
+          "finding_codes": []
+        }
+      ],
+      "finding_links": []
+    }
+  }
+}

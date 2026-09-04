@@ -71,6 +71,10 @@ class PlanInspection(EngineModel):
 PLAN_INSPECTION_INSTRUCTIONS = (
     "응답은 기존 plan 또는 review와 inspection을 감싼 provider 전용 envelope다. inspection은 "
     "검증 가능한 사실·참조의 간결한 대조표이며 장황한 사고 과정이나 Core 판정을 쓰지 않는다. "
+    "review를 제출하는 Reviewer는 findings와 ratings 두 key를 모두 제출한다. findings가 비면 "
+    "goal_fit·grounding·engineering·verification·execution_safety 다섯 0~4 rating 객체를 쓰고, "
+    "finding이 하나 이상이면 ratings:null을 쓴다. rating key 자체를 생략하지 않는다. 이 rating은 "
+    "비권위 관찰이며 admission과 0~100 score는 Core가 결정하므로 status·admissible·score·weakest task를 쓰지 않는다. "
     "같은 원문 인용은 citations에 한 번 등록하고 나머지 행은 citation_id를 참조한다. "
     "source:goal은 Goal definition, Reviewer의 artifact:plan_contract는 revision 전체, 작성자의 "
     "artifact:plan_draft는 응답 plan 전체다. JSON pointer는 이 값의 루트부터 쓰며 배열은 /0 형식이다. "

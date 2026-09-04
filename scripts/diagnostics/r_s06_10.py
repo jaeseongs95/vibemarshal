@@ -13,7 +13,7 @@ from flowmarshal.engine.domain import GoalContractRevision, PlanContractRevision
 from flowmarshal.engine.models import EngineRoleConfiguration
 from flowmarshal.engine.plan_inspection_eval import assess_inspection_review
 from flowmarshal.engine.planner_roles import PlanExpanderAdapter, PlanReviewerAdapter, PlanReviewEnvelope, RuleBasedTaskAssigner
-from flowmarshal.engine.planning import plan_gate, risk_route
+from flowmarshal.engine.planning import plan_gate, risk_route, validation_comparison_targets
 from flowmarshal.engine.qualification import PlanningScenarioCatalog, ScopeQualificationReport, _model_lock, _planning_contract, source_manifest_digest, source_manifest_files
 from flowmarshal.engine.roles import CodexStructuredRoleRunner, RoleCallRequest, strict_json_output_schema
 from flowmarshal.engine.runtime import CodexAppServerRuntime
@@ -201,6 +201,21 @@ def capture_request(name, run, roles, inventory_digest):
     raise AssertionError("요청이 생성되지 않았습니다.")
 
 
+def fixed_relation_rows_if_applicable(run: Path, *, goal: GoalContractRevision, plan: PlanContractRevision):
+    """고정 clean 28행은 같은 Goal과 validation 쌍을 가진 실제 Plan에만 적용한다."""
+    expectations = read(run / "expectations.json")
+    baseline_goal = GoalContractRevision.model_validate(read(run / "input-goal.json"))
+    expected_rows = expectations["ac_validation_rows"]
+    expected_pairs = {(row["criterion_id"], row["validation_id"]) for row in expected_rows}
+    actual_pairs = {
+        (row["criterion_id"], row["validation_id"])
+        for row in validation_comparison_targets(goal, plan)["ac_validation_pairs"]
+    }
+    if goal.definition_digest != baseline_goal.definition_digest or actual_pairs != expected_pairs:
+        return None
+    return expected_rows
+
+
 def verify_lock(run):
     lock = read(run / "preflight.json")
     body = dict(lock)
@@ -370,7 +385,8 @@ def summarize(run, status, error=None):
     for path in sorted((run / "calls").glob("*/terminal.json")):
         terminal = read(path)
         payload = terminal["payload"]
-        usage = payload.get("usage", {}).get("total")
+        raw_usage = payload.get("usage")
+        usage = raw_usage.get("total") if isinstance(raw_usage, dict) else None
         thread = read(path.parent / "thread.receipt.json")["payload"]["thread"]
         turns.append({"thread_id": payload.get("thread_id"), "turn_id": payload.get("turn_id"),
                       "usage_source": payload.get("usage_source"), "usage_scope": payload.get("usage_scope"),
@@ -473,7 +489,19 @@ def execute(run, generated=False):
                 else:
                     write_new(run / f"{name}-review.json", result)
                     envelope = PlanReviewEnvelope.model_validate(runner.last_result.payload)
-                    assessment = assess_inspection_review(envelope, expectations[name])
+                    plan_path = run / ("expanded-plan.json" if name == "expanded-review" else f"input-{name}-plan.json")
+                    plan = PlanContractRevision.model_validate(read(plan_path))
+                    goal_for_case = GoalContractRevision.model_validate(read(
+                        run / ("input-semantic-explicit-goal.json" if name in {"semantic-explicit", "semantic-missing-link"}
+                               else "input-goal.json")
+                    ))
+                    assessment = assess_inspection_review(
+                        envelope,
+                        expectations[name],
+                        fixed_ac_validation_rows=fixed_relation_rows_if_applicable(
+                            run, goal=goal_for_case, plan=plan,
+                        ),
+                    )
                     write_new(run / f"{name}-assessment.json", assessment)
                     if not assessment["passed"]:
                         raise RuntimeError(f"SEMANTIC_ASSESSMENT_FAILED: {name}: {json.dumps(assessment, ensure_ascii=False)}")

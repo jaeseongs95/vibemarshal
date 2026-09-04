@@ -13,21 +13,26 @@ import json
 from pathlib import Path
 import unittest
 
-from flowmarshal.canonical import sha256_digest
+from pydantic import ValidationError
+
+from flowmarshal.canonical import sha256_bytes, sha256_digest
 from flowmarshal.engine.domain import (
     GoalContractRevision,
     PlanContractRevision,
     ProjectMapRevision,
     StateSnapshot,
 )
-from flowmarshal.engine.plan_inspection import PlanInspectionError, validate_plan_inspection
+from flowmarshal.engine.plan_inspection import PlanInspection, PlanInspectionError, validate_plan_inspection
+from flowmarshal.engine.plan_inspection_eval import assess_fixed_ac_validation_relations
 from flowmarshal.engine.planning import plan_review_evidence_catalog
 from flowmarshal.engine.planner_roles import PlanReviewEnvelope
 
 
 ROOT = Path(__file__).resolve().parent / "fixtures" / "engine"
 RAW = json.loads((ROOT / "plan-inspection-raw-v1.json").read_text(encoding="utf-8"))
+RAW_V3_REJECTED = json.loads((ROOT / "plan-inspection-raw-v3-rejected.json").read_text(encoding="utf-8"))
 FILES = json.loads((ROOT / "plan-inspection-regressions.json").read_text(encoding="utf-8"))["files"]
+V3_EXPECTATIONS = json.loads((ROOT / "plan-inspection-v2-expectations.json").read_text(encoding="utf-8"))
 REFERENCE_ENTRY = "project:entry_ad363844d3392d9ef718d2d6"
 
 
@@ -117,6 +122,32 @@ def _validate(payload: dict, *, goal_data: dict | None = None):
 
 
 class RawPlanInspectionRegressionTests(unittest.TestCase):
+    def test_v3_rejected_raw_response_keeps_rating_failure_and_independent_inspection_errors(self):
+        """v3 원문은 보정하지 않고 rating·constraint·관계 오류를 각자 고정한다."""
+        raw = RAW_V3_REJECTED["raw_response"]
+        provenance = RAW_V3_REJECTED["provenance"]
+        raw_bytes = json.dumps(raw, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
+        self.assertEqual(provenance["raw_response_digest"], sha256_bytes(raw_bytes))
+        self.assertEqual("finding이 없으면 fitness rating이 필요합니다.", provenance["schema_failure"])
+        self.assertEqual({"findings": [], "ratings": None}, raw["review"])
+        # 과거의 잘못된 응답을 rating으로 PASS 보정하지 않는다.
+        with self.assertRaisesRegex(ValidationError, "finding이 없으면 fitness rating이 필요합니다"):
+            PlanReviewEnvelope.model_validate(raw)
+
+        inspection = PlanInspection.model_validate(raw["inspection"])
+        relation = assess_fixed_ac_validation_relations(inspection, V3_EXPECTATIONS["ac_validation_rows"])
+        self.assertTrue(relation["pair_set_matches"])
+        self.assertFalse(relation["passed"])
+        self.assertEqual(8, len(relation["relation_differences"]))
+
+        citations = {item.citation_id: item for item in inspection.citations}
+        for constraint_id in ("constraint_001", "constraint_002"):
+            row = next(item for item in inspection.constraint_task_rows if item.constraint_id == constraint_id)
+            self.assertFalse(any(
+                citations[reference].selector == f"/constraints/{int(constraint_id[-3:]) - 1}/statement"
+                for reference in row.basis_refs
+            ))
+
     def test_each_raw_reference_citation_wrong_goal_trace_address_is_rejected(self):
         for target in ("C_REF_TASK", "C_REF_VALIDATOR", "C_REF_GOAL"):
             with self.subTest(citation_id=target):

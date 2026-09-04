@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -240,11 +241,9 @@ class PlannerRoleAdapterError(RuntimeError):
 
 class PlanReviewDraft(ReviewDraft):
     findings: tuple[FindingDraft, ...] = Field(
-        default=(),
         description="직접 확인한 Plan 계약 결함. 검사 수단·phase의 범위, 복합 검사 문장 전체와 AC의 필수 ID 연결, Worker 산출물과 후속 Validator 입력·결과 순서를 각각 대조한다. 연결 누락과 실행 누락, Task의 Validator 통과 조건과 Worker가 미래 검토 결과를 미리 제출하는 충돌을 구분한다. 독립 결함은 각각 직접 evidence로 제출하고 다른 finding이나 낮은 rating으로 대신하지 않는다. 같은 원인의 중복·추측은 제외한다.",
     )
     ratings: ReviewRatings | None = Field(
-        default=None,
         description="직접 근거가 있는 finding이 전혀 없을 때만 후보 품질을 평가한다. 확인된 계약 모순이 있으면 findings를 제출하고 ratings는 null이다. 낮은 점수는 후보 차단이나 finding을 대신하지 않는다.",
     )
 
@@ -342,6 +341,29 @@ class PlanExpansionDraft(EngineModel):
     prohibited_effects: tuple[str, ...] = Field(default=(), description="Goal이 금지한 효과와 범위를 보존하며 현재 계획 역할의 행동 제한을 새로 추가하지 않는다.")
 
 
+def _inline_local_schema_refs(schema: dict[str, Any]) -> dict[str, Any]:
+    """Pydantic 단일 model schema의 local $defs를 provider branch 안에 전개한다."""
+    root = deepcopy(schema)
+    definitions = root.pop("$defs", {})
+
+    def visit(value: Any) -> Any:
+        if isinstance(value, list):
+            return [visit(item) for item in value]
+        if not isinstance(value, dict):
+            return value
+        reference = value.get("$ref")
+        if isinstance(reference, str) and reference.startswith("#/$defs/"):
+            name = reference.removeprefix("#/$defs/")
+            if name not in definitions:
+                raise RuntimeError("Plan review schema의 local $defs ref를 찾지 못했습니다: " + name)
+            resolved = deepcopy(definitions[name])
+            resolved.update({key: item for key, item in value.items() if key != "$ref"})
+            return visit(resolved)
+        return {key: visit(item) for key, item in value.items()}
+
+    return visit(root)
+
+
 class PlanExpansionEnvelope(EngineModel):
     plan: PlanExpansionDraft
     inspection: PlanInspection
@@ -350,6 +372,42 @@ class PlanExpansionEnvelope(EngineModel):
 class PlanReviewEnvelope(EngineModel):
     review: PlanReviewDraft
     inspection: PlanInspection
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema: Any, handler: Any) -> dict[str, Any]:
+        """지원되지 않는 root allOf 대신 review 속성의 nested anyOf로 배타 조건을 전송한다."""
+        schema = handler(core_schema)
+        # parent handler 뒤에 $defs를 조립하므로 review branch에는 local ref를 남기지 않는다.
+        review_schema = _inline_local_schema_refs(PlanReviewDraft.model_json_schema())
+        properties = review_schema["properties"]
+        empty_findings = deepcopy(properties["findings"])
+        empty_findings["maxItems"] = 0
+        nonempty_findings = deepcopy(properties["findings"])
+        nonempty_findings["minItems"] = 1
+        rating_value = deepcopy(properties["ratings"])
+        rating_value["anyOf"] = [
+            value for value in rating_value.get("anyOf", ()) if value != {"type": "null"}
+        ]
+        if not rating_value["anyOf"]:
+            raise RuntimeError("Plan review rating schema에 non-null ReviewRatings branch가 없습니다.")
+        schema["properties"]["review"] = {
+            "description": "finding/rating 두 key가 항상 있는 비권위 Reviewer 제출물",
+            "anyOf": [
+                {
+                    "type": "object",
+                    "properties": {"findings": empty_findings, "ratings": rating_value},
+                    "required": ["findings", "ratings"],
+                    "additionalProperties": False,
+                },
+                {
+                    "type": "object",
+                    "properties": {"findings": nonempty_findings, "ratings": {"type": "null"}},
+                    "required": ["findings", "ratings"],
+                    "additionalProperties": False,
+                },
+            ],
+        }
+        return schema
 
 
 class TaskAssigner(Protocol):
@@ -910,9 +968,16 @@ class PlanReviewerAdapter:
         request = RoleCallRequest(
             role=risk_route,
             instructions=(
+                "반드시 review.findings와 review.ratings 두 key를 함께 제출한다. 허용 조합은 정확히 둘이다: "
+                "(1) findings가 빈 배열이면 ratings는 goal_fit·grounding·engineering·verification·execution_safety "
+                "다섯 정수(각 0~4)를 모두 가진 객체, (2) finding이 하나 이상이면 ratings는 null이다. "
+                "rating 생략은 key를 빼는 뜻이 아니라 ratings:null 제출이다. 예: 정상은 "
+                "{\"findings\":[],\"ratings\":{\"goal_fit\":4,\"grounding\":4,\"engineering\":4,\"verification\":4,\"execution_safety\":4}}, "
+                "결함은 {\"findings\":[{\"finding_code\":\"EXAMPLE_FINDING\",\"...\":\"직접 근거 finding\"}],\"ratings\":null}이다. "
+                "이 rating은 Reviewer의 비권위 관찰이며 Core만 admission과 0~100 종합 score를 결정한다. "
+                "status·admissible·score·fitness score·weakest task는 선언하지 않는다. "
                 "PlanContract의 goal, intent, engineering, verification, execution gate를 독립 검토한다. "
-                "직접 evidence가 있는 최소 finding만 제출한다. finding이 있으면 rating을 생략하고, "
-                "status·fitness score·weakest task는 선언하지 않는다."
+                "직접 evidence가 있는 최소 finding만 제출한다. "
                 "현재는 활성화 전 Plan 후보이므로 미래 activation receipt는 아직 없는 것이 정상이다. "
                 "파일·명령의 운영 상세는 ExecutionSpec에 확정한다. read_only는 산출물 mutation 정책이며 "
                 "읽기 검사와 계획 생성 자체를 금지하지 않는다. 외부 효과는 외부 시스템·계정·제3자에 대한 효과다."

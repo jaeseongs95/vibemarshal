@@ -4,6 +4,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from flowmarshal.engine.domain import ThreadBinding, new_id, utc_now
 from flowmarshal.engine.models import ModelCapability, ModelInventory
 from flowmarshal.engine.roles import (
@@ -93,6 +95,66 @@ class ImmediateRoleRuntime:
 
 
 class EngineStructuredRoleTests(unittest.TestCase):
+    def test_plan_reviewer_transport_schema_and_post_validator_share_two_review_branches(self) -> None:
+        """전송 strict schema와 Pydantic 사후 검증이 같은 두 review 조합만 허용한다."""
+        from flowmarshal.engine.planner_roles import PlanReviewEnvelope
+
+        schema = strict_json_output_schema(PlanReviewEnvelope.model_json_schema())
+        review = schema["properties"]["review"]
+        branches = review["anyOf"]
+        self.assertNotIn("allOf", schema)
+        self.assertEqual(2, len(branches))
+        self.assertEqual(0, branches[0]["properties"]["findings"]["maxItems"])
+        self.assertEqual(1, branches[1]["properties"]["findings"]["minItems"])
+        self.assertEqual({"type": "null"}, branches[1]["properties"]["ratings"])
+        ratings = branches[0]["properties"]["ratings"]["anyOf"][0]
+        self.assertEqual(
+            ["goal_fit", "grounding", "engineering", "verification", "execution_safety"],
+            ratings["required"],
+        )
+        for field in ratings["properties"].values():
+            self.assertEqual((0, 4), (field["minimum"], field["maximum"]))
+
+        inspection = {
+            "citations": [{"citation_id": "C1", "source_ref": "source:goal", "selector": "/x", "quote": "x"}],
+            "ac_validation_rows": [], "constraint_task_rows": [], "validation_rows": [], "finding_links": [],
+        }
+        ratings_at_bounds = {
+            "goal_fit": 0, "grounding": 1, "engineering": 2, "verification": 3, "execution_safety": 4,
+        }
+        finding = {
+            "finding_code": "F1", "gate": "verification", "severity": "error", "summary": "직접 근거 결함",
+            "evidence_refs": ["source:goal"], "affected_task_refs": [], "remediable": True,
+        }
+
+        def payload(review_value):
+            return {"review": review_value, "inspection": inspection}
+
+        # 정상 rating(다섯 항목과 0/4 경계), 단일·복수 finding+null은 사후 validator가 수용한다.
+        for review_value in (
+            {"findings": [], "ratings": ratings_at_bounds},
+            {"findings": [finding], "ratings": None},
+            {"findings": [finding, {**finding, "finding_code": "F2"}], "ratings": None},
+        ):
+            with self.subTest(valid=review_value):
+                PlanReviewEnvelope.model_validate(payload(review_value))
+
+        # 빈 finding+null, 동시 제출, key 누락, 범위 밖 rating, Core 권위 필드는 모두 거부한다.
+        invalid = (
+            {"findings": [], "ratings": None},
+            {"findings": [finding], "ratings": ratings_at_bounds},
+            {"findings": []},
+            {"ratings": ratings_at_bounds},
+            {"findings": [], "ratings": {**ratings_at_bounds, "goal_fit": 5}},
+            {"findings": [], "ratings": {key: value for key, value in ratings_at_bounds.items() if key != "goal_fit"}},
+            {"findings": [], "ratings": ratings_at_bounds, "status": "admissible"},
+            {"findings": [], "ratings": ratings_at_bounds, "score": 100},
+        )
+        for review_value in invalid:
+            with self.subTest(invalid=review_value):
+                with self.assertRaises(ValidationError):
+                    PlanReviewEnvelope.model_validate(payload(review_value))
+
     def test_bounded_diagnostic_records_first_schema_failure_without_retry(self):
         runtime = ImmediateRoleRuntime(["not-json", '{"answer":"would-pass"}'])
         runner = CodexStructuredRoleRunner(runtime, max_schema_recovery_attempts=0)

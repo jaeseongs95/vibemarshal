@@ -425,7 +425,7 @@ class EngineRoleAdapterTests(unittest.TestCase):
                         "finding_code": "VERIFICATION_GOAL_TEST_SELF_DEPENDENCY", "gate": "verification",
                         "severity": "error", "summary": "Task가 자신을 포함한 모든 Task 검증과 이후 Goal Test를 기다린다.",
                         "evidence_refs": ["artifact:plan_contract"], "affected_task_refs": [check_ref], "remediable": True,
-                    }]}
+                    }], "ratings": None}
                 elif defect == "aggregate":
                     plan["integration_validations"][0]["evidence_mode"] = "task_aggregate"
                     review = {"findings": [{
@@ -433,7 +433,7 @@ class EngineRoleAdapterTests(unittest.TestCase):
                         "severity": "error", "summary": "새 독립 검사를 요구하는 AC에 Task evidence 집계를 배정했다.",
                         "evidence_refs": ["artifact:plan_contract", "source:goal"],
                         "affected_task_refs": [check_ref], "remediable": True,
-                    }]}
+                    }], "ratings": None}
                 runner = ScriptedStructuredRoleRunner({
                     "skeleton_generator": [skeleton], "skeleton_reviewer": [{"findings": [], "ratings": _ratings()}],
                     "plan_expander": [plan], "compact_plan_reviewer": [review],
@@ -600,7 +600,7 @@ class EngineRoleAdapterTests(unittest.TestCase):
                         "evidence_refs": ["artifact:plan_contract", "source:goal"],
                         "affected_task_refs": [change_ref],
                         "remediable": True,
-                    }]}
+                    }], "ratings": None}
                 runner = ScriptedStructuredRoleRunner({
                     "skeleton_generator": [skeleton],
                     "skeleton_reviewer": [{"findings": [], "ratings": _ratings()}],
@@ -670,7 +670,7 @@ class EngineRoleAdapterTests(unittest.TestCase):
                         "summary": "변경 Task의 자체 검사는 존재하지만 각 Task 검증 AC의 validation_ids에서 빠졌다.",
                         "evidence_refs": ["source:goal", "artifact:plan_contract"],
                         "affected_task_refs": [change_ref], "remediable": True,
-                    }]}
+                    }], "ratings": None}
                 runner = ScriptedStructuredRoleRunner({
                     "skeleton_generator": [skeleton],
                     "skeleton_reviewer": [{"findings": [], "ratings": _ratings()}],
@@ -790,7 +790,7 @@ class EngineRoleAdapterTests(unittest.TestCase):
                         "severity": "error", "summary": "새 응답 생성과 응답 무변경 조건이 충돌한다.",
                         "evidence_refs": ["artifact:plan_contract"], "affected_task_refs": ["task_one"],
                         "remediable": True,
-                    }]}
+                    }], "ratings": None}
                 runner = ScriptedStructuredRoleRunner({
                     "skeleton_generator": [skeleton],
                     "skeleton_reviewer": [{"findings": [], "ratings": _ratings()}],

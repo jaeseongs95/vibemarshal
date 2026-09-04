@@ -19,6 +19,7 @@ from flowmarshal.engine.domain import PlanContractRevision
 
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTATIONS_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v2-expectations.json"
+INDEPENDENT_REVIEW_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v2-independent-fixture-review.json"
 LEGACY_EXPECTATIONS_PATH = ROOT / "tests/fixtures/engine/plan-inspection-expectations.json"
 SOURCE_INPUT_FILENAMES = (
     "input-bad-plan.json",
@@ -151,6 +152,25 @@ def _runtime_review_expectations(expectations: dict[str, Any]) -> dict[str, Any]
     return legacy | revised
 
 
+def _independent_fixture_review(
+    expectations: dict[str, Any], runtime_expectations: dict[str, Any],
+) -> dict[str, Any]:
+    """사전 독립 원문 대조의 고정 입력을 새 run에 그대로 결속한다."""
+    review = _read(INDEPENDENT_REVIEW_PATH)
+    expected_cases = expectations["provider_call_order"][:-2]
+    runtime_bytes = (
+        json.dumps(json_value(expectations | runtime_expectations), ensure_ascii=False, sort_keys=True,
+                   separators=(",", ":")) + "\n"
+    ).encode("utf-8")
+    if (
+        review.get("review_complete") is not True
+        or review.get("reviewed_cases") != expected_cases
+        or review.get("expectations_digest") != sha256_bytes(runtime_bytes)
+    ):
+        raise FixtureRevisionError("독립 fixture review의 case·기대값 결속이 다릅니다.")
+    return review
+
+
 def build_revision(source_run: Path, destination: Path) -> None:
     """R-S06-09 입력을 읽어 R-S06-10 전용 정상·결함 fixture를 x-쓰기한다.
 
@@ -163,6 +183,7 @@ def build_revision(source_run: Path, destination: Path) -> None:
     expectations = _read(EXPECTATIONS_PATH)
     _verify_source_input_digests(source_run, expectations)
     runtime_expectations = _runtime_review_expectations(expectations)
+    independent_review = _independent_fixture_review(expectations, runtime_expectations)
 
     originals: dict[str, Any] = {}
     working: dict[str, Any] = {}
@@ -200,6 +221,7 @@ def build_revision(source_run: Path, destination: Path) -> None:
     if (source_run / "raw-clean-assessment.json").is_file():
         _copy_new(source_run / "raw-clean-assessment.json", destination / "source-raw-clean-assessment.json")
     _write_new(destination / "expectations.json", expectations | runtime_expectations)
+    _write_new(destination / "independent-fixture-review.json", independent_review)
 
     normalized_digests = {
         filename: value["definition_digest"]

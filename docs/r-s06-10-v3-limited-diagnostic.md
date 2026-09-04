@@ -59,3 +59,64 @@ finding이 없으면 fitness rating이 필요합니다.
 - preflight와 지침 결속: `preflight.json` (`sha256:0325b09bc67554828c20abae8f8ac83e636010f326c90efd0b8f832218b9690c`), `instruction-binding.json` (`sha256:c3b4a6eefe78200aaa6bde3c5a971ecd9f201d04750f1ee0f1b4ba32cd258fe0`)
 - 첫 호출: `calls/01-compact_plan_reviewer/thread.receipt.json` (`sha256:8a514063ba399072b0d319f846f50ba761c902f67595ed517620a1ab5bf7e785`), `turn.receipt.json` (`sha256:b10a6b5700471532d650565ee3421cdaa61c5839c595a2cdd195e04c0256082c`), `terminal.json` (`sha256:aa430693964cc7073adf5914be5d512b089cda9c99499372b240c5b3b8f8ee24`), `failed.json` (`sha256:96670168055d043cbb988380a27fa8fd5beab3c0ac1fe10b83819e52498b3777`)
 - 최종 제한 진단 summary: `summary.json` (`sha256:e34728d5affab8626b914fb4385dfe97011b3f00711412353d486f4ddef47438`)
+
+## R-S06-11 — 평점 조건 schema·관계표 실제 대조 보완
+
+### 구현 범위
+
+v3 원문은 수정하지 않고 `tests/fixtures/engine/plan-inspection-raw-v3-rejected.json`으로 옮겼다. fixture는 원래 terminal·failed·request·schema·developer instruction digest와 원시 response digest를 함께 보존한다. 빈 `findings`와 `ratings: null`은 과거 실패 응답 그대로이며, test가 이를 rating으로 보정하거나 PASS로 바꾸지 않는다. 이 원문은 사후 Pydantic 거부, `constraint_001`·`constraint_002`의 자기 constraint 인용 누락, 고정 clean 28행과의 relation 분류 차이 8건을 각각 검증한다.
+
+`PlanReviewDraft`는 `findings`와 `ratings`를 모두 입력 필수 key로 둔다. `PlanReviewEnvelope`의 실제 provider schema는 review 속성 아래에 다음 두 object branch만 nested `anyOf`로 전송한다.
+
+1. `findings: []`와 다섯 `ReviewRatings` (`goal_fit`, `grounding`, `engineering`, `verification`, `execution_safety`)의 0~4 정수 객체
+2. 하나 이상의 `findings`와 `ratings: null`
+
+이전 시도의 root `allOf`는 provider가 지원하지 않는다는 실제 400 응답을 받은 뒤 제거하지 않고, 같은 제약을 지원 표현인 nested `anyOf`로 옮겼다. local `$defs` reference도 branch 안에서 인라인 전개해 전송 schema가 독립적으로 두 분기를 강제한다. Pydantic 사후 validator는 동일 조합을 다시 검사한다. 누락 key, 빈 findings+null, findings/rating 동시 제출, range 밖 rating, `status`·`admissible`·`score`·`weakest_task` 같은 Core 권위 필드는 거부한다.
+
+Reviewer 지침과 `PLAN_INSPECTION_INSTRUCTIONS` 앞부분에는 두 조합, `ratings:null`의 의미, 다섯 0~4 rating, Reviewer의 비권위 rating과 Core의 admission·0~100 종합 score 경계를 명시했다. 예시는 실제 schema와 validator 회귀에서 검증한다.
+
+`assess_fixed_ac_validation_relations()`은 고정 clean AC×validation 표를 응답의 실제 `inspection.ac_validation_rows`와 대조한다. evaluator는 구조와 Goal이 같은 입력에만 이 표를 적용한다. validation pair 집합이 다른 결함 case나 생성 Plan에는 표를 강제하지 않으며, adapter·runtime·Core에 의미 정답, coverage 보정 또는 새 finding을 주입하지 않는다. `clean-assessment.json`에 실제 relation 차이를 남긴다.
+
+또한 R-S06-10 fixture builder가 고정 독립 원문 검토를 새 run에 복사하고, runtime expectations bytes digest·정적 11개 Reviewer case 순서를 검증하도록 보완했다. 이로써 missing independent-review가 provider 호출 전 `prepare()`를 중단시키던 문제를 없앴다. `summary()`는 provider error의 `usage: null`도 보존하며 후속 요약 과정에서 실패하지 않게 했다.
+
+`GoalContractRevision`, `PlanContractRevision`, `ReviewerSubmission`, DB schema 및 Core의 admission/score 계산은 변경하지 않았다.
+
+### 결정적 검증
+
+- 직접 추가한 transport/schema·원시 v3·fixture/결속 회귀 31건과 adapter 경계 회귀 24건을 통과했다.
+- 최종 source의 결정적 Gate는 **5/5 PASS**다. `compileall`, 전체 unittest **530개**, `pip check`, synthetic lifecycle, legacy freeze manifest가 모두 통과했다.
+- v6 결정적 계약 digest는 `sha256:ced6f696e0f88f2545f8aeaa24224d6dbf37391ab54f634b7b9d48b608055007`, report bytes digest는 `sha256:edd47dbd82fa236aae33ebc397fe85a34b65de6ca97c64f1752c21b3862941a4`다.
+
+이 Gate는 구현·결속 검증일 뿐 실제 역할 품질, 전체 S06, 전체 qualification 또는 1.0 cutover의 PASS가 아니다.
+
+### 제한 실제 진단
+
+v5와 v6은 v3의 남은 호출을 재개하지 않은 새 run root다. 둘 다 실제 정책·모델 inventory·AGENTS source·원문 입력·기대값·projection·strict schema를 provider 효과 전에 잠갔다.
+
+| run | 실제 결과 | 호출 / 최대 | token·latency |
+|---|---|---:|---:|
+| v5 | 첫 `clean` turn에서 provider가 root `allOf`를 `invalid_json_schema`로 거부했다. retry 0회, 다음 case 미실행. | 1 / 13 | usage 미제공(모든 token 0), 3,578ms |
+| v6 | nested `anyOf` schema는 실제 `gpt-5.6-terra/high` turn에서 수용됐다. 정상 다섯 rating 응답도 Pydantic·receipt 결속을 통과했지만, 고정 관계표와 2건 불일치하여 즉시 FAIL이다. | 1 / 13 | input 42,715, cached 0, output 7,031(그 안 reasoning 924), total 49,746, role latency 131,515ms, provider duration 131,055ms |
+
+v5 provider 오류의 실제 메시지는 다음과 같다.
+
+```text
+Invalid schema for response_format 'codex_output_schema': In context=(), 'allOf' is not permitted.
+```
+
+v6의 실제 review는 `findings: []` 및 다섯 항목 모두 4인 ratings였다. 형식·권위 경계·실제 thread/turn receipt와 source/instruction binding은 통과했지만, `clean`의 relation이 다음 두 행에서 고정 표와 달랐다.
+
+- `ac_003 × val_goal_independent_behavior_contract`: expected `explicit_procedure`, actual `optional_or_unrelated`
+- `ac_004 × val_task_scope_preservation`: expected `optional_or_unrelated`, actual `explicit_procedure`
+
+따라서 semantic assessment가 FAIL을 기록했고 `bad`, `wrong-goal`, `combined`, `boundary-clean`, `missing-link`, `future-result`, `stored-expanded`, `semantic-explicit`, `stored-multi-defect`, `semantic-missing-link`, `expansion`, `expanded-review`는 실행하지 않았다. 생성 Plan의 독립 정상성 대조 및 마지막 Reviewer도 미실행이다. 모델 대체·schema recovery·rating 기본값·인용 자동 교정·expectation 완화는 수행하지 않았다. provider receipt에는 청구 금액이 없으므로 금액은 `null`이다. v3/v5/v6은 schema·지침·source 계약이 달라 성능 비교 대상이 아니다.
+
+### 증거와 다음 조건
+
+- v5 root: `D:\codex\flowmarshal\.flowmarshal-engine-eval\runs\r-s06-10-20260905-v5`
+  - preflight lock `sha256:509cf28a57279ec0bb69222b1d1fb9b1028fa148db7a659187f54534ff1a1488`, terminal `sha256:47d5cebee3336c92fffd1088b95c50cb4856d554c15016209e9fbab0676e9f06`, failed receipt `sha256:009bb4b2113a5e0eb1d963364d29818e27192ca7b584b9b3bcd2c7887a7281aa`
+- v6 root: `D:\codex\flowmarshal\.flowmarshal-engine-eval\runs\r-s06-10-20260905-v6`
+  - preflight lock `sha256:7ee6bebd8b301458694815516124e17b9603c4291439fbdb5e823d9ab974ebb6`, summary `sha256:23bd87633fdf0a1856bc63f922411d97c5985bdf7b0d5b3271c9c93045460501`
+  - actual schema `calls/01-compact_plan_reviewer/strict-schema.json` (`sha256:bfeee24e88b215a2e22ddc378fdcff1be966f16945d5cf381d90f4e998492c6e`), request `sha256:c2b234bea109913402cd07758a65ddc79b0266ec7d56dbad2e37d6f8d55b20b6`, terminal `sha256:9f1aed1218e73d5d025f23f5896b9cd0f5e3957def931567fe7df240d19fbfdc`, result/receipt `sha256:836dd2e68e3112027aed473cc64d988232286789f021aa34fe371768b50d4b74`, assessment `sha256:69840cf1544c47068de08edfccfa2fcabd9e4a414cc474227854c88ecfca8af1`
+
+다음 실제 진단은 Reviewer가 위 두 relation을 올바르게 구분하도록 별도 변경을 한 뒤, 새 source digest·결정적 Gate·새 run root·새 preflight lock으로 시작해야 한다. v6의 남은 12개 호출을 이어 실행해서는 안 된다. 이 제한 진단은 전체 qualification이나 1.0 판정이 아니며, 현재 cutover는 계속 **NO-GO**다.

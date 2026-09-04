@@ -1,0 +1,71 @@
+{
+  "reviewer": "R-S06-10 v3 독립 원문 대조",
+  "review_complete": true,
+  "reviewed_cases": [
+    "clean",
+    "bad",
+    "wrong-goal",
+    "combined",
+    "boundary-clean",
+    "missing-link",
+    "future-result",
+    "stored-expanded",
+    "semantic-explicit",
+    "stored-multi-defect",
+    "semantic-missing-link"
+  ],
+  "expectations_digest": "sha256:ab2d3ea8f7ebf9b0ed429270c01f5a6c2a626d02e4573e714dd36cec44b74272",
+  "basis": [
+    {
+      "source": "D:/codex/flowmarshal/.flowmarshal-engine-eval/runs/r-s06-09-20260904-v1/input-goal.json",
+      "selectors": [
+        "/definition/hard_acceptance/0/validation_intent",
+        "/definition/hard_acceptance/2/validation_intent"
+      ],
+      "conclusion": "ac_001은 task/goal oracle 및 기존 unittest를 명시하고, ac_003의 새 프로세스 unittest는 Task 단계로 제한되지 않는다."
+    },
+    {
+      "source": "D:/codex/flowmarshal/.flowmarshal-engine-eval/runs/r-s06-09-20260904-v1/input-clean-plan.json",
+      "selectors": [
+        "/definition/integration_validations/1/statement",
+        "/definition/integration_validations/0/statement",
+        "/definition/goal_coverage"
+      ],
+      "conclusion": "현행 전수 절차 규칙에서는 ac_001→val_goal_independent_unittest와 ac_003→val_goal_independent_behavior_contract 연결이 필요하며, 과거 clean에는 없었다. 새 사본의 두 연결만 보완한다."
+    },
+    {
+      "source": "D:/codex/flowmarshal/.flowmarshal-engine-eval/runs/s06-bugfix-trace-20260904-v4/validation-reference.md",
+      "selector": "/content",
+      "conclusion": "goal phase는 Task 단계 검사를 다시 수행하며 phase 공통 unittest를 실행한다. task phase는 goal 고정 정수쌍 위치/키워드 검사를 수행하지 않는다."
+    },
+    {
+      "source": "D:/codex/flowmarshal/tests/fixtures/engine/bugfix-trace/oracle.py",
+      "lines": [
+        85,
+        93,
+        96,
+        100
+      ],
+      "conclusion": "goal 전용 behavior 분기와 phase 공통 새 프로세스 unittest를 직접 대조했으며 oracle과 threshold는 변경하지 않는다."
+    },
+    {
+      "source": "D:/codex/flowmarshal/docs/orchestration-redesign.md",
+      "conclusion": "AC 명시 절차 ID 전수 연결, Task 실제 검사 존재와 연결 누락의 구분, 선택적 연결 허용, 명시적 evidence 제외만 결함, 실행 evidence catalog 경계를 대조한다."
+    }
+  ],
+  "case_conclusions": {
+    "clean": "F001/F002 두 연결만 새 사본에서 보완한다. semantic 선택적 AC-002 연결과 file/diff 단순 언급은 정상이다.",
+    "bad": "두 숨은 누락은 보완하되 task phase에 부여한 goal 동작 검사의 직접 범위 모순은 유지한다.",
+    "wrong-goal": "두 숨은 누락은 보완하되 independent goal 검사에 task phase를 사용한 범위 모순은 유지한다.",
+    "combined": "정상화 두 연결과 같은 Task statement의 별도 정수쌍 호출·기대 합 비교 책임을 확인한다.",
+    "boundary-clean": "task와 goal phase 구별 및 모든 실제 절차 연결이 정상이다.",
+    "missing-link": "ac_003의 val_task_oracle 연결만 누락하며 기존 unittest와 goal 검사는 이를 대체하지 않는다.",
+    "future-result": "동일 Worker 응답에 미래 Validator 결과를 요구하는 독립 결함을 유지한다.",
+    "stored-expanded": "ac_004의 validation_task_oracle_and_unittest 연결 누락을 유지한다.",
+    "semantic-explicit": "Goal ac_001의 명시 semantic 요구 및 해당 ID 연결을 유지하고 F001/F002만 보완한다.",
+    "stored-multi-defect": "ac_004 task oracle 연결 누락과 같은 task phase의 양수·음수·0 검사 과장을 각각 유지한다.",
+    "semantic-missing-link": "명시 semantic 연결만 누락이며 F001/F002는 정상화 사본에서 제거한다."
+  },
+  "deterministic_semantics": "역사적 clean F001/F002, 각 단독 누락, 선택적/명시 semantic, Validator 책임 전체 누락과 남은 unittest/scope 검사, test evidence 명시 제외와 단순 언급을 독립 사례로 고정한다. constraint_001/002는 검사 의무 행으로 비적용이나 원문 인용은 필요하며 실제 검사 의무는 constraint_003에 있다.",
+  "limitations": "고정 의미 기준의 원문 대조이며 실제 모델의 탐지 성공 증명은 아니다. 생성 Plan은 별도 고정 기준으로 독립 검토한 뒤 Reviewer에 제공한다."
+}

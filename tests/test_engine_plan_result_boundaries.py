@@ -215,6 +215,7 @@ class PlanResultBoundaryRegressionTests(unittest.TestCase):
                     "affected_task_refs": ["task_change"],
                     "remediable": True,
                 }],
+                "ratings": None,
             }
         runner = ScriptedStructuredRoleRunner({
             "skeleton_generator": [_skeleton_response()],

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import hashlib
 import json
 from pathlib import Path
 import tempfile
@@ -94,6 +95,13 @@ class InspectionFixtureRevisionTests(unittest.TestCase):
         self.assertEqual(13, len(set(EXPECTATIONS["provider_call_order"])))
         self.assertEqual(EXPECTATIONS["provider_call_order"], assessment["provider_call_order"])
         self.assertTrue((destination / "expectations.json").is_file())
+        independent_review = _plan(destination, "independent-fixture-review.json")
+        self.assertTrue(independent_review["review_complete"])
+        self.assertEqual(EXPECTATIONS["provider_call_order"][:-2], independent_review["reviewed_cases"])
+        self.assertEqual(
+            independent_review["expectations_digest"],
+            "sha256:" + hashlib.sha256((destination / "expectations.json").read_bytes()).hexdigest(),
+        )
         runtime_expectations = _plan(destination, "expectations.json")
         self.assertEqual([], runtime_expectations["clean"])
         self.assertEqual(["ac003-task-oracle-link"],
