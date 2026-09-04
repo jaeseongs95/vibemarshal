@@ -408,7 +408,12 @@ def advance_independent_goal_test(
                 "WHERE e.project_id = ? AND t.plan_revision_id = ? ORDER BY e.observed_at",
                 (project_id, plan.plan_revision_id),
             ).fetchall()
-        catalog = {row["id"]: json.loads(row["payload_json"]) for row in rows}
+        catalog = {
+            row["id"]: json.loads(row["payload_json"]) for row in rows
+            if not (row["kind"] == "external_observation"
+                    and row["source_ref"].startswith("codex-thread:")
+                    and row["source_ref"].endswith(":truncated"))
+        }
         if not catalog:
             return blocked(project_id, "GOAL_TEST_INPUT_INCOMPLETE", "독립 검사에 필요한 직접 evidence가 없습니다.")
         try:

@@ -18,6 +18,8 @@
 
 `deterministic`은 `compileall`, 전체 테스트, `pip check`, synthetic lifecycle과 legacy freeze를 검사한다. 하나라도 실패하면 실제 모델 scope는 시작하지 않는다.
 
+synthetic lifecycle의 프로젝트 입력은 `tests/fixtures/engine/synthetic-lifecycle-project`에 고정한다. 이 fixture와 검사 규칙은 평가 계약에 결속하고 원장·artifact는 임시 경로에 둔다. 저장소 전체 문서량에 따라 합성 상태 전이 검사의 Context가 달라지지 않게 하며, 전체 저장소 코드 검증은 전체 테스트·compileall·freeze에서 수행한다. 합성 fixture는 실제 모델 E2E를 대신하지 않는다.
+
 `role-fixture`는 plan 8건과 Goal 8건을 seed 3개로 실행한다. recall 90%, precision 85%, critical false admission 0, clean false block 0, schema failure 0, critical seed 불일치 0을 모두 요구한다.
 
 개별 필수 finding 누락은 `diagnostics`와 raw cell에 항상 보존하고 recall에 반영한다. 누락 한 건을 독립 FAIL로 처리해 사실상 recall 100%를 요구하지 않는다. critical false admission·clean false block 등 0건 조건은 여전히 개별 한 건도 Gate 실패다. 이 구분을 잘못 적용한 과거 보고서는 변경하지 않으며 새 source 계약에서만 수정 판정기를 사용한다.

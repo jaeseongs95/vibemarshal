@@ -264,7 +264,8 @@ def deterministic_observations(root: Path) -> tuple[dict[str, Any], ...]:
         _command_observation(
             root,
             "synthetic-lifecycle",
-            (python, "-m", "flowmarshal.engine.smoke", "--project-root", str(root)),
+            (python, "-m", "flowmarshal.engine.smoke", "--project-root",
+             str(root / "tests" / "fixtures" / "engine" / "synthetic-lifecycle-project")),
         ),
     ]
     manifest = _manifest(root)
@@ -287,7 +288,17 @@ def _deterministic_contract(root: Path) -> EvaluationContract:
         "synthetic-lifecycle",
         "legacy-freeze-manifest",
     )
-    fixture_digests = tuple(sha256_digest({"deterministic_check": name}) for name in names)
+    synthetic_root = (root / "tests" / "fixtures" / "engine" / "synthetic-lifecycle-project").resolve(strict=True)
+    synthetic_inputs = {
+        path.relative_to(synthetic_root).as_posix(): sha256_bytes(path.read_bytes())
+        for path in sorted(synthetic_root.rglob("*"))
+        if path.is_file() and "__pycache__" not in path.parts and path.suffix not in {".pyc", ".pyo"}
+    }
+    fixture_digests = tuple(
+        sha256_digest({"deterministic_check": name} | (
+            {"project_files": synthetic_inputs} if name == "synthetic-lifecycle" else {}
+        )) for name in names
+    )
     roles = default_role_configuration(root)
     return EvaluationContract(
         scope=EvaluationScope.DETERMINISTIC,
@@ -297,7 +308,8 @@ def _deterministic_contract(root: Path) -> EvaluationContract:
         expected_cell_count=len(names),
         role_configuration_digest=roles.configuration_digest,
         source_manifest_digest=source_manifest_digest(root),
-        rules_digest=sha256_digest({"commands": names, "all_must_pass": True}),
+        rules_digest=sha256_digest({"commands": names, "all_must_pass": True,
+                                   "synthetic_project": "tests/fixtures/engine/synthetic-lifecycle-project"}),
         threshold_digest=sha256_digest({"failure_count": 0}),
         taxonomy_digest=sha256_digest({"gates": ["schema", "dag", "history", "intent", "freeze"]}),
         prompt_digest=sha256_digest({"model_calls": False}),
@@ -652,7 +664,9 @@ def _planning_contract(
 ) -> EvaluationContract:
     import inspect
     from .goal import GoalNormalizationProposal
-    from .planner_roles import PlanExpansionDraft, SkeletonBatchDraft, SkeletonCandidateDraft
+    from .planner_roles import (
+        PlanExpansionDraft, SkeletonBatchDraft, SkeletonCandidateDraft, READ_ONLY_REPORTING_INSTRUCTIONS,
+    )
 
     return EvaluationContract(
         scope=EvaluationScope.FULL_PLANNING_PIPELINE,
@@ -671,7 +685,7 @@ def _planning_contract(
                 role.__name__: inspect.getsource(role)
                 for role in (GoalNormalizerAdapter, GoalReviewerAdapter, SkeletonGeneratorAdapter,
                              SkeletonReviewerAdapter, PlanExpanderAdapter, PlanReviewerAdapter)
-            }
+            } | {"read_only_reporting": READ_ONLY_REPORTING_INSTRUCTIONS}
         ),
         output_schema_digest=sha256_digest(
             {

@@ -12,6 +12,7 @@ from flowmarshal.engine.goal import GoalNormalizerAdapter, GoalReviewerAdapter, 
 from flowmarshal.engine.planner_roles import (
     PlanExpanderAdapter, PlanReviewerAdapter, PlanExpansionDraft, SkeletonBatchDraft,
     SkeletonCandidateDraft, SkeletonGeneratorAdapter, SkeletonReviewerAdapter,
+    READ_ONLY_REPORTING_INSTRUCTIONS,
 )
 from flowmarshal.engine.qualification import (
     PlanningScenarioCatalog, _planning_contract, _role_progress, default_role_configuration,
@@ -47,6 +48,7 @@ class EvaluationBindingTests(unittest.TestCase):
         prompts = {role.__name__: inspect.getsource(role) for role in (
             GoalNormalizerAdapter, GoalReviewerAdapter, SkeletonGeneratorAdapter,
             SkeletonReviewerAdapter, PlanExpanderAdapter, PlanReviewerAdapter)}
+        prompts["read_only_reporting"] = READ_ONLY_REPORTING_INSTRUCTIONS
         schemas = {model.__name__: strict_json_output_schema(model.model_json_schema()) for model in (
             GoalNormalizationProposal, SkeletonBatchDraft, SkeletonCandidateDraft, PlanExpansionDraft, ReviewDraft)}
         self.assertEqual(sha256_digest(prompts), contract.prompt_digest)
@@ -54,6 +56,10 @@ class EvaluationBindingTests(unittest.TestCase):
         changed = dict(prompts)
         changed["GoalNormalizerAdapter"] += "\n실제 지침 변경"
         self.assertNotEqual(sha256_digest(changed), contract.prompt_digest)
+        with patch("flowmarshal.engine.planner_roles.READ_ONLY_REPORTING_INSTRUCTIONS", "변경된 보고 계약"):
+            self.assertNotEqual(_planning_contract(ROOT, catalog, qualification_inventory(),
+                                                 default_role_configuration(ROOT)).prompt_digest,
+                                contract.prompt_digest)
 
     def test_partial_role_progress_is_not_a_completed_cell(self):
         with tempfile.TemporaryDirectory() as temp:

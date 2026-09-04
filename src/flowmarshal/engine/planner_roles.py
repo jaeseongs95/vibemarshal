@@ -51,6 +51,18 @@ from .roles import RoleCallReceipt, RoleCallRequest, StructuredRolePort
 from .domain import GoalContractRevision
 
 
+READ_ONLY_REPORTING_INSTRUCTIONS = (
+    "Goal이 read_only이고 파일을 쓰지 않는 분석·보고를 요청하면 보고는 Worker 응답 본문으로 "
+    "제공하는 논리적 산출물로 명시한다. produces의 보고 key는 새 프로젝트 파일 생성 권한이 아니다. "
+    "프로젝트 파일의 생성·수정·삭제 금지와 새 응답 본문 생성을 구분하고, 응답 본문까지 "
+    "전후 무변경이어야 한다는 조건을 만들지 않는다. 보고 내용은 원본 근거와 대조하고 "
+    "프로젝트 파일 무변경은 별도 검사로 둔다. 명시적인 파일 산출물 요구나 더 강한 금지 조건을 "
+    "응답 보고로 몰래 바꾸거나 파일 쓰기 예외를 발명하지 않는다."
+    "read_only의 응답 보고 Task는 inspect 또는 decide로 분류한다. '작성'이라는 동사만으로 "
+    "change Task를 만들거나 분석과 보고를 별도 변경 Task로 분할하지 않는다."
+)
+
+
 class PlannerRoleAdapterError(RuntimeError):
     pass
 
@@ -213,7 +225,7 @@ class SkeletonGeneratorAdapter:
                 "독립 Goal Test는 상세 Plan의 integration_validations로 Core가 별도 실행하므로 "
                 "그 실행을 위해 Skeleton에 중복 검사 Task를 추가할 필요는 없다. "
                 "read_only는 프로젝트 산출물 변경 금지이며 읽기 관측·계획 제안 자체를 금지하지 않는다."
-            ),
+            ) + READ_ONLY_REPORTING_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(goal.definition_digest),
                 "candidate_count": candidate_count,
@@ -276,7 +288,7 @@ class SkeletonGeneratorAdapter:
                 "몰래 바꾸지 말고 실제 파일·명령을 상세화하지 않는다. "
                 "consumes는 external_input_catalog의 key 또는 data dependency의 산출물과 일치해야 한다. "
                 "unknown_refs는 StateSnapshot.unknowns의 실제 ID만 쓴다. 새 정보는 발명하지 않는다."
-            ),
+            ) + READ_ONLY_REPORTING_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(sha256_digest(candidate)),
                 "goal": goal.definition.model_dump(mode="json"),
@@ -462,8 +474,14 @@ class PlanExpanderAdapter:
                 "manual은 user_decision, external_observation은 external_observation 증거를 사용한다. "
                 "검증용 프로세스 밖의 함수 반환값·프로젝트 파일 수정은 external 효과가 아니다. "
                 "external=true는 외부 시스템·계정·제3자에 대한 효과이며 Goal의 허용 외부 효과에 결속해야 한다. "
+                "expected_effects와 prohibited_effects 모두 로컬 파일 mutation과 외부 시스템 효과를 "
+                "각각 별도 항목으로 작성하고 external 값을 구분한다. 한 항목에 두 범위를 섞지 않는다. "
                 "Core의 이후 Plan digest 활성화를 별도 승인 Task나 현재 필요한 승인 입력으로 발명하지 않는다."
-            ),
+                "Worker 응답 보고는 Core가 external_observation evidence로 수집한다. 응답 내용의 "
+                "의미 검사는 원본 file 근거와 응답 관측을 함께 참조하는 semantic validation으로 "
+                "계약하고 required_evidence_kinds에 model_review·external_observation·file을 모두 "
+                "요구한다. 이는 외부 시스템 변경 효과를 뜻하지 않는다."
+            ) + READ_ONLY_REPORTING_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(sha256_digest(candidate)),
                 "goal": goal.definition.model_dump(mode="json"),

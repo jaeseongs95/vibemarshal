@@ -33,6 +33,7 @@ from .domain import (
     SemanticValidationObservation,
     TaskExecutionSpecRevision,
     ThreadBinding,
+    ValidationExecutionStep,
     ValidationResult,
     ValidationStatus,
     new_id,
@@ -991,19 +992,16 @@ class EngineDispatcher:
             raise EngineServiceError("semantic validation용 독립 validator binding이 없습니다.")
         if validation_id is None:
             validation_id = self._validation_id_from_attempt(row["id"])
-        step = next(
-            (item for item in spec.definition.validation_steps if item.validation_id == validation_id),
-            None,
-        )
-        if step is None or step.method != "semantic":
-            raise EngineServiceError("validation Attempt가 semantic step에 결속되지 않았습니다.")
-        catalog = self._task_evidence_catalog(row["task_id"], spec.definition_digest)
+        step = self._semantic_validation_step(spec, validation_id)
+        catalog = self._semantic_evidence_catalog(row, spec, validation_id)
         if not catalog:
             raise EngineServiceError("독립 Task validator에 제공할 직접 evidence가 없습니다.")
         self._check_semantic_evidence_fresh(catalog, Path(row["root"]))
         prompt = (
             "다음 Task 결과를 독립적으로 검사하고 지정된 JSON object만 반환하세요. "
             "worker의 완료 주장은 근거로 취급하지 마세요. 파일과 명령을 실행·수정하지 마세요. "
+            "Core가 수집한 Worker 응답 보고가 있으면 그 내용은 원본 직접 evidence와 대조하되, "
+            "응답만으로 충족을 판단하지 마세요. "
             "evidence_refs에는 제공한 catalog의 ID만 사용하세요.\n"
             f"Validation ID: {validation_id}\n"
             f"검사 지시: {step.semantic_instruction}\n"
@@ -1014,7 +1012,38 @@ class EngineDispatcher:
         )
         return spec.definition.validator, prompt, self._semantic_schema()
 
-    def _task_evidence_catalog(self, task_id: str, spec_digest: str) -> dict[str, Any]:
+    @staticmethod
+    def _semantic_validation_step(
+        spec: TaskExecutionSpecRevision, validation_id: str,
+    ) -> ValidationExecutionStep:
+        step = next(
+            (item for item in spec.definition.validation_steps if item.validation_id == validation_id),
+            None,
+        )
+        if step is None or step.method != "semantic":
+            raise EngineServiceError("validation Attempt가 semantic step에 결속되지 않았습니다.")
+        return step
+
+    def _semantic_evidence_catalog(
+        self,
+        row: Any,
+        spec: TaskExecutionSpecRevision,
+        validation_id: str,
+    ) -> dict[str, Any]:
+        step = self._semantic_validation_step(spec, validation_id)
+        return self._task_evidence_catalog(
+            row["task_id"],
+            spec.definition_digest,
+            required_evidence_kinds=step.required_evidence_kinds,
+        )
+
+    def _task_evidence_catalog(
+        self,
+        task_id: str,
+        spec_digest: str,
+        *,
+        required_evidence_kinds: tuple[str, ...] = (),
+    ) -> dict[str, Any]:
         with self.service.ledger.read() as connection:
             execution = connection.execute(
                 "SELECT id, created_at FROM attempts WHERE task_id = ? AND kind = 'execution' "
@@ -1023,11 +1052,23 @@ class EngineDispatcher:
             ).fetchone()
             if execution is None:
                 return {}
+            include_worker_report = (
+                EvidenceKind.EXTERNAL_OBSERVATION.value in set(required_evidence_kinds)
+            )
             rows = connection.execute(
-                "SELECT id, payload_json FROM evidence_records WHERE task_id = ? "
-                "AND kind IN ('file','diff','command','test','build') "
-                "AND (attempt_id = ? OR (attempt_id IS NULL AND observed_at >= ?)) ORDER BY observed_at",
-                (task_id, execution["id"], execution["created_at"]),
+                "SELECT id, payload_json FROM evidence_records WHERE task_id = ? AND ("
+                "(kind IN ('file','diff','command','test','build') "
+                "AND (attempt_id = ? OR (attempt_id IS NULL AND observed_at >= ?))) "
+                "OR (? = 1 AND kind = 'external_observation' AND attempt_id = ? "
+                "AND source_ref LIKE 'codex-thread:%' AND source_ref NOT LIKE '%:truncated')"
+                ") ORDER BY observed_at",
+                (
+                    task_id,
+                    execution["id"],
+                    execution["created_at"],
+                    int(include_worker_report),
+                    execution["id"],
+                ),
             ).fetchall()
         return {item["id"]: json.loads(item["payload_json"]) for item in rows}
 
@@ -1063,7 +1104,10 @@ class EngineDispatcher:
             "validation_id": validation_id,
         }
         if row["kind"] == AttemptKind.VALIDATION.value:
-            request["semantic_evidence_ids"] = list(self._task_evidence_catalog(row["task_id"], spec.definition_digest))
+            semantic_validation_id = validation_id or self._validation_id_from_attempt(attempt_id)
+            request["semantic_evidence_ids"] = list(
+                self._semantic_evidence_catalog(row, spec, semantic_validation_id)
+            )
         self._hit("before_thread_intent")
         create_intent = self.service.prepare_runtime_intent(
             attempt_id=attempt_id,
@@ -1313,13 +1357,16 @@ class EngineDispatcher:
             "final_response": observation.final_response,
             "payload": observation.payload,
         }
+        report_source_ref = f"codex-thread:{observation.thread_id}"
+        if len(observation.final_response or "") > 10_000:
+            report_source_ref += ":truncated"
         report = EvidenceRecord(
             evidence_id=new_id("evidence"),
             project_id=row["project_id"],
             task_id=row["task_id"],
             attempt_id=row["id"],
             kind=EvidenceKind.EXTERNAL_OBSERVATION,
-            source_ref=f"codex-thread:{observation.thread_id}",
+            source_ref=report_source_ref,
             observation=(observation.final_response or "worker turn completed")[:10_000],
             content_digest=sha256_digest(report_document),
             observed_at=utc_now(),
@@ -1413,7 +1460,9 @@ class EngineDispatcher:
                          if "semantic_evidence_ids" in item), set())
         if not set(semantic.evidence_refs).issubset(provided):
             raise EngineServiceError("validator가 제공되지 않은 evidence ref를 반환했습니다.")
-        self._check_semantic_evidence_fresh(self._task_evidence_catalog(row["task_id"], spec.definition_digest), Path(row["root"]))
+        self._check_semantic_evidence_fresh(
+            self._semantic_evidence_catalog(row, spec, validation_id), Path(row["root"])
+        )
         evidence = EvidenceRecord(
             evidence_id=new_id("evidence"),
             project_id=row["project_id"],

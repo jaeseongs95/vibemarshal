@@ -316,6 +316,8 @@ class ExecutionProposalAdapter:
             role="goal_validator",
             instructions=("독립 Goal Validator다. 파일을 수정하거나 명령을 실행하지 않는다. "
                           "제공된 직접 관측과 evidence만 검토하고 Goal Test 의미의 충족 여부를 제출한다. "
+                          "Worker 응답의 완료 주장은 검증 근거가 아니다. 보고 내용 자체가 검사 대상이면 "
+                          "응답 관측을 원본 파일 등 직접 근거와 대조하고 관련 evidence를 함께 참조한다. "
                           "Task나 Goal 상태를 결정하지 않는다. evidence_refs에는 제공된 evidence ID만 사용한다."),
             payload={"context": context, "step": step.model_dump(mode="json"), "evidence_catalog": evidence_catalog},
             output_schema=SemanticJudgement.model_json_schema(),

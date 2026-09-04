@@ -4,12 +4,15 @@
 
 ## 결론
 
-현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. 최신 재평가에서는 실제 역할 회귀 48건을 통과했고, Planning은 4/18건 중 읽기 전용 Plan 모순 1건을 확인했다. E2E에서 발견한 실행 준비 계약 검증 결함을 수정한 뒤 전체 **459개 테스트와 결정적 Gate, 실제 E2E 네 시나리오가 PASS**다. source별 근거와 남은 작업은 [최종 source 재평가 기록](final-source-requalification-20260904.md)에 정리한다.
+현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. 읽기 전용 응답 보고와 프로젝트 파일 무변경 계약을 구분하고, Worker 응답을 독립 검사의 자료로 전달하는 경로를 연결했다. 첫 수정 source에서 **실제 역할 회귀 48/48 PASS, 실제 E2E 4/4 PASS**, Planning은 **18/18건 수집 완료·12건 통과·6건 실패**다. 후속 지침까지 반영한 최종 코드의 **464개 테스트와 결정적 Gate는 PASS**다. source별 근거와 남은 작업은 [읽기 전용 보고 검증 기록](readonly-report-requalification-20260904.md)에 정리한다.
 
-역할 PASS와 부분 Planning은 이번 수정 전 source의 결과이므로 수정 후 E2E와 합쳐 같은 source의 전체 qualification으로 사용하지 않는다. Planning은 결함 수정 우선으로 중단한 상태이며 18건 전체 완료가 아니다. 최종 source의 역할·Planning과 별도 성능 Gate가 남아 있다. 이전 A4의 승인된 Goal 완료·환경 복구와 A5 저장 turn 재개는 [A4·A5 실행 기록](alpha-a4-a5-execution.md)에 보존한다.
+전체 평가 종료 후 읽기 전용 Task 종류와 로컬·외부 금지 효과 분류 지침을 추가 보완했으므로 앞선 실제 평가를 최종 source의 전체 qualification으로 사용하지 않는다. Goal 정규화의 반환 동작 계약 누락과 로컬 효과의 외부 효과 오분류를 보완한 뒤 하나의 확정 source로 기능 Gate를 대조해야 한다. 별도 성능 Gate도 남아 있다. 이전 결과는 [최종 source 재평가 기록](final-source-requalification-20260904.md)과 [A4·A5 실행 기록](alpha-a4-a5-execution.md)에 보존한다.
+
+최종 source의 읽기 전용 S02 seed 17·89 재검증도 모두 Plan 선택에 실패했다. Task 종류 오류는 관측되지 않았지만 부정형 외부 효과 오분류와 명령 미실행 조건의 evidence 누락이 남았다. 단일 override 진단의 성공으로 실제 Planning 안정성을 선언하지 않는다. 세부 원시 finding과 source binding은 위 읽기 전용 보고 검증 기록에 보존한다.
 
 ## 반영한 구현
 
+- 읽기 전용 분석 보고를 응답 본문의 논리 산출물로 명시한다. Task semantic 검사가 요구할 때 현재 성공 실행의 Worker 응답을 원본 evidence와 함께 전달하고 prompt·intent·결과 검사를 같은 catalog에 결속한다. 잘린 응답은 Task·Goal 검사에서 제외한다. 고정된 합성 lifecycle fixture와 파일 digest를 평가 계약에 결속한다.
 - Task 실행 준비의 Core 계약 결합 검사와 Goal Test의 활성 계약 일치 검사를 기존 structured recovery 안에서 수행한다. 저장 응답도 재검증하며 실제 receipt 비용은 call ID로 한 번만 보존한다. 잘못된 필드 자동 삭제나 재시도 한도 확대는 하지 않는다.
 - `ExecutionSpecProposal`을 Core가 최신 Goal·Plan·State·Project Map과 실제 model inventory에 결속해 컴파일한다.
 - Context의 모든 필수 본문과 정책이 예산 내에 남아야 컴파일한다. 부족하면 `run once`가 `CONTEXT_REQUIRED`와 누락 need·이유를 반환한다. Python AST 행 범위를 Prompt 조립에도 적용하고 파일 전체 digest로 freshness를 유지한다. 기본 운영 디렉터리와 설정된 artifact root는 Goal·State·실행 준비의 일반 source 색인에서 제외한다.

@@ -84,6 +84,7 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 - 이미 시작된 turn에서 바꾼 정책을 소급 적용된 것으로 보지 않는다.
 - 전체 권한은 Plan 승인이나 Core 상태 변경 권한을 뜻하지 않는다. 비권위성은 typed I/O, Core capability 미제공과 receipt 검증으로 유지한다.
 - `read_only` Goal은 산출물 mutation 계약이며 Codex sandbox profile을 뜻하지 않는다.
+- 파일 무변경 분석·보고의 응답 본문과 프로젝트 파일 산출물을 구분한다. 보고 key만으로 파일 생성 권한을 추정하지 않고, 응답 내용 검증과 프로젝트 파일 무변경 검증을 분리한다. 명시적 파일 요구나 더 강한 금지를 응답 보고로 바꾸지 않는다.
 
 ## Planning과 모델 배정
 

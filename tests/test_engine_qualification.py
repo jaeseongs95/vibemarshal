@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 import sqlite3
+import shutil
 from collections import defaultdict
 from pathlib import Path
 from unittest.mock import patch
@@ -129,6 +130,30 @@ class EngineQualificationTests(unittest.TestCase):
         report = verify_legacy_freeze(manifest, project_root=ROOT)
         self.assertTrue(report.passed, report)
         self.assertEqual(40, report.checked_file_count)
+
+    def test_synthetic_fixture_is_independently_bound_and_runs_without_source_mutation(self) -> None:
+        from flowmarshal.engine.smoke import run_synthetic_lifecycle
+        with tempfile.TemporaryDirectory() as temp:
+            base = Path(temp)
+            selector = Path("tests/fixtures/engine/synthetic-lifecycle-project")
+            fixture = base / selector
+            shutil.copytree(ROOT / selector, fixture)
+            before = {path.name: path.read_bytes() for path in fixture.iterdir()}
+            (base / "AGENTS.md").write_text("검사 프로젝트 밖의 큰 지침" * 20000, encoding="utf-8")
+            with patch("flowmarshal.engine.qualification.source_manifest_digest", return_value="sha256:" + "1" * 64), \
+                 patch("flowmarshal.engine.qualification.default_role_configuration", return_value=self.roles):
+                original = _deterministic_contract(base)
+                status = run_synthetic_lifecycle(project_root=fixture, database_path=base / "state.sqlite3",
+                                                artifact_root=base / "artifacts")
+                self.assertEqual("completed", status["project"]["run_state"])
+                self.assertTrue(status["history_valid"])
+                self.assertEqual(before, {path.name: path.read_bytes() for path in fixture.iterdir()})
+                (fixture / "app.py").write_text("value = 2\n", encoding="utf-8")
+                changed = _deterministic_contract(base)
+            self.assertEqual(original.fixture_digests[:3], changed.fixture_digests[:3])
+            self.assertNotEqual(original.fixture_digests[3], changed.fixture_digests[3])
+            self.assertEqual(original.fixture_digests[4], changed.fixture_digests[4])
+            self.assertNotEqual(original.contract_digest, changed.contract_digest)
 
     def test_benchmark_requires_exact_scenarios_seeds_and_one_model_lock(self) -> None:
         catalog = PlanningScenarioCatalog.load(

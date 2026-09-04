@@ -109,6 +109,10 @@ Task 준비 역할과 Goal Test 준비 역할의 입력·지침·출력은 분�
 
 Hard AC는 반드시 관측 가능해야 하고 출처를 갖는다. Soft preference는 점수화할 수 있지만 Hard AC를 대신하지 못한다. 비목표는 constraint 목록에 섞지 않고 명시적으로 보존한다.
 
+파일 무변경 상태에서 분석·보고를 요청한 Goal의 보고는 Worker 응답 본문으로 제공하는 논리적 산출물로 계획할 수 있다. `produces`의 보고 key는 프로젝트 파일 생성 권한이 아니다. 프로젝트 파일의 생성·수정·삭제 금지와 새 응답 생성을 구분하고, 응답까지 전후 무변경이어야 한다는 모순된 완료 조건을 만들지 않는다. 보고 내용은 Core가 수집한 Worker 응답 관측과 원본 파일 근거를 대조하는 semantic validation으로 검증하고, 프로젝트 파일 무변경은 별도로 검사한다. 명시적인 파일 산출물 요구나 더 강한 금지 조건은 응답 보고로 대체하거나 임의 파일 쓰기 예외로 해결하지 않는다.
+
+Task semantic 검사가 `external_observation`을 요구할 때 현재 Execution Spec의 최신 성공 실행 Attempt에 결속된 Worker 응답을 검사 대상으로 함께 제공한다. 응답의 완료 주장은 충족 증명이 아니며 보고 내용은 원본 `file` 근거와 대조한다. 검증 계약은 `model_review`, `external_observation`, `file`을 모두 요구한다. 현재 원장 관측은 10,000자까지 보존하므로 잘린 Worker 응답에는 `source_ref`의 `:truncated` 표식을 붙이고 Task·Goal semantic catalog에서 제외한다. 잘린 응답을 완전한 보고로 검증하거나 무조건 성공으로 처리하지 않는다.
+
 ### 5.2 Project Map과 State Projection
 
 Project Map은 다음 순서로 만든다.

@@ -132,7 +132,7 @@ class ExecutionAutomationTests(unittest.TestCase):
         with self.assertRaisesRegex(EngineServiceError, "STALE_EXECUTION_INPUT"):
             execution_context(service, prepared.project_id)
 
-    def validating(self, prepared, runtime):
+    def validating(self, prepared, runtime, *, worker_response=None):
         dispatcher = EngineDispatcher(prepared.service, runtime)
         dispatcher.run_once(prepared.project_id, proposal=prepared.proposal)
         dispatched = dispatcher.run_once(prepared.project_id)
@@ -140,7 +140,7 @@ class ExecutionAutomationTests(unittest.TestCase):
             row = connection.execute("SELECT binding_json FROM attempts WHERE id = ?", (dispatched.attempt_id,)).fetchone()
         binding = ThreadBinding.model_validate_json(row["binding_json"])
         (prepared.workspace / "app.py").write_text("def add(left: int, right: int) -> int:\n    return left + right\n", encoding="utf-8")
-        runtime.complete(binding.thread_id)
+        runtime.complete(binding.thread_id, response=worker_response)
         self.assertEqual(RunOnceAction.OBSERVED, dispatcher.run_once(prepared.project_id).action)
         return dispatcher
 
@@ -652,6 +652,51 @@ class ExecutionAutomationTests(unittest.TestCase):
         self.assertIn("독립 통합 검사", goal_request.instructions)
         self.assertEqual(RunOnceAction.COMPLETED, dispatcher.run_once(prepared.project_id).action)
 
+    def test_semantic_goal_report_requires_response_and_source_evidence(self):
+        required = ("model_review", "external_observation", "file")
+        for include_source, truncated in ((True, False), (False, False), (True, True)):
+            with self.subTest(include_source=include_source, truncated=truncated):
+                contract = IntegrationValidationContract(
+                    validation_id="validation_goal", statement="Worker 응답 보고를 원본 파일 근거와 대조한다.",
+                    criterion_refs=("ac_fix",), method="semantic", required_evidence_kinds=required,
+                )
+                prepared, runtime = self.prepared(name=f"report-{include_source}-{truncated}", goal_validation=contract)
+                completed = self.validating(prepared, runtime, worker_response="분석" * 6000 if truncated else "분석 보고")
+                self.assertEqual(RunOnceAction.VALIDATED, completed.run_once(prepared.project_id).action)
+                self.assertEqual(RunOnceAction.COMPLETED, completed.run_once(prepared.project_id).action)
+                with prepared.service.ledger.read() as connection:
+                    rows = connection.execute(
+                        "SELECT id, kind FROM evidence_records WHERE task_id = ? AND kind IN ('external_observation','file')",
+                        (prepared.task_id,),
+                    ).fetchall()
+                refs = [row["id"] for row in rows if (include_source or row["kind"] != "file")
+                        and (not truncated or row["kind"] != "external_observation")]
+                self.assertTrue(any(row["kind"] == "external_observation" for row in rows))
+                runner = ScriptedStructuredRoleRunner({
+                    "goal_test_preparation": [{"step": {"validation_id": "validation_goal", "method": "semantic",
+                        "semantic_instruction": "응답 보고의 주장을 파일 근거와 대조한다.",
+                        "required_evidence_kinds": list(required)}}],
+                    "goal_validator": [{"passed": True, "rationale": "보고 내용과 원본을 대조했다.", "evidence_refs": refs}],
+                })
+                dispatcher = EngineDispatcher(prepared.service, runtime,
+                    proposal_provider=ExecutionProposalAdapter(prepared.service, runner, self.roles))
+                self.assertEqual(RunOnceAction.MATERIALIZED, dispatcher.run_once(prepared.project_id).action)
+                if include_source and not truncated:
+                    self.assertEqual(RunOnceAction.VALIDATED, dispatcher.run_once(prepared.project_id).action)
+                    self.assertEqual(RunOnceAction.COMPLETED, dispatcher.run_once(prepared.project_id).action)
+                else:
+                    with self.assertRaises(EngineServiceError):
+                        dispatcher.run_once(prepared.project_id)
+                    with prepared.service.ledger.read() as connection:
+                        self.assertEqual(0, connection.execute(
+                            "SELECT COUNT(*) FROM validation_results WHERE task_id IS NULL AND status = 'pass'",
+                        ).fetchone()[0])
+                self.assertTrue(set(refs).issubset(runner.calls[-1].payload["evidence_catalog"]))
+                if truncated:
+                    self.assertFalse(any(evidence["kind"] == "external_observation"
+                                         for evidence in runner.calls[-1].payload["evidence_catalog"].values()))
+                self.assertIn("완료 주장은 검증 근거가 아니다", runner.calls[-1].instructions)
+
     def test_goal_mixed_command_file_evidence_is_collected_directly(self):
         contract = IntegrationValidationContract(
             validation_id="validation_goal", statement="통합 테스트와 파일 실재를 확인한다.",
@@ -749,6 +794,64 @@ class ExecutionAutomationTests(unittest.TestCase):
                                                                 "evidence_refs": provided}))
         self.assertEqual(RunOnceAction.OBSERVED, dispatcher.run_once(prepared.project_id).action)
         self.assertEqual(RunOnceAction.COMPLETED, dispatcher.run_once(prepared.project_id).action)
+
+    def test_task_semantic_catalog_includes_only_current_core_worker_report_when_required(self):
+        prepared, runtime = self.prepared(semantic_task_validation=True)
+        dispatcher = self.validating(prepared, runtime, worker_response="근거를 대조한 읽기 전용 분석 보고")
+        with prepared.service.ledger.read() as connection:
+            execution = connection.execute(
+                "SELECT id, execution_spec_digest FROM attempts WHERE task_id = ? "
+                "AND kind = 'execution' AND status = 'succeeded'",
+                (prepared.task_id,),
+            ).fetchone()
+            report = connection.execute(
+                "SELECT id, source_ref FROM evidence_records WHERE attempt_id = ? "
+                "AND kind = 'external_observation'",
+                (execution["id"],),
+            ).fetchone()
+        self.assertEqual("codex-thread:", report["source_ref"][:13])
+        unrelated = EvidenceRecord(
+            evidence_id=new_id("evidence"), project_id=prepared.project_id,
+            task_id=prepared.task_id, attempt_id=execution["id"],
+            kind=EvidenceKind.EXTERNAL_OBSERVATION, source_ref="fixture:external-report",
+            observation="임의 외부 제출", content_digest=sha256_digest({"fixture": "external-report"}),
+            observed_at=utc_now(),
+        )
+        prepared.service.record_evidence(unrelated)
+        without_report = dispatcher._task_evidence_catalog(
+            prepared.task_id, execution["execution_spec_digest"],
+        )
+        with_report = dispatcher._task_evidence_catalog(
+            prepared.task_id,
+            execution["execution_spec_digest"],
+            required_evidence_kinds=("external_observation",),
+        )
+        self.assertNotIn(report["id"], without_report)
+        self.assertIn(report["id"], with_report)
+        self.assertNotIn(unrelated.evidence_id, with_report)
+        self.assertEqual("근거를 대조한 읽기 전용 분석 보고", with_report[report["id"]]["observation"])
+
+    def test_task_semantic_catalog_excludes_truncated_worker_report(self):
+        prepared, runtime = self.prepared(name="truncated-report", semantic_task_validation=True)
+        dispatcher = self.validating(prepared, runtime, worker_response="x" * 10_001)
+        with prepared.service.ledger.read() as connection:
+            execution = connection.execute(
+                "SELECT id, execution_spec_digest FROM attempts WHERE task_id = ? "
+                "AND kind = 'execution' AND status = 'succeeded'",
+                (prepared.task_id,),
+            ).fetchone()
+            report = connection.execute(
+                "SELECT id, source_ref FROM evidence_records WHERE attempt_id = ? "
+                "AND kind = 'external_observation'",
+                (execution["id"],),
+            ).fetchone()
+        catalog = dispatcher._task_evidence_catalog(
+            prepared.task_id,
+            execution["execution_spec_digest"],
+            required_evidence_kinds=("external_observation",),
+        )
+        self.assertTrue(report["source_ref"].endswith(":truncated"))
+        self.assertNotIn(report["id"], catalog)
 
     def test_task_semantic_validation_rejects_invented_evidence(self):
         prepared, runtime = self.prepared(semantic_task_validation=True)

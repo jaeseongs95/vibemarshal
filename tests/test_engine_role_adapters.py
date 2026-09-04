@@ -271,6 +271,65 @@ class EngineRoleAdapterTests(unittest.TestCase):
                 project_map=self.map,
             )
 
+    def test_read_only_response_report_preserves_scope_and_reviewer_authority(self) -> None:
+        """응답 산출물의 계약 전달과 실제 모순 finding의 차단을 함께 검사한다."""
+        read_goal = goal(self.project_id, self.profile.definition_digest, read_only=True)
+        read_state = state(self.project_id, read_goal.definition_digest, self.map.revision_digest)
+        for contradictory in (False, True):
+            with self.subTest(contradictory=contradictory):
+                skeleton = _skeleton_response()
+                plan = _plan_response()
+                for task in (skeleton["candidates"][0]["tasks"][0], plan["tasks"][0]):
+                    task.update(kind="inspect", objective="원본 근거를 읽고 Worker 응답 본문으로 분석을 보고한다.",
+                                produces=["analysis_report"])
+                detailed = plan["tasks"][0]
+                detailed["acceptance_criteria"] = ["응답 보고가 원본 근거와 일치한다.", "프로젝트 파일이 변경되지 않는다."]
+                detailed["expected_effects"] = [{"effect_id": "report", "statement": "Worker 응답 본문에 분석 보고를 생성한다."}]
+                detailed["prohibited_effects"] = [{"effect_id": "no_file_change", "statement": "프로젝트 파일 생성·수정·삭제 금지"}]
+                detailed["validations"] = [
+                    {"validation_id": "validation_task", "statement": "응답 관측과 원본 파일 근거를 대조한다.",
+                     "method": "semantic", "required_evidence_kinds": ["model_review", "external_observation", "file"]},
+                    {"validation_id": "validation_unchanged", "statement": "프로젝트 파일의 전후 변경을 검사한다.",
+                     "method": "deterministic", "required_evidence_kinds": ["diff"]},
+                ]
+                plan["integration_validations"][0].update(
+                    statement="원본 근거와 응답을 독립적으로 대조해 Goal을 검증한다.", method="semantic",
+                    required_evidence_kinds=["model_review", "external_observation", "file"],
+                )
+                review = {"findings": [], "ratings": _ratings()}
+                if contradictory:
+                    detailed["acceptance_criteria"].append("새 응답 보고까지 전후 무변경이어야 한다.")
+                    review = {"findings": [{
+                        "finding_code": "ENG_READ_ONLY_OUTPUT_CONTRADICTION", "gate": "engineering",
+                        "severity": "error", "summary": "새 응답 생성과 응답 무변경 조건이 충돌한다.",
+                        "evidence_refs": ["artifact:plan_contract"], "affected_task_refs": ["task_one"],
+                        "remediable": True,
+                    }]}
+                runner = ScriptedStructuredRoleRunner({
+                    "skeleton_generator": [skeleton],
+                    "skeleton_reviewer": [{"findings": [], "ratings": _ratings()}],
+                    "plan_expander": [plan], "compact_plan_reviewer": [review],
+                })
+                options = dict(model="worker", effort="high", inventory_digest=self.inventory.inventory_digest, cwd=self.root)
+                outcome = SkeletonFirstPlanner(
+                    SkeletonGeneratorAdapter(runner, **options), SkeletonReviewerAdapter(runner, **options),
+                    PlanExpanderAdapter(runner, RuleBasedTaskAssigner(assignment(), assignment(), assignment()), **options),
+                    PlanReviewerAdapter(runner, **options),
+                ).search(goal=read_goal, state=read_state, project_map=self.map)
+                self.assertEqual(not contradictory, outcome.selected_activation_digest is not None)
+                result = outcome.plan_evaluations[0]
+                self.assertEqual(CandidateStatus.NEEDS_REVISION if contradictory else CandidateStatus.ADMISSIBLE,
+                                 result.decision.status)
+                self.assertEqual(tuple(detailed["acceptance_criteria"]), result.plan.definition.tasks[0].acceptance_criteria)
+                self.assertEqual("read_only", runner.calls[2].payload["goal"]["effect_policy"]["mutation_policy"])
+                for call in (runner.calls[0], runner.calls[2]):
+                    self.assertIn("Worker 응답 본문", call.instructions)
+                    self.assertIn("파일 쓰기 예외를 발명하지 않는다", call.instructions)
+                    self.assertIn("inspect 또는 decide", call.instructions)
+                self.assertIn("한 항목에 두 범위를 섞지 않는다", runner.calls[2].instructions)
+                self.assertEqual(["model_review", "external_observation", "file"],
+                                 list(result.plan.definition.tasks[0].validations[0].required_evidence_kinds))
+
     def test_review_draft_requires_findings_xor_ratings(self) -> None:
         with self.assertRaisesRegex(ValueError, "fitness rating"):
             ReviewDraft.model_validate({"findings": [], "ratings": None})
