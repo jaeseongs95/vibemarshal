@@ -4,9 +4,13 @@
 
 ## 결론
 
-현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [R-S06-06](r-s06-06-handoff.md)에서 정상 비교 입력의 검사 ID 연결, 모든 Task·integration 검사 원문을 펼친 비권위 Reviewer 색인과 provider 작성·검토 설명을 보완했다. **최종 source의 496개 테스트·결정적 Gate 5/5·legacy freeze 40개와 실제 호출 결속 검증은 PASS지만, 제한된 실제 진단은 FAIL**이다. 중간 schema 이름 참조 테스트 실패와 당시 source, 두 실제 진단의 원본을 모두 보존했다.
+현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [R-S06-07](r-s06-07-handoff.md)에서 복합 검사 ID 연결과 Worker·Validator 결과 순서의 생성·검토 지침 및 합성 회귀를 보완했다. **497개 테스트·결정적 Gate 5/5·legacy freeze 40개와 실제 호출 결속 검증은 PASS지만, 제한 진단은 FAIL**이다. 기존 입력·기준·source별 결과와 평가 스크립트 오류의 provenance를 보존했다.
 
-최종 진단의 정상·Task phase 과장·Goal phase 오지정·별도 실제 검사 책임 사례 4개는 기대한 결과를 냈고 새 상세화도 phase 범위를 보존했다. 그러나 새 Plan의 `ac_003`에서 기존 unittest를 실행하는 `val_task_oracle` ID가 다시 빠졌고, 분리 Validator의 결과를 Worker 응답으로 제출하라는 역할·시점 충돌이 생겼다. Reviewer는 finding 없이 모든 rating을 4로 반환했으며 읽기 전용 Core 재계산상 score 100의 `admissible`이다. 실제 Plan 등록·선택·활성화는 없었다. 다음 작업은 **R-S06-07: 검사 ID 연결·Worker와 Validator의 결과 제출 경계 보완**이다. 새 S06과 Worker 실행은 수행하지 않았다.
+새 상세화는 `ac_003` 검사 연결과 Worker 보고→후속 Validator 순서를 보존했지만, `ac_004`가 명시한 task phase의 검사 ID를 누락했다. 일반 Reviewer는 고정 연결 오류를 놓쳤고 전역 semantic Task 검증을 AC별 필수 ID로 확대해 정상 후보를 거부했다. 동일 요청·지침·high effort에서 Reviewer 모델만 Terra→Sol로 바꾼 4사례 비교는 목표 오류 3개 중 검출이 1개→3개로 늘었으나, Sol에도 근거 부족 추가 지적이 남았다. 기본 모델 배정이나 전체 qualification을 변경하지 않았다.
+
+추천 분석 항목은 **R-S06-08: AC가 명시한 검사 책임과 전역 Task 검증 의무의 연결 경계 정밀화**다. 현재 단계는 결과 인계까지 마치고, 후속 해결안 탐색과 개발 배정은 분석·조율 작업에서 결정한다. 후속 S06은 오프라인 준비만 했으며 Plan 선택·활성화·Worker 실행·새 예약작업·작업관리 DB 생성은 수행하지 않았다.
+
+이전 [R-S06-06](r-s06-06-handoff.md)의 496개 테스트와 제한 진단 FAIL은 당시 source의 역사적 결과다. 고정 phase 4사례 통과와 새 Plan의 검사 연결·역할 시점 결함 검출 누락을 현재 qualification으로 재사용하지 않는다.
 
 이전 [R-S06-05](r-s06-05-handoff.md)의 495개 테스트·결정적 Gate 통과와 실제 진단 FAIL은 당시 source의 역사적 결과로 보존한다. 정상 입력 분류 오류, 잘못된 Goal phase의 검출 누락과 다른 결함에 의한 후보 차단을 현재 qualification으로 재사용하지 않는다.
 

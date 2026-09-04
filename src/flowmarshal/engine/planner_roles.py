@@ -159,6 +159,37 @@ PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS = (
 )
 
 
+PLAN_VALIDATION_TRACE_INSTRUCTIONS = (
+    "상세 Plan의 검사 연결은 각 AC에서 필요한 검사로, 각 검사에서 해당 AC로 양방향 대조한다. "
+    "먼저 Goal의 statement·validation_intent에서 검사 대상·절차·적용 Task 범위를 확인한다. "
+    "다음으로 모든 validation.statement 전체를 읽어 그 요구를 실제 수행하는 검사 ID를 찾고 "
+    "해당 goal_coverage.validation_ids와 비교한다. ID 이름이나 대표 검사 하나로 판단하지 않는다. "
+    "한 검사가 파일 보존·공개 계약·기존 테스트 실행을 함께 맡으면 그 문장 안의 각 검사 책임을 "
+    "각각 해당 AC에 연결한다. 예를 들어 각 Task의 기존 테스트 실행을 요구하는 AC에는, 이름에 "
+    "test가 없어도 그 실행을 포함하는 복합 Task 검사 ID가 필요하다. 다른 Task나 Goal 검사 "
+    "ID가 이미 연결되어 있어도 적용 대상 Task의 필수 검사 연결을 대신하지 않는다. "
+    "검사 자체가 존재하지만 ID만 빠진 경우에는 연결 누락으로 지적하고 실행 누락이나 새 검사 "
+    "추가 의무로 바꾸지 않는다. 단순 선후조건, 같은 파일·evidence 종류나 선택적 부가 검사만으로 "
+    "모든 AC에 연결하지 않는다. Reviewer는 Goal·검사 원문·실제 coverage를 직접 evidence로 "
+    "대조하고, 작성자는 동일한 기준으로 검사 문장과 연결을 함께 완성한다."
+)
+
+
+PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS = (
+    "Task 실행 순서는 Worker의 작업·응답 제출 → Core의 evidence 수집과 해당 Task 검증 "
+    "→ Task 완료 판정이다. Worker 실행 종료와 Task 검증 완료를 구분한다. Worker는 자기 작업·"
+    "관측·산출물 근거를 제출하고, 이후 독립 Validator가 이를 검토해 별도 결과를 제출한다. "
+    "Task 완료 조건에 독립 Validator 통과를 요구하는 것은 정상이다. 다만 그 후속 Validator "
+    "결과를 같은 Task의 Worker 응답·산출물에 포함하거나 Worker 종료 전에 확보하라고 요구하면 "
+    "생성·소비 순서의 충돌이다. produces·consumes·preconditions·acceptance_criteria와 validation "
+    "입력을 함께 대조한다. 이미 검증된 선행 Task의 Validator 결과를 후속 Task가 인용하는 것은 "
+    "허용하며, 자신의 미래 검토 결과를 인용하는 경우와 구분한다. read_only 응답 보고의 작성 "
+    "주체를 자동으로 Worker로 지정해 후속 Validator의 독립 보고까지 Worker에게 전가하지 않는다. "
+    "Reviewer는 충돌한 완료 조건·검사 입력을 직접 근거로 제출한다. 자연어의 시점 충돌을 명시적 "
+    "DAG cycle이나 실제 관측된 runtime 교착으로 확대하지 않는다."
+)
+
+
 class PlannerRoleAdapterError(RuntimeError):
     pass
 
@@ -166,7 +197,7 @@ class PlannerRoleAdapterError(RuntimeError):
 class PlanReviewDraft(ReviewDraft):
     findings: tuple[FindingDraft, ...] = Field(
         default=(),
-        description="직접 확인한 Plan 계약 결함. 검사 statement가 명시한 수단·phase의 실제 범위와 모순되면 validation ID와 양쪽 근거를 finding에 보존한다. 다른 결함의 finding이나 낮은 rating으로 그 모순을 대신하지 않는다. 같은 원인의 중복·추측은 제외한다.",
+        description="직접 확인한 Plan 계약 결함. 검사 수단·phase의 범위, 복합 검사 문장 전체와 AC의 필수 ID 연결, Worker 산출물과 후속 Validator 입력·결과 순서를 각각 대조한다. 연결 누락과 실행 누락, Task의 Validator 통과 조건과 Worker가 미래 검토 결과를 미리 제출하는 충돌을 구분한다. 독립 결함은 각각 직접 evidence로 제출하고 다른 finding이나 낮은 rating으로 대신하지 않는다. 같은 원인의 중복·추측은 제외한다.",
     )
     ratings: ReviewRatings | None = Field(
         default=None,
@@ -237,7 +268,7 @@ class DetailedTaskDraft(EngineModel):
     expected_effects: tuple[EffectContract, ...] = Field(default=(), description="Task가 실제 발생시키는 효과만 포함한다. 파일 무변경·외부 효과 없음 같은 미발생 조건은 금지 효과나 완료 조건에 둔다.")
     prohibited_effects: tuple[EffectContract, ...] = Field(default=(), description="Task가 발생시키면 안 되는 효과. 로컬 파일 mutation과 외부 시스템 효과를 별도 항목으로 작성하고 각 external 값을 해당 범위에 맞춘다.")
     required_capabilities: tuple[str, ...] = ()
-    acceptance_criteria: tuple[str, ...] = Field(min_length=1)
+    acceptance_criteria: tuple[str, ...] = Field(min_length=1, description="Worker 작업·응답 제출 뒤 검증까지 포함한 Task 완료 조건. 독립 Validator 통과는 정상 조건이나, Worker 응답을 입력으로 나중에 수행하는 Validator의 결과를 같은 Worker가 미리 제출하도록 요구하지 않는다. Worker의 실행 보고와 Validator의 별도 검사 결과를 구분한다.")
     validations: tuple[PlanTaskValidationDraft, ...] = Field(min_length=1, description="이 Task 완료 전에 필요한 실제 검사 계약. statement에 Goal이 이 Task에 요구한 검사 대상·종류·실행 목적을 보존하고 method·필수 evidence 종류를 함께 명시한다. 등록 도구·phase를 참조하면 제공된 자료의 실제 검사 범위와 일치해야 한다. 부족한 필수 검사는 별도 검사 책임으로 명시하며 다른 phase의 능력을 부여하지 않는다. 기존 unittest 실행 요구를 일반 동작 확인이나 test enum만으로 대체하지 않는다. 후속 Task 검사, 모델 배정, AC 문장이나 integration validation으로 자체 필수 검증을 대체하지 않는다.")
     risk_level: RiskLevel
     risk_tags: tuple[str, ...] = ()
@@ -255,7 +286,7 @@ class PlanDependencyDraft(EngineModel):
 class PlanGoalCoverageDraft(EngineModel):
     criterion_id: str
     task_refs: tuple[str, ...] = Field(min_length=1, description="Skeleton의 해당 AC 기여 Task 집합을 그대로 보존한다. validation_ids 소유 Task의 허용 목록이 아니며 검사 ID를 연결하려고 이 집합을 확대하지 않는다.")
-    validation_ids: tuple[str, ...] = Field(min_length=1, description="해당 AC를 검사하는 실제 Task 또는 integration validation ID. Goal의 요구가 적용되는 Task는 task_refs에 없어도 자체 필수 검사 ID를 모두 연결한다. task_refs로 검사 소유 Task를 제한하지 않는다. Core의 독립 Goal Test는 integration validation ID로 연결한다.")
+    validation_ids: tuple[str, ...] = Field(min_length=1, description="해당 AC를 검사하는 실제 Task 또는 integration validation ID. 모든 검사 statement의 복합 책임을 읽고 AC의 statement·validation_intent·적용 범위와 대조한다. 다른 ID가 이미 연결되어도 해당 요구를 수행하는 필수 Task 검사 ID를 빠뜨리지 않는다. Goal의 요구가 적용되는 Task는 task_refs에 없어도 자체 필수 검사 ID를 모두 연결하며 소유 Task를 task_refs로 제한하지 않는다. 단순 선후조건이나 선택적 부가 검사로 전체 ID를 일괄 연결하지 않는다. Core의 독립 Goal Test는 integration validation ID로 연결한다.")
 
 
 class PlanExpansionDraft(EngineModel):
@@ -621,7 +652,7 @@ class PlanExpanderAdapter:
                 "의미 검사는 원본 file 근거와 응답 관측을 함께 참조하는 semantic validation으로 "
                 "계약하고 required_evidence_kinds에 model_review·external_observation·file을 모두 "
                 "요구한다. 이는 외부 시스템 변경 효과를 뜻하지 않는다."
-            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS + PLAN_VALIDATION_TRACE_INSTRUCTIONS + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(sha256_digest(candidate)),
                 "goal": goal.definition.model_dump(mode="json"),
@@ -814,7 +845,7 @@ class PlanReviewerAdapter:
                 "각 행의 statement를 등록 자료의 실제 수단·phase와 대조하고 마지막 integration 행까지 "
                 "확인한다. linked_criterion_ids는 현재 연결 사실이며 필수 연결의 판정이 아니다. "
                 "색인 자체를 새 evidence ref나 별도 권위로 사용하지 않고 finding은 원본 evidence_catalog에 결속한다."
-            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + PLAN_VALIDATION_TRACE_INSTRUCTIONS + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(digest),
                 "evidence_catalog": evidence_catalog,

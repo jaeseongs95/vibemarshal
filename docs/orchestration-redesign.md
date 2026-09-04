@@ -203,6 +203,10 @@ Goal이 각 Task 또는 특정 범위 Task의 완료 전에 요구한 검증은 
 
 ### 6.1 Reviewer와 Core 판정
 
+검사 연결은 Goal의 statement·validation_intent·적용 범위와 모든 검사 문장의 복합 책임을 양방향 대조한다. ID 이름이나 이미 연결된 대표 검사만으로 필수 Task 검사 ID를 생략하지 않는다. 연결만 빠졌다면 실행 누락이나 새 검사 의무로 확대하지 않으며 단순 선후조건·선택적 부가 검사를 모든 AC에 연결하지 않는다. 상세화와 Reviewer는 같은 기준을 공유하며 Goal·검사 원문·현재 coverage를 직접 근거로 사용한다.
+
+Worker의 작업·응답 제출, 이후 Task 검증과 Core의 완료 판정을 구분한다. Task 완료 조건에 독립 Validator 통과를 요구할 수 있지만, Worker 응답을 입력으로 뒤에 수행하는 Validator의 결과를 같은 Worker가 미리 제출하도록 요구하지 않는다. 검증된 선행 Task 결과의 후속 인용은 허용하며 자연어 시점 충돌을 실제 runtime 교착으로 단정하지 않는다. produces·consumes·preconditions·완료 조건과 validation 입력을 함께 대조하여 Worker 실행 보고와 Validator의 별도 검사 결과를 구분한다.
+
 검증 계약의 `statement`는 Goal이 명시한 검사 대상·종류·실행 목적을 보존한다. `required_evidence_kinds`의 `test`는 evidence 종류이며 특정 검사 절차를 보장하지 않는다. 기존 unittest 실행을 요구했다면 적용 대상 Task의 검사 문장에도 해당 실행·통과 확인을 보존하고 일반 동작 검사로 바꾸지 않는다. 실제 명령은 ready-time Execution Spec에서 확정한다.
 
 상세 Plan의 Task·integration validation이 등록 검사 도구·자료의 phase·mode·절차를 참조하면 상세화와 Reviewer는 등록 경로의 관련 본문과 필요한 구현 분기를 읽어 실제 검사 범위를 대조한다. 같은 도구의 다른 phase가 수행하는 검사를 합쳐 설명하거나 선언·시그니처 검사를 실제 입력·호출 방식 검사로 확대하지 않는다. Goal의 검사 목적과 수단의 실제 능력을 구분하며, 부족한 필수 검사는 별도 실제 검사 책임으로 보존한다. Goal이 Task에 요구하지 않은 검사를 일괄 추가하지 않고 정상 Task 검사와 독립 Goal Test의 범위 차이를 허용한다. 도구·phase 참조로 검사 의미를 식별하는 것은 계획 단계에서 허용하되 argv 등 운영 상세는 ready-time에 확정한다. 이미 명시된 phase와 검사 의미의 충돌은 Plan Contract 결함이며 새 revision으로 수정한다. 자료 부족과 직접 확인된 모순을 구분하고 원래 검사 의무나 합격선을 약화하지 않는다.
