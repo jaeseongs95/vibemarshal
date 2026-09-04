@@ -16,14 +16,14 @@ class InspectionCitation(EngineModel):
     citation_id: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_]{0,59}$")
     source_ref: str = Field(description="Goal/Plan 원문 ref 또는 정확한 project:<entry_id>. 등록 자료의 검사 범위는 inspection_source_catalog의 정식 project ref로 인용한다.")
     selector: str = Field(description="source_ref 원문 값에 대한 RFC 6901 JSON pointer. 파일 본문은 /content.")
-    quote: str = Field(min_length=1, max_length=240, description="선택한 문자열에 그대로 존재하는 짧은 연속 인용. 요약·생략 기호를 삽입하지 않는다.")
+    quote: str = Field(min_length=1, max_length=5000, description="선택한 문자열에 그대로 존재하는 연속 인용. AC 행의 validation statement 인용은 해당 문장 전체와 같아야 하며, 요약·생략 기호를 삽입하지 않는다.")
 
 
 class ACValidationInspection(EngineModel):
     criterion_id: str
     validation_id: str
     relation: Literal["explicit_procedure", "global_constraint_only", "optional_or_unrelated"] = Field(description="AC 연결 의무의 출처 분류. 필수가 아닌 기존 선택적 연결을 금지한다는 뜻이 아니다.")
-    basis_refs: tuple[str, ...] = Field(min_length=2, description="해당 AC와 validation statement 인용 ID. global_constraint_only이면 constraint 원문도 포함한다.")
+    basis_refs: tuple[str, ...] = Field(min_length=2, description="해당 AC의 statement·validation_intent 각각과 validation statement 전체 인용 ID. global_constraint_only이면 constraint 원문도 포함한다.")
     finding_codes: tuple[str, ...] = Field(description="explicit_procedure인데 현재 ID 연결이 없는 경우만 missing_validation_link finding. 나머지는 빈 배열.")
 
 
@@ -82,14 +82,18 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "selector=/content를 반드시 사용한다. 함께 제공한 content는 content_digest로 검증한 UTF-8 "
     "원문이다. Goal source_traces의 복제 본문이나 배열 번호로 등록 파일의 주소를 재구성하지 않는다. "
     "그 밖의 Project Map 파일도 정확한 entry_id와 /content로 실제 본문을 인용한다. 파일 인용은 "
-    "finding의 source:project_map evidence에 대응한다. 모든 quote는 240자 이내의 연속 원문이며 "
-    "의역·생략 표시를 넣지 않는다. 등록 문서가 부족하면 관련 구현도 읽되 제공된 원문으로 "
+    "finding의 source:project_map evidence에 대응한다. quote는 연속 원문이며 의역·생략 표시를 "
+    "넣지 않는다. AC × validation 행의 validation statement 인용은 문장 전체를 그대로 쓴다. 등록 문서가 부족하면 관련 구현도 읽되 제공된 원문으로 "
     "확인한 범위만 주장한다. "
     "모든 AC × 모든 Task·integration validation 쌍을 ac_validation_rows에 정확히 한 번씩 쓴다. "
     "작성자는 완성한 plan의 모든 validation ID에서 이 곱집합을 구성한다. 각 행에서 AC가 "
     "명시한 절차(explicit_procedure), 전역 constraint만의 의무(global_constraint_only), 선택적·무관 "
-    "관계(optional_or_unrelated)를 구분한다. AC와 검사 statement 인용을 모두 연결하고 전역 의무이면 "
-    "constraint 인용도 붙인다. 다른 ID가 연결되어도 AC가 명시한 복합 검사 절차 ID를 빠뜨리지 않는다. "
+    "관계(optional_or_unrelated)를 구분한다. 모든 행의 basis_refs에는 해당 AC의 비어 있지 않은 "
+    "statement와 validation_intent를 각각 인용하고 validation statement 전체 인용도 연결한다. 전역 의무이면 "
+    "constraint 인용도 붙인다. validation_rows의 mechanism으로 등록 자료·구현을 검사 범위 판단에 "
+    "사용했다면 그 정확한 project:<entry_id>/content citation_id를 같은 validation의 모든 AC 관계 행 "
+    "basis_refs에도 재사용해 두 판단을 함께 추적한다. 같은 "
+    "citation_id를 여러 행에서 재사용할 수 있다. 다른 ID가 연결되어도 AC가 명시한 복합 검사 절차 ID를 빠뜨리지 않는다. "
     "반대로 검사 문장의 연관 표현·전역 의무만으로 AC 명시 절차로 분류하지 않는다. relation은 "
     "연결 의무의 출처이며 선택적 연결 금지가 아니다. global_constraint_only 또는 "
     "optional_or_unrelated여도 기존 연결을 허용하고 그 이유만으로 finding을 만들지 않는다. "
@@ -99,7 +103,12 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "보존하고 누락 책임의 missing_task_validation finding을 함께 연결한다. 검사 자체의 존재와 "
     "AC 연결 누락을 구분하고, 실제 수단 범위 모순은 validation_rows에 둔다. "
     "모든 validation을 validation_rows에 한 번씩 쓰고 주장·도구·phase·등록 범위와 같은 문장의 "
-    "별도 실제 실행 및 기대값 비교 책임을 구분한다. 독립 결함은 각각 finding과 finding_links로 "
+    "별도 실제 실행 및 기대값 비교 책임을 구분한다. 도구·phase는 실제 실행 절차와 그 절차가 관측하는 "
+    "범위만 나타내며, 검사 목적을 덧붙인 문장만으로 새 절차나 다른 phase의 능력을 만들지 않는다. "
+    "Task validation과 independent Goal validation의 scope·소유자를 구분하고, 전역 Task 검사 책임의 "
+    "출처와 AC 연결 책임의 출처를 섞지 않는다. 같은 절차가 여러 적용 Task에서 실제 수행되면 각 ID의 "
+    "필수 연결을 개별 대조하되, 선택 AC 연결은 유지한다. 도구·phase 언급이나 별도 검사 ID가 있다는 "
+    "사실만으로 다른 AC에 연결 의무를 전염시키지 않는다. 독립 결함은 각각 finding과 finding_links로 "
     "연결한다. finding_code는 제출물 안에서 유일해야 한다. finding_links는 AC·validation·Task ID와 "
     "직접 원문 인용을 지정하고 finding.evidence_refs에는 그 인용의 원본 evidence ref를 모두 포함한다. "
     "연결 누락 행은 Goal AC·validation statement·현재 coverage 인용을, 범위 모순 행은 검사 주장과 "
@@ -112,7 +121,8 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "unresolved 검사는 각각 validation_scope 또는 insufficient_evidence finding에 연결한다. "
     "독립적으로 확인한 다른 결함을 이미 제출한 finding이나 낮은 rating으로 대신하지 않는다. "
     "작성자는 결함을 보정한 완성 plan과 대조표를 제출하므로 finding_links와 모든 finding_codes는 "
-    "비운다. adapter는 원문·집합·내부 일관성만 검사하며 의미 정답을 추정하거나 Plan을 수정하지 않는다."
+    "비운다. adapter는 selector·quote·ref·행 집합과 내부 일관성만 검사하며 관계 의미 정답을 추정하거나 "
+    "coverage를 보정하거나 Plan을 수정하지 않는다."
 )
 
 
@@ -194,8 +204,13 @@ def validate_plan_inspection(
     validation_by_id = {row["validation_id"]: row for row in targets["validations"]}
     _unique((row["validation_id"] for row in targets["validations"]), "입력 validation ID")
     task_by_ref = {task.task_ref: task for task in definition.tasks}
-    criterion_selectors = {item.criterion_id: {f"/hard_acceptance/{i}/statement", f"/hard_acceptance/{i}/validation_intent"}
-                           for i, item in enumerate(goal.definition.hard_acceptance)}
+    criterion_selectors = {
+        item.criterion_id: {
+            "statement": f"/hard_acceptance/{i}/statement",
+            "validation_intent": f"/hard_acceptance/{i}/validation_intent",
+        }
+        for i, item in enumerate(goal.definition.hard_acceptance)
+    }
     constraint_selectors = {item.constraint_id: f"/constraints/{i}/statement"
                             for i, item in enumerate(goal.definition.constraints)}
     coverage = {item.criterion_id: item for item in definition.goal_coverage}
@@ -224,13 +239,30 @@ def validate_plan_inspection(
             _require(validation is None or validation in link.validation_ids, "대조표 finding validation 불일치")
             _require(task is None or task in link.task_refs, "대조표 finding Task 불일치")
 
+    mechanism_project_refs_by_validation: dict[str, set[str]] = {}
+    for validation_row in inspection.validation_rows:
+        mechanism_project_refs_by_validation[validation_row.validation_id] = {
+            citation.citation_id for mechanism in validation_row.mechanisms
+            for citation in refs(mechanism.basis_refs)
+            if citation.source_ref in entries
+        }
+
     pairs = _unique(((row.criterion_id, row.validation_id) for row in inspection.ac_validation_rows), "AC 검사 행")
     _require(pairs == {(row["criterion_id"], row["validation_id"]) for row in targets["ac_validation_pairs"]},
              "대조표 AC 검사 행 집합 불완전")
     for row in inspection.ac_validation_rows:
-        _require(has(row.basis_refs, "source:goal", criterion_selectors[row.criterion_id]), "대조표 해당 AC 인용 누락")
+        criterion = criterion_selectors[row.criterion_id]
+        _require(has(row.basis_refs, "source:goal", {criterion["statement"]}), "대조표 해당 AC statement 인용 누락")
+        _require(has(row.basis_refs, "source:goal", {criterion["validation_intent"]}), "대조표 해당 AC validation_intent 인용 누락")
         validation = validation_by_id[row.validation_id]
-        _require(has(row.basis_refs, plan_ref, {validation["selector"] + "/statement"}), "대조표 해당 검사 인용 누락")
+        validation_selector = validation["selector"] + "/statement"
+        validation_statement = _pointer(sources[plan_ref], validation_selector)
+        _require(any(
+            item.source_ref == plan_ref and item.selector == validation_selector and item.quote == validation_statement
+            for item in refs(row.basis_refs)
+        ), "대조표 해당 검사 전체 문장 인용 누락")
+        _require(mechanism_project_refs_by_validation.get(row.validation_id, set()) <= set(row.basis_refs),
+                 "대조표 AC 관계 등록 자료 인용 누락")
         if row.relation == "global_constraint_only":
             _require(has(row.basis_refs, "source:goal", set(constraint_selectors.values())), "대조표 전역 constraint 인용 누락")
         missing = row.relation == "explicit_procedure" and row.validation_id not in coverage[row.criterion_id].validation_ids
@@ -240,8 +272,10 @@ def validate_plan_inspection(
             ci = next(i for i, item in enumerate(definition.goal_coverage) if item.criterion_id == row.criterion_id)
             for code in row.finding_codes:
                 basis = links[code].basis_refs
-                _require(has(basis, "source:goal", criterion_selectors[row.criterion_id]) and
-                         has(basis, plan_ref, {validation["selector"] + "/statement"}) and
+                _require(has(basis, "source:goal", {criterion["statement"]}) and
+                         has(basis, "source:goal", {criterion["validation_intent"]}) and
+                         any(item.source_ref == plan_ref and item.selector == validation_selector and item.quote == validation_statement
+                             for item in refs(basis)) and
                          any(item.source_ref == plan_ref and item.selector.startswith(f"{prefix}/goal_coverage/{ci}/validation_ids/")
                              for item in refs(basis)), "대조표 연결 finding의 직접 근거 누락")
         else:

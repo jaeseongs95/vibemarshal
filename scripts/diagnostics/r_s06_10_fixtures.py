@@ -18,8 +18,8 @@ from flowmarshal.engine.domain import PlanContractRevision
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EXPECTATIONS_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v2-expectations.json"
-INDEPENDENT_REVIEW_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v2-independent-fixture-review.json"
+EXPECTATIONS_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v3-expectations.json"
+INDEPENDENT_REVIEW_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v3-independent-fixture-review.json"
 LEGACY_EXPECTATIONS_PATH = ROOT / "tests/fixtures/engine/plan-inspection-expectations.json"
 SOURCE_INPUT_FILENAMES = (
     "input-bad-plan.json",
@@ -169,6 +169,42 @@ def _independent_fixture_review(
     ):
         raise FixtureRevisionError("독립 fixture review의 case·기대값 결속이 다릅니다.")
     return review
+
+
+def verify_reviewed_case(
+    case_id: str, payload: dict[str, Any], expectations: dict[str, Any], review: dict[str, Any],
+) -> None:
+    """사전 검토한 문장·소유 단계·method·mode와 직접 인용을 실제 요청에 재대조한다."""
+    if sha256_digest(payload["evidence_catalog"]["source:goal"]) != review["case_goal_contract_digests"][case_id]:
+        raise FixtureRevisionError("CASE_REVIEWED_GOAL_CONTRACT_MISMATCH")
+    if sha256_digest(payload["evidence_catalog"]["artifact:plan_contract"]) != review["case_plan_contract_digests"][case_id]:
+        raise FixtureRevisionError("CASE_REVIEWED_PLAN_CONTRACT_MISMATCH")
+    expected = expectations["case_validation_scope_rows"][case_id]
+    actual = payload["validation_scope_rows"]
+    if len(expected) != len(actual):
+        raise FixtureRevisionError("CASE_REVIEWED_VALIDATION_SET_MISMATCH")
+    for checked, provided in zip(expected, actual, strict=True):
+        projected = {"validation_id": provided["validation_id"], "statement": provided["statement"],
+                     "owner_scope": "goal" if provided["scope"] == "integration" else "task",
+                     "owner_task_ref": provided["task_ref"], "method": provided["method"],
+                     "evidence_mode": provided["evidence_mode"]}
+        if any(checked[key] != value for key, value in projected.items()):
+            raise FixtureRevisionError("CASE_REVIEWED_VALIDATION_CONTRACT_MISMATCH")
+    sources = dict(payload["evidence_catalog"]) | {
+        ref: value for ref, value in payload["inspection_source_catalog"].items() if ref.startswith("project:")
+    }
+    rows = expectations["case_ac_validation_rows"][case_id] + expected
+    for ref in {ref for row in rows for ref in row["basis_refs"]}:
+        citation = review["citations"][ref]
+        source = sources[citation["source_ref"]]
+        selected = source
+        for token in citation["selector"][1:].split("/"):
+            token = token.replace("~1", "/").replace("~0", "~")
+            selected = selected[int(token)] if isinstance(selected, (list, tuple)) else selected[token]
+        if not isinstance(selected, str) or citation["quote"] not in selected:
+            raise FixtureRevisionError("CASE_REVIEWED_CITATION_MISMATCH")
+        if "content_digest" in citation and source.get("content_digest") != citation["content_digest"]:
+            raise FixtureRevisionError("CASE_REVIEWED_SOURCE_DIGEST_MISMATCH")
 
 
 def build_revision(source_run: Path, destination: Path) -> None:

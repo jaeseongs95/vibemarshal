@@ -93,8 +93,57 @@ def _make_constraint_citations(payload: dict, goal: GoalContractRevision) -> Non
         payload["inspection"]["constraint_task_rows"][row_index]["basis_refs"].append(citation_id)
 
 
+def _make_ac_statement_citations(payload: dict, goal: GoalContractRevision) -> None:
+    """원시 intent 인용은 유지하고, 현재 adapter 계약의 statement 인용만 명시적으로 보완한다."""
+    goal_data = goal.definition.model_dump(mode="json")
+    statement_refs = {}
+    intent_refs = {}
+    for index, criterion in enumerate(goal_data["hard_acceptance"], start=1):
+        citation_id = f"C_AC{index}_STATEMENT"
+        payload["inspection"]["citations"].append({
+            "citation_id": citation_id,
+            "source_ref": "source:goal",
+            "selector": f"/hard_acceptance/{index - 1}/statement",
+            "quote": criterion["statement"],
+        })
+        statement_refs[criterion["criterion_id"]] = citation_id
+        intent_refs[criterion["criterion_id"]] = next(
+            item["citation_id"]
+            for item in payload["inspection"]["citations"]
+            if item["source_ref"] == "source:goal" and
+            item["selector"] == f"/hard_acceptance/{index - 1}/validation_intent"
+        )
+    for row in payload["inspection"]["ac_validation_rows"]:
+        row["basis_refs"].append(statement_refs[row["criterion_id"]])
+    for link in payload["inspection"]["finding_links"]:
+        for criterion_id in link["criterion_ids"]:
+            for citation_id in (statement_refs[criterion_id], intent_refs[criterion_id]):
+                if citation_id not in link["basis_refs"]:
+                    link["basis_refs"].append(citation_id)
+
+
+def _link_registered_mechanism_citations(payload: dict) -> None:
+    """검사 범위 판단에 쓴 정식 project citation을 같은 validation의 모든 AC 행에 재사용한다."""
+    citations = {item["citation_id"]: item for item in payload["inspection"]["citations"]}
+    project_refs_by_validation = {
+        row["validation_id"]: {
+            reference
+            for mechanism in row["mechanisms"]
+            for reference in mechanism["basis_refs"]
+            if citations[reference]["source_ref"].startswith("project:")
+        }
+        for row in payload["inspection"]["validation_rows"]
+    }
+    for row in payload["inspection"]["ac_validation_rows"]:
+        for reference in project_refs_by_validation[row["validation_id"]]:
+            if reference not in row["basis_refs"]:
+                row["basis_refs"].append(reference)
+
+
 def _clean_non_target_conflicts(payload: dict, goal: GoalContractRevision) -> dict:
     _formalize_reference_addresses(payload)
+    _make_ac_statement_citations(payload, goal)
+    _link_registered_mechanism_citations(payload)
     _make_constraint_citations(payload, goal)
     _remove_finding(payload, "F003")
     _remove_finding(payload, "F004")
@@ -122,6 +171,11 @@ def _validate(payload: dict, *, goal_data: dict | None = None):
 
 
 class RawPlanInspectionRegressionTests(unittest.TestCase):
+    def test_v1_raw_response_without_ac_statement_citations_is_rejected(self):
+        """주소 오류를 분리해도 원시 AC basis는 새 계약을 만족하지 않는다."""
+        with self.assertRaisesRegex(PlanInspectionError, "AC statement 인용 누락"):
+            _validate(_formalize_reference_addresses(_payload()))
+
     def test_v3_rejected_raw_response_keeps_rating_failure_and_independent_inspection_errors(self):
         """v3 원문은 보정하지 않고 rating·constraint·관계 오류를 각자 고정한다."""
         raw = RAW_V3_REJECTED["raw_response"]
@@ -171,8 +225,11 @@ class RawPlanInspectionRegressionTests(unittest.TestCase):
         envelope = _validate(payload)
         self.assertEqual(2, len(envelope.review.findings))
 
-    def test_corrected_addresses_alone_still_reject_raw_internal_contradictions(self):
+    def test_corrected_addresses_and_ac_basis_still_reject_raw_internal_contradictions(self):
+        goal = GoalContractRevision.model_validate(FILES["input-goal.json"])
         payload = _formalize_reference_addresses(_payload())
+        _make_ac_statement_citations(payload, goal)
+        _link_registered_mechanism_citations(payload)
         with self.assertRaisesRegex(PlanInspectionError, "대조표 정상 연결 행의 finding 모순"):
             _validate(payload)
 

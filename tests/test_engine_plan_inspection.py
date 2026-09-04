@@ -45,10 +45,10 @@ def submission(name):
 
     def cite(source, selector, text):
         for item in inspection["citations"]:
-            if (item["source_ref"], item["selector"], item["quote"]) == (source, selector, text[:240]):
+            if (item["source_ref"], item["selector"], item["quote"]) == (source, selector, text):
                 return item["citation_id"]
         ref = f"c{len(inspection['citations'])}"
-        inspection["citations"].append({"citation_id": ref, "source_ref": source, "selector": selector, "quote": text[:240]})
+        inspection["citations"].append({"citation_id": ref, "source_ref": source, "selector": selector, "quote": text})
         return ref
 
     for index, defect in enumerate(EXPECTED[name]):
@@ -72,6 +72,9 @@ def submission(name):
             basis.append(scope_ref)
             vrow.update(assessment="contradicted", finding_codes=[code],
                         mechanisms=[{"tool": "oracle.py", "phase": "task", "basis_refs": [scope_ref]}])
+            for relation_row in inspection["ac_validation_rows"]:
+                if relation_row["validation_id"] == vid:
+                    relation_row["basis_refs"].append(scope_ref)
         elif defect["defect_kind"] == "result_order":
             basis.append(cite("artifact:plan_contract", "/definition/tasks/0/acceptance_criteria/4",
                               plan.definition.tasks[0].acceptance_criteria[4]))
@@ -130,6 +133,59 @@ class PlanInspectionTests(unittest.TestCase):
                 mutation(payload)
                 with self.assertRaises((PlanInspectionError, ValueError)):
                     validate("missing-link", payload)
+
+    def test_each_ac_validation_row_requires_statement_intent_and_full_validation_statement(self):
+        payload = submission("clean")
+        row = payload["inspection"]["ac_validation_rows"][0]
+        statement_ref = next(citation["citation_id"] for citation in payload["inspection"]["citations"]
+                             if citation["source_ref"] == "source:goal" and
+                             citation["selector"] == "/hard_acceptance/0/statement")
+        intent_ref = next(citation["citation_id"] for citation in payload["inspection"]["citations"]
+                          if citation["source_ref"] == "source:goal" and
+                          citation["selector"] == "/hard_acceptance/0/validation_intent")
+        validation_ref = next(citation for citation in payload["inspection"]["citations"]
+                              if citation["source_ref"] == "artifact:plan_contract" and
+                              citation["selector"] == "/definition/tasks/0/validations/0/statement")
+
+        for reference, message in ((statement_ref, "AC statement"), (intent_ref, "AC validation_intent")):
+            with self.subTest(reference=reference):
+                altered = deepcopy(payload)
+                altered["inspection"]["ac_validation_rows"][0]["basis_refs"].remove(reference)
+                with self.assertRaisesRegex(PlanInspectionError, message):
+                    validate("clean", altered)
+
+        altered = deepcopy(payload)
+        citation = next(item for item in altered["inspection"]["citations"]
+                        if item["citation_id"] == validation_ref["citation_id"])
+        citation["quote"] = citation["quote"][:10]
+        with self.assertRaisesRegex(PlanInspectionError, "검사 전체 문장"):
+            validate("clean", altered)
+
+    def test_registered_mechanism_citation_is_reused_by_every_matching_ac_row(self):
+        _, _, _, project_map = inputs("clean")
+        reference = next(entry for entry in project_map.entries if entry.kind.value == "reference")
+        payload = submission("clean")
+        citation_id = "registered_scope"
+        payload["inspection"]["citations"].append({
+            "citation_id": citation_id,
+            "source_ref": f"project:{reference.entry_id}",
+            "selector": "/content",
+            "quote": Path(reference.path).read_text(encoding="utf-8")[:80],
+        })
+        validation_id = "val_task_add_behavior_contract"
+        validation_row = next(row for row in payload["inspection"]["validation_rows"]
+                              if row["validation_id"] == validation_id)
+        validation_row["mechanisms"][0]["basis_refs"].append(citation_id)
+        for row in payload["inspection"]["ac_validation_rows"]:
+            if row["validation_id"] == validation_id:
+                row["basis_refs"].append(citation_id)
+        validate("clean", payload)
+
+        altered = deepcopy(payload)
+        next(row for row in altered["inspection"]["ac_validation_rows"]
+             if row["criterion_id"] == "ac_002" and row["validation_id"] == validation_id)["basis_refs"].remove(citation_id)
+        with self.assertRaisesRegex(PlanInspectionError, "AC 관계 등록 자료 인용 누락"):
+            validate("clean", altered)
 
     def test_two_defects_require_separate_consistent_finding_links(self):
         payload = submission("stored-multi-defect")

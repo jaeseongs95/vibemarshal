@@ -11,9 +11,11 @@ from typing import Any
 from flowmarshal.canonical import canonical_json, json_value, sha256_bytes, sha256_digest
 from flowmarshal.engine.domain import GoalContractRevision, PlanContractRevision, PlanSkeletonCandidate, ProjectMapRevision, StateSnapshot, utc_now
 from flowmarshal.engine.models import EngineRoleConfiguration
-from flowmarshal.engine.plan_inspection_eval import assess_inspection_review
+from flowmarshal.engine.plan_inspection_eval import (
+    assess_case_inspection_review, bind_case_expectation, verify_case_expectation,
+)
 from flowmarshal.engine.planner_roles import PlanExpanderAdapter, PlanReviewerAdapter, PlanReviewEnvelope, RuleBasedTaskAssigner
-from flowmarshal.engine.planning import plan_gate, risk_route, validation_comparison_targets
+from flowmarshal.engine.planning import plan_gate, risk_route
 from flowmarshal.engine.qualification import PlanningScenarioCatalog, ScopeQualificationReport, _model_lock, _planning_contract, source_manifest_digest, source_manifest_files
 from flowmarshal.engine.roles import CodexStructuredRoleRunner, RoleCallRequest, strict_json_output_schema
 from flowmarshal.engine.runtime import CodexAppServerRuntime
@@ -52,10 +54,11 @@ def locked_input_files(run: Path) -> dict[str, str]:
             and not (path.parent == run and path.suffix == ".log")}
 
 
-def preserved_files():
+def preserved_files(run: Path | None = None):
     return {str(path.relative_to(ROOT)): sha256_bytes(path.read_bytes())
             for base in sorted(OLD.parent.iterdir())
-            if base.is_dir() and base.name.startswith(("r-s06-", "s06-bugfix-", "s05-bugfix-")) and not base.name.startswith("r-s06-10-")
+            if base.is_dir() and base.name.startswith(("r-s06-", "s06-bugfix-", "s05-bugfix-"))
+            and (run is None or base.resolve() != run.resolve())
             for path in sorted(base.rglob("*")) if path.is_file() and "__pycache__" not in path.parts}
 
 
@@ -201,19 +204,11 @@ def capture_request(name, run, roles, inventory_digest):
     raise AssertionError("요청이 생성되지 않았습니다.")
 
 
-def fixed_relation_rows_if_applicable(run: Path, *, goal: GoalContractRevision, plan: PlanContractRevision):
-    """고정 clean 28행은 같은 Goal과 validation 쌍을 가진 실제 Plan에만 적용한다."""
-    expectations = read(run / "expectations.json")
-    baseline_goal = GoalContractRevision.model_validate(read(run / "input-goal.json"))
-    expected_rows = expectations["ac_validation_rows"]
-    expected_pairs = {(row["criterion_id"], row["validation_id"]) for row in expected_rows}
-    actual_pairs = {
-        (row["criterion_id"], row["validation_id"])
-        for row in validation_comparison_targets(goal, plan)["ac_validation_pairs"]
-    }
-    if goal.definition_digest != baseline_goal.definition_digest or actual_pairs != expected_pairs:
-        return None
-    return expected_rows
+def case_expectation(run: Path, name: str, request: RoleCallRequest) -> dict[str, Any]:
+    """반드시 해당 사례의 사전 검토표를 읽는다. clean 표나 미평가 PASS로 대체하지 않는다."""
+    expectation = read(run / "case-expectations" / f"{name}.json")
+    verify_case_expectation(expectation, case_id=name, payload=request.payload)
+    return expectation
 
 
 def verify_lock(run):
@@ -224,6 +219,8 @@ def verify_lock(run):
         raise RuntimeError("PREFLIGHT_LOCK_CHANGED")
     if source_manifest_digest(ROOT) != lock["source_manifest_digest"]:
         raise RuntimeError("SOURCE_LOCK_CHANGED")
+    if preserved_files(run) != lock["original_files"]:
+        raise RuntimeError("PRESERVED_ORIGINALS_CHANGED")
     for name, expected in lock["locked_files"].items():
         if sha256_bytes((run / name).read_bytes()) != expected:
             raise RuntimeError(f"INPUT_LOCK_CHANGED: {name}")
@@ -236,6 +233,17 @@ def verify_lock(run):
     if lock["call_order"] != list(CALL_ORDER) or any(lock[key] != MAXIMUM_CALLS for key in
             ("maximum_logical_calls", "maximum_provider_turns")) or lock["schema_recovery_attempts"] != 0:
         raise RuntimeError("CALL_BUDGET_LOCK_CHANGED")
+    generated_lock_path = run / "generated-input-lock.json"
+    if generated_lock_path.exists():
+        generated = read(generated_lock_path)
+        request = RoleCallRequest.model_validate(read(run / "requests/expanded-review.json"))
+        expectation = case_expectation(run, "expanded-review", request)
+        if (generated["request_digest"] != request.request_digest or
+                generated["expectation_digest"] != expectation["expectation_digest"] or
+                generated["assessment_digest"] != sha256_bytes((run / "generation-assessment.json").read_bytes()) or
+                generated["preflight_digest"] != lock["lock_digest"] or
+                generated["plan_digest"] != PlanContractRevision.model_validate(read(run / "expanded-plan.json")).activation_digest):
+            raise RuntimeError("GENERATED_INPUT_LOCK_CHANGED")
     return lock
 
 
@@ -246,7 +254,7 @@ def prepare(run):
     source = source_manifest_digest(ROOT)
     if not report.passed or read(run / "deterministic/evaluation-contract.json")["source_manifest_digest"] != source:
         raise RuntimeError("DETERMINISTIC_GATE_FAILED_OR_STALE")
-    from scripts.diagnostics.r_s06_10_fixtures import build_revision
+    from scripts.diagnostics.r_s06_10_fixtures import build_revision, verify_reviewed_case
     build_revision(OLD, run)
     review = read(run / "independent-fixture-review.json")
     if (review.get("review_complete") is not True or review.get("reviewed_cases") != list(STATIC_CASES) or
@@ -282,6 +290,15 @@ def prepare(run):
             request = capture_request(name, run, roles, inventory.inventory_digest)
             write_new(run / "requests" / f"{name}.json", request)
             write_new(run / "schemas" / f"{name}.json", strict_json_output_schema(request.output_schema))
+            if name in STATIC_CASES:
+                expectations = read(run / "expectations.json")
+                verify_reviewed_case(name, request.payload, expectations, review)
+                expectation = bind_case_expectation(
+                    case_id=name, payload=request.payload,
+                    rows=expectations["case_ac_validation_rows"][name], defects=expectations[name],
+                    review_digest=sha256_bytes((run / "independent-fixture-review.json").read_bytes()),
+                )
+                write_new(run / "case-expectations" / f"{name}.json", expectation)
         catalog = PlanningScenarioCatalog.model_validate(read(ROOT / "tests/fixtures/engine/planning-scenarios.json"))
         contract = _planning_contract(ROOT, catalog, inventory, roles)
         write_new(run / "planning-binding.json", contract)
@@ -301,6 +318,7 @@ def prepare(run):
                 "전역 semantic 의무를 Task에 보존하되 AC의 추가 연결로 확대하지 않는다.",
                 "도구·phase의 실제 범위와 별도 실행·기대값 비교를 대조한다.",
                 "Worker 응답 제출 뒤 Validator 검사 순서, Skeleton 기여 집합, 독립 Goal Test와 ready-time 명령 경계를 보존한다.",
+                "생성된 AC×validation 전체 관계를 원문과 독립 대조한 새 표를 기록하고 생성 입력·등록 근거 digest에 결속한다.",
             ]})
         write_new(run / "instruction-binding.json", instruction_binding(run))
         source_files = source_manifest_files(ROOT)
@@ -308,8 +326,8 @@ def prepare(run):
             copy_new(ROOT / name, run / "executed-source" / name)
         write_new(run / "executed-source-manifest.json", {"files": source_files, "source_manifest_digest": source})
         locked = locked_input_files(run)
-        body = {"session": "R-S06-10", "source_manifest_digest": source, "locked_files": locked,
-                "harness_digest": sha256_bytes(Path(__file__).read_bytes()), "original_files": preserved_files(),
+        body = {"session": "R-S06-12", "source_manifest_digest": source, "locked_files": locked,
+                "harness_digest": sha256_bytes(Path(__file__).read_bytes()), "original_files": preserved_files(run),
                 "base_head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                 "policy": policy, "inventory_digest": inventory.inventory_digest, "model_lock_digest": _model_lock(inventory, roles),
                 "codex_bin": old_lock["codex_bin"], "codex_bin_digest": runtime.executable_digest,
@@ -335,6 +353,8 @@ class RecordedRunner:
         expected = RoleCallRequest.model_validate(read(self.run_root / "requests" / f"{self.name}.json"))
         if request.request_digest != expected.request_digest:
             raise RuntimeError("ACTUAL_REQUEST_BINDING_MISMATCH")
+        if self.name != "expansion":
+            case_expectation(self.run_root, self.name, request)
         actual_schema = strict_json_output_schema(request.output_schema)
         expected_schema = (read(self.run_root / "schemas" / f"{self.name}.json") if self.name != "expanded-review" else
                            read(self.run_root / "generated-review-template.json")["templates"][request.role]["output_schema"])
@@ -362,7 +382,38 @@ class RecordedRunner:
         terminal = read(capture / "terminal.json")
         if json.loads(terminal["final_response"]) != result.payload:
             raise RuntimeError("RAW_RESULT_BINDING_MISMATCH")
+        verification = completed_call_verification(capture, json_value(receipt))
+        write_new(capture / "binding-verification.json", verification)
+        if not verification["passed"]:
+            raise RuntimeError("ACTUAL_COMPLETED_CALL_BINDING_MISMATCH")
         return result
+
+
+def completed_call_verification(capture: Path, receipt: dict[str, Any] | None) -> dict[str, Any]:
+    """완료 receipt 결속은 다음 사례를 호출하기 전에 확인한다."""
+    request = RoleCallRequest.model_validate(read(capture / "request.json"))
+    terminal = read(capture / "terminal.json")["payload"]
+    thread = read(capture / "thread.receipt.json")["payload"]["thread"]
+    intent = read(capture / "turn.intent.json")
+    turn_receipt = read(capture / "turn.receipt.json")
+    checks = {
+        "payload": json.loads(intent["prompt"]) == request.payload,
+        "prompt": terminal.get("prompt_digest") == sha256_digest(intent["prompt"]),
+        "instructions": read(capture / "thread.intent.json")["developer_instructions"] == request.instructions,
+        "schema": intent["output_schema"] == read(capture / "strict-schema.json"),
+        "model_effort": intent["model"] == request.model and intent["effort"] == request.effort,
+        "thread_turn": intent["thread_id"] == thread["id"] == terminal.get("thread_id") and
+                       terminal.get("turn_id") == turn_receipt["operation_id"],
+        "receipt": receipt is not None and receipt["input_digest"] == request.request_digest and
+                   receipt["thread_id"] == terminal.get("thread_id") == intent["thread_id"] and
+                   receipt["role"] == request.role and receipt["model"] == request.model and
+                   receipt["effort"] == request.effort and receipt["inventory_digest"] == request.inventory_digest and
+                   receipt["permission_profile"] == ":danger-full-access" and receipt["approval_policy"] == "never" and
+                   receipt["output_schema_digest"] == sha256_digest(intent["output_schema"]) and
+                   receipt["schema_recovery_attempts"] == 0 and receipt["turn_ids"] == [terminal.get("turn_id")],
+    }
+    return {"passed": all(checks.values()), "checks": checks, "request_digest": request.request_digest,
+            "receipt_digest": sha256_digest(receipt) if receipt else None}
 
 
 def summarize(run, status, error=None):
@@ -376,7 +427,7 @@ def summarize(run, status, error=None):
             receipts[item["call_id"]] = item
     binding = read(run / "instruction-binding.json")
     checks = {"source_unchanged": source_manifest_digest(ROOT) == lock["source_manifest_digest"],
-              "preserved_originals": preserved_files() == lock["original_files"],
+              "preserved_originals": preserved_files(run) == lock["original_files"],
               "instructions_unchanged": all(Path(item["path"]).is_file() and
                   sha256_bytes(Path(item["path"]).read_bytes()) == item["content_digest"] for item in binding["sources"]),
               "workspace_unchanged": files(run / "workspace") == files(OLD / "workspace")}
@@ -393,30 +444,14 @@ def summarize(run, status, error=None):
                       "empty_new_thread": thread.get("turns") == [], "usage_total": usage,
                       "provider_duration_ms": payload.get("duration_ms"),
                       "terminal_digest": sha256_bytes(path.read_bytes())})
-        request = RoleCallRequest.model_validate(read(path.parent / "request.json"))
-        intent = read(path.parent / "turn.intent.json")
-        turn_receipt = read(path.parent / "turn.receipt.json")
         receipt = next((item for item in values if item["thread_id"] == payload.get("thread_id")), None)
-        call_checks = {
-            "payload": json.loads(intent["prompt"]) == request.payload,
-            "prompt": payload.get("prompt_digest") == sha256_digest(intent["prompt"]),
-            "instructions": read(path.parent / "thread.intent.json")["developer_instructions"] == request.instructions,
-            "schema": intent["output_schema"] == read(path.parent / "strict-schema.json"),
-            "model_effort": intent["model"] == request.model and intent["effort"] == request.effort,
-            "thread_turn": intent["thread_id"] == thread["id"] == payload.get("thread_id") and
-                           payload.get("turn_id") == turn_receipt["operation_id"],
-            "receipt": receipt is not None and receipt["input_digest"] == request.request_digest and
-                       receipt["output_schema_digest"] == sha256_digest(intent["output_schema"]) and
-                       receipt["schema_recovery_attempts"] == 0 and receipt["turn_ids"] == [payload.get("turn_id")],
-        }
-        verification = {"passed": all(call_checks.values()), "checks": call_checks,
-                        "request_digest": request.request_digest, "receipt_digest": sha256_digest(receipt) if receipt else None}
+        verification = completed_call_verification(path.parent, receipt)
         verification_path = path.parent / "binding-verification.json"
         if verification_path.exists():
             checks[f"{path.parent.name}_prior_binding"] = read(verification_path) == verification
         else:
             write_new(verification_path, verification)
-        checks[f"{path.parent.name}_binding"] = all(call_checks.values())
+        checks[f"{path.parent.name}_binding"] = verification["passed"]
     usage_keys = {"input_tokens": "inputTokens", "cached_input_tokens": "cachedInputTokens",
                   "output_tokens": "outputTokens", "reasoning_tokens": "reasoningOutputTokens", "total_tokens": "totalTokens"}
     available = len(turns) == len(list((run / "calls").glob("*/turn.intent.json"))) and bool(turns) and all(
@@ -437,24 +472,36 @@ def summarize(run, status, error=None):
                "generation_assessment": read(run / "generation-assessment.json") if (run / "generation-assessment.json").exists() else None,
                "plan_activated": False, "worker_executed": False, "new_ledger_writes": 0,
                "full_qualification": "NOT_RUN", "cutover": "NO-GO", "observed_at": utc_now()}
-    write_new(run / ("summary.json" if status != "GENERATION_REVIEW_REQUIRED" else "generation-pending.json"), summary)
+    write_new(run / ("generation-pending.json" if summary["status"] == "GENERATION_REVIEW_REQUIRED" else "summary.json"), summary)
     print(json.dumps({key: summary[key] for key in ("status", "logical_calls", "provider_turns", "usage", "error")}, ensure_ascii=False), flush=True)
 
 
+def verify_generation_pending(run: Path) -> None:
+    pending = read(run / "generation-pending.json")
+    if (pending.get("status") != "GENERATION_REVIEW_REQUIRED" or not pending.get("checks") or
+            not all(pending["checks"].values()) or pending.get("logical_calls") != 12 or
+            pending.get("provider_turns") != 12 or
+            len(list((run / "calls").glob("*/result.json"))) != 12 or
+            len(list((run / "calls").glob("*/turn.intent.json"))) != 12):
+        raise RuntimeError("GENERATION_PENDING_FAILED_OR_INCOMPLETE")
+
+
 def execute(run, generated=False):
-    lock = verify_lock(run)
     marker = "generated-review-started.json" if generated else "execution-started.json"
     if (run / "summary.json").exists():
         raise RuntimeError("완료·실패한 진단을 반복하지 않습니다.")
-    write_new(run / marker, {"preflight_digest": lock["lock_digest"], "observed_at": utc_now()})
-    roles = EngineRoleConfiguration.model_validate(read(run / "roles.json"))
-    expectations = read(run / "expectations.json")
     status = "FAIL"
     error = None
     try:
+        lock = verify_lock(run)
+        write_new(run / marker, {"preflight_digest": lock["lock_digest"], "observed_at": utc_now()})
+        roles = EngineRoleConfiguration.model_validate(read(run / "roles.json"))
+        # 첫 turn 전 모든 고정 사례의 표 존재·입력 결속을 확인한다.
+        for name in STATIC_CASES:
+            request = RoleCallRequest.model_validate(read(run / "requests" / f"{name}.json"))
+            case_expectation(run, name, request)
         if generated:
-            if not (run / "generation-pending.json").exists():
-                raise RuntimeError("생성 결과가 없습니다.")
+            verify_generation_pending(run)
             assessment = read(run / "generation-assessment.json")
             plan = PlanContractRevision.model_validate(read(run / "expanded-plan.json"))
             template_document = read(run / "generated-review-template.json")
@@ -470,11 +517,20 @@ def execute(run, generated=False):
             if strict_json_output_schema(request.output_schema) != template["output_schema"]:
                 raise RuntimeError("GENERATED_REVIEW_SCHEMA_CHANGED")
             write_new(run / "requests/expanded-review.json", request)
+            generated_expectation = bind_case_expectation(
+                case_id="expanded-review", payload=request.payload,
+                rows=assessment["ac_validation_rows"], defects=[],
+                review_digest=sha256_bytes((run / "generation-assessment.json").read_bytes()),
+            )
+            # 사전 criteria에 따른 독립 검토자가 실제 생성 입력 digest까지 확인해야 한다.
+            if assessment.get("input_binding") != generated_expectation["input_binding"]:
+                raise RuntimeError("GENERATED_REVIEW_SEMANTIC_BINDING_MISMATCH")
+            write_new(run / "case-expectations/expanded-review.json", generated_expectation)
             write_new(run / "generated-input-lock.json", {"request_digest": request.request_digest,
                       "plan_digest": plan.activation_digest, "assessment_digest": sha256_bytes((run / "generation-assessment.json").read_bytes()),
+                      "expectation_digest": generated_expectation["expectation_digest"],
                       "expected_defects": [], "preflight_digest": lock["lock_digest"]})
             names = ("expanded-review",)
-            expectations["expanded-review"] = []
         else:
             names = CALL_ORDER[:-1]
         with CapturingRuntime(run=run, codex_bin=Path(lock["codex_bin"])) as runtime:
@@ -489,18 +545,9 @@ def execute(run, generated=False):
                 else:
                     write_new(run / f"{name}-review.json", result)
                     envelope = PlanReviewEnvelope.model_validate(runner.last_result.payload)
-                    plan_path = run / ("expanded-plan.json" if name == "expanded-review" else f"input-{name}-plan.json")
-                    plan = PlanContractRevision.model_validate(read(plan_path))
-                    goal_for_case = GoalContractRevision.model_validate(read(
-                        run / ("input-semantic-explicit-goal.json" if name in {"semantic-explicit", "semantic-missing-link"}
-                               else "input-goal.json")
-                    ))
-                    assessment = assess_inspection_review(
-                        envelope,
-                        expectations[name],
-                        fixed_ac_validation_rows=fixed_relation_rows_if_applicable(
-                            run, goal=goal_for_case, plan=plan,
-                        ),
+                    request = RoleCallRequest.model_validate(read(run / "requests" / f"{name}.json"))
+                    assessment = assess_case_inspection_review(
+                        envelope, case_expectation(run, name, request), case_id=name, payload=request.payload,
                     )
                     write_new(run / f"{name}-assessment.json", assessment)
                     if not assessment["passed"]:
@@ -518,9 +565,17 @@ if __name__ == "__main__":
     parser.add_argument("--run-root", type=Path, required=True)
     arguments = parser.parse_args()
     destination = arguments.run_root.resolve()
-    if not destination.name.startswith("r-s06-10-") or destination.parent != OLD.parent:
-        raise RuntimeError("새 R-S06-10 진단 디렉터리만 허용합니다.")
+    if not destination.name.startswith(("r-s06-10-", "r-s06-12-")) or destination.parent != OLD.parent:
+        raise RuntimeError("새 R-S06 검사 진단 디렉터리만 허용합니다.")
     if arguments.mode == "prepare":
-        prepare(destination)
+        try:
+            prepare(destination)
+        except Exception as error:
+            write_new(destination / "preparation-failed.json", {
+                "status": "FAIL", "error": f"{type(error).__name__}: {error}",
+                "provider_turns": len(list((destination / "calls").glob("*/turn.intent.json"))),
+                "full_qualification": "NOT_RUN", "cutover": "NO-GO", "observed_at": utc_now(),
+            })
+            raise
     else:
         execute(destination, generated=arguments.mode == "review-generated")

@@ -229,6 +229,10 @@ adapter는 행 집합의 완전성·중복·ID·selector·인용 일치와 제�
 
 제한 실제 진단은 실제 adapter schema·공유 지침·입력 projection·고정한 원문 근거와 기대값을 하나의 새 평가 계약으로 잠근다. 자동 주입되는 전역·프로젝트·workspace 지침은 경로와 본문 digest를 잠그고 실제 thread receipt의 `instructionSources`와 provider turn 전에 대조한다. 과거 입력의 숨은 결함이 확인되면 과거 fixture와 판정을 보존하고 별도 revision의 정상·독립 결함 사례를 만든다. 결정적 구조 회귀의 통과를 실제 모델의 의미 검출 성공으로 대체하지 않는다.
 
+각 AC 관계 행은 비어 있지 않은 AC statement와 validation_intent를 각각 인용하고 validation 전체 문장을 연결한다. 등록 자료·구현의 실제 절차를 근거로 삼은 citation은 검사 범위 판단과 해당 validation의 AC 관계 판단에 함께 연결하며 동일 citation을 재사용한다. adapter는 selector·quote·참조 집합의 일관성만 검사한다. 명시 도구·phase에 포함된 실제 절차는 문장에 반복하지 않아도 검토하지만, 해당 범위를 수행하지 않는 phase나 불완전 자료에서 능력을 추정하지 않는다. 독립 Goal 검사의 범위를 별도 Task 검사에 옮기지 않고, 전역 책임을 중복 충족하는 여러 검사 ID 각각의 필수성과 그 책임의 출처를 분리한다. 특정 phase 실행을 명시했다고 같은 목적의 모든 별도 검사가 해당 AC의 필수 절차가 되는 것은 아니다. 현재 존재하는 명시 절차의 연결 누락과 실제 검사 책임의 누락도 별도로 판단한다.
+
+기대표는 사례별로 사전 검토한 Goal 전체·Plan 전체(검사 statement·소유 Task/Goal·method·mode·evidence·현재 연결 포함)와 등록 source의 주소·본문·digest에 결속한다. 같은 ID의 검사라도 문장·phase·소유자·method·mode·등록 본문이 바뀌면 기존 표를 적용하지 않는다. 사례별 관계 전수 평가와 독립 결함의 직접 근거 대조, 평가하지 않는 constraint·수단 의미 범위를 명시하며 필요한 표가 없으면 호출 전에 중단한다. 생성 Plan은 사전 기준에 따른 독립 정상성 대조와 전용 관계표를 실제 생성 입력 digest에 결속한 뒤에만 Reviewer에게 전달한다. 고정 clean 표를 생성물에 재사용하거나 모델 결과를 본 뒤 기대값·threshold를 바꾸지 않는다. 실제 완료 receipt의 결속 실패도 다음 사례 전에 중단한다.
+
 Core에 전달하는 ReviewerSubmission은 다음으로 제한한다.
 
 - `finding_code`

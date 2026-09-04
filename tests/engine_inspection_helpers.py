@@ -12,11 +12,16 @@ def inspection_fixture(plan: dict, goal: dict, *, revision: bool = False, review
 
     def cite(source, selector, text):
         ref = f"c{len(citations)}"
-        citations.append({"citation_id": ref, "source_ref": source, "selector": selector, "quote": text[:240]})
+        citations.append({"citation_id": ref, "source_ref": source, "selector": selector, "quote": text})
         return ref
 
-    ac_refs = {ac["criterion_id"]: cite("source:goal", f"/hard_acceptance/{i}/validation_intent", ac["validation_intent"])
-               for i, ac in enumerate(goal["hard_acceptance"])}
+    ac_refs = {
+        ac["criterion_id"]: (
+            cite("source:goal", f"/hard_acceptance/{i}/statement", ac["statement"]),
+            cite("source:goal", f"/hard_acceptance/{i}/validation_intent", ac["validation_intent"]),
+        )
+        for i, ac in enumerate(goal["hard_acceptance"])
+    }
     validations = [(task["task_ref"], validation, f"{prefix}/tasks/{ti}/validations/{vi}")
                    for ti, task in enumerate(definition["tasks"]) for vi, validation in enumerate(task["validations"])]
     validations += [(None, validation, f"{prefix}/integration_validations/{vi}")
@@ -29,7 +34,7 @@ def inspection_fixture(plan: dict, goal: dict, *, revision: bool = False, review
     for finding in (review or {}).get("findings", []):
         basis = []
         if "source:goal" in finding["evidence_refs"]:
-            basis.append(next(iter(ac_refs.values())))
+            basis.append(next(iter(ac_refs.values()))[0])
         if "artifact:plan_contract" in finding["evidence_refs"]:
             basis.append(next(iter(val_refs.values())))
         links.append({"finding_code": finding["finding_code"], "defect_kind": "other",
@@ -38,8 +43,8 @@ def inspection_fixture(plan: dict, goal: dict, *, revision: bool = False, review
     return {
         "citations": citations,
         "ac_validation_rows": [{"criterion_id": ac, "validation_id": vid, "relation": "optional_or_unrelated",
-                                "basis_refs": [aref, vref], "finding_codes": []}
-                               for ac, aref in ac_refs.items() for vid, vref in val_refs.items()],
+                                "basis_refs": [*arefs, vref], "finding_codes": []}
+                               for ac, arefs in ac_refs.items() for vid, vref in val_refs.items()],
         "constraint_task_rows": [{"constraint_id": cid, "task_ref": task["task_ref"], "applicability": "not_applicable",
                                   "validation_ids": [], "basis_refs": [ref], "finding_codes": []}
                                  for cid, ref in constraint_refs.items() for task in definition["tasks"]],
