@@ -219,7 +219,11 @@ Plan Reviewer에는 모든 Task·integration validation을 원래 순서대로 �
 
 Skeleton·`PlanExpansionDraft`의 `task_refs`는 Compiler가 `Task.task_id`에 대응시켜 권위 `PlanContractDefinition.goal_coverage.task_ids`로 변환한다. 컴파일된 Plan을 받는 Reviewer는 `task_ids`를 실제 Task ID에 대조하고 대응되는 `task_ref` 집합으로 기여 관계를 확인한다. `task_ids`를 draft의 `task_refs`로 바꾸도록 요구하지 않는다. Reviewer finding의 `affected_task_refs`는 별도 입력 계약에 따라 `Task.task_ref`를 사용한다.
 
-Reviewer 출력은 다음으로 제한한다.
+상세화·검토 provider 응답은 기존 Plan 작성 draft 또는 review와 검사 근거 대조표를 감싼 strict envelope다. 대조표에는 모든 AC×모든 Task·integration validation과 모든 전역 constraint×Task를 중복 없이 제출한다. 원문 인용은 source ref·JSON pointer·짧은 연속 인용으로 한 번 등록하고 각 행에서 참조한다. AC 명시 절차·전역 constraint만의 의무·선택적 관계와 검사 주장·수단·phase·같은 문장의 별도 실제 검사 책임을 구분한다. 명시 절차인데 연결이 없다고 제출한 행이나 확인한 범위 모순은 각각 실제 finding과 직접 evidence에 결속한다.
+
+adapter는 행 집합의 완전성·중복·ID·selector·인용 일치와 제출물 내부 일관성만 검증한다. 파일 인용은 Project Map의 정확한 entry 경로와 content digest를 검증하고 원본 Project Map evidence에 대응시킨다. 관계나 도구 능력의 의미 정답을 코드로 추정하거나 coverage를 자동 보정하지 않는다. 상세화는 결함을 보정한 완성 draft를 제출하므로 남은 결함을 선언한 대조표와 성공 draft를 함께 통과시키지 않는다. 구조적으로 일관된 잘못된 의미 판단은 별도 고정 의미 평가에서 검출한다. 대조표를 GoalContractRevision·PlanContractRevision·ReviewerSubmission 또는 DB schema에 추가하지 않으며 Core의 판정·Skeleton 기여 집합·독립 Goal Test·ready-time 명령 경계는 유지한다. 평가 digest는 실제 adapter의 strict 출력 schema와 공유 지침을 함께 결속한다.
+
+Core에 전달하는 ReviewerSubmission은 다음으로 제한한다.
 
 - `finding_code`
 - 직접 `evidence_ref`

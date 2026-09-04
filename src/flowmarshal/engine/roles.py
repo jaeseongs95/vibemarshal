@@ -159,8 +159,12 @@ class CodexStructuredRoleRunner:
     """CodexRuntimePort를 통해 strict JSON 역할을 최대 두 turn으로 실행한다."""
 
     def __init__(self, runtime: CodexRuntimePort, *, poll_interval_seconds: float = 0.25,
-                 progress_sink: Callable[[dict[str, Any]], None] | None = None) -> None:
+                 progress_sink: Callable[[dict[str, Any]], None] | None = None,
+                 max_schema_recovery_attempts: int = 1) -> None:
+        if type(max_schema_recovery_attempts) is not int or max_schema_recovery_attempts not in {0, 1}:
+            raise ValueError("schema recovery 상한은 0 또는 1이어야 합니다.")
         self.runtime = runtime
+        self.max_schema_recovery_attempts = max_schema_recovery_attempts
         self.poll_interval_seconds = poll_interval_seconds
         self.progress_sink = progress_sink
         self.receipts: list[RoleCallReceipt] = []
@@ -214,7 +218,7 @@ class CodexStructuredRoleRunner:
         last_error: Exception | None = None
         final_text: str | None = None
         observation_payload: dict[str, Any] = {}
-        for attempt_index in range(2):
+        for attempt_index in range(self.max_schema_recovery_attempts + 1):
             if attempt_index == 1:
                 recovery_attempts = 1
                 prompt = canonical_json(
@@ -312,7 +316,7 @@ class CodexStructuredRoleRunner:
                 return RoleCallResult(payload=decoded, receipt=receipt)
             except Exception as error:
                 last_error = error
-                if attempt_index == 0:
+                if attempt_index < self.max_schema_recovery_attempts:
                     continue
         receipt = self._receipt(
             call_id=call_id,
@@ -328,7 +332,7 @@ class CodexStructuredRoleRunner:
         )
         self.receipts.append(receipt)
         raise StructuredRoleError(
-            "schema recovery 후에도 structured output이 유효하지 않습니다.",
+            f"structured output이 유효하지 않습니다. schema recovery {recovery_attempts}회",
             receipt=receipt,
             receipts=tuple(self.receipts),
         )

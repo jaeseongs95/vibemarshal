@@ -34,7 +34,7 @@ from flowmarshal.engine.planning import (
     goal_validation_requirement_rows,
     plan_validation_scope_rows,
 )
-from flowmarshal.engine.roles import ScriptedStructuredRoleRunner
+from tests.engine_inspection_helpers import InspectionScriptedRunner as ScriptedStructuredRoleRunner
 from flowmarshal.engine.service import EngineService, EngineServiceError
 
 from tests.engine_helpers import assignment, goal, inventory, profile, state
@@ -376,7 +376,9 @@ class PlanValidationScopeRegressionTests(unittest.TestCase):
                 ]["PlanGoalCoverageDraft"]["properties"]
                 self.assertIn("task_refs", draft_coverage_schema)
                 self.assertNotIn("task_ids", draft_coverage_schema)
-                plan_review_schema = calls["compact_plan_reviewer"].output_schema
+                envelope_schema = calls["compact_plan_reviewer"].output_schema
+                self.assertEqual({"review", "inspection"}, set(envelope_schema["properties"]))
+                plan_review_schema = envelope_schema["$defs"]["PlanReviewDraft"]
                 base_review_schema = ReviewDraft.model_json_schema()
                 self.assertEqual(
                     set(base_review_schema["properties"]),

@@ -24,7 +24,7 @@ from flowmarshal.engine.planner_roles import (
     SkeletonReviewerAdapter,
 )
 from flowmarshal.engine.planning import SkeletonFirstPlanner
-from flowmarshal.engine.roles import ScriptedStructuredRoleRunner
+from tests.engine_inspection_helpers import InspectionScriptedRunner as ScriptedStructuredRoleRunner
 
 from tests.engine_helpers import assignment, goal, inventory, profile, project_map, state
 
@@ -274,6 +274,23 @@ class EngineRoleAdapterTests(unittest.TestCase):
                 state=self.state,
                 project_map=self.map,
             )
+
+    def test_expander_rejects_incomplete_inspection_before_returning_plan(self):
+        from tests.engine_inspection_helpers import inspection_fixture
+        from flowmarshal.engine.plan_inspection import PlanInspectionError
+        response = _plan_response()
+        table = inspection_fixture(response, self.goal.definition.model_dump(mode="json"))
+        table["ac_validation_rows"].pop()
+        runner = ScriptedStructuredRoleRunner({
+            "skeleton_generator": [_skeleton_response()],
+            "plan_expander": [{"plan": response, "inspection": table}],
+        })
+        options = dict(model="worker", effort="medium", inventory_digest=self.inventory.inventory_digest, cwd=self.root)
+        candidate = SkeletonGeneratorAdapter(runner, **options).generate(
+            goal=self.goal, state=self.state, project_map=self.map, candidate_count=1)[0]
+        expander = PlanExpanderAdapter(runner, RuleBasedTaskAssigner(assignment(), assignment(), assignment()), **options)
+        with self.assertRaisesRegex(PlanInspectionError, "행 집합 불완전"):
+            expander.expand(candidate=candidate, goal=self.goal, state=self.state, project_map=self.map)
 
     def _validation_boundary_case(self, check_ref="task_check"):
         definition = self.goal.definition.model_copy(update={"hard_acceptance": (

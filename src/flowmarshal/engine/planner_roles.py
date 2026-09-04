@@ -48,7 +48,13 @@ from .planning import (
     skeleton_input_catalog,
     plan_review_evidence_catalog,
     plan_validation_scope_rows,
+    validation_comparison_targets,
     skeleton_review_evidence_catalog,
+)
+from .plan_inspection import (
+    PLAN_INSPECTION_INSTRUCTIONS,
+    PlanInspection,
+    validate_plan_inspection,
 )
 from .roles import RoleCallReceipt, RoleCallRequest, StructuredRolePort
 from .domain import GoalContractRevision
@@ -308,6 +314,16 @@ class PlanExpansionDraft(EngineModel):
     integration_validations: tuple[PlanIntegrationValidationDraft, ...] = Field(min_length=1, description="Task 검사와 분리한 plan-level Goal 검사 계약. 참조한 등록 도구·phase가 statement의 검사 범위를 실제 지원하는지 대조한다. 다른 phase의 검사 능력이나 Task evidence로 independent 검사를 대체하지 않는다.")
     expected_effects: tuple[str, ...] = Field(default=(), description="Plan이 실제 발생시키는 효과. 효과가 없다는 부정형 조건은 포함하지 않는다.")
     prohibited_effects: tuple[str, ...] = Field(default=(), description="Goal이 금지한 효과와 범위를 보존하며 현재 계획 역할의 행동 제한을 새로 추가하지 않는다.")
+
+
+class PlanExpansionEnvelope(EngineModel):
+    plan: PlanExpansionDraft
+    inspection: PlanInspection
+
+
+class PlanReviewEnvelope(EngineModel):
+    review: PlanReviewDraft
+    inspection: PlanInspection
 
 
 class TaskAssigner(Protocol):
@@ -666,7 +682,7 @@ class PlanExpanderAdapter:
                 "의미 검사는 원본 file 근거와 응답 관측을 함께 참조하는 semantic validation으로 "
                 "계약하고 required_evidence_kinds에 model_review·external_observation·file을 모두 "
                 "요구한다. 이는 외부 시스템 변경 효과를 뜻하지 않는다."
-            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS + PLAN_VALIDATION_TRACE_INSTRUCTIONS + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS + PLAN_VALIDATION_TRACE_INSTRUCTIONS + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS + PLAN_INSPECTION_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(sha256_digest(candidate)),
                 "goal": goal.definition.model_dump(mode="json"),
@@ -674,15 +690,25 @@ class PlanExpanderAdapter:
                 "project_map": compact_project_map(project_map),
                 "skeleton": candidate.model_dump(mode="json"),
                 "goal_validation_requirement_rows": goal_validation_requirement_rows(goal),
+                "inspection_source_catalog": {
+                    "source:goal": "payload.goal",
+                    "artifact:plan_draft": "output.plan",
+                    **{f"project:{entry.entry_id}": {
+                        "path": entry.path,
+                        "content_digest": entry.content_digest,
+                        "evidence_ref": "source:project_map",
+                    } for entry in project_map.entries},
+                },
             },
-            output_schema=PlanExpansionDraft.model_json_schema(),
+            output_schema=PlanExpansionEnvelope.model_json_schema(),
             model=self.model,
             effort=self.effort,
             inventory_digest=self.inventory_digest,
             cwd=str(Path(self.cwd).resolve()),
         )
-        def validate_expansion(value: dict[str, Any]) -> PlanExpansionDraft:
-            draft = PlanExpansionDraft.model_validate(value)
+        def validate_expansion(value: dict[str, Any]) -> PlanExpansionEnvelope:
+            envelope = PlanExpansionEnvelope.model_validate(value)
+            draft = envelope.plan
             self._compile(
                 draft,
                 candidate=candidate,
@@ -691,11 +717,24 @@ class PlanExpanderAdapter:
                 project_map=project_map,
                 planning_budget=applied_budget,
             )
-            return draft
+            validate_plan_inspection(
+                envelope.inspection,
+                plan=draft,
+                goal=goal,
+                project_map=project_map,
+                evidence_catalog={
+                    "source:goal": goal.definition.model_dump(mode="json"),
+                    "source:state": state.model_dump(mode="json"),
+                    "source:project_map": compact_project_map(project_map),
+                    "artifact:skeleton": candidate.model_dump(mode="json"),
+                },
+                findings=(),
+            )
+            return envelope
 
         result = self.runner.run(request, validator=validate_expansion)
         self.receipts.append(result.receipt)
-        draft = PlanExpansionDraft.model_validate(result.payload)
+        draft = validate_expansion(result.payload).plan
         return self._compile(
             draft,
             candidate=candidate,
@@ -863,21 +902,31 @@ class PlanReviewerAdapter:
                 "각 행의 statement를 등록 자료의 실제 수단·phase와 대조하고 마지막 integration 행까지 "
                 "확인한다. linked_criterion_ids는 현재 연결 사실이며 필수 연결의 판정이 아니다. "
                 "색인 자체를 새 evidence ref나 별도 권위로 사용하지 않고 finding은 원본 evidence_catalog에 결속한다."
-            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + PLAN_VALIDATION_TRACE_INSTRUCTIONS + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + PLAN_VALIDATION_TRACE_INSTRUCTIONS + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS + PLAN_INSPECTION_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(digest),
                 "evidence_catalog": evidence_catalog,
                 "validation_scope_rows": plan_validation_scope_rows(plan),
                 "goal_validation_requirement_rows": goal_validation_requirement_rows(goal),
+                "validation_comparison_targets": validation_comparison_targets(goal, plan),
+                "inspection_source_catalog": {
+                    **{key: f"payload.evidence_catalog.{key}" for key in evidence_catalog},
+                    **{f"project:{entry.entry_id}": {
+                        "path": entry.path,
+                        "content_digest": entry.content_digest,
+                        "evidence_ref": "source:project_map",
+                    } for entry in project_map.entries},
+                },
             },
-            output_schema=PlanReviewDraft.model_json_schema(),
+            output_schema=PlanReviewEnvelope.model_json_schema(),
             model=selected_model,
             effort=selected_effort,
             inventory_digest=self.inventory_digest,
             cwd=str(Path(self.cwd).resolve()),
         )
-        def validate_review(value: dict[str, Any]) -> ReviewDraft:
-            draft = PlanReviewDraft.model_validate(value)
+        def validate_review(value: dict[str, Any]) -> PlanReviewEnvelope:
+            envelope = PlanReviewEnvelope.model_validate(value)
+            draft = envelope.review
             submission = _review_submission(
                 role=risk_route,
                 artifact_digest=digest,
@@ -889,7 +938,15 @@ class PlanReviewerAdapter:
                 evidence_catalog=evidence_catalog,
                 known_task_refs={item.task_ref for item in plan.definition.tasks},
             )
-            return draft
+            validate_plan_inspection(
+                envelope.inspection,
+                plan=plan,
+                goal=goal,
+                project_map=project_map,
+                evidence_catalog=evidence_catalog,
+                findings=draft.findings,
+            )
+            return envelope
 
         result = self.runner.run(request, validator=validate_review)
         self.receipts.append(result.receipt)
@@ -897,5 +954,5 @@ class PlanReviewerAdapter:
             role=risk_route,
             artifact_digest=digest,
             evidence_catalog=evidence_catalog,
-            draft=PlanReviewDraft.model_validate(result.payload),
+            draft=validate_review(result.payload).review,
         )

@@ -1,0 +1,3445 @@
+{
+  "provenance": {
+    "source_run": "r-s06-08-20260904-v2",
+    "source_head": "76b2bd9fc3f231874979119fa2df2d1707381acf",
+    "file_digests": {
+      "input-goal.json": "sha256:f5e4d87ac94c21c8b297af7466e7d979eb639f71a2714ca2e0d7ff5848f07e35",
+      "input-semantic-explicit-goal.json": "sha256:0c4d47a8ccd6d275262e910b5e141a138c7b70f98827bde46668a794736c5f2d",
+      "input-state.json": "sha256:daea768fdbf0b5ddad35a52367044c639be8c3866fedfe743d04adf714968ae7",
+      "input-semantic-explicit-state.json": "sha256:2aa96a5c6b2d10f53398e0a5273c46a8184857086e28cb6d5909bd303384e755",
+      "input-project-map.json": "sha256:748f48f7fb4f89656cd514377bb2897c7c146fa60d7ef81aae01dd8c5908d6b1",
+      "input-clean-plan.json": "sha256:a2f30c18b683bbccb2d728f745770af0b5a7d9a23ffbefef293c011bdfae7e3f",
+      "input-bad-plan.json": "sha256:b5c02fb154208be94046391d8c20a1124ba33f13b66c1f566e980a327a09fa43",
+      "input-wrong-goal-plan.json": "sha256:696ee3a36d8edfaf9b948edbdaacadf8ba3418f975cc37e0032c8df22d94fc82",
+      "input-combined-plan.json": "sha256:18bc283d65440ebdb792b6f4561f323f842926965b41aaf9edf7c5f9cc2699e8",
+      "input-boundary-clean-plan.json": "sha256:c8c2e3cc6ede40eb4c7edc24f3e8154d7454765da20434e7d1badf501fcd040a",
+      "input-missing-link-plan.json": "sha256:86c962148f6028ab345627c1f0f52b66fa215e576726ed29bb5dfc3b39a792b7",
+      "input-future-result-plan.json": "sha256:66d3827f3db19246c859c45cc05e731a66cca6edd7c2ae4c5d62682ccb7876ca",
+      "input-stored-expanded-plan.json": "sha256:aa9a909b7abea2306b246f259afba886a75f4131f88c35d618160b82bce789ce",
+      "input-semantic-explicit-plan.json": "sha256:daae5a6dcfb035cb7fd1a3f5a6db151f70c5355e707abef2ea7c046fe2169961",
+      "expanded-plan.json": "sha256:1bc97203633c5c255a88fe5afe810812f735e58ed96c68bbfe336d1673d38ec5"
+    }
+  },
+  "files": {
+    "input-goal.json": {
+      "created_at": "2026-09-04T10:08:45.064369Z",
+      "definition": {
+        "approved_decision_refs": [],
+        "assumptions": [],
+        "constraints": [
+          {
+            "category": "수정 범위",
+            "constraint_id": "constraint_001",
+            "statement": "app.py의 add 구현만 수정한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ]
+          },
+          {
+            "category": "보존",
+            "constraint_id": "constraint_002",
+            "statement": "test_app.py와 AGENTS.md를 그대로 보존하고 프로젝트 파일을 추가하거나 삭제하지 않는다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ]
+          },
+          {
+            "category": "검증",
+            "constraint_id": "constraint_003",
+            "statement": "실제 unittest·파일 변경 범위 확인·분리된 Validator의 직접 evidence 검토를 Task 검증에 포함하고, 모든 Task 검증 후 별도 Goal Test를 수행한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ]
+          }
+        ],
+        "effect_policy": {
+          "allowed_external_effects": [],
+          "behavior_policy": "preserve_public_contracts",
+          "irreversible_effects_require_checkpoint": true,
+          "mutation_policy": "scoped_change",
+          "prohibited_effects": [
+            "app.py의 add 구현 외 프로젝트 파일 변경",
+            "test_app.py 또는 AGENTS.md 변경",
+            "프로젝트 파일 추가 또는 삭제",
+            "외부 서비스 변경 또는 배포",
+            "프로젝트 의존성 추가"
+          ]
+        },
+        "hard_acceptance": [
+          {
+            "criterion_id": "ac_001",
+            "statement": "add(left: int, right: int) -> int가 양수·음수·0을 포함한 두 정수의 합을 반환한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ],
+            "validation_intent": "등록된 oracle.py의 task 및 goal phase와 기존 unittest를 사용해 동작 결과를 검증한다. goal phase에서는 위치·키워드 인자 호출을 포함한 고정 정수 쌍을 새로 검사한다."
+          },
+          {
+            "criterion_id": "ac_002",
+            "statement": "공개 함수명 add, left·right 인자명, int annotation, int 반환 annotation과 위치·키워드 인자 호출 계약을 유지한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ],
+            "validation_intent": "oracle.py가 실제 함수 annotation·시그니처와 위치·키워드 호출 결과를 검사한다."
+          },
+          {
+            "criterion_id": "ac_003",
+            "statement": "기존 unittest가 통과한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ],
+            "validation_intent": "동일 workspace에서 Python unittest를 새 프로세스로 실행해 통과 여부를 확인한다."
+          },
+          {
+            "criterion_id": "ac_004",
+            "statement": "Task 검증과 별도로 동일 workspace에서 Goal Test를 실행하고, 모든 동작·공개 계약·파일 보존 검사가 통과한 독립 evidence로 최종 Goal을 판정한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ],
+            "validation_intent": "oracle.py를 task phase와 goal phase로 구분해 실행한다. Goal evidence는 새 command·test·file·diff evidence를 사용하고 task_id는 null로 유지하며 Task evidence를 복사하지 않는다."
+          }
+        ],
+        "mission_class": "bugfix_stabilization",
+        "non_goals": [
+          "외부 서비스 변경이나 배포",
+          "프로젝트 의존성 추가"
+        ],
+        "observable_outcome": "app.py의 add가 공개 호출 계약을 유지하면서 두 정수의 합을 반환하고, 기존 파일 보존 조건과 독립 Goal Test를 포함한 전체 검증을 통과한다.",
+        "profile_definition_digest": "sha256:06f95423e21eaf4993c1624089bd15de2e6461fde59849dabc14302e64a05639",
+        "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+        "quality_preferences": [
+          {
+            "preference_id": "pref_001",
+            "statement": "수정 범위를 app.py의 add 구현으로 최소화한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ],
+            "weight": 10
+          },
+          {
+            "preference_id": "pref_002",
+            "statement": "검증 결과가 직접 관측 evidence로 추적 가능하도록 유지한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ],
+            "weight": 8
+          }
+        ],
+        "source_request": "app.py의 add(2, 3)이 -1을 반환하여 test_app.py의 기존 합산 테스트가 실패한다. add가 양수·음수·0을 포함한 두 정수의 합을 반환하도록 add 함수 구현만 최소 수정해줘. 공개 함수 add(left: int, right: int) -> int와 위치·키워드 인자 호출 계약을 유지한다. test_app.py와 AGENTS.md는 그대로 보존하고 프로젝트 파일을 추가하거나 삭제하지 않는다. 기존 unittest를 통과해야 한다. Task 검증은 실제 unittest·파일 변경 범위 확인과 실행 역할과 분리된 Validator의 직접 evidence 검토로 수행한다. 모든 Task가 검증된 뒤 같은 workspace에서 기존 unittest와 별도의 동작·공개 계약·파일 보존 검사를 Goal Test로 새로 실행하고, Task evidence와 구분된 근거로 최종 Goal을 판정한다. 외부 서비스 변경·배포·의존성 추가는 범위에 없다.",
+        "source_request_digest": "sha256:7a2e53cd7c7f0aebbda43ca6048972e122e9e08cab6c9679d26cab5d09e7e1a4",
+        "source_traces": [
+          {
+            "source_digest": "sha256:7a2e53cd7c7f0aebbda43ca6048972e122e9e08cab6c9679d26cab5d09e7e1a4",
+            "source_ref": "user-request",
+            "statement": "app.py의 add(2, 3)이 -1을 반환하여 test_app.py의 기존 합산 테스트가 실패한다. add가 양수·음수·0을 포함한 두 정수의 합을 반환하도록 add 함수 구현만 최소 수정해줘. 공개 함수 add(left: int, right: int) -> int와 위치·키워드 인자 호출 계약을 유지한다. test_app.py와 AGENTS.md는 그대로 보존하고 프로젝트 파일을 추가하거나 삭제하지 않는다. 기존 unittest를 통과해야 한다. Task 검증은 실제 unittest·파일 변경 범위 확인과 실행 역할과 분리된 Validator의 직접 evidence 검토로 수행한다. 모든 Task가 검증된 뒤 같은 workspace에서 기존 unittest와 별도의 동작·공개 계약·파일 보존 검사를 Goal Test로 새로 실행하고, Task evidence와 구분된 근거로 최종 Goal을 판정한다. 외부 서비스 변경·배포·의존성 추가는 범위에 없다.",
+            "trace_id": "trace_user_request"
+          },
+          {
+            "source_digest": "sha256:6816ea2ad8a0b9d6a5f5e35fac1d6b4ff37a5b7459415429aa02bfcb5905e25f",
+            "source_ref": "observation:001",
+            "statement": "{\"indexed_file_count\":4,\"inventory_complete\":true,\"kind\":\"project_inventory\",\"observed_file_count\":4,\"project_map_digest\":\"sha256:dd5e87324637558a85870482d70a25105c1326048d4721bf1131881d15534071\",\"project_root\":\"D:\\\\codex\\\\flowmarshal\\\\.flowmarshal-engine-eval\\\\runs\\\\s05-bugfix-trace-20260904\\\\workspace\"}",
+            "trace_id": "trace_observation_001"
+          },
+          {
+            "source_digest": "sha256:f2bb1929224609c1de8993092329de4b391d26088ba01ac986a599c1e7ac8a57",
+            "source_ref": "observation:002",
+            "statement": "{\"content_complete\":true,\"content_digest\":\"sha256:57fb50121f05548961e1e725e5537526b4e9cbc754383f8d42b0162096944b2a\",\"content_excerpt\":\"# Engine 실제 프로젝트 E2E 지침\\n\\n- `app.py`의 `add` 구현만 최소 수정한다.\\n- 공개 함수 이름과 인자 계약을 유지한다.\\n- `test_app.py`는 수정하지 않는다.\\n- Python `unittest` 검증을 실행한다.\\n\",\"kind\":\"project_file\",\"path\":\"AGENTS.md\",\"symbols\":[]}",
+            "trace_id": "trace_observation_002"
+          },
+          {
+            "source_digest": "sha256:1a79ab6da531a8bd242a35612b04aa4f1545a3da7c9971bd9a5b0d3ce704a8bb",
+            "source_ref": "observation:003",
+            "statement": "{\"content_complete\":true,\"content_digest\":\"sha256:de37b83f3f9bc35808d83d3252ce8c237fee98301d448d74cd4839699a1497bd\",\"content_excerpt\":\"def add(left: int, right: int) -> int:\\n    \\\"\\\"\\\"두 정수의 합을 반환한다.\\\"\\\"\\\"\\n\\n    return left - right\\n\",\"kind\":\"project_file\",\"path\":\"app.py\",\"symbols\":[\"add\"]}",
+            "trace_id": "trace_observation_003"
+          },
+          {
+            "source_digest": "sha256:ad019fc00558b1909188a3cbf8aea4bab973044feda58f578149488aeb4c2ccd",
+            "source_ref": "observation:004",
+            "statement": "{\"content_complete\":true,\"content_digest\":\"sha256:080c09d10ca93fff3eac35c3ce3200c988f8fb49a9ab87e09c0192e154bff188\",\"content_excerpt\":\"import unittest\\n\\nfrom app import add\\n\\n\\nclass AddTests(unittest.TestCase):\\n    def test_add_returns_sum(self) -> None:\\n        self.assertEqual(5, add(2, 3))\\n\",\"kind\":\"project_file\",\"path\":\"test_app.py\",\"symbols\":[\"AddTests\",\"AddTests.test_add_returns_sum\",\"test_add_returns_sum\"]}",
+            "trace_id": "trace_observation_004"
+          },
+          {
+            "source_digest": "sha256:42b135d15ad2e02fa105f1f252f31e55e422558d748339e704cd2a7fc1e1ce38",
+            "source_ref": "observation:005",
+            "statement": "{\"content_complete\":true,\"content_digest\":\"sha256:c0c58dc3ed0ff48b9f6161d1013d8fb8972549d20378322843f7279033b01ed8\",\"content_excerpt\":\"# 단일 bugfix의 고정 검증 자료\\n\\n이 자료는 S05에서 실행 전에 고정한 검증 계약의 운영 참고자료다. 실제 Goal 정규화 결과, Skeleton, Plan 후보나 선택 결과를 제공하지 않는다. Task 개수·분할·DAG·ID는 Planner가 제안한다. 아래 명령은 실행 준비 단계에서 사용할 기존 검사 도구이며 계획 생성 단계에서 실행할 의무가 아니다.\\n\\n## 현재 프로젝트와 검사 범위\\n\\n- 작업 복사본: `D:\\\\codex\\\\flowmarshal\\\\.flowmarshal-engine-eval\\\\runs\\\\s05-bugfix-trace-20260904\\\\workspace`\\n- Python: `D:\\\\codex\\\\flowmarshal\\\\.venv\\\\Scripts\\\\python.exe`\\n- 이미 구현·검증된 외부 검사 도구: `D:\\\\codex\\\\flowmarshal\\\\tests\\\\fixtures\\\\engine\\\\bugfix-trace\\\\oracle.py`\\n- 초기 보존 파일은 `app.py`, `test_app.py`, `AGENTS.md` 세 개다. Git 메타데이터와 Python bytecode만 파일 집합 비교에서 제외한다. Engine DB·artifact는 workspace 밖에 둔다.\\n- 수정은 작업 복사본의 `app.py` 안 `add` 구현으로 한정한다. 원본 fixture와 검사 도구는 수정 대상이 아니다. 새 프로젝트 파일이나 의존성을 추가할 필요가 없다.\\n\\n## Task 검사\\n\\n기존 도구를 `--phase task --workspace <작업 복사본>`으로 실행하면 현재 프로젝트 파일 집합, 테스트·AGENTS.md 초기 byte 해시, add 본문 밖 AST, 실제 함수 annotation·시그니처와 기존 unittest를 직접 검사한다. Python 실행 시 `-B`를 사용한다. 실제 unittest는 workspace에서 `python -B -m unittest discover -s . -p test_app.py -v`로 새 프로세스에서 수행한다.\\n\\nTask에는 직접 `file`, `diff`, `command`, `test` evidence와 실행 역할과 분리된 Validator의 `model_review`가 필요하다. 최소 변경 의미는 직접 file/diff/test evidence를 받은 독립 Validator가 검토하며, oracle 종료 코드만으로 이 의미 검사를 대체하지 않는다.\\n\\n## 모든 Task 검증 뒤 독립 Goal Test\\n\\n같은 기존 도구를 `--phase goal --workspace <동일 작업 복사본>`으로 새로 실행한다. Task 단계 검사를 다시 수행하면서 아래 정수 쌍 각각을 위치 인자와 키워드 인자로 호출하여 결과를 비교한다.\\n\\n| left | right | 결과 |\\n|---:|---:|---:|\\n| 2 | 3 | 5 |\\n| 0 | 0 | 0 |\\n| -2 | -3 | -5 |\\n| -5 | 8 | 3 |\\n| 7 | 0 | 7 |\\n| 0 | -9 | -9 |\\n| 1000000000000 | -1 | 999999999999 |\\n\\n공개 계약은 `add(left: int, right: int) -> int`이며 이름·annotation·위치 및 키워드 인자 호출을 유지한다. 검사 실행 도중 소스가 바뀌어도 실패한다. 정답 diff나 특정 구현 문자열은 강제하지 않는다.\\n\\nGoal 검증은 `evidence_mode=independent`와 새 `command`, `test`, `file`, `diff` evidence를 요구한다. Goal evidence의 `task_id`는 null이며 Task evidence를 복사하거나 이름만 바꿔 쓰지 않는다. Core가 최신 State·Goal binding·최종 GoalVerdict를 별도로 결속한다. 고정된 합격 기준은 모든 검사 통과이며 초기 결함 상태에서 oracle 종료 코드 1은 예상되는 실패다.\\n\",\"kind\":\"project_file\",\"path\":\"D:\\\\codex\\\\flowmarshal\\\\.flowmarshal-engine-eval\\\\runs\\\\s06-bugfix-trace-20260904-v4\\\\validation-reference.md\",\"symbols\":[]}",
+            "trace_id": "trace_observation_005"
+          }
+        ],
+        "unresolved_questions": []
+      },
+      "definition_digest": "sha256:e43e73deb801e42b7762d474afcb62917d19d39dbbfbfb54e4f90424eba2bedd",
+      "goal_id": "goal_a65a5d6b59374f81b0a13c4eef117ea9",
+      "goal_revision_id": "goal_revision_1deefe6198134a989283d48463a19995",
+      "preparation_binding": {
+        "finding_codes": [],
+        "finding_evidence_refs": [],
+        "findings": [],
+        "normalization_proposal_digest": "sha256:8fb90448ae84a0a9621f6d68e8163b15bef0a801a58d14f231e5aff886667e05",
+        "ratings": {
+          "engineering": 4,
+          "execution_safety": 4,
+          "goal_fit": 4,
+          "grounding": 4,
+          "verification": 4
+        },
+        "reviewer_role": "goal_reviewer",
+        "reviewer_submission_digest": "sha256:d4f94406151ccbd0fc3cf4e43b5acfe23943b6de0e4bb8456aa44448b73b89dc"
+      },
+      "revision_no": 1,
+      "schema_version": "1.0",
+      "status": "ready"
+    },
+    "input-semantic-explicit-goal.json": {
+      "created_at": "2026-09-04T10:08:45.064369Z",
+      "definition": {
+        "approved_decision_refs": [],
+        "assumptions": [],
+        "constraints": [
+          {
+            "category": "수정 범위",
+            "constraint_id": "constraint_001",
+            "statement": "app.py의 add 구현만 수정한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ]
+          },
+          {
+            "category": "보존",
+            "constraint_id": "constraint_002",
+            "statement": "test_app.py와 AGENTS.md를 그대로 보존하고 프로젝트 파일을 추가하거나 삭제하지 않는다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ]
+          },
+          {
+            "category": "검증",
+            "constraint_id": "constraint_003",
+            "statement": "실제 unittest·파일 변경 범위 확인·분리된 Validator의 직접 evidence 검토를 Task 검증에 포함하고, 모든 Task 검증 후 별도 Goal Test를 수행한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ]
+          }
+        ],
+        "effect_policy": {
+          "allowed_external_effects": [],
+          "behavior_policy": "preserve_public_contracts",
+          "irreversible_effects_require_checkpoint": true,
+          "mutation_policy": "scoped_change",
+          "prohibited_effects": [
+            "app.py의 add 구현 외 프로젝트 파일 변경",
+            "test_app.py 또는 AGENTS.md 변경",
+            "프로젝트 파일 추가 또는 삭제",
+            "외부 서비스 변경 또는 배포",
+            "프로젝트 의존성 추가"
+          ]
+        },
+        "hard_acceptance": [
+          {
+            "criterion_id": "ac_001",
+            "statement": "add(left: int, right: int) -> int가 양수·음수·0을 포함한 두 정수의 합을 반환한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ],
+            "validation_intent": "등록된 oracle.py의 task 및 goal phase와 기존 unittest를 사용해 동작 결과를 검증한다. goal phase에서는 위치·키워드 인자 호출을 포함한 고정 정수 쌍을 새로 검사한다. 분리 Validator의 semantic 검토도 이 AC의 검사 절차로 명시하고 해당 validation ID를 연결한다."
+          },
+          {
+            "criterion_id": "ac_002",
+            "statement": "공개 함수명 add, left·right 인자명, int annotation, int 반환 annotation과 위치·키워드 인자 호출 계약을 유지한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ],
+            "validation_intent": "oracle.py가 실제 함수 annotation·시그니처와 위치·키워드 호출 결과를 검사한다."
+          },
+          {
+            "criterion_id": "ac_003",
+            "statement": "기존 unittest가 통과한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ],
+            "validation_intent": "동일 workspace에서 Python unittest를 새 프로세스로 실행해 통과 여부를 확인한다."
+          },
+          {
+            "criterion_id": "ac_004",
+            "statement": "Task 검증과 별도로 동일 workspace에서 Goal Test를 실행하고, 모든 동작·공개 계약·파일 보존 검사가 통과한 독립 evidence로 최종 Goal을 판정한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ],
+            "validation_intent": "oracle.py를 task phase와 goal phase로 구분해 실행한다. Goal evidence는 새 command·test·file·diff evidence를 사용하고 task_id는 null로 유지하며 Task evidence를 복사하지 않는다."
+          }
+        ],
+        "mission_class": "bugfix_stabilization",
+        "non_goals": [
+          "외부 서비스 변경이나 배포",
+          "프로젝트 의존성 추가"
+        ],
+        "observable_outcome": "app.py의 add가 공개 호출 계약을 유지하면서 두 정수의 합을 반환하고, 기존 파일 보존 조건과 독립 Goal Test를 포함한 전체 검증을 통과한다.",
+        "profile_definition_digest": "sha256:06f95423e21eaf4993c1624089bd15de2e6461fde59849dabc14302e64a05639",
+        "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+        "quality_preferences": [
+          {
+            "preference_id": "pref_001",
+            "statement": "수정 범위를 app.py의 add 구현으로 최소화한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ],
+            "weight": 10
+          },
+          {
+            "preference_id": "pref_002",
+            "statement": "검증 결과가 직접 관측 evidence로 추적 가능하도록 유지한다.",
+            "trace_refs": [
+              "trace_user_request",
+              "trace_observation_001",
+              "trace_observation_002",
+              "trace_observation_003",
+              "trace_observation_004",
+              "trace_observation_005"
+            ],
+            "weight": 8
+          }
+        ],
+        "source_request": "app.py의 add(2, 3)이 -1을 반환하여 test_app.py의 기존 합산 테스트가 실패한다. add가 양수·음수·0을 포함한 두 정수의 합을 반환하도록 add 함수 구현만 최소 수정해줘. 공개 함수 add(left: int, right: int) -> int와 위치·키워드 인자 호출 계약을 유지한다. test_app.py와 AGENTS.md는 그대로 보존하고 프로젝트 파일을 추가하거나 삭제하지 않는다. 기존 unittest를 통과해야 한다. Task 검증은 실제 unittest·파일 변경 범위 확인과 실행 역할과 분리된 Validator의 직접 evidence 검토로 수행한다. 모든 Task가 검증된 뒤 같은 workspace에서 기존 unittest와 별도의 동작·공개 계약·파일 보존 검사를 Goal Test로 새로 실행하고, Task evidence와 구분된 근거로 최종 Goal을 판정한다. 외부 서비스 변경·배포·의존성 추가는 범위에 없다.",
+        "source_request_digest": "sha256:7a2e53cd7c7f0aebbda43ca6048972e122e9e08cab6c9679d26cab5d09e7e1a4",
+        "source_traces": [
+          {
+            "source_digest": "sha256:7a2e53cd7c7f0aebbda43ca6048972e122e9e08cab6c9679d26cab5d09e7e1a4",
+            "source_ref": "user-request",
+            "statement": "app.py의 add(2, 3)이 -1을 반환하여 test_app.py의 기존 합산 테스트가 실패한다. add가 양수·음수·0을 포함한 두 정수의 합을 반환하도록 add 함수 구현만 최소 수정해줘. 공개 함수 add(left: int, right: int) -> int와 위치·키워드 인자 호출 계약을 유지한다. test_app.py와 AGENTS.md는 그대로 보존하고 프로젝트 파일을 추가하거나 삭제하지 않는다. 기존 unittest를 통과해야 한다. Task 검증은 실제 unittest·파일 변경 범위 확인과 실행 역할과 분리된 Validator의 직접 evidence 검토로 수행한다. 모든 Task가 검증된 뒤 같은 workspace에서 기존 unittest와 별도의 동작·공개 계약·파일 보존 검사를 Goal Test로 새로 실행하고, Task evidence와 구분된 근거로 최종 Goal을 판정한다. 외부 서비스 변경·배포·의존성 추가는 범위에 없다.",
+            "trace_id": "trace_user_request"
+          },
+          {
+            "source_digest": "sha256:6816ea2ad8a0b9d6a5f5e35fac1d6b4ff37a5b7459415429aa02bfcb5905e25f",
+            "source_ref": "observation:001",
+            "statement": "{\"indexed_file_count\":4,\"inventory_complete\":true,\"kind\":\"project_inventory\",\"observed_file_count\":4,\"project_map_digest\":\"sha256:dd5e87324637558a85870482d70a25105c1326048d4721bf1131881d15534071\",\"project_root\":\"D:\\\\codex\\\\flowmarshal\\\\.flowmarshal-engine-eval\\\\runs\\\\s05-bugfix-trace-20260904\\\\workspace\"}",
+            "trace_id": "trace_observation_001"
+          },
+          {
+            "source_digest": "sha256:f2bb1929224609c1de8993092329de4b391d26088ba01ac986a599c1e7ac8a57",
+            "source_ref": "observation:002",
+            "statement": "{\"content_complete\":true,\"content_digest\":\"sha256:57fb50121f05548961e1e725e5537526b4e9cbc754383f8d42b0162096944b2a\",\"content_excerpt\":\"# Engine 실제 프로젝트 E2E 지침\\n\\n- `app.py`의 `add` 구현만 최소 수정한다.\\n- 공개 함수 이름과 인자 계약을 유지한다.\\n- `test_app.py`는 수정하지 않는다.\\n- Python `unittest` 검증을 실행한다.\\n\",\"kind\":\"project_file\",\"path\":\"AGENTS.md\",\"symbols\":[]}",
+            "trace_id": "trace_observation_002"
+          },
+          {
+            "source_digest": "sha256:1a79ab6da531a8bd242a35612b04aa4f1545a3da7c9971bd9a5b0d3ce704a8bb",
+            "source_ref": "observation:003",
+            "statement": "{\"content_complete\":true,\"content_digest\":\"sha256:de37b83f3f9bc35808d83d3252ce8c237fee98301d448d74cd4839699a1497bd\",\"content_excerpt\":\"def add(left: int, right: int) -> int:\\n    \\\"\\\"\\\"두 정수의 합을 반환한다.\\\"\\\"\\\"\\n\\n    return left - right\\n\",\"kind\":\"project_file\",\"path\":\"app.py\",\"symbols\":[\"add\"]}",
+            "trace_id": "trace_observation_003"
+          },
+          {
+            "source_digest": "sha256:ad019fc00558b1909188a3cbf8aea4bab973044feda58f578149488aeb4c2ccd",
+            "source_ref": "observation:004",
+            "statement": "{\"content_complete\":true,\"content_digest\":\"sha256:080c09d10ca93fff3eac35c3ce3200c988f8fb49a9ab87e09c0192e154bff188\",\"content_excerpt\":\"import unittest\\n\\nfrom app import add\\n\\n\\nclass AddTests(unittest.TestCase):\\n    def test_add_returns_sum(self) -> None:\\n        self.assertEqual(5, add(2, 3))\\n\",\"kind\":\"project_file\",\"path\":\"test_app.py\",\"symbols\":[\"AddTests\",\"AddTests.test_add_returns_sum\",\"test_add_returns_sum\"]}",
+            "trace_id": "trace_observation_004"
+          },
+          {
+            "source_digest": "sha256:42b135d15ad2e02fa105f1f252f31e55e422558d748339e704cd2a7fc1e1ce38",
+            "source_ref": "observation:005",
+            "statement": "{\"content_complete\":true,\"content_digest\":\"sha256:c0c58dc3ed0ff48b9f6161d1013d8fb8972549d20378322843f7279033b01ed8\",\"content_excerpt\":\"# 단일 bugfix의 고정 검증 자료\\n\\n이 자료는 S05에서 실행 전에 고정한 검증 계약의 운영 참고자료다. 실제 Goal 정규화 결과, Skeleton, Plan 후보나 선택 결과를 제공하지 않는다. Task 개수·분할·DAG·ID는 Planner가 제안한다. 아래 명령은 실행 준비 단계에서 사용할 기존 검사 도구이며 계획 생성 단계에서 실행할 의무가 아니다.\\n\\n## 현재 프로젝트와 검사 범위\\n\\n- 작업 복사본: `D:\\\\codex\\\\flowmarshal\\\\.flowmarshal-engine-eval\\\\runs\\\\s05-bugfix-trace-20260904\\\\workspace`\\n- Python: `D:\\\\codex\\\\flowmarshal\\\\.venv\\\\Scripts\\\\python.exe`\\n- 이미 구현·검증된 외부 검사 도구: `D:\\\\codex\\\\flowmarshal\\\\tests\\\\fixtures\\\\engine\\\\bugfix-trace\\\\oracle.py`\\n- 초기 보존 파일은 `app.py`, `test_app.py`, `AGENTS.md` 세 개다. Git 메타데이터와 Python bytecode만 파일 집합 비교에서 제외한다. Engine DB·artifact는 workspace 밖에 둔다.\\n- 수정은 작업 복사본의 `app.py` 안 `add` 구현으로 한정한다. 원본 fixture와 검사 도구는 수정 대상이 아니다. 새 프로젝트 파일이나 의존성을 추가할 필요가 없다.\\n\\n## Task 검사\\n\\n기존 도구를 `--phase task --workspace <작업 복사본>`으로 실행하면 현재 프로젝트 파일 집합, 테스트·AGENTS.md 초기 byte 해시, add 본문 밖 AST, 실제 함수 annotation·시그니처와 기존 unittest를 직접 검사한다. Python 실행 시 `-B`를 사용한다. 실제 unittest는 workspace에서 `python -B -m unittest discover -s . -p test_app.py -v`로 새 프로세스에서 수행한다.\\n\\nTask에는 직접 `file`, `diff`, `command`, `test` evidence와 실행 역할과 분리된 Validator의 `model_review`가 필요하다. 최소 변경 의미는 직접 file/diff/test evidence를 받은 독립 Validator가 검토하며, oracle 종료 코드만으로 이 의미 검사를 대체하지 않는다.\\n\\n## 모든 Task 검증 뒤 독립 Goal Test\\n\\n같은 기존 도구를 `--phase goal --workspace <동일 작업 복사본>`으로 새로 실행한다. Task 단계 검사를 다시 수행하면서 아래 정수 쌍 각각을 위치 인자와 키워드 인자로 호출하여 결과를 비교한다.\\n\\n| left | right | 결과 |\\n|---:|---:|---:|\\n| 2 | 3 | 5 |\\n| 0 | 0 | 0 |\\n| -2 | -3 | -5 |\\n| -5 | 8 | 3 |\\n| 7 | 0 | 7 |\\n| 0 | -9 | -9 |\\n| 1000000000000 | -1 | 999999999999 |\\n\\n공개 계약은 `add(left: int, right: int) -> int`이며 이름·annotation·위치 및 키워드 인자 호출을 유지한다. 검사 실행 도중 소스가 바뀌어도 실패한다. 정답 diff나 특정 구현 문자열은 강제하지 않는다.\\n\\nGoal 검증은 `evidence_mode=independent`와 새 `command`, `test`, `file`, `diff` evidence를 요구한다. Goal evidence의 `task_id`는 null이며 Task evidence를 복사하거나 이름만 바꿔 쓰지 않는다. Core가 최신 State·Goal binding·최종 GoalVerdict를 별도로 결속한다. 고정된 합격 기준은 모든 검사 통과이며 초기 결함 상태에서 oracle 종료 코드 1은 예상되는 실패다.\\n\",\"kind\":\"project_file\",\"path\":\"D:\\\\codex\\\\flowmarshal\\\\.flowmarshal-engine-eval\\\\runs\\\\s06-bugfix-trace-20260904-v4\\\\validation-reference.md\",\"symbols\":[]}",
+            "trace_id": "trace_observation_005"
+          }
+        ],
+        "unresolved_questions": []
+      },
+      "definition_digest": "sha256:5db87970a337e4afe9388fba1c581fb649a8fc9d87d4fc5148892b4fed0b06d4",
+      "goal_id": "goal_a65a5d6b59374f81b0a13c4eef117ea9",
+      "goal_revision_id": "diagnostic_goal_revision_9e244b2bceb44767a9e592b7dfb20ca1",
+      "preparation_binding": {
+        "finding_codes": [],
+        "finding_evidence_refs": [],
+        "findings": [],
+        "normalization_proposal_digest": "sha256:8fb90448ae84a0a9621f6d68e8163b15bef0a801a58d14f231e5aff886667e05",
+        "ratings": {
+          "engineering": 4,
+          "execution_safety": 4,
+          "goal_fit": 4,
+          "grounding": 4,
+          "verification": 4
+        },
+        "reviewer_role": "goal_reviewer",
+        "reviewer_submission_digest": "sha256:d4f94406151ccbd0fc3cf4e43b5acfe23943b6de0e4bb8456aa44448b73b89dc"
+      },
+      "revision_no": 2,
+      "schema_version": "1.0",
+      "status": "ready",
+      "supersedes_goal_revision_id": "goal_revision_1deefe6198134a989283d48463a19995"
+    },
+    "input-state.json": {
+      "facts": [
+        {
+          "confidence_basis": "observed",
+          "evidence_digest": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a",
+          "fact_id": "fact_project_map",
+          "freshness": "current",
+          "invalidates_on": [
+            "project file content changes"
+          ],
+          "predicate": "current project map",
+          "source_ref": "project-map",
+          "value": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a"
+        }
+      ],
+      "goal_contract_digest": "sha256:e43e73deb801e42b7762d474afcb62917d19d39dbbfbfb54e4f90424eba2bedd",
+      "observed_at": "2026-09-04T10:09:16.673019Z",
+      "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+      "schema_version": "1.0",
+      "scope_fingerprint": "sha256:fe9dade1c6b8ec48854564ebcdf9fde09888e9b70fb78fdfae048e4799b53e0f",
+      "snapshot_id": "snapshot_ed969fdff2224baeae59f38ff825d180",
+      "unknowns": [],
+      "version": 1
+    },
+    "input-semantic-explicit-state.json": {
+      "facts": [
+        {
+          "confidence_basis": "observed",
+          "evidence_digest": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a",
+          "fact_id": "fact_project_map",
+          "freshness": "current",
+          "invalidates_on": [
+            "project file content changes"
+          ],
+          "predicate": "current project map",
+          "source_ref": "project-map",
+          "value": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a"
+        }
+      ],
+      "goal_contract_digest": "sha256:5db87970a337e4afe9388fba1c581fb649a8fc9d87d4fc5148892b4fed0b06d4",
+      "observed_at": "2026-09-04T13:07:02.369793Z",
+      "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+      "schema_version": "1.0",
+      "scope_fingerprint": "sha256:2199494ad19087b9d1bca7bcf92523dea623d20c6cb73d462e72374213c04c1e",
+      "snapshot_id": "diagnostic_snapshot_70298a31f4b3456c9ce116af2be87bb4",
+      "unknowns": [],
+      "version": 2
+    },
+    "input-project-map.json": {
+      "created_at": "2026-09-04T10:09:16.657465Z",
+      "entries": [
+        {
+          "content_digest": "sha256:57fb50121f05548961e1e725e5537526b4e9cbc754383f8d42b0162096944b2a",
+          "dependency_refs": [],
+          "entry_id": "entry_a1440f0933c4047ccf0dff60",
+          "kind": "instruction",
+          "path": "AGENTS.md",
+          "symbols": [],
+          "tags": [
+            "instruction_source",
+            "md"
+          ]
+        },
+        {
+          "content_digest": "sha256:de37b83f3f9bc35808d83d3252ce8c237fee98301d448d74cd4839699a1497bd",
+          "dependency_refs": [],
+          "entry_id": "entry_e223b090bcffafe2127c34a7",
+          "kind": "file",
+          "path": "app.py",
+          "symbols": [
+            "add"
+          ],
+          "tags": [
+            "py",
+            "symbol_indexed"
+          ]
+        },
+        {
+          "content_digest": "sha256:080c09d10ca93fff3eac35c3ce3200c988f8fb49a9ab87e09c0192e154bff188",
+          "dependency_refs": [],
+          "entry_id": "entry_306ad59137986ddd9d5cc8b8",
+          "kind": "test",
+          "path": "test_app.py",
+          "symbols": [
+            "AddTests",
+            "AddTests.test_add_returns_sum",
+            "test_add_returns_sum"
+          ],
+          "tags": [
+            "py",
+            "symbol_indexed"
+          ]
+        },
+        {
+          "content_digest": "sha256:c0c58dc3ed0ff48b9f6161d1013d8fb8972549d20378322843f7279033b01ed8",
+          "dependency_refs": [],
+          "entry_id": "entry_ad363844d3392d9ef718d2d6",
+          "kind": "reference",
+          "path": "D:\\codex\\flowmarshal\\.flowmarshal-engine-eval\\runs\\s06-bugfix-trace-20260904-v4\\validation-reference.md",
+          "symbols": [],
+          "tags": [
+            "md",
+            "registered_reference"
+          ]
+        }
+      ],
+      "instruction_source_refs": [
+        "entry_a1440f0933c4047ccf0dff60"
+      ],
+      "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+      "project_map_revision_id": "project_map_6ac82ecb30834445a9351251a36f97bc",
+      "revision_no": 1,
+      "root": "D:\\codex\\flowmarshal\\.flowmarshal-engine-eval\\runs\\s05-bugfix-trace-20260904\\workspace",
+      "schema_version": "1.0"
+    },
+    "input-clean-plan.json": {
+      "created_at": "2026-09-04T10:11:11.861102Z",
+      "definition": {
+        "base_state_snapshot_digest": "sha256:ff1e4dd1f7f7e7a430c4544dc1123e458577a701f019f2a134bbc7fda4b19444",
+        "commit_horizon": {
+          "irreversible_effect_checkpoint": true,
+          "max_ready_tasks": 1,
+          "project_serial_execution": true,
+          "revalidate_snapshot_before_materialization": true
+        },
+        "dependencies": [],
+        "expected_effects": [
+          "app.py의 add 구현이 두 정수의 합을 반환하도록 변경된다.",
+          "Task와 독립 Goal Test의 검증 evidence 및 최종 Goal 판정에 필요한 관측이 원장에 기록된다."
+        ],
+        "goal_contract_digest": "sha256:e43e73deb801e42b7762d474afcb62917d19d39dbbfbfb54e4f90424eba2bedd",
+        "goal_coverage": [
+          {
+            "criterion_id": "ac_001",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_unittest",
+              "val_goal_independent_behavior_contract"
+            ]
+          },
+          {
+            "criterion_id": "ac_002",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_validator_review",
+              "val_goal_independent_behavior_contract"
+            ]
+          },
+          {
+            "criterion_id": "ac_003",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_unittest",
+              "val_goal_independent_unittest",
+              "val_task_add_behavior_contract"
+            ]
+          },
+          {
+            "criterion_id": "ac_004",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_unittest",
+              "val_task_scope_preservation",
+              "val_goal_independent_behavior_contract",
+              "val_goal_independent_unittest",
+              "val_goal_independent_scope_preservation"
+            ]
+          }
+        ],
+        "integration_validations": [
+          {
+            "criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test",
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace에서 oracle.py의 goal phase를 새로 실행하여 고정된 양수·음수·0 정수 쌍을 위치 인자와 키워드 인자로 호출하고 합산 결과를 비교하며, 공개 함수명 add, left·right 인자명, int annotation, int 반환 annotation과 위치·키워드 호출 계약을 독립적으로 검사한다.",
+            "validation_id": "val_goal_independent_behavior_contract"
+          },
+          {
+            "criterion_refs": [
+              "ac_003",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace에서 기존 unittest를 별도 새 프로세스로 다시 실행하여 기존 unittest 통과 여부를 독립적으로 확인한다.",
+            "validation_id": "val_goal_independent_unittest"
+          },
+          {
+            "criterion_refs": [
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace의 새 file·diff evidence를 사용하여 app.py의 add 구현 외 변경이 없고 test_app.py와 AGENTS.md가 보존되며 프로젝트 파일 추가·삭제가 없는지 독립적으로 검사한다.",
+            "validation_id": "val_goal_independent_scope_preservation"
+          }
+        ],
+        "model_inventory_digest": "sha256:82e6bbcba85b38800c736c9f9809a493fbc9b3270cb53b514721a80839a49f14",
+        "planning_budget": {
+          "max_candidate_versions": 5,
+          "max_initial_candidates": 3,
+          "max_logical_role_calls": 14,
+          "max_refinement_per_candidate": 1,
+          "max_shortlist": 2,
+          "replan_reserve_percent": 25
+        },
+        "prohibited_effects": [
+          "app.py의 add 구현 외 프로젝트 파일 mutation",
+          "test_app.py 또는 AGENTS.md mutation",
+          "프로젝트 파일 추가 또는 삭제",
+          "프로젝트 의존성 추가 또는 변경",
+          "외부 서비스 변경·배포·외부 계정·제3자에 대한 효과"
+        ],
+        "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+        "project_map_digest": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a",
+        "source_skeleton_digest": "sha256:d758b38cbc6dca2091480122403897b801b540e83770fc9a6228ebb853f99254",
+        "tasks": [
+          {
+            "acceptance_criteria": [
+              "app.py의 add가 양수·음수·0을 포함한 두 정수의 합을 반환한다.",
+              "공개 함수명 add, left·right 인자명, int 입력 annotation, int 반환 annotation과 위치·키워드 인자 호출 계약을 유지한다.",
+              "기존 unittest를 동일 workspace에서 새 프로세스로 실행해 통과한다.",
+              "변경 파일 집합과 app.py의 add 구현 범위가 허용 범위와 일치하고 test_app.py·AGENTS.md 및 프로젝트 파일 집합 보존 조건을 확인한다.",
+              "실행 역할과 분리된 Validator가 직접 수집된 변경 evidence를 검토하고 범위·공개 계약·최소 변경 의미에 대한 검토 결과를 제출한다."
+            ],
+            "approval_class": "none",
+            "assignment": {
+              "executor": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "high",
+                "preferred_model": "gpt-5.6-terra",
+                "role": "executor"
+              },
+              "independence_required": true,
+              "validator": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "xhigh",
+                "preferred_model": "gpt-5.6-sol",
+                "role": "validator"
+              }
+            },
+            "consumes": [
+              "input:app.py",
+              "input:test_app.py",
+              "input:AGENTS.md",
+              "input:D:\\codex\\flowmarshal\\.flowmarshal-engine-eval\\runs\\s06-bugfix-trace-20260904-v4\\validation-reference.md",
+              "project:map",
+              "project:root",
+              "state:fact_project_map"
+            ],
+            "expected_effects": [
+              {
+                "effect_id": "effect_local_add_change",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py 내부 add 구현이 두 정수의 합을 반환하도록 변경된다."
+              },
+              {
+                "effect_id": "effect_task_evidence",
+                "external": false,
+                "reversible": true,
+                "statement": "Task 완료에 필요한 변경 범위·unittest·Validator 검토 evidence가 원장에 기록된다."
+              }
+            ],
+            "goal_criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "kind": "change",
+            "objective": "app.py의 add 구현만 수정하여 두 정수의 합을 반환하고, 공개 호출 계약과 보존 범위를 유지한다.",
+            "preconditions": [
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_project_binding",
+                "statement": "Goal의 명시적 대상 프로젝트가 Project Map.root 및 state:fact_project_map과 일치하고, 제공된 현재 프로젝트 관측을 기준으로 app.py·test_app.py·AGENTS.md가 입력으로 존재한다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_scope_binding",
+                "statement": "변경 대상은 app.py의 add 구현으로 한정되며 test_app.py·AGENTS.md는 보존 대상이고 프로젝트 파일 추가·삭제와 의존성 추가는 계약 범위 밖이다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_initial_state",
+                "statement": "현재 add 구현의 결함 상태와 기존 파일 보존 해시를 제공된 원본 관측 및 등록 검증 자료와 대조할 수 있다."
+              }
+            ],
+            "produces": [
+              "artifact:add_implementation_change",
+              "evidence:task_change_scope",
+              "evidence:task_unittest",
+              "evidence:task_validator_review"
+            ],
+            "prohibited_effects": [
+              {
+                "effect_id": "prohibited_local_scope",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py의 add 구현 이외의 프로젝트 파일을 변경하지 않으며, test_app.py와 AGENTS.md를 변경하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_local_filesystem_shape",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 파일을 추가하거나 삭제하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_external_effects",
+                "external": true,
+                "reversible": true,
+                "statement": "외부 서비스 변경·배포·외부 계정 또는 제3자에 대한 효과를 발생시키지 않는다."
+              },
+              {
+                "effect_id": "prohibited_dependency_change",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 의존성을 추가하거나 변경하지 않는다."
+              }
+            ],
+            "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+            "recovery": {
+              "max_goal_replans": 5,
+              "max_same_failure_replans": 2,
+              "requires_new_evidence": true,
+              "resume_strategy": "existing_binding_first",
+              "retryable_failure_classes": [
+                "implementation",
+                "context",
+                "task_contract",
+                "dependency",
+                "environment"
+              ]
+            },
+            "required_capabilities": [
+              "python_change",
+              "unittest_validation",
+              "independent_validator_review"
+            ],
+            "risk_level": "medium",
+            "risk_tags": [
+              "scoped_mutation",
+              "public_contract"
+            ],
+            "task_id": "task_60f8eabb986e4083a301ea7959f8b153",
+            "task_ref": "task_change_add",
+            "validations": [
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "command",
+                  "test",
+                  "file",
+                  "diff"
+                ],
+                "statement": "등록된 oracle.py의 task phase를 실제 실행하여 현재 프로젝트 파일 집합, test_app.py·AGENTS.md의 보존 해시, add 본문 밖 AST, 공개 함수명·인자명·int 입력 및 반환 annotation·시그니처와 기존 unittest 통과를 검사한다.",
+                "validation_id": "val_task_add_behavior_contract"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "command",
+                  "test"
+                ],
+                "statement": "기존 test_app.py의 unittest를 동일 workspace에서 새 프로세스로 실제 실행하여 기존 unittest가 통과하는지 확인한다.",
+                "validation_id": "val_task_unittest"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "file",
+                  "diff"
+                ],
+                "statement": "Task 변경 결과의 파일 집합과 diff를 직접 검사하여 변경이 app.py의 add 구현에만 한정되고 test_app.py와 AGENTS.md의 원본 내용, 프로젝트 파일 추가·삭제 및 의존성 변경이 없는지 확인한다.",
+                "validation_id": "val_task_scope_preservation"
+              },
+              {
+                "method": "semantic",
+                "required_evidence_kinds": [
+                  "model_review"
+                ],
+                "statement": "실행 역할과 분리된 Validator가 Task의 직접 file·diff evidence를 검토하여 app.py의 add 구현 변경이 요구된 동작·공개 호출 계약·최소 수정 범위를 충족하는지 독립적으로 판단하고 검토 결과를 제출한다.",
+                "validation_id": "val_task_validator_review"
+              }
+            ]
+          }
+        ]
+      },
+      "definition_digest": "sha256:ca525e86547e699b6df3d7b5526b5ae38f97f63a32f13a4a9930496fd3aab148",
+      "plan_id": "diagnostic_plan_808405f525c348dfbddb5831f6febea8",
+      "plan_revision_id": "diagnostic_plan_revision_4de479a9da134366a65c046b2a841b05",
+      "revision_no": 1,
+      "schema_version": "1.0",
+      "status": "ready"
+    },
+    "input-bad-plan.json": {
+      "created_at": "2026-09-04T10:11:11.861102Z",
+      "definition": {
+        "base_state_snapshot_digest": "sha256:ff1e4dd1f7f7e7a430c4544dc1123e458577a701f019f2a134bbc7fda4b19444",
+        "commit_horizon": {
+          "irreversible_effect_checkpoint": true,
+          "max_ready_tasks": 1,
+          "project_serial_execution": true,
+          "revalidate_snapshot_before_materialization": true
+        },
+        "dependencies": [],
+        "expected_effects": [
+          "app.py의 add 구현이 두 정수의 합을 반환하도록 변경된다.",
+          "Task와 독립 Goal Test의 검증 evidence 및 최종 Goal 판정에 필요한 관측이 원장에 기록된다."
+        ],
+        "goal_contract_digest": "sha256:e43e73deb801e42b7762d474afcb62917d19d39dbbfbfb54e4f90424eba2bedd",
+        "goal_coverage": [
+          {
+            "criterion_id": "ac_001",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_unittest",
+              "val_goal_independent_behavior_contract"
+            ]
+          },
+          {
+            "criterion_id": "ac_002",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_validator_review",
+              "val_goal_independent_behavior_contract"
+            ]
+          },
+          {
+            "criterion_id": "ac_003",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_unittest",
+              "val_goal_independent_unittest",
+              "val_task_add_behavior_contract"
+            ]
+          },
+          {
+            "criterion_id": "ac_004",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_unittest",
+              "val_task_scope_preservation",
+              "val_goal_independent_behavior_contract",
+              "val_goal_independent_unittest",
+              "val_goal_independent_scope_preservation"
+            ]
+          }
+        ],
+        "integration_validations": [
+          {
+            "criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test",
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace에서 oracle.py의 goal phase를 새로 실행하여 고정된 양수·음수·0 정수 쌍을 위치 인자와 키워드 인자로 호출하고 합산 결과를 비교하며, 공개 함수명 add, left·right 인자명, int annotation, int 반환 annotation과 위치·키워드 호출 계약을 독립적으로 검사한다.",
+            "validation_id": "val_goal_independent_behavior_contract"
+          },
+          {
+            "criterion_refs": [
+              "ac_003",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace에서 기존 unittest를 별도 새 프로세스로 다시 실행하여 기존 unittest 통과 여부를 독립적으로 확인한다.",
+            "validation_id": "val_goal_independent_unittest"
+          },
+          {
+            "criterion_refs": [
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace의 새 file·diff evidence를 사용하여 app.py의 add 구현 외 변경이 없고 test_app.py와 AGENTS.md가 보존되며 프로젝트 파일 추가·삭제가 없는지 독립적으로 검사한다.",
+            "validation_id": "val_goal_independent_scope_preservation"
+          }
+        ],
+        "model_inventory_digest": "sha256:82e6bbcba85b38800c736c9f9809a493fbc9b3270cb53b514721a80839a49f14",
+        "planning_budget": {
+          "max_candidate_versions": 5,
+          "max_initial_candidates": 3,
+          "max_logical_role_calls": 14,
+          "max_refinement_per_candidate": 1,
+          "max_shortlist": 2,
+          "replan_reserve_percent": 25
+        },
+        "prohibited_effects": [
+          "app.py의 add 구현 외 프로젝트 파일 mutation",
+          "test_app.py 또는 AGENTS.md mutation",
+          "프로젝트 파일 추가 또는 삭제",
+          "프로젝트 의존성 추가 또는 변경",
+          "외부 서비스 변경·배포·외부 계정·제3자에 대한 효과"
+        ],
+        "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+        "project_map_digest": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a",
+        "source_skeleton_digest": "sha256:d758b38cbc6dca2091480122403897b801b540e83770fc9a6228ebb853f99254",
+        "tasks": [
+          {
+            "acceptance_criteria": [
+              "app.py의 add가 양수·음수·0을 포함한 두 정수의 합을 반환한다.",
+              "공개 함수명 add, left·right 인자명, int 입력 annotation, int 반환 annotation과 위치·키워드 인자 호출 계약을 유지한다.",
+              "기존 unittest를 동일 workspace에서 새 프로세스로 실행해 통과한다.",
+              "변경 파일 집합과 app.py의 add 구현 범위가 허용 범위와 일치하고 test_app.py·AGENTS.md 및 프로젝트 파일 집합 보존 조건을 확인한다.",
+              "실행 역할과 분리된 Validator가 직접 수집된 변경 evidence를 검토하고 범위·공개 계약·최소 변경 의미에 대한 검토 결과를 제출한다."
+            ],
+            "approval_class": "none",
+            "assignment": {
+              "executor": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "high",
+                "preferred_model": "gpt-5.6-terra",
+                "role": "executor"
+              },
+              "independence_required": true,
+              "validator": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "xhigh",
+                "preferred_model": "gpt-5.6-sol",
+                "role": "validator"
+              }
+            },
+            "consumes": [
+              "input:app.py",
+              "input:test_app.py",
+              "input:AGENTS.md",
+              "input:D:\\codex\\flowmarshal\\.flowmarshal-engine-eval\\runs\\s06-bugfix-trace-20260904-v4\\validation-reference.md",
+              "project:map",
+              "project:root",
+              "state:fact_project_map"
+            ],
+            "expected_effects": [
+              {
+                "effect_id": "effect_local_add_change",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py 내부 add 구현이 두 정수의 합을 반환하도록 변경된다."
+              },
+              {
+                "effect_id": "effect_task_evidence",
+                "external": false,
+                "reversible": true,
+                "statement": "Task 완료에 필요한 변경 범위·unittest·Validator 검토 evidence가 원장에 기록된다."
+              }
+            ],
+            "goal_criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "kind": "change",
+            "objective": "app.py의 add 구현만 수정하여 두 정수의 합을 반환하고, 공개 호출 계약과 보존 범위를 유지한다.",
+            "preconditions": [
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_project_binding",
+                "statement": "Goal의 명시적 대상 프로젝트가 Project Map.root 및 state:fact_project_map과 일치하고, 제공된 현재 프로젝트 관측을 기준으로 app.py·test_app.py·AGENTS.md가 입력으로 존재한다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_scope_binding",
+                "statement": "변경 대상은 app.py의 add 구현으로 한정되며 test_app.py·AGENTS.md는 보존 대상이고 프로젝트 파일 추가·삭제와 의존성 추가는 계약 범위 밖이다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_initial_state",
+                "statement": "현재 add 구현의 결함 상태와 기존 파일 보존 해시를 제공된 원본 관측 및 등록 검증 자료와 대조할 수 있다."
+              }
+            ],
+            "produces": [
+              "artifact:add_implementation_change",
+              "evidence:task_change_scope",
+              "evidence:task_unittest",
+              "evidence:task_validator_review"
+            ],
+            "prohibited_effects": [
+              {
+                "effect_id": "prohibited_local_scope",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py의 add 구현 이외의 프로젝트 파일을 변경하지 않으며, test_app.py와 AGENTS.md를 변경하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_local_filesystem_shape",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 파일을 추가하거나 삭제하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_external_effects",
+                "external": true,
+                "reversible": true,
+                "statement": "외부 서비스 변경·배포·외부 계정 또는 제3자에 대한 효과를 발생시키지 않는다."
+              },
+              {
+                "effect_id": "prohibited_dependency_change",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 의존성을 추가하거나 변경하지 않는다."
+              }
+            ],
+            "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+            "recovery": {
+              "max_goal_replans": 5,
+              "max_same_failure_replans": 2,
+              "requires_new_evidence": true,
+              "resume_strategy": "existing_binding_first",
+              "retryable_failure_classes": [
+                "implementation",
+                "context",
+                "task_contract",
+                "dependency",
+                "environment"
+              ]
+            },
+            "required_capabilities": [
+              "python_change",
+              "unittest_validation",
+              "independent_validator_review"
+            ],
+            "risk_level": "medium",
+            "risk_tags": [
+              "scoped_mutation",
+              "public_contract"
+            ],
+            "task_id": "task_60f8eabb986e4083a301ea7959f8b153",
+            "task_ref": "task_change_add",
+            "validations": [
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "command",
+                  "test",
+                  "file",
+                  "diff"
+                ],
+                "statement": "등록된 oracle.py의 task phase를 실행하여 app.py의 add 구현이 양수·음수·0을 포함한 두 정수의 합을 반환하는지, 공개 함수명 add와 left·right 인자명, int 입력·반환 annotation, 위치 및 키워드 인자 호출 계약을 실제로 검사한다.",
+                "validation_id": "val_task_add_behavior_contract"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "command",
+                  "test"
+                ],
+                "statement": "기존 test_app.py의 unittest를 동일 workspace에서 새 프로세스로 실제 실행하여 기존 unittest가 통과하는지 확인한다.",
+                "validation_id": "val_task_unittest"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "file",
+                  "diff"
+                ],
+                "statement": "Task 변경 결과의 파일 집합과 diff를 직접 검사하여 변경이 app.py의 add 구현에만 한정되고 test_app.py와 AGENTS.md의 원본 내용, 프로젝트 파일 추가·삭제 및 의존성 변경이 없는지 확인한다.",
+                "validation_id": "val_task_scope_preservation"
+              },
+              {
+                "method": "semantic",
+                "required_evidence_kinds": [
+                  "model_review"
+                ],
+                "statement": "실행 역할과 분리된 Validator가 Task의 직접 file·diff evidence를 검토하여 app.py의 add 구현 변경이 요구된 동작·공개 호출 계약·최소 수정 범위를 충족하는지 독립적으로 판단하고 검토 결과를 제출한다.",
+                "validation_id": "val_task_validator_review"
+              }
+            ]
+          }
+        ]
+      },
+      "definition_digest": "sha256:1f522ef96cf5efab1d3bb356ac59183bc652c92a825ac32eda37abdeec60c231",
+      "plan_id": "diagnostic_plan_faa08b4cc22549c2ad001724621722c3",
+      "plan_revision_id": "diagnostic_plan_revision_c51e6a099ce642aa916afb72a3cc0939",
+      "revision_no": 1,
+      "schema_version": "1.0",
+      "status": "ready"
+    },
+    "input-wrong-goal-plan.json": {
+      "created_at": "2026-09-04T10:11:11.861102Z",
+      "definition": {
+        "base_state_snapshot_digest": "sha256:ff1e4dd1f7f7e7a430c4544dc1123e458577a701f019f2a134bbc7fda4b19444",
+        "commit_horizon": {
+          "irreversible_effect_checkpoint": true,
+          "max_ready_tasks": 1,
+          "project_serial_execution": true,
+          "revalidate_snapshot_before_materialization": true
+        },
+        "dependencies": [],
+        "expected_effects": [
+          "app.py의 add 구현이 두 정수의 합을 반환하도록 변경된다.",
+          "Task와 독립 Goal Test의 검증 evidence 및 최종 Goal 판정에 필요한 관측이 원장에 기록된다."
+        ],
+        "goal_contract_digest": "sha256:e43e73deb801e42b7762d474afcb62917d19d39dbbfbfb54e4f90424eba2bedd",
+        "goal_coverage": [
+          {
+            "criterion_id": "ac_001",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_unittest",
+              "val_goal_independent_behavior_contract"
+            ]
+          },
+          {
+            "criterion_id": "ac_002",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_validator_review",
+              "val_goal_independent_behavior_contract"
+            ]
+          },
+          {
+            "criterion_id": "ac_003",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_unittest",
+              "val_goal_independent_unittest",
+              "val_task_add_behavior_contract"
+            ]
+          },
+          {
+            "criterion_id": "ac_004",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_unittest",
+              "val_task_scope_preservation",
+              "val_goal_independent_behavior_contract",
+              "val_goal_independent_unittest",
+              "val_goal_independent_scope_preservation"
+            ]
+          }
+        ],
+        "integration_validations": [
+          {
+            "criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test",
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace에서 oracle.py의 task phase를 새로 실행하여 고정된 양수·음수·0 정수 쌍을 위치 인자와 키워드 인자로 호출하고 합산 결과를 비교하며, 공개 함수명 add, left·right 인자명, int annotation, int 반환 annotation과 위치·키워드 호출 계약을 독립적으로 검사한다.",
+            "validation_id": "val_goal_independent_behavior_contract"
+          },
+          {
+            "criterion_refs": [
+              "ac_003",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace에서 기존 unittest를 별도 새 프로세스로 다시 실행하여 기존 unittest 통과 여부를 독립적으로 확인한다.",
+            "validation_id": "val_goal_independent_unittest"
+          },
+          {
+            "criterion_refs": [
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace의 새 file·diff evidence를 사용하여 app.py의 add 구현 외 변경이 없고 test_app.py와 AGENTS.md가 보존되며 프로젝트 파일 추가·삭제가 없는지 독립적으로 검사한다.",
+            "validation_id": "val_goal_independent_scope_preservation"
+          }
+        ],
+        "model_inventory_digest": "sha256:82e6bbcba85b38800c736c9f9809a493fbc9b3270cb53b514721a80839a49f14",
+        "planning_budget": {
+          "max_candidate_versions": 5,
+          "max_initial_candidates": 3,
+          "max_logical_role_calls": 14,
+          "max_refinement_per_candidate": 1,
+          "max_shortlist": 2,
+          "replan_reserve_percent": 25
+        },
+        "prohibited_effects": [
+          "app.py의 add 구현 외 프로젝트 파일 mutation",
+          "test_app.py 또는 AGENTS.md mutation",
+          "프로젝트 파일 추가 또는 삭제",
+          "프로젝트 의존성 추가 또는 변경",
+          "외부 서비스 변경·배포·외부 계정·제3자에 대한 효과"
+        ],
+        "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+        "project_map_digest": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a",
+        "source_skeleton_digest": "sha256:d758b38cbc6dca2091480122403897b801b540e83770fc9a6228ebb853f99254",
+        "tasks": [
+          {
+            "acceptance_criteria": [
+              "app.py의 add가 양수·음수·0을 포함한 두 정수의 합을 반환한다.",
+              "공개 함수명 add, left·right 인자명, int 입력 annotation, int 반환 annotation과 위치·키워드 인자 호출 계약을 유지한다.",
+              "기존 unittest를 동일 workspace에서 새 프로세스로 실행해 통과한다.",
+              "변경 파일 집합과 app.py의 add 구현 범위가 허용 범위와 일치하고 test_app.py·AGENTS.md 및 프로젝트 파일 집합 보존 조건을 확인한다.",
+              "실행 역할과 분리된 Validator가 직접 수집된 변경 evidence를 검토하고 범위·공개 계약·최소 변경 의미에 대한 검토 결과를 제출한다."
+            ],
+            "approval_class": "none",
+            "assignment": {
+              "executor": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "high",
+                "preferred_model": "gpt-5.6-terra",
+                "role": "executor"
+              },
+              "independence_required": true,
+              "validator": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "xhigh",
+                "preferred_model": "gpt-5.6-sol",
+                "role": "validator"
+              }
+            },
+            "consumes": [
+              "input:app.py",
+              "input:test_app.py",
+              "input:AGENTS.md",
+              "input:D:\\codex\\flowmarshal\\.flowmarshal-engine-eval\\runs\\s06-bugfix-trace-20260904-v4\\validation-reference.md",
+              "project:map",
+              "project:root",
+              "state:fact_project_map"
+            ],
+            "expected_effects": [
+              {
+                "effect_id": "effect_local_add_change",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py 내부 add 구현이 두 정수의 합을 반환하도록 변경된다."
+              },
+              {
+                "effect_id": "effect_task_evidence",
+                "external": false,
+                "reversible": true,
+                "statement": "Task 완료에 필요한 변경 범위·unittest·Validator 검토 evidence가 원장에 기록된다."
+              }
+            ],
+            "goal_criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "kind": "change",
+            "objective": "app.py의 add 구현만 수정하여 두 정수의 합을 반환하고, 공개 호출 계약과 보존 범위를 유지한다.",
+            "preconditions": [
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_project_binding",
+                "statement": "Goal의 명시적 대상 프로젝트가 Project Map.root 및 state:fact_project_map과 일치하고, 제공된 현재 프로젝트 관측을 기준으로 app.py·test_app.py·AGENTS.md가 입력으로 존재한다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_scope_binding",
+                "statement": "변경 대상은 app.py의 add 구현으로 한정되며 test_app.py·AGENTS.md는 보존 대상이고 프로젝트 파일 추가·삭제와 의존성 추가는 계약 범위 밖이다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_initial_state",
+                "statement": "현재 add 구현의 결함 상태와 기존 파일 보존 해시를 제공된 원본 관측 및 등록 검증 자료와 대조할 수 있다."
+              }
+            ],
+            "produces": [
+              "artifact:add_implementation_change",
+              "evidence:task_change_scope",
+              "evidence:task_unittest",
+              "evidence:task_validator_review"
+            ],
+            "prohibited_effects": [
+              {
+                "effect_id": "prohibited_local_scope",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py의 add 구현 이외의 프로젝트 파일을 변경하지 않으며, test_app.py와 AGENTS.md를 변경하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_local_filesystem_shape",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 파일을 추가하거나 삭제하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_external_effects",
+                "external": true,
+                "reversible": true,
+                "statement": "외부 서비스 변경·배포·외부 계정 또는 제3자에 대한 효과를 발생시키지 않는다."
+              },
+              {
+                "effect_id": "prohibited_dependency_change",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 의존성을 추가하거나 변경하지 않는다."
+              }
+            ],
+            "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+            "recovery": {
+              "max_goal_replans": 5,
+              "max_same_failure_replans": 2,
+              "requires_new_evidence": true,
+              "resume_strategy": "existing_binding_first",
+              "retryable_failure_classes": [
+                "implementation",
+                "context",
+                "task_contract",
+                "dependency",
+                "environment"
+              ]
+            },
+            "required_capabilities": [
+              "python_change",
+              "unittest_validation",
+              "independent_validator_review"
+            ],
+            "risk_level": "medium",
+            "risk_tags": [
+              "scoped_mutation",
+              "public_contract"
+            ],
+            "task_id": "task_60f8eabb986e4083a301ea7959f8b153",
+            "task_ref": "task_change_add",
+            "validations": [
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "command",
+                  "test",
+                  "file",
+                  "diff"
+                ],
+                "statement": "등록된 oracle.py의 task phase를 실제 실행하여 현재 프로젝트 파일 집합, test_app.py·AGENTS.md의 보존 해시, add 본문 밖 AST, 공개 함수명·인자명·int 입력 및 반환 annotation·시그니처와 기존 unittest 통과를 검사한다.",
+                "validation_id": "val_task_add_behavior_contract"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "command",
+                  "test"
+                ],
+                "statement": "기존 test_app.py의 unittest를 동일 workspace에서 새 프로세스로 실제 실행하여 기존 unittest가 통과하는지 확인한다.",
+                "validation_id": "val_task_unittest"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "file",
+                  "diff"
+                ],
+                "statement": "Task 변경 결과의 파일 집합과 diff를 직접 검사하여 변경이 app.py의 add 구현에만 한정되고 test_app.py와 AGENTS.md의 원본 내용, 프로젝트 파일 추가·삭제 및 의존성 변경이 없는지 확인한다.",
+                "validation_id": "val_task_scope_preservation"
+              },
+              {
+                "method": "semantic",
+                "required_evidence_kinds": [
+                  "model_review"
+                ],
+                "statement": "실행 역할과 분리된 Validator가 Task의 직접 file·diff evidence를 검토하여 app.py의 add 구현 변경이 요구된 동작·공개 호출 계약·최소 수정 범위를 충족하는지 독립적으로 판단하고 검토 결과를 제출한다.",
+                "validation_id": "val_task_validator_review"
+              }
+            ]
+          }
+        ]
+      },
+      "definition_digest": "sha256:5c5ece9b3fb6983937ed88b4c0da24914d574094b4fd5914a1521c88713fbf61",
+      "plan_id": "diagnostic_plan_547cc78157134ed4bbd767045602c230",
+      "plan_revision_id": "diagnostic_plan_revision_953104bd8d2e4cc3b084df197c882aeb",
+      "revision_no": 1,
+      "schema_version": "1.0",
+      "status": "ready"
+    },
+    "input-combined-plan.json": {
+      "created_at": "2026-09-04T10:11:11.861102Z",
+      "definition": {
+        "base_state_snapshot_digest": "sha256:ff1e4dd1f7f7e7a430c4544dc1123e458577a701f019f2a134bbc7fda4b19444",
+        "commit_horizon": {
+          "irreversible_effect_checkpoint": true,
+          "max_ready_tasks": 1,
+          "project_serial_execution": true,
+          "revalidate_snapshot_before_materialization": true
+        },
+        "dependencies": [],
+        "expected_effects": [
+          "app.py의 add 구현이 두 정수의 합을 반환하도록 변경된다.",
+          "Task와 독립 Goal Test의 검증 evidence 및 최종 Goal 판정에 필요한 관측이 원장에 기록된다."
+        ],
+        "goal_contract_digest": "sha256:e43e73deb801e42b7762d474afcb62917d19d39dbbfbfb54e4f90424eba2bedd",
+        "goal_coverage": [
+          {
+            "criterion_id": "ac_001",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_unittest",
+              "val_goal_independent_behavior_contract"
+            ]
+          },
+          {
+            "criterion_id": "ac_002",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_validator_review",
+              "val_goal_independent_behavior_contract"
+            ]
+          },
+          {
+            "criterion_id": "ac_003",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_unittest",
+              "val_goal_independent_unittest",
+              "val_task_add_behavior_contract"
+            ]
+          },
+          {
+            "criterion_id": "ac_004",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_unittest",
+              "val_task_scope_preservation",
+              "val_goal_independent_behavior_contract",
+              "val_goal_independent_unittest",
+              "val_goal_independent_scope_preservation"
+            ]
+          }
+        ],
+        "integration_validations": [
+          {
+            "criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test",
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace에서 oracle.py의 goal phase를 새로 실행하여 고정된 양수·음수·0 정수 쌍을 위치 인자와 키워드 인자로 호출하고 합산 결과를 비교하며, 공개 함수명 add, left·right 인자명, int annotation, int 반환 annotation과 위치·키워드 호출 계약을 독립적으로 검사한다.",
+            "validation_id": "val_goal_independent_behavior_contract"
+          },
+          {
+            "criterion_refs": [
+              "ac_003",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace에서 기존 unittest를 별도 새 프로세스로 다시 실행하여 기존 unittest 통과 여부를 독립적으로 확인한다.",
+            "validation_id": "val_goal_independent_unittest"
+          },
+          {
+            "criterion_refs": [
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace의 새 file·diff evidence를 사용하여 app.py의 add 구현 외 변경이 없고 test_app.py와 AGENTS.md가 보존되며 프로젝트 파일 추가·삭제가 없는지 독립적으로 검사한다.",
+            "validation_id": "val_goal_independent_scope_preservation"
+          }
+        ],
+        "model_inventory_digest": "sha256:82e6bbcba85b38800c736c9f9809a493fbc9b3270cb53b514721a80839a49f14",
+        "planning_budget": {
+          "max_candidate_versions": 5,
+          "max_initial_candidates": 3,
+          "max_logical_role_calls": 14,
+          "max_refinement_per_candidate": 1,
+          "max_shortlist": 2,
+          "replan_reserve_percent": 25
+        },
+        "prohibited_effects": [
+          "app.py의 add 구현 외 프로젝트 파일 mutation",
+          "test_app.py 또는 AGENTS.md mutation",
+          "프로젝트 파일 추가 또는 삭제",
+          "프로젝트 의존성 추가 또는 변경",
+          "외부 서비스 변경·배포·외부 계정·제3자에 대한 효과"
+        ],
+        "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+        "project_map_digest": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a",
+        "source_skeleton_digest": "sha256:d758b38cbc6dca2091480122403897b801b540e83770fc9a6228ebb853f99254",
+        "tasks": [
+          {
+            "acceptance_criteria": [
+              "app.py의 add가 양수·음수·0을 포함한 두 정수의 합을 반환한다.",
+              "공개 함수명 add, left·right 인자명, int 입력 annotation, int 반환 annotation과 위치·키워드 인자 호출 계약을 유지한다.",
+              "기존 unittest를 동일 workspace에서 새 프로세스로 실행해 통과한다.",
+              "변경 파일 집합과 app.py의 add 구현 범위가 허용 범위와 일치하고 test_app.py·AGENTS.md 및 프로젝트 파일 집합 보존 조건을 확인한다.",
+              "실행 역할과 분리된 Validator가 직접 수집된 변경 evidence를 검토하고 범위·공개 계약·최소 변경 의미에 대한 검토 결과를 제출한다."
+            ],
+            "approval_class": "none",
+            "assignment": {
+              "executor": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "high",
+                "preferred_model": "gpt-5.6-terra",
+                "role": "executor"
+              },
+              "independence_required": true,
+              "validator": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "xhigh",
+                "preferred_model": "gpt-5.6-sol",
+                "role": "validator"
+              }
+            },
+            "consumes": [
+              "input:app.py",
+              "input:test_app.py",
+              "input:AGENTS.md",
+              "input:D:\\codex\\flowmarshal\\.flowmarshal-engine-eval\\runs\\s06-bugfix-trace-20260904-v4\\validation-reference.md",
+              "project:map",
+              "project:root",
+              "state:fact_project_map"
+            ],
+            "expected_effects": [
+              {
+                "effect_id": "effect_local_add_change",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py 내부 add 구현이 두 정수의 합을 반환하도록 변경된다."
+              },
+              {
+                "effect_id": "effect_task_evidence",
+                "external": false,
+                "reversible": true,
+                "statement": "Task 완료에 필요한 변경 범위·unittest·Validator 검토 evidence가 원장에 기록된다."
+              }
+            ],
+            "goal_criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "kind": "change",
+            "objective": "app.py의 add 구현만 수정하여 두 정수의 합을 반환하고, 공개 호출 계약과 보존 범위를 유지한다.",
+            "preconditions": [
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_project_binding",
+                "statement": "Goal의 명시적 대상 프로젝트가 Project Map.root 및 state:fact_project_map과 일치하고, 제공된 현재 프로젝트 관측을 기준으로 app.py·test_app.py·AGENTS.md가 입력으로 존재한다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_scope_binding",
+                "statement": "변경 대상은 app.py의 add 구현으로 한정되며 test_app.py·AGENTS.md는 보존 대상이고 프로젝트 파일 추가·삭제와 의존성 추가는 계약 범위 밖이다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_initial_state",
+                "statement": "현재 add 구현의 결함 상태와 기존 파일 보존 해시를 제공된 원본 관측 및 등록 검증 자료와 대조할 수 있다."
+              }
+            ],
+            "produces": [
+              "artifact:add_implementation_change",
+              "evidence:task_change_scope",
+              "evidence:task_unittest",
+              "evidence:task_validator_review"
+            ],
+            "prohibited_effects": [
+              {
+                "effect_id": "prohibited_local_scope",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py의 add 구현 이외의 프로젝트 파일을 변경하지 않으며, test_app.py와 AGENTS.md를 변경하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_local_filesystem_shape",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 파일을 추가하거나 삭제하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_external_effects",
+                "external": true,
+                "reversible": true,
+                "statement": "외부 서비스 변경·배포·외부 계정 또는 제3자에 대한 효과를 발생시키지 않는다."
+              },
+              {
+                "effect_id": "prohibited_dependency_change",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 의존성을 추가하거나 변경하지 않는다."
+              }
+            ],
+            "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+            "recovery": {
+              "max_goal_replans": 5,
+              "max_same_failure_replans": 2,
+              "requires_new_evidence": true,
+              "resume_strategy": "existing_binding_first",
+              "retryable_failure_classes": [
+                "implementation",
+                "context",
+                "task_contract",
+                "dependency",
+                "environment"
+              ]
+            },
+            "required_capabilities": [
+              "python_change",
+              "unittest_validation",
+              "independent_validator_review"
+            ],
+            "risk_level": "medium",
+            "risk_tags": [
+              "scoped_mutation",
+              "public_contract"
+            ],
+            "task_id": "task_60f8eabb986e4083a301ea7959f8b153",
+            "task_ref": "task_change_add",
+            "validations": [
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "command",
+                  "test",
+                  "file",
+                  "diff"
+                ],
+                "statement": "등록된 oracle.py의 task phase를 실제 실행하여 현재 프로젝트 파일 집합, test_app.py·AGENTS.md의 보존 해시, add 본문 밖 AST, 공개 함수명·인자명·int 입력 및 반환 annotation·시그니처와 기존 unittest 통과를 검사한다. 또한 이 Task 검증에서 별도로 양수·음수·0 정수 쌍에 대해 add를 위치 인자와 키워드 인자로 실제 호출하고 각 반환값을 두 정수의 기대 합과 비교한다.",
+                "validation_id": "val_task_add_behavior_contract"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "command",
+                  "test"
+                ],
+                "statement": "기존 test_app.py의 unittest를 동일 workspace에서 새 프로세스로 실제 실행하여 기존 unittest가 통과하는지 확인한다.",
+                "validation_id": "val_task_unittest"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "file",
+                  "diff"
+                ],
+                "statement": "Task 변경 결과의 파일 집합과 diff를 직접 검사하여 변경이 app.py의 add 구현에만 한정되고 test_app.py와 AGENTS.md의 원본 내용, 프로젝트 파일 추가·삭제 및 의존성 변경이 없는지 확인한다.",
+                "validation_id": "val_task_scope_preservation"
+              },
+              {
+                "method": "semantic",
+                "required_evidence_kinds": [
+                  "model_review"
+                ],
+                "statement": "실행 역할과 분리된 Validator가 Task의 직접 file·diff evidence를 검토하여 app.py의 add 구현 변경이 요구된 동작·공개 호출 계약·최소 수정 범위를 충족하는지 독립적으로 판단하고 검토 결과를 제출한다.",
+                "validation_id": "val_task_validator_review"
+              }
+            ]
+          }
+        ]
+      },
+      "definition_digest": "sha256:6d650a97566ea50647ab2ddf6877439d5966a6b9be2ecd02a5a7f179e271a21b",
+      "plan_id": "diagnostic_plan_10536d8e8c7340dcb15c744803a6ba99",
+      "plan_revision_id": "diagnostic_plan_revision_fa10bc22c1664a0ba1f6d4dbed7186ae",
+      "revision_no": 1,
+      "schema_version": "1.0",
+      "status": "ready"
+    },
+    "input-boundary-clean-plan.json": {
+      "created_at": "2026-09-04T11:30:08.755931Z",
+      "definition": {
+        "base_state_snapshot_digest": "sha256:ff1e4dd1f7f7e7a430c4544dc1123e458577a701f019f2a134bbc7fda4b19444",
+        "commit_horizon": {
+          "irreversible_effect_checkpoint": true,
+          "max_ready_tasks": 1,
+          "project_serial_execution": true,
+          "revalidate_snapshot_before_materialization": true
+        },
+        "dependencies": [],
+        "expected_effects": [
+          "add가 공개 호출 계약을 유지하면서 두 정수의 합을 반환한다.",
+          "모든 Task validation 후 독립 Goal Test evidence가 수집되어 최종 Goal 판정에 사용된다."
+        ],
+        "goal_contract_digest": "sha256:e43e73deb801e42b7762d474afcb62917d19d39dbbfbfb54e4f90424eba2bedd",
+        "goal_coverage": [
+          {
+            "criterion_id": "ac_001",
+            "task_ids": [
+              "task_6fbb742bc3584de3a41bbca0e6dfe556"
+            ],
+            "validation_ids": [
+              "val_task_oracle",
+              "val_task_unittest",
+              "val_goal_test"
+            ]
+          },
+          {
+            "criterion_id": "ac_002",
+            "task_ids": [
+              "task_6fbb742bc3584de3a41bbca0e6dfe556"
+            ],
+            "validation_ids": [
+              "val_task_oracle",
+              "val_goal_test"
+            ]
+          },
+          {
+            "criterion_id": "ac_003",
+            "task_ids": [
+              "task_6fbb742bc3584de3a41bbca0e6dfe556"
+            ],
+            "validation_ids": [
+              "val_task_unittest",
+              "val_goal_test",
+              "val_task_oracle"
+            ]
+          },
+          {
+            "criterion_id": "ac_004",
+            "task_ids": [
+              "task_6fbb742bc3584de3a41bbca0e6dfe556"
+            ],
+            "validation_ids": [
+              "val_task_oracle",
+              "val_task_unittest",
+              "val_task_scope",
+              "val_task_validator_review",
+              "val_goal_test"
+            ]
+          }
+        ],
+        "integration_validations": [
+          {
+            "criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test",
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task validation 후 동일 workspace에서 등록된 oracle.py의 goal phase를 새로 실행하여 독립 evidence를 수집한다. ac_001에 대해 고정된 양수·음수·0 포함 정수쌍을 위치 인자와 키워드 인자로 각각 호출하고 기대 합과 결과를 비교하며, ac_002에 대해 add의 공개 이름·left·right 인자명·int annotation·int 반환 annotation과 두 호출 방식을 검사한다. ac_003의 기존 unittest와 ac_004의 동작·공개 계약·파일 보존 검사도 Goal phase에서 새로 확인한다. 새 command·test·file·diff evidence를 사용하고 Task evidence를 복사하지 않으며, 모든 검사가 통과한 독립 결과로 최종 Goal을 판정한다.",
+            "validation_id": "val_goal_test"
+          }
+        ],
+        "model_inventory_digest": "sha256:82e6bbcba85b38800c736c9f9809a493fbc9b3270cb53b514721a80839a49f14",
+        "planning_budget": {
+          "max_candidate_versions": 5,
+          "max_initial_candidates": 3,
+          "max_logical_role_calls": 14,
+          "max_refinement_per_candidate": 1,
+          "max_shortlist": 2,
+          "replan_reserve_percent": 25
+        },
+        "prohibited_effects": [
+          "app.py의 add 구현 외 프로젝트 파일을 변경하거나 프로젝트 파일을 추가·삭제하지 않는다.",
+          "test_app.py와 AGENTS.md를 변경하지 않는다.",
+          "외부 서비스 변경·배포 또는 프로젝트 의존성 추가를 수행하지 않는다."
+        ],
+        "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+        "project_map_digest": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a",
+        "source_skeleton_digest": "sha256:d758b38cbc6dca2091480122403897b801b540e83770fc9a6228ebb853f99254",
+        "tasks": [
+          {
+            "acceptance_criteria": [
+              "두 정수의 합을 반환하는 add 구현이 산출된다.",
+              "공개 함수명·인자명·int annotation·반환 annotation과 위치·키워드 인자 호출 계약이 유지된다.",
+              "기존 unittest가 통과한다.",
+              "app.py의 add 구현 외 프로젝트 파일 변경·추가·삭제가 없고 test_app.py와 AGENTS.md가 보존된다.",
+              "Worker가 자기 작업과 직접 관측 근거를 응답 본문으로 제출하고, 이후 분리된 Validator가 그 응답과 원본 evidence를 검토하여 별도 결과를 제출해야 Task를 완료한다."
+            ],
+            "approval_class": "none",
+            "assignment": {
+              "executor": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "high",
+                "preferred_model": "gpt-5.6-terra",
+                "role": "executor"
+              },
+              "independence_required": true,
+              "validator": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "xhigh",
+                "preferred_model": "gpt-5.6-sol",
+                "role": "validator"
+              }
+            },
+            "consumes": [
+              "input:app.py",
+              "input:test_app.py",
+              "input:AGENTS.md",
+              "input:D:\\codex\\flowmarshal\\.flowmarshal-engine-eval\\runs\\s06-bugfix-trace-20260904-v4\\validation-reference.md",
+              "project:map",
+              "project:root",
+              "state:fact_project_map"
+            ],
+            "expected_effects": [
+              {
+                "effect_id": "effect_add_sum_implementation",
+                "external": false,
+                "reversible": true,
+                "statement": "로컬 프로젝트에서 add 구현이 두 정수의 합을 반환하도록 수정된다."
+              },
+              {
+                "effect_id": "effect_worker_response_report",
+                "external": false,
+                "reversible": true,
+                "statement": "Task 수행 결과와 직접 관측 evidence가 Worker 응답 본문으로 제출된다."
+              }
+            ],
+            "goal_criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "kind": "change",
+            "objective": "app.py의 add 구현만 수정하여 두 정수의 합을 반환하고, 공개 호출 계약과 보존 범위를 유지한다.",
+            "preconditions": [
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_project_binding_current",
+                "statement": "Goal의 명시적 대상과 Project Map.root가 일치하고, State의 current project map binding이 제공된 Project Map과 일치한다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_required_inputs_available",
+                "statement": "add 구현, 기존 unittest, AGENTS.md와 등록 validation reference의 관련 본문이 검증 입력으로 제공되어 있다."
+              }
+            ],
+            "produces": [
+              "artifact:add_implementation_change",
+              "evidence:task_change_scope",
+              "evidence:task_unittest",
+              "evidence:task_validator_review"
+            ],
+            "prohibited_effects": [
+              {
+                "effect_id": "prohibited_unscoped_local_change",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py의 add 구현 외 프로젝트 파일은 변경되지 않고 test_app.py와 AGENTS.md가 보존되며 프로젝트 파일이 추가되거나 삭제되지 않는다."
+              },
+              {
+                "effect_id": "prohibited_external_change",
+                "external": true,
+                "reversible": false,
+                "statement": "외부 서비스·계정·제3자에 대한 변경이나 배포가 발생하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_dependency_addition",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 의존성이 추가되지 않는다."
+              }
+            ],
+            "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+            "recovery": {
+              "max_goal_replans": 5,
+              "max_same_failure_replans": 2,
+              "requires_new_evidence": true,
+              "resume_strategy": "existing_binding_first",
+              "retryable_failure_classes": [
+                "implementation",
+                "context",
+                "task_contract",
+                "dependency",
+                "environment"
+              ]
+            },
+            "required_capabilities": [
+              "python_change",
+              "unittest_validation",
+              "independent_validator_review"
+            ],
+            "risk_level": "medium",
+            "risk_tags": [
+              "scoped_mutation",
+              "public_contract"
+            ],
+            "task_id": "task_6fbb742bc3584de3a41bbca0e6dfe556",
+            "task_ref": "task_change_add",
+            "validations": [
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "file",
+                  "diff",
+                  "command",
+                  "test"
+                ],
+                "statement": "등록된 oracle.py의 task phase를 실행하여 프로젝트 파일 집합, test_app.py·AGENTS.md의 초기 byte hash, add 본문 밖 AST, 실제 함수 annotation·시그니처와 기존 unittest 통과 여부를 검사한다. 이 검사는 task phase의 검사 범위만 확인하며 goal phase의 고정 정수쌍 위치·키워드 호출 검사를 대신하지 않는다.",
+                "validation_id": "val_task_oracle"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "command",
+                  "test"
+                ],
+                "statement": "동일 workspace에서 기존 unittest를 새 프로세스로 실제 실행하여 test_app.py의 기존 합산 테스트가 통과하는지 확인한다.",
+                "validation_id": "val_task_unittest"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "file",
+                  "diff"
+                ],
+                "statement": "변경 전후 프로젝트 파일 목록과 diff를 직접 비교하여 app.py의 add 구현만 변경되고 test_app.py와 AGENTS.md가 보존되며 프로젝트 파일 추가·삭제가 없는지 확인한다.",
+                "validation_id": "val_task_scope"
+              },
+              {
+                "method": "semantic",
+                "required_evidence_kinds": [
+                  "model_review",
+                  "external_observation",
+                  "file"
+                ],
+                "statement": "실행 역할과 분리된 Validator가 원본 파일 근거와 Worker 응답 본문의 실행 관측을 함께 참조하여 add 구현의 최소 변경, 공개 호출 계약 보존, 프로젝트 파일 보존 주장이 직접 근거와 일치하는지 의미 검토한다. 응답 관측은 external_observation으로 수집하며 외부 시스템 변경을 의미하지 않는다.",
+                "validation_id": "val_task_validator_review"
+              }
+            ]
+          }
+        ]
+      },
+      "definition_digest": "sha256:c0f1983b26087d98d92d28a8c7d3a0d4d3d7110469e5c9c4bc5104236615c219",
+      "plan_id": "diagnostic_plan_f97689b05dbf4e2386613252a99bb358",
+      "plan_revision_id": "diagnostic_plan_revision_a1742fe9d70c4542bec75466ec5024fe",
+      "revision_no": 1,
+      "schema_version": "1.0",
+      "status": "ready"
+    },
+    "input-missing-link-plan.json": {
+      "created_at": "2026-09-04T11:30:08.755931Z",
+      "definition": {
+        "base_state_snapshot_digest": "sha256:ff1e4dd1f7f7e7a430c4544dc1123e458577a701f019f2a134bbc7fda4b19444",
+        "commit_horizon": {
+          "irreversible_effect_checkpoint": true,
+          "max_ready_tasks": 1,
+          "project_serial_execution": true,
+          "revalidate_snapshot_before_materialization": true
+        },
+        "dependencies": [],
+        "expected_effects": [
+          "add가 공개 호출 계약을 유지하면서 두 정수의 합을 반환한다.",
+          "모든 Task validation 후 독립 Goal Test evidence가 수집되어 최종 Goal 판정에 사용된다."
+        ],
+        "goal_contract_digest": "sha256:e43e73deb801e42b7762d474afcb62917d19d39dbbfbfb54e4f90424eba2bedd",
+        "goal_coverage": [
+          {
+            "criterion_id": "ac_001",
+            "task_ids": [
+              "task_6fbb742bc3584de3a41bbca0e6dfe556"
+            ],
+            "validation_ids": [
+              "val_task_oracle",
+              "val_task_unittest",
+              "val_goal_test"
+            ]
+          },
+          {
+            "criterion_id": "ac_002",
+            "task_ids": [
+              "task_6fbb742bc3584de3a41bbca0e6dfe556"
+            ],
+            "validation_ids": [
+              "val_task_oracle",
+              "val_goal_test"
+            ]
+          },
+          {
+            "criterion_id": "ac_003",
+            "task_ids": [
+              "task_6fbb742bc3584de3a41bbca0e6dfe556"
+            ],
+            "validation_ids": [
+              "val_task_unittest",
+              "val_goal_test"
+            ]
+          },
+          {
+            "criterion_id": "ac_004",
+            "task_ids": [
+              "task_6fbb742bc3584de3a41bbca0e6dfe556"
+            ],
+            "validation_ids": [
+              "val_task_oracle",
+              "val_task_unittest",
+              "val_task_scope",
+              "val_task_validator_review",
+              "val_goal_test"
+            ]
+          }
+        ],
+        "integration_validations": [
+          {
+            "criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test",
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task validation 후 동일 workspace에서 등록된 oracle.py의 goal phase를 새로 실행하여 독립 evidence를 수집한다. ac_001에 대해 고정된 양수·음수·0 포함 정수쌍을 위치 인자와 키워드 인자로 각각 호출하고 기대 합과 결과를 비교하며, ac_002에 대해 add의 공개 이름·left·right 인자명·int annotation·int 반환 annotation과 두 호출 방식을 검사한다. ac_003의 기존 unittest와 ac_004의 동작·공개 계약·파일 보존 검사도 Goal phase에서 새로 확인한다. 새 command·test·file·diff evidence를 사용하고 Task evidence를 복사하지 않으며, 모든 검사가 통과한 독립 결과로 최종 Goal을 판정한다.",
+            "validation_id": "val_goal_test"
+          }
+        ],
+        "model_inventory_digest": "sha256:82e6bbcba85b38800c736c9f9809a493fbc9b3270cb53b514721a80839a49f14",
+        "planning_budget": {
+          "max_candidate_versions": 5,
+          "max_initial_candidates": 3,
+          "max_logical_role_calls": 14,
+          "max_refinement_per_candidate": 1,
+          "max_shortlist": 2,
+          "replan_reserve_percent": 25
+        },
+        "prohibited_effects": [
+          "app.py의 add 구현 외 프로젝트 파일을 변경하거나 프로젝트 파일을 추가·삭제하지 않는다.",
+          "test_app.py와 AGENTS.md를 변경하지 않는다.",
+          "외부 서비스 변경·배포 또는 프로젝트 의존성 추가를 수행하지 않는다."
+        ],
+        "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+        "project_map_digest": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a",
+        "source_skeleton_digest": "sha256:d758b38cbc6dca2091480122403897b801b540e83770fc9a6228ebb853f99254",
+        "tasks": [
+          {
+            "acceptance_criteria": [
+              "두 정수의 합을 반환하는 add 구현이 산출된다.",
+              "공개 함수명·인자명·int annotation·반환 annotation과 위치·키워드 인자 호출 계약이 유지된다.",
+              "기존 unittest가 통과한다.",
+              "app.py의 add 구현 외 프로젝트 파일 변경·추가·삭제가 없고 test_app.py와 AGENTS.md가 보존된다.",
+              "Worker가 자기 작업과 직접 관측 근거를 응답 본문으로 제출하고, 이후 분리된 Validator가 그 응답과 원본 evidence를 검토하여 별도 결과를 제출해야 Task를 완료한다."
+            ],
+            "approval_class": "none",
+            "assignment": {
+              "executor": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "high",
+                "preferred_model": "gpt-5.6-terra",
+                "role": "executor"
+              },
+              "independence_required": true,
+              "validator": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "xhigh",
+                "preferred_model": "gpt-5.6-sol",
+                "role": "validator"
+              }
+            },
+            "consumes": [
+              "input:app.py",
+              "input:test_app.py",
+              "input:AGENTS.md",
+              "input:D:\\codex\\flowmarshal\\.flowmarshal-engine-eval\\runs\\s06-bugfix-trace-20260904-v4\\validation-reference.md",
+              "project:map",
+              "project:root",
+              "state:fact_project_map"
+            ],
+            "expected_effects": [
+              {
+                "effect_id": "effect_add_sum_implementation",
+                "external": false,
+                "reversible": true,
+                "statement": "로컬 프로젝트에서 add 구현이 두 정수의 합을 반환하도록 수정된다."
+              },
+              {
+                "effect_id": "effect_worker_response_report",
+                "external": false,
+                "reversible": true,
+                "statement": "Task 수행 결과와 직접 관측 evidence가 Worker 응답 본문으로 제출된다."
+              }
+            ],
+            "goal_criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "kind": "change",
+            "objective": "app.py의 add 구현만 수정하여 두 정수의 합을 반환하고, 공개 호출 계약과 보존 범위를 유지한다.",
+            "preconditions": [
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_project_binding_current",
+                "statement": "Goal의 명시적 대상과 Project Map.root가 일치하고, State의 current project map binding이 제공된 Project Map과 일치한다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_required_inputs_available",
+                "statement": "add 구현, 기존 unittest, AGENTS.md와 등록 validation reference의 관련 본문이 검증 입력으로 제공되어 있다."
+              }
+            ],
+            "produces": [
+              "artifact:add_implementation_change",
+              "evidence:task_change_scope",
+              "evidence:task_unittest",
+              "evidence:task_validator_review"
+            ],
+            "prohibited_effects": [
+              {
+                "effect_id": "prohibited_unscoped_local_change",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py의 add 구현 외 프로젝트 파일은 변경되지 않고 test_app.py와 AGENTS.md가 보존되며 프로젝트 파일이 추가되거나 삭제되지 않는다."
+              },
+              {
+                "effect_id": "prohibited_external_change",
+                "external": true,
+                "reversible": false,
+                "statement": "외부 서비스·계정·제3자에 대한 변경이나 배포가 발생하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_dependency_addition",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 의존성이 추가되지 않는다."
+              }
+            ],
+            "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+            "recovery": {
+              "max_goal_replans": 5,
+              "max_same_failure_replans": 2,
+              "requires_new_evidence": true,
+              "resume_strategy": "existing_binding_first",
+              "retryable_failure_classes": [
+                "implementation",
+                "context",
+                "task_contract",
+                "dependency",
+                "environment"
+              ]
+            },
+            "required_capabilities": [
+              "python_change",
+              "unittest_validation",
+              "independent_validator_review"
+            ],
+            "risk_level": "medium",
+            "risk_tags": [
+              "scoped_mutation",
+              "public_contract"
+            ],
+            "task_id": "task_6fbb742bc3584de3a41bbca0e6dfe556",
+            "task_ref": "task_change_add",
+            "validations": [
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "file",
+                  "diff",
+                  "command",
+                  "test"
+                ],
+                "statement": "등록된 oracle.py의 task phase를 실행하여 프로젝트 파일 집합, test_app.py·AGENTS.md의 초기 byte hash, add 본문 밖 AST, 실제 함수 annotation·시그니처와 기존 unittest 통과 여부를 검사한다. 이 검사는 task phase의 검사 범위만 확인하며 goal phase의 고정 정수쌍 위치·키워드 호출 검사를 대신하지 않는다.",
+                "validation_id": "val_task_oracle"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "command",
+                  "test"
+                ],
+                "statement": "동일 workspace에서 기존 unittest를 새 프로세스로 실제 실행하여 test_app.py의 기존 합산 테스트가 통과하는지 확인한다.",
+                "validation_id": "val_task_unittest"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "file",
+                  "diff"
+                ],
+                "statement": "변경 전후 프로젝트 파일 목록과 diff를 직접 비교하여 app.py의 add 구현만 변경되고 test_app.py와 AGENTS.md가 보존되며 프로젝트 파일 추가·삭제가 없는지 확인한다.",
+                "validation_id": "val_task_scope"
+              },
+              {
+                "method": "semantic",
+                "required_evidence_kinds": [
+                  "model_review",
+                  "external_observation",
+                  "file"
+                ],
+                "statement": "실행 역할과 분리된 Validator가 원본 파일 근거와 Worker 응답 본문의 실행 관측을 함께 참조하여 add 구현의 최소 변경, 공개 호출 계약 보존, 프로젝트 파일 보존 주장이 직접 근거와 일치하는지 의미 검토한다. 응답 관측은 external_observation으로 수집하며 외부 시스템 변경을 의미하지 않는다.",
+                "validation_id": "val_task_validator_review"
+              }
+            ]
+          }
+        ]
+      },
+      "definition_digest": "sha256:cbead9d67a12228a3f87dbd66f74188134aaf375e612b40002652ab543c330d9",
+      "plan_id": "diagnostic_plan_7db420b779774dd19f98f8b4a0de1fce",
+      "plan_revision_id": "diagnostic_plan_revision_17720700e08e4133949a3443587566b9",
+      "revision_no": 1,
+      "schema_version": "1.0",
+      "status": "ready"
+    },
+    "input-future-result-plan.json": {
+      "created_at": "2026-09-04T11:30:08.755931Z",
+      "definition": {
+        "base_state_snapshot_digest": "sha256:ff1e4dd1f7f7e7a430c4544dc1123e458577a701f019f2a134bbc7fda4b19444",
+        "commit_horizon": {
+          "irreversible_effect_checkpoint": true,
+          "max_ready_tasks": 1,
+          "project_serial_execution": true,
+          "revalidate_snapshot_before_materialization": true
+        },
+        "dependencies": [],
+        "expected_effects": [
+          "add가 공개 호출 계약을 유지하면서 두 정수의 합을 반환한다.",
+          "모든 Task validation 후 독립 Goal Test evidence가 수집되어 최종 Goal 판정에 사용된다."
+        ],
+        "goal_contract_digest": "sha256:e43e73deb801e42b7762d474afcb62917d19d39dbbfbfb54e4f90424eba2bedd",
+        "goal_coverage": [
+          {
+            "criterion_id": "ac_001",
+            "task_ids": [
+              "task_6fbb742bc3584de3a41bbca0e6dfe556"
+            ],
+            "validation_ids": [
+              "val_task_oracle",
+              "val_task_unittest",
+              "val_goal_test"
+            ]
+          },
+          {
+            "criterion_id": "ac_002",
+            "task_ids": [
+              "task_6fbb742bc3584de3a41bbca0e6dfe556"
+            ],
+            "validation_ids": [
+              "val_task_oracle",
+              "val_goal_test"
+            ]
+          },
+          {
+            "criterion_id": "ac_003",
+            "task_ids": [
+              "task_6fbb742bc3584de3a41bbca0e6dfe556"
+            ],
+            "validation_ids": [
+              "val_task_unittest",
+              "val_goal_test",
+              "val_task_oracle"
+            ]
+          },
+          {
+            "criterion_id": "ac_004",
+            "task_ids": [
+              "task_6fbb742bc3584de3a41bbca0e6dfe556"
+            ],
+            "validation_ids": [
+              "val_task_oracle",
+              "val_task_unittest",
+              "val_task_scope",
+              "val_task_validator_review",
+              "val_goal_test"
+            ]
+          }
+        ],
+        "integration_validations": [
+          {
+            "criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test",
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task validation 후 동일 workspace에서 등록된 oracle.py의 goal phase를 새로 실행하여 독립 evidence를 수집한다. ac_001에 대해 고정된 양수·음수·0 포함 정수쌍을 위치 인자와 키워드 인자로 각각 호출하고 기대 합과 결과를 비교하며, ac_002에 대해 add의 공개 이름·left·right 인자명·int annotation·int 반환 annotation과 두 호출 방식을 검사한다. ac_003의 기존 unittest와 ac_004의 동작·공개 계약·파일 보존 검사도 Goal phase에서 새로 확인한다. 새 command·test·file·diff evidence를 사용하고 Task evidence를 복사하지 않으며, 모든 검사가 통과한 독립 결과로 최종 Goal을 판정한다.",
+            "validation_id": "val_goal_test"
+          }
+        ],
+        "model_inventory_digest": "sha256:82e6bbcba85b38800c736c9f9809a493fbc9b3270cb53b514721a80839a49f14",
+        "planning_budget": {
+          "max_candidate_versions": 5,
+          "max_initial_candidates": 3,
+          "max_logical_role_calls": 14,
+          "max_refinement_per_candidate": 1,
+          "max_shortlist": 2,
+          "replan_reserve_percent": 25
+        },
+        "prohibited_effects": [
+          "app.py의 add 구현 외 프로젝트 파일을 변경하거나 프로젝트 파일을 추가·삭제하지 않는다.",
+          "test_app.py와 AGENTS.md를 변경하지 않는다.",
+          "외부 서비스 변경·배포 또는 프로젝트 의존성 추가를 수행하지 않는다."
+        ],
+        "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+        "project_map_digest": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a",
+        "source_skeleton_digest": "sha256:d758b38cbc6dca2091480122403897b801b540e83770fc9a6228ebb853f99254",
+        "tasks": [
+          {
+            "acceptance_criteria": [
+              "두 정수의 합을 반환하는 add 구현이 산출된다.",
+              "공개 함수명·인자명·int annotation·반환 annotation과 위치·키워드 인자 호출 계약이 유지된다.",
+              "기존 unittest가 통과한다.",
+              "app.py의 add 구현 외 프로젝트 파일 변경·추가·삭제가 없고 test_app.py와 AGENTS.md가 보존된다.",
+              "실행 역할과 분리된 Validator의 직접 검토 결과가 Worker 응답 본문으로 제출된다."
+            ],
+            "approval_class": "none",
+            "assignment": {
+              "executor": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "high",
+                "preferred_model": "gpt-5.6-terra",
+                "role": "executor"
+              },
+              "independence_required": true,
+              "validator": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "xhigh",
+                "preferred_model": "gpt-5.6-sol",
+                "role": "validator"
+              }
+            },
+            "consumes": [
+              "input:app.py",
+              "input:test_app.py",
+              "input:AGENTS.md",
+              "input:D:\\codex\\flowmarshal\\.flowmarshal-engine-eval\\runs\\s06-bugfix-trace-20260904-v4\\validation-reference.md",
+              "project:map",
+              "project:root",
+              "state:fact_project_map"
+            ],
+            "expected_effects": [
+              {
+                "effect_id": "effect_add_sum_implementation",
+                "external": false,
+                "reversible": true,
+                "statement": "로컬 프로젝트에서 add 구현이 두 정수의 합을 반환하도록 수정된다."
+              },
+              {
+                "effect_id": "effect_worker_response_report",
+                "external": false,
+                "reversible": true,
+                "statement": "Task 수행 결과와 직접 관측 evidence가 Worker 응답 본문으로 제출된다."
+              }
+            ],
+            "goal_criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "kind": "change",
+            "objective": "app.py의 add 구현만 수정하여 두 정수의 합을 반환하고, 공개 호출 계약과 보존 범위를 유지한다.",
+            "preconditions": [
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_project_binding_current",
+                "statement": "Goal의 명시적 대상과 Project Map.root가 일치하고, State의 current project map binding이 제공된 Project Map과 일치한다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_required_inputs_available",
+                "statement": "add 구현, 기존 unittest, AGENTS.md와 등록 validation reference의 관련 본문이 검증 입력으로 제공되어 있다."
+              }
+            ],
+            "produces": [
+              "artifact:add_implementation_change",
+              "evidence:task_change_scope",
+              "evidence:task_unittest",
+              "evidence:task_validator_review"
+            ],
+            "prohibited_effects": [
+              {
+                "effect_id": "prohibited_unscoped_local_change",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py의 add 구현 외 프로젝트 파일은 변경되지 않고 test_app.py와 AGENTS.md가 보존되며 프로젝트 파일이 추가되거나 삭제되지 않는다."
+              },
+              {
+                "effect_id": "prohibited_external_change",
+                "external": true,
+                "reversible": false,
+                "statement": "외부 서비스·계정·제3자에 대한 변경이나 배포가 발생하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_dependency_addition",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 의존성이 추가되지 않는다."
+              }
+            ],
+            "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+            "recovery": {
+              "max_goal_replans": 5,
+              "max_same_failure_replans": 2,
+              "requires_new_evidence": true,
+              "resume_strategy": "existing_binding_first",
+              "retryable_failure_classes": [
+                "implementation",
+                "context",
+                "task_contract",
+                "dependency",
+                "environment"
+              ]
+            },
+            "required_capabilities": [
+              "python_change",
+              "unittest_validation",
+              "independent_validator_review"
+            ],
+            "risk_level": "medium",
+            "risk_tags": [
+              "scoped_mutation",
+              "public_contract"
+            ],
+            "task_id": "task_6fbb742bc3584de3a41bbca0e6dfe556",
+            "task_ref": "task_change_add",
+            "validations": [
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "file",
+                  "diff",
+                  "command",
+                  "test"
+                ],
+                "statement": "등록된 oracle.py의 task phase를 실행하여 프로젝트 파일 집합, test_app.py·AGENTS.md의 초기 byte hash, add 본문 밖 AST, 실제 함수 annotation·시그니처와 기존 unittest 통과 여부를 검사한다. 이 검사는 task phase의 검사 범위만 확인하며 goal phase의 고정 정수쌍 위치·키워드 호출 검사를 대신하지 않는다.",
+                "validation_id": "val_task_oracle"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "command",
+                  "test"
+                ],
+                "statement": "동일 workspace에서 기존 unittest를 새 프로세스로 실제 실행하여 test_app.py의 기존 합산 테스트가 통과하는지 확인한다.",
+                "validation_id": "val_task_unittest"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "file",
+                  "diff"
+                ],
+                "statement": "변경 전후 프로젝트 파일 목록과 diff를 직접 비교하여 app.py의 add 구현만 변경되고 test_app.py와 AGENTS.md가 보존되며 프로젝트 파일 추가·삭제가 없는지 확인한다.",
+                "validation_id": "val_task_scope"
+              },
+              {
+                "method": "semantic",
+                "required_evidence_kinds": [
+                  "model_review",
+                  "external_observation",
+                  "file"
+                ],
+                "statement": "실행 역할과 분리된 Validator가 원본 파일 근거와 Worker 응답 본문의 실행 관측을 함께 참조하여 add 구현의 최소 변경, 공개 호출 계약 보존, 프로젝트 파일 보존 주장이 직접 근거와 일치하는지 의미 검토한다. 응답 관측은 external_observation으로 수집하며 외부 시스템 변경을 의미하지 않는다.",
+                "validation_id": "val_task_validator_review"
+              }
+            ]
+          }
+        ]
+      },
+      "definition_digest": "sha256:a8606a0123ff841229bb5b6d60b9342d6e8df3ad0818df7f40e695cef8463b10",
+      "plan_id": "diagnostic_plan_422af2f0d4e344239b705cc43f0ea6f2",
+      "plan_revision_id": "diagnostic_plan_revision_9f1e520b1ff64368a429b10514d38e3b",
+      "revision_no": 1,
+      "schema_version": "1.0",
+      "status": "ready"
+    },
+    "input-stored-expanded-plan.json": {
+      "created_at": "2026-09-04T11:51:34.946082Z",
+      "definition": {
+        "base_state_snapshot_digest": "sha256:ff1e4dd1f7f7e7a430c4544dc1123e458577a701f019f2a134bbc7fda4b19444",
+        "commit_horizon": {
+          "irreversible_effect_checkpoint": true,
+          "max_ready_tasks": 1,
+          "project_serial_execution": true,
+          "revalidate_snapshot_before_materialization": true
+        },
+        "dependencies": [],
+        "expected_effects": [
+          "app.py의 add 구현이 두 정수의 합을 반환하도록 변경된다.",
+          "Task 검증과 독립 Goal Test의 검증 결과가 원장 evidence로 기록된다."
+        ],
+        "goal_contract_digest": "sha256:e43e73deb801e42b7762d474afcb62917d19d39dbbfbfb54e4f90424eba2bedd",
+        "goal_coverage": [
+          {
+            "criterion_id": "ac_001",
+            "task_ids": [
+              "task_ceb802ec8151477386abb52ae48df55c"
+            ],
+            "validation_ids": [
+              "validation_task_oracle_and_unittest",
+              "validation_goal_test"
+            ]
+          },
+          {
+            "criterion_id": "ac_002",
+            "task_ids": [
+              "task_ceb802ec8151477386abb52ae48df55c"
+            ],
+            "validation_ids": [
+              "validation_task_oracle_and_unittest",
+              "validation_goal_test"
+            ]
+          },
+          {
+            "criterion_id": "ac_003",
+            "task_ids": [
+              "task_ceb802ec8151477386abb52ae48df55c"
+            ],
+            "validation_ids": [
+              "validation_task_oracle_and_unittest",
+              "validation_goal_test"
+            ]
+          },
+          {
+            "criterion_id": "ac_004",
+            "task_ids": [
+              "task_ceb802ec8151477386abb52ae48df55c"
+            ],
+            "validation_ids": [
+              "validation_goal_test"
+            ]
+          }
+        ],
+        "integration_validations": [
+          {
+            "criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test",
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task 검증이 완료된 뒤 동일 workspace에서 등록된 oracle.py의 goal phase를 새로 실행한다. 이 독립 Goal Test는 Task phase의 파일 집합·보존 파일 해시·add 외부 AST·실제 annotation 및 시그니처 검사를 새로 수행하고, 양수·음수·0 및 큰 정수를 포함한 고정 정수 쌍을 위치 인자와 키워드 인자로 호출해 기대 합과 비교한다. 실행 중 소스 변경도 검사한다. Goal evidence는 새 command·test·file·diff evidence로 기록하고 task_id는 null로 유지하며 Task evidence를 복사하지 않는다.",
+            "validation_id": "validation_goal_test"
+          }
+        ],
+        "model_inventory_digest": "sha256:82e6bbcba85b38800c736c9f9809a493fbc9b3270cb53b514721a80839a49f14",
+        "planning_budget": {
+          "max_candidate_versions": 5,
+          "max_initial_candidates": 3,
+          "max_logical_role_calls": 14,
+          "max_refinement_per_candidate": 1,
+          "max_shortlist": 2,
+          "replan_reserve_percent": 25
+        },
+        "prohibited_effects": [
+          "add 구현 외 프로젝트 파일 변경",
+          "test_app.py 또는 AGENTS.md 변경",
+          "프로젝트 파일 추가 또는 삭제",
+          "프로젝트 의존성 추가 또는 변경",
+          "외부 서비스 변경 또는 배포"
+        ],
+        "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+        "project_map_digest": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a",
+        "source_skeleton_digest": "sha256:d758b38cbc6dca2091480122403897b801b540e83770fc9a6228ebb853f99254",
+        "tasks": [
+          {
+            "acceptance_criteria": [
+              "Worker가 add 구현 변경과 자신의 작업·관측 근거를 제출한다.",
+              "add가 양수·음수·0을 포함한 두 정수의 합을 반환하고 공개 함수명·인자명·int annotation·위치 및 키워드 호출 계약을 유지한다.",
+              "Task phase의 결정적 검사와 기존 unittest가 통과한다.",
+              "프로젝트 파일 변경 범위가 허용된 add 구현으로 한정되고 test_app.py와 AGENTS.md가 보존된다.",
+              "Worker 응답 제출 이후 Core가 수집한 원본 file evidence와 응답 관측을 사용해 분리된 Validator의 semantic 검토가 통과한다."
+            ],
+            "approval_class": "none",
+            "assignment": {
+              "executor": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "high",
+                "preferred_model": "gpt-5.6-terra",
+                "role": "executor"
+              },
+              "independence_required": true,
+              "validator": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "xhigh",
+                "preferred_model": "gpt-5.6-sol",
+                "role": "validator"
+              }
+            },
+            "consumes": [
+              "input:app.py",
+              "input:test_app.py",
+              "input:AGENTS.md",
+              "input:D:\\codex\\flowmarshal\\.flowmarshal-engine-eval\\runs\\s06-bugfix-trace-20260904-v4\\validation-reference.md",
+              "project:map",
+              "project:root",
+              "state:fact_project_map"
+            ],
+            "expected_effects": [
+              {
+                "effect_id": "effect_add_implementation",
+                "external": false,
+                "reversible": true,
+                "statement": "두 정수의 합을 반환하도록 add 구현이 변경된다."
+              },
+              {
+                "effect_id": "effect_worker_report",
+                "external": false,
+                "reversible": true,
+                "statement": "Worker가 변경 결과와 관측 근거를 응답 본문으로 제출한다."
+              }
+            ],
+            "goal_criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "kind": "change",
+            "objective": "app.py의 add 구현만 수정하여 두 정수의 합을 반환하고, 공개 호출 계약과 보존 범위를 유지한다.",
+            "preconditions": [
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_current_project_binding",
+                "statement": "현재 State의 project map fact와 Goal·Project Map의 대상 프로젝트 결속이 유효하고 freshness 위반이 없다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_observed_defect",
+                "statement": "현재 관측된 add 구현이 요구된 두 정수 합산 동작을 충족하지 않는다."
+              }
+            ],
+            "produces": [
+              "artifact:add_implementation_change",
+              "evidence:task_change_scope",
+              "evidence:task_unittest",
+              "evidence:task_validator_review"
+            ],
+            "prohibited_effects": [
+              {
+                "effect_id": "prohibited_out_of_scope_file_change",
+                "external": false,
+                "reversible": true,
+                "statement": "add 구현을 제외한 프로젝트 파일을 변경한다."
+              },
+              {
+                "effect_id": "prohibited_preserved_file_change",
+                "external": false,
+                "reversible": true,
+                "statement": "test_app.py 또는 AGENTS.md를 변경한다."
+              },
+              {
+                "effect_id": "prohibited_project_file_set_change",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 파일을 추가하거나 삭제한다."
+              },
+              {
+                "effect_id": "prohibited_dependency_change",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 의존성을 추가하거나 변경한다."
+              },
+              {
+                "effect_id": "prohibited_external_effect",
+                "external": true,
+                "reversible": false,
+                "statement": "외부 서비스·계정·제3자 시스템을 변경하거나 배포한다."
+              }
+            ],
+            "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+            "recovery": {
+              "max_goal_replans": 5,
+              "max_same_failure_replans": 2,
+              "requires_new_evidence": true,
+              "resume_strategy": "existing_binding_first",
+              "retryable_failure_classes": [
+                "implementation",
+                "context",
+                "task_contract",
+                "dependency",
+                "environment"
+              ]
+            },
+            "required_capabilities": [
+              "python_change",
+              "unittest_validation",
+              "independent_validator_review"
+            ],
+            "risk_level": "medium",
+            "risk_tags": [
+              "scoped_mutation",
+              "public_contract"
+            ],
+            "task_id": "task_ceb802ec8151477386abb52ae48df55c",
+            "task_ref": "task_change_add",
+            "validations": [
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "file",
+                  "diff",
+                  "command",
+                  "test"
+                ],
+                "statement": "Task 완료 전에 등록된 oracle.py의 task phase를 실제 실행하여 프로젝트 파일 집합, test_app.py·AGENTS.md의 초기 byte 해시, add 본문 밖 AST, 실제 함수 annotation·시그니처를 검사한다. 이어서 동일 workspace에서 기존 Python unittest를 새 프로세스로 실행해 통과를 확인한다. 이 검사는 선언이나 evidence 종류만 확인하는 것이 아니라 변경 범위·보존 조건·공개 계약·기존 테스트 결과를 직접 관측한다.",
+                "validation_id": "validation_task_oracle_and_unittest"
+              },
+              {
+                "method": "semantic",
+                "required_evidence_kinds": [
+                  "model_review",
+                  "external_observation",
+                  "file"
+                ],
+                "statement": "Worker 응답 제출 후 Core가 응답 보고를 external_observation evidence로 수집하고, 원본 프로젝트 file evidence와 함께 독립 Validator의 semantic model_review를 수행한다. 검토는 add 구현 변경이 최소 범위인지, 보존 파일과 파일 집합이 원본 근거와 일치하는지, Worker 응답의 의미가 관측된 근거를 정확히 보고하는지를 확인하며, 응답 관측을 외부 시스템 변경 효과로 해석하지 않는다.",
+                "validation_id": "validation_task_validator_review"
+              }
+            ]
+          }
+        ]
+      },
+      "definition_digest": "sha256:44e69847b2eb54a25b1cdba42feaf1cb29febba2adb11b710340fb3442676f7e",
+      "plan_id": "plan_f3d364c3b5f84ad3a3b5b895cc1d7877",
+      "plan_revision_id": "plan_revision_f6002b7b27c143ffa9d3346063ecc11d",
+      "revision_no": 1,
+      "schema_version": "1.0",
+      "status": "ready"
+    },
+    "input-semantic-explicit-plan.json": {
+      "created_at": "2026-09-04T10:11:11.861102Z",
+      "definition": {
+        "base_state_snapshot_digest": "sha256:7b9aecdb8ead6ee76f0396526316ee06e7b0abc62c678473d7b7ef9aa5bf7f41",
+        "commit_horizon": {
+          "irreversible_effect_checkpoint": true,
+          "max_ready_tasks": 1,
+          "project_serial_execution": true,
+          "revalidate_snapshot_before_materialization": true
+        },
+        "dependencies": [],
+        "expected_effects": [
+          "app.py의 add 구현이 두 정수의 합을 반환하도록 변경된다.",
+          "Task와 독립 Goal Test의 검증 evidence 및 최종 Goal 판정에 필요한 관측이 원장에 기록된다."
+        ],
+        "goal_contract_digest": "sha256:5db87970a337e4afe9388fba1c581fb649a8fc9d87d4fc5148892b4fed0b06d4",
+        "goal_coverage": [
+          {
+            "criterion_id": "ac_001",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_unittest",
+              "val_goal_independent_behavior_contract",
+              "val_task_validator_review"
+            ]
+          },
+          {
+            "criterion_id": "ac_002",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_validator_review",
+              "val_goal_independent_behavior_contract"
+            ]
+          },
+          {
+            "criterion_id": "ac_003",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_unittest",
+              "val_goal_independent_unittest",
+              "val_task_add_behavior_contract"
+            ]
+          },
+          {
+            "criterion_id": "ac_004",
+            "task_ids": [
+              "task_60f8eabb986e4083a301ea7959f8b153"
+            ],
+            "validation_ids": [
+              "val_task_add_behavior_contract",
+              "val_task_unittest",
+              "val_task_scope_preservation",
+              "val_goal_independent_behavior_contract",
+              "val_goal_independent_unittest",
+              "val_goal_independent_scope_preservation"
+            ]
+          }
+        ],
+        "integration_validations": [
+          {
+            "criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test",
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace에서 oracle.py의 goal phase를 새로 실행하여 고정된 양수·음수·0 정수 쌍을 위치 인자와 키워드 인자로 호출하고 합산 결과를 비교하며, 공개 함수명 add, left·right 인자명, int annotation, int 반환 annotation과 위치·키워드 호출 계약을 독립적으로 검사한다.",
+            "validation_id": "val_goal_independent_behavior_contract"
+          },
+          {
+            "criterion_refs": [
+              "ac_003",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace에서 기존 unittest를 별도 새 프로세스로 다시 실행하여 기존 unittest 통과 여부를 독립적으로 확인한다.",
+            "validation_id": "val_goal_independent_unittest"
+          },
+          {
+            "criterion_refs": [
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task 검증 완료 후 Core가 동일 workspace의 새 file·diff evidence를 사용하여 app.py의 add 구현 외 변경이 없고 test_app.py와 AGENTS.md가 보존되며 프로젝트 파일 추가·삭제가 없는지 독립적으로 검사한다.",
+            "validation_id": "val_goal_independent_scope_preservation"
+          }
+        ],
+        "model_inventory_digest": "sha256:82e6bbcba85b38800c736c9f9809a493fbc9b3270cb53b514721a80839a49f14",
+        "planning_budget": {
+          "max_candidate_versions": 5,
+          "max_initial_candidates": 3,
+          "max_logical_role_calls": 14,
+          "max_refinement_per_candidate": 1,
+          "max_shortlist": 2,
+          "replan_reserve_percent": 25
+        },
+        "prohibited_effects": [
+          "app.py의 add 구현 외 프로젝트 파일 mutation",
+          "test_app.py 또는 AGENTS.md mutation",
+          "프로젝트 파일 추가 또는 삭제",
+          "프로젝트 의존성 추가 또는 변경",
+          "외부 서비스 변경·배포·외부 계정·제3자에 대한 효과"
+        ],
+        "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+        "project_map_digest": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a",
+        "source_skeleton_digest": "sha256:d758b38cbc6dca2091480122403897b801b540e83770fc9a6228ebb853f99254",
+        "tasks": [
+          {
+            "acceptance_criteria": [
+              "app.py의 add가 양수·음수·0을 포함한 두 정수의 합을 반환한다.",
+              "공개 함수명 add, left·right 인자명, int 입력 annotation, int 반환 annotation과 위치·키워드 인자 호출 계약을 유지한다.",
+              "기존 unittest를 동일 workspace에서 새 프로세스로 실행해 통과한다.",
+              "변경 파일 집합과 app.py의 add 구현 범위가 허용 범위와 일치하고 test_app.py·AGENTS.md 및 프로젝트 파일 집합 보존 조건을 확인한다.",
+              "실행 역할과 분리된 Validator가 직접 수집된 변경 evidence를 검토하고 범위·공개 계약·최소 변경 의미에 대한 검토 결과를 제출한다."
+            ],
+            "approval_class": "none",
+            "assignment": {
+              "executor": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "high",
+                "preferred_model": "gpt-5.6-terra",
+                "role": "executor"
+              },
+              "independence_required": true,
+              "validator": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "xhigh",
+                "preferred_model": "gpt-5.6-sol",
+                "role": "validator"
+              }
+            },
+            "consumes": [
+              "input:app.py",
+              "input:test_app.py",
+              "input:AGENTS.md",
+              "input:D:\\codex\\flowmarshal\\.flowmarshal-engine-eval\\runs\\s06-bugfix-trace-20260904-v4\\validation-reference.md",
+              "project:map",
+              "project:root",
+              "state:fact_project_map"
+            ],
+            "expected_effects": [
+              {
+                "effect_id": "effect_local_add_change",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py 내부 add 구현이 두 정수의 합을 반환하도록 변경된다."
+              },
+              {
+                "effect_id": "effect_task_evidence",
+                "external": false,
+                "reversible": true,
+                "statement": "Task 완료에 필요한 변경 범위·unittest·Validator 검토 evidence가 원장에 기록된다."
+              }
+            ],
+            "goal_criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "kind": "change",
+            "objective": "app.py의 add 구현만 수정하여 두 정수의 합을 반환하고, 공개 호출 계약과 보존 범위를 유지한다.",
+            "preconditions": [
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_project_binding",
+                "statement": "Goal의 명시적 대상 프로젝트가 Project Map.root 및 state:fact_project_map과 일치하고, 제공된 현재 프로젝트 관측을 기준으로 app.py·test_app.py·AGENTS.md가 입력으로 존재한다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_scope_binding",
+                "statement": "변경 대상은 app.py의 add 구현으로 한정되며 test_app.py·AGENTS.md는 보존 대상이고 프로젝트 파일 추가·삭제와 의존성 추가는 계약 범위 밖이다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_initial_state",
+                "statement": "현재 add 구현의 결함 상태와 기존 파일 보존 해시를 제공된 원본 관측 및 등록 검증 자료와 대조할 수 있다."
+              }
+            ],
+            "produces": [
+              "artifact:add_implementation_change",
+              "evidence:task_change_scope",
+              "evidence:task_unittest",
+              "evidence:task_validator_review"
+            ],
+            "prohibited_effects": [
+              {
+                "effect_id": "prohibited_local_scope",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py의 add 구현 이외의 프로젝트 파일을 변경하지 않으며, test_app.py와 AGENTS.md를 변경하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_local_filesystem_shape",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 파일을 추가하거나 삭제하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_external_effects",
+                "external": true,
+                "reversible": true,
+                "statement": "외부 서비스 변경·배포·외부 계정 또는 제3자에 대한 효과를 발생시키지 않는다."
+              },
+              {
+                "effect_id": "prohibited_dependency_change",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 의존성을 추가하거나 변경하지 않는다."
+              }
+            ],
+            "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+            "recovery": {
+              "max_goal_replans": 5,
+              "max_same_failure_replans": 2,
+              "requires_new_evidence": true,
+              "resume_strategy": "existing_binding_first",
+              "retryable_failure_classes": [
+                "implementation",
+                "context",
+                "task_contract",
+                "dependency",
+                "environment"
+              ]
+            },
+            "required_capabilities": [
+              "python_change",
+              "unittest_validation",
+              "independent_validator_review"
+            ],
+            "risk_level": "medium",
+            "risk_tags": [
+              "scoped_mutation",
+              "public_contract"
+            ],
+            "task_id": "task_60f8eabb986e4083a301ea7959f8b153",
+            "task_ref": "task_change_add",
+            "validations": [
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "command",
+                  "test",
+                  "file",
+                  "diff"
+                ],
+                "statement": "등록된 oracle.py의 task phase를 실제 실행하여 현재 프로젝트 파일 집합, test_app.py·AGENTS.md의 보존 해시, add 본문 밖 AST, 공개 함수명·인자명·int 입력 및 반환 annotation·시그니처와 기존 unittest 통과를 검사한다.",
+                "validation_id": "val_task_add_behavior_contract"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "command",
+                  "test"
+                ],
+                "statement": "기존 test_app.py의 unittest를 동일 workspace에서 새 프로세스로 실제 실행하여 기존 unittest가 통과하는지 확인한다.",
+                "validation_id": "val_task_unittest"
+              },
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "file",
+                  "diff"
+                ],
+                "statement": "Task 변경 결과의 파일 집합과 diff를 직접 검사하여 변경이 app.py의 add 구현에만 한정되고 test_app.py와 AGENTS.md의 원본 내용, 프로젝트 파일 추가·삭제 및 의존성 변경이 없는지 확인한다.",
+                "validation_id": "val_task_scope_preservation"
+              },
+              {
+                "method": "semantic",
+                "required_evidence_kinds": [
+                  "model_review"
+                ],
+                "statement": "실행 역할과 분리된 Validator가 Task의 직접 file·diff evidence를 검토하여 app.py의 add 구현 변경이 요구된 동작·공개 호출 계약·최소 수정 범위를 충족하는지 독립적으로 판단하고 검토 결과를 제출한다.",
+                "validation_id": "val_task_validator_review"
+              }
+            ]
+          }
+        ]
+      },
+      "definition_digest": "sha256:2b8c0a21145a3aa8b46339b9f03caa94d7d72034d960cba55495cb2078588534",
+      "plan_id": "diagnostic_plan_a3a95c94c68542c3a960985eabfd379a",
+      "plan_revision_id": "diagnostic_plan_revision_adabda3cc82645d38d97e3e75aadf339",
+      "revision_no": 1,
+      "schema_version": "1.0",
+      "status": "ready"
+    },
+    "expanded-plan.json": {
+      "created_at": "2026-09-04T13:12:16.354837Z",
+      "definition": {
+        "base_state_snapshot_digest": "sha256:ff1e4dd1f7f7e7a430c4544dc1123e458577a701f019f2a134bbc7fda4b19444",
+        "commit_horizon": {
+          "irreversible_effect_checkpoint": true,
+          "max_ready_tasks": 1,
+          "project_serial_execution": true,
+          "revalidate_snapshot_before_materialization": true
+        },
+        "dependencies": [],
+        "expected_effects": [
+          "app.py의 add 구현이 공개 호출 계약을 유지하면서 두 정수의 합을 반환한다.",
+          "Task 검증과 독립 Goal Test의 결과 및 evidence가 Core의 최종 Goal 판정에 결속된다."
+        ],
+        "goal_contract_digest": "sha256:e43e73deb801e42b7762d474afcb62917d19d39dbbfbfb54e4f90424eba2bedd",
+        "goal_coverage": [
+          {
+            "criterion_id": "ac_001",
+            "task_ids": [
+              "task_d5ab2360cae243c6b097f37fa9ba631c"
+            ],
+            "validation_ids": [
+              "val_task_oracle",
+              "val_goal_independent"
+            ]
+          },
+          {
+            "criterion_id": "ac_002",
+            "task_ids": [
+              "task_d5ab2360cae243c6b097f37fa9ba631c"
+            ],
+            "validation_ids": [
+              "val_task_oracle",
+              "val_goal_independent"
+            ]
+          },
+          {
+            "criterion_id": "ac_003",
+            "task_ids": [
+              "task_d5ab2360cae243c6b097f37fa9ba631c"
+            ],
+            "validation_ids": [
+              "val_task_oracle",
+              "val_goal_independent"
+            ]
+          },
+          {
+            "criterion_id": "ac_004",
+            "task_ids": [
+              "task_d5ab2360cae243c6b097f37fa9ba631c"
+            ],
+            "validation_ids": [
+              "val_goal_independent"
+            ]
+          }
+        ],
+        "integration_validations": [
+          {
+            "criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "evidence_mode": "independent",
+            "method": "deterministic",
+            "required_evidence_kinds": [
+              "command",
+              "test",
+              "file",
+              "diff"
+            ],
+            "statement": "모든 Task 검증이 완료된 뒤 동일 workspace에서 등록된 oracle.py의 goal phase를 task phase와 분리된 새 실행으로 수행한다. 고정된 정수 쌍 각각을 위치 인자와 키워드 인자로 호출하여 기대 합과 비교하고, 공개 함수명 add, left·right 인자명, int annotation, int 반환 annotation 및 위치·키워드 호출 계약을 독립적으로 검사한다. 또한 기존 unittest, 프로젝트 파일 보존 및 변경 범위를 새 command·test·file·diff evidence로 확인하며, Goal evidence는 task_id를 null로 유지하고 Task evidence를 복사하지 않는다.",
+            "validation_id": "val_goal_independent"
+          }
+        ],
+        "model_inventory_digest": "sha256:82e6bbcba85b38800c736c9f9809a493fbc9b3270cb53b514721a80839a49f14",
+        "planning_budget": {
+          "max_candidate_versions": 5,
+          "max_initial_candidates": 3,
+          "max_logical_role_calls": 14,
+          "max_refinement_per_candidate": 1,
+          "max_shortlist": 2,
+          "replan_reserve_percent": 25
+        },
+        "prohibited_effects": [
+          "test_app.py와 AGENTS.md를 변경하지 않는다.",
+          "프로젝트 파일을 추가하거나 삭제하지 않는다.",
+          "app.py의 add 구현 밖을 변경하지 않는다.",
+          "외부 서비스·계정·제3자 시스템을 변경하거나 배포하지 않는다.",
+          "프로젝트 의존성을 추가하지 않는다."
+        ],
+        "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+        "project_map_digest": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a",
+        "source_skeleton_digest": "sha256:d758b38cbc6dca2091480122403897b801b540e83770fc9a6228ebb853f99254",
+        "tasks": [
+          {
+            "acceptance_criteria": [
+              "Worker가 app.py의 add 구현 변경과 관측 근거를 제출한다.",
+              "Worker 보고와 별도로 Core가 Task 검증 결과를 수집한다.",
+              "등록된 task phase 검사와 기존 unittest가 통과하고, 파일 변경 범위 및 보존 조건이 확인된다.",
+              "분리된 Validator가 Worker 응답의 의미를 원본 file 근거와 대조해 독립 검토를 통과한다."
+            ],
+            "approval_class": "none",
+            "assignment": {
+              "executor": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "high",
+                "preferred_model": "gpt-5.6-terra",
+                "role": "executor"
+              },
+              "independence_required": true,
+              "validator": {
+                "allowed_fallbacks": [],
+                "preferred_effort": "xhigh",
+                "preferred_model": "gpt-5.6-sol",
+                "role": "validator"
+              }
+            },
+            "consumes": [
+              "input:app.py",
+              "input:test_app.py",
+              "input:AGENTS.md",
+              "input:D:\\codex\\flowmarshal\\.flowmarshal-engine-eval\\runs\\s06-bugfix-trace-20260904-v4\\validation-reference.md",
+              "project:map",
+              "project:root",
+              "state:fact_project_map"
+            ],
+            "expected_effects": [
+              {
+                "effect_id": "effect_add_sum",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py의 add 구현이 양수·음수·0을 포함한 두 정수의 합을 반환하도록 변경된다."
+              }
+            ],
+            "goal_criterion_refs": [
+              "ac_001",
+              "ac_002",
+              "ac_003",
+              "ac_004"
+            ],
+            "kind": "change",
+            "objective": "app.py의 add 구현만 수정하여 두 정수의 합을 반환하고, 공개 호출 계약과 보존 범위를 유지한다.",
+            "preconditions": [
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_current_target",
+                "statement": "Goal의 명시 대상과 Project Map.root가 일치하고, 현재 State의 Project Map binding이 유효하다."
+              },
+              {
+                "evidence_required": true,
+                "precondition_id": "precondition_change_scope",
+                "statement": "변경은 기존 app.py의 add 구현에 한정되며 test_app.py·AGENTS.md와 프로젝트 파일 집합은 보존 대상이다."
+              }
+            ],
+            "produces": [
+              "artifact:add_implementation_change",
+              "evidence:task_change_scope",
+              "evidence:task_unittest",
+              "evidence:task_validator_review"
+            ],
+            "prohibited_effects": [
+              {
+                "effect_id": "prohibited_other_local_files",
+                "external": false,
+                "reversible": true,
+                "statement": "test_app.py와 AGENTS.md의 내용 또는 프로젝트 파일 집합을 변경하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_outside_add",
+                "external": false,
+                "reversible": true,
+                "statement": "app.py에서 add 구현 밖의 내용을 변경하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_dependencies",
+                "external": false,
+                "reversible": true,
+                "statement": "프로젝트 파일을 추가하거나 삭제하지 않고 의존성을 추가하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_external_service",
+                "external": true,
+                "reversible": true,
+                "statement": "외부 서비스·계정·제3자 시스템을 변경하지 않는다."
+              },
+              {
+                "effect_id": "prohibited_deployment",
+                "external": true,
+                "reversible": true,
+                "statement": "배포하거나 외부에 공개하지 않는다."
+              }
+            ],
+            "project_id": "project_1512a6cf6fa841488029ab4e44e9229a",
+            "recovery": {
+              "max_goal_replans": 5,
+              "max_same_failure_replans": 2,
+              "requires_new_evidence": true,
+              "resume_strategy": "existing_binding_first",
+              "retryable_failure_classes": [
+                "implementation",
+                "context",
+                "task_contract",
+                "dependency",
+                "environment"
+              ]
+            },
+            "required_capabilities": [
+              "python_change",
+              "unittest_validation",
+              "independent_validator_review"
+            ],
+            "risk_level": "low",
+            "risk_tags": [
+              "scoped_mutation",
+              "public_contract"
+            ],
+            "task_id": "task_d5ab2360cae243c6b097f37fa9ba631c",
+            "task_ref": "task_change_add",
+            "validations": [
+              {
+                "method": "deterministic",
+                "required_evidence_kinds": [
+                  "file",
+                  "diff",
+                  "command",
+                  "test"
+                ],
+                "statement": "등록된 oracle.py의 task phase를 실행하여 현재 프로젝트 파일 집합, test_app.py와 AGENTS.md의 초기 byte hash, add 구현 밖 AST, 실제 함수명·인자·annotation·반환 annotation을 검사하고, 동일 workspace에서 기존 unittest를 새 프로세스로 실제 실행해 통과 여부를 확인한다. 이 검사 결과로 양수·음수·0을 포함한 기존 합산 동작과 공개 계약의 Task 수준 조건을 확인한다.",
+                "validation_id": "val_task_oracle"
+              },
+              {
+                "method": "semantic",
+                "required_evidence_kinds": [
+                  "file",
+                  "model_review",
+                  "external_observation"
+                ],
+                "statement": "실행 역할과 분리된 Validator가 Worker 응답 보고를 Core가 수집한 external_observation으로 검토하고, 원본 app.py 및 파일 변경 범위의 file 근거와 대조하여 add 구현만의 최소 수정, 공개 호출 계약 보존, 보고 내용의 의미를 독립적으로 판단한다. oracle 종료 코드만으로 이 semantic 검토를 대체하지 않는다.",
+                "validation_id": "val_task_validator_review"
+              }
+            ]
+          }
+        ]
+      },
+      "definition_digest": "sha256:18834bdd5d939df9c1789301ab9333f6616d270aae5f12f003b57ba3b9c504ad",
+      "plan_id": "plan_eae2ac172b9d4e938c33a7b28c0dfde0",
+      "plan_revision_id": "plan_revision_dde337ca724649d588b8133d62c67408",
+      "revision_no": 1,
+      "schema_version": "1.0",
+      "status": "ready"
+    }
+  }
+}

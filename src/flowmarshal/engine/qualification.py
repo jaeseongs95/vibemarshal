@@ -183,6 +183,8 @@ def source_manifest_digest(root: Path) -> str:
         root / "src" / "flowmarshal" / "benchmark_legacy.py",
     }
     paths.update((root / "src" / "flowmarshal" / "engine").glob("*.py"))
+    paths.update((root / "tests").glob("engine*_helpers.py"))
+    paths.update((root / "scripts" / "diagnostics").glob("*.py"))
     paths.update((root / "tests").glob("test_engine*.py"))
     paths.update((root / "tests" / "fixtures" / "engine").rglob("*"))
     files = sorted(
@@ -663,9 +665,10 @@ def _planning_contract(
     roles: EngineRoleConfiguration,
 ) -> EvaluationContract:
     import inspect
+    from . import goal as goal_roles, planner_roles
     from .goal import GoalNormalizationProposal
     from .planner_roles import (
-        PlanExpansionDraft, SkeletonBatchDraft, SkeletonCandidateDraft, READ_ONLY_REPORTING_INSTRUCTIONS,
+        PlanExpansionEnvelope, PlanReviewEnvelope, SkeletonBatchDraft, SkeletonCandidateDraft,
     )
 
     return EvaluationContract(
@@ -685,13 +688,19 @@ def _planning_contract(
                 role.__name__: inspect.getsource(role)
                 for role in (GoalNormalizerAdapter, GoalReviewerAdapter, SkeletonGeneratorAdapter,
                              SkeletonReviewerAdapter, PlanExpanderAdapter, PlanReviewerAdapter)
-            } | {"read_only_reporting": READ_ONLY_REPORTING_INSTRUCTIONS}
+            } | {
+                "shared_instructions": {
+                    name: value for module in (goal_roles, planner_roles)
+                    for name, value in vars(module).items()
+                    if name.endswith("_INSTRUCTIONS") and isinstance(value, str)
+                }
+            }
         ),
         output_schema_digest=sha256_digest(
             {
                 model.__name__: strict_json_output_schema(model.model_json_schema())
                 for model in (GoalNormalizationProposal, SkeletonBatchDraft, SkeletonCandidateDraft,
-                              PlanExpansionDraft, ReviewDraft)
+                              PlanExpansionEnvelope, PlanReviewEnvelope, ReviewDraft)
             }
         ),
         model_lock_digest=_model_lock(inventory, roles),

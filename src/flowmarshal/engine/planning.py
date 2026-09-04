@@ -155,6 +155,33 @@ def plan_validation_scope_rows(plan: PlanContractRevision) -> list[dict[str, Any
     return rows
 
 
+def validation_comparison_targets(goal: GoalContractRevision, plan: Any) -> dict[str, Any]:
+    """권위 Plan 또는 작성 draft의 전체 대조 집합을 원문 ID·JSON pointer로만 투영한다."""
+    definition = getattr(plan, "definition", plan)
+    prefix = "/definition" if hasattr(plan, "definition") else ""
+    validations = [
+        {"validation_id": validation.validation_id, "task_ref": task.task_ref,
+         "selector": f"{prefix}/tasks/{ti}/validations/{vi}"}
+        for ti, task in enumerate(definition.tasks)
+        for vi, validation in enumerate(task.validations)
+    ] + [
+        {"validation_id": validation.validation_id, "task_ref": None,
+         "selector": f"{prefix}/integration_validations/{vi}"}
+        for vi, validation in enumerate(definition.integration_validations)
+    ]
+    return {
+        "validations": validations,
+        "ac_validation_pairs": [
+            {"criterion_id": criterion.criterion_id, "validation_id": row["validation_id"]}
+            for criterion in goal.definition.hard_acceptance for row in validations
+        ],
+        "constraint_task_pairs": [
+            {"constraint_id": constraint.constraint_id, "task_ref": task.task_ref}
+            for constraint in goal.definition.constraints for task in definition.tasks
+        ],
+    }
+
+
 class SkeletonGenerator(Protocol):
     def generate(
         self,

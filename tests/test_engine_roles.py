@@ -93,11 +93,28 @@ class ImmediateRoleRuntime:
 
 
 class EngineStructuredRoleTests(unittest.TestCase):
+    def test_bounded_diagnostic_records_first_schema_failure_without_retry(self):
+        runtime = ImmediateRoleRuntime(["not-json", '{"answer":"would-pass"}'])
+        runner = CodexStructuredRoleRunner(runtime, max_schema_recovery_attempts=0)
+        with tempfile.TemporaryDirectory() as temp:
+            request = RoleCallRequest(role="bounded-diagnostic", instructions="고정 응답 계약을 따른다.",
+                                      payload={}, output_schema={"type": "object"}, model="available", effort="low",
+                                      inventory_digest=runtime.inventory.inventory_digest, cwd=temp)
+            with self.assertRaises(StructuredRoleError) as raised:
+                runner.run(request)
+        self.assertEqual(1, len(runtime.outputs))
+        receipt = raised.exception.receipt
+        self.assertEqual("schema_failed", receipt.status)
+        self.assertEqual(0, receipt.schema_recovery_attempts)
+        self.assertEqual(1, len(receipt.turn_ids))
+        self.assertEqual(100, receipt.input_tokens)
+        self.assertEqual(10, receipt.output_tokens)
+
     def test_all_role_schemas_remove_defaults_without_changing_core_schema(self) -> None:
         from flowmarshal.engine.domain import ExecutionSpecProposal
         from flowmarshal.engine.goal import GoalNormalizationProposal, ReviewDraft
         from flowmarshal.engine.planner_roles import (
-            PlanExpansionDraft, SkeletonBatchDraft, SkeletonCandidateDraft,
+            PlanExpansionDraft, PlanExpansionEnvelope, PlanReviewEnvelope, SkeletonBatchDraft, SkeletonCandidateDraft,
         )
 
         def verify(node):
@@ -112,7 +129,7 @@ class EngineStructuredRoleTests(unittest.TestCase):
                 for child in node.values():
                     verify(child)
 
-        for model in (GoalNormalizationProposal, ReviewDraft, PlanExpansionDraft,
+        for model in (GoalNormalizationProposal, ReviewDraft, PlanExpansionDraft, PlanExpansionEnvelope, PlanReviewEnvelope,
                       SkeletonBatchDraft, SkeletonCandidateDraft, ExecutionSpecProposal):
             with self.subTest(model=model.__name__):
                 original = model.model_json_schema()

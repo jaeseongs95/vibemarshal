@@ -1,0 +1,316 @@
+{
+  "clean": [],
+  "combined": [],
+  "boundary-clean": [],
+  "semantic-explicit": [],
+  "bad": [
+    {
+      "defect_id": "task-phase-overclaim",
+      "defect_kind": "validation_scope",
+      "criterion_ids": [],
+      "allowed_criterion_ids": [
+        "ac_001",
+        "ac_002",
+        "ac_003",
+        "ac_004"
+      ],
+      "validation_ids": [
+        "val_task_add_behavior_contract"
+      ],
+      "allowed_task_ref_sets": [
+        [
+          "task_change_add"
+        ]
+      ],
+      "required_evidence_refs": [
+        "artifact:plan_contract",
+        "source:project_map"
+      ],
+      "required_citations": [
+        {
+          "source_ref": "artifact:plan_contract",
+          "selectors": [
+            "/definition/tasks/0/validations/0/statement"
+          ]
+        },
+        {
+          "source_ref": "project:entry_ad363844d3392d9ef718d2d6",
+          "selectors": [
+            "/content"
+          ]
+        }
+      ]
+    }
+  ],
+  "wrong-goal": [
+    {
+      "defect_id": "goal-uses-task-phase",
+      "defect_kind": "validation_scope",
+      "criterion_ids": [],
+      "allowed_criterion_ids": [
+        "ac_001",
+        "ac_002",
+        "ac_003",
+        "ac_004"
+      ],
+      "validation_ids": [
+        "val_goal_independent_behavior_contract"
+      ],
+      "allowed_task_ref_sets": [
+        [],
+        [
+          "task_change_add"
+        ]
+      ],
+      "required_evidence_refs": [
+        "artifact:plan_contract",
+        "source:project_map"
+      ],
+      "required_citations": [
+        {
+          "source_ref": "artifact:plan_contract",
+          "selectors": [
+            "/definition/integration_validations/0/statement"
+          ]
+        },
+        {
+          "source_ref": "project:entry_ad363844d3392d9ef718d2d6",
+          "selectors": [
+            "/content"
+          ]
+        }
+      ]
+    }
+  ],
+  "missing-link": [
+    {
+      "defect_id": "ac003-task-oracle-link",
+      "defect_kind": "missing_validation_link",
+      "criterion_ids": [
+        "ac_003"
+      ],
+      "allowed_criterion_ids": [
+        "ac_003"
+      ],
+      "validation_ids": [
+        "val_task_oracle"
+      ],
+      "allowed_task_ref_sets": [
+        [
+          "task_change_add"
+        ]
+      ],
+      "required_evidence_refs": [
+        "artifact:plan_contract",
+        "source:goal"
+      ],
+      "required_citations": [
+        {
+          "source_ref": "artifact:plan_contract",
+          "selectors": [
+            "/definition/tasks/0/validations/0/statement"
+          ]
+        },
+        {
+          "source_ref": "source:goal",
+          "selectors": [
+            "/hard_acceptance/2/statement",
+            "/hard_acceptance/2/validation_intent"
+          ]
+        }
+      ]
+    }
+  ],
+  "stored-expanded": [
+    {
+      "defect_id": "ac004-combined-task-link",
+      "defect_kind": "missing_validation_link",
+      "criterion_ids": [
+        "ac_004"
+      ],
+      "allowed_criterion_ids": [
+        "ac_004"
+      ],
+      "validation_ids": [
+        "validation_task_oracle_and_unittest"
+      ],
+      "allowed_task_ref_sets": [
+        [
+          "task_change_add"
+        ]
+      ],
+      "required_evidence_refs": [
+        "artifact:plan_contract",
+        "source:goal"
+      ],
+      "required_citations": [
+        {
+          "source_ref": "artifact:plan_contract",
+          "selectors": [
+            "/definition/tasks/0/validations/0/statement"
+          ]
+        },
+        {
+          "source_ref": "source:goal",
+          "selectors": [
+            "/hard_acceptance/3/statement",
+            "/hard_acceptance/3/validation_intent"
+          ]
+        }
+      ]
+    }
+  ],
+  "stored-multi-defect": [
+    {
+      "defect_id": "ac004-task-oracle-link",
+      "defect_kind": "missing_validation_link",
+      "criterion_ids": [
+        "ac_004"
+      ],
+      "allowed_criterion_ids": [
+        "ac_004"
+      ],
+      "validation_ids": [
+        "val_task_oracle"
+      ],
+      "allowed_task_ref_sets": [
+        [
+          "task_change_add"
+        ]
+      ],
+      "required_evidence_refs": [
+        "artifact:plan_contract",
+        "source:goal"
+      ],
+      "required_citations": [
+        {
+          "source_ref": "artifact:plan_contract",
+          "selectors": [
+            "/definition/tasks/0/validations/0/statement"
+          ]
+        },
+        {
+          "source_ref": "source:goal",
+          "selectors": [
+            "/hard_acceptance/3/statement",
+            "/hard_acceptance/3/validation_intent"
+          ]
+        }
+      ]
+    },
+    {
+      "defect_id": "task-phase-overclaim",
+      "defect_kind": "validation_scope",
+      "criterion_ids": [],
+      "allowed_criterion_ids": [
+        "ac_001",
+        "ac_002",
+        "ac_003",
+        "ac_004"
+      ],
+      "validation_ids": [
+        "val_task_oracle"
+      ],
+      "allowed_task_ref_sets": [
+        [
+          "task_change_add"
+        ]
+      ],
+      "required_evidence_refs": [
+        "artifact:plan_contract",
+        "source:project_map"
+      ],
+      "required_citations": [
+        {
+          "source_ref": "artifact:plan_contract",
+          "selectors": [
+            "/definition/tasks/0/validations/0/statement"
+          ]
+        },
+        {
+          "source_ref": "project:entry_ad363844d3392d9ef718d2d6",
+          "selectors": [
+            "/content"
+          ]
+        }
+      ]
+    }
+  ],
+  "semantic-missing-link": [
+    {
+      "defect_id": "ac001-explicit-semantic-link",
+      "defect_kind": "missing_validation_link",
+      "criterion_ids": [
+        "ac_001"
+      ],
+      "allowed_criterion_ids": [
+        "ac_001"
+      ],
+      "validation_ids": [
+        "val_task_validator_review"
+      ],
+      "allowed_task_ref_sets": [
+        [
+          "task_change_add"
+        ]
+      ],
+      "required_evidence_refs": [
+        "artifact:plan_contract",
+        "source:goal"
+      ],
+      "required_citations": [
+        {
+          "source_ref": "artifact:plan_contract",
+          "selectors": [
+            "/definition/tasks/0/validations/3/statement"
+          ]
+        },
+        {
+          "source_ref": "source:goal",
+          "selectors": [
+            "/hard_acceptance/0/statement",
+            "/hard_acceptance/0/validation_intent"
+          ]
+        }
+      ]
+    }
+  ],
+  "future-result": [
+    {
+      "defect_id": "worker-future-validator-result",
+      "defect_kind": "result_order",
+      "criterion_ids": [],
+      "allowed_criterion_ids": [
+        "ac_001",
+        "ac_002",
+        "ac_003",
+        "ac_004"
+      ],
+      "validation_ids": [
+        "val_task_validator_review"
+      ],
+      "allowed_task_ref_sets": [
+        [
+          "task_change_add"
+        ]
+      ],
+      "required_evidence_refs": [
+        "artifact:plan_contract"
+      ],
+      "required_citations": [
+        {
+          "source_ref": "artifact:plan_contract",
+          "selectors": [
+            "/definition/tasks/0/validations/3/statement"
+          ]
+        },
+        {
+          "source_ref": "artifact:plan_contract",
+          "selectors": [
+            "/definition/tasks/0/acceptance_criteria/4"
+          ]
+        }
+      ]
+    }
+  ]
+}

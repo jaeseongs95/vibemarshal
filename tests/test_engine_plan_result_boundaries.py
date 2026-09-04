@@ -16,7 +16,7 @@ from flowmarshal.engine.planner_roles import (
     SkeletonReviewerAdapter,
 )
 from flowmarshal.engine.planning import SkeletonFirstPlanner
-from flowmarshal.engine.roles import ScriptedStructuredRoleRunner
+from tests.engine_inspection_helpers import InspectionScriptedRunner as ScriptedStructuredRoleRunner
 from flowmarshal.engine.service import EngineService, EngineServiceError
 
 from tests.engine_helpers import assignment, goal, inventory, profile, state
