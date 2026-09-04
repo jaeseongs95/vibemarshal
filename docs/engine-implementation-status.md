@@ -4,7 +4,9 @@
 
 ## 결론
 
-현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. A3의 불변 PromptBundle 저장·전송 연결 후 A4의 실제 자연어 Goal·Planning 실측에서 미지원 evidence 종류를 허용하는 Plan 계약 결함을 발견해 수정했다. provider schema와 Core 등록 경계가 같은 지원 집합을 검사하며 typed `model_copy` 우회도 차단한다. 현재 source의 447개 회귀와 결정적 Gate는 PASS다. 실측·실패·후속 실행 범위는 [A4 인계 기록](alpha-a4-handoff.md)에 기록한다. A4 실행·독립 검증과 A5 중단·재개는 아직 완료되지 않았으며 이전 source의 PASS를 현재 qualification으로 재사용하지 않는다.
+현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. A4의 승인된 Plan에서 세 Task와 네 Task validation을 완료하고 A5 저장 turn 중단·재개를 확인했다. 별도 Goal Test의 환경 명령 실패를 보존한 뒤, 이전 FAIL과 직접 evidence를 연결하는 명시적 운영 상세 재시도 경로를 추가했다. 실제 실행·source 전환·최종 검증 범위는 [A4·A5 실행 기록](alpha-a4-a5-execution.md)에 기록한다. 이전 source의 Task·A5 증거와 수정 source의 Goal 복구를 같은 source의 전체 qualification으로 합산하지 않는다.
+
+수정 source의 전체 **455개 테스트와 결정적 Gate는 PASS**다. 실제 독립 Goal 재검사도 PASS이며 Core는 최종 `satisfied`와 Plan·project completed를 기록했다. 원래 FAIL은 보존됐고 History hash chain도 유효하다. 전체 qualification campaign은 아직 재실행하지 않았다.
 
 ## 반영한 구현
 
@@ -110,7 +112,7 @@ SDK에 묶인 Codex 0.147.0에서는 응답 API의 404로 첫 역할 cell을 완
 
 ## 남은 작업
 
-아래 항목은 장기 qualification 후속 목록이다. 현재 실행 참조는 [A4 인계 기록](alpha-a4-handoff.md)이며, A4 → A5가 닫히기 전 전체 campaign을 재실행하지 않는다.
+아래 항목은 장기 qualification 후속 목록이다. 현재 실행 참조는 [A4·A5 실행 기록](alpha-a4-a5-execution.md)이다. 전체 campaign은 아래 범위를 같은 최종 source·고정 계약으로 다시 검증해야 한다.
 
 1. 역할 회귀의 직접 evidence를 분석해 검토 입력·역할 지침의 최소 범위만 보완하고 새 계약으로 다시 평가한다. oracle와 합격선은 유지한다.
 2. 전체 planning Gate를 통과시키고 사용량 제한 재개의 실제 qualification을 보강한다. 실제 E2E 네 시나리오는 통과했지만 사용량 제한을 고의로 유발한 별도 실측을 대신하지 않는다. 모의 회귀 테스트를 실제 PASS로 대체하지 않는다.

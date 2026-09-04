@@ -9,10 +9,11 @@ from pathlib import Path
 from unittest.mock import patch
 
 from flowmarshal.engine.domain import (
-    ExecutionContextNeed, ExternalValidationObservation, IntegrationValidationContract, ManualValidationObservation,
-    RunOnceAction, ThreadBinding, ValidationExecutionStep, utc_now,
+    DeterministicValidationObservation, EvidenceKind, EvidenceRecord, ExecutionContextNeed,
+    ExternalValidationObservation, FailureClass, IntegrationValidationContract, ManualValidationObservation,
+    RunOnceAction, ThreadBinding, ValidationExecutionStep, ValidationResult, ValidationStatus, new_id, utc_now,
 )
-from flowmarshal.canonical import sha256_bytes
+from flowmarshal.canonical import sha256_bytes, sha256_digest
 from flowmarshal.engine.context import AdditionalContextRequest, ContextSelector, PromptAssembler, read_context_fragment
 from flowmarshal.engine.service import EngineServiceError
 from flowmarshal.engine.e2e_qualification import _copy_fixture, _prepare
@@ -24,6 +25,7 @@ from pydantic import ValidationError
 from flowmarshal.engine.qualification import default_role_configuration
 from flowmarshal.engine.roles import ScriptedStructuredRoleRunner
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime
+from flowmarshal.engine.validation_execution import GoalValidationBinding, GoalValidationRetryRequest
 from tests.test_engine_qualification import qualification_inventory
 
 
@@ -387,6 +389,223 @@ class ExecutionAutomationTests(unittest.TestCase):
         self.assertIsNone(row["task_id"])
         dispatcher.run_once(prepared.project_id)
         self.assertNotEqual("completed", prepared.service.status(prepared.project_id)["project"]["run_state"])
+
+    def test_environment_goal_retry_rebinds_and_preserves_failed_result(self):
+        prepared, runtime = self.prepared()
+        dispatcher = self.task_completed(prepared, runtime)
+        step = prepared.proposal.validation_steps[0].model_copy(update={"validation_id": "validation_goal"})
+        self.assertEqual(RunOnceAction.MATERIALIZED,
+                         dispatcher.run_once(prepared.project_id, goal_validation_step=step).action)
+        with patch("flowmarshal.engine.validation_execution.subprocess.run",
+                   return_value=subprocess.CompletedProcess([], 9009, b"", b"Python")):
+            failed = dispatcher.run_once(prepared.project_id)
+        self.assertEqual(RunOnceAction.VALIDATED, failed.action)
+        retry = GoalValidationRetryRequest(
+            step=step.model_copy(update={"argv": ("repaired-python", "-m", "unittest")}),
+            failed_validation_result_id=failed.validation_result_id,
+            failure_class=FailureClass.ENVIRONMENT,
+            failure_evidence_id=failed.evidence_ids[0],
+            rationale="직접 command evidence가 Windows Python alias 환경 실패를 보인다.",
+        )
+        rebound = dispatcher.run_once(prepared.project_id, goal_validation_retry=retry)
+        self.assertEqual(RunOnceAction.MATERIALIZED, rebound.action)
+        with patch("flowmarshal.engine.validation_execution.subprocess.run",
+                   return_value=subprocess.CompletedProcess([], 0, b"direct test", b"")) as command:
+            observed = dispatcher.run_once(prepared.project_id)
+        self.assertEqual(RunOnceAction.VALIDATED, observed.action)
+        self.assertEqual(1, command.call_count)
+        with prepared.service.ledger.read() as connection:
+            rows = connection.execute(
+                "SELECT payload_json FROM validation_results WHERE validation_id = 'validation_goal' ORDER BY evaluated_at, rowid"
+            ).fetchall()
+            history = connection.execute(
+                "SELECT event_type, payload_json FROM history_events WHERE project_id = ? "
+                "AND event_type = 'goal_test.retry_bound'",
+                (prepared.project_id,),
+            ).fetchone()
+        self.assertEqual(["fail", "pass"], [json.loads(row["payload_json"])["status"] for row in rows])
+        retry_binding = GoalValidationBinding.model_validate_json(history["payload_json"])
+        self.assertEqual(failed.validation_result_id, retry_binding.retry.failed_validation_result_id)
+        self.assertEqual(FailureClass.ENVIRONMENT, retry_binding.retry.failure_class)
+        passed = ValidationResult.model_validate_json(rows[-1]["payload_json"])
+        self.assertEqual(retry_binding.binding_digest, passed.goal_validation_binding_digest)
+        self.assertEqual(RunOnceAction.COMPLETED, dispatcher.run_once(prepared.project_id).action)
+        self.assertTrue(prepared.service.ledger.verify_history(prepared.project_id))
+
+    def test_environment_goal_retry_accepts_legacy_unbound_failure(self):
+        prepared, runtime = self.prepared()
+        dispatcher = self.task_completed(prepared, runtime)
+        step = prepared.proposal.validation_steps[0].model_copy(update={"validation_id": "validation_goal"})
+        dispatcher.run_once(prepared.project_id, goal_validation_step=step)
+        observation = DeterministicValidationObservation(
+            validation_id="validation_goal", task_id=None, argv=step.argv,
+            working_directory=str(prepared.workspace), timeout_seconds=step.timeout_seconds,
+            expected_exit_codes=step.expected_exit_codes, actual_exit_code=9009, timed_out=False,
+            stdout="", stderr="Python", observed_at=utc_now(),
+        )
+        evidence = EvidenceRecord(
+            evidence_id=new_id("evidence"), project_id=prepared.project_id, task_id=None,
+            kind=EvidenceKind.TEST, source_ref="legacy:goal-test",
+            observation=observation.model_dump_json(),
+            content_digest=sha256_digest(observation), observed_at=observation.observed_at,
+        )
+        prepared.service.record_evidence(evidence)
+        legacy = ValidationResult(
+            validation_result_id=new_id("validation_result"), validation_id="validation_goal",
+            task_id=None, status=ValidationStatus.FAIL, evidence_ids=(evidence.evidence_id,),
+            rationale="legacy 환경 실패", evaluated_at=observation.observed_at,
+        )
+        prepared.service.record_validation(
+            project_id=prepared.project_id, plan_revision_id=prepared.plan_revision_id, result=legacy,
+        )
+        retry = GoalValidationRetryRequest(
+            step=step.model_copy(update={"argv": ("repaired-python", "-m", "unittest")}),
+            failed_validation_result_id=legacy.validation_result_id,
+            failure_class=FailureClass.ENVIRONMENT, failure_evidence_id=evidence.evidence_id,
+            rationale="legacy direct test evidence에 근거한 환경 복구다.",
+        )
+        self.assertEqual(RunOnceAction.MATERIALIZED,
+                         dispatcher.run_once(prepared.project_id, goal_validation_retry=retry).action)
+        with patch("flowmarshal.engine.validation_execution.subprocess.run",
+                   return_value=subprocess.CompletedProcess([], 0, b"direct test", b"")):
+            self.assertEqual(RunOnceAction.VALIDATED, dispatcher.run_once(prepared.project_id).action)
+
+    def test_environment_goal_retry_requires_changed_step_and_has_no_side_effect(self):
+        prepared, runtime = self.prepared()
+        dispatcher = self.task_completed(prepared, runtime)
+        step = prepared.proposal.validation_steps[0].model_copy(update={"validation_id": "validation_goal"})
+        dispatcher.run_once(prepared.project_id, goal_validation_step=step)
+        with patch("flowmarshal.engine.validation_execution.subprocess.run",
+                   return_value=subprocess.CompletedProcess([], 9009, b"", b"Python")):
+            failed = dispatcher.run_once(prepared.project_id)
+        retry = GoalValidationRetryRequest(
+            step=step, failed_validation_result_id=failed.validation_result_id,
+            failure_class=FailureClass.ENVIRONMENT, failure_evidence_id=failed.evidence_ids[0],
+            rationale="변경되지 않은 step은 거부돼야 한다.",
+        )
+        before = prepared.service.status(prepared.project_id)["history_count"]
+        outcome = dispatcher.run_once(prepared.project_id, goal_validation_retry=retry)
+        self.assertEqual("GOAL_VALIDATION_RETRY_INVALID", outcome.blocker_code)
+        self.assertEqual(before, prepared.service.status(prepared.project_id)["history_count"])
+
+    def test_environment_goal_retry_preserves_exit_and_artifact_contract(self):
+        prepared, runtime = self.prepared()
+        dispatcher = self.task_completed(prepared, runtime)
+        step = prepared.proposal.validation_steps[0].model_copy(update={"validation_id": "validation_goal"})
+        dispatcher.run_once(prepared.project_id, goal_validation_step=step)
+        with patch("flowmarshal.engine.validation_execution.subprocess.run",
+                   return_value=subprocess.CompletedProcess([], 9009, b"", b"Python")):
+            failed = dispatcher.run_once(prepared.project_id)
+        for changed in (
+            step.model_copy(update={"argv": ("repaired-python",), "expected_exit_codes": (0, 9009)}),
+            step.model_copy(update={"argv": ("repaired-python",), "artifact_paths": ("app.py",)}),
+        ):
+            with self.subTest(changed=changed):
+                retry = GoalValidationRetryRequest(
+                    step=changed, failed_validation_result_id=failed.validation_result_id,
+                    failure_class=FailureClass.ENVIRONMENT, failure_evidence_id=failed.evidence_ids[0],
+                    rationale="실패 evidence를 보존한 환경 복구 요청이다.",
+                )
+                outcome = dispatcher.run_once(prepared.project_id, goal_validation_retry=retry)
+                self.assertEqual("GOAL_VALIDATION_RETRY_INVALID", outcome.blocker_code)
+
+    def test_environment_goal_retry_rejects_unowned_evidence_and_stale_inputs(self):
+        prepared, runtime = self.prepared()
+        dispatcher = self.task_completed(prepared, runtime)
+        step = prepared.proposal.validation_steps[0].model_copy(update={"validation_id": "validation_goal"})
+        dispatcher.run_once(prepared.project_id, goal_validation_step=step)
+        with patch("flowmarshal.engine.validation_execution.subprocess.run",
+                   return_value=subprocess.CompletedProcess([], 9009, b"", b"Python")):
+            failed = dispatcher.run_once(prepared.project_id)
+        retry_step = step.model_copy(update={"argv": ("repaired-python",)})
+        with prepared.service.ledger.read() as connection:
+            other_evidence_id = connection.execute(
+                "SELECT id FROM evidence_records WHERE task_id IS NOT NULL ORDER BY observed_at LIMIT 1"
+            ).fetchone()[0]
+        before = prepared.service.status(prepared.project_id)["history_count"]
+        unowned = GoalValidationRetryRequest(
+            step=retry_step, failed_validation_result_id=failed.validation_result_id,
+            failure_class=FailureClass.ENVIRONMENT, failure_evidence_id=other_evidence_id,
+            rationale="다른 Task 증거는 Goal Test 재시도 근거가 될 수 없다.",
+        )
+        self.assertEqual("GOAL_VALIDATION_RETRY_INVALID",
+                         dispatcher.run_once(prepared.project_id, goal_validation_retry=unowned).blocker_code)
+        self.assertEqual(before, prepared.service.status(prepared.project_id)["history_count"])
+        (prepared.workspace / "new-input.txt").write_text("stale", encoding="utf-8")
+        stale = GoalValidationRetryRequest(
+            step=retry_step, failed_validation_result_id=failed.validation_result_id,
+            failure_class=FailureClass.ENVIRONMENT, failure_evidence_id=failed.evidence_ids[0],
+            rationale="입력 변경 뒤에는 기존 실패 evidence를 재결속하지 않는다.",
+        )
+        outcome = dispatcher.run_once(prepared.project_id, goal_validation_retry=stale)
+        self.assertEqual("STALE_EXECUTION_INPUT", outcome.blocker_code)
+        self.assertEqual(before, prepared.service.status(prepared.project_id)["history_count"])
+
+    def test_environment_goal_retry_is_limited_to_two_rebindings(self):
+        prepared, runtime = self.prepared()
+        dispatcher = self.task_completed(prepared, runtime)
+        step = prepared.proposal.validation_steps[0].model_copy(update={"validation_id": "validation_goal"})
+        dispatcher.run_once(prepared.project_id, goal_validation_step=step)
+        with patch("flowmarshal.engine.validation_execution.subprocess.run",
+                   return_value=subprocess.CompletedProcess([], 9009, b"", b"Python")):
+            failed = dispatcher.run_once(prepared.project_id)
+        for retry_no in (1, 2):
+            retry = GoalValidationRetryRequest(
+                step=step.model_copy(update={"argv": (f"repaired-python-{retry_no}",)}),
+                failed_validation_result_id=failed.validation_result_id,
+                failure_class=FailureClass.ENVIRONMENT, failure_evidence_id=failed.evidence_ids[0],
+                rationale="환경 복구 명령을 변경한다.",
+            )
+            self.assertEqual(RunOnceAction.MATERIALIZED,
+                             dispatcher.run_once(prepared.project_id, goal_validation_retry=retry).action)
+            with patch("flowmarshal.engine.validation_execution.subprocess.run",
+                       return_value=subprocess.CompletedProcess([], 9009, b"", b"Python")):
+                failed = dispatcher.run_once(prepared.project_id)
+        retry = GoalValidationRetryRequest(
+            step=step.model_copy(update={"argv": ("repaired-python-3",)}),
+            failed_validation_result_id=failed.validation_result_id,
+            failure_class=FailureClass.ENVIRONMENT, failure_evidence_id=failed.evidence_ids[0],
+            rationale="세 번째 재결속은 한도를 넘어야 한다.",
+        )
+        outcome = dispatcher.run_once(prepared.project_id, goal_validation_retry=retry)
+        self.assertEqual("GOAL_VALIDATION_RETRY_INVALID", outcome.blocker_code)
+
+    def test_terminal_goal_verdict_rejects_goal_retry_without_new_binding(self):
+        prepared, runtime = self.prepared()
+        dispatcher = self.task_completed(prepared, runtime)
+        step = prepared.proposal.validation_steps[0].model_copy(update={"validation_id": "validation_goal"})
+        dispatcher.run_once(prepared.project_id, goal_validation_step=step)
+        with patch("flowmarshal.engine.validation_execution.subprocess.run",
+                   return_value=subprocess.CompletedProcess([], 9009, b"", b"Python")):
+            failed = dispatcher.run_once(prepared.project_id)
+        terminal = dispatcher.run_once(prepared.project_id)
+        self.assertEqual("GOAL_NOT_SATISFIED", terminal.blocker_code)
+        retry = GoalValidationRetryRequest(
+            step=step.model_copy(update={"argv": ("repaired-python",)}),
+            failed_validation_result_id=failed.validation_result_id,
+            failure_class=FailureClass.ENVIRONMENT, failure_evidence_id=failed.evidence_ids[0],
+            rationale="이미 terminal verdict가 있으면 재결속하지 않는다.",
+        )
+        before = prepared.service.status(prepared.project_id)["history_count"]
+        outcome = dispatcher.run_once(prepared.project_id, goal_validation_retry=retry)
+        self.assertEqual("GOAL_NOT_SATISFIED", outcome.blocker_code)
+        self.assertEqual(before, prepared.service.status(prepared.project_id)["history_count"])
+
+    def test_legacy_goal_binding_payload_and_digest_are_preserved(self):
+        prepared, runtime = self.prepared()
+        dispatcher = self.task_completed(prepared, runtime)
+        step = prepared.proposal.validation_steps[0].model_copy(update={"validation_id": "validation_goal"})
+        dispatcher.run_once(prepared.project_id, goal_validation_step=step)
+        with prepared.service.ledger.read() as connection:
+            payload = json.loads(connection.execute(
+                "SELECT payload_json FROM history_events WHERE project_id = ? AND event_type = 'goal_test.bound'",
+                (prepared.project_id,),
+            ).fetchone()[0])
+        payload.pop("goal_validation_binding_id")
+        payload.pop("retry")
+        legacy = GoalValidationBinding.model_validate(payload)
+        self.assertEqual(payload, legacy.payload())
+        self.assertEqual(sha256_digest(payload), legacy.binding_digest)
 
     def test_goal_binding_rejects_file_change_before_execution(self):
         prepared, runtime = self.prepared()

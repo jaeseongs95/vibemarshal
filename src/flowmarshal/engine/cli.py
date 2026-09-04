@@ -71,6 +71,7 @@ from .planner_roles import (
 from .planning import PlanningError, PlanningSearchOutcome
 from .planning import SkeletonFirstPlanner
 from .runtime import CodexAppServerRuntime, EngineDispatcher, RuntimePolicyError
+from .validation_execution import GoalValidationRetryRequest
 from .roles import CodexStructuredRoleRunner, RoleCallReceipt, StructuredRoleError
 from .reporting import render_final
 from .service import EngineService, EngineServiceError
@@ -825,6 +826,10 @@ def _cmd_run_once(arguments: argparse.Namespace) -> None:
             proposal=proposal,
             goal_validation_step=(None if arguments.goal_validation_file is None
                                   else ValidationExecutionStep.model_validate(_json(arguments.goal_validation_file))),
+            goal_validation_retry=(
+                None if arguments.goal_validation_retry_file is None
+                else GoalValidationRetryRequest.model_validate(_json(arguments.goal_validation_retry_file))
+            ),
         )
         # 이 CLI 프로세스가 App Server의 소유자다. dispatch 단계만 전이한 뒤
         # 현재 turn 종료까지 연결을 유지하고 결과 판정은 다음 호출에 맡긴다.
@@ -1126,7 +1131,9 @@ def build_parser() -> argparse.ArgumentParser:
     run_once.add_argument("--codex-bin")
     run_once.add_argument("--proposal-file")
     run_once.add_argument("--role-config")
-    run_once.add_argument("--goal-validation-file")
+    goal_validation_input = run_once.add_mutually_exclusive_group()
+    goal_validation_input.add_argument("--goal-validation-file")
+    goal_validation_input.add_argument("--goal-validation-retry-file")
     run_once.set_defaults(handler=_cmd_run_once)
     run_status = run_commands.add_parser("status")
     run_status.add_argument("--project-id", required=True)

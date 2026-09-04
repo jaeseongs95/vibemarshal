@@ -106,6 +106,7 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 - 파일·artifact, 빌드·테스트와 diff 같은 결정적 검사를 우선하고 의미 검토가 필요할 때만 별도 Validator를 쓴다.
 - Task validation과 plan-level Goal Test를 분리한다. 모든 Task·criterion·integration evidence를 확인한 뒤에만 Goal을 완료한다.
 - 독립 Goal Test는 실제 명령 또는 별도 Validator 관측을 요구한다. Task 증거의 집계는 Plan의 `task_aggregate` 계약에 명시된 경우에만 사용한다.
+- 실패한 독립 Goal Test의 환경·명령 상세 복구는 최종 GoalVerdict 전에 명시적 요청으로만 수행한다. Core는 최신 실패 결과와 직접 실패 evidence, 변경된 동일 의미의 검사 명세, freshness와 제한 횟수를 검증하고 새 binding에 연결한다. 원인 분류는 요청자의 주장으로 보존하며 기존 실패를 삭제하거나 성공으로 바꾸지 않는다.
 - 준비 역할과 결정적 검증 명령도 효과 전에 Core intent를 남긴다. 완료 관측이 없는 효과는 입력을 바꾸거나 재시작해도 자동 재실행하지 않는다.
 - 실패는 `implementation`, `context`, `task_contract`, `dependency`, `environment`, `requirement_change`, `external_unknown`으로 분류한다.
 - 운영 상세 변경은 Execution Spec revision, Task 의미 변경은 Plan subgraph revision, 사용자 목표 변경은 Goal revision으로 처리한다.

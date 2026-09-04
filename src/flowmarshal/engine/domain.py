@@ -1785,6 +1785,7 @@ class ValidationResult(EngineModel):
     validation_result_id: str = Field(pattern=_ENTITY_ID_PATTERN)
     validation_id: str = Field(pattern=_LOCAL_ID_PATTERN)
     task_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
+    goal_validation_binding_digest: str | None = Field(default=None, pattern=_DIGEST_PATTERN)
     status: ValidationStatus
     evidence_ids: tuple[str, ...] = ()
     rationale: str = Field(min_length=1, max_length=5000)
@@ -1795,6 +1796,8 @@ class ValidationResult(EngineModel):
     @model_validator(mode="after")
     def validation_claim_has_evidence(self) -> "ValidationResult":
         _unique(self.evidence_ids, "validation evidence")
+        if self.task_id is not None and self.goal_validation_binding_digest is not None:
+            raise ValueError("Task validation에는 Goal Test binding을 결속할 수 없습니다.")
         if self.status in {ValidationStatus.PASS, ValidationStatus.FAIL} and not self.evidence_ids:
             raise ValueError("PASS/FAIL validation에는 실제 evidence가 필요합니다.")
         if self.status is ValidationStatus.NOT_RUN and self.evidence_ids:

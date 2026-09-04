@@ -1,5 +1,7 @@
 # 기능 Alpha A4 실측·수정 인계
 
+이 문서는 Plan 활성화 전 준비 세션의 기록이다. 이후 사용자 승인·실행·A5 재개·독립 Goal 복구와 최종 판정은 [A4·A5 실행 기록](alpha-a4-a5-execution.md)에 보존한다.
+
 - 기준일: 2026-09-04 KST
 - 시작 HEAD: `5f1c8a3`
 - 현재 완료 범위: 실제 Goal·Planning 준비 경로 실측과 미지원 evidence 계약 결함 수정

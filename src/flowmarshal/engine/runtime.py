@@ -636,8 +636,12 @@ class EngineDispatcher:
         *,
         proposal: ExecutionSpecProposal | None = None,
         goal_validation_step: Any | None = None,
+        goal_validation_retry: Any | None = None,
     ) -> RunOnceOutcome:
         """관측 → 검사 → materialize → dispatch → Goal Test 순서로 한 단계만 수행한다."""
+
+        if goal_validation_step is not None and goal_validation_retry is not None:
+            raise EngineServiceError("Goal Test 최초 binding과 재시도 요청을 함께 제출할 수 없습니다.")
 
         with self.service.ledger.read() as connection:
             project = connection.execute(
@@ -881,7 +885,10 @@ class EngineDispatcher:
                 blocker_code="NO_RUNNABLE_TASK",
                 detail="미완료 Task가 있으나 dependency 또는 실패 상태로 실행 가능하지 않습니다.",
             )
-        return self._advance_goal_test(project_id, plan, goal_validation_step=goal_validation_step)
+        return self._advance_goal_test(
+            project_id, plan, goal_validation_step=goal_validation_step,
+            goal_validation_retry=goal_validation_retry,
+        )
 
     def _verify_policy(self, cwd: Path) -> None:
         policy = self.runtime.verify_execution_policy(cwd)
@@ -1517,6 +1524,7 @@ class EngineDispatcher:
         project_id: str,
         plan: PlanContractRevision,
         *, goal_validation_step: Any | None = None,
+        goal_validation_retry: Any | None = None,
     ) -> RunOnceOutcome:
         with self.service.ledger.read() as connection:
             rows = connection.execute(
@@ -1542,7 +1550,64 @@ class EngineDispatcher:
         for contract in plan.definition.integration_validations:
             recorded = latest.get(contract.validation_id)
             if recorded is not None:
+                result = ValidationResult.model_validate_json(recorded["payload_json"])
+                retry_pending = False
+                if contract.evidence_mode == "independent":
+                    from .validation_execution import _goal_bindings
+                    bindings = _goal_bindings(
+                        self.service, project_id, plan.plan_revision_id, contract.validation_id,
+                    )
+                    current_binding = None if not bindings else bindings[0][0]
+                    retry_pending = bool(
+                        current_binding is not None
+                        and current_binding.retry is not None
+                        and current_binding.retry.failed_validation_result_id == result.validation_result_id
+                        and len(bindings) > 1
+                        and bindings[1][0].binding_digest == current_binding.retry.prior_binding_digest
+                        and (
+                            result.goal_validation_binding_digest is None
+                            or result.goal_validation_binding_digest == current_binding.retry.prior_binding_digest
+                        )
+                    )
+                    if result.goal_validation_binding_digest is not None and (not retry_pending and (
+                        current_binding is None
+                        or current_binding.binding_digest != result.goal_validation_binding_digest
+                    )):
+                        return RunOnceOutcome(
+                            action=RunOnceAction.BLOCKED, project_id=project_id,
+                            validation_result_id=result.validation_result_id,
+                            blocker_code="GOAL_TEST_RESULT_BINDING_MISMATCH",
+                            detail="현재 Goal Test binding과 최신 validation 결과의 digest가 다릅니다.",
+                        )
                 if recorded["status"] == ValidationStatus.FAIL.value:
+                    if goal_validation_retry is not None:
+                        if contract.evidence_mode != "independent" or contract.method != "deterministic":
+                            return RunOnceOutcome(
+                                action=RunOnceAction.BLOCKED, project_id=project_id,
+                                validation_result_id=result.validation_result_id,
+                                blocker_code="GOAL_VALIDATION_RETRY_UNSUPPORTED",
+                                detail="독립 deterministic Goal Test만 운영 상세 재시도를 지원합니다.",
+                            )
+                        from .validation_execution import advance_independent_goal_test
+                        try:
+                            return advance_independent_goal_test(
+                                self.service, self.runtime, project_id, plan, contract,
+                                retry_request=goal_validation_retry, provider=self.proposal_provider,
+                                fault_hook=self.fault_hook,
+                            )
+                        except EngineServiceError as error:
+                            return RunOnceOutcome(
+                                action=RunOnceAction.BLOCKED, project_id=project_id,
+                                validation_result_id=result.validation_result_id,
+                                blocker_code="GOAL_VALIDATION_RETRY_INVALID",
+                                detail=str(error),
+                            )
+                    if retry_pending:
+                        from .validation_execution import advance_independent_goal_test
+                        return advance_independent_goal_test(
+                            self.service, self.runtime, project_id, plan, contract,
+                            provider=self.proposal_provider, fault_hook=self.fault_hook,
+                        )
                     return self._record_goal_verdict(project_id, plan, latest)
                 if recorded["status"] == ValidationStatus.PASS.value:
                     continue

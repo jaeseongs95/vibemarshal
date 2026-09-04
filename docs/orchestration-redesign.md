@@ -223,6 +223,8 @@ Task·Goal validation 계약과 Execution Spec의 `required_evidence_kinds`는 `
 
 `IntegrationValidationContract.evidence_mode`의 기본값은 `independent`다. Task 완료 후 Core가 최신 Plan·State·Project Map에 독립 Goal Test의 운영 상세 binding을 만들고 실제 명령 또는 별도 Validator 관측을 기록한다. Task evidence를 다시 합산하는 검사는 Plan에 `task_aggregate`가 명시된 경우에만 수행한다. 운영 상세가 같은 의미를 유지하는 한 Plan을 다시 승인하지 않지만 binding 이후 입력 변경은 `STALE_EXECUTION_INPUT`으로 차단한다.
 
+최종 GoalVerdict가 없는 상태에서 독립 deterministic Goal Test의 환경·명령 상세를 복구할 때는 기존 실패 결과 ID, 직접 실패 evidence ID, 원인 분류와 이유, 변경된 검사 명세를 명시적으로 제출한다. Core는 최신 FAIL과 evidence 소유 관계, 기존 binding, 동일 validation ID·method·필수 evidence 종류, 현재 입력 freshness와 최대 두 번의 복구 한도를 확인한다. 환경 원인은 요청자가 제출한 분류이며 exit code만으로 Core가 추정하지 않는다. 새 binding과 재시도 History는 이전 실패를 연결하고 원래 evidence·validation을 보존한다. 새 결과가 나오기 전에는 과거 실패를 새 binding의 실행 결과로 취급하지 않으며, 정상 command intent·receipt와 새 validation을 기록한 뒤 최종 Goal을 판정한다. 같은 명세 반복, 불명확한 효과의 재실행과 terminal verdict 이후 덮어쓰기는 허용하지 않는다. 검사 의미·완료 조건 변경은 여전히 새 Plan이 필요하다.
+
 실행 상세화 역할과 검증 명령도 기존 append-only History의 `operation.prepared` → 외부 호출 → `operation.completed`에 결속한다. 완료 관측을 기록한 뒤 중단되면 이를 재사용하고, 완료 관측이 없는 효과는 `external_unknown`으로 보존한다. 다른 입력을 제출해 불명확한 이전 효과를 우회하지 않는다. 이 보수적 복구는 exactly-once 보장이 아니다.
 
 dependency를 만족한 Task만 `ready`가 된다. 먼저 프로젝트별 직렬 실행을 적용한다. 병렬 실행은 resource lock과 충돌 검증이 qualification을 통과한 뒤 선택적으로 연다.

@@ -5,7 +5,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Callable
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ..canonical import sha256_bytes, sha256_digest
 from .domain import (
@@ -153,6 +153,7 @@ def run_command_validation(service: EngineService, task: Any, step: ValidationEx
         task_id=task_id, status=(ValidationStatus.PASS if observation.passed and all(
             item["exists"] == item["expected_presence"] for item in response["artifacts"]
         ) else ValidationStatus.FAIL),
+        goal_validation_binding_digest=(None if task_id is not None else task.get("goal_binding_digest")),
         evidence_ids=tuple(evidence_ids),
         rationale=f"직접 명령 관측: exit={observation.actual_exit_code}, timeout={observation.timed_out}",
         evaluated_at=observation.observed_at,
@@ -167,18 +168,164 @@ def run_command_validation(service: EngineService, task: Any, step: ValidationEx
     )
 
 
+class GoalValidationRetryRequest(EngineModel):
+    """실패한 독립 deterministic Goal Test의 환경 복구 재시도 요청."""
+
+    step: ValidationExecutionStep
+    failed_validation_result_id: str = Field(pattern=r"^validation_result_[0-9a-f]{32}$")
+    failure_class: FailureClass
+    failure_evidence_id: str = Field(pattern=r"^evidence_[0-9a-f]{32}$")
+    rationale: str = Field(min_length=1, max_length=5000)
+
+    @model_validator(mode="after")
+    def only_environment_recovery_is_supported(self) -> "GoalValidationRetryRequest":
+        if self.failure_class is not FailureClass.ENVIRONMENT:
+            raise ValueError("Goal Test 운영 상세 재시도에는 environment 원인만 허용합니다.")
+        return self
+
+
+class GoalValidationRetryBinding(EngineModel):
+    failed_validation_result_id: str = Field(pattern=r"^validation_result_[0-9a-f]{32}$")
+    failure_class: FailureClass
+    failure_evidence_id: str = Field(pattern=r"^evidence_[0-9a-f]{32}$")
+    rationale: str = Field(min_length=1, max_length=5000)
+    prior_binding_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    retry_no: int = Field(ge=1, le=2)
+
+    @model_validator(mode="after")
+    def only_environment_recovery_is_supported(self) -> "GoalValidationRetryBinding":
+        if self.failure_class is not FailureClass.ENVIRONMENT:
+            raise ValueError("Goal Test 운영 상세 재시도에는 environment 원인만 허용합니다.")
+        return self
+
+
 class GoalValidationBinding(EngineModel):
+    goal_validation_binding_id: str | None = Field(default=None, pattern=r"^goal_binding_[0-9a-f]{32}$")
     plan_revision_id: str = Field(pattern=r"^plan_revision_[0-9a-f]{32}$")
     plan_activation_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     context_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     role_configuration_digest: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
     model_inventory_digest: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
+    retry: GoalValidationRetryBinding | None = None
     step: ValidationExecutionStep
+
+    def payload(self) -> dict[str, Any]:
+        """이전 binding을 다시 실행할 때 기존 Core operation 입력을 바꾸지 않는다."""
+        payload = self.model_dump(mode="json")
+        if self.goal_validation_binding_id is None:
+            payload.pop("goal_validation_binding_id")
+            payload.pop("retry")
+        return payload
+
+    @property
+    def binding_digest(self) -> str:
+        return sha256_digest(self.payload())
+
+
+def _goal_bindings(service: EngineService, project_id: str, plan_revision_id: str,
+                   validation_id: str) -> list[tuple[GoalValidationBinding, Any]]:
+    with service.ledger.read() as connection:
+        rows = connection.execute(
+            "SELECT sequence, payload_json, created_at FROM history_events WHERE project_id = ? "
+            "AND event_type IN ('goal_test.bound', 'goal_test.retry_bound') ORDER BY sequence DESC",
+            (project_id,),
+        ).fetchall()
+    return [
+        (binding, row)
+        for row in rows
+        for binding in (GoalValidationBinding.model_validate_json(row["payload_json"]),)
+        if binding.plan_revision_id == plan_revision_id and binding.step.validation_id == validation_id
+    ]
+
+
+def _normalize_goal_step(context: dict[str, Any], contract: Any,
+                         step: ValidationExecutionStep) -> ValidationExecutionStep:
+    if (step.validation_id != contract.validation_id or step.method != contract.method
+            or set(step.required_evidence_kinds) != set(contract.required_evidence_kinds)):
+        raise EngineServiceError("Goal Test step의 ID·method·evidence kind가 PlanContract와 다릅니다.")
+    if step.method != "deterministic":
+        return step
+    root = Path(context["project_map"]["root"]).resolve(strict=True)
+    cwd = (root / (step.working_directory or "")).resolve(strict=True)
+    if not cwd.is_dir() or (cwd != root and root not in cwd.parents):
+        raise EngineServiceError("Goal Test cwd는 프로젝트 내부여야 합니다.")
+    step = step.model_copy(update={"working_directory": str(cwd)})
+    if set(step.required_evidence_kinds) & {"file", "diff"}:
+        step = step.model_copy(update={"artifact_paths": normalize_artifact_paths(root, step.artifact_paths)})
+    return step
+
+
+def _validate_goal_retry(
+    service: EngineService, project_id: str, plan: PlanContractRevision, contract: Any,
+    binding: GoalValidationBinding, binding_row: Any, retry: GoalValidationRetryRequest,
+    retry_step: ValidationExecutionStep,
+) -> GoalValidationRetryBinding:
+    if contract.evidence_mode != "independent" or contract.method != "deterministic":
+        raise EngineServiceError("독립 deterministic Goal Test만 운영 상세 재시도할 수 있습니다.")
+    with service.ledger.read() as connection:
+        result_row = connection.execute(
+            "SELECT payload_json FROM validation_results WHERE id = ? AND project_id = ? "
+            "AND plan_revision_id = ? AND task_id IS NULL",
+            (retry.failed_validation_result_id, project_id, plan.plan_revision_id),
+        ).fetchone()
+        latest_row = connection.execute(
+            "SELECT id FROM validation_results WHERE project_id = ? AND plan_revision_id = ? "
+            "AND task_id IS NULL AND validation_id = ? ORDER BY evaluated_at DESC, rowid DESC LIMIT 1",
+            (project_id, plan.plan_revision_id, contract.validation_id),
+        ).fetchone()
+        result_event = connection.execute(
+            "SELECT sequence FROM history_events WHERE project_id = ? AND event_type = 'validation.recorded' "
+            "AND entity_id = ?",
+            (project_id, retry.failed_validation_result_id),
+        ).fetchone()
+    if result_row is None or result_event is None:
+        raise EngineServiceError("Goal Test 재시도 대상 실패 결과가 원장에 없습니다.")
+    if latest_row is None or latest_row["id"] != retry.failed_validation_result_id:
+        raise EngineServiceError("Goal Test 재시도 대상은 현재 최신 실패 결과여야 합니다.")
+    result = ValidationResult.model_validate_json(result_row["payload_json"])
+    if result.validation_id != contract.validation_id or result.status is not ValidationStatus.FAIL:
+        raise EngineServiceError("Goal Test 재시도 대상은 현재 integration validation의 FAIL이어야 합니다.")
+    if result.goal_validation_binding_digest is not None:
+        if result.goal_validation_binding_digest != binding.binding_digest:
+            raise EngineServiceError("Goal Test FAIL 결과가 현재 binding에 결속되지 않았습니다.")
+    elif binding_row["sequence"] >= result_event["sequence"]:
+        raise EngineServiceError("legacy Goal Test FAIL 결과와 이전 binding의 순서가 맞지 않습니다.")
+    if retry.failure_evidence_id not in result.evidence_ids:
+        raise EngineServiceError("Goal Test 재시도 evidence가 실패 결과에 결속되지 않았습니다.")
+    with service.ledger.read() as connection:
+        evidence_row = connection.execute(
+            "SELECT kind, observation FROM evidence_records WHERE id = ? AND project_id = ? AND task_id IS NULL",
+            (retry.failure_evidence_id, project_id),
+        ).fetchone()
+    if evidence_row is None or evidence_row["kind"] not in {"command", "test", "build"}:
+        raise EngineServiceError("Goal Test 재시도에는 직접 command/test/build 실패 evidence가 필요합니다.")
+    observation = DeterministicValidationObservation.model_validate_json(evidence_row["observation"])
+    if observation.validation_id != contract.validation_id or observation.passed:
+        raise EngineServiceError("Goal Test 재시도 evidence가 직접 실패 관측이 아닙니다.")
+    if retry_step.expected_exit_codes != binding.step.expected_exit_codes:
+        raise EngineServiceError("Goal Test 재시도는 예상 종료 코드 계약을 바꿀 수 없습니다.")
+    if retry_step.artifact_paths != binding.step.artifact_paths:
+        raise EngineServiceError("Goal Test 재시도는 artifact 관측 집합을 바꿀 수 없습니다.")
+    retry_count = sum(
+        bound.retry is not None
+        for bound, _ in _goal_bindings(service, project_id, plan.plan_revision_id, contract.validation_id)
+    )
+    if retry_count >= 2:
+        raise EngineServiceError("동일 Goal Test 운영 상세 재시도 한도 2회를 넘었습니다.")
+    return GoalValidationRetryBinding(
+        failed_validation_result_id=retry.failed_validation_result_id,
+        failure_class=retry.failure_class,
+        failure_evidence_id=retry.failure_evidence_id,
+        rationale=retry.rationale,
+        prior_binding_digest=binding.binding_digest,
+        retry_no=int(retry_count) + 1,
+    )
 
 
 def advance_independent_goal_test(
     service: EngineService, runtime: Any, project_id: str, plan: PlanContractRevision, contract: Any,
     *, supplied_step: ValidationExecutionStep | None = None, provider: Any | None = None,
+    retry_request: GoalValidationRetryRequest | None = None,
     fault_hook: Callable[[str], None] | None = None,
 ) -> RunOnceOutcome:
     try:
@@ -193,13 +340,17 @@ def advance_independent_goal_test(
         if connection.execute("SELECT COUNT(*) FROM task_contracts WHERE plan_revision_id = ? AND status <> 'completed'",
                               (plan.plan_revision_id,)).fetchone()[0]:
             return blocked(project_id, "GOAL_TEST_INPUT_INCOMPLETE", "모든 Task 완료 후 Goal Test를 준비합니다.")
-        rows = connection.execute(
-            "SELECT payload_json FROM history_events WHERE project_id = ? AND event_type = 'goal_test.bound' "
-            "ORDER BY sequence DESC", (project_id,),
-        ).fetchall()
-    binding = next((item for item in (GoalValidationBinding.model_validate_json(row["payload_json"]) for row in rows)
-                    if item.plan_revision_id == plan.plan_revision_id and item.step.validation_id == contract.validation_id), None)
-    if binding is not None and supplied_step == binding.step:
+    bindings = _goal_bindings(service, project_id, plan.plan_revision_id, contract.validation_id)
+    binding, binding_row = (bindings[0] if bindings else (None, None))
+    if retry_request is not None:
+        supplied_step = retry_request.step
+        if binding is not None and (
+            binding.plan_activation_digest != plan.activation_digest
+            or binding.context_digest != sha256_digest(context)
+        ):
+            return blocked(project_id, "STALE_EXECUTION_INPUT",
+                           "실패한 Goal Test binding 이후 입력이 바뀌어 재시도할 수 없습니다.")
+    if retry_request is None and binding is not None and supplied_step == binding.step:
         supplied_step = None
     if supplied_step is not None or binding is None:
         step = supplied_step
@@ -212,33 +363,38 @@ def advance_independent_goal_test(
                                              inventory=runtime.list_models())
             except ExternalOperationUnknown as error:
                 return blocked(project_id, "EXTERNAL_EFFECT_UNKNOWN", str(error))
-        if (step.validation_id != contract.validation_id or step.method != contract.method
-                or set(step.required_evidence_kinds) != set(contract.required_evidence_kinds)):
-            raise EngineServiceError("Goal Test step의 ID·method·evidence kind가 PlanContract와 다릅니다.")
-        if step.method == "deterministic":
-            root = Path(context["project_map"]["root"]).resolve(strict=True)
-            cwd = (root / (step.working_directory or "")).resolve(strict=True)
-            if not cwd.is_dir() or (cwd != root and root not in cwd.parents):
-                raise EngineServiceError("Goal Test cwd는 프로젝트 내부여야 합니다.")
-            step = step.model_copy(update={"working_directory": str(cwd)})
-            if set(step.required_evidence_kinds) & {"file", "diff"}:
-                step = step.model_copy(update={"artifact_paths": normalize_artifact_paths(root, step.artifact_paths)})
-        binding = GoalValidationBinding(plan_revision_id=plan.plan_revision_id,
+        step = _normalize_goal_step(context, contract, step)
+        if retry_request is not None:
+            if binding is None or binding_row is None:
+                raise EngineServiceError("Goal Test 재시도에는 기존 실행 binding이 필요합니다.")
+            if step == binding.step:
+                raise EngineServiceError("Goal Test 재시도 step은 현재 binding과 달라야 합니다.")
+            retry = _validate_goal_retry(
+                service, project_id, plan, contract, binding, binding_row, retry_request, step,
+            )
+        else:
+            retry = None
+        binding = GoalValidationBinding(
+            goal_validation_binding_id=new_id("goal_binding"), plan_revision_id=plan.plan_revision_id,
                                         plan_activation_digest=plan.activation_digest,
                                         context_digest=sha256_digest(context), step=step,
                                         model_inventory_digest=(runtime.list_models().inventory_digest if step.method == "semantic" else None),
-                                        role_configuration_digest=(None if provider is None else provider.roles.configuration_digest))
+                                        role_configuration_digest=(None if provider is None else provider.roles.configuration_digest),
+                                        retry=retry)
         with service.ledger.transaction() as tx:
-            tx.history(project_id, "goal_test.bound", "goal_validation_binding", new_id("goal_binding"),
-                       binding.model_dump(mode="json"))
+            tx.history(project_id, "goal_test.retry_bound" if retry is not None else "goal_test.bound",
+                       "goal_validation_binding", binding.goal_validation_binding_id,
+                       binding.payload())
         return RunOnceOutcome(action=RunOnceAction.MATERIALIZED, project_id=project_id,
-                              detail=f"독립 Goal Test 실행 binding을 고정했습니다: {step.validation_id}")
+                              detail=(f"독립 Goal Test 운영 상세 재시도 binding을 고정했습니다: {step.validation_id}"
+                                      if retry is not None else f"독립 Goal Test 실행 binding을 고정했습니다: {step.validation_id}"))
     if binding.plan_activation_digest != plan.activation_digest or binding.context_digest != sha256_digest(context):
         return blocked(project_id, "STALE_EXECUTION_INPUT", "Goal Test materialization 이후 입력이 바뀌었습니다.")
     if binding.step.method == "deterministic":
         return run_command_validation(
             service, {"project_id": project_id, "id": None, "plan_revision_id": plan.plan_revision_id,
-                      "goal_binding": binding.model_dump(mode="json")}, binding.step, fault_hook=fault_hook,
+                      "goal_binding": binding.payload(),
+                      "goal_binding_digest": binding.binding_digest}, binding.step, fault_hook=fault_hook,
         )
     if binding.step.method == "semantic" and provider is not None:
         if binding.role_configuration_digest != provider.roles.configuration_digest:
