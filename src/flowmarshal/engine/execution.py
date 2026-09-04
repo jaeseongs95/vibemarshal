@@ -79,8 +79,11 @@ EXECUTION_PREPARATION_INSTRUCTIONS = """활성 계약의 운영 상세만 제안
 없는 사내 자료·외부 계정·환경을 추측하지 않는다. 필요한 context가 없으면 source/selector/이유를
 context_request.missing_needs에 작성하고 proposal은 null로 둔다.
 validation_id는 Task 계약과 정확히 대응한다. method와 required_evidence_kinds는 Core가 채우므로 출력하지 않는다.
+명령을 실행할 action만 kind를 command로 두고 command에 argv를 넣는다. inspect/edit/validate/external_effect
+action의 command는 반드시 빈 배열로 둔다.
 deterministic validation에는 실제 argv, 프로젝트 내부 cwd, timeout, 예상 종료 코드를 제시한다.
-semantic/manual/external 관측은 해당 종류의 필드만 채운다. worker 완료 선언은 검증이 아니다.
+semantic/manual/external 관측은 해당 종류의 필드만 채우고 artifact_paths는 반드시 빈 배열로 둔다.
+worker 완료 선언은 검증이 아니다.
 최종 authority digest, idempotency key와 상태는 Core가 결정한다."""
 
 GOAL_TEST_PREPARATION_INSTRUCTIONS = """활성 Goal Test 하나의 운영 상세만 제안하는 비권위 역할이다.
@@ -211,9 +214,20 @@ class ExecutionProposalAdapter:
             **{key: values[key] for key in fields},
         ))
 
-    def _run(self, project_id: str, inventory: ModelInventory, context: dict[str, Any],
-             model_type: type[EngineModel], kind: str, *, payload: dict[str, Any], instructions: str | None = None):
+    def _run(
+        self,
+        project_id: str,
+        inventory: ModelInventory,
+        context: dict[str, Any],
+        model_type: type[EngineModel],
+        kind: str,
+        *,
+        payload: dict[str, Any],
+        instructions: str | None = None,
+        validator: Callable[[dict[str, Any]], EngineModel] | None = None,
+    ) -> EngineModel:
         self.roles.validate_inventory(inventory)
+        output_validator = validator or model_type.model_validate
         binding = self.roles.plan_expander
         request = RoleCallRequest(
             role=kind, instructions=instructions or EXECUTION_PREPARATION_INSTRUCTIONS,
@@ -225,11 +239,12 @@ class ExecutionProposalAdapter:
         result = self.operations.invoke(
             project_id=project_id, kind=kind,
             request={"role_request": request.model_dump(mode="json"), "authority_context_digest": sha256_digest(context)},
-            execute=lambda: self.runner.run(request, validator=model_type.model_validate).model_dump(mode="json"),
+            execute=lambda: self.runner.run(request, validator=output_validator).model_dump(mode="json"),
         )
         self._record_usage(project_id, context, result,
                            BudgetStage.EXECUTION_PREPARATION if kind == "execution_preparation" else BudgetStage.VALIDATION)
-        return model_type.model_validate(result["payload"])
+        # operation.completed 재생도 최초 role 출력과 같은 계약으로 검증한다.
+        return output_validator(result["payload"])
 
     def prepare_task(self, *, project_id: str, task_id: str, inventory: ModelInventory) -> ExecutionPreparation:
         context = execution_context(self.service, project_id)
@@ -239,7 +254,22 @@ class ExecutionProposalAdapter:
             raise EngineServiceError("활성 Plan에 없는 Task입니다.")
         context["predecessor_outputs"] = self._predecessor_outputs(plan, task)
         payload = task_preparation_payload(context, task)
-        raw = self._run(project_id, inventory, context, ProviderExecutionPreparation, "execution_preparation", payload=payload)
+
+        def validate_task_preparation(value: dict[str, Any]) -> ProviderExecutionPreparation:
+            raw = ProviderExecutionPreparation.model_validate(value)
+            # TaskContract와 결속한 최종 ExecutionSpec 검증은 recovery 대상이다.
+            compile_task_preparation(raw, task)
+            return raw
+
+        raw = self._run(
+            project_id,
+            inventory,
+            context,
+            ProviderExecutionPreparation,
+            "execution_preparation",
+            payload=payload,
+            validator=validate_task_preparation,
+        )
         result = compile_task_preparation(raw, task)
         # 모델 호출 사이 원장 revision·관찰이 바뀌면 이전 응답을 새 snapshot에 세탁하지 않는다.
         current = execution_context(self.service, project_id)
@@ -254,14 +284,27 @@ class ExecutionProposalAdapter:
         contract = next(item for item in plan.definition.integration_validations if item.validation_id == validation_id)
         payload = {key: value for key, value in context.items() if key != "plan"}
         payload["goal_test"] = contract.model_dump(mode="json")
-        result = self._run(project_id, inventory, context, GoalTestPreparation, "goal_test_preparation",
-                           payload=payload, instructions=GOAL_TEST_PREPARATION_INSTRUCTIONS)
+
+        def validate_goal_preparation(value: dict[str, Any]) -> GoalTestPreparation:
+            result = GoalTestPreparation.model_validate(value)
+            if (result.step.validation_id != contract.validation_id or result.step.method != contract.method
+                    or set(result.step.required_evidence_kinds) != set(contract.required_evidence_kinds)):
+                raise EngineServiceError("Goal Test 운영 상세가 활성 integration validation과 정확히 대응하지 않습니다.")
+            return result
+
+        result = self._run(
+            project_id,
+            inventory,
+            context,
+            GoalTestPreparation,
+            "goal_test_preparation",
+            payload=payload,
+            instructions=GOAL_TEST_PREPARATION_INSTRUCTIONS,
+            validator=validate_goal_preparation,
+        )
         current = execution_context(self.service, project_id)
         if sha256_digest(current) != sha256_digest(context):
             raise EngineServiceError("STALE_EXECUTION_INPUT: Goal Test 준비 중 입력이 바뀌었습니다.")
-        if (result.step.validation_id != contract.validation_id or result.step.method != contract.method
-                or set(result.step.required_evidence_kinds) != set(contract.required_evidence_kinds)):
-            raise EngineServiceError("Goal Test 운영 상세가 활성 integration validation과 정확히 대응하지 않습니다.")
         return result.step
 
     def validate_goal(self, *, project_id: str, inventory: ModelInventory,

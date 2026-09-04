@@ -24,9 +24,11 @@ from flowmarshal.engine.execution import (
 from pydantic import ValidationError
 from flowmarshal.engine.qualification import default_role_configuration
 from flowmarshal.engine.roles import ScriptedStructuredRoleRunner
+from flowmarshal.engine.roles import CodexStructuredRoleRunner, RoleCallReceipt, StructuredRoleError
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime
 from flowmarshal.engine.validation_execution import GoalValidationBinding, GoalValidationRetryRequest
 from tests.test_engine_qualification import qualification_inventory
+from tests.test_engine_roles import ImmediateRoleRuntime
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -760,6 +762,138 @@ class ExecutionAutomationTests(unittest.TestCase):
                                                                 "evidence_refs": ["evidence_" + "0" * 32]}))
         with self.assertRaisesRegex(EngineServiceError, "제공되지 않은"):
             dispatcher.run_once(prepared.project_id)
+
+    def test_auto_preparation_recovers_contract_invalid_semantic_artifacts_once(self):
+        prepared, runtime = self.prepared(semantic_task_validation=True)
+        bad = self.provider_response(prepared)
+        next(item for item in bad["proposal"]["validation_steps"]
+             if item["validation_id"] == "validation_public_contract")["artifact_paths"] = ["app.py", "test_app.py"]
+        good = self.provider_response(prepared)
+        role_runtime = ImmediateRoleRuntime([json.dumps(bad), json.dumps(good)])
+        role_runtime.inventory = self.inventory
+        runner = CodexStructuredRoleRunner(role_runtime, poll_interval_seconds=0)
+        provider = ExecutionProposalAdapter(prepared.service, runner, self.roles)
+
+        outcome = EngineDispatcher(prepared.service, runtime, proposal_provider=provider).run_once(prepared.project_id)
+
+        self.assertEqual(RunOnceAction.MATERIALIZED, outcome.action)
+        self.assertEqual(1, runner.receipts[-1].schema_recovery_attempts)
+        self.assertEqual(2, len(runner.receipts[-1].turn_ids))
+        with prepared.service.ledger.read() as connection:
+            spec = json.loads(connection.execute(
+                "SELECT payload_json FROM execution_spec_revisions WHERE task_id = ?", (prepared.task_id,)
+            ).fetchone()[0])
+            completed = connection.execute(
+                "SELECT COUNT(*) FROM history_events WHERE event_type = 'operation.completed'"
+            ).fetchone()[0]
+        semantic = next(item for item in spec["definition"]["validation_steps"]
+                        if item["validation_id"] == "validation_public_contract")
+        self.assertEqual([], semantic["artifact_paths"])
+        self.assertEqual(1, completed)
+
+    def test_auto_preparation_fails_after_second_contract_invalid_output(self):
+        prepared, runtime = self.prepared(semantic_task_validation=True)
+        bad = self.provider_response(prepared)
+        next(item for item in bad["proposal"]["validation_steps"]
+             if item["validation_id"] == "validation_public_contract")["artifact_paths"] = ["app.py"]
+        role_runtime = ImmediateRoleRuntime([json.dumps(bad), json.dumps(bad)])
+        role_runtime.inventory = self.inventory
+        runner = CodexStructuredRoleRunner(role_runtime, poll_interval_seconds=0)
+        provider = ExecutionProposalAdapter(prepared.service, runner, self.roles)
+
+        with self.assertRaises(StructuredRoleError) as raised:
+            EngineDispatcher(prepared.service, runtime, proposal_provider=provider).run_once(prepared.project_id)
+
+        receipt = raised.exception.receipt
+        self.assertIsNotNone(receipt)
+        self.assertEqual("schema_failed", receipt.status)
+        self.assertEqual(1, receipt.schema_recovery_attempts)
+        self.assertEqual(2, len(receipt.turn_ids))
+        with prepared.service.ledger.read() as connection:
+            self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM execution_spec_revisions").fetchone()[0])
+            self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0])
+
+    def test_run_revalidates_replayed_execution_preparation_without_runtime_or_spec_and_deduplicates_usage(self):
+        prepared, _ = self.prepared(semantic_task_validation=True)
+        context, task = self.task_contract(prepared)
+        context["predecessor_outputs"] = []
+        payload = task_preparation_payload(context, task)
+        bad = self.provider_response(prepared)
+        next(item for item in bad["proposal"]["validation_steps"]
+             if item["validation_id"] == "validation_public_contract")["artifact_paths"] = ["app.py"]
+        runner = ScriptedStructuredRoleRunner({"execution_preparation": []})
+        provider = ExecutionProposalAdapter(prepared.service, runner, self.roles)
+        receipt = RoleCallReceipt(
+            call_id="model_call_replayed_invalid_payload",
+            role="execution_preparation",
+            status="succeeded",
+            model=self.roles.plan_expander.model,
+            effort=self.roles.plan_expander.effort,
+            inventory_digest=self.inventory.inventory_digest,
+            permission_profile=":danger-full-access",
+            approval_policy="never",
+            input_digest="sha256:" + "1" * 64,
+            output_digest=sha256_digest(bad),
+            output_schema_digest="sha256:" + "2" * 64,
+            input_tokens=101,
+            cached_input_tokens=50,
+            output_tokens=23,
+            reasoning_tokens=11,
+            usage_available=True,
+            latency_ms=7,
+            recorded_at=utc_now(),
+        )
+
+        def validate(value):
+            raw = ProviderExecutionPreparation.model_validate(value)
+            compile_task_preparation(raw, task)
+            return raw
+
+        with prepared.service.ledger.read() as connection:
+            before_usage = connection.execute("SELECT COUNT(*) FROM budget_usage").fetchone()[0]
+        for _ in range(2):
+            with patch.object(provider.operations, "invoke", return_value={
+                "payload": bad, "receipt": receipt.model_dump(mode="json"),
+            }):
+                with self.assertRaises(ValidationError):
+                    provider._run(
+                        prepared.project_id, self.inventory, context, ProviderExecutionPreparation,
+                        "execution_preparation", payload=payload, validator=validate,
+                    )
+        with prepared.service.ledger.read() as connection:
+            after_usage = connection.execute("SELECT COUNT(*) FROM budget_usage").fetchone()[0]
+            stored_usage = json.loads(connection.execute(
+                "SELECT payload_json FROM budget_usage WHERE logical_call_ref = ?", (receipt.call_id,)
+            ).fetchone()[0])
+        self.assertEqual([], runner.calls)
+        self.assertEqual(before_usage + 1, after_usage)
+        self.assertEqual((101, 23, 11), (
+            stored_usage["input_tokens"], stored_usage["output_tokens"], stored_usage["reasoning_tokens"],
+        ))
+        with prepared.service.ledger.read() as connection:
+            self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM execution_spec_revisions").fetchone()[0])
+            self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0])
+
+    def test_goal_preparation_recovers_changed_contract_once(self):
+        prepared, _ = self.prepared()
+        good_step = prepared.proposal.validation_steps[0].model_dump(mode="json")
+        good_step["validation_id"] = "validation_goal"
+        bad_step = copy.deepcopy(good_step)
+        bad_step["validation_id"] = "validation_wrong"
+        role_runtime = ImmediateRoleRuntime([
+            json.dumps({"step": bad_step}), json.dumps({"step": good_step}),
+        ])
+        role_runtime.inventory = self.inventory
+        runner = CodexStructuredRoleRunner(role_runtime, poll_interval_seconds=0)
+        provider = ExecutionProposalAdapter(prepared.service, runner, self.roles)
+
+        step = provider.prepare_goal(
+            project_id=prepared.project_id, validation_id="validation_goal", inventory=self.inventory,
+        )
+
+        self.assertEqual("validation_goal", step.validation_id)
+        self.assertEqual(1, runner.receipts[-1].schema_recovery_attempts)
+        self.assertEqual(2, len(runner.receipts[-1].turn_ids))
 
 
 if __name__ == "__main__":
