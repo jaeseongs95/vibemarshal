@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from flowmarshal.engine.context import ProjectMapper
 from flowmarshal.engine.domain import CandidateStatus, GoalCriterion, RevisionStatus
 from flowmarshal.engine.goal import (
     GoalNormalizerAdapter,
@@ -13,6 +14,7 @@ from flowmarshal.engine.goal import (
     ReviewDraft,
 )
 from flowmarshal.engine.planner_roles import (
+    PLANNING_PROJECT_PATH_INSTRUCTIONS,
     PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS,
     PlanExpanderAdapter,
     PlanReviewerAdapter,
@@ -309,14 +311,50 @@ class EngineRoleAdapterTests(unittest.TestCase):
         )
         return skeleton, plan
 
-    def _boundary_search(self, runner):
+    def _boundary_search(self, runner, *, reviewer_cwd=None):
         options = dict(model="worker", effort="medium", inventory_digest=self.inventory.inventory_digest, cwd=self.root)
-        reviewer_options = {**options, "model": "validator", "effort": "high"}
+        reviewer_options = {**options, "model": "validator", "effort": "high", "cwd": reviewer_cwd or self.root}
         return SkeletonFirstPlanner(
             SkeletonGeneratorAdapter(runner, **options), SkeletonReviewerAdapter(runner, **reviewer_options),
             PlanExpanderAdapter(runner, RuleBasedTaskAssigner(assignment(), assignment(), assignment()), **options),
             PlanReviewerAdapter(runner, **reviewer_options),
         ).search(goal=self.goal, state=self.state, project_map=self.map)
+
+    def test_registered_reference_and_role_cwd_preserve_target_project(self) -> None:
+        """대상 밖 참고자료와 별도 역할 cwd를 대상 Project Map과 구분해 전달한다."""
+        with tempfile.TemporaryDirectory() as outside:
+            reference = Path(outside) / "reference-run" / "validation-reference.md"
+            reference.parent.mkdir()
+            reference.write_text(f"검증 대상은 {self.root}이다.\n", encoding="utf-8")
+            role_cwd = Path(outside) / "role-copy"
+            role_cwd.mkdir()
+            self.map = ProjectMapper().build(
+                project_id=self.project_id, root=self.root, revision_no=1,
+                registered_references=(reference,),
+            )
+            self.state = state(self.project_id, self.goal.definition_digest, self.map.revision_digest)
+            runner = ScriptedStructuredRoleRunner({
+                "skeleton_generator": [_skeleton_response()],
+                "skeleton_reviewer": [{"findings": [], "ratings": _ratings()}],
+                "plan_expander": [_plan_response()],
+                "compact_plan_reviewer": [{"findings": [], "ratings": _ratings()}],
+            })
+            outcome = self._boundary_search(runner, reviewer_cwd=role_cwd)
+            self.assertIsNotNone(outcome.selected_activation_digest)
+            for call in runner.calls:
+                self.assertIn(PLANNING_PROJECT_PATH_INSTRUCTIONS, call.instructions)
+                if "reviewer" not in call.role:
+                    continue
+                mapped = call.payload["evidence_catalog"]["source:project_map"]
+                self.assertEqual(str(self.root), mapped["root"])
+                self.assertEqual(self.map.revision_digest, mapped["revision_digest"])
+                self.assertEqual(str(role_cwd), call.cwd)
+                self.assertNotEqual(mapped["root"], call.cwd)
+                entry = next(item for item in mapped["entries"] if item["path"] == str(reference))
+                self.assertEqual("reference", entry["kind"])
+                self.assertIn("registered_reference", entry["tags"])
+                self.assertIn("Goal의 명시 대상과 Map.root의 충돌", call.instructions)
+                self.assertIn("State의 freshness 위반", call.instructions)
 
     def test_goal_test_coverage_survives_refinement_without_an_execution_task(self) -> None:
         """책임 안내·후보 보정·재검토의 연결을 검증하며 모델의 의미 판단을 모사하지 않는다."""
@@ -396,7 +434,7 @@ class EngineRoleAdapterTests(unittest.TestCase):
                     self.assertIn("detail_requirements에 반복하지 않았다는 이유만으로 Skeleton을 차단하지 않는다",
                                   runner.calls[1].instructions)
 
-    def _per_task_validation_requirement_case(self, *, omit_change_validation: bool):
+    def _per_task_validation_requirement_case(self, *, omit_change_validation: bool, generic_change_test: bool = False):
         """Goal의 Task별 검사 요구와 plan-level Goal Test를 함께 가진 축소 S06 사례다."""
         definition = self.goal.definition.model_copy(update={"hard_acceptance": (
             *self.goal.definition.hard_acceptance,
@@ -473,6 +511,8 @@ class EngineRoleAdapterTests(unittest.TestCase):
                     "required_evidence_kinds": ["model_review"],
                 },
             ]
+        if generic_change_test:
+            change["validations"][0]["statement"] = "변경 Task의 일반 동작과 파일 범위를 직접 검사한다."
         follow = deepcopy(change)
         follow.update(
             task_ref=follow_ref,
@@ -523,19 +563,23 @@ class EngineRoleAdapterTests(unittest.TestCase):
 
     def test_task_validation_requirements_are_not_replaced_by_followup_or_goal_test(self) -> None:
         """Task별 필수 검증, AC 기여, 독립 Goal Test의 계약 경계를 실제 상세 Plan으로 확인한다."""
-        for omit_change_validation in (True, False):
-            with self.subTest(omit_change_validation=omit_change_validation):
+        for omit_change_validation, generic_change_test in ((True, False), (False, False), (False, True)):
+            with self.subTest(omit_change_validation=omit_change_validation, generic_change_test=generic_change_test):
                 self.goal = goal(self.project_id, self.profile.definition_digest)
                 skeleton, plan, change_ref, follow_ref = self._per_task_validation_requirement_case(
                     omit_change_validation=omit_change_validation,
+                    generic_change_test=generic_change_test,
                 )
                 review = {"findings": [], "ratings": _ratings()}
-                if omit_change_validation:
+                has_gap = omit_change_validation or generic_change_test
+                finding_code = "TASK_VALIDATION_UNITTEST_MISSING" if generic_change_test else "VERIFICATION_TASK_VALIDATOR_GAP"
+                if has_gap:
                     review = {"findings": [{
-                        "finding_code": "VERIFICATION_TASK_VALIDATOR_GAP",
+                        "finding_code": finding_code,
                         "gate": "verification",
                         "severity": "error",
-                        "summary": "변경 Task의 validation이 file·diff뿐이어서 unittest와 분리 Validator 검토를 대체할 수 없다.",
+                        "summary": ("test evidence 종류만으로는 Goal이 요구한 기존 unittest 실행을 대신할 수 없다."
+                                    if generic_change_test else "변경 Task의 validation이 file·diff뿐이어서 unittest와 분리 Validator 검토를 대체할 수 없다."),
                         "evidence_refs": ["artifact:plan_contract", "source:goal"],
                         "affected_task_refs": [change_ref],
                         "remediable": True,
@@ -549,12 +593,12 @@ class EngineRoleAdapterTests(unittest.TestCase):
                 outcome = self._boundary_search(runner)
                 evaluation = outcome.plan_evaluations[0]
                 self.assertEqual(
-                    CandidateStatus.NEEDS_REVISION if omit_change_validation else CandidateStatus.ADMISSIBLE,
+                    CandidateStatus.NEEDS_REVISION if has_gap else CandidateStatus.ADMISSIBLE,
                     evaluation.decision.status,
                 )
-                self.assertEqual(not omit_change_validation, outcome.selected_activation_digest is not None)
-                if omit_change_validation:
-                    self.assertIn("VERIFICATION_TASK_VALIDATOR_GAP", evaluation.decision.finding_codes)
+                self.assertEqual(not has_gap, outcome.selected_activation_digest is not None)
+                if has_gap:
+                    self.assertIn(finding_code, evaluation.decision.finding_codes)
 
                 plan_definition = evaluation.plan.definition
                 change_task = next(item for item in plan_definition.tasks if item.kind.value == "change")
@@ -584,6 +628,56 @@ class EngineRoleAdapterTests(unittest.TestCase):
                 self.assertIn("각 Task의 validation", required_ac["validation_intent"])
                 self.assertTrue(all(not item["detail_requirements"] for item in
                                     expander_call.payload["skeleton"]["tasks"]))
+                if generic_change_test:
+                    self.assertNotIn("unittest", change_task.validations[0].statement)
+                    self.assertIn("test", change_task.validations[0].required_evidence_kinds)
+                    self.assertIn("기존 unittest 실행을 요구하면 각 Task의 검사 문장에도", expander_call.instructions)
+
+    def test_task_validation_coverage_is_independent_of_contributing_tasks(self) -> None:
+        """자체 검사가 모두 있어도 Goal 연결 누락은 보존하고 Reviewer finding으로 거부한다."""
+        for omit_link in (False, True):
+            with self.subTest(omit_link=omit_link):
+                self.goal = goal(self.project_id, self.profile.definition_digest)
+                skeleton, plan, change_ref, follow_ref = self._per_task_validation_requirement_case(
+                    omit_change_validation=False,
+                )
+                if omit_link:
+                    plan["goal_coverage"][1]["validation_ids"] = [
+                        "validation_followup_direct", "validation_followup_review",
+                    ]
+                review = {"findings": [], "ratings": _ratings()}
+                if omit_link:
+                    review = {"findings": [{
+                        "finding_code": "VERIFICATION_TASK_COVERAGE_GAP",
+                        "gate": "verification", "severity": "error",
+                        "summary": "변경 Task의 자체 검사는 존재하지만 각 Task 검증 AC의 validation_ids에서 빠졌다.",
+                        "evidence_refs": ["source:goal", "artifact:plan_contract"],
+                        "affected_task_refs": [change_ref], "remediable": True,
+                    }]}
+                runner = ScriptedStructuredRoleRunner({
+                    "skeleton_generator": [skeleton],
+                    "skeleton_reviewer": [{"findings": [], "ratings": _ratings()}],
+                    "plan_expander": [plan], "compact_plan_reviewer": [review],
+                })
+                outcome = self._boundary_search(runner)
+                evaluation = outcome.plan_evaluations[0]
+                coverage = evaluation.plan.definition.goal_coverage[1]
+                tasks = {task.task_ref: task for task in evaluation.plan.definition.tasks}
+                self.assertEqual((tasks[follow_ref].task_id,), coverage.task_ids)
+                self.assertEqual(2, len(tasks[change_ref].validations))
+                linked_change_ids = {item.validation_id for item in tasks[change_ref].validations}
+                self.assertEqual(not omit_link, linked_change_ids <= set(coverage.validation_ids))
+                self.assertEqual(not omit_link, outcome.selected_activation_digest is not None)
+                if omit_link:
+                    self.assertIn("VERIFICATION_TASK_COVERAGE_GAP", evaluation.decision.finding_codes)
+                for call in runner.calls:
+                    if call.role in {"plan_expander", "compact_plan_reviewer"}:
+                        self.assertIn("validation_ids의 소유 Task를 그 task_refs로 제한하지 않는다", call.instructions)
+                        self.assertIn("각각 확인한다", call.instructions)
+                expander = next(call for call in runner.calls if call.role == "plan_expander")
+                fields = expander.output_schema["$defs"]["PlanGoalCoverageDraft"]["properties"]
+                self.assertIn("허용 목록이 아니며", fields["task_refs"]["description"])
+                self.assertIn("task_refs에 없어도", fields["validation_ids"]["description"])
 
     def test_task_scoped_validation_requirement_does_not_become_a_global_rule(self) -> None:
         """Goal이 특정 변경 Task에만 요구한 semantic 검사를 무관한 후속 Task에 강제하지 않는다."""

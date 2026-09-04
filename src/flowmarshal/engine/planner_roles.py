@@ -67,6 +67,18 @@ READ_ONLY_REPORTING_INSTRUCTIONS = (
 )
 
 
+PLANNING_PROJECT_PATH_INSTRUCTIONS = (
+    "대상 프로젝트는 Goal의 명시적 대상과 Project Map.root를 대조해 판단한다. "
+    "Project Map.entries의 kind=reference 또는 registered_reference 자료는 등록 참고자료이며 "
+    "그 파일의 부모 디렉터리가 대상 프로젝트라는 뜻이 아니다. 자료 경로의 실행명·날짜·버전이나 "
+    "역할 실행 cwd가 다르다는 사실만으로 target 변경·stale root를 추론하지 않는다. 역할 cwd는 "
+    "계획·검토 프로세스의 실행 위치이며 Goal의 대상 프로젝트를 변경하지 않는다. "
+    "실제 Goal의 명시 대상과 Map.root의 충돌, 후보의 project_map_digest·State binding 불일치, "
+    "State의 freshness 위반은 제공된 evidence에서 직접 확인해 지적한다. 관련 입력이 일치하면 "
+    "참고자료의 위치에서 다른 workspace 경로를 만들어 finding의 근거로 사용하지 않는다."
+)
+
+
 PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS = (
     "Task validation은 해당 Task의 산출물·완료 조건을 검사한다. 필요한 테스트 작성·실행이나 "
     "선행 산출물의 독립 검토 Task는 허용한다. 반면 모든 Task 완료 후 Core가 수행하는 독립 "
@@ -97,6 +109,15 @@ PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS = (
     "Goal의 요구 범위 밖 Task에 일괄 강제하지 않는다. Task별 필수 검증은 detail_requirements나 "
     "contributes_to에 반복되지 않아도 Goal에서 상속하며, 상세 Plan에서 실제 누락된 경우에만 "
     "Goal과 해당 Task.validations를 직접 근거로 지적한다."
+    "상세 Plan의 goal_coverage.task_refs와 validation_ids는 서로 다른 연결이다. task_refs는 "
+    "Skeleton의 기여 Task 집합을 그대로 보존한다. validation_ids의 소유 Task를 그 task_refs로 "
+    "제한하지 않는다. Goal이 각 Task에 검증을 요구하면 해당 AC의 validation_ids에는 적용 대상 "
+    "모든 Task의 자체 검사 ID를 연결한다. 예를 들어 검증 AC의 task_refs가 후속 검증 Task B뿐이어도 "
+    "Goal이 변경 Task A와 B 각각의 검증을 요구하면 A와 B의 검사 ID가 모두 필요하다. 이 연결을 "
+    "추가하려고 task_refs나 contributes_to를 바꾸지 않는다. 특정 Task에만 적용되는 요구는 그 "
+    "범위를 유지한다. 검토 시 Task 자체의 필수 검사 존재와 해당 AC.validation_ids의 연결을 "
+    "각각 확인한다. 검사 계약이 존재해도 AC 연결이 빠졌으면 Goal·해당 Task.validations·"
+    "goal_coverage를 직접 근거로 누락을 지적한다."
 )
 
 
@@ -144,7 +165,7 @@ class DetailedTaskDraft(EngineModel):
     task_ref: str
     kind: TaskKind
     objective: str
-    goal_criterion_refs: tuple[str, ...] = Field(min_length=1)
+    goal_criterion_refs: tuple[str, ...] = Field(min_length=1, description="Skeleton의 contributes_to를 그대로 보존한다. 다른 AC의 필수 검사 ID를 연결하려고 이 기여 집합을 바꾸지 않는다. 검사 연결은 goal_coverage.validation_ids에 둔다.")
     produces: tuple[str, ...] = Field(min_length=1)
     consumes: tuple[str, ...] = ()
     preconditions: tuple[PreconditionContract, ...] = ()
@@ -152,7 +173,7 @@ class DetailedTaskDraft(EngineModel):
     prohibited_effects: tuple[EffectContract, ...] = Field(default=(), description="Task가 발생시키면 안 되는 효과. 로컬 파일 mutation과 외부 시스템 효과를 별도 항목으로 작성하고 각 external 값을 해당 범위에 맞춘다.")
     required_capabilities: tuple[str, ...] = ()
     acceptance_criteria: tuple[str, ...] = Field(min_length=1)
-    validations: tuple[ValidationContract, ...] = Field(min_length=1, description="이 Task 완료 전에 필요한 실제 검사 계약. Goal이 이 Task에 요구한 검사 목적·method·필수 evidence 종류를 보존한다. 후속 Task 검사, 모델 배정, AC 문장이나 integration validation으로 자체 필수 검증을 대체하지 않는다.")
+    validations: tuple[ValidationContract, ...] = Field(min_length=1, description="이 Task 완료 전에 필요한 실제 검사 계약. statement에 Goal이 이 Task에 요구한 검사 대상·종류·실행 목적을 보존하고 method·필수 evidence 종류를 함께 명시한다. 기존 unittest 실행 요구를 일반 동작 확인이나 test enum만으로 대체하지 않는다. 후속 Task 검사, 모델 배정, AC 문장이나 integration validation으로 자체 필수 검증을 대체하지 않는다.")
     risk_level: RiskLevel
     risk_tags: tuple[str, ...] = ()
     approval_class: ApprovalClass = ApprovalClass.PLAN_ACTIVATION
@@ -168,8 +189,8 @@ class PlanDependencyDraft(EngineModel):
 
 class PlanGoalCoverageDraft(EngineModel):
     criterion_id: str
-    task_refs: tuple[str, ...] = Field(min_length=1)
-    validation_ids: tuple[str, ...] = Field(min_length=1, description="해당 AC를 검사하는 실제 Task 또는 integration validation ID. Task별 검증 요구에는 적용 대상 Task들의 자체 검사 ID를 연결하며, Core의 독립 Goal Test는 integration validation ID로 연결한다.")
+    task_refs: tuple[str, ...] = Field(min_length=1, description="Skeleton의 해당 AC 기여 Task 집합을 그대로 보존한다. validation_ids 소유 Task의 허용 목록이 아니며 검사 ID를 연결하려고 이 집합을 확대하지 않는다.")
+    validation_ids: tuple[str, ...] = Field(min_length=1, description="해당 AC를 검사하는 실제 Task 또는 integration validation ID. Goal의 요구가 적용되는 Task는 task_refs에 없어도 자체 필수 검사 ID를 모두 연결한다. task_refs로 검사 소유 Task를 제한하지 않는다. Core의 독립 Goal Test는 integration validation ID로 연결한다.")
 
 
 class PlanExpansionDraft(EngineModel):
@@ -260,7 +281,7 @@ class SkeletonGeneratorAdapter:
                 "현재 출력은 실행 전 계획 후보다. 사용자가 이후 정확한 Plan digest를 활성화하며, "
                 "아직 없는 활성화 증적을 consumes로 요구하거나 별도 승인 Task를 발명하지 않는다. "
                 "read_only는 프로젝트 산출물 변경 금지이며 읽기 관측·계획 제안 자체를 금지하지 않는다."
-            ) + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(goal.definition_digest),
                 "candidate_count": candidate_count,
@@ -326,7 +347,7 @@ class SkeletonGeneratorAdapter:
                 "Core의 검사를 기다리는 일반 Task를 추가하지 않는다. 실제 Task 검증 결함은 수정한다. "
                 "consumes는 external_input_catalog의 key 또는 data dependency의 산출물과 일치해야 한다. "
                 "unknown_refs는 StateSnapshot.unknowns의 실제 ID만 쓴다. 새 정보는 발명하지 않는다."
-            ) + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(sha256_digest(candidate)),
                 "goal": goal.definition.model_dump(mode="json"),
@@ -444,7 +465,7 @@ class SkeletonReviewerAdapter:
                 "다음 Plan/ExecutionSpec 단계의 책임이다. 그 필드 부재만으로 Skeleton을 차단하지 않는다. "
                 "Plan 후보는 아직 승인되지 않은 것이 정상이며 미래 activation 증적의 부재는 dead-end가 아니다. "
                 "read_only는 파일 mutation 계약이지 모든 명령·검사를 금지하는 sandbox가 아니다."
-            ) + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS,
             payload={"case_ref": _case_ref(digest), "evidence_catalog": evidence_catalog},
             output_schema=ReviewDraft.model_json_schema(),
             model=self.model,
@@ -507,6 +528,14 @@ class PlanExpanderAdapter:
                 "ready-time 상세이므로 넣지 않는다. 완료조건·validation·recovery만 구체화한다."
                 "독립 Goal Test는 integration_validations에 넣고 Task validation과 분리한다. "
                 "Goal의 Task별 필수 검증은 적용 대상 Task의 validations에 보존한다. "
+                "각 validation.statement는 해당 Task에 적용되는 Goal의 검사 대상·종류·실행 목적을 "
+                "구체적으로 보존한다. required_evidence_kinds의 test는 evidence 종류일 뿐 검사 절차가 "
+                "아니다. Goal이 각 Task에 기존 unittest 실행을 요구하면 각 Task의 검사 문장에도 기존 "
+                "unittest를 실제 실행해 통과를 확인한다고 명시한다. 이를 일반 동작 확인·test evidence "
+                "종류나 후속 Task의 unittest 실행으로 대체하지 않는다. 명시된 검사 대상과 종류를 "
+                "보존하되 실제 실행 명령은 ready-time 명세로 남긴다. "
+                "각 AC의 적용 범위와 Task별 검사 ID를 대조해 goal_coverage.validation_ids에도 연결한다. "
+                "기여 Task 집합인 task_refs를 검사 ID의 소유 Task 제한으로 해석하지 않는다. "
                 "Skeleton의 detail_requirements도 같은 적용 범위로 해석하며, 모든 Task 완료 후 "
                 "Goal Test 책임만 별도 integration validation에 반영한다. "
                 "Skeleton에 책임 충돌이 남아 있어도 Task를 몰래 삭제·재정의해 우회하지 않는다. "
@@ -524,7 +553,7 @@ class PlanExpanderAdapter:
                 "의미 검사는 원본 file 근거와 응답 관측을 함께 참조하는 semantic validation으로 "
                 "계약하고 required_evidence_kinds에 model_review·external_observation·file을 모두 "
                 "요구한다. 이는 외부 시스템 변경 효과를 뜻하지 않는다."
-            ) + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(sha256_digest(candidate)),
                 "goal": goal.definition.model_dump(mode="json"),
@@ -712,7 +741,8 @@ class PlanReviewerAdapter:
                 "현재는 활성화 전 Plan 후보이므로 미래 activation receipt는 아직 없는 것이 정상이다. "
                 "파일·명령의 운영 상세는 ExecutionSpec에 확정한다. read_only는 산출물 mutation 정책이며 "
                 "읽기 검사와 계획 생성 자체를 금지하지 않는다. 외부 효과는 외부 시스템·계정·제3자에 대한 효과다."
-            ) + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS,
+                "affected_task_refs는 Task.task_ref를 참조하며 Core의 task_id와 혼동하지 않는다."
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS,
             payload={"case_ref": _case_ref(digest), "evidence_catalog": evidence_catalog},
             output_schema=ReviewDraft.model_json_schema(),
             model=selected_model,

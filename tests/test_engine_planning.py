@@ -103,7 +103,11 @@ class Expander:
 
 
 class CleanPlanReviewer:
+    def __init__(self):
+        self.calls = 0
+
     def review(self, *, plan, goal, state, project_map, **_):
+        self.calls += 1
         catalog = plan_review_evidence_catalog(plan, goal, state, project_map)
         return ReviewerSubmission(
             reviewer_role="compact-plan-reviewer",
@@ -117,6 +121,18 @@ class CleanPlanReviewer:
             ),
             evidence_catalog_digest=sha256_digest(catalog),
         )
+
+
+class FixedPlanExpander:
+    """현재 입력과 무관하게 이전에 만든 Plan을 반환하는 stale expander 모사체."""
+
+    def __init__(self, stale_plan):
+        self.stale_plan = stale_plan
+        self.calls = 0
+
+    def expand(self, **_):
+        self.calls += 1
+        return self.stale_plan
 
 
 class EnginePlanningTests(unittest.TestCase):
@@ -204,6 +220,77 @@ class EnginePlanningTests(unittest.TestCase):
         self.assertIn(evaluation.decision.status, {CandidateStatus.NEEDS_REVISION, CandidateStatus.BLOCKED})
         self.assertIsNone(evaluation.decision.fitness_score)
         self.assertEqual(0, len(outcome.plan_evaluations))
+
+    def test_stale_expanded_plan_is_rejected_before_plan_reviewer(self) -> None:
+        """같은 후보는 정상 선택되지만 재관측 뒤의 과거 Plan은 결정적으로 거부한다."""
+        baseline_plan = plan(
+            self.project_id,
+            self.goal,
+            self.state,
+            self.map.revision_digest,
+            self.candidate,
+            self.inventory,
+        )[0]
+        normal_reviewer = CleanPlanReviewer()
+        normal_planner = SkeletonFirstPlanner(
+            generator=Generator((self.candidate,)),
+            skeleton_reviewer=CleanSkeletonReviewer(),
+            expander=FixedPlanExpander(baseline_plan),
+            plan_reviewer=normal_reviewer,
+        )
+        normal = normal_planner.search(
+            goal=self.goal,
+            state=self.state,
+            project_map=self.map,
+        )
+        self.assertIsNotNone(normal.selected_activation_digest)
+        self.assertEqual(1, normal_reviewer.calls)
+
+        (self.root / "app.py").write_text("value = 2\n", encoding="utf-8")
+        current_map = project_map(self.project_id, self.root)
+        current_state = state(
+            self.project_id,
+            self.goal.definition_digest,
+            current_map.revision_digest,
+        )
+        current_candidate = skeleton(self.goal, current_state)
+        # 현재 Skeleton에는 결속됐지만 관찰 전 State/Project Map을 가진 과거 binding을
+        # expander가 반환한 경우다. source skeleton까지 과거 것으로 반환하면 Outcome의
+        # shortlist 불변조건에서 먼저 차단되어 Plan gate를 관찰할 수 없다.
+        stale_plan = plan(
+            self.project_id,
+            self.goal,
+            self.state,
+            self.map.revision_digest,
+            current_candidate,
+            self.inventory,
+        )[0]
+        stale_expander = FixedPlanExpander(stale_plan)
+        stale_reviewer = CleanPlanReviewer()
+        stale_planner = SkeletonFirstPlanner(
+            generator=Generator((current_candidate,)),
+            skeleton_reviewer=CleanSkeletonReviewer(),
+            expander=stale_expander,
+            plan_reviewer=stale_reviewer,
+        )
+        stale = stale_planner.search(
+            goal=self.goal,
+            state=current_state,
+            project_map=current_map,
+        )
+
+        self.assertNotEqual(self.map.revision_digest, current_map.revision_digest)
+        self.assertEqual(1, stale_expander.calls)
+        self.assertEqual(0, stale_reviewer.calls)
+        self.assertIsNone(stale.selected_activation_digest)
+        evaluation = stale.plan_evaluations[0]
+        self.assertEqual((), evaluation.semantic_submissions)
+        finding_codes = {item.finding_code for item in evaluation.deterministic_findings}
+        self.assertTrue(
+            {"PLAN_MAP_BINDING_MISMATCH", "PLAN_STATE_BINDING_MISMATCH"}.issubset(
+                finding_codes
+            )
+        )
 
     def test_reviewer_finding_cannot_be_admitted(self) -> None:
         planner, _ = self._planner(Generator((self.candidate,)), FindingReviewer())
