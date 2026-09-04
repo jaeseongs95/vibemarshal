@@ -4,7 +4,9 @@
 
 ## 결론
 
-현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. Goal의 적용 단계, 정상 동작과 결함, 로컬·외부 효과와 미발생 조건의 해석을 보완했다. 후속 확정 source의 **464개 테스트와 결정적 Gate, 실제 역할 회귀 48/48, 실제 E2E 4/4는 PASS**다. 같은 source의 Planning은 **18/18건 수집 완료·13건 통과·5건 실패**다. 현재 근거와 다음 작업은 [Goal 계약 해석 재검증 기록](goal-contract-boundaries-requalification-20260904.md)에 정리한다.
+현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [R-S04-01](r-s04-01-handoff.md)에서 Worker Prompt·Attempt·turn·actual usage의 영속 연결을 검증했고, [S05](s05-bugfix-trace-handoff.md)에서 단일 bugfix 입력·Goal 후보·초기 snapshot·Task/독립 Goal oracle을 고정했다. S05 source의 **482개 테스트와 결정적 Gate 5/5는 PASS**다. 현재 source의 자연어부터 Goal 완료까지 전체 Trace는 **INCOMPLETE**이며 다음 세션은 **S06 — 실제 Normalizer·Planner의 Selected Plan 생성**이다.
+
+그 이전 Goal 계약 해석 source의 **464개 테스트와 결정적 Gate, 실제 역할 회귀 48/48, 실제 E2E 4/4는 PASS**였고 같은 source의 Planning은 **18/18건 수집 완료·13건 통과·5건 실패**였다. 이 결과는 [Goal 계약 해석 재검증 기록](goal-contract-boundaries-requalification-20260904.md)에 보존하며 현재 source의 실제 역할·Planning·E2E 완료 증거로 재사용하지 않는다.
 
 남은 실패는 Profile 정책의 Goal 중복 요구, 독립 Goal Test의 diff evidence 누락, Skeleton 생성·보정·상세화의 유일성 및 의미 보존 위반이다. 정상 입력은 7/12 Plan 선택, 정보 부족 입력은 6/6 질문·차단이며 최종 schema failure는 3건이다. source와 정규화 역할 모델을 함께 변경했으므로 결과 차이를 어느 한 변경의 효과로 단정하지 않는다. 별도 성능 Gate는 미실행이며, 일부 순서의 성공으로 전체 Planning 안정성을 선언하지 않는다.
 

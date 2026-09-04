@@ -1,0 +1,88 @@
+{
+  "contract_version": "1.0",
+  "fixture_id": "bugfix-add-trace-v1",
+  "authority": "non_authoritative_goal_input",
+  "project_fixture": "tests/fixtures/engine/project-e2e",
+  "source_request": "app.py의 add(2, 3)이 -1을 반환하여 test_app.py의 기존 합산 테스트가 실패한다. add가 양수·음수·0을 포함한 두 정수의 합을 반환하도록 add 함수 구현만 최소 수정해줘. 공개 함수 add(left: int, right: int) -> int와 위치·키워드 인자 호출 계약을 유지한다. test_app.py와 AGENTS.md는 그대로 보존하고 프로젝트 파일을 추가하거나 삭제하지 않는다. 기존 unittest를 통과해야 한다. Task 검증은 실제 unittest·파일 변경 범위 확인과 실행 역할과 분리된 Validator의 직접 evidence 검토로 수행한다. 모든 Task가 검증된 뒤 같은 workspace에서 기존 unittest와 별도의 동작·공개 계약·파일 보존 검사를 Goal Test로 새로 실행하고, Task evidence와 구분된 근거로 최종 Goal을 판정한다. 외부 서비스 변경·배포·의존성 추가는 범위에 없다.",
+  "initial_snapshot": {
+    "files": {
+      "AGENTS.md": "sha256:57fb50121f05548961e1e725e5537526b4e9cbc754383f8d42b0162096944b2a",
+      "app.py": "sha256:de37b83f3f9bc35808d83d3252ce8c237fee98301d448d74cd4839699a1497bd",
+      "test_app.py": "sha256:080c09d10ca93fff3eac35c3ce3200c988f8fb49a9ab87e09c0192e154bff188"
+    },
+    "snapshot_digest": "sha256:762136c2a7d27aa864504ad79558241f0429705a18be64f3e12aca72f2d4a0c5",
+    "ignored_runtime_entries": [".git", "__pycache__", "*.pyc", "*.pyo"]
+  },
+  "expected_goal_proposal": {
+    "mission_class": "bugfix_stabilization",
+    "observable_outcome": "add의 정수 덧셈 동작을 복구하고 공개 계약·기존 테스트·프로젝트 지침을 보존한 결과를 Task 검증과 독립 Goal Test로 확인한다.",
+    "hard_acceptance": [
+      {
+        "statement": "add는 양수·음수·0을 포함한 두 정수의 합을 반환하며 add(2, 3)은 5다.",
+        "validation_intent": "기존 unittest와 별도 Goal 동작 oracle의 고정 입력·기대값을 모두 통과한다."
+      },
+      {
+        "statement": "add(left: int, right: int) -> int의 이름·인자·반환 annotation과 위치·키워드 호출 계약을 유지한다.",
+        "validation_intent": "실제 모듈의 공개 시그니처와 위치·키워드 인자 호출을 검사한다."
+      },
+      {
+        "statement": "app.py의 add 구현만 최소 수정하고 test_app.py·AGENTS.md·프로젝트 파일 집합을 보존한다.",
+        "validation_intent": "초기 파일 해시·파일 집합 및 add 본문 밖 AST를 대조하고 독립 Validator가 diff의 최소 변경 여부를 검토한다."
+      },
+      {
+        "statement": "기존 unittest가 실제로 실행되어 종료 코드 0을 반환한다.",
+        "validation_intent": "Task 검증의 실제 unittest command/test evidence를 수집한다."
+      },
+      {
+        "statement": "실행 역할과 분리된 Validator가 직접 파일·diff·테스트 evidence를 검토하여 Task 검증을 통과한다.",
+        "validation_intent": "Core의 semantic validation 기록과 직접 evidence 참조를 대조한다. Worker의 완료 선언만으로 통과시키지 않는다."
+      },
+      {
+        "statement": "모든 필수 Task 검증 후 같은 workspace에서 독립 Goal Test를 새로 실행하고 별도의 evidence로 최종 Goal을 판정한다.",
+        "validation_intent": "Task 없는 새 Goal command/test evidence, independent Goal binding, 최신 State와 Core GoalVerdict를 확인한다."
+      }
+    ],
+    "quality_preferences": [],
+    "constraints": [
+      {"category": "scope", "statement": "변경 대상은 작업용 복사본 app.py의 add 구현이며 저장소의 원본 fixture는 보존한다."},
+      {"category": "compatibility", "statement": "공개 API와 기존 unittest·AGENTS.md를 보존하고 의존성을 추가하지 않는다."},
+      {"category": "external_effect", "statement": "외부 서비스 변경이나 배포를 수행하지 않는다."}
+    ],
+    "non_goals": ["기능 확장", "구조 재설계", "새 UI", "성능 benchmark", "제품 1.0 승격"],
+    "assumptions": [],
+    "unresolved_questions": [],
+    "mutation_policy": "minimal_change",
+    "behavior_policy": "preserve_public_contracts",
+    "allowed_external_effects": [],
+    "prohibited_effects": ["원본 fixture 변경", "app.py의 add 구현 밖 소스 변경", "프로젝트 파일 추가·삭제", "외부 서비스 변경", "배포", "의존성 추가"]
+  },
+  "oracles": {
+    "task": {
+      "phase": "task",
+      "required_evidence_kinds": ["file", "diff", "command", "test", "model_review"],
+      "semantic_review": "직접 file/diff/test evidence로 변경 범위·공개 계약·최소 수정을 별도 Validator가 검토한다. oracle.py는 이 semantic review를 대신하지 않는다."
+    },
+    "goal": {
+      "phase": "goal",
+      "evidence_mode": "independent",
+      "required_evidence_kinds": ["command", "test", "file", "diff"],
+      "behavior_cases": [[2, 3, 5], [0, 0, 0], [-2, -3, -5], [-5, 8, 3], [7, 0, 7], [0, -9, -9], [1000000000000, -1, 999999999999]],
+      "required_task_id": null,
+      "fresh_execution_required": true
+    },
+    "public_signature": "(left: int, right: int) -> int",
+    "unittest_argv": ["{python}", "-B", "-m", "unittest", "discover", "-s", ".", "-p", "test_app.py", "-v"],
+    "oracle_argv": ["{python}", "-B", "{oracle}", "--phase", "{phase}", "--workspace", "{workspace}"],
+    "timeout_seconds": 30,
+    "all_checks_must_pass": true
+  },
+  "trace_requirements": [
+    "S06은 source_request를 실제 Normalizer와 Planner에 전달한다. expected_goal_proposal은 의미 대조용이며 수동 Goal·Plan 입력으로 주입하지 않는다.",
+    "Hard AC 1~6은 이 문서의 순번이다. 실제 Core criterion·Task ID, Task 개수, 분할과 DAG는 고정하지 않는다. 실제 ID와 각 의미의 coverage를 별도로 대조한다.",
+    "S06의 선택 Plan revision·digest와 Task ID를 보존하고 정확한 Plan 활성화 후 같은 원장에서 S07~S09를 이어간다.",
+    "Task PASS와 Goal PASS를 분리하며 oracle 종료 코드만으로 Core 완료 상태를 기록하지 않는다.",
+    "재시작 시 기존 intent·receipt·Attempt·thread·turn·검증 checkpoint를 먼저 관측한다. 후속 turn이 필요할 때만 기존 binding을 재개한다.",
+    "Worker Prompt·spec·Attempt·turn·usage와 unavailable 이유를 보존한다. 부분 usage를 Goal 전체 비용으로 표시하지 않는다.",
+    "source·원문·fixture·oracle·prompt·schema·역할 설정의 digest가 바뀌면 기존 실행 계약에 섞지 않는다. model inventory는 S06 호출 직전 실제 조회로 확인한다."
+  ]
+}
