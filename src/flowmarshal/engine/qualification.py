@@ -168,7 +168,7 @@ def _manifest(root: Path) -> LegacyFreezeManifest:
 
 
 def source_manifest_files(root: Path) -> dict[str, str]:
-    """현재 Engine/eval 입력과 frozen legacy manifest의 실제 파일 결속을 반환한다."""
+    """결정적 Gate가 실행하는 source·test·fixture 입력의 실제 결속을 반환한다."""
 
     paths: set[Path] = {
         root / "AGENTS.md",
@@ -182,18 +182,61 @@ def source_manifest_files(root: Path) -> dict[str, str]:
         root / "tests" / "engine_helpers.py",
         root / "src" / "flowmarshal" / "benchmark_legacy.py",
     }
-    paths.update((root / "src" / "flowmarshal" / "engine").glob("*.py"))
-    paths.update((root / "tests").glob("engine*_helpers.py"))
+    paths.update((root / "src").rglob("*.py"))
+    paths.update((root / "tests").rglob("*.py"))
     paths.update((root / "scripts" / "diagnostics").glob("*.py"))
-    paths.update((root / "tests").glob("test_engine*.py"))
-    paths.update((root / "tests" / "fixtures" / "engine").rglob("*"))
+    paths.update((root / "tests" / "fixtures").rglob("*"))
+    excluded_parts = {
+        ".flowmarshal-engine",
+        ".flowmarshal-engine-eval",
+        ".git",
+        ".pytest_cache",
+        ".venv",
+        "__pycache__",
+    }
+    excluded_names = {
+        "auth.json",
+        "api-key.json",
+        "api-keys.json",
+        "credential.json",
+        "credentials.json",
+        "oauth.json",
+        "secret.json",
+        "secrets.json",
+        "token.json",
+        "tokens.json",
+    }
+    excluded_suffixes = {
+        ".db",
+        ".db-journal",
+        ".db-shm",
+        ".db-wal",
+        ".kdbx",
+        ".key",
+        ".p12",
+        ".pem",
+        ".pfx",
+        ".pyc",
+        ".pyo",
+        ".sqlite",
+        ".sqlite-journal",
+        ".sqlite-shm",
+        ".sqlite-wal",
+        ".sqlite3",
+        ".sqlite3-journal",
+        ".sqlite3-shm",
+        ".sqlite3-wal",
+    }
     files = sorted(
         (
             path
             for path in paths
             if path.is_file()
-            and "__pycache__" not in path.parts
-            and path.suffix.casefold() not in {".pyc", ".pyo"}
+            and not path.is_symlink()
+            and not excluded_parts.intersection(part.casefold() for part in path.parts)
+            and path.name.casefold() not in excluded_names
+            and not path.name.casefold().startswith(".env")
+            and path.suffix.casefold() not in excluded_suffixes
         ),
         key=lambda item: item.relative_to(root).as_posix(),
     )

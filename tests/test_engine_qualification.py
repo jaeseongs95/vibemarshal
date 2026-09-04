@@ -46,6 +46,8 @@ from flowmarshal.engine.qualification import (
     _deterministic_contract,
     _planning_cell,
     default_role_configuration,
+    source_manifest_digest,
+    source_manifest_files,
 )
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime
 from flowmarshal.engine.service import EngineService, EngineServiceError
@@ -124,6 +126,105 @@ class EngineQualificationTests(unittest.TestCase):
         self.assertNotIn("gpt-5.6-luna", python_source)
         self.assertNotIn("gpt-5.6-terra", python_source)
         self.assertNotIn("gpt-5.6-sol", python_source)
+
+    def test_source_manifest_binds_all_python_tests_and_gate_inputs_by_bytes(self) -> None:
+        manifest = source_manifest_files(ROOT)
+        expected_source = {
+            path.relative_to(ROOT).as_posix()
+            for path in (ROOT / "src").rglob("*.py")
+            if path.is_file() and not path.is_symlink()
+        }
+        expected_tests = {
+            path.relative_to(ROOT).as_posix()
+            for path in (ROOT / "tests").rglob("test_*.py")
+            if path.is_file() and not path.is_symlink()
+        }
+        self.assertLessEqual(expected_source, manifest.keys())
+        self.assertLessEqual(expected_tests, manifest.keys())
+        required = (
+            "src/flowmarshal/gate0c/ledger.py",
+            "src/flowmarshal/gate0c/e2e.py",
+            "src/flowmarshal/canonical.py",
+            "tests/test_gate0c_e2e.py",
+        )
+        for relative in required:
+            self.assertIn(relative, manifest)
+        for relative in (
+            "config/legacy-freeze-manifest.json",
+            "config/qualification-roles.json",
+            "config/qualification-finding-taxonomy.json",
+            "tests/fixtures/gate0c/prompt-injection-corpus.json",
+            "tests/fixtures/engine/synthetic-lifecycle-project/AGENTS.md",
+        ):
+            self.assertIn(relative, manifest)
+        for relative in manifest:
+            folded = relative.casefold()
+            self.assertNotIn("/__pycache__/", f"/{folded}/")
+            self.assertNotIn("/.venv/", f"/{folded}/")
+            self.assertNotIn("/.flowmarshal-engine-eval/", f"/{folded}/")
+            self.assertFalse(
+                folded.endswith(
+                    (
+                        ".pyc",
+                        ".pyo",
+                        ".db",
+                        ".db-journal",
+                        ".db-shm",
+                        ".db-wal",
+                        ".sqlite",
+                        ".sqlite3",
+                        ".sqlite-journal",
+                        ".sqlite-wal",
+                        ".sqlite3-journal",
+                        ".sqlite3-wal",
+                    )
+                )
+            )
+
+        with tempfile.TemporaryDirectory() as raw:
+            copy_root = Path(raw) / "source"
+            for relative in manifest:
+                source = ROOT / relative
+                destination = copy_root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
+            self.assertEqual(manifest, source_manifest_files(copy_root))
+            baseline_source_digest = source_manifest_digest(copy_root)
+            baseline_contract_digest = _deterministic_contract(copy_root).contract_digest
+            excluded_inputs = (
+                copy_root / "tests/fixtures/gate0c/auth.json",
+                copy_root / "tests/fixtures/gate0c/runtime.sqlite3",
+                copy_root / "tests/fixtures/gate0c/runtime.sqlite3-wal",
+                copy_root / "tests/fixtures/gate0c/__pycache__/generated.pyc",
+                copy_root / ".flowmarshal-engine-eval/runs/generated.json",
+            )
+            for excluded in excluded_inputs:
+                excluded.parent.mkdir(parents=True, exist_ok=True)
+                excluded.write_bytes(b"excluded-local-material")
+            self.assertEqual(manifest, source_manifest_files(copy_root))
+            self.assertEqual(baseline_source_digest, source_manifest_digest(copy_root))
+            self.assertEqual(
+                baseline_contract_digest,
+                _deterministic_contract(copy_root).contract_digest,
+            )
+            for relative in required:
+                target = copy_root / relative
+                original = target.read_bytes()
+                mutated = bytearray(original)
+                mutated[-1] = 32 if mutated[-1] != 32 else 10
+                target.write_bytes(mutated)
+                self.assertNotEqual(manifest[relative], source_manifest_files(copy_root)[relative])
+                self.assertNotEqual(baseline_source_digest, source_manifest_digest(copy_root))
+                self.assertNotEqual(
+                    baseline_contract_digest,
+                    _deterministic_contract(copy_root).contract_digest,
+                )
+                target.write_bytes(original)
+                self.assertEqual(baseline_source_digest, source_manifest_digest(copy_root))
+                self.assertEqual(
+                    baseline_contract_digest,
+                    _deterministic_contract(copy_root).contract_digest,
+                )
 
     def test_legacy_freeze_manifest_is_current(self) -> None:
         manifest = LegacyFreezeManifest.load(ROOT / "config" / "legacy-freeze-manifest.json")

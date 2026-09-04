@@ -736,13 +736,16 @@ def append_retest_correction(
     evidence_id = f"evidence_fm0c1_{label}_20260902"
     document_digest = sha256_digest(document)
     with Gate0CLedger(database_path) as ledger:
-        ledger.append_task_state(
-            "FM-0C-1",
-            TaskState.READY,
-            reason_code="HARNESS_SCOPE_CORRECTION",
-            detail={"correction": correction},
-        )
-        ledger.append_task_state("FM-0C-1", TaskState.ACTIVE)
+        duplicate = ledger.connection.execute(
+            "SELECT EXISTS(SELECT 1 FROM attempts WHERE attempt_id=?) "
+            "OR EXISTS(SELECT 1 FROM evidence_records WHERE evidence_id=?)",
+            (attempt_id, evidence_id),
+        ).fetchone()[0]
+        if duplicate:
+            raise Gate0CE2EError(
+                "RETEST_ATTEMPT_ALREADY_EXISTS",
+                f"같은 재시험 label의 Attempt 또는 evidence가 이미 존재합니다: {label}",
+            )
         ledger.create_attempt(
             attempt_id=attempt_id,
             task_id="FM-0C-1",
@@ -750,6 +753,17 @@ def append_retest_correction(
             model="gpt-5.6-sol",
             effort="high",
             profile_digest=str(document["profile_set_digest"]),
+        )
+        ledger.append_task_state(
+            "FM-0C-1",
+            TaskState.READY,
+            reason_code="HARNESS_SCOPE_CORRECTION",
+            detail={"correction": correction, "retest_attempt_id": attempt_id},
+        )
+        ledger.append_task_state(
+            "FM-0C-1",
+            TaskState.ACTIVE,
+            detail={"retest_attempt_id": attempt_id},
         )
         ledger.append_attempt_stage(attempt_id, AttemptStage.DISPATCHED)
         ledger.record_evidence(
@@ -776,6 +790,7 @@ def append_retest_correction(
             TaskState.FAILED,
             reason_code="GATE0C_RETEST_NO_GO",
             detail={
+                "retest_attempt_id": attempt_id,
                 "boundary_artifact_digest": document_digest,
                 "failed_probe_ids": document.get("failed_probe_ids", []),
                 "unregistered_read_passed": next(

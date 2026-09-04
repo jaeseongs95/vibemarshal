@@ -1,4 +1,4 @@
-"""R-S06-10 검사 근거 대조표의 제한 실제 진단. 기존 실행·원장·oracle은 변경하지 않는다."""
+"""R-S06 검사 근거 대조표의 제한 실제 진단. 기존 실행·원장·oracle은 변경하지 않는다."""
 from __future__ import annotations
 
 import argparse
@@ -326,7 +326,7 @@ def prepare(run):
             copy_new(ROOT / name, run / "executed-source" / name)
         write_new(run / "executed-source-manifest.json", {"files": source_files, "source_manifest_digest": source})
         locked = locked_input_files(run)
-        body = {"session": "R-S06-12", "source_manifest_digest": source, "locked_files": locked,
+        body = {"session": "R-S06-14", "source_manifest_digest": source, "locked_files": locked,
                 "harness_digest": sha256_bytes(Path(__file__).read_bytes()), "original_files": preserved_files(run),
                 "base_head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                 "policy": policy, "inventory_digest": inventory.inventory_digest, "model_lock_digest": _model_lock(inventory, roles),
@@ -565,7 +565,7 @@ if __name__ == "__main__":
     parser.add_argument("--run-root", type=Path, required=True)
     arguments = parser.parse_args()
     destination = arguments.run_root.resolve()
-    if not destination.name.startswith(("r-s06-10-", "r-s06-12-")) or destination.parent != OLD.parent:
+    if not destination.name.startswith(("r-s06-10-", "r-s06-12-", "r-s06-13-", "r-s06-14-")) or destination.parent != OLD.parent:
         raise RuntimeError("새 R-S06 검사 진단 디렉터리만 허용합니다.")
     if arguments.mode == "prepare":
         try:

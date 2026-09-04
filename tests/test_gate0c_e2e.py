@@ -1,10 +1,14 @@
 from __future__ import annotations
 
 import json
+import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
+from unittest.mock import patch
 
+from flowmarshal.canonical import sha256_digest
 from flowmarshal.context import RuntimeRole
 from flowmarshal.gate0c.e2e import (
     Gate0CE2EError,
@@ -16,10 +20,12 @@ from flowmarshal.gate0c.e2e import (
     record_retest_ledger,
     stage_attack_corpus,
 )
+from flowmarshal.gate0c.ledger import Gate0CLedger
 from flowmarshal.gate0c.profile_probe import (
     FailClosedApprovalHandler,
     build_retest_permission_profiles,
 )
+from flowmarshal.gate0c.verifier import Gate0CVerifier
 
 
 PROJECT_ROOT = Path(__file__).parents[1]
@@ -135,42 +141,140 @@ class Gate0CE2ETests(unittest.TestCase):
                 )
                 evidence_paths.append((label, path))
             database = root / "control" / "gate0c-r2.sqlite3"
-            result = record_retest_ledger(
-                project_root=root,
-                database_path=database,
-                plan_artifact_path=plan,
-                evidence_paths=tuple(evidence_paths),
-            )
-            self.assertEqual(3, result["attempt_count"])
-            self.assertEqual("failed", result["fm0c1_state"])
-            correction = root / "r2c.json"
-            correction.write_text(
-                json.dumps(
-                    {
-                        "status": "NO-GO",
-                        "profile_set_digest": "sha256:r2c",
-                        "reason_codes": ["PERMISSION_BOUNDARY_FAILED"],
-                        "failed_probe_ids": ["runner_network_loopback"],
-                        "host_invariants": {"unchanged": True},
-                        "probes": [
-                            {
-                                "probe_id": "runner_read_unregistered",
-                                "passed": True,
-                            }
-                        ],
-                    }
+            correction_paths = []
+            for label, reason_code, probe_id in (
+                ("r2c", "PERMISSION_BOUNDARY_FAILED", "runner_network_loopback"),
+                ("r2d", "MODEL_RESPONSE_FAILED", "validator_submission"),
+            ):
+                correction_path = root / f"{label}.json"
+                correction_path.write_text(
+                    json.dumps(
+                        {
+                            "status": "NO-GO",
+                            "profile_set_digest": f"sha256:{label}",
+                            "reason_codes": [reason_code],
+                            "failed_probe_ids": [probe_id],
+                            "host_invariants": {"unchanged": True},
+                            "probes": [
+                                {
+                                    "probe_id": "runner_read_unregistered",
+                                    "passed": True,
+                                }
+                            ],
+                        }
+                    ),
+                    encoding="utf-8",
+                )
+                correction_paths.append((label, correction_path))
+
+            fixed_time = "2026-09-05T00:00:00Z"
+            with patch("flowmarshal.gate0c.ledger._now", return_value=fixed_time):
+                result = record_retest_ledger(
+                    project_root=root,
+                    database_path=database,
+                    plan_artifact_path=plan,
+                    evidence_paths=tuple(evidence_paths),
+                )
+                self.assertEqual(3, result["attempt_count"])
+                self.assertEqual("failed", result["fm0c1_state"])
+                appended = tuple(
+                    append_retest_correction(
+                        project_root=root,
+                        database_path=database,
+                        label=label,
+                        evidence_path=correction_path,
+                        correction="미등록 canary를 실제 기본 deny 대상으로 교정",
+                        evidence_kind="permission_boundary_matrix",
+                    )
+                    for label, correction_path in correction_paths
+                )
+
+                before_duplicate = self._ledger_counts(database)
+                with self.assertRaises(Gate0CE2EError) as duplicate:
+                    append_retest_correction(
+                        project_root=root,
+                        database_path=database,
+                        label="r2d",
+                        evidence_path=correction_paths[-1][1],
+                    )
+                self.assertEqual(
+                    "RETEST_ATTEMPT_ALREADY_EXISTS", duplicate.exception.reason_code
+                )
+                self.assertEqual(before_duplicate, self._ledger_counts(database))
+
+            attempt_ids = tuple(item["attempt_id"] for item in appended)
+            self.assertEqual(
+                (
+                    "attempt_fm0c1_r2c_20260902",
+                    "attempt_fm0c1_r2d_20260902",
                 ),
-                encoding="utf-8",
+                attempt_ids,
             )
-            appended = append_retest_correction(
-                project_root=root,
-                database_path=database,
-                label="r2c",
-                evidence_path=correction,
-                correction="미등록 canary를 실제 기본 deny 대상으로 교정",
-                evidence_kind="permission_boundary_matrix",
-            )
-            self.assertEqual("attempt_fm0c1_r2c_20260902", appended["attempt_id"])
+            with closing(sqlite3.connect(database)) as connection:
+                connection.row_factory = sqlite3.Row
+                rows = connection.execute(
+                    "SELECT * FROM task_events WHERE task_id='FM-0C-1' ORDER BY sequence"
+                ).fetchall()
+                correction_rows = {
+                    attempt_id: [
+                        row
+                        for row in rows
+                        if json.loads(row["detail_json"]).get("retest_attempt_id")
+                        == attempt_id
+                    ]
+                    for attempt_id in attempt_ids
+                }
+                for attempt_id, attempt_rows in correction_rows.items():
+                    self.assertEqual(
+                        ["ready", "active", "failed"],
+                        [row["state"] for row in attempt_rows],
+                    )
+                    self.assertEqual(
+                        {fixed_time}, {row["occurred_at"] for row in attempt_rows}
+                    )
+                    for row in attempt_rows:
+                        detail = json.loads(row["detail_json"])
+                        self.assertEqual(attempt_id, detail["retest_attempt_id"])
+                        self.assertEqual(
+                            sha256_digest(
+                                {
+                                    "task_id": row["task_id"],
+                                    "state": row["state"],
+                                    "reason_code": row["reason_code"],
+                                    "detail": detail,
+                                    "occurred_at": row["occurred_at"],
+                                }
+                            ),
+                            row["row_digest"],
+                        )
+                for state in ("ready", "active", "failed"):
+                    state_digests = {
+                        next(row for row in correction_rows[item] if row["state"] == state)[
+                            "row_digest"
+                        ]
+                        for item in attempt_ids
+                    }
+                    self.assertEqual(2, len(state_digests))
+                self.assertTrue(Gate0CVerifier._row_digests(connection).passed)
+                self.assertTrue(Gate0CVerifier._history_chain(connection).passed)
+
+            with Gate0CLedger(database) as ledger:
+                active = ledger.connection.execute(
+                    "SELECT sequence,detail_json FROM task_events "
+                    "WHERE task_id='FM-0C-1' AND state='active' ORDER BY sequence DESC LIMIT 1"
+                ).fetchone()
+                with self.assertRaises(sqlite3.IntegrityError):
+                    ledger.connection.execute(
+                        "UPDATE task_events SET detail_json='{}' WHERE sequence=?",
+                        (active["sequence"],),
+                    )
+                ledger.connection.rollback()
+                preserved = ledger.connection.execute(
+                    "SELECT detail_json FROM task_events WHERE sequence=?",
+                    (active["sequence"],),
+                ).fetchone()[0]
+                self.assertEqual(active["detail_json"], preserved)
+
             with self.assertRaises(Gate0CE2EError) as caught:
                 record_retest_ledger(
                     project_root=root,
@@ -179,6 +283,14 @@ class Gate0CE2ETests(unittest.TestCase):
                     evidence_paths=tuple(evidence_paths),
                 )
             self.assertEqual("RETEST_LEDGER_ALREADY_EXISTS", caught.exception.reason_code)
+
+    @staticmethod
+    def _ledger_counts(database: Path) -> tuple[int, int, int, int]:
+        with closing(sqlite3.connect(database)) as connection:
+            return tuple(
+                connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+                for table in ("task_events", "attempts", "evidence_records", "history")
+            )
 
 
 if __name__ == "__main__":
