@@ -691,7 +691,11 @@ class EngineService:
             )
 
     def register_plan_evaluation(self, evaluation: ExpandedPlanEvaluation) -> None:
-        plan = evaluation.plan
+        # typed 입력도 model_copy로 검증을 우회할 수 있으므로 중첩 계약까지 다시 검사한다.
+        try:
+            plan = PlanContractRevision.model_validate_json(evaluation.plan.model_dump_json())
+        except ValueError as error:
+            raise EngineServiceError(f"PlanContract 입력 검증에 실패했습니다: {error}") from error
         definition = plan.definition
         with self.ledger.read() as connection:
             goal_row = connection.execute(
@@ -762,7 +766,7 @@ class EngineService:
         if evaluation.decision != expected_decision:
             raise EngineServiceError("Plan decision이 Core 재계산 결과와 다릅니다.")
         self._register_plan(
-            evaluation.plan,
+            plan,
             decision=evaluation.decision,
             reviews=evaluation.semantic_submissions,
         )

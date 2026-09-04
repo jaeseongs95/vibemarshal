@@ -50,6 +50,7 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 - SQLite 원장은 revision, 활성 계약, Task, Attempt, binding, evidence, validation, budget와 History의 권위 기준이다.
 - Core만 권위 상태를 전이한다. Planner는 후보, Worker는 결과, Validator는 관측값만 제출한다.
 - 대화나 모델의 완료 선언만으로 Task나 Goal을 완료하지 않는다.
+- Plan의 Task·Goal 검증과 Execution Spec은 실제 EvidenceKind 집합만 요구할 수 있다. provider schema와 Core가 함께 검사하며 임의 evidence 이름의 Plan을 활성화 후보로 등록하지 않는다.
 - Reviewer는 `finding code + 직접 evidence ref + affected task + remediable`과 finding이 없을 때의 rating만 제출한다.
 - Reviewer가 `status`, admission, score와 weakest task를 정하지 못하게 schema에서 금지하고 Core가 결정적으로 계산한다.
 - finding이 있는 후보를 `admissible`로 표현할 수 없게 타입과 validator에서 차단한다.

@@ -306,6 +306,66 @@ class EngineLedgerServiceTests(EngineServiceFixture):
         with self.assertRaisesRegex(EngineServiceError, "Core 재계산"):
             self.service.register_plan_evaluation(evaluation)
 
+    def test_service_rejects_copied_unknown_evidence_before_plan_registration(self) -> None:
+        for location in ("task", "goal"):
+            with self.subTest(location=location):
+                task = self.task.model_copy(update={"task_id": new_id("task")})
+                integrations = self.plan.definition.integration_validations
+                if location == "task":
+                    validation = task.validations[0].model_copy(
+                        update={"required_evidence_kinds": ("unknown_kind",)}
+                    )
+                    task = task.model_copy(update={"validations": (validation,)})
+                else:
+                    integrations = (
+                        integrations[0].model_copy(
+                            update={"required_evidence_kinds": ("unknown_kind",)}
+                        ),
+                    )
+                coverage = tuple(
+                    item.model_copy(update={"task_ids": (task.task_id,)})
+                    for item in self.plan.definition.goal_coverage
+                )
+                definition = self.plan.definition.model_copy(update={
+                    "tasks": (task,),
+                    "goal_coverage": coverage,
+                    "integration_validations": integrations,
+                })
+                invalid_plan = PlanContractRevision(
+                    plan_revision_id=new_id("plan_revision"),
+                    plan_id=new_id("plan"),
+                    revision_no=1,
+                    definition=definition,
+                    definition_digest=definition.definition_digest,
+                    created_at=utc_now(),
+                )
+                evaluation = ExpandedPlanEvaluation(
+                    plan=invalid_plan,
+                    semantic_submissions=(clean_review(
+                        invalid_plan.activation_digest,
+                        role="compact_plan_reviewer",
+                        evidence_catalog=plan_review_evidence_catalog(
+                            invalid_plan, self.goal, self.state, self.map
+                        ),
+                    ),),
+                    decision=CandidateDecision(
+                        candidate_digest=invalid_plan.activation_digest,
+                        status=CandidateStatus.ADMISSIBLE,
+                        fitness_score=100,
+                        weakest_dimension="engineering",
+                    ),
+                )
+                with self.assertRaisesRegex(EngineServiceError, "알 수 없는 evidence kind"):
+                    self.service.register_plan_evaluation(evaluation)
+                with self.ledger.read() as connection:
+                    self.assertIsNone(connection.execute(
+                        "SELECT id FROM plan_revisions WHERE id = ?",
+                        (invalid_plan.plan_revision_id,),
+                    ).fetchone())
+                    self.assertIsNone(connection.execute(
+                        "SELECT id FROM task_contracts WHERE id = ?", (task.task_id,)
+                    ).fetchone())
+
     def test_prototype_database_is_rejected_without_migration(self) -> None:
         other = self.base / "legacy.sqlite3"
         connection = sqlite3.connect(other)

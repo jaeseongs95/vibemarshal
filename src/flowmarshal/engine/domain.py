@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import StrEnum
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 from uuid import uuid4
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from ..canonical import sha256_digest
 
@@ -967,11 +967,38 @@ class EffectContract(EngineModel):
     reversible: bool = True
 
 
+class EvidenceKind(StrEnum):
+    FILE = "file"
+    DIFF = "diff"
+    COMMAND = "command"
+    TEST = "test"
+    BUILD = "build"
+    MODEL_REVIEW = "model_review"
+    USER_DECISION = "user_decision"
+    EXTERNAL_OBSERVATION = "external_observation"
+
+
+def _known_evidence_kind(value: str) -> str:
+    try:
+        EvidenceKind(value)
+    except ValueError as error:
+        raise ValueError(f"알 수 없는 evidence kind입니다: {value}") from error
+    return value
+
+
+# 기존 문자열 계약과 canonical digest를 보존하면서 provider와 Core에 같은 집합을 공개한다.
+EvidenceKindName = Annotated[
+    str,
+    AfterValidator(_known_evidence_kind),
+    Field(json_schema_extra={"enum": [item.value for item in EvidenceKind]}),
+]
+
+
 class ValidationContract(EngineModel):
     validation_id: str = Field(pattern=_LOCAL_ID_PATTERN)
     statement: str = Field(min_length=1, max_length=3000)
     method: Literal["deterministic", "semantic", "manual", "external_observation"]
-    required_evidence_kinds: tuple[str, ...] = Field(min_length=1)
+    required_evidence_kinds: tuple[EvidenceKindName, ...] = Field(min_length=1)
 
     @field_validator("required_evidence_kinds")
     @classmethod
@@ -1124,7 +1151,7 @@ class IntegrationValidationContract(EngineModel):
     criterion_refs: tuple[str, ...] = Field(min_length=1)
     method: Literal["deterministic", "semantic", "manual", "external_observation"]
     evidence_mode: Literal["independent", "task_aggregate"] = "independent"
-    required_evidence_kinds: tuple[str, ...] = Field(min_length=1)
+    required_evidence_kinds: tuple[EvidenceKindName, ...] = Field(min_length=1)
 
     @field_validator("criterion_refs", "required_evidence_kinds")
     @classmethod
@@ -1402,7 +1429,7 @@ class ValidationExecutionStep(EngineModel):
     working_directory: str | None = Field(default=None, max_length=2000)
     timeout_seconds: int = Field(default=300, ge=1, le=86_400)
     expected_exit_codes: tuple[int, ...] = (0,)
-    required_evidence_kinds: tuple[str, ...] = Field(min_length=1)
+    required_evidence_kinds: tuple[EvidenceKindName, ...] = Field(min_length=1)
     semantic_instruction: str | None = Field(default=None, max_length=5000)
     manual_instruction: str | None = Field(default=None, max_length=5000)
     external_selector: str | None = Field(default=None, max_length=3000)
@@ -1731,17 +1758,6 @@ class RuntimeReceipt(EngineModel):
     received_at: datetime
 
     _received_at_is_aware = field_validator("received_at")(_aware)
-
-
-class EvidenceKind(StrEnum):
-    FILE = "file"
-    DIFF = "diff"
-    COMMAND = "command"
-    TEST = "test"
-    BUILD = "build"
-    MODEL_REVIEW = "model_review"
-    USER_DECISION = "user_decision"
-    EXTERNAL_OBSERVATION = "external_observation"
 
 
 class EvidenceRecord(EngineModel):

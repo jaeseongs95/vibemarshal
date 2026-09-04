@@ -217,6 +217,8 @@ localhost와 인터넷을 일괄 차단하지 않는다. Task가 필요한 연�
 
 대화나 모델의 완료 선언만으로 Task를 완료하지 않는다. Task validation과 plan-level Goal Test를 분리하며, 모든 필수 Task·criterion·integration validation evidence가 확인된 뒤에만 Goal을 `satisfied`로 판정한다.
 
+Task·Goal validation 계약과 Execution Spec의 `required_evidence_kinds`는 `EvidenceKind`의 실제 지원 집합으로 제한한다. 같은 집합을 provider JSON Schema에 공개하고 Core의 입력 검증에도 적용한다. 구체적인 검사 목적은 statement에 기술하며 새로운 evidence 종류를 임의로 만들어 실행 준비 시점까지 넘기지 않는다. 기존 유효 문자열의 canonical 표현은 유지한다.
+
 필수 외부 사실(계약 문서·계정·삭제 selector)과 계획이 제안할 설계 선택(대안·새 산출물 배치·검증 명령)을 구분한다. 전자는 근거가 없으면 질문·차단하고, 후자는 사용자 Goal과 관찰된 프로젝트의 범위에서 정한다. materialization에서 확정할 운영 상세의 미확정만으로 Goal을 차단하지 않는다.
 
 `IntegrationValidationContract.evidence_mode`의 기본값은 `independent`다. Task 완료 후 Core가 최신 Plan·State·Project Map에 독립 Goal Test의 운영 상세 binding을 만들고 실제 명령 또는 별도 Validator 관측을 기록한다. Task evidence를 다시 합산하는 검사는 Plan에 `task_aggregate`가 명시된 경우에만 수행한다. 운영 상세가 같은 의미를 유지하는 한 Plan을 다시 승인하지 않지만 binding 이후 입력 변경은 `STALE_EXECUTION_INPUT`으로 차단한다.
