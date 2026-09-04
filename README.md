@@ -8,6 +8,8 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고
 
 ## 현재 판정
 
+2026-09-05 [R-S06-19-CLOSE](docs/r-s06-19-close-handoff.md)에서 provider 검사 계약의 기존 보정을 확정했다. 설명 변형·구조 거부의 오프라인 회귀와 558개 테스트·결정론 Gate 5/5는 PASS다. 마지막 실제 R19는 FAIL이며, 현재 source의 실모델 의미 검증은 미실행이다. 기존 S06 FAIL, Functional Alpha 미완료와 1.0 **NO-GO**를 유지한다. 다음 경계는 별도 제한 역할 검증이며 이번 CLOSE에서는 실행하지 않았다.
+
 - 새 Engine은 비권위 `ExecutionSpecProposal`을 최신 Goal·Plan·State·Project Map에 컴파일하고, `run once` 호출마다 materialize·dispatch·observe·validate·complete 중 한 단계만 전진한다.
 - worker 종료 문구는 관측값으로만 보존하고 파일·diff·command·test evidence와 별도 validator 결과로 Task 및 Goal을 판정한다.
 - 완료 Task 뒤 Project Map·State 재관측, 저장 thread의 `thread/read` 우선 복구, receipt 불명확 시 중복 생성 방지가 구현돼 있다.
@@ -82,7 +84,7 @@ flowmarshal-engine-eval cutover --scope-report <report> ... --benchmark-report <
 
 실제 모델 평가에는 `--codex-bin <검증할 codex.exe의 절대 경로>`를 명시할 수 있다. 이 작업에서 SDK 동봉 runtime은 응답 API 404를 반환했고 설치된 앱 runtime을 명시한 실행은 정상 동작했다. 검증한 실행 파일과 실패·성공 범위는 [실행 현황 보고서](docs/engine-implementation-status.md)에 기록한다. 실행 파일을 바꾸면 새 evaluation 계약과 run root를 사용한다.
 
-현재 `benchmark`는 외부에서 수집한 36-cell 입력을 검증하는 경로이며, frozen R3.1과 Engine의 중립 입력 live 수집 harness는 아직 미완료다. 이 수입 경로와 모의 테스트 통과만으로 성능 Gate를 통과한 것으로 간주하지 않는다.
+현재 `benchmark`는 외부 36-cell 입력 검증과 frozen R3.1·Engine의 중립 입력 live 수집 경로를 구현한다. 수집기 구현·모의 회귀와 실제 성능 Gate 통과는 별개이며, 이번 CLOSE에서 비용 비교는 실행하지 않았다. 전체 usage·결측·Budget의 F04·F09는 S10~S12, 측정 계약의 F06은 S17 이후에 남긴다.
 
 동결 검사는 이 저장소 외에 형제 디렉터리 `../자동화템플릿/prototypes/skills/flowmarshal-work-planner`의 원본 Planner 스킬 7개 파일도 요구한다. 새 clone에서 해당 감사 기준선이 없으면 freeze Gate는 실패하며 자동으로 생략하거나 재생성하지 않는다. 인증정보·로컬 실행 DB·Codex home 복제본·평가 작업 디렉터리는 Git에서 제외하고 기존 로컬 파일은 보존한다.
 

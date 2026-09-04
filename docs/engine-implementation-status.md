@@ -1,14 +1,16 @@
 # Engine 실행 구현과 qualification 현황
 
-기준일: 2026-09-04 KST. 이 문서는 실행별 보고서이며 장기 제품 계약이나 R3.1 판정을 변경하지 않는다.
+기준일: 2026-09-05 KST. 이 문서는 실행별 보고서이며 장기 제품 계약이나 R3.1 판정을 변경하지 않는다.
 
 ## 결론
 
-현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [R-S06-07](r-s06-07-handoff.md)에서 복합 검사 ID 연결과 Worker·Validator 결과 순서의 생성·검토 지침 및 합성 회귀를 보완했다. **497개 테스트·결정적 Gate 5/5·legacy freeze 40개와 실제 호출 결속 검증은 PASS지만, 제한 진단은 FAIL**이다. 기존 입력·기준·source별 결과와 평가 스크립트 오류의 provenance를 보존했다.
+현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [R-S06-19-CLOSE](r-s06-19-close-handoff.md)는 기존 provider 검사 계약 보정의 오프라인 검증·인계를 완료했다. 감사와 동일한 Engine source `febb5dec…`에서 이번에 전체 **558개 테스트·결정론 Gate 5/5·legacy freeze 40개**를 실행해 통과했다. 설명 변형 3개 수용과 잘못된 phase·basis·scope link 변형 10개 거부도 확인했으며 추가 제품 코드 수정은 없었다.
 
-새 상세화는 `ac_003` 검사 연결과 Worker 보고→후속 Validator 순서를 보존했지만, `ac_004`가 명시한 task phase의 검사 ID를 누락했다. 일반 Reviewer는 고정 연결 오류를 놓쳤고 전역 semantic Task 검증을 AC별 필수 ID로 확대해 정상 후보를 거부했다. 동일 요청·지침·high effort에서 Reviewer 모델만 Terra→Sol로 바꾼 4사례 비교는 목표 오류 3개 중 검출이 1개→3개로 늘었으나, Sol에도 근거 부족 추가 지적이 남았다. 기본 모델 배정이나 전체 qualification을 변경하지 않았다.
+마지막 실제 R19 v2는 첫 clean 호출의 `schema_failed`·FAIL이다. 원본 raw를 현재 adapter에 오프라인으로 대조하면 구조는 통과하지만 AC boolean 2건은 고정 기대값과 계속 다르다. **현재 source의 실모델 의미 검증은 미실행**이며 기존 S06 FAIL, Functional Alpha 미완료를 유지한다. 이번 제품 provider 호출·Plan 활성화·Worker 실행은 모두 0건이다.
 
-추천 분석 항목은 **R-S06-08: AC가 명시한 검사 책임과 전역 Task 검증 의무의 연결 경계 정밀화**다. 현재 단계는 결과 인계까지 마치고, 후속 해결안 탐색과 개발 배정은 분석·조율 작업에서 결정한다. 후속 S06은 오프라인 준비만 했으며 Plan 선택·활성화·Worker 실행·새 예약작업·작업관리 DB 생성은 수행하지 않았다.
+다음 하나의 경계는 **별도 제한 역할 검증**이다. 기존 계약·입력·시작 조건은 CLOSE Handoff에 연결했고 이번에는 실행하지 않았다. F04·F09의 전체 usage·결측·Budget은 S10~S12, F06의 측정 계약은 S17 이후에 남긴다.
+
+이전 [R-S06-07](r-s06-07-handoff.md)의 497개 테스트·결정적 Gate 5/5·legacy freeze 40개와 실제 호출 결속 PASS, 제한 진단 FAIL은 당시 source의 결과다. 그 실행의 상세화는 `ac_003` 연결과 Worker 보고→Validator 순서를 보존했지만 `ac_004`의 task phase ID를 누락했다. 당시 Terra→Sol 4사례 비교의 검출 개선과 추가 지적, 후속 R-S06-08 분석 권고는 과거 인계에 보존하며 현재 모델 배정·qualification의 근거로 승격하지 않는다.
 
 이전 [R-S06-06](r-s06-06-handoff.md)의 496개 테스트와 제한 진단 FAIL은 당시 source의 역사적 결과다. 고정 phase 4사례 통과와 새 Plan의 검사 연결·역할 시점 결함 검출 누락을 현재 qualification으로 재사용하지 않는다.
 

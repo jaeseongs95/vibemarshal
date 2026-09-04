@@ -350,6 +350,10 @@ class PlanInspectionTests(unittest.TestCase):
             for row in payload["inspection"]["validation_scope_rows"]
             if row["assessment"] == "supported"
         }
+        next(row for row in payload["inspection"]["validation_scope_rows"]
+             if row["scope_id"] == supported["val_task_add_behavior_contract"])["procedure"] = (
+                 "oracle.py task phase의 실제 unittest 책임"
+             )
         for criterion_id, validation_id in (
             ("ac_003", "val_task_add_behavior_contract"),
             ("ac_003", "val_goal_independent_behavior_contract"),
@@ -397,6 +401,20 @@ class PlanInspectionTests(unittest.TestCase):
                 findings=altered_envelope.review.findings,
             )
 
+        wrong_phase = deepcopy(payload)
+        next(row for row in wrong_phase["inspection"]["validation_scope_rows"]
+             if row["scope_id"] == supported["val_task_add_behavior_contract"])["phase"] = "goal"
+        with self.assertRaisesRegex(PlanInspectionError, "절차·phase·근거 결속"):
+            wrong_phase_envelope = PlanReviewEnvelope.model_validate(wrong_phase)
+            validate_plan_inspection(
+                wrong_phase_envelope.inspection,
+                plan=plan,
+                goal=goal,
+                project_map=project_map,
+                evidence_catalog=plan_review_evidence_catalog(plan, goal, state, project_map),
+                findings=wrong_phase_envelope.review.findings,
+            )
+
     def test_composite_phase_positive_rule_precedes_sibling_overlink_guard(self):
         positive = "동일 절차의 task/goal phase를 각각 명시하면"
         negative = "명시되지 않은 sibling unittest·scope·semantic validation"
@@ -406,7 +424,11 @@ class PlanInspectionTests(unittest.TestCase):
                 self.assertIn(negative, instructions)
                 self.assertLess(instructions.index(positive), instructions.index(negative))
 
+        self.assertIn("특정 phase의 절차 실행 자체", PLAN_VALIDATION_TRACE_INSTRUCTIONS)
+        self.assertIn("semantic 검토 절차를 명시하지 않았는데", PLAN_VALIDATION_TRACE_INSTRUCTIONS)
         schema = PlanInspection.model_json_schema()
+        scope = schema["$defs"]["ValidationScopeInspection"]["properties"]
+        self.assertIn("같은 phase·근거 인용", scope["procedure"]["description"])
         row = schema["$defs"]["ACValidationInspection"]["properties"]["ac_link_required"]
         self.assertIn(positive, row["description"])
         self.assertIn(negative, row["description"])

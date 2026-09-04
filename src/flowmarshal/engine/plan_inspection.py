@@ -54,7 +54,7 @@ class ValidationScopeInspection(EngineModel):
     scope_id: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_]{0,79}$")
     validation_id: str
     claim_ref: str = Field(description="validation statement에서 이 행이 판정하는 부분 주장의 연속 원문 인용 ID.")
-    procedure: str = Field(min_length=1, max_length=240, description="이 부분 주장을 실제로 수행한다고 대조한 절차·검사 이름. 근거 인용으로 결속하며 새 검사 능력을 뜻하지 않는다.")
+    procedure: str = Field(min_length=1, max_length=240, description="이 부분 주장을 실제로 수행한다고 대조한 절차 설명. validation_rows mechanism과 같은 phase·근거 인용으로 결속하며 tool 문자열의 별칭이나 새 검사 능력을 뜻하지 않는다.")
     phase: str | None = Field(description="해당 절차가 실제 실행되는 phase/mode. 원문에 없으면 null.")
     basis_refs: tuple[str, ...] = Field(min_length=1, description="claim_ref와 실제 절차·phase·범위 판단의 직접 근거 citation ID. claim_ref를 반드시 포함한다.")
     assessment: Literal["supported", "contradicted", "unresolved"] = Field(description="해당 부분 주장만 지지됨/직접 모순/근거 부족으로 판정한다. 한 부분의 결과를 같은 validation의 다른 부분이나 AC 연결 판정으로 전파하지 않는다.")
@@ -100,7 +100,8 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "별도 실제 검사 책임의 근거를 확정한다. 이어 validation_scope_rows에서 복합 statement의 책임을 "
     "실제 절차·phase·부분 claim별로 나누어 supported·contradicted·unresolved를 각각 판정한다. 각 validation은 "
     "scope 행이 하나 이상 있어야 하며 scope 행의 claim_ref와 basis_refs는 원문 주장과 실제 절차 근거를 "
-    "함께 결속한다. 그 뒤 ac_validation_rows와 constraint_task_rows를 작성한다. "
+    "함께 결속한다. AC가 특정 phase의 절차 실행 자체를 명시하면 세부 관측 scope와 별도로 그 실제 phase "
+    "실행을 나타내는 supported scope도 둔다. 그 뒤 ac_validation_rows와 constraint_task_rows를 작성한다. "
     "모든 AC × 모든 Task·integration validation 쌍을 ac_validation_rows에 정확히 한 번씩 쓴다. "
     "작성자는 완성한 plan의 모든 validation ID에서 이 곱집합을 구성한다. 각 행의 "
     "ac_link_required는 validation이 AC 일부를 직접 검증하면 true이고 아니면 false다. AC statement 또는 "
@@ -296,8 +297,7 @@ def validate_plan_inspection(
         _require(row.claim_ref in row.basis_refs, "대조표 검사 scope claim 근거 누락")
         scope_basis = refs(row.basis_refs)
         _require(any(
-            row.procedure == mechanism.tool and row.phase == mechanism.phase and
-            set(mechanism.basis_refs) <= set(row.basis_refs)
+            row.phase == mechanism.phase and set(mechanism.basis_refs) <= set(row.basis_refs)
             for mechanism in validation_rows_by_id[row.validation_id].mechanisms
         ), "대조표 검사 scope 절차·phase·근거 결속 오류")
         mechanism_project_refs_by_validation[row.validation_id].update(
