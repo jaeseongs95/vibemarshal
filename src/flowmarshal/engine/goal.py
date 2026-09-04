@@ -59,17 +59,35 @@ GOAL_INTERPRETATION_INSTRUCTIONS = (
     "각 대안의 보존 방안을 요구하되 실제 수정이나 migration 실행 의무를 추가하지 않는다. "
     "읽기 전용 원인 분석은 원인·근거 AC에 필요한 정상 기대값과 현재 불일치가 명시되면 "
     "충분하다. 이를 별도 구현·호환성 보존 의무로 승격하지 않는다. 전체 proposal의 Hard AC와 "
-    "constraint를 함께 읽고 이미 명시된 같은 의미를 특정 항목에 반복하도록 요구하지 않는다. "
+    "constraint와 validation_intent를 함께 읽고 이미 명시된 같은 의미를 특정 항목에 반복하도록 "
+    "요구하지 않는다. Goal이 등록 검사 도구·자료의 특정 phase 또는 절차 실행을 명시하면, "
+    "제공된 관측에서 그 참조의 대상과 범위를 확인해 해당 검사의 의미를 전체 계약과 함께 "
+    "검토한다. 명확히 참조한 검사에 포함된 입력·호출 방식·기대 결과를 다른 AC에 다시 "
+    "나열하지 않았다는 이유만으로 누락 finding을 만들지 않는다. 자료가 등록·관찰됐다는 "
+    "사실만으로 모든 요구를 Goal이 채택했다고 추정하지 않는다. 참조가 없거나 대상·phase가 "
+    "다르고, 선택 범위에 필요한 검사가 없거나 본문이 불완전해 확인할 수 없으면 상속을 "
+    "가정하지 않는다. Goal의 명시적 제외·충돌을 참조로 덮지 않으며 실제 누락은 직접 "
+    "source와 proposal 근거로 검토한다. 정규화할 때 참조할 검사 대상·범위·목적을 "
+    "식별 가능하게 보존하고 실행 명령의 운영 상세는 ready-time 명세에 둔다. "
+    "대상 프로젝트는 사용자 명시 대상과 제공된 프로젝트 관측의 project_root로 확인한다. "
+    "현재 역할의 cwd와 등록 참고자료의 저장 디렉터리는 대상 프로젝트를 정하는 근거가 "
+    "아니다. 역할 cwd가 별도 복사본이어도 관측의 대상·검사 자료가 같은 프로젝트를 "
+    "가리키면 그 경로 차이만으로 target 충돌·stale·필수 selector 부재를 추정해 질문이나 "
+    "가정을 추가하지 않는다. 사용자 명시 대상과 관측 root의 실제 충돌, 확인할 수 없는 "
+    "참조와 불완전한 관측은 구분해서 검토한다. "
     "allowed_external_effects에는 사용자 목표가 허용한 외부 시스템·계정·제3자 효과만 넣는다. "
     "로컬 파일 변경·로컬 검증 명령·함수 반환·응답 보고는 외부 효과가 아니다. 허용된 외부 효과가 "
     "없으면 빈 배열로 둔다. 효과가 발생하지 않는다는 조건은 허용 효과가 아니라 금지·제약으로 "
-    "표현하고, 한 금지 항목에 로컬 파일 mutation과 외부 시스템 효과를 섞지 않는다. "
+    "표현한다. 프로젝트 파일 변경과 프로젝트 의존성 추가 같은 로컬 변경 금지는 외부 "
+    "서비스 변경·배포 금지와 별도 항목으로 작성한다. 로컬 의존성 변경에 네트워크 사용이나 "
+    "외부 계정 변경이 필연적으로 따른다고 추정하지 않는다. 원문이 한 문장으로 묶었어도 "
+    "각 금지 의미만 분리해 보존하며 새로운 금지나 허용 효과를 추가하지 않는다. "
 )
 
 
 class AcceptanceDraft(EngineModel):
     statement: str = Field(min_length=1, max_length=5000, description="출처가 있는 관측 가능한 사용자 결과. API 변경·보존 전략은 문서·테스트의 정상 동작 계약을 구체화한다. 원인 분석에는 기대값과 현재 불일치의 근거를 담고 별도 구현·보존 의무나 현재 역할 한정 제한을 추가하지 않는다.")
-    validation_intent: str = Field(min_length=1, max_length=5000)
+    validation_intent: str = Field(min_length=1, max_length=5000, description="결과를 확인할 검사 대상·범위·목적. 등록 검사 도구·자료를 참조하면 식별 가능한 phase·절차를 명시하며 관측으로 확인한 검사 의미를 보존한다. 자료의 존재만으로 계약 채택을 추정하지 않고 실행 명령은 ready-time 명세에 둔다.")
 
 
 class PreferenceDraft(EngineModel):
@@ -105,7 +123,7 @@ class GoalNormalizationProposal(EngineModel):
     mutation_policy: MutationPolicy
     behavior_policy: BehaviorPolicy
     allowed_external_effects: tuple[str, ...] = Field(default=(), description="목표가 허용한 외부 시스템·계정·제3자 효과만 포함한다. 로컬 파일 변경·검증 명령·응답 보고와 효과 미발생 조건은 제외하며 허용 효과가 없으면 빈 배열이다.")
-    prohibited_effects: tuple[str, ...] = Field(default=(), description="사용자 목표에 적용되는 금지 효과. 로컬 파일 mutation과 외부 시스템 효과는 별도 항목으로 구분하고 현재 계획 역할의 행동 제한을 추가하지 않는다.")
+    prohibited_effects: tuple[str, ...] = Field(default=(), description="사용자 목표에 적용되는 금지 효과. 프로젝트 파일·의존성 변경 같은 로컬 변경 금지와 외부 서비스 변경·배포 금지를 별도 항목으로 구분한다. 원문이 묶은 금지를 분리할 때 의미를 추가하거나 현재 계획 역할의 행동 제한을 전사하지 않는다.")
 
     @model_validator(mode="after")
     def values_are_consistent(self) -> "GoalNormalizationProposal":

@@ -4,9 +4,11 @@
 
 ## 결론
 
-현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [R-S06-03](r-s06-03-handoff.md)에서 Task의 AC 기여 집합과 검증 ID 연결을 구분하고, 참고자료 경로·역할 cwd의 근거 한계와 명시된 unittest 검사 목적을 보완했다. **최종 source의 489개 테스트·결정적 Gate 5/5·legacy freeze 40개와 제한된 실제 역할 진단은 PASS**다. 1차 진단 FAIL과 당시 source snapshot도 보존했다.
+현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [R-S06-04](r-s06-04-handoff.md)에서 Goal의 등록 검사 도구·phase 참조 해석, 금지 효과 분리, 관측 project_root와 역할 cwd의 구분을 보완했다. **최종 source의 494개 테스트·결정적 Gate 5/5·legacy freeze 40개와 제한된 실제 Goal 진단은 PASS**다. 과거 Goal의 Task unittest 귀속 누락과 역할 cwd 오판으로 실패한 1차 진단·당시 source도 보존했다.
 
-후속 [S06-RETRY-02](s06-planning-final-retry-handoff.md)는 같은 source의 새 원장에서 Goal 정규화·독립 검토 2회를 실행했고 **Goal `conflict`, S06 FAIL**로 종료됐다. 키워드 호출 누락 error는 전체 AC의 등록 검사 도구 `goal phase` 참조를 놓친 과잉 검토로, 로컬·외부 금지 효과 혼합 warning은 유효한 표현 정리 대상으로 별도 판단했다. 실제 finding과 Core 판정은 유지했다. 활성 Goal·Plan과 Skeleton·Task 실행은 없으며 전체 Trace는 **INCOMPLETE**다. 다음 작업은 **R-S06-04: Goal의 등록 검사 도구 참조 해석과 금지 효과 분리 보완**이다. 실제 선택 Plan 전에는 S07로 진입하지 않는다.
+후속 [S06-RETRY-03](s06-planning-goal-reference-handoff.md)은 고정 원문부터 실제 Goal·Skeleton·상세 Plan까지 실행해 단일 Task Plan을 선택했다. Core는 `admissible`로 기록했지만, 독립 의미 대조에서 **task phase에 없는 양·음·0 및 위치·키워드 호출 검사 능력을 Plan에 기재한 오류**를 확인해 S06은 **FAIL**이다. 실제 선택·판정은 보존했고 Plan 활성화·Worker 실행은 없다. 전체 Trace는 **INCOMPLETE**이며 다음 작업은 **R-S06-05: 상세 Plan의 등록 검사 도구·phase 능력 보존**이다. 같은 Goal·oracle·합격선에서 검사 의미를 바로잡은 새 Plan revision을 확보한 뒤 S07로 진행한다.
+
+이전 [R-S06-03](r-s06-03-handoff.md)의 489개 테스트와 제한된 역할 진단 PASS, [S06-RETRY-02](s06-planning-final-retry-handoff.md)의 Goal `conflict`·S06 FAIL은 역사적 기록으로 보존한다. 당시 키워드 호출 누락 finding은 명시 goal phase 참조를 놓친 과잉 검토였고 혼합 금지 효과 warning은 유효했다. 그 source의 결과를 현재 source의 전체 qualification으로 재사용하지 않는다.
 
 이전 [S06 재평가](s06-planning-retry-handoff.md)는 당시 source에서 고정 원문부터 새 Goal·독립 검토·Skeleton·Plan까지 실제 실행한 결과다. 수정 Task의 필수 unittest·독립 Validator 검증 누락으로 선택 digest가 null인 FAIL을 보존한다. 그 뒤 [R-S06-02 실제 진단](r-s06-02-live-handoff.md)은 정책 차단을 해소했으나 검증 ID 연결 누락과 경로 오판으로 FAIL이었다. 당시 484·486개 테스트와 실제 역할 결과를 현재 source의 qualification으로 재사용하지 않는다.
 
