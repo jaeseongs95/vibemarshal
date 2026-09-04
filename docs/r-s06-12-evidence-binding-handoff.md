@@ -162,3 +162,35 @@ usage는 새 빈 thread의 첫 turn에서 관측한 `thread/tokenUsage/updated.t
 다음 실제 진단에는 이번 원문에서 확인한 등록 근거 연결 누락과 세 관계 분류의 직접 원인을 검토한 변경이 필요하다. 근거 연결 지침만으로 의미 문제가 해소됐다고 가정해서는 안 된다. 새 source의 결정적 Gate, 새 독립 검토·사례표·지침/schema/inventory 결속과 **새 run root**가 필요하며 이번 FAIL의 남은 호출을 이어 실행하면 안 된다. 최종 source의 인용 재사용 수정도 새 실제 검증 범위에 포함해야 한다. 기대값·threshold를 이번 결과에 맞춰 조정하지 않는다.
 
 이 보고서는 한 항목의 구현과 제한 진단 인계이며 전체 qualification 또는 `flowmarshal` 1.0 승인 자료가 아니다.
+
+## R-S06-13 구현·제한 진단 후속 기록
+
+### 구현 결과
+
+R-S06-13은 검사 수단을 먼저 확정하도록 공유 지침과 provider schema 순서를 조정했다. 판단 순서는 **validation 전체 책임·실제 phase → 전역 Task 검사 의무 → AC statement·validation_intent 적용 범위 → 현재 연결·finding**이다. AC가 절차를 직접 요구한 경우와 특정 도구·phase 실행이 그 절차를 실제 포함하는 경우를 구분하며, 같은 목적의 별도 검사·다른 phase까지 확대하지 않는다.
+
+`PlanInspection`과 Plan provider envelope는 기존 필드와 relation enum을 유지한다. 다만 `validation_rows` 및 `inspection`을 관계 행보다 먼저 내보내어 mechanism 근거를 먼저 작성하게 한다. 등록 `project:` citation을 mechanism 범위 판단에 썼으면, 제출 전 같은 validation의 모든 AC 행 `basis_refs`에 그 citation 집합이 포함됐는지 제출자가 확인한다. adapter는 selector·quote·참조 집합과 내부 일관성만 확인하며 관계·citation·coverage를 생성·보정하지 않는다.
+
+원시 v1은 다음의 새 fixture로 바이트 보존했다.
+
+- `tests/fixtures/engine/r-s06-12-raw-rejected/manifest.json`
+- request `sha256:e073be43350a2b76023e1af3287164758325594cc10b9efa48dbdb6bb61fb14e`
+- terminal `sha256:e491ff614e118d3aed415ed908c2ddb05b3bc832fd300ff9cde33d9ece34130a`
+- summary `sha256:b0316724b531296263ef52a3f8ff19257acf999750424670332970263e20ab7f`
+
+원시 final response는 보정하지 않았고, `reference_goal_evidence`가 `ac_001/002/003 × val_goal_independent_behavior_contract/val_goal_independent_scope_preservation`의 6행에서 빠진 것을 회귀로 고정했다. 독립 정상 합성 fixture는 `tests/fixtures/engine/plan-inspection-r-s06-13-synthetic-normal.json`(bytes SHA-256 `9a13d34bb921d20e87b624d56b8470ea741e371cd4a749090445b2008d751296`)이다. 기존 사례별 기대값을 유지한 v4 기대표·독립 검토는 각각 `f132337b8b237e2379c6315a3b12ff18bfd5d24f8d62be6e29608b8bf963b011`, `7b664981550bd50d53f19345052da0f92410e44f44458a9eb55fb3b291a3bd2d`로 provenance와 직접 selector를 결속한다.
+
+추가 회귀는 원시 보존·행별 citation 누락, 합성 정상 응답, mechanism 우선 schema 순서와 enum 보존, v4 provenance/direct selector, 다중 mechanism의 citation 재사용과 배열 내부 중복 거부를 확인한다. 기존 관계 전수·선택적 연결·AC-003 복합 fresh unittest·AC-004의 Goal/Task phase 경계·finding/receipt 결속 회귀는 유지한다.
+
+### 검증 및 제한 실제 진단 판정
+
+`compileall`, `pip check`, 전체 unittest는 각각 통과했으며 전체 unittest는 **551개 PASS**였다. `compileall`이 합성 fixture에 만든 `__pycache__`는 실제 소스가 아닌 cache 오염이어서 확인 후 workspace 밖 recoverable 임시 위치로 옮긴 뒤 다시 검증했다.
+
+새 미사용 run root `D:\codex\flowmarshal\.flowmarshal-engine-eval\runs\r-s06-13-20260905-v1`에서 source manifest `sha256:de6f4c86e940629befef71d4c1fe1f4e004672d3d14a108d5258145fbc296890`에 결속한 결정적 Gate 5개를 실행했다. 결과는 **4/5 PASS, FAIL**이다. `full-test-suite` cell에서 R-S06-13과 무관한 `test_gate0c_e2e.Gate0CE2ETests.test_retest_ledger_is_new_append_only_record`가 `sqlite3.IntegrityError: UNIQUE constraint failed: task_events.row_digest`로 실패했다. 실제 cell과 report는 다음에 보존한다.
+
+- `D:\codex\flowmarshal\.flowmarshal-engine-eval\runs\r-s06-13-20260905-v1\qualification-report.json` (report digest `sha256:b5e4afd12348f620c41d7a94941b2a7fb491139ba4edf335145c448307089f63`)
+- `D:\codex\flowmarshal\.flowmarshal-engine-eval\runs\r-s06-13-20260905-v1\cells\seed-0\7d4dcc7b1f24fd4291a0fa867a6dcb147c19f5c33ce41e8e73cef0f4b3930dff.json`
+
+따라서 첫 결정적 Gate 실패에서 즉시 중단했다. `prepare`, 모델 호출, provider turn, receipt는 **새 run에서 모두 0회**이며 기존 v1의 1회 결과를 재사용하지 않았다. 이 구현이 모델의 관계 의미 정확도나 token/latency를 개선했다고 주장할 실제 결과는 없다. R-S06-12의 관측 비용(51,133 tokens, 142.047초)은 과거 FAIL 관측으로만 유지한다.
+
+이 항목은 제한 진단 구현이며 전체 S06, Plan 활성화, Worker 실행, 운영 SQLite 원장, 전체 qualification 및 1.0 cutover는 모두 미실행/NO-GO다. 다음 실제 호출의 전제는 Gate0C의 append-only row digest 충돌을 별도 범위에서 해결·검증하고, 변경 source와 새 run root에서 5/5 Gate를 통과시키며 새 입력·기대표·지침·schema·inventory·역할 설정을 다시 잠그는 것이다. 실패한 `r-s06-13-20260905-v1` run은 재사용하거나 이어 실행하지 않는다.

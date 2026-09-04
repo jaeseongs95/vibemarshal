@@ -23,7 +23,7 @@ class ACValidationInspection(EngineModel):
     criterion_id: str
     validation_id: str
     relation: Literal["explicit_procedure", "global_constraint_only", "optional_or_unrelated"] = Field(description="AC 연결 의무의 출처 분류. 필수가 아닌 기존 선택적 연결을 금지한다는 뜻이 아니다.")
-    basis_refs: tuple[str, ...] = Field(min_length=2, description="해당 AC의 statement·validation_intent 각각과 validation statement 전체 인용 ID. global_constraint_only이면 constraint 원문도 포함한다.")
+    basis_refs: tuple[str, ...] = Field(min_length=2, description="해당 AC의 statement·validation_intent 각각, validation statement 전체, global_constraint_only의 constraint 원문 및 같은 validation mechanism이 실제 범위 판단에 사용한 모든 project citation ID. 기존 citation을 재사용하며 새 citation을 만들지 않는다.")
     finding_codes: tuple[str, ...] = Field(description="explicit_procedure인데 현재 ID 연결이 없는 경우만 missing_validation_link finding. 나머지는 빈 배열.")
 
 
@@ -39,7 +39,7 @@ class ConstraintTaskInspection(EngineModel):
 class InspectionMechanism(EngineModel):
     tool: str = Field(min_length=1, max_length=120)
     phase: str | None = Field(description="원문이 식별하는 phase/mode. 없으면 null.")
-    basis_refs: tuple[str, ...] = Field(min_length=1, description="등록 자료·구현의 실제 범위 또는 새로 계약한 검사 책임의 인용 ID.")
+    basis_refs: tuple[str, ...] = Field(min_length=1, description="등록 자료·구현의 실제 범위 또는 새로 계약한 검사 책임의 인용 ID. project citation으로 실제 범위를 판단했다면 해당 validation의 모든 AC 관계 행 basis_refs도 같은 ID를 공유한다.")
 
 
 class ValidationInspection(EngineModel):
@@ -62,9 +62,9 @@ class InspectionFindingLink(EngineModel):
 
 class PlanInspection(EngineModel):
     citations: tuple[InspectionCitation, ...] = Field(min_length=1)
+    validation_rows: tuple[ValidationInspection, ...]
     ac_validation_rows: tuple[ACValidationInspection, ...]
     constraint_task_rows: tuple[ConstraintTaskInspection, ...]
-    validation_rows: tuple[ValidationInspection, ...]
     finding_links: tuple[InspectionFindingLink, ...]
 
 
@@ -85,6 +85,8 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "finding의 source:project_map evidence에 대응한다. quote는 연속 원문이며 의역·생략 표시를 "
     "넣지 않는다. AC × validation 행의 validation statement 인용은 문장 전체를 그대로 쓴다. 등록 문서가 부족하면 관련 구현도 읽되 제공된 원문으로 "
     "확인한 범위만 주장한다. "
+    "citations 다음에는 모든 validation_rows를 먼저 작성해 validation statement, mechanism, phase와 "
+    "별도 실제 검사 책임의 근거를 확정한다. 그 뒤 ac_validation_rows와 constraint_task_rows를 작성한다. "
     "모든 AC × 모든 Task·integration validation 쌍을 ac_validation_rows에 정확히 한 번씩 쓴다. "
     "작성자는 완성한 plan의 모든 validation ID에서 이 곱집합을 구성한다. 각 행에서 AC가 "
     "명시한 절차(explicit_procedure), 전역 constraint만의 의무(global_constraint_only), 선택적·무관 "
@@ -92,7 +94,8 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "statement와 validation_intent를 각각 인용하고 validation statement 전체 인용도 연결한다. 전역 의무이면 "
     "constraint 인용도 붙인다. validation_rows의 mechanism으로 등록 자료·구현을 검사 범위 판단에 "
     "사용했다면 그 정확한 project:<entry_id>/content citation_id를 같은 validation의 모든 AC 관계 행 "
-    "basis_refs에도 재사용해 두 판단을 함께 추적한다. 같은 "
+    "basis_refs에도 재사용해 두 판단을 함께 추적한다. 제출 직전 validation별 mechanism의 project citation "
+    "집합이 관련 모든 AC 행에 들어 있는지 직접 대조한다. 같은 "
     "citation_id를 여러 행에서 재사용할 수 있다. 다른 ID가 연결되어도 AC가 명시한 복합 검사 절차 ID를 빠뜨리지 않는다. "
     "반대로 검사 문장의 연관 표현·전역 의무만으로 AC 명시 절차로 분류하지 않는다. relation은 "
     "연결 의무의 출처이며 선택적 연결 금지가 아니다. global_constraint_only 또는 "
@@ -122,7 +125,7 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "독립적으로 확인한 다른 결함을 이미 제출한 finding이나 낮은 rating으로 대신하지 않는다. "
     "작성자는 결함을 보정한 완성 plan과 대조표를 제출하므로 finding_links와 모든 finding_codes는 "
     "비운다. adapter는 selector·quote·ref·행 집합과 내부 일관성만 검사하며 관계 의미 정답을 추정하거나 "
-    "coverage를 보정하거나 Plan을 수정하지 않는다."
+    "coverage·citation을 생성·보정하거나 Plan을 수정하지 않는다."
 )
 
 

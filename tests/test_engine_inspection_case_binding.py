@@ -271,7 +271,7 @@ class IndependentlyReviewedCaseTests(unittest.TestCase):
         self.assertEqual(6, sum(row["changed_expectation"] for row in self.review["focused_row_decisions"]))
         baseline = json.loads((FIXTURES / "plan-inspection-v2-expectations.json").read_text(encoding="utf-8"))
         self.assertEqual(self.expected["parent_expectations_byte_digest"],
-                         sha256_bytes((FIXTURES / "plan-inspection-v2-expectations.json").read_bytes()))
+                         sha256_bytes((FIXTURES / "plan-inspection-v3-expectations.json").read_bytes()))
         self.assertEqual("optional_or_unrelated", next(row for row in baseline["ac_validation_rows"]
                          if (row["criterion_id"], row["validation_id"]) == ("ac_004", "val_task_scope_preservation"))["relation"])
 

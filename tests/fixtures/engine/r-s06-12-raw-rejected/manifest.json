@@ -1,0 +1,24 @@
+{
+  "fixture_revision": "r-s06-12-v1-raw-rejected",
+  "provenance": {
+    "source_run": ".flowmarshal-engine-eval/runs/r-s06-12-20260905-v1",
+    "source_call": "calls/01-compact_plan_reviewer",
+    "preservation": "request·terminal의 원시 final_response·사례 기대표·failed·summary를 바이트 변경 없이 복사했다. 이 fixture는 사후 citation·rating·relation 보정을 포함하지 않는다.",
+    "failure_boundary": "모델 응답은 등록 자료 citation 연결 누락으로 adapter에서 거부됐다. 고정 관계표 평가는 별도 경계다."
+  },
+  "files": {
+    "request.json": "sha256:e073be43350a2b76023e1af3287164758325594cc10b9efa48dbdb6bb61fb14e",
+    "terminal.json": "sha256:e491ff614e118d3aed415ed908c2ddb05b3bc832fd300ff9cde33d9ece34130a",
+    "failed.json": "sha256:b985a2a8763b00f0241f5de5dc22a3b85f4ceb7c4585d09bf85d3aaf0988dc78",
+    "summary.json": "sha256:b0316724b531296263ef52a3f8ff19257acf999750424670332970263e20ab7f",
+    "expectations.json": "sha256:f1cdbd5e5c3567e6044b9d0f28b2850703aa36c3e4a53dc7a12235effd1d9174",
+    "case-expectations-clean.json": "sha256:9054814a1244b4ece527ad6f7c236c351d0233e9fe402f9843b9ec452c9ef473",
+    "input-project-map.json": "sha256:748f48f7fb4f89656cd514377bb2897c7c146fa60d7ef81aae01dd8c5908d6b1"
+  },
+  "raw_final_response_utf8_digest": "sha256:dba0e8cad88061de43dc92ea181d651e9eab88e0dcac3b144d6e30ad161d4729",
+  "expected_status": "FAIL",
+  "expected_error_summary": "대조표 AC 관계 등록 자료 인용 누락",
+  "expected_logical_calls": 1,
+  "expected_provider_turns": 1,
+  "expected_schema_recovery_attempts": 0
+}

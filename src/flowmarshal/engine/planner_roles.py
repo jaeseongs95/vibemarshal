@@ -182,11 +182,14 @@ PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS = (
 
 
 PLAN_VALIDATION_TRACE_INSTRUCTIONS = (
-    "상세 Plan의 검사 검토는 다음 순서로 한다. 1) Goal의 전역 constraints가 요구한 Task 자체 "
-    "validation의 존재를 확인한다. 2) AC의 statement·validation_intent가 명시한 검사 대상·절차·"
-    "적용 범위를 읽고, 모든 validation.statement 전체에서 그 절차를 실제 수행하는 ID를 찾아 해당 "
-    "goal_coverage.validation_ids와 양방향 대조한다. 3) 등록 수단의 phase·mode 능력과 검사 문장의 "
-    "주장을 대조한다. 4) Worker의 응답 제출과 후속 Validator 결과의 순서를 확인한다. "
+    "상세 Plan의 검사 검토는 다음 순서로 한다. 1) 먼저 모든 validation.statement 전체와 그 수단·"
+    "phase·mode·별도 실제 검사 책임을 읽어, 각 validation이 실제로 수행하고 관측하는 전체 책임을 "
+    "확정한다. 등록 자료·구현의 근거는 이 단계에서 정식 project citation으로 등록한다. 2) Goal의 "
+    "전역 constraints가 요구한 Task 자체 validation의 존재와 실제 실행 책임을 확인한다. 3) AC의 "
+    "statement·validation_intent가 명시한 검사 대상·절차·적용 범위를 각 validation의 확정된 책임과 "
+    "대조한다. AC가 절차 자체를 직접 요구한 경우와 특정 도구·phase 실행을 요구하여 그 실제 phase가 "
+    "그 절차를 포함하는 경우를 구분하되, 같은 목적의 별도 검사나 다른 phase까지 확대하지 않는다. "
+    "4) 마지막으로 현재 goal_coverage.validation_ids 연결과 finding을 양방향 대조한다. "
     "전역 constraint의 검사 존재와 AC별 ID 연결은 별도 판정이다. 전역 semantic 의무나 검사 문장의 "
     "동작·공개 계약 언급을 모든 AC의 연결 의무로 확대하지 않는다. 반대로 AC가 명시한 절차라면 "
     "이름에 test가 없어도 그 절차를 포함하는 복합 검사 ID를 빠뜨리지 않는다. 다른 Task나 Goal 검사 "
@@ -202,7 +205,9 @@ PLAN_VALIDATION_TRACE_INSTRUCTIONS = (
     "명시적으로 제외한 것으로 추정하지 않는다. 명시적 제외·범위 충돌과 단순 언급은 구분한다. "
     "Reviewer는 Goal·검사 원문·실제 coverage를 직접 evidence로 대조하고, 작성자는 동일한 기준으로 "
     "검사 문장과 연결을 함께 완성한다. 등록 자료·구현의 범위를 판단에 썼다면 정식 project citation으로 "
-    "그 범위 판단과 AC 관계 판단을 각각 추적 가능하게 남긴다."
+    "그 범위 판단과 AC 관계 판단을 각각 추적 가능하게 남긴다. 제출 직전 각 validation의 mechanism이 "
+    "사용한 project citation 집합이 그 validation의 모든 AC 관계 행 basis_refs에 포함됐는지 직접 "
+    "확인한다. adapter가 관계 정답·인용을 생성하거나 사후 보정한다고 가정하지 않는다."
 )
 
 
@@ -372,13 +377,13 @@ def _inline_local_schema_refs(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 class PlanExpansionEnvelope(EngineModel):
-    plan: PlanExpansionDraft
     inspection: PlanInspection
+    plan: PlanExpansionDraft
 
 
 class PlanReviewEnvelope(EngineModel):
-    review: PlanReviewDraft
     inspection: PlanInspection
+    review: PlanReviewDraft
 
     @classmethod
     def __get_pydantic_json_schema__(cls, core_schema: Any, handler: Any) -> dict[str, Any]:

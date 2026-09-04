@@ -247,6 +247,26 @@ class PlanInspectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate("clean", payload)
 
+    def test_provider_schema_orders_mechanism_evidence_before_ac_relations_without_changing_fields_or_enums(self):
+        schema = PlanReviewEnvelope.model_json_schema()
+
+        def resolve(value):
+            while "$ref" in value:
+                value = schema["$defs"][value["$ref"].removeprefix("#/$defs/")]
+            return value
+
+        inspection = resolve(schema["properties"]["inspection"])
+        properties = inspection["properties"]
+        self.assertEqual(
+            ["citations", "validation_rows", "ac_validation_rows", "constraint_task_rows", "finding_links"],
+            list(properties),
+        )
+        self.assertEqual(["inspection", "review"], list(schema["properties"]))
+        self.assertEqual(
+            ["explicit_procedure", "global_constraint_only", "optional_or_unrelated"],
+            resolve(properties["ac_validation_rows"]["items"])["properties"]["relation"]["enum"],
+        )
+
     def test_partial_global_obligation_can_cite_existing_checks_and_missing_responsibility(self):
         payload = submission("clean")
         row = payload["inspection"]["constraint_task_rows"][2]

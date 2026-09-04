@@ -203,7 +203,7 @@ Goal의 AC 또는 전역 constraint가 각 Task 또는 특정 범위 Task의 완
 
 ### 6.1 Reviewer와 Core 판정
 
-검사 연결은 Goal의 statement·validation_intent·적용 범위와 모든 검사 문장의 복합 책임을 양방향 대조한다. 전역 constraint가 요구한 Task 자체 validation의 존재와 AC가 명시한 절차의 validation ID 연결은 별도 판정이다. ID 이름이나 이미 연결된 대표 검사만으로 AC가 명시한 필수 검사 ID를 생략하지 않으며, 전역 semantic 의무·검사 문장의 연관 표현·evidence 종류나 단순 선후조건만으로 모든 AC에 연결을 강제하지 않는다. 연결만 빠졌다면 실행 누락이나 새 검사 의무로 확대하지 않는다. 상세화와 Reviewer는 같은 기준을 공유하며 Goal·검사 원문·현재 coverage를 직접 근거로 사용한다.
+검사 연결은 먼저 모든 검사 문장의 복합 책임과 등록 수단·phase의 실제 절차를 확인하고, 다음 전역 constraint가 요구한 Task 자체 validation, 다음 Goal의 statement·validation_intent·적용 범위, 마지막 현재 연결과 finding을 양방향 대조한다. AC가 절차 자체를 직접 요구한 경우와 특정 도구·phase 실행을 요구하여 그 실제 phase가 절차를 포함하는 경우를 구분하며, 같은 목적의 별도 검사나 다른 phase까지 확대하지 않는다. 전역 constraint가 요구한 Task 자체 validation의 존재와 AC가 명시한 절차의 validation ID 연결은 별도 판정이다. ID 이름이나 이미 연결된 대표 검사만으로 AC가 명시한 필수 검사 ID를 생략하지 않으며, 전역 semantic 의무·검사 문장의 연관 표현·evidence 종류나 단순 선후조건만으로 모든 AC에 연결을 강제하지 않는다. 연결만 빠졌다면 실행 누락이나 새 검사 의무로 확대하지 않는다. 상세화와 Reviewer는 같은 기준을 공유하며 Goal·검사 원문·현재 coverage를 직접 근거로 사용한다.
 
 Worker의 작업·응답 제출, 이후 Task 검증과 Core의 완료 판정을 구분한다. Task 완료 조건에 독립 Validator 통과를 요구할 수 있지만, Worker 응답을 입력으로 뒤에 수행하는 Validator의 결과를 같은 Worker가 미리 제출하도록 요구하지 않는다. 검증된 선행 Task 결과의 후속 인용은 허용하며 자연어 시점 충돌을 실제 runtime 교착으로 단정하지 않는다. produces·consumes·preconditions·완료 조건과 validation 입력을 함께 대조하여 Worker 실행 보고와 Validator의 별도 검사 결과를 구분한다.
 
@@ -223,7 +223,7 @@ Skeleton·`PlanExpansionDraft`의 `task_refs`는 Compiler가 `Task.task_id`에 �
 
 adapter는 행 집합의 완전성·중복·ID·selector·인용 일치와 제출물 내부 일관성만 검증한다. 파일 인용은 Project Map의 정확한 entry 경로와 content digest를 검증하고 원본 Project Map evidence에 대응시킨다. 관계나 도구 능력의 의미 정답을 코드로 추정하거나 coverage를 자동 보정하지 않는다. 상세화는 결함을 보정한 완성 draft를 제출하므로 남은 결함을 선언한 대조표와 성공 draft를 함께 통과시키지 않는다. 구조적으로 일관된 잘못된 의미 판단은 별도 고정 의미 평가에서 검출한다. 대조표를 GoalContractRevision·PlanContractRevision·ReviewerSubmission 또는 DB schema에 추가하지 않으며 Core의 판정·Skeleton 기여 집합·독립 Goal Test·ready-time 명령 경계는 유지한다. 평가 digest는 실제 adapter의 strict 출력 schema와 공유 지침을 함께 결속한다.
 
-등록 참고자료와 지침 entry의 본문은 공통 입력 projection에서 실제 bytes의 digest를 확인한 뒤 정식 `source_ref=project:<entry_id>`, `selector=/content`, `content_digest`와 함께 제공한다. 등록 자료의 검사 범위 인용은 이 정식 주소를 사용한다. Goal trace 배열의 복제 본문은 파일 주소의 대체물이 아니며 잘못된 주소에 대한 자동 교정·사후 alias는 금지한다. 인용 수용 시에도 원본 파일의 digest와 선택 문자열을 다시 확인한다. 다른 Project Map 파일은 정확한 경로를 통해 읽고 같은 인용 검사를 적용한다.
+등록 참고자료와 지침 entry의 본문은 공통 입력 projection에서 실제 bytes의 digest를 확인한 뒤 정식 `source_ref=project:<entry_id>`, `selector=/content`, `content_digest`와 함께 제공한다. 등록 자료의 검사 범위 인용은 이 정식 주소를 사용한다. mechanism이 실제 범위 판단에 사용한 project citation 집합은 같은 validation의 모든 AC 관계 행에도 그대로 재사용하고, 제출자가 최종 응답 전에 이 포함 관계를 확인한다. Goal trace 배열의 복제 본문은 파일 주소의 대체물이 아니며 잘못된 주소에 대한 자동 교정·사후 alias는 금지한다. 인용 수용 시에도 원본 파일의 digest와 선택 문자열을 다시 확인한다. 다른 Project Map 파일은 정확한 경로를 통해 읽고 같은 인용 검사를 적용한다. adapter는 이 내부 일관성만 검사하며 관계 의미·인용·coverage를 자동 생성하거나 보정하지 않는다.
 
 대조표의 relation은 AC 연결 의무의 출처를 분류하며 선택적 연결을 금지하지 않는다. `global_constraint_only`나 `optional_or_unrelated`에 이미 연결된 ID가 있다는 사실만으로 결함을 만들지 않는다. 모든 constraint 행은 비적용일 때도 해당 원문을 인용한다. 전역 검사 의무의 일부만 빠지면 존재하는 validation ID와 `missing_task_validation` finding을 함께 제출한다. `explicit_procedure`의 ID 연결만 빠진 경우는 `missing_validation_link`, 검사 주장과 수단의 직접 모순은 `validation_scope`/`contradicted`, 근거 부족은 `insufficient_evidence`/`unresolved`로 분리한다. Plan의 file·diff 등 단순 evidence 언급을 다른 입력의 명시적 제외로 간주하지 않는다.
 

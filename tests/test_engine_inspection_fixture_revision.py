@@ -16,7 +16,7 @@ from scripts.diagnostics.r_s06_10_fixtures import FixtureRevisionError, SOURCE_I
 ROOT = Path(__file__).resolve().parent / "fixtures" / "engine"
 LEGACY = json.loads((ROOT / "plan-inspection-regressions.json").read_text(encoding="utf-8"))["files"]
 SOURCE_INPUTS = json.loads((ROOT / "plan-inspection-v2-source-inputs.json").read_text(encoding="utf-8"))
-EXPECTATIONS = json.loads((ROOT / "plan-inspection-v2-expectations.json").read_text(encoding="utf-8"))
+EXPECTATIONS = json.loads((ROOT / "plan-inspection-v4-expectations.json").read_text(encoding="utf-8"))
 
 
 def _write_portable_source(source: Path) -> None:
@@ -140,7 +140,7 @@ class InspectionFixtureRevisionTests(unittest.TestCase):
                 self.assertIn("val_goal_independent_behavior_contract", _coverage(plan, "ac_003"))
                 PlanContractRevision.model_validate(plan)
 
-    def test_v2_cases_keep_one_intended_defect_or_the_recorded_normal_semantics(self):
+    def test_revised_cases_keep_one_intended_defect_or_the_recorded_normal_semantics(self):
         _, destination = self.build()
         cases = EXPECTATIONS["cases"]
         for case_id in ("clean", "combined", "semantic-explicit", "evidence-simple-mention"):
@@ -185,8 +185,17 @@ class InspectionFixtureRevisionTests(unittest.TestCase):
         self.assertEqual([], semantic["required_goal_coverage_links"])
         task_scope = next(row for row in rows if (row["criterion_id"], row["validation_id"]) ==
                           ("ac_004", "val_task_scope_preservation"))
-        self.assertEqual(("optional_or_unrelated", []),
-                         (task_scope["relation"], task_scope["required_goal_coverage_links"]))
+        self.assertEqual(("global_constraint_only", []),
+                          (task_scope["relation"], task_scope["required_goal_coverage_links"]))
+
+    def test_r_s06_13_provenance_binds_the_raw_rejection_and_normal_fixture_selectors(self):
+        provenance = EXPECTATIONS["r_s06_13_provenance"]
+        raw_manifest = json.loads((ROOT / provenance["raw_rejection_fixture"]).read_text(encoding="utf-8"))
+        normal = json.loads((ROOT / provenance["normal_fixture"]).read_text(encoding="utf-8"))
+        self.assertEqual("FAIL", raw_manifest["expected_status"])
+        self.assertEqual(provenance["raw_summary_byte_digest"], raw_manifest["files"]["summary.json"])
+        self.assertEqual("/expected_ac_validation_rows", normal["provenance"]["relation_rows_selector"])
+        self.assertEqual(EXPECTATIONS["fixture_revision"], normal["provenance"]["expectation_revision"])
 
     def test_fixed_review_expectations_require_each_independent_defect(self):
         fixed = EXPECTATIONS["revision_review_expectations"]

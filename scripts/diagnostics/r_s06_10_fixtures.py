@@ -18,8 +18,10 @@ from flowmarshal.engine.domain import PlanContractRevision
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EXPECTATIONS_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v3-expectations.json"
-INDEPENDENT_REVIEW_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v3-independent-fixture-review.json"
+EXPECTATIONS_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v4-expectations.json"
+INDEPENDENT_REVIEW_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v4-independent-fixture-review.json"
+RAW_REJECTED_MANIFEST_PATH = ROOT / "tests/fixtures/engine/r-s06-12-raw-rejected/manifest.json"
+SYNTHETIC_NORMAL_FIXTURE_PATH = ROOT / "tests/fixtures/engine/plan-inspection-r-s06-13-synthetic-normal.json"
 LEGACY_EXPECTATIONS_PATH = ROOT / "tests/fixtures/engine/plan-inspection-expectations.json"
 SOURCE_INPUT_FILENAMES = (
     "input-bad-plan.json",
@@ -168,6 +170,21 @@ def _independent_fixture_review(
         or review.get("expectations_digest") != sha256_bytes(runtime_bytes)
     ):
         raise FixtureRevisionError("독립 fixture review의 case·기대값 결속이 다릅니다.")
+    provenance = expectations.get("r_s06_13_provenance")
+    if not isinstance(provenance, dict) or provenance.get("raw_rejection_fixture") != "r-s06-12-raw-rejected/manifest.json":
+        raise FixtureRevisionError("R-S06-13 원시 거부 fixture provenance가 없습니다.")
+    if not RAW_REJECTED_MANIFEST_PATH.is_file() or not SYNTHETIC_NORMAL_FIXTURE_PATH.is_file():
+        raise FixtureRevisionError("R-S06-13 원시 거부 또는 정상 합성 fixture가 없습니다.")
+    raw_manifest = _read(RAW_REJECTED_MANIFEST_PATH)
+    normal = _read(SYNTHETIC_NORMAL_FIXTURE_PATH)
+    if (
+        raw_manifest.get("expected_status") != "FAIL"
+        or raw_manifest.get("files", {}).get("summary.json") != provenance.get("raw_summary_byte_digest")
+        or normal.get("provenance", {}).get("relation_rows_selector") != "/expected_ac_validation_rows"
+        or normal.get("provenance", {}).get("expectation_revision") != expectations.get("fixture_revision")
+        or review.get("r_s06_13_provenance", {}).get("expectations_path") != EXPECTATIONS_PATH.name
+    ):
+        raise FixtureRevisionError("R-S06-13 provenance 또는 직접 selector 결속이 다릅니다.")
     return review
 
 

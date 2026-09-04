@@ -31,6 +31,8 @@ from flowmarshal.engine.planner_roles import PlanReviewEnvelope
 ROOT = Path(__file__).resolve().parent / "fixtures" / "engine"
 RAW = json.loads((ROOT / "plan-inspection-raw-v1.json").read_text(encoding="utf-8"))
 RAW_V3_REJECTED = json.loads((ROOT / "plan-inspection-raw-v3-rejected.json").read_text(encoding="utf-8"))
+RAW_S06_12_ROOT = ROOT / "r-s06-12-raw-rejected"
+RAW_S06_12_MANIFEST = json.loads((RAW_S06_12_ROOT / "manifest.json").read_text(encoding="utf-8"))
 FILES = json.loads((ROOT / "plan-inspection-regressions.json").read_text(encoding="utf-8"))["files"]
 V3_EXPECTATIONS = json.loads((ROOT / "plan-inspection-v2-expectations.json").read_text(encoding="utf-8"))
 REFERENCE_ENTRY = "project:entry_ad363844d3392d9ef718d2d6"
@@ -171,6 +173,66 @@ def _validate(payload: dict, *, goal_data: dict | None = None):
 
 
 class RawPlanInspectionRegressionTests(unittest.TestCase):
+    def test_r_s06_12_raw_rejection_is_byte_preserved_and_keeps_missing_registered_citation_rows(self):
+        for filename, digest in RAW_S06_12_MANIFEST["files"].items():
+            with self.subTest(filename=filename):
+                self.assertEqual(digest, sha256_bytes((RAW_S06_12_ROOT / filename).read_bytes()))
+        terminal = json.loads((RAW_S06_12_ROOT / "terminal.json").read_text(encoding="utf-8"))
+        raw_response = json.loads(terminal["final_response"])
+        self.assertEqual(RAW_S06_12_MANIFEST["raw_final_response_utf8_digest"],
+                         sha256_bytes(terminal["final_response"].encode("utf-8")))
+        summary = json.loads((RAW_S06_12_ROOT / "summary.json").read_text(encoding="utf-8"))
+        failed = json.loads((RAW_S06_12_ROOT / "failed.json").read_text(encoding="utf-8"))
+        self.assertEqual(RAW_S06_12_MANIFEST["expected_status"], summary["status"])
+        self.assertEqual(RAW_S06_12_MANIFEST["expected_error_summary"], failed["receipts"][0]["error_summary"])
+        self.assertEqual(1, summary["logical_calls"])
+        self.assertEqual(1, summary["provider_turns"])
+        self.assertEqual(0, failed["receipts"][0]["schema_recovery_attempts"])
+
+        envelope = PlanReviewEnvelope.model_validate(raw_response)
+        self.assertFalse(envelope.review.findings)
+        self.assertIsNotNone(envelope.review.ratings)
+        citations = {item.citation_id: item for item in envelope.inspection.citations}
+        project_refs_by_validation = {
+            row.validation_id: {
+                ref for mechanism in row.mechanisms for ref in mechanism.basis_refs
+                if citations[ref].source_ref.startswith("project:")
+            }
+            for row in envelope.inspection.validation_rows
+        }
+        missing = {
+            (row.criterion_id, row.validation_id, ref)
+            for row in envelope.inspection.ac_validation_rows
+            for ref in project_refs_by_validation[row.validation_id] - set(row.basis_refs)
+        }
+        self.assertEqual({
+            (criterion, validation, "reference_goal_evidence")
+            for criterion in ("ac_001", "ac_002", "ac_003")
+            for validation in ("val_goal_independent_behavior_contract", "val_goal_independent_scope_preservation")
+        }, missing)
+
+    def test_r_s06_13_independent_synthetic_normal_fixture_is_structurally_valid(self):
+        fixture = json.loads((ROOT / "plan-inspection-r-s06-13-synthetic-normal.json").read_text(encoding="utf-8"))
+        self.assertEqual("/expected_ac_validation_rows", fixture["provenance"]["relation_rows_selector"])
+        self.assertEqual(fixture["response_canonical_digest"], sha256_digest(fixture["response"]))
+        plan = PlanContractRevision.model_validate(fixture["plan"])
+        goal = GoalContractRevision.model_validate(fixture["goal"])
+        state = StateSnapshot.model_validate(fixture["state"])
+        project_map = ProjectMapRevision.model_validate(fixture["project_map"])
+        envelope = PlanReviewEnvelope.model_validate(fixture["response"])
+        validate_plan_inspection(
+            envelope.inspection,
+            plan=plan,
+            goal=goal,
+            project_map=project_map,
+            evidence_catalog=plan_review_evidence_catalog(plan, goal, state, project_map),
+            findings=envelope.review.findings,
+        )
+        assessment = assess_fixed_ac_validation_relations(
+            envelope.inspection, fixture["expected_ac_validation_rows"],
+        )
+        self.assertTrue(assessment["passed"], assessment)
+
     def test_v1_raw_response_without_ac_statement_citations_is_rejected(self):
         """주소 오류를 분리해도 원시 AC basis는 새 계약을 만족하지 않는다."""
         with self.assertRaisesRegex(PlanInspectionError, "AC statement 인용 누락"):
