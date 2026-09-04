@@ -98,6 +98,7 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 - 직접 증거가 있는 최소 finding만 허용하며, 상관 결함은 별도 증거가 있을 때만 추가한다.
 - Task의 AC coverage는 산출물·근거의 기여 관계이며 독립 Goal Test의 직접 실행 책임이 아니다. 생성·검토·보정·상세화는 이 경계를 공유한다. 정상 Task 검증은 허용하되 모든 Task 완료 후 Core의 integration validation을 일반 Task로 재귀 배치하지 않는다. 상세화가 Skeleton의 Task 의미를 몰래 바꾸어 충돌을 숨기지 않는다.
 - Goal과 AC 기여 관계로 전달된 요구를 선택 detail requirement에 반복하지 않았다는 이유나 후속 단계의 가상 누락 가능성만으로 Skeleton을 차단하지 않는다. 실제 AC 기여 누락·Task 요구 충돌과 상세 Plan의 독립 검사·evidence mode·validation 연결 결함은 직접 evidence로 검토한다.
+- Goal이 각 Task 또는 특정 Task의 완료 전에 요구한 검증은 해당 Task의 validation 계약에 보존한다. AC 기여 관계·완료 조건 문장·모델 배정만으로 검사 호출과 evidence를 대체하지 않으며 후속 검증 Task나 독립 Goal Test에만 넘기지 않는다. 적용 범위는 Goal에서 판단하고 모든 Task에 동일 검사 종류를 강제하지 않는다.
 - 실제 모델 이름을 제품 코드에 하드코딩하지 않는다. 호출자가 역할 설정을 주입하고 실제 호출 직전 App Server `model/list`로 지원 여부를 확인한다.
 - 실행과 검사를 별도로 배정하고 선택 이유·inventory digest·허용 fallback envelope를 Plan Contract에 남긴다.
 - 지원되지 않는 model/effort를 조용히 fallback하지 않는다. 모델 변경 재시도는 새 Attempt 또는 새 Plan Contract에 기록한다.

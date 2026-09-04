@@ -4,7 +4,9 @@
 
 ## 결론
 
-현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [S06 재평가](s06-planning-retry-handoff.md)에서 현재 source로 고정 원문부터 새 Goal·독립 검토·Skeleton·Plan까지 실제 실행했다. 이전 Goal Test의 일반 Task 재귀 배치는 나타나지 않았지만, 수정 Task에 필수 unittest·독립 Validator 검증이 빠져 최종 Plan이 `VERIFICATION_TASK_VALIDATOR_GAP`으로 거부됐다. **선택 digest는 null이며 S06은 FAIL**이다. 같은 source의 **484개 테스트·결정적 Gate 5/5는 재실행 PASS**다. 실제 역할 6 logical calls·11 provider turns를 원장과 대조했고 활성화·Worker·Task/Goal validation은 0건이다. 자연어부터 Goal 완료까지 전체 Trace는 **INCOMPLETE**다. 다음 세션은 **R-S06-02 — Goal의 Task별 필수 검증 요구를 Planning 상세화에 보존하는 Repair**이며 실제 선택 Plan을 확보하기 전에는 S07로 진입하지 않는다.
+현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [R-S06-02](r-s06-02-handoff.md)에서 Goal의 Task별 필수 검증을 해당 Task의 validation과 coverage 검사 ID에 보존하도록 Planning 역할 안내·provider 필드 설명을 보완했다. **최종 source의 486개 테스트·결정적 Gate 5/5는 PASS**다. 실제 역할 진단은 별도 App Server가 읽은 정책이 `:danger-full-access / on-request`여서 `PERMISSION_POLICY_MISMATCH`로 호출 전에 중단됐다. 실제 역할 요청·thread/turn intent는 0건이며 **진단은 BLOCKED**다. 다음 작업은 요구 정책 `never`가 실제 적용된 새 실행 환경에서 R-S06-02 진단을 재개하는 것이다. 실제 선택 Plan 전에는 S07로 진입하지 않는다.
+
+직전 [S06 재평가](s06-planning-retry-handoff.md)는 당시 source에서 고정 원문부터 새 Goal·독립 검토·Skeleton·Plan까지 실제 실행한 결과다. 이전 Goal Test의 일반 Task 재귀 배치는 나타나지 않았지만, 수정 Task의 필수 unittest·독립 Validator 검증 누락으로 `VERIFICATION_TASK_VALIDATOR_GAP`이 발생했다. **선택 digest는 null이며 S06은 FAIL**로 보존한다. 당시 484개 테스트·결정적 Gate 5/5 PASS와 실제 역할 6 logical calls·11 provider turns를 현재 source의 실제 진단으로 재사용하지 않는다. 활성화·Worker·Task/Goal validation은 0건이며 자연어부터 Goal 완료까지 전체 Trace는 **INCOMPLETE**다.
 
 [첫 S06](s06-planning-handoff.md)의 실패와 [R-S06-01](r-s06-01-handoff.md)의 제한된 실제 역할 진단 5/5 PASS는 각각 보존한다. R-S06-01 진단은 과거 Goal·State를 입력으로 사용한 경계 검증이었으며 이번 새 전체 Planning의 성공을 미리 보장하는 증거가 아니다.
 

@@ -193,6 +193,8 @@ Task의 `contributes_to`와 Skeleton의 `goal_coverage.task_refs`는 AC 충족�
 
 생성·검토·보정·상세화 역할은 이 책임 경계를 공유한다. 테스트 작성·실행이나 선행 산출물의 독립 검토처럼 목적이 있는 Task 검증은 허용한다. 같은 대상을 검사한다는 이유만으로 Task 검증과 독립 Goal Test를 중복으로 판정하지 않는다. 반면 일반 Task가 자신을 포함한 모든 Task의 검증 완료 또는 이후 Core Goal Test 결과를 선행조건으로 요구하면 직접 evidence가 있는 계약 충돌로 검토한다. 자연어 자기의존을 명시적 DAG cycle이나 실제 runtime 교착으로 단정하지 않는다. refiner는 finding을 Goal과 단계별 책임에 대조하고, expander는 남아 있는 충돌을 Task 삭제·재정의로 숨기지 않으며 기존 의미 보존 검사와 독립 review를 유지한다.
 
+Goal이 각 Task 또는 특정 범위 Task의 완료 전에 요구한 검증은 AC 기여 관계와 별개인 Task 자체의 필수 책임이다. 상세화는 Goal의 적용 범위를 각 Task에 대조하고 해당 `Task.validations`에 검사 목적·method·필수 evidence 종류를 보존한다. `detail_requirements`나 Task의 AC 연결에 반복되지 않아도 Goal의 명시적 요구는 유지한다. 후속 검증 Task·`integration_validations`·완료 조건 문장 또는 `independence_required` 모델 배정만으로 이를 대체하지 않는다. Core는 선행 Task 자체의 검증을 통과한 뒤 dependency를 해제하므로 선행 Task의 완료에 필요한 evidence를 후속 Task에 의존하게 만들지 않는다. 명시적으로 요구한 실제 테스트·파일 범위·독립 모델 검토에는 적용 대상 Task의 deterministic command/test·file/diff 및 semantic model_review 검사를 둔다. Goal의 요구 밖 Task에 이 검사 종류를 일괄 강제하지 않는다. Reviewer는 상세 Plan의 실제 누락을 Goal과 해당 Task의 validation 계약으로 검토하며, Skeleton 선택 필드의 반복 부재를 결함으로 승격하지 않는다.
+
 ### 6.1 Reviewer와 Core 판정
 
 Reviewer 출력은 다음으로 제한한다.

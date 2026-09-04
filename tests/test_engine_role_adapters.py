@@ -396,6 +396,256 @@ class EngineRoleAdapterTests(unittest.TestCase):
                     self.assertIn("detail_requirements에 반복하지 않았다는 이유만으로 Skeleton을 차단하지 않는다",
                                   runner.calls[1].instructions)
 
+    def _per_task_validation_requirement_case(self, *, omit_change_validation: bool):
+        """Goal의 Task별 검사 요구와 plan-level Goal Test를 함께 가진 축소 S06 사례다."""
+        definition = self.goal.definition.model_copy(update={"hard_acceptance": (
+            *self.goal.definition.hard_acceptance,
+            GoalCriterion(
+                criterion_id="ac_task_evidence",
+                statement="각 변경·검증 Task는 실제 unittest·파일 범위와 분리 Validator 검토를 완료 전에 확인한다.",
+                validation_intent="각 Task의 validation에 command·test·file·diff 및 semantic model_review를 직접 결속한다.",
+                trace_refs=("trace_one",),
+            ),
+            GoalCriterion(
+                criterion_id="ac_independent_goal",
+                statement="모든 Task 뒤 새 evidence로 Goal을 독립 검사한다.",
+                validation_intent="Plan.integration_validations의 independent Goal Test를 수행한다.",
+                trace_refs=("trace_one",),
+            ),
+        )})
+        self.goal = self.goal.model_copy(update={
+            "definition": definition,
+            "definition_digest": definition.definition_digest,
+        })
+        self.state = state(self.project_id, self.goal.definition_digest, self.map.revision_digest)
+
+        change_ref = "task_update_contract"
+        skeleton = _skeleton_response()
+        change = skeleton["candidates"][0]["tasks"][0]
+        change["task_ref"] = change_ref
+        change["detail_requirements"] = []
+        follow_ref = "task_followup_evidence"
+        skeleton["candidates"][0]["tasks"].append({
+            "task_ref": follow_ref,
+            "kind": "validate",
+            "objective": "변경 산출물의 Task 수준 검증 evidence를 수집한다.",
+            "contributes_to": ["ac_task_evidence", "ac_independent_goal"],
+            "produces": ["artifact:followup_evidence"],
+            "consumes": ["result:one"],
+            "detail_requirements": [],
+        })
+        skeleton["candidates"][0]["dependencies"] = [{
+            "producer_task_ref": change_ref,
+            "consumer_task_ref": follow_ref,
+            "dependency_type": "data",
+            "produces": ["result:one"],
+            "consumes": ["result:one"],
+        }]
+        skeleton["candidates"][0]["goal_coverage"] = [
+            {"criterion_id": "ac_one", "task_refs": [change_ref]},
+            {"criterion_id": "ac_task_evidence", "task_refs": [follow_ref]},
+            {"criterion_id": "ac_independent_goal", "task_refs": [follow_ref]},
+        ]
+
+        plan = _plan_response()
+        change = plan["tasks"][0]
+        change["task_ref"] = change_ref
+        change["validations"] = [
+            {
+                "validation_id": "validation_change_scope",
+                "statement": "변경 Task의 파일 범위와 diff를 직접 검사한다.",
+                "method": "deterministic",
+                "required_evidence_kinds": ["file", "diff"],
+            }
+        ]
+        if not omit_change_validation:
+            change["validations"] = [
+                {
+                    "validation_id": "validation_change_direct",
+                    "statement": "변경 Task의 unittest와 파일 범위를 직접 검사한다.",
+                    "method": "deterministic",
+                    "required_evidence_kinds": ["command", "test", "file", "diff"],
+                },
+                {
+                    "validation_id": "validation_change_review",
+                    "statement": "분리 Validator가 변경 Task evidence를 의미 검토한다.",
+                    "method": "semantic",
+                    "required_evidence_kinds": ["model_review"],
+                },
+            ]
+        follow = deepcopy(change)
+        follow.update(
+            task_ref=follow_ref,
+            kind="validate",
+            objective="변경 산출물의 Task 수준 검증 evidence를 수집한다.",
+            goal_criterion_refs=["ac_task_evidence", "ac_independent_goal"],
+            produces=["artifact:followup_evidence"],
+            consumes=["result:one"],
+            acceptance_criteria=["후속 검증 Task의 validation이 PASS다."],
+            validations=[
+                {
+                    "validation_id": "validation_followup_direct",
+                    "statement": "후속 검증 Task의 unittest와 파일 범위를 직접 검사한다.",
+                    "method": "deterministic",
+                    "required_evidence_kinds": ["command", "test", "file", "diff"],
+                },
+                {
+                    "validation_id": "validation_followup_review",
+                    "statement": "분리 Validator가 후속 검증 Task evidence를 의미 검토한다.",
+                    "method": "semantic",
+                    "required_evidence_kinds": ["model_review"],
+                },
+            ],
+        )
+        plan["tasks"].append(follow)
+        plan["dependencies"] = [{
+            "producer_task_ref": change_ref,
+            "consumer_task_ref": follow_ref,
+            "dependency_type": "data",
+            "products": ["result:one"],
+        }]
+        change_validation_ids = [item["validation_id"] for item in change["validations"]]
+        plan["goal_coverage"] = [
+            {"criterion_id": "ac_one", "task_refs": [change_ref],
+             "validation_ids": [*change_validation_ids, "validation_goal"]},
+            {"criterion_id": "ac_task_evidence", "task_refs": [follow_ref],
+             "validation_ids": [*change_validation_ids, "validation_followup_direct", "validation_followup_review"]},
+            {"criterion_id": "ac_independent_goal", "task_refs": [follow_ref],
+             "validation_ids": ["validation_goal"]},
+        ]
+        plan["integration_validations"][0].update(
+            criterion_refs=["ac_one", "ac_task_evidence", "ac_independent_goal"],
+            evidence_mode="independent",
+            statement="모든 Task validation 뒤 새 command·test·file·diff evidence로 Goal을 독립 검사한다.",
+            required_evidence_kinds=["command", "test", "file", "diff"],
+        )
+        return skeleton, plan, change_ref, follow_ref
+
+    def test_task_validation_requirements_are_not_replaced_by_followup_or_goal_test(self) -> None:
+        """Task별 필수 검증, AC 기여, 독립 Goal Test의 계약 경계를 실제 상세 Plan으로 확인한다."""
+        for omit_change_validation in (True, False):
+            with self.subTest(omit_change_validation=omit_change_validation):
+                self.goal = goal(self.project_id, self.profile.definition_digest)
+                skeleton, plan, change_ref, follow_ref = self._per_task_validation_requirement_case(
+                    omit_change_validation=omit_change_validation,
+                )
+                review = {"findings": [], "ratings": _ratings()}
+                if omit_change_validation:
+                    review = {"findings": [{
+                        "finding_code": "VERIFICATION_TASK_VALIDATOR_GAP",
+                        "gate": "verification",
+                        "severity": "error",
+                        "summary": "변경 Task의 validation이 file·diff뿐이어서 unittest와 분리 Validator 검토를 대체할 수 없다.",
+                        "evidence_refs": ["artifact:plan_contract", "source:goal"],
+                        "affected_task_refs": [change_ref],
+                        "remediable": True,
+                    }]}
+                runner = ScriptedStructuredRoleRunner({
+                    "skeleton_generator": [skeleton],
+                    "skeleton_reviewer": [{"findings": [], "ratings": _ratings()}],
+                    "plan_expander": [plan],
+                    "compact_plan_reviewer": [review],
+                })
+                outcome = self._boundary_search(runner)
+                evaluation = outcome.plan_evaluations[0]
+                self.assertEqual(
+                    CandidateStatus.NEEDS_REVISION if omit_change_validation else CandidateStatus.ADMISSIBLE,
+                    evaluation.decision.status,
+                )
+                self.assertEqual(not omit_change_validation, outcome.selected_activation_digest is not None)
+                if omit_change_validation:
+                    self.assertIn("VERIFICATION_TASK_VALIDATOR_GAP", evaluation.decision.finding_codes)
+
+                plan_definition = evaluation.plan.definition
+                change_task = next(item for item in plan_definition.tasks if item.kind.value == "change")
+                follow_task = next(item for item in plan_definition.tasks if item.task_ref == follow_ref)
+                self.assertTrue(change_task.assignment.independence_required)
+                self.assertEqual("independent", plan_definition.integration_validations[0].evidence_mode)
+                self.assertEqual({"command", "test", "file", "diff"}, set(
+                    follow_task.validations[0].required_evidence_kinds,
+                ))
+                self.assertEqual({"model_review"}, set(follow_task.validations[1].required_evidence_kinds))
+                evidence_coverage = next(item for item in plan_definition.goal_coverage
+                                         if item.criterion_id == "ac_task_evidence")
+                self.assertEqual((follow_task.task_id,), evidence_coverage.task_ids)
+                self.assertTrue({item.validation_id for item in change_task.validations}
+                                <= set(evidence_coverage.validation_ids))
+                if omit_change_validation:
+                    self.assertEqual({"file", "diff"}, set(change_task.validations[0].required_evidence_kinds))
+                else:
+                    self.assertEqual({"command", "test", "file", "diff"}, set(
+                        change_task.validations[0].required_evidence_kinds,
+                    ))
+                    self.assertEqual({"model_review"}, set(change_task.validations[1].required_evidence_kinds))
+
+                expander_call = next(item for item in runner.calls if item.role == "plan_expander")
+                required_ac = next(item for item in expander_call.payload["goal"]["hard_acceptance"]
+                                   if item["criterion_id"] == "ac_task_evidence")
+                self.assertIn("각 Task의 validation", required_ac["validation_intent"])
+                self.assertTrue(all(not item["detail_requirements"] for item in
+                                    expander_call.payload["skeleton"]["tasks"]))
+
+    def test_task_scoped_validation_requirement_does_not_become_a_global_rule(self) -> None:
+        """Goal이 특정 변경 Task에만 요구한 semantic 검사를 무관한 후속 Task에 강제하지 않는다."""
+        self.goal = goal(self.project_id, self.profile.definition_digest)
+        skeleton, plan, change_ref, follow_ref = self._per_task_validation_requirement_case(
+            omit_change_validation=False,
+        )
+        scoped_criteria = tuple(
+            GoalCriterion(
+                criterion_id="ac_task_evidence",
+                statement="변경 Task는 실제 unittest·파일 범위와 분리 Validator 검토를 완료 전에 확인한다.",
+                validation_intent="변경 Task의 validation에 command·test·file·diff 및 semantic model_review를 직접 결속한다.",
+                trace_refs=("trace_one",),
+            ) if item.criterion_id == "ac_task_evidence" else item
+            for item in self.goal.definition.hard_acceptance
+        )
+        definition = self.goal.definition.model_copy(update={"hard_acceptance": scoped_criteria})
+        self.goal = self.goal.model_copy(update={
+            "definition": definition,
+            "definition_digest": definition.definition_digest,
+        })
+        self.state = state(self.project_id, self.goal.definition_digest, self.map.revision_digest)
+
+        follow_skeleton = next(item for item in skeleton["candidates"][0]["tasks"]
+                               if item["task_ref"] == follow_ref)
+        change_skeleton = next(item for item in skeleton["candidates"][0]["tasks"]
+                               if item["task_ref"] == change_ref)
+        change_skeleton["contributes_to"] = ["ac_one", "ac_task_evidence"]
+        follow_skeleton["contributes_to"] = ["ac_independent_goal"]
+        skeleton["candidates"][0]["goal_coverage"][1]["task_refs"] = [change_ref]
+        change_plan = next(item for item in plan["tasks"] if item["task_ref"] == change_ref)
+        change_plan["goal_criterion_refs"] = ["ac_one", "ac_task_evidence"]
+        follow_plan = next(item for item in plan["tasks"] if item["task_ref"] == follow_ref)
+        follow_plan["goal_criterion_refs"] = ["ac_independent_goal"]
+        follow_plan["validations"] = [{
+            "validation_id": "validation_followup_scope_only",
+            "statement": "후속 evidence 산출물의 파일 범위만 확인한다.",
+            "method": "deterministic",
+            "required_evidence_kinds": ["file", "diff"],
+        }]
+        plan["goal_coverage"][1].update(
+            task_refs=[change_ref],
+            validation_ids=["validation_change_direct", "validation_change_review"],
+        )
+        plan["goal_coverage"][2]["validation_ids"] = ["validation_goal"]
+        runner = ScriptedStructuredRoleRunner({
+            "skeleton_generator": [skeleton],
+            "skeleton_reviewer": [{"findings": [], "ratings": _ratings()}],
+            "plan_expander": [plan],
+            "compact_plan_reviewer": [{"findings": [], "ratings": _ratings()}],
+        })
+        outcome = self._boundary_search(runner)
+        self.assertIsNotNone(outcome.selected_activation_digest)
+        definition = outcome.plan_evaluations[0].plan.definition
+        change_task = next(item for item in definition.tasks if item.kind.value == "change")
+        follow_task = next(item for item in definition.tasks if item.task_ref == follow_ref)
+        self.assertEqual({"model_review"}, set(change_task.validations[1].required_evidence_kinds))
+        self.assertEqual(1, len(follow_task.validations))
+        self.assertEqual({"file", "diff"}, set(follow_task.validations[0].required_evidence_kinds))
+        coverage = next(item for item in definition.goal_coverage if item.criterion_id == "ac_task_evidence")
+        self.assertEqual((change_task.task_id,), coverage.task_ids)
+
     def test_read_only_response_report_preserves_scope_and_reviewer_authority(self) -> None:
         """응답 산출물의 계약 전달과 실제 모순 finding의 차단을 함께 검사한다."""
         read_goal = goal(self.project_id, self.profile.definition_digest, read_only=True)

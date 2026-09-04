@@ -85,6 +85,18 @@ PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS = (
     "포함한 모든 Task의 검증 완료나 이후 Core Goal Test 결과를 기다리면 계약의 자기의존을 "
     "직접 evidence로 지적한다. 자연어 선행조건 충돌을 명시적 DAG cycle이나 관측된 교착으로 "
     "단정하지 않는다."
+    "Goal이 각 Task 또는 특정 범위 Task의 완료 전에 요구한 검증은 AC 기여 관계와 별개인 "
+    "해당 Task 자체의 필수 책임이다. Goal의 적용 범위를 각 Task와 대조하고, 상세 Plan에서는 "
+    "그 Task.validations에 검사 목적·method·필수 evidence 종류를 보존한다. 후속 검증 Task나 "
+    "integration validation에만 검사를 두거나 acceptance_criteria에 문장만 적어 이를 대체하지 않는다. "
+    "Core는 선행 Task 자체의 validation을 통과한 뒤 dependency를 해제하므로, 그 Task의 완료에 "
+    "필요한 evidence를 후속 Task에서 받도록 계획하지 않는다. Executor/Validator 모델 배정과 "
+    "independence_required는 역할 배정이며 검증 호출·evidence를 대신하지 않는다. 예를 들어 Goal이 "
+    "해당 Task에 실제 테스트·파일 범위 검사와 독립 모델 검토를 요구하면 그 Task에 deterministic "
+    "command/test·file/diff 검사와 semantic model_review 검사를 각각 명시한다. 이러한 검사 종류를 "
+    "Goal의 요구 범위 밖 Task에 일괄 강제하지 않는다. Task별 필수 검증은 detail_requirements나 "
+    "contributes_to에 반복되지 않아도 Goal에서 상속하며, 상세 Plan에서 실제 누락된 경우에만 "
+    "Goal과 해당 Task.validations를 직접 근거로 지적한다."
 )
 
 
@@ -103,7 +115,7 @@ class SkeletonTaskDraft(EngineModel):
     required_capabilities: tuple[str, ...] = ()
     no_op_when: tuple[str, ...] = ()
     unknown_refs: tuple[str, ...] = Field(default=(), description="현재 StateSnapshot.unknowns에 실제 있는 unknown_id만 참조한다. 없으면 빈 배열. 새 질문은 candidate.unknowns에 설명한다.")
-    detail_requirements: tuple[str, ...] = Field(default=(), description="상세 Plan에서 보존할 책임. Task validation과 모든 Task 완료 후 Core의 integration validation을 구분하며 실행 명령은 넣지 않는다.")
+    detail_requirements: tuple[str, ...] = Field(default=(), description="상세 Plan에서 보존할 책임. Goal이 해당 Task에 요구한 자체 검증과 모든 Task 완료 후 Core의 integration validation을 구분한다. 이 필드의 생략은 Goal의 Task별 검증 요구를 면제하지 않으며 실행 명령은 넣지 않는다.")
 
 
 class SkeletonDependencyDraft(EngineModel):
@@ -140,7 +152,7 @@ class DetailedTaskDraft(EngineModel):
     prohibited_effects: tuple[EffectContract, ...] = Field(default=(), description="Task가 발생시키면 안 되는 효과. 로컬 파일 mutation과 외부 시스템 효과를 별도 항목으로 작성하고 각 external 값을 해당 범위에 맞춘다.")
     required_capabilities: tuple[str, ...] = ()
     acceptance_criteria: tuple[str, ...] = Field(min_length=1)
-    validations: tuple[ValidationContract, ...] = Field(min_length=1)
+    validations: tuple[ValidationContract, ...] = Field(min_length=1, description="이 Task 완료 전에 필요한 실제 검사 계약. Goal이 이 Task에 요구한 검사 목적·method·필수 evidence 종류를 보존한다. 후속 Task 검사, 모델 배정, AC 문장이나 integration validation으로 자체 필수 검증을 대체하지 않는다.")
     risk_level: RiskLevel
     risk_tags: tuple[str, ...] = ()
     approval_class: ApprovalClass = ApprovalClass.PLAN_ACTIVATION
@@ -157,7 +169,7 @@ class PlanDependencyDraft(EngineModel):
 class PlanGoalCoverageDraft(EngineModel):
     criterion_id: str
     task_refs: tuple[str, ...] = Field(min_length=1)
-    validation_ids: tuple[str, ...] = Field(min_length=1, description="해당 AC를 검사하는 Task 또는 integration validation ID. Core의 독립 Goal Test는 integration validation ID로 연결한다.")
+    validation_ids: tuple[str, ...] = Field(min_length=1, description="해당 AC를 검사하는 실제 Task 또는 integration validation ID. Task별 검증 요구에는 적용 대상 Task들의 자체 검사 ID를 연결하며, Core의 독립 Goal Test는 integration validation ID로 연결한다.")
 
 
 class PlanExpansionDraft(EngineModel):
@@ -494,7 +506,9 @@ class PlanExpanderAdapter:
                 "produces/consumes 의미는 바꾸지 않는다. 파일·symbol·실행 명령·Context Pack은 "
                 "ready-time 상세이므로 넣지 않는다. 완료조건·validation·recovery만 구체화한다."
                 "독립 Goal Test는 integration_validations에 넣고 Task validation과 분리한다. "
-                "Skeleton의 detail_requirements에 있는 검사 책임을 해당 validation에 반영한다. "
+                "Goal의 Task별 필수 검증은 적용 대상 Task의 validations에 보존한다. "
+                "Skeleton의 detail_requirements도 같은 적용 범위로 해석하며, 모든 Task 완료 후 "
+                "Goal Test 책임만 별도 integration validation에 반영한다. "
                 "Skeleton에 책임 충돌이 남아 있어도 Task를 몰래 삭제·재정의해 우회하지 않는다. "
                 "required_evidence_kinds는 schema의 enum만 사용한다. 구체적인 검사 목적은 statement에 쓴다. "
                 "deterministic 검사는 file·diff·command·test·build, semantic 검사는 model_review, "
