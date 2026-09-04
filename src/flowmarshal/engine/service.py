@@ -1100,7 +1100,8 @@ class EngineService:
     ) -> TaskExecutionSpecRevision:
         """비권위 운영 상세 후보를 현재 authority revision들에 결속한다."""
 
-        from .context import ContextSelector, PromptAssembler, read_context_fragment
+        from .context import ContextSelector, PromptAssembler
+        from .worker_prompt import assemble_worker_prompt
 
         with self.ledger.read() as connection:
             task_row = connection.execute(
@@ -1270,37 +1271,7 @@ class EngineService:
             request = selection.additional_context_request
             assert request is not None
             raise ContextRequiredError(request)
-        reference_blocks: list[tuple[str, str]] = []
-        for fragment in selection.manifest.fragments:
-            try:
-                reference_blocks.append(
-                    (f"{fragment.source_ref}#{fragment.selector}", read_context_fragment(root, fragment))
-                )
-            except (OSError, ValueError) as error:
-                raise EngineServiceError(
-                    f"Context fragment를 읽을 수 없습니다: {fragment.source_ref}: {error}"
-                ) from error
-        final_prompt = PromptAssembler().assemble(
-            static_policy=(
-                "활성 PlanContract가 지정한 Task 하나만 수행한다. Core 원장을 직접 변경하거나 "
-                "다음 Task를 선택하지 않는다."
-            ),
-            project_policy=canonical_json(profile.definition),
-            stage_schema=(
-                "실제 변경과 실행 결과를 보고하되 완료 여부는 주장하지 말고, "
-                "검증 가능한 파일·명령 evidence 위치를 제시한다."
-            ),
-            task_instruction=task.objective,
-            reference_blocks=reference_blocks,
-        )
-        manifest = ContextManifest(
-            context_pack_id=selection.manifest.context_pack_id,
-            fragments=selection.manifest.fragments,
-            prompt_binding=final_prompt.binding,
-            total_token_estimate=selection.manifest.total_token_estimate,
-            selection_rationale=selection.manifest.selection_rationale,
-            missing_context=selection.manifest.missing_context,
-        )
+        manifest = selection.manifest
         executor, validator = self.assignment_resolver.resolve_contract(task.assignment, inventory)
         revision_no = 1 if current_spec is None else int(current_spec["revision_no"]) + 1
         supersedes = None if current_spec is None else current_spec["id"]
@@ -1331,6 +1302,15 @@ class EngineService:
             timeout_seconds=proposal.timeout_seconds,
             idempotency_key=idempotency_key,
         )
+        try:
+            bundle = assemble_worker_prompt(
+                task=task, definition=definition, profile=profile.definition, root=root,
+            )
+        except (OSError, ValueError) as error:
+            raise EngineServiceError(f"Worker Context 조립 실패: {error}") from error
+        definition = definition.model_copy(update={
+            "context_manifest": manifest.model_copy(update={"prompt_binding": bundle.binding}),
+        })
         spec = TaskExecutionSpecRevision(
             execution_spec_revision_id=new_id("execution_spec"),
             task_id=task.task_id,
@@ -1451,6 +1431,19 @@ class EngineService:
                 raise EngineServiceError(f"ExecutionSpec revision_no는 {expected_no}여야 합니다.")
             if current is not None and spec.supersedes_execution_spec_revision_id != current["id"]:
                 raise EngineServiceError("새 ExecutionSpec은 현재 revision을 supersede해야 합니다.")
+            # 수동 명세도 동일한 Core 조립 결과에 결속하며 본문 게시가 먼저 완료돼야 한다.
+            from .worker_prompt import PromptArtifactStore, assemble_worker_prompt
+            project = tx.one("SELECT root FROM projects WHERE id = ?", (task["project_id"],))
+            try:
+                bundle = assemble_worker_prompt(
+                    task=task_contract, definition=spec.definition,
+                    profile=profile.definition, root=Path(project["root"]),
+                )
+                if bundle.binding != spec.definition.context_manifest.prompt_binding:
+                    raise ValueError("PROMPT_BINDING_MISMATCH: Core 조립 본문과 명세가 다릅니다.")
+                PromptArtifactStore(self.ledger.artifact_root).put(bundle)
+            except (OSError, ValueError) as error:
+                raise EngineServiceError(f"Worker Prompt 저장 실패: {error}") from error
             if current is not None:
                 tx.connection.execute(
                     "UPDATE execution_spec_revisions SET is_current = 0 WHERE id = ?",

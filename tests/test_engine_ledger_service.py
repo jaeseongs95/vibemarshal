@@ -215,6 +215,12 @@ class EngineServiceFixture(unittest.TestCase):
             resource_locks=(f"project:{self.project_id}",),
             idempotency_key=f"test-engine-{task.task_id}",
         )
+        from flowmarshal.engine.worker_prompt import assemble_worker_prompt
+        bundle = assemble_worker_prompt(task=task, definition=definition,
+                                        profile=self.profile.definition, root=self.root)
+        definition = definition.model_copy(update={
+            "context_manifest": definition.context_manifest.model_copy(update={"prompt_binding": bundle.binding}),
+        })
         return TaskExecutionSpecRevision(
             execution_spec_revision_id=new_id("execution_spec"),
             task_id=task.task_id,
@@ -377,6 +383,12 @@ class EngineLedgerServiceTests(EngineServiceFixture):
         spec_definition = spec.definition.model_copy(
             update={"validation_steps": (manual_step,)}
         )
+        from flowmarshal.engine.worker_prompt import assemble_worker_prompt
+        bundle = assemble_worker_prompt(task=manual_task, definition=spec_definition,
+                                        profile=self.profile.definition, root=self.root)
+        spec_definition = spec_definition.model_copy(update={
+            "context_manifest": spec_definition.context_manifest.model_copy(update={"prompt_binding": bundle.binding}),
+        })
         spec = spec.model_copy(
             update={
                 "definition": spec_definition,

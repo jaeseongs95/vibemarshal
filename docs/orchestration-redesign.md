@@ -142,6 +142,10 @@ Python symbol은 AST의 실제 정의 범위를 선택한다. decorator·async �
 
 Context fragment의 `content_digest`는 파일 전체의 byte digest를 유지한다. 선택과 Prompt 조립이 같은 범위 복원 함수를 사용하고 source·selector·실제 본문을 Prompt binding에 결속한다. 선택 이후 파일이 바뀌면 조립과 실행 예약을 차단한다. `token_estimate`는 선택 문자열의 UTF-8 byte 수를 4로 나눈 올림값이며 4,000-token 상한으로 자르지 않는다. 이는 Context 본문에 대한 휴리스틱으로, Prompt의 다른 영역이나 provider 실측 사용량을 대신하지 않는다.
 
+Worker PromptBundle에는 전체 Task 계약, Execution Spec의 운영 상세 projection과 선택 Context 본문을 포함한다. projection에서 `context_manifest.prompt_binding`과 파생 spec digest를 제외하여 자기참조를 막는다. 네 segment digest를 가진 binding의 canonical digest로 artifact를 식별하고, 완성된 임시 파일을 덮어쓰기 없는 원자적 게시로 저장한 뒤 명세를 등록한다. 게시 뒤 DB 등록 전에 중단되면 권위 명세 없는 artifact만 남으며 실행 권한이 되지 않는다. 수동 명세도 Core 조립 결과와 binding이 일치해야 한다.
+
+Dispatcher는 초기 실행과 기존 thread 재개 모두 저장된 bundle의 binding·segment digest를 검증하여 실제 본문을 전송한다. 누락·변조 시 임의 Prompt나 과거 Task·Spec 문자열 조립으로 우회하지 않는다. Worker가 변경한 파일로 재개 Prompt를 다시 만들지 않고 원래 저장 본문을 유지하며, 재개 안내문까지 포함한 최종 전송 문자열의 canonical digest를 turn intent의 `prompt_digest`에 기록한다. semantic Validator는 실행 후 직접 evidence catalog를 사용해 독립 입력을 구성한다. 이 artifact 무결성 계약은 OS 권한을 제한하는 보안 경계나 저장장치 전원 장애에 대한 완전한 내구성 보장이 아니다.
+
 ## 6. Skeleton-first Planning
 
 ```text

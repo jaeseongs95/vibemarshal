@@ -972,7 +972,14 @@ class EngineDispatcher:
         validation_id: str | None,
     ) -> tuple[Any, str, dict[str, Any] | None]:
         if row["kind"] == AttemptKind.EXECUTION.value:
-            return spec.definition.executor, canonical_task_prompt(row["task_json"], spec), None
+            from .worker_prompt import PromptArtifactError, PromptArtifactStore
+            try:
+                bundle = PromptArtifactStore(self.service.ledger.artifact_root).load(
+                    spec.definition.context_manifest.prompt_binding
+                )
+            except PromptArtifactError as error:
+                raise EngineServiceError(str(error)) from error
+            return spec.definition.executor, bundle.rendered, None
         if spec.definition.validator is None:
             raise EngineServiceError("semantic validation용 독립 validator binding이 없습니다.")
         if validation_id is None:
@@ -1031,7 +1038,7 @@ class EngineDispatcher:
     def _dispatch_reserved(self, attempt_id: str, *, validation_id: str | None = None) -> None:
         row, spec = self._attempt_context(attempt_id)
         cwd = Path(row["root"])
-        role, prompt, output_schema = self._role_for_attempt(
+        role, _prompt, _output_schema = self._role_for_attempt(
             row, spec, validation_id=validation_id
         )
         self._verify_policy(cwd)
@@ -1081,9 +1088,6 @@ class EngineDispatcher:
             row=row,
             spec=spec,
             thread_id=thread_receipt.binding.thread_id,
-            role=role,
-            prompt=prompt,
-            output_schema=output_schema,
             attempt_key=attempt_key,
             validation_id=validation_id,
         )
@@ -1094,12 +1098,14 @@ class EngineDispatcher:
         row: Any,
         spec: TaskExecutionSpecRevision,
         thread_id: str,
-        role: Any,
-        prompt: str,
-        output_schema: dict[str, Any] | None,
         attempt_key: str,
         validation_id: str | None,
+        resumed: bool = False,
     ) -> None:
+        # 전송 직전에 다시 읽는다. 호출자가 임의 본문으로 대체할 인자는 두지 않는다.
+        role, prompt, output_schema = self._role_for_attempt(row, spec, validation_id=validation_id)
+        if resumed:
+            prompt = "이전 turn이 중단되었습니다. 같은 TaskContract 범위에서 재개하세요.\n" + prompt
         request = {
             "thread_id": thread_id,
             "prompt_digest": sha256_digest(prompt),
@@ -1139,7 +1145,7 @@ class EngineDispatcher:
             if row["kind"] == AttemptKind.VALIDATION.value
             else None
         )
-        role, prompt, output_schema = self._role_for_attempt(
+        role, _prompt, _output_schema = self._role_for_attempt(
             row, spec, validation_id=validation_id
         )
         cwd = Path(row["root"])
@@ -1176,11 +1182,9 @@ class EngineDispatcher:
             row=row,
             spec=spec,
             thread_id=binding.thread_id,
-            role=role,
-            prompt="이전 turn이 중단되었습니다. 같은 TaskContract 범위에서 재개하세요.\n" + prompt,
-            output_schema=output_schema,
             attempt_key=f"{attempt_key}:resumed",
             validation_id=validation_id,
+            resumed=True,
         )
 
     def _observe_as_outcome(self, attempt_id: str) -> RunOnceOutcome:
@@ -1753,15 +1757,3 @@ class EngineDispatcher:
         if binding.turn_id is None:
             raise EngineServiceError("interrupt할 turn binding이 없습니다.")
         return self.runtime.interrupt(thread_id=binding.thread_id, turn_id=binding.turn_id)
-
-
-def canonical_task_prompt(task_json: str, spec: Any) -> str:
-    from ..canonical import canonical_json
-
-    return (
-        "다음 TaskContract 하나만 수행하고 결과와 검증 가능한 evidence를 보고하세요.\n"
-        "TaskContract:\n"
-        + task_json
-        + "\nExecutionSpec:\n"
-        + canonical_json(spec.definition)
-    )

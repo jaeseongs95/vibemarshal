@@ -823,7 +823,7 @@ def _contract(
 ) -> EvaluationContract:
     import inspect
     from .execution import ProviderExecutionPreparation, GoalTestPreparation, EXECUTION_PREPARATION_INSTRUCTIONS, GOAL_TEST_PREPARATION_INSTRUCTIONS
-    from .runtime import canonical_task_prompt
+    from .worker_prompt import assemble_worker_prompt, PromptArtifactStore
     from .roles import strict_json_output_schema
     fixture_digests = tuple(
         sha256_digest({"scenario": scenario, "source_fixture_digest": source_digest})
@@ -846,7 +846,9 @@ def _contract(
         taxonomy_digest=sha256_digest(
             {"requirements": ["digest", "binding", "evidence", "validation", "goal", "history"]}
         ),
-        prompt_digest=sha256_digest({"task": inspect.getsource(canonical_task_prompt),
+        prompt_digest=sha256_digest({"task": inspect.getsource(assemble_worker_prompt),
+                                    "artifact": inspect.getsource(PromptArtifactStore),
+                                    "turn": inspect.getsource(EngineDispatcher._start_turn),
                                     "preparation": EXECUTION_PREPARATION_INSTRUCTIONS,
                                     "goal_preparation": GOAL_TEST_PREPARATION_INSTRUCTIONS,
                                     "validator": inspect.getsource(EngineDispatcher._role_for_attempt),

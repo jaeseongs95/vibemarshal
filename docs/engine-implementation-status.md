@@ -4,12 +4,13 @@
 
 ## 결론
 
-현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. A1의 Task·Goal 준비 경계에 이어 A2에서 예산 적용 후 필수 Context 보장, Python symbol의 실제 범위 선택, 본문 기준 token 추정과 운영 artifact 색인 제외를 구현했다. 현재 source와 검증 범위는 [A2 인계 기록](alpha-a2-handoff.md)에 기록한다. A3~A5와 실제 모델 검증은 다음 완료 단위이며, 이전 source의 PASS를 현재 qualification으로 재사용하지 않는다.
+현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. A1의 Task·Goal 준비 경계, A2의 필수 Context 보장에 이어 A3에서 불변 PromptBundle 저장과 실제 Worker 전송 경로를 연결했다. 현재 source와 검증 범위는 [A3 인계 기록](alpha-a3-handoff.md)에 기록한다. A4·A5의 실제 모델 검증은 다음 완료 단위이며, 이전 source의 PASS를 현재 qualification으로 재사용하지 않는다.
 
 ## 반영한 구현
 
 - `ExecutionSpecProposal`을 Core가 최신 Goal·Plan·State·Project Map과 실제 model inventory에 결속해 컴파일한다.
 - Context의 모든 필수 본문과 정책이 예산 내에 남아야 컴파일한다. 부족하면 `run once`가 `CONTEXT_REQUIRED`와 누락 need·이유를 반환한다. Python AST 행 범위를 Prompt 조립에도 적용하고 파일 전체 digest로 freshness를 유지한다. 기본 운영 디렉터리와 설정된 artifact root는 Goal·State·실행 준비의 일반 source 색인에서 제외한다.
+- Task 계약·운영 상세·선택 Context를 `artifact_root/worker-prompts/<binding digest>.json`에 덮어쓰기 없이 원자적으로 게시한 뒤 명세를 등록한다. 초기 실행과 재개는 binding·segment digest를 다시 검사한 저장 본문을 전송한다. 재개 안내문을 포함한 최종 문자열을 turn intent에 결속하며 semantic Validator는 실행 후 evidence로 별도 입력을 구성한다. artifact가 없는 과거 명세는 임의 본문으로 실행하지 않는다. 수동 명세도 동일한 `assemble_worker_prompt` 조립 결과에 binding을 맞춰야 한다.
 - `run once`는 기존 Attempt 관측·복구, validation, ready Task materialization, dispatch, Goal Test 순서로 한 단계만 전진하고 typed `RunOnceOutcome`을 반환한다.
 - worker 완료 메시지와 Task 완료를 분리하고 직접 파일·diff·명령 evidence, typed validation, Task 완료 후 State·Project Map 재관측을 연결했다.
 - 외부 source 등록·digest 검사, 역할별 strict 설정, manual/external 관측 경로와 실패별 repair 제안을 추가했다.
@@ -109,7 +110,7 @@ SDK에 묶인 Codex 0.147.0에서는 응답 API의 404로 첫 역할 cell을 완
 
 ## 남은 작업
 
-아래 항목은 장기 qualification 후속 목록이다. 현재 실행 순서는 [A2 인계 기록](alpha-a2-handoff.md)의 A3 → A4·A5이며, 기능 Alpha가 닫히기 전 전체 campaign을 재실행하지 않는다.
+아래 항목은 장기 qualification 후속 목록이다. 현재 실행 순서는 [A3 인계 기록](alpha-a3-handoff.md)의 A4 → A5이며, 기능 Alpha가 닫히기 전 전체 campaign을 재실행하지 않는다.
 
 1. 역할 회귀의 직접 evidence를 분석해 검토 입력·역할 지침의 최소 범위만 보완하고 새 계약으로 다시 평가한다. oracle와 합격선은 유지한다.
 2. 전체 planning Gate를 통과시키고 사용량 제한 재개의 실제 qualification을 보강한다. 실제 E2E 네 시나리오는 통과했지만 사용량 제한을 고의로 유발한 별도 실측을 대신하지 않는다. 모의 회귀 테스트를 실제 PASS로 대체하지 않는다.

@@ -401,6 +401,12 @@ def run_synthetic_lifecycle(
         resource_locks=(f"project:{project_id}",),
         idempotency_key=f"flowmarshal-engine-{task.task_id}",
     )
+    from .worker_prompt import assemble_worker_prompt
+    bundle = assemble_worker_prompt(task=task, definition=spec_definition,
+                                    profile=profile.definition, root=root)
+    spec_definition = spec_definition.model_copy(update={
+        "context_manifest": spec_definition.context_manifest.model_copy(update={"prompt_binding": bundle.binding}),
+    })
     spec = TaskExecutionSpecRevision(
         execution_spec_revision_id=new_id("execution_spec"),
         task_id=task.task_id,
