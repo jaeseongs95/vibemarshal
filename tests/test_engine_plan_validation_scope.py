@@ -11,6 +11,7 @@ from flowmarshal.engine.context import ProjectMapper
 from flowmarshal.engine.domain import (
     CandidateStatus,
     GoalCriterion,
+    GoalConstraint,
     GoalContractRevision,
     IntegrationValidationContract,
     SourceTrace,
@@ -28,7 +29,11 @@ from flowmarshal.engine.planner_roles import (
     SkeletonGeneratorAdapter,
     SkeletonReviewerAdapter,
 )
-from flowmarshal.engine.planning import SkeletonFirstPlanner, plan_validation_scope_rows
+from flowmarshal.engine.planning import (
+    SkeletonFirstPlanner,
+    goal_validation_requirement_rows,
+    plan_validation_scope_rows,
+)
 from flowmarshal.engine.roles import ScriptedStructuredRoleRunner
 from flowmarshal.engine.service import EngineService, EngineServiceError
 
@@ -220,6 +225,14 @@ class PlanValidationScopeRegressionTests(unittest.TestCase):
                     criterion_id="ac_003",
                     statement="기존 unittest가 Task 검증에서 실제로 실행되어 통과한다.",
                     validation_intent="task phase가 실제 실행하는 기존 unittest command/test evidence를 연결한다.",
+                    trace_refs=("trace_one",),
+                ),
+            ),
+            "constraints": (
+                GoalConstraint(
+                    constraint_id="constraint_semantic_task_review",
+                    category="validation",
+                    statement="각 Task는 분리 Validator의 독립 semantic 검토를 받아야 한다.",
                     trace_refs=("trace_one",),
                 ),
             ),
@@ -530,6 +543,43 @@ class PlanValidationScopeRegressionTests(unittest.TestCase):
             },
         ]
         self.assertEqual(expected_rows, plan_validation_scope_rows(indexed_plan))
+        expected_requirement_rows = [
+            {
+                "source_kind": "acceptance_criterion", "source_id": "ac_task_scope",
+                "source_order": 0, "selector": "hard_acceptance[0]",
+                "statement": "Task 검증은 task phase가 실제 지원하는 파일·보존·공개 계약·기존 unittest 범위를 확인한다.",
+                "validation_intent": "등록 oracle.py task phase와 분리 Validator evidence를 사용한다.",
+                "trace_refs": ("trace_one",),
+            },
+            {
+                "source_kind": "acceptance_criterion", "source_id": "ac_behavior",
+                "source_order": 1, "selector": "hard_acceptance[1]",
+                "statement": "add는 양수·음수·0 정수의 합을 반환한다.",
+                "validation_intent": "독립 goal phase의 고정 동작 검사를 실행한다.",
+                "trace_refs": ("trace_one",),
+            },
+            {
+                "source_kind": "acceptance_criterion", "source_id": "ac_goal_phase",
+                "source_order": 2, "selector": "hard_acceptance[2]",
+                "statement": "공개 함수의 위치·키워드 호출 계약을 보존한다.",
+                "validation_intent": "독립 goal phase의 위치·키워드 호출 검사를 실행한다.",
+                "trace_refs": ("trace_one",),
+            },
+            {
+                "source_kind": "acceptance_criterion", "source_id": "ac_003",
+                "source_order": 3, "selector": "hard_acceptance[3]",
+                "statement": "기존 unittest가 Task 검증에서 실제로 실행되어 통과한다.",
+                "validation_intent": "task phase가 실제 실행하는 기존 unittest command/test evidence를 연결한다.",
+                "trace_refs": ("trace_one",),
+            },
+            {
+                "source_kind": "global_constraint", "source_id": "constraint_semantic_task_review",
+                "source_order": 0, "selector": "constraints[0]", "category": "validation",
+                "statement": "각 Task는 분리 Validator의 독립 semantic 검토를 받아야 한다.",
+                "trace_refs": ("trace_one",),
+            },
+        ]
+        self.assertEqual(expected_requirement_rows, goal_validation_requirement_rows(contract))
 
         changed_validation = unlinked_validation.model_copy(update={
             "statement": "기여 AC에 연결하지 않은 변경된 Validator 검토를 수행한다.",
@@ -562,6 +612,14 @@ class PlanValidationScopeRegressionTests(unittest.TestCase):
                 risk_route="compact_plan_reviewer",
             )
         self.assertEqual(expected_rows, runner.calls[0].payload["validation_scope_rows"])
+        self.assertEqual(
+            expected_requirement_rows,
+            runner.calls[0].payload["goal_validation_requirement_rows"],
+        )
+        self.assertEqual(
+            expected_requirement_rows,
+            runner.calls[1].payload["goal_validation_requirement_rows"],
+        )
         self.assertNotEqual(runner.calls[0].request_digest, runner.calls[1].request_digest)
 
 

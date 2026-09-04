@@ -44,6 +44,7 @@ from .domain import (
 from .goal import FindingDraft, ReviewDraft
 from .planning import (
     compact_project_map,
+    goal_validation_requirement_rows,
     skeleton_input_catalog,
     plan_review_evidence_catalog,
     plan_validation_scope_rows,
@@ -99,33 +100,38 @@ PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS = (
     "포함한 모든 Task의 검증 완료나 이후 Core Goal Test 결과를 기다리면 계약의 자기의존을 "
     "직접 evidence로 지적한다. 자연어 선행조건 충돌을 명시적 DAG cycle이나 관측된 교착으로 "
     "단정하지 않는다."
-    "Goal이 각 Task 또는 특정 범위 Task의 완료 전에 요구한 검증은 AC 기여 관계와 별개인 "
+    "Goal의 AC 또는 전역 constraint가 각 Task 또는 특정 범위 Task의 완료 전에 요구한 검증은 AC 기여 관계와 별개인 "
     "해당 Task 자체의 필수 책임이다. Goal의 적용 범위를 각 Task와 대조하고, 상세 Plan에서는 "
     "그 Task.validations에 검사 목적·method·필수 evidence 종류를 보존한다. 후속 검증 Task나 "
     "integration validation에만 검사를 두거나 acceptance_criteria에 문장만 적어 이를 대체하지 않는다. "
     "Core는 선행 Task 자체의 validation을 통과한 뒤 dependency를 해제하므로, 그 Task의 완료에 "
     "필요한 evidence를 후속 Task에서 받도록 계획하지 않는다. Executor/Validator 모델 배정과 "
-    "independence_required는 역할 배정이며 검증 호출·evidence를 대신하지 않는다. 예를 들어 Goal이 "
+    "independence_required는 역할 배정이며 검증 호출·evidence를 대신하지 않는다. 예를 들어 AC가 "
     "해당 Task에 실제 테스트·파일 범위 검사와 독립 모델 검토를 요구하면 그 Task에 deterministic "
     "command/test·file/diff 검사와 semantic model_review 검사를 각각 명시한다. 이러한 검사 종류를 "
     "Goal의 요구 범위 밖 Task에 일괄 강제하지 않는다. Task별 필수 검증은 detail_requirements나 "
     "contributes_to에 반복되지 않아도 Goal에서 상속하며, 상세 Plan에서 실제 누락된 경우에만 "
     "Goal과 해당 Task.validations를 직접 근거로 지적한다."
+    "Goal의 검사 요구는 두 출처로 분리한다. 전역 constraint가 Task 검증을 요구하면 적용 Task의 "
+    "validations에 그 검사가 존재하는지 먼저 확인한다. 이 전역 의무만으로 특정 AC의 validation_ids "
+    "연결을 추정하지 않는다. 반대로 AC의 statement 또는 validation_intent가 검사 대상·절차·적용 "
+    "범위를 명시하면, 그 절차를 실제 수행하는 validation ID를 해당 AC에 연결한다. AC가 명시적으로 "
+    "semantic 검토를 요구한 경우에만 그 semantic ID도 같은 방식으로 연결한다. 검사 문장의 동작·공개 "
+    "계약 언급, 전역 의무, evidence 종류나 단순 선후조건만으로 다른 AC에 semantic ID를 일괄 연결하지 "
+    "않는다. "
     "Skeleton과 Plan 작성 draft의 goal_coverage.task_refs는 기여 Task 집합이다. Compiler는 "
     "draft의 task_refs를 Task.task_id로 변환하여 PlanContractDefinition.goal_coverage.task_ids에 "
     "기록한다. Reviewer가 받는 컴파일된 Plan의 task_ids는 정상 필드다. 실제 Task.task_id에 "
     "대조해 연결을 확인하고 Task.task_ref로 대응시켜 기여 집합을 비교한다. 이를 task_refs로 "
     "바꾸라고 요구하거나 내부 task_id 자체를 잘못된 참조로 판정하지 않는다. Reviewer finding의 "
     "affected_task_refs는 별도로 Task.task_ref를 사용한다. "
-    "기여 Task 연결과 validation_ids는 서로 다른 연결이다. draft의 task_refs는 "
-    "Skeleton의 기여 Task 집합을 그대로 보존한다. validation_ids의 소유 Task를 그 task_refs로 "
-    "제한하지 않는다. Goal이 각 Task에 검증을 요구하면 해당 AC의 validation_ids에는 적용 대상 "
-    "모든 Task의 자체 검사 ID를 연결한다. 예를 들어 검증 AC의 task_refs가 후속 검증 Task B뿐이어도 "
-    "Goal이 변경 Task A와 B 각각의 검증을 요구하면 A와 B의 검사 ID가 모두 필요하다. 이 연결을 "
-    "추가하려고 task_refs나 contributes_to를 바꾸지 않는다. 특정 Task에만 적용되는 요구는 그 "
-    "범위를 유지한다. 검토 시 Task 자체의 필수 검사 존재와 해당 AC.validation_ids의 연결을 "
-    "각각 확인한다. 검사 계약이 존재해도 AC 연결이 빠졌으면 Goal·해당 Task.validations·"
-    "goal_coverage를 직접 근거로 누락을 지적한다."
+    "기여 Task 연결과 validation_ids는 서로 다른 연결이다. draft의 task_refs는 Skeleton의 기여 "
+    "Task 집합을 그대로 보존하고 validation_ids의 소유 Task를 그 task_refs로 제한하지 않는다. AC가 "
+    "명시한 절차가 여러 적용 Task에서 수행되면 그 검사 ID를 모두 연결하되, 이 연결을 추가하려고 "
+    "task_refs나 contributes_to를 바꾸지 않는다. 특정 Task에만 적용되는 요구는 그 범위를 유지한다. "
+    "검토 시 전역 Task 검사 존재와 AC별 validation_ids 연결을 각각 확인한다. 검사 계약이 존재해도 "
+    "명시 AC 연결만 빠졌으면 Goal·해당 Task.validations·goal_coverage를 직접 근거로 연결 누락을 "
+    "지적하고, 실행 누락이나 새 검사 의무로 바꾸지 않는다."
 )
 
 
@@ -154,24 +160,30 @@ PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS = (
     "뜻이며 독립적으로 확인한 결함을 숨기라는 뜻이 아니다. "
     "검사 수단·phase는 계약 의미로 식별할 수 있고 구체 argv는 ready-time에 확정한다. 이미 "
     "명시한 수단과 검사 목적의 충돌을 이후 명령 변경으로 해결할 운영 상세로 분류하지 않는다. "
-    "정상 Task 검사와 independent Goal Test의 범위 차이, 명시된 별도 실제 검사 책임은 허용한다. "
-    "불완전한 자료와 확인된 모순은 구분하며, 없는 검사 능력이나 근거 없는 누락을 만들지 않는다."
+    "required_evidence_kinds는 해당 validation 계약이 요구하는 evidence 종류이지, 이후 semantic "
+    "Validator에 제공할 직접 evidence catalog의 허용 목록이 아니다. 현재 실행의 file·diff·command·"
+    "test·build 직접 관측은 이 목록에 없다는 이유로 제외됐다고 추정하지 않는다. "
+    "external_observation Worker 보고의 포함 여부만 별도 계약으로 제어한다. 실행 전 Plan 검토에서 "
+    "아직 없는 runtime catalog의 누락을 finding으로 만들지 않는다. 정상 Task 검사와 independent Goal "
+    "Test의 범위 차이, 명시된 별도 실제 검사 책임은 허용한다. 불완전한 자료와 확인된 모순은 "
+    "구분하며, 없는 검사 능력이나 근거 없는 누락을 만들지 않는다."
 )
 
 
 PLAN_VALIDATION_TRACE_INSTRUCTIONS = (
-    "상세 Plan의 검사 연결은 각 AC에서 필요한 검사로, 각 검사에서 해당 AC로 양방향 대조한다. "
-    "먼저 Goal의 statement·validation_intent에서 검사 대상·절차·적용 Task 범위를 확인한다. "
-    "다음으로 모든 validation.statement 전체를 읽어 그 요구를 실제 수행하는 검사 ID를 찾고 "
-    "해당 goal_coverage.validation_ids와 비교한다. ID 이름이나 대표 검사 하나로 판단하지 않는다. "
-    "한 검사가 파일 보존·공개 계약·기존 테스트 실행을 함께 맡으면 그 문장 안의 각 검사 책임을 "
-    "각각 해당 AC에 연결한다. 예를 들어 각 Task의 기존 테스트 실행을 요구하는 AC에는, 이름에 "
-    "test가 없어도 그 실행을 포함하는 복합 Task 검사 ID가 필요하다. 다른 Task나 Goal 검사 "
-    "ID가 이미 연결되어 있어도 적용 대상 Task의 필수 검사 연결을 대신하지 않는다. "
-    "검사 자체가 존재하지만 ID만 빠진 경우에는 연결 누락으로 지적하고 실행 누락이나 새 검사 "
-    "추가 의무로 바꾸지 않는다. 단순 선후조건, 같은 파일·evidence 종류나 선택적 부가 검사만으로 "
-    "모든 AC에 연결하지 않는다. Reviewer는 Goal·검사 원문·실제 coverage를 직접 evidence로 "
-    "대조하고, 작성자는 동일한 기준으로 검사 문장과 연결을 함께 완성한다."
+    "상세 Plan의 검사 검토는 다음 순서로 한다. 1) Goal의 전역 constraints가 요구한 Task 자체 "
+    "validation의 존재를 확인한다. 2) AC의 statement·validation_intent가 명시한 검사 대상·절차·"
+    "적용 범위를 읽고, 모든 validation.statement 전체에서 그 절차를 실제 수행하는 ID를 찾아 해당 "
+    "goal_coverage.validation_ids와 양방향 대조한다. 3) 등록 수단의 phase·mode 능력과 검사 문장의 "
+    "주장을 대조한다. 4) Worker의 응답 제출과 후속 Validator 결과의 순서를 확인한다. "
+    "전역 constraint의 검사 존재와 AC별 ID 연결은 별도 판정이다. 전역 semantic 의무나 검사 문장의 "
+    "동작·공개 계약 언급을 모든 AC의 연결 의무로 확대하지 않는다. 반대로 AC가 명시한 절차라면 "
+    "이름에 test가 없어도 그 절차를 포함하는 복합 검사 ID를 빠뜨리지 않는다. 다른 Task나 Goal 검사 "
+    "ID가 이미 연결되어 있어도 적용 대상의 명시 검사 연결을 대신하지 않는다. 검사 자체가 존재하지만 "
+    "ID만 빠진 경우에는 연결 누락으로 지적하고 실행 누락이나 새 검사 의무로 바꾸지 않는다. 단순 "
+    "선후조건, 같은 파일·evidence 종류 또는 선택적 부가 검사만으로 모든 AC에 연결하지 않는다. "
+    "Reviewer는 Goal·검사 원문·실제 coverage를 직접 evidence로 대조하고, 작성자는 동일한 기준으로 "
+    "검사 문장과 연결을 함께 완성한다."
 )
 
 
@@ -286,7 +298,7 @@ class PlanDependencyDraft(EngineModel):
 class PlanGoalCoverageDraft(EngineModel):
     criterion_id: str
     task_refs: tuple[str, ...] = Field(min_length=1, description="Skeleton의 해당 AC 기여 Task 집합을 그대로 보존한다. validation_ids 소유 Task의 허용 목록이 아니며 검사 ID를 연결하려고 이 집합을 확대하지 않는다.")
-    validation_ids: tuple[str, ...] = Field(min_length=1, description="해당 AC를 검사하는 실제 Task 또는 integration validation ID. 모든 검사 statement의 복합 책임을 읽고 AC의 statement·validation_intent·적용 범위와 대조한다. 다른 ID가 이미 연결되어도 해당 요구를 수행하는 필수 Task 검사 ID를 빠뜨리지 않는다. Goal의 요구가 적용되는 Task는 task_refs에 없어도 자체 필수 검사 ID를 모두 연결하며 소유 Task를 task_refs로 제한하지 않는다. 단순 선후조건이나 선택적 부가 검사로 전체 ID를 일괄 연결하지 않는다. Core의 독립 Goal Test는 integration validation ID로 연결한다.")
+    validation_ids: tuple[str, ...] = Field(min_length=1, description="해당 AC의 statement·validation_intent가 명시한 절차를 실제 수행하는 Task 또는 integration validation ID. 모든 검사 statement의 복합 책임과 AC의 적용 범위를 대조한다. 전역 constraint가 요구한 Task 자체 검사는 존재를 보존하되, 그 전역 의무만으로 각 AC에 ID 연결을 추정하지 않는다. AC가 명시한 절차를 수행하는 필수 Task 검사 ID는 소유 Task가 task_refs에 없어도 다른 ID가 이미 연결돼도 빠뜨리지 않는다. 단순 선후조건·검사 문장의 연관 표현·선택적 부가 검사로 전체 ID를 일괄 연결하지 않는다. Core의 독립 Goal Test는 integration validation ID로 연결한다.")
 
 
 class PlanExpansionDraft(EngineModel):
@@ -630,7 +642,9 @@ class PlanExpanderAdapter:
                 "unittest를 실제 실행해 통과를 확인한다고 명시한다. 이를 일반 동작 확인·test evidence "
                 "종류나 후속 Task의 unittest 실행으로 대체하지 않는다. 명시된 검사 대상과 종류를 "
                 "보존하되 실제 실행 명령은 ready-time 명세로 남긴다. "
-                "각 AC의 적용 범위와 Task별 검사 ID를 대조해 goal_coverage.validation_ids에도 연결한다. "
+                "payload의 goal_validation_requirement_rows는 AC 원문과 전역 constraint 원문을 구분한 "
+                "비권위 색인이다. 전역 constraint가 요구한 Task 검사 존재를 먼저 보존하고, 각 AC의 "
+                "statement·validation_intent가 명시한 절차만 goal_coverage.validation_ids에 연결한다. "
                 "검사 statement를 작성한 뒤 각 AC가 명시한 검사 절차에 해당하는 ID를 다시 확인한다. "
                 "예를 들어 한 AC가 Task phase와 Goal phase를 구분해 요구하면 두 phase의 검사 ID를 "
                 "연결한다. 단순한 선후조건만으로 모든 검사 ID를 모든 AC에 연결하지 않는다. "
@@ -659,6 +673,7 @@ class PlanExpanderAdapter:
                 "state": state.model_dump(mode="json"),
                 "project_map": compact_project_map(project_map),
                 "skeleton": candidate.model_dump(mode="json"),
+                "goal_validation_requirement_rows": goal_validation_requirement_rows(goal),
             },
             output_schema=PlanExpansionDraft.model_json_schema(),
             model=self.model,
@@ -841,6 +856,9 @@ class PlanReviewerAdapter:
                 "파일·명령의 운영 상세는 ExecutionSpec에 확정한다. read_only는 산출물 mutation 정책이며 "
                 "읽기 검사와 계획 생성 자체를 금지하지 않는다. 외부 효과는 외부 시스템·계정·제3자에 대한 효과다."
                 "affected_task_refs는 Task.task_ref를 참조하며 Core의 task_id와 혼동하지 않는다."
+                "goal_validation_requirement_rows는 AC 원문과 전역 constraint 원문을 구분한 비권위 "
+                "색인이다. 전역 constraint의 Task 검사 존재와 AC별 명시 절차의 validation_ids 연결을 "
+                "각각 검토한다. 색인에서 필수 연결 ID·phase 능력·runtime evidence 누락을 추정하지 않는다. "
                 "validation_scope_rows는 원본 Plan의 모든 Task·integration 검사를 펼친 비권위 색인이다. "
                 "각 행의 statement를 등록 자료의 실제 수단·phase와 대조하고 마지막 integration 행까지 "
                 "확인한다. linked_criterion_ids는 현재 연결 사실이며 필수 연결의 판정이 아니다. "
@@ -850,6 +868,7 @@ class PlanReviewerAdapter:
                 "case_ref": _case_ref(digest),
                 "evidence_catalog": evidence_catalog,
                 "validation_scope_rows": plan_validation_scope_rows(plan),
+                "goal_validation_requirement_rows": goal_validation_requirement_rows(goal),
             },
             output_schema=PlanReviewDraft.model_json_schema(),
             model=selected_model,

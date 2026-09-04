@@ -830,6 +830,9 @@ class ExecutionAutomationTests(unittest.TestCase):
         self.assertIn(report["id"], with_report)
         self.assertNotIn(unrelated.evidence_id, with_report)
         self.assertEqual("근거를 대조한 읽기 전용 분석 보고", with_report[report["id"]]["observation"])
+        self.assertTrue(
+            {"file", "diff"}.issubset({item["kind"] for item in with_report.values()})
+        )
 
     def test_task_semantic_catalog_excludes_truncated_worker_report(self):
         prepared, runtime = self.prepared(name="truncated-report", semantic_task_validation=True)

@@ -93,6 +93,37 @@ def plan_review_evidence_catalog(
     }
 
 
+def goal_validation_requirement_rows(goal: GoalContractRevision) -> list[dict[str, Any]]:
+    """AC별 검사 요구와 전역 검사 제약을 구분해 원문 순서대로 투영한다.
+
+    이 색인은 작성·검토 역할이 원본 Goal을 탐색할 수 있게 돕는 비권위 입력이다.
+    필수 검사 ID, 적용 Task, 수단의 phase나 evidence catalog 범위를 추정하지 않는다.
+    """
+
+    rows: list[dict[str, Any]] = []
+    for order, criterion in enumerate(goal.definition.hard_acceptance):
+        rows.append({
+            "source_kind": "acceptance_criterion",
+            "source_id": criterion.criterion_id,
+            "source_order": order,
+            "selector": f"hard_acceptance[{order}]",
+            "statement": criterion.statement,
+            "validation_intent": criterion.validation_intent,
+            "trace_refs": criterion.trace_refs,
+        })
+    for order, constraint in enumerate(goal.definition.constraints):
+        rows.append({
+            "source_kind": "global_constraint",
+            "source_id": constraint.constraint_id,
+            "source_order": order,
+            "selector": f"constraints[{order}]",
+            "category": constraint.category,
+            "statement": constraint.statement,
+            "trace_refs": constraint.trace_refs,
+        })
+    return rows
+
+
 def plan_validation_scope_rows(plan: PlanContractRevision) -> list[dict[str, Any]]:
     """검사 원문과 연결을 빠짐없이 펼친 비권위 검토 색인이다."""
 

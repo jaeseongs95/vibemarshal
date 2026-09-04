@@ -274,8 +274,18 @@ class PlanResultBoundaryRegressionTests(unittest.TestCase):
                     self.assertIn(finding_code, evaluation.decision.finding_codes)
 
                 calls = {call.role: call for call in runner.calls}
-                self.assertIn("복합 Task 검사 ID", calls["plan_expander"].instructions)
+                self.assertIn("복합 검사 ID", calls["plan_expander"].instructions)
                 self.assertIn("후속 Validator 결과", calls["compact_plan_reviewer"].instructions)
+                self.assertEqual(
+                    "acceptance_criterion",
+                    calls["plan_expander"].payload["goal_validation_requirement_rows"][0]["source_kind"],
+                )
+                self.assertEqual(
+                    "ac_unittest",
+                    calls["compact_plan_reviewer"].payload[
+                        "goal_validation_requirement_rows"
+                    ][0]["source_id"],
+                )
                 coverage = next(
                     item for item in calls["compact_plan_reviewer"].payload[
                         "evidence_catalog"

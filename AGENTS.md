@@ -100,9 +100,9 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 - 직접 증거가 있는 최소 finding만 허용하며, 상관 결함은 별도 증거가 있을 때만 추가한다.
 - Task의 AC coverage는 산출물·근거의 기여 관계이며 독립 Goal Test의 직접 실행 책임이 아니다. 생성·검토·보정·상세화는 이 경계를 공유한다. 정상 Task 검증은 허용하되 모든 Task 완료 후 Core의 integration validation을 일반 Task로 재귀 배치하지 않는다. 상세화가 Skeleton의 Task 의미를 몰래 바꾸어 충돌을 숨기지 않는다.
 - Goal과 AC 기여 관계로 전달된 요구를 선택 detail requirement에 반복하지 않았다는 이유나 후속 단계의 가상 누락 가능성만으로 Skeleton을 차단하지 않는다. 실제 AC 기여 누락·Task 요구 충돌과 상세 Plan의 독립 검사·evidence mode·validation 연결 결함은 직접 evidence로 검토한다.
-- Goal이 각 Task 또는 특정 Task의 완료 전에 요구한 검증은 해당 Task의 validation 계약에 보존한다. AC 기여 관계·완료 조건 문장·모델 배정만으로 검사 호출과 evidence를 대체하지 않으며 후속 검증 Task나 독립 Goal Test에만 넘기지 않는다. 적용 범위는 Goal에서 판단하고 모든 Task에 동일 검사 종류를 강제하지 않는다.
-- 상세 Plan의 AC 기여 Task 집합과 validation ID 연결은 독립적이다. Skeleton의 기여 집합을 보존하면서 Goal의 요구가 적용되는 Task의 필수 검사 ID를 해당 AC에 연결한다. 검사 소유 Task가 그 기여 집합에 없다는 이유로 연결을 제외하지 않으며, Reviewer는 자체 검사 존재와 AC 연결 누락을 각각 확인한다.
-- 검사 연결은 Goal의 statement·validation_intent·적용 범위와 모든 검사 문장의 복합 책임을 양방향 대조한다. ID 이름이나 이미 연결된 대표 검사만으로 필수 Task 검사 ID를 생략하지 않는다. 연결만 빠졌다면 실행 누락이나 새 검사 의무로 확대하지 않으며 단순 선후조건·선택적 부가 검사를 모든 AC에 연결하지 않는다.
+- Goal의 AC 또는 전역 constraint가 각 Task 또는 특정 Task의 완료 전에 요구한 검증은 해당 Task의 validation 계약에 보존한다. AC 기여 관계·완료 조건 문장·모델 배정만으로 검사 호출과 evidence를 대체하지 않으며 후속 검증 Task나 독립 Goal Test에만 넘기지 않는다. 적용 범위는 Goal에서 판단하고 모든 Task에 동일 검사 종류를 강제하지 않는다.
+- 상세 Plan의 AC 기여 Task 집합과 validation ID 연결은 독립적이다. Skeleton의 기여 집합을 보존하면서 **AC가 명시한 절차**가 적용되는 Task의 필수 검사 ID를 해당 AC에 연결한다. 전역 constraint만으로는 특정 AC 연결을 추정하지 않는다. 검사 소유 Task가 그 기여 집합에 없다는 이유로 연결을 제외하지 않으며, Reviewer는 자체 검사 존재와 AC 연결 누락을 각각 확인한다.
+- Plan 검토용 검사 색인에는 AC의 statement·validation_intent와 전역 constraint 원문을 구분해 함께 제공할 수 있다. 이 색인은 ID·순서·selector·원문만 투영한 비권위 입력이며 필수 연결·phase 능력·runtime evidence 범위를 추정하지 않는다. 전역 constraint가 요구한 Task 검사 존재와 AC가 명시한 절차의 validation ID 연결은 별도 판정이다. 전역 semantic 의무·검사 문장의 연관 표현·단순 선후조건만으로 모든 AC에 semantic ID 연결을 강제하지 않으며, AC가 명시한 복합 검사 절차의 ID 연결만 빠졌다면 실행 누락이나 새 검사 의무로 확대하지 않는다.
 - Worker의 작업·응답 제출, 이후 Task 검증과 Core의 완료 판정을 구분한다. Task 완료 조건에 독립 Validator 통과를 요구할 수 있지만, Worker 응답을 입력으로 뒤에 수행하는 Validator의 결과를 같은 Worker가 미리 제출하도록 요구하지 않는다. 검증된 선행 Task 결과의 후속 인용은 허용하며 자연어 시점 충돌을 실제 runtime 교착으로 단정하지 않는다.
 - Skeleton·Plan 작성 draft의 `task_refs`는 Compiler가 권위 Plan의 `task_ids`로 변환한다. Reviewer는 실제 Task ID 결속과 대응하는 기여 집합을 확인하며, finding의 `affected_task_refs`에는 `Task.task_ref`를 사용한다. 정상적인 내부 ID 표현을 후보 결함으로 판정하지 않는다.
 - 검증 계약의 statement에는 Goal이 명시한 검사 대상·종류·실행 목적을 보존한다. evidence 종류가 같아도 특정 unittest 실행을 일반 동작 검사로 바꿀 수 없다. 실제 명령은 ready-time 명세에 둔다.
