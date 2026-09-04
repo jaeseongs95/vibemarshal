@@ -4,9 +4,13 @@
 
 ## 결론
 
-현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [R-S06-04](r-s06-04-handoff.md)에서 Goal의 등록 검사 도구·phase 참조 해석, 금지 효과 분리, 관측 project_root와 역할 cwd의 구분을 보완했다. **최종 source의 494개 테스트·결정적 Gate 5/5·legacy freeze 40개와 제한된 실제 Goal 진단은 PASS**다. 과거 Goal의 Task unittest 귀속 누락과 역할 cwd 오판으로 실패한 1차 진단·당시 source도 보존했다.
+현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [R-S06-05](r-s06-05-handoff.md)에서 상세 Plan의 등록 검사 도구·phase 범위 대조와 draft `task_refs`·권위 Plan `task_ids` 구분을 보완했다. **최종 source의 495개 테스트·결정적 Gate 5/5·legacy freeze 40개와 실제 호출 결속 검증은 PASS지만, 제한된 실제 진단은 FAIL**이다. 1차의 ID 표기 오판·당시 source와 최종 재진단의 원본 결과를 모두 보존했다.
 
-후속 [S06-RETRY-03](s06-planning-goal-reference-handoff.md)은 고정 원문부터 실제 Goal·Skeleton·상세 Plan까지 실행해 단일 Task Plan을 선택했다. Core는 `admissible`로 기록했지만, 독립 의미 대조에서 **task phase에 없는 양·음·0 및 위치·키워드 호출 검사 능력을 Plan에 기재한 오류**를 확인해 S06은 **FAIL**이다. 실제 선택·판정은 보존했고 Plan 활성화·Worker 실행은 없다. 전체 Trace는 **INCOMPLETE**이며 다음 작업은 **R-S06-05: 상세 Plan의 등록 검사 도구·phase 능력 보존**이다. 같은 Goal·oracle·합격선에서 검사 의미를 바로잡은 새 Plan revision을 확보한 뒤 S07로 진행한다.
+최종 진단에서 정상으로 분류한 입력의 `ac_003` 검사 ID 추적 누락을 확인했고, 잘못된 Goal phase 후보에는 finding 없이 낮은 rating만 반환해 Core 재계산상 score 25의 `admissible`이 됐다. 새 상세 Plan에서도 task phase 능력 과장이 재발했으며 Reviewer는 별도 파일 범위 검사 ID 연결 오류만 찾아 후보를 차단했다. 입력 분류 오류·검출 실패·다른 결함에 의한 차단을 구분한다. 다음 작업은 **R-S06-06: 검사 ID 추적 입력 보완·phase 주장 대조·Reviewer의 finding 반환 보완**이다. 새 S06, Plan 활성화와 Worker 실행은 수행하지 않았다.
+
+이전 [S06-RETRY-03](s06-planning-goal-reference-handoff.md)의 단일 Task Plan 선택·Core `admissible` 기록과 독립 의미 대조의 **S06 FAIL**은 보존한다. 당시 task phase에 없는 양·음·0 및 위치·키워드 호출 능력을 기재한 결함이 있었다. 전체 Trace는 **INCOMPLETE**이며, 실제 진단 통과와 고정 원문부터의 새 Plan 의미 검증을 거친 뒤 S07로 진행한다.
+
+이전 [R-S06-04](r-s06-04-handoff.md)의 Goal 참조·효과·대상 경계 보완, 494개 테스트와 실제 Goal 진단 PASS는 해당 source의 역사적 결과다. 현재 source의 전체 qualification으로 재사용하지 않는다.
 
 이전 [R-S06-03](r-s06-03-handoff.md)의 489개 테스트와 제한된 역할 진단 PASS, [S06-RETRY-02](s06-planning-final-retry-handoff.md)의 Goal `conflict`·S06 FAIL은 역사적 기록으로 보존한다. 당시 키워드 호출 누락 finding은 명시 goal phase 참조를 놓친 과잉 검토였고 혼합 금지 효과 warning은 유효했다. 그 source의 결과를 현재 source의 전체 qualification으로 재사용하지 않는다.
 

@@ -109,7 +109,13 @@ PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS = (
     "Goal의 요구 범위 밖 Task에 일괄 강제하지 않는다. Task별 필수 검증은 detail_requirements나 "
     "contributes_to에 반복되지 않아도 Goal에서 상속하며, 상세 Plan에서 실제 누락된 경우에만 "
     "Goal과 해당 Task.validations를 직접 근거로 지적한다."
-    "상세 Plan의 goal_coverage.task_refs와 validation_ids는 서로 다른 연결이다. task_refs는 "
+    "Skeleton과 Plan 작성 draft의 goal_coverage.task_refs는 기여 Task 집합이다. Compiler는 "
+    "draft의 task_refs를 Task.task_id로 변환하여 PlanContractDefinition.goal_coverage.task_ids에 "
+    "기록한다. Reviewer가 받는 컴파일된 Plan의 task_ids는 정상 필드다. 실제 Task.task_id에 "
+    "대조해 연결을 확인하고 Task.task_ref로 대응시켜 기여 집합을 비교한다. 이를 task_refs로 "
+    "바꾸라고 요구하거나 내부 task_id 자체를 잘못된 참조로 판정하지 않는다. Reviewer finding의 "
+    "affected_task_refs는 별도로 Task.task_ref를 사용한다. "
+    "기여 Task 연결과 validation_ids는 서로 다른 연결이다. draft의 task_refs는 "
     "Skeleton의 기여 Task 집합을 그대로 보존한다. validation_ids의 소유 Task를 그 task_refs로 "
     "제한하지 않는다. Goal이 각 Task에 검증을 요구하면 해당 AC의 validation_ids에는 적용 대상 "
     "모든 Task의 자체 검사 ID를 연결한다. 예를 들어 검증 AC의 task_refs가 후속 검증 Task B뿐이어도 "
@@ -118,6 +124,29 @@ PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS = (
     "범위를 유지한다. 검토 시 Task 자체의 필수 검사 존재와 해당 AC.validation_ids의 연결을 "
     "각각 확인한다. 검사 계약이 존재해도 AC 연결이 빠졌으면 Goal·해당 Task.validations·"
     "goal_coverage를 직접 근거로 누락을 지적한다."
+)
+
+
+PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS = (
+    "상세 Plan의 Task validation과 integration validation마다 검사 목적과 그 목적을 실제로 "
+    "수행하는 수단의 범위를 대조한다. Goal이나 후보가 등록 검사 도구·자료의 특정 phase·mode·"
+    "절차를 참조하면 Project Map의 등록 경로에서 관련 본문을 읽고, 필요하면 그 본문이 가리킨 "
+    "검사 구현의 분기·입력·출력을 확인한다. 경로·도구 이름·test evidence 종류만으로 검사 능력을 "
+    "추정하지 않는다. Goal이 요구하는 동작 범위와 특정 검사 수단이 관측하는 범위는 다르다. "
+    "같은 도구라도 선택한 phase에 없는 검사 능력을 부여하거나 다른 phase의 검사를 합쳐 "
+    "설명하지 않는다. 선언·시그니처 검사나 기존 테스트의 통과를 실제로 실행하지 않는 입력·"
+    "호출 방식의 검사로 확대하지 않는다. "
+    "계약의 검사 도구·phase 참조는 의미를 식별하기 위해 보존할 수 있으며, 실제 argv·실행 경로 "
+    "등 운영 상세는 ready-time 명세에서 확정한다. 이미 명시한 phase와 검사 범위가 충돌하면 "
+    "현재 Plan의 의미 결함이다. 나중에 명령을 바꾸면 된다는 이유로 허용하지 않는다. "
+    "상세화는 Goal의 Task별 필수 검증을 유지하면서 참조 도구가 지원하는 범위만 명시한다. "
+    "그 도구로 부족한 필수 검사는 별도의 실제 검사 책임으로 계약하고, 단순한 도구 설명 수정으로 "
+    "Task의 검증 의무를 약화하거나 독립 Goal Test로 넘기지 않는다. Goal이 Task에 요구하지 않은 "
+    "검사를 Goal 전체의 동작 요구만으로 모든 Task에 추가하지도 않는다. "
+    "Reviewer는 후보 검사 문장·Goal·등록 자료를 직접 대조하고 범위 충돌을 최소 finding으로 "
+    "제출한다. 정상 Task 검사와 별도 independent Goal Test가 각각 자기 범위를 보존하면 허용한다. "
+    "자료가 불완전해 능력을 확인하지 못한 경우와 자료로 확인된 모순을 구분하고, 없는 검사 "
+    "능력이나 근거 없는 누락을 만들어 판단하지 않는다."
 )
 
 
@@ -173,7 +202,7 @@ class DetailedTaskDraft(EngineModel):
     prohibited_effects: tuple[EffectContract, ...] = Field(default=(), description="Task가 발생시키면 안 되는 효과. 로컬 파일 mutation과 외부 시스템 효과를 별도 항목으로 작성하고 각 external 값을 해당 범위에 맞춘다.")
     required_capabilities: tuple[str, ...] = ()
     acceptance_criteria: tuple[str, ...] = Field(min_length=1)
-    validations: tuple[ValidationContract, ...] = Field(min_length=1, description="이 Task 완료 전에 필요한 실제 검사 계약. statement에 Goal이 이 Task에 요구한 검사 대상·종류·실행 목적을 보존하고 method·필수 evidence 종류를 함께 명시한다. 기존 unittest 실행 요구를 일반 동작 확인이나 test enum만으로 대체하지 않는다. 후속 Task 검사, 모델 배정, AC 문장이나 integration validation으로 자체 필수 검증을 대체하지 않는다.")
+    validations: tuple[ValidationContract, ...] = Field(min_length=1, description="이 Task 완료 전에 필요한 실제 검사 계약. statement에 Goal이 이 Task에 요구한 검사 대상·종류·실행 목적을 보존하고 method·필수 evidence 종류를 함께 명시한다. 등록 도구·phase를 참조하면 제공된 자료의 실제 검사 범위와 일치해야 한다. 부족한 필수 검사는 별도 검사 책임으로 명시하며 다른 phase의 능력을 부여하지 않는다. 기존 unittest 실행 요구를 일반 동작 확인이나 test enum만으로 대체하지 않는다. 후속 Task 검사, 모델 배정, AC 문장이나 integration validation으로 자체 필수 검증을 대체하지 않는다.")
     risk_level: RiskLevel
     risk_tags: tuple[str, ...] = ()
     approval_class: ApprovalClass = ApprovalClass.PLAN_ACTIVATION
@@ -197,7 +226,7 @@ class PlanExpansionDraft(EngineModel):
     tasks: tuple[DetailedTaskDraft, ...] = Field(min_length=1)
     dependencies: tuple[PlanDependencyDraft, ...] = ()
     goal_coverage: tuple[PlanGoalCoverageDraft, ...] = Field(min_length=1)
-    integration_validations: tuple[IntegrationValidationContract, ...] = Field(min_length=1)
+    integration_validations: tuple[IntegrationValidationContract, ...] = Field(min_length=1, description="Task 검사와 분리한 plan-level Goal 검사 계약. 참조한 등록 도구·phase가 statement의 검사 범위를 실제 지원하는지 대조한다. 다른 phase의 검사 능력이나 Task evidence로 independent 검사를 대체하지 않는다.")
     expected_effects: tuple[str, ...] = Field(default=(), description="Plan이 실제 발생시키는 효과. 효과가 없다는 부정형 조건은 포함하지 않는다.")
     prohibited_effects: tuple[str, ...] = Field(default=(), description="Goal이 금지한 효과와 범위를 보존하며 현재 계획 역할의 행동 제한을 새로 추가하지 않는다.")
 
@@ -553,7 +582,7 @@ class PlanExpanderAdapter:
                 "의미 검사는 원본 file 근거와 응답 관측을 함께 참조하는 semantic validation으로 "
                 "계약하고 required_evidence_kinds에 model_review·external_observation·file을 모두 "
                 "요구한다. 이는 외부 시스템 변경 효과를 뜻하지 않는다."
-            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(sha256_digest(candidate)),
                 "goal": goal.definition.model_dump(mode="json"),
@@ -742,7 +771,7 @@ class PlanReviewerAdapter:
                 "파일·명령의 운영 상세는 ExecutionSpec에 확정한다. read_only는 산출물 mutation 정책이며 "
                 "읽기 검사와 계획 생성 자체를 금지하지 않는다. 외부 효과는 외부 시스템·계정·제3자에 대한 효과다."
                 "affected_task_refs는 Task.task_ref를 참조하며 Core의 task_id와 혼동하지 않는다."
-            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS,
             payload={"case_ref": _case_ref(digest), "evidence_catalog": evidence_catalog},
             output_schema=ReviewDraft.model_json_schema(),
             model=selected_model,

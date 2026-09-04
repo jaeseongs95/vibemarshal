@@ -205,7 +205,11 @@ Goal이 각 Task 또는 특정 범위 Task의 완료 전에 요구한 검증은 
 
 검증 계약의 `statement`는 Goal이 명시한 검사 대상·종류·실행 목적을 보존한다. `required_evidence_kinds`의 `test`는 evidence 종류이며 특정 검사 절차를 보장하지 않는다. 기존 unittest 실행을 요구했다면 적용 대상 Task의 검사 문장에도 해당 실행·통과 확인을 보존하고 일반 동작 검사로 바꾸지 않는다. 실제 명령은 ready-time Execution Spec에서 확정한다.
 
+상세 Plan의 Task·integration validation이 등록 검사 도구·자료의 phase·mode·절차를 참조하면 상세화와 Reviewer는 등록 경로의 관련 본문과 필요한 구현 분기를 읽어 실제 검사 범위를 대조한다. 같은 도구의 다른 phase가 수행하는 검사를 합쳐 설명하거나 선언·시그니처 검사를 실제 입력·호출 방식 검사로 확대하지 않는다. Goal의 검사 목적과 수단의 실제 능력을 구분하며, 부족한 필수 검사는 별도 실제 검사 책임으로 보존한다. Goal이 Task에 요구하지 않은 검사를 일괄 추가하지 않고 정상 Task 검사와 독립 Goal Test의 범위 차이를 허용한다. 도구·phase 참조로 검사 의미를 식별하는 것은 계획 단계에서 허용하되 argv 등 운영 상세는 ready-time에 확정한다. 이미 명시된 phase와 검사 의미의 충돌은 Plan Contract 결함이며 새 revision으로 수정한다. 자료 부족과 직접 확인된 모순을 구분하고 원래 검사 의무나 합격선을 약화하지 않는다.
+
 상세 Plan의 `goal_coverage.task_ids`는 Skeleton의 AC 기여 Task 집합을 보존하며, `validation_ids`의 소유 Task를 제한하지 않는다. Goal이 각 Task에 검증을 요구하면 해당 AC의 `validation_ids`에 적용 대상 모든 Task의 자체 필수 검사 ID를 연결한다. 검사 소유 Task가 AC 기여 목록에 없어도 이 연결은 필요하며, 연결을 추가하기 위해 기여 집합이나 Task 의미를 바꾸지 않는다. 특정 Task에만 적용되는 요구의 범위도 유지한다. Reviewer는 자체 검사 존재와 해당 AC의 검사 ID 연결을 각각 확인하고, 연결 누락은 Goal·Task validation·Goal coverage를 직접 근거로 제출한다.
+
+Skeleton·`PlanExpansionDraft`의 `task_refs`는 Compiler가 `Task.task_id`에 대응시켜 권위 `PlanContractDefinition.goal_coverage.task_ids`로 변환한다. 컴파일된 Plan을 받는 Reviewer는 `task_ids`를 실제 Task ID에 대조하고 대응되는 `task_ref` 집합으로 기여 관계를 확인한다. `task_ids`를 draft의 `task_refs`로 바꾸도록 요구하지 않는다. Reviewer finding의 `affected_task_refs`는 별도 입력 계약에 따라 `Task.task_ref`를 사용한다.
 
 Reviewer 출력은 다음으로 제한한다.
 
