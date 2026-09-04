@@ -4,7 +4,7 @@
 
 ## 결론
 
-현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [R-S04-01](r-s04-01-handoff.md)에서 Worker Prompt·Attempt·turn·actual usage의 영속 연결을 검증했고, [S05](s05-bugfix-trace-handoff.md)에서 단일 bugfix 입력·Goal 후보·초기 snapshot·Task/독립 Goal oracle을 고정했다. 같은 source의 [S06 실제 Planning](s06-planning-handoff.md)은 Goal 생성·검토를 통과했지만 **선택 Plan 생성에 실패**했다. Skeleton 검토의 불필요한 Goal Test Task 요구가 refinement와 상세 Plan에 전파돼 `VERIFICATION_GOAL_TEST_SELF_DEPENDENCY`로 `needs_revision`이 됐다. 실제 DAG cycle·runtime 교착을 관측한 것은 아니다. 선택 digest는 null, 원장 Plan은 draft이며 활성화·Worker 실행은 0건이다. **482개 테스트와 결정적 Gate 5/5는 재검증 PASS**지만 자연어부터 Goal 완료까지 전체 Trace는 **INCOMPLETE**다. 다음 세션은 **R-S06-01 — Skeleton 검토·보정의 독립 Goal Test 책임 경계 보완**이며 S07로 진입하지 않는다.
+현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [S06 실제 Planning](s06-planning-handoff.md)의 선택 Plan 생성 실패를 보존하고, [R-S06-01](r-s06-01-handoff.md)에서 생성·검토·보정·상세화의 독립 Goal Test 책임 경계를 보완했다. Task coverage를 직접 검사 실행 책임으로 오인하거나 선택 detail requirement의 반복 부재로 Skeleton을 차단하지 않도록 했다. 최종 source의 **484개 테스트·결정적 Gate 5/5와 제한된 실제 역할 진단 5/5는 PASS**다. 정상 Skeleton·Plan은 불필요한 Task 없이 검토를 통과하고 기존 자기의존 Plan은 계속 거부됐다. 진단은 과거 Goal·State를 입력으로 사용했으며 새 전체 Planning 실행·계획 선택·원장 등록·활성화가 아니다. 기존 S06의 선택 digest는 null, 활성화·Worker 실행은 0건이며 자연어부터 Goal 완료까지 전체 Trace는 **INCOMPLETE**다. 다음 세션은 **새 source 계약의 S06 재평가**이며 실제 선택 Plan을 확보하기 전에는 S07로 진입하지 않는다.
 
 그 이전 Goal 계약 해석 source의 **464개 테스트와 결정적 Gate, 실제 역할 회귀 48/48, 실제 E2E 4/4는 PASS**였고 같은 source의 Planning은 **18/18건 수집 완료·13건 통과·5건 실패**였다. 이 결과는 [Goal 계약 해석 재검증 기록](goal-contract-boundaries-requalification-20260904.md)에 보존하며 현재 source의 실제 역할·Planning·E2E 완료 증거로 재사용하지 않는다.
 

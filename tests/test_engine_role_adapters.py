@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import tempfile
 import unittest
 from pathlib import Path
 
-from flowmarshal.engine.domain import CandidateStatus, RevisionStatus
+from flowmarshal.engine.domain import CandidateStatus, GoalCriterion, RevisionStatus
 from flowmarshal.engine.goal import (
     GoalNormalizerAdapter,
     GoalPreparationPipeline,
@@ -12,6 +13,7 @@ from flowmarshal.engine.goal import (
     ReviewDraft,
 )
 from flowmarshal.engine.planner_roles import (
+    PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS,
     PlanExpanderAdapter,
     PlanReviewerAdapter,
     PlannerRoleAdapterError,
@@ -270,6 +272,129 @@ class EngineRoleAdapterTests(unittest.TestCase):
                 state=self.state,
                 project_map=self.map,
             )
+
+    def _validation_boundary_case(self, check_ref="task_check"):
+        definition = self.goal.definition.model_copy(update={"hard_acceptance": (
+            *self.goal.definition.hard_acceptance,
+            GoalCriterion(criterion_id="ac_independent", statement="모든 Task 완료 후 Goal을 독립 검사한다.",
+                          validation_intent="Core가 같은 workspace에서 새 검사 evidence를 수집한다.",
+                          trace_refs=("trace_one",)),
+        )})
+        self.goal = self.goal.model_copy(update={"definition": definition, "definition_digest": definition.definition_digest})
+        self.state = state(self.project_id, self.goal.definition_digest, self.map.revision_digest)
+        skeleton = _skeleton_response()
+        candidate = skeleton["candidates"][0]
+        candidate["tasks"].append({
+            "task_ref": check_ref, "kind": "inspect", "objective": "선행 산출물과 Task evidence를 검토한다.",
+            "contributes_to": ["ac_independent"], "produces": ["result:checked"], "consumes": ["result:one"],
+        })
+        candidate["dependencies"] = [{
+            "producer_task_ref": "task_one", "consumer_task_ref": check_ref, "dependency_type": "data",
+            "produces": ["result:one"], "consumes": ["result:one"],
+        }]
+        candidate["goal_coverage"].append({"criterion_id": "ac_independent", "task_refs": [check_ref]})
+        plan = _plan_response()
+        check = deepcopy(plan["tasks"][0])
+        check.update(task_ref=check_ref, kind="inspect", objective=candidate["tasks"][1]["objective"],
+                     goal_criterion_refs=["ac_independent"], produces=["result:checked"], consumes=["result:one"])
+        check["validations"][0].update(validation_id="validation_check", statement="해당 Task의 검토 산출물을 검사한다.")
+        plan["tasks"].append(check)
+        plan["dependencies"] = [{"producer_task_ref": "task_one", "consumer_task_ref": check_ref,
+                                 "dependency_type": "data", "products": ["result:one"]}]
+        plan["goal_coverage"].append({"criterion_id": "ac_independent", "task_refs": [check_ref],
+                                      "validation_ids": ["validation_goal"]})
+        plan["integration_validations"][0].update(
+            criterion_refs=["ac_one", "ac_independent"], evidence_mode="independent",
+            statement="모든 Task 완료 후 Core가 같은 workspace에서 Goal을 새 evidence로 독립 검사한다.",
+        )
+        return skeleton, plan
+
+    def _boundary_search(self, runner):
+        options = dict(model="worker", effort="medium", inventory_digest=self.inventory.inventory_digest, cwd=self.root)
+        reviewer_options = {**options, "model": "validator", "effort": "high"}
+        return SkeletonFirstPlanner(
+            SkeletonGeneratorAdapter(runner, **options), SkeletonReviewerAdapter(runner, **reviewer_options),
+            PlanExpanderAdapter(runner, RuleBasedTaskAssigner(assignment(), assignment(), assignment()), **options),
+            PlanReviewerAdapter(runner, **reviewer_options),
+        ).search(goal=self.goal, state=self.state, project_map=self.map)
+
+    def test_goal_test_coverage_survives_refinement_without_an_execution_task(self) -> None:
+        """책임 안내·후보 보정·재검토의 연결을 검증하며 모델의 의미 판단을 모사하지 않는다."""
+        skeleton, plan = self._validation_boundary_case()
+        refined = deepcopy(skeleton["candidates"][0])
+        refined["tasks"][1]["detail_requirements"] = [
+            "검토 산출물은 ac_independent에 기여하며 독립 Goal Test 실행은 Plan.integration_validations에 둔다."
+        ]
+        finding = {"finding_code": "SKEL_GOAL_001", "gate": "goal", "severity": "error",
+                   "summary": "독립 Goal Test를 수행할 후속 작업이 DAG에 없다.",
+                   "evidence_refs": ["artifact:skeleton"], "affected_task_refs": ["task_check"], "remediable": True}
+        runner = ScriptedStructuredRoleRunner({
+            "skeleton_generator": [skeleton], "skeleton_refiner": [refined],
+            "skeleton_reviewer": [{"findings": [finding]}, {"findings": [], "ratings": _ratings()}],
+            "plan_expander": [plan], "compact_plan_reviewer": [{"findings": [], "ratings": _ratings()}],
+        })
+        outcome = self._boundary_search(runner)
+        self.assertIsNotNone(outcome.selected_activation_digest)
+        self.assertEqual(CandidateStatus.NEEDS_REVISION, outcome.skeleton_evaluations[0].decision.status)
+        result = outcome.plan_evaluations[0].plan.definition
+        self.assertEqual(["task_one", "task_check"], [item.task_ref for item in result.tasks])
+        self.assertEqual("independent", result.integration_validations[0].evidence_mode)
+        coverage = next(item for item in result.goal_coverage if item.criterion_id == "ac_independent")
+        self.assertEqual((result.tasks[1].task_id,), coverage.task_ids)
+        self.assertEqual(("validation_goal",), coverage.validation_ids)
+        self.assertEqual("validation_check", result.tasks[1].validations[0].validation_id)
+        calls = {call.role: call for call in runner.calls}
+        self.assertEqual(finding, calls["skeleton_refiner"].payload["findings"][0])
+        self.assertEqual(refined["tasks"][1]["detail_requirements"],
+                         calls["plan_expander"].payload["skeleton"]["tasks"][1]["detail_requirements"])
+        self.assertEqual({"skeleton_generator", "skeleton_refiner", "skeleton_reviewer", "plan_expander",
+                          "compact_plan_reviewer"}, set(calls))
+        for call in runner.calls:
+            self.assertIn(PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS, call.instructions)
+        properties = calls["skeleton_refiner"].output_schema["$defs"]["SkeletonTaskDraft"]["properties"]
+        self.assertIn("직접 실행", properties["contributes_to"]["description"])
+
+    def test_recursive_goal_test_finding_is_preserved_without_task_name_rules(self) -> None:
+        """일반 검증 Task의 이름은 허용하고 직접 evidence가 있는 의미 충돌 finding은 유지한다."""
+        for defect, check_ref in ((None, "task_goal_test"), ("recursive", "task_check"), ("aggregate", "task_check")):
+            with self.subTest(defect=defect):
+                # 각 사례는 별도 Goal에서 같은 추가 AC를 한 번만 구성한다.
+                self.goal = goal(self.project_id, self.profile.definition_digest)
+                skeleton, plan = self._validation_boundary_case(check_ref)
+                review = {"findings": [], "ratings": _ratings()}
+                if defect == "recursive":
+                    plan["tasks"][1]["preconditions"] = [{"precondition_id": "all_completed",
+                                                          "statement": "자신을 포함한 모든 Task 검증이 완료됐다."}]
+                    plan["tasks"][1]["validations"][0]["statement"] = "이후 Core 독립 Goal Test의 실행 결과를 확인한다."
+                    review = {"findings": [{
+                        "finding_code": "VERIFICATION_GOAL_TEST_SELF_DEPENDENCY", "gate": "verification",
+                        "severity": "error", "summary": "Task가 자신을 포함한 모든 Task 검증과 이후 Goal Test를 기다린다.",
+                        "evidence_refs": ["artifact:plan_contract"], "affected_task_refs": [check_ref], "remediable": True,
+                    }]}
+                elif defect == "aggregate":
+                    plan["integration_validations"][0]["evidence_mode"] = "task_aggregate"
+                    review = {"findings": [{
+                        "finding_code": "VERIFICATION_INDEPENDENT_MODE_MISMATCH", "gate": "verification",
+                        "severity": "error", "summary": "새 독립 검사를 요구하는 AC에 Task evidence 집계를 배정했다.",
+                        "evidence_refs": ["artifact:plan_contract", "source:goal"],
+                        "affected_task_refs": [check_ref], "remediable": True,
+                    }]}
+                runner = ScriptedStructuredRoleRunner({
+                    "skeleton_generator": [skeleton], "skeleton_reviewer": [{"findings": [], "ratings": _ratings()}],
+                    "plan_expander": [plan], "compact_plan_reviewer": [review],
+                })
+                outcome = self._boundary_search(runner)
+                self.assertEqual(defect is None, outcome.selected_activation_digest is not None)
+                evaluation = outcome.plan_evaluations[0]
+                self.assertEqual(CandidateStatus.NEEDS_REVISION if defect else CandidateStatus.ADMISSIBLE,
+                                 evaluation.decision.status)
+                if defect:
+                    self.assertIn(review["findings"][0]["finding_code"], evaluation.decision.finding_codes)
+                    self.assertIsNone(evaluation.decision.fitness_score)
+                else:
+                    self.assertFalse(outcome.skeleton_evaluations[0].candidate.tasks[1].detail_requirements)
+                    self.assertIn("detail_requirements에 반복하지 않았다는 이유만으로 Skeleton을 차단하지 않는다",
+                                  runner.calls[1].instructions)
 
     def test_read_only_response_report_preserves_scope_and_reviewer_authority(self) -> None:
         """응답 산출물의 계약 전달과 실제 모순 finding의 차단을 함께 검사한다."""

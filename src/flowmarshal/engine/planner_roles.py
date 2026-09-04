@@ -67,6 +67,27 @@ READ_ONLY_REPORTING_INSTRUCTIONS = (
 )
 
 
+PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS = (
+    "Task validation은 해당 Task의 산출물·완료 조건을 검사한다. 필요한 테스트 작성·실행이나 "
+    "선행 산출물의 독립 검토 Task는 허용한다. 반면 모든 Task 완료 후 Core가 수행하는 독립 "
+    "Goal Test는 Plan.integration_validations의 책임이며 일반 Task로 재귀 배치하지 않는다. "
+    "contributes_to와 goal_coverage.task_refs는 AC 충족에 기여하는 산출물·근거의 연결이지, "
+    "연결된 Task가 그 AC의 모든 검사 절차를 직접 실행한다는 뜻이 아니다. 독립 Goal Test "
+    "AC도 관련 산출물·근거를 제공하는 Task에 연결한다. 필요하면 Skeleton의 detail_requirements에 "
+    "후속 integration validation 책임을 명확히 하고, 상세 Plan의 validation_ids로 해당 검사에 연결한다. "
+    "Skeleton에 Goal Test 전용 노드나 상세 integration_validations가 없다는 이유만으로 "
+    "Task 추가를 요구하지 않는다. Goal과 AC 기여 관계로 이미 전달된 요구를 선택 필드인 "
+    "detail_requirements에 반복하지 않았다는 이유만으로 Skeleton을 차단하지 않는다. "
+    "후속 단계에서 누락될 수 있다는 가정은 현재 결함의 직접 evidence가 아니다. 실제 AC 기여 "
+    "누락·상충하는 Task 요구와 상세 Plan의 독립 검사·evidence_mode·validation ID 연결 누락은 검토한다. "
+    "같은 대상을 검사한다는 이유만으로 Task validation과 Goal Test를 중복으로 판정하지 않는다. "
+    "Task 이름·개수가 아니라 목적·선행조건·산출물의 책임을 대조한다. 일반 Task가 자신을 "
+    "포함한 모든 Task의 검증 완료나 이후 Core Goal Test 결과를 기다리면 계약의 자기의존을 "
+    "직접 evidence로 지적한다. 자연어 선행조건 충돌을 명시적 DAG cycle이나 관측된 교착으로 "
+    "단정하지 않는다."
+)
+
+
 class PlannerRoleAdapterError(RuntimeError):
     pass
 
@@ -75,14 +96,14 @@ class SkeletonTaskDraft(EngineModel):
     task_ref: str
     kind: TaskKind
     objective: str
-    contributes_to: tuple[str, ...]
+    contributes_to: tuple[str, ...] = Field(description="산출물·근거로 기여하는 Goal AC ID. 연결된 모든 검사 절차를 이 Task가 직접 실행한다는 뜻은 아니다.")
     produces: tuple[str, ...]
     consumes: tuple[str, ...] = Field(default=(), description="제공된 external_input_catalog의 정확한 key 또는 data dependency producer의 산출물 key. 경로·설명을 임의 key로 만들지 않는다.")
     risk_tags: tuple[str, ...] = ()
     required_capabilities: tuple[str, ...] = ()
     no_op_when: tuple[str, ...] = ()
     unknown_refs: tuple[str, ...] = Field(default=(), description="현재 StateSnapshot.unknowns에 실제 있는 unknown_id만 참조한다. 없으면 빈 배열. 새 질문은 candidate.unknowns에 설명한다.")
-    detail_requirements: tuple[str, ...] = ()
+    detail_requirements: tuple[str, ...] = Field(default=(), description="상세 Plan에서 보존할 책임. Task validation과 모든 Task 완료 후 Core의 integration validation을 구분하며 실행 명령은 넣지 않는다.")
 
 
 class SkeletonDependencyDraft(EngineModel):
@@ -97,7 +118,7 @@ class SkeletonCandidateDraft(EngineModel):
     approach: ApproachSignature
     tasks: tuple[SkeletonTaskDraft, ...] = Field(min_length=1)
     dependencies: tuple[SkeletonDependencyDraft, ...] = ()
-    goal_coverage: tuple[GoalCoverage, ...] = Field(min_length=1)
+    goal_coverage: tuple[GoalCoverage, ...] = Field(min_length=1, description="각 AC에 기여하는 Task 연결. 독립 Goal Test AC의 연결은 검사 실행 주체가 아니라 입력 산출물·근거의 제공 책임이다.")
     unknowns: tuple[str, ...] = ()
     estimated_change_cost: int = Field(ge=0)
     estimated_context_tokens: int = Field(ge=0)
@@ -136,7 +157,7 @@ class PlanDependencyDraft(EngineModel):
 class PlanGoalCoverageDraft(EngineModel):
     criterion_id: str
     task_refs: tuple[str, ...] = Field(min_length=1)
-    validation_ids: tuple[str, ...] = Field(min_length=1)
+    validation_ids: tuple[str, ...] = Field(min_length=1, description="해당 AC를 검사하는 Task 또는 integration validation ID. Core의 독립 Goal Test는 integration validation ID로 연결한다.")
 
 
 class PlanExpansionDraft(EngineModel):
@@ -226,10 +247,8 @@ class SkeletonGeneratorAdapter:
                 "unknown_refs는 StateSnapshot에 실제 있는 unknown_id만 쓰고 없으면 비운다."
                 "현재 출력은 실행 전 계획 후보다. 사용자가 이후 정확한 Plan digest를 활성화하며, "
                 "아직 없는 활성화 증적을 consumes로 요구하거나 별도 승인 Task를 발명하지 않는다. "
-                "독립 Goal Test는 상세 Plan의 integration_validations로 Core가 별도 실행하므로 "
-                "그 실행을 위해 Skeleton에 중복 검사 Task를 추가할 필요는 없다. "
                 "read_only는 프로젝트 산출물 변경 금지이며 읽기 관측·계획 제안 자체를 금지하지 않는다."
-            ) + READ_ONLY_REPORTING_INSTRUCTIONS,
+            ) + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(goal.definition_digest),
                 "candidate_count": candidate_count,
@@ -290,9 +309,12 @@ class SkeletonGeneratorAdapter:
             instructions=(
                 "기존 Skeleton의 remediable finding만 한 번 수정한다. Goal 의미나 접근 전략을 "
                 "몰래 바꾸지 말고 실제 파일·명령을 상세화하지 않는다. "
+                "finding은 비권위 관측이므로 Goal과 단계별 책임에 대조해 보정한다. 독립 Goal Test "
+                "책임은 관련 Task의 기여·detail_requirements로 명확히 하며, 지적을 그대로 수행해 "
+                "Core의 검사를 기다리는 일반 Task를 추가하지 않는다. 실제 Task 검증 결함은 수정한다. "
                 "consumes는 external_input_catalog의 key 또는 data dependency의 산출물과 일치해야 한다. "
                 "unknown_refs는 StateSnapshot.unknowns의 실제 ID만 쓴다. 새 정보는 발명하지 않는다."
-            ) + READ_ONLY_REPORTING_INSTRUCTIONS,
+            ) + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(sha256_digest(candidate)),
                 "goal": goal.definition.model_dump(mode="json"),
@@ -408,10 +430,9 @@ class SkeletonReviewerAdapter:
                 "직접 evidence가 있는 최소 finding만 제출하고 status·최종 score를 선언하지 않는다."
                 "Skeleton schema에 없는 상세 validation·integration_validations·실행 명령은 "
                 "다음 Plan/ExecutionSpec 단계의 책임이다. 그 필드 부재만으로 Skeleton을 차단하지 않는다. "
-                "Core는 Plan 활성화 후 모든 Task 완료 시 독립 Goal Test를 별도 실행한다. "
                 "Plan 후보는 아직 승인되지 않은 것이 정상이며 미래 activation 증적의 부재는 dead-end가 아니다. "
                 "read_only는 파일 mutation 계약이지 모든 명령·검사를 금지하는 sandbox가 아니다."
-            ),
+            ) + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS,
             payload={"case_ref": _case_ref(digest), "evidence_catalog": evidence_catalog},
             output_schema=ReviewDraft.model_json_schema(),
             model=self.model,
@@ -473,6 +494,8 @@ class PlanExpanderAdapter:
                 "produces/consumes 의미는 바꾸지 않는다. 파일·symbol·실행 명령·Context Pack은 "
                 "ready-time 상세이므로 넣지 않는다. 완료조건·validation·recovery만 구체화한다."
                 "독립 Goal Test는 integration_validations에 넣고 Task validation과 분리한다. "
+                "Skeleton의 detail_requirements에 있는 검사 책임을 해당 validation에 반영한다. "
+                "Skeleton에 책임 충돌이 남아 있어도 Task를 몰래 삭제·재정의해 우회하지 않는다. "
                 "required_evidence_kinds는 schema의 enum만 사용한다. 구체적인 검사 목적은 statement에 쓴다. "
                 "deterministic 검사는 file·diff·command·test·build, semantic 검사는 model_review, "
                 "manual은 user_decision, external_observation은 external_observation 증거를 사용한다. "
@@ -487,7 +510,7 @@ class PlanExpanderAdapter:
                 "의미 검사는 원본 file 근거와 응답 관측을 함께 참조하는 semantic validation으로 "
                 "계약하고 required_evidence_kinds에 model_review·external_observation·file을 모두 "
                 "요구한다. 이는 외부 시스템 변경 효과를 뜻하지 않는다."
-            ) + READ_ONLY_REPORTING_INSTRUCTIONS,
+            ) + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(sha256_digest(candidate)),
                 "goal": goal.definition.model_dump(mode="json"),
@@ -673,10 +696,9 @@ class PlanReviewerAdapter:
                 "직접 evidence가 있는 최소 finding만 제출한다. finding이 있으면 rating을 생략하고, "
                 "status·fitness score·weakest task는 선언하지 않는다."
                 "현재는 활성화 전 Plan 후보이므로 미래 activation receipt는 아직 없는 것이 정상이다. "
-                "Task 이후 독립 Goal Test는 integration_validations에 있으며 별도 Task 노드가 필수는 아니다. "
                 "파일·명령의 운영 상세는 ExecutionSpec에 확정한다. read_only는 산출물 mutation 정책이며 "
                 "읽기 검사와 계획 생성 자체를 금지하지 않는다. 외부 효과는 외부 시스템·계정·제3자에 대한 효과다."
-            ),
+            ) + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS,
             payload={"case_ref": _case_ref(digest), "evidence_catalog": evidence_catalog},
             output_schema=ReviewDraft.model_json_schema(),
             model=selected_model,

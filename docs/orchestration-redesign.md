@@ -189,6 +189,10 @@ Goal Contract 정규화·독립 검토
 
 명확한 단일 변경은 후보 1개만 만든다. 실제 trade-off가 있을 때만 2~3개를 생성한다. 첫 feasible plan을 확보한 뒤 남은 budget에서만 anytime improvement를 수행한다.
 
+Task의 `contributes_to`와 Skeleton의 `goal_coverage.task_refs`는 AC 충족에 기여하는 산출물·근거의 연결이다. 해당 Task가 연결된 AC의 모든 검사 절차를 직접 실행한다는 뜻은 아니다. 모든 Task 완료 후의 독립 Goal Test AC도 관련 산출물을 제공하는 Task와 연결하고, 상세 Plan의 `goal_coverage.validation_ids`에서 `integration_validations`의 검사 ID로 연결한다. 필요하면 Skeleton의 `detail_requirements`에 이 책임을 명확히 한다. Skeleton 단계에서 Goal Test 전용 Task나 상세 integration validation 필드가 없다는 이유만으로 추가 Task를 요구하지 않는다. Goal과 AC 기여 관계로 이미 전달된 요구는 선택 `detail_requirements`의 반복 부재만으로 차단하지 않는다. 후속 상세화에서 누락될 수 있다는 가정은 현재 결함의 직접 evidence가 아니다. 실제 AC 기여 누락·Task 요구 충돌이나 상세 Plan의 독립 검사·evidence mode·validation ID 연결 결함은 계속 검토한다.
+
+생성·검토·보정·상세화 역할은 이 책임 경계를 공유한다. 테스트 작성·실행이나 선행 산출물의 독립 검토처럼 목적이 있는 Task 검증은 허용한다. 같은 대상을 검사한다는 이유만으로 Task 검증과 독립 Goal Test를 중복으로 판정하지 않는다. 반면 일반 Task가 자신을 포함한 모든 Task의 검증 완료 또는 이후 Core Goal Test 결과를 선행조건으로 요구하면 직접 evidence가 있는 계약 충돌로 검토한다. 자연어 자기의존을 명시적 DAG cycle이나 실제 runtime 교착으로 단정하지 않는다. refiner는 finding을 Goal과 단계별 책임에 대조하고, expander는 남아 있는 충돌을 Task 삭제·재정의로 숨기지 않으며 기존 의미 보존 검사와 독립 review를 유지한다.
+
 ### 6.1 Reviewer와 Core 판정
 
 Reviewer 출력은 다음으로 제한한다.
