@@ -7,16 +7,19 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from flowmarshal.canonical import sha256_bytes
 from flowmarshal.engine.domain import PlanContractRevision
 from flowmarshal.engine.plan_inspection_eval import assess_inspection_review
 from flowmarshal.engine.planner_roles import PlanReviewEnvelope
-from scripts.diagnostics.r_s06_10_fixtures import FixtureRevisionError, SOURCE_INPUT_FILENAMES, build_revision
+from scripts.diagnostics.r_s06_10_fixtures import (
+    FixtureRevisionError, SOURCE_INPUT_FILENAMES, build_revision, verify_integration_criterion_coverage,
+)
 
 
 ROOT = Path(__file__).resolve().parent / "fixtures" / "engine"
 LEGACY = json.loads((ROOT / "plan-inspection-regressions.json").read_text(encoding="utf-8"))["files"]
 SOURCE_INPUTS = json.loads((ROOT / "plan-inspection-v2-source-inputs.json").read_text(encoding="utf-8"))
-EXPECTATIONS = json.loads((ROOT / "plan-inspection-v4-expectations.json").read_text(encoding="utf-8"))
+EXPECTATIONS = json.loads((ROOT / "plan-inspection-v5-expectations.json").read_text(encoding="utf-8"))
 
 
 def _write_portable_source(source: Path) -> None:
@@ -139,6 +142,24 @@ class InspectionFixtureRevisionTests(unittest.TestCase):
                 self.assertIn("val_goal_independent_unittest", _coverage(plan, "ac_001"))
                 self.assertIn("val_goal_independent_behavior_contract", _coverage(plan, "ac_003"))
                 PlanContractRevision.model_validate(plan)
+                verify_integration_criterion_coverage(plan)
+
+    def test_integration_criterion_refs_and_goal_coverage_are_bidirectionally_locked(self):
+        _, destination = self.build()
+        plan = _plan(destination, "input-clean-plan.json")
+        verify_integration_criterion_coverage(plan)
+        for mutation in ("criterion_refs_only", "goal_coverage_only"):
+            with self.subTest(mutation=mutation):
+                changed = deepcopy(plan)
+                if mutation == "criterion_refs_only":
+                    changed["definition"]["integration_validations"][0]["criterion_refs"].remove("ac_003")
+                else:
+                    _coverage(changed, "ac_003").discard("val_goal_independent_behavior_contract")
+                    row = next(item for item in changed["definition"]["goal_coverage"]
+                               if item["criterion_id"] == "ac_003")
+                    row["validation_ids"].remove("val_goal_independent_behavior_contract")
+                with self.assertRaisesRegex(FixtureRevisionError, "INTEGRATION_CRITERION_COVERAGE_MISMATCH"):
+                    verify_integration_criterion_coverage(changed)
 
     def test_revised_cases_keep_one_intended_defect_or_the_recorded_normal_semantics(self):
         _, destination = self.build()
@@ -180,13 +201,10 @@ class InspectionFixtureRevisionTests(unittest.TestCase):
                          third["satisfying_validation_ids"]["independent_validator_review"])
         semantic = next(row for row in rows if (row["criterion_id"], row["validation_id"]) ==
                         ("ac_001", "val_task_validator_review"))
-        self.assertEqual("global_constraint_only", semantic["relation"])
-        self.assertTrue(semantic["optional_connection_allowed"])
-        self.assertEqual([], semantic["required_goal_coverage_links"])
+        self.assertFalse(semantic["ac_link_required"])
         task_scope = next(row for row in rows if (row["criterion_id"], row["validation_id"]) ==
                           ("ac_004", "val_task_scope_preservation"))
-        self.assertEqual(("global_constraint_only", []),
-                          (task_scope["relation"], task_scope["required_goal_coverage_links"]))
+        self.assertFalse(task_scope["ac_link_required"])
 
     def test_r_s06_13_provenance_binds_the_raw_rejection_and_normal_fixture_selectors(self):
         provenance = EXPECTATIONS["r_s06_13_provenance"]
@@ -195,7 +213,9 @@ class InspectionFixtureRevisionTests(unittest.TestCase):
         self.assertEqual("FAIL", raw_manifest["expected_status"])
         self.assertEqual(provenance["raw_summary_byte_digest"], raw_manifest["files"]["summary.json"])
         self.assertEqual("/expected_ac_validation_rows", normal["provenance"]["relation_rows_selector"])
-        self.assertEqual(EXPECTATIONS["fixture_revision"], normal["provenance"]["expectation_revision"])
+        self.assertEqual(EXPECTATIONS["parent_fixture_revision"], normal["provenance"]["expectation_revision"])
+        self.assertEqual(EXPECTATIONS["parent_expectations_byte_digest"],
+                         sha256_bytes((ROOT / "plan-inspection-v4-expectations.json").read_bytes()))
 
     def test_fixed_review_expectations_require_each_independent_defect(self):
         fixed = EXPECTATIONS["revision_review_expectations"]

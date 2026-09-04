@@ -23,7 +23,7 @@ from flowmarshal.engine.domain import (
     StateSnapshot,
 )
 from flowmarshal.engine.plan_inspection import PlanInspection, PlanInspectionError, validate_plan_inspection
-from flowmarshal.engine.plan_inspection_eval import assess_fixed_ac_validation_relations
+from flowmarshal.engine.plan_inspection_eval import assess_fixed_ac_link_requirements
 from flowmarshal.engine.planning import plan_review_evidence_catalog
 from flowmarshal.engine.planner_roles import PlanReviewEnvelope
 
@@ -54,7 +54,23 @@ def _context(*, goal_data: dict | None = None):
 
 
 def _payload() -> dict:
-    return deepcopy(RAW["submission"])
+    return _current_contract(RAW["submission"])
+
+
+def _current_contract(payload: dict) -> dict:
+    """byte-preserved 과거 relation 제출을 현재 bool 계약으로 메모리에서만 투영한다."""
+    converted = deepcopy(payload)
+    for row in converted["inspection"]["ac_validation_rows"]:
+        row["ac_link_required"] = row.pop("relation") == "explicit_procedure"
+    return converted
+
+
+def _current_rows(rows: list[dict]) -> list[dict]:
+    return [
+        {key: value for key, value in row.items() if key != "relation"}
+        | {"ac_link_required": row["relation"] == "explicit_procedure"}
+        for row in deepcopy(rows)
+    ]
 
 
 def _formalize_reference_addresses(payload: dict) -> dict:
@@ -189,7 +205,7 @@ class RawPlanInspectionRegressionTests(unittest.TestCase):
         self.assertEqual(1, summary["provider_turns"])
         self.assertEqual(0, failed["receipts"][0]["schema_recovery_attempts"])
 
-        envelope = PlanReviewEnvelope.model_validate(raw_response)
+        envelope = PlanReviewEnvelope.model_validate(_current_contract(raw_response))
         self.assertFalse(envelope.review.findings)
         self.assertIsNotNone(envelope.review.ratings)
         citations = {item.citation_id: item for item in envelope.inspection.citations}
@@ -219,7 +235,7 @@ class RawPlanInspectionRegressionTests(unittest.TestCase):
         goal = GoalContractRevision.model_validate(fixture["goal"])
         state = StateSnapshot.model_validate(fixture["state"])
         project_map = ProjectMapRevision.model_validate(fixture["project_map"])
-        envelope = PlanReviewEnvelope.model_validate(fixture["response"])
+        envelope = PlanReviewEnvelope.model_validate(_current_contract(fixture["response"]))
         validate_plan_inspection(
             envelope.inspection,
             plan=plan,
@@ -228,8 +244,8 @@ class RawPlanInspectionRegressionTests(unittest.TestCase):
             evidence_catalog=plan_review_evidence_catalog(plan, goal, state, project_map),
             findings=envelope.review.findings,
         )
-        assessment = assess_fixed_ac_validation_relations(
-            envelope.inspection, fixture["expected_ac_validation_rows"],
+        assessment = assess_fixed_ac_link_requirements(
+            envelope.inspection, _current_rows(fixture["expected_ac_validation_rows"]), fixture["plan"],
         )
         self.assertTrue(assessment["passed"], assessment)
 
@@ -250,11 +266,13 @@ class RawPlanInspectionRegressionTests(unittest.TestCase):
         with self.assertRaisesRegex(ValidationError, "finding이 없으면 fitness rating이 필요합니다"):
             PlanReviewEnvelope.model_validate(raw)
 
-        inspection = PlanInspection.model_validate(raw["inspection"])
-        relation = assess_fixed_ac_validation_relations(inspection, V3_EXPECTATIONS["ac_validation_rows"])
+        inspection = PlanInspection.model_validate(_current_contract({"inspection": raw["inspection"]})["inspection"])
+        relation = assess_fixed_ac_link_requirements(
+            inspection, _current_rows(V3_EXPECTATIONS["ac_validation_rows"]), FILES["input-clean-plan.json"],
+        )
         self.assertTrue(relation["pair_set_matches"])
         self.assertFalse(relation["passed"])
-        self.assertEqual(8, len(relation["relation_differences"]))
+        self.assertEqual(4, len(relation["requirement_differences"]))
 
         citations = {item.citation_id: item for item in inspection.citations}
         for constraint_id in ("constraint_001", "constraint_002"):

@@ -13,7 +13,8 @@ class InspectionExpectationError(ValueError):
 
 
 CASE_EVALUATION_SCOPE = {
-    "ac_validation_relations": "complete_matrix",
+    "ac_link_requirements": "complete_matrix",
+    "actual_link_source": "plan_goal_coverage",
     "independent_defects": "fixed_direct_evidence",
     "constraint_semantics": "not_scored",
     "mechanism_semantics": "fixed_defect_anchors_only",
@@ -27,6 +28,7 @@ def inspection_input_binding(payload: dict[str, Any]) -> dict[str, str]:
     연결이 포함된다. source catalog 본문이 없으면 부재 자체를 결속하며 능력을 추정하지 않는다.
     """
     catalog = payload["evidence_catalog"]
+    _verify_integration_criterion_coverage(catalog["artifact:plan_contract"])
     sources = payload["inspection_source_catalog"]
     registered = {ref: value for ref, value in sources.items() if ref.startswith("project:")}
     for ref, value in registered.items():
@@ -46,6 +48,22 @@ def inspection_input_binding(payload: dict[str, Any]) -> dict[str, str]:
     return result | {"input_digest": sha256_digest(result)}
 
 
+def _verify_integration_criterion_coverage(plan: dict[str, Any]) -> None:
+    """fixture Plan의 integration criterion_refs와 goal_coverage를 양방향 대조한다."""
+    definition = plan["definition"]
+    integrations = {
+        validation["validation_id"]: set(validation["criterion_refs"])
+        for validation in definition["integration_validations"]
+    }
+    linked = {validation_id: set() for validation_id in integrations}
+    for coverage in definition["goal_coverage"]:
+        for validation_id in coverage["validation_ids"]:
+            if validation_id in linked:
+                linked[validation_id].add(coverage["criterion_id"])
+    if integrations != linked:
+        raise InspectionExpectationError("INTEGRATION_CRITERION_COVERAGE_MISMATCH")
+
+
 def bind_case_expectation(
     *, case_id: str, payload: dict[str, Any], rows: list[dict[str, Any]],
     defects: list[dict[str, Any]], review_digest: str,
@@ -55,10 +73,9 @@ def bind_case_expectation(
     targets = {(row["criterion_id"], row["validation_id"])
                for row in payload["validation_comparison_targets"]["ac_validation_pairs"]}
     if not rows or len(pairs) != len(set(pairs)) or set(pairs) != targets:
-        raise InspectionExpectationError("CASE_RELATION_TABLE_MISSING_OR_INCOMPLETE")
-    if any(row["relation"] not in {"explicit_procedure", "global_constraint_only", "optional_or_unrelated"}
-           for row in rows):
-        raise InspectionExpectationError("CASE_RELATION_INVALID")
+        raise InspectionExpectationError("CASE_AC_LINK_TABLE_MISSING_OR_INCOMPLETE")
+    if any(type(row.get("ac_link_required")) is not bool for row in rows):
+        raise InspectionExpectationError("CASE_AC_LINK_REQUIREMENT_INVALID")
     if not case_id or not review_digest.startswith("sha256:"):
         raise InspectionExpectationError("INDEPENDENT_REVIEW_BINDING_MISSING")
     body = {"case_id": case_id, "input_binding": inspection_input_binding(payload),
@@ -88,32 +105,36 @@ def assess_case_inspection_review(
     envelope: PlanReviewEnvelope, expectation: dict[str, Any], *, case_id: str, payload: dict[str, Any],
 ) -> dict[str, Any]:
     verify_case_expectation(expectation, case_id=case_id, payload=payload)
-    assessment = assess_inspection_review(envelope, expectation["expected_defects"],
-                                         fixed_ac_validation_rows=expectation["ac_validation_rows"])
+    assessment = assess_inspection_review(
+        envelope,
+        expectation["expected_defects"],
+        fixed_ac_link_rows=expectation["ac_validation_rows"],
+        plan=payload["evidence_catalog"]["artifact:plan_contract"],
+    )
     return assessment | {"case_id": case_id, "expectation_digest": expectation["expectation_digest"],
                          "input_binding": expectation["input_binding"],
                          "evaluation_scope": expectation["evaluation_scope"]}
 
 
-def assess_fixed_ac_validation_relations(
-    inspection: PlanInspection, expected_rows: list[dict[str, Any]],
+def assess_fixed_ac_link_requirements(
+    inspection: PlanInspection, expected_rows: list[dict[str, Any]], plan: dict[str, Any],
 ) -> dict[str, Any]:
-    """사전 관계표와 실제 제출의 relation만 대조한다.
+    """사전 AC 연결 필수성 atom과 실제 제출을 대조한다.
 
     실제 진단은 assess_case_inspection_review의 입력 결속을 거친다. 이 저수준 함수는
-    과거 원시 제출 회귀에도 쓰며 의미 정답을 adapter나 Plan에 주입하지 않는다.
+    의미 정답을 adapter나 Plan에 주입하지 않는다. 실제 연결은 Plan에서 계산한다.
     """
     expected = {
-        (row["criterion_id"], row["validation_id"]): row["relation"]
+        (row["criterion_id"], row["validation_id"]): row["ac_link_required"]
         for row in expected_rows
     }
     actual = {
-        (row.criterion_id, row.validation_id): row.relation
+        (row.criterion_id, row.validation_id): row.ac_link_required
         for row in inspection.ac_validation_rows
     }
     pair_set_matches = (bool(expected_rows) and set(actual) == set(expected)
                         and len(actual) == len(inspection.ac_validation_rows) and len(expected) == len(expected_rows))
-    differences = [
+    requirement_differences = [
         {
             "criterion_id": criterion_id,
             "validation_id": validation_id,
@@ -123,11 +144,25 @@ def assess_fixed_ac_validation_relations(
         for criterion_id, validation_id in sorted(set(actual) & set(expected))
         if actual[(criterion_id, validation_id)] != expected[(criterion_id, validation_id)]
     ]
+    coverage = {
+        row["criterion_id"]: set(row["validation_ids"])
+        for row in plan["definition"]["goal_coverage"]
+    }
+    link_presence = [
+        {
+            "criterion_id": criterion_id,
+            "validation_id": validation_id,
+            "ac_link_required": actual[(criterion_id, validation_id)],
+            "actual_link_exists": validation_id in coverage[criterion_id],
+        }
+        for criterion_id, validation_id in sorted(actual)
+    ]
     return {
         "applicable": True,
         "pair_set_matches": pair_set_matches,
-        "relation_differences": differences,
-        "passed": pair_set_matches and not differences,
+        "requirement_differences": requirement_differences,
+        "link_presence": link_presence,
+        "passed": pair_set_matches and not requirement_differences,
     }
 
 
@@ -135,7 +170,8 @@ def assess_inspection_review(
     envelope: PlanReviewEnvelope,
     expected: list[dict[str, Any]],
     *,
-    fixed_ac_validation_rows: list[dict[str, Any]] | None = None,
+    fixed_ac_link_rows: list[dict[str, Any]] | None = None,
+    plan: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """finding의 존재 여부가 아닌 독립 결함의 ID·직접 근거·실제 finding 결속을 검사한다.
 
@@ -180,14 +216,23 @@ def assess_inspection_review(
     missing = [defect["defect_id"] for defect in expected if defect["defect_id"] not in matched]
     unexpected = [code for code in findings if code not in matched.values()]
     exclusive = (bool(findings) and envelope.review.ratings is None) or (not findings and envelope.review.ratings is not None)
-    relation_assessment = (
-        {"applicable": False, "pair_set_matches": None, "relation_differences": [], "passed": None}
-        if fixed_ac_validation_rows is None
-        else assess_fixed_ac_validation_relations(envelope.inspection, fixed_ac_validation_rows)
+    link_assessment = (
+        {"applicable": False, "pair_set_matches": None, "requirement_differences": [],
+         "link_presence": [], "passed": None}
+        if fixed_ac_link_rows is None
+        else assess_fixed_ac_link_requirements(
+            envelope.inspection,
+            fixed_ac_link_rows,
+            plan if plan is not None else _missing_plan(),
+        )
     )
     return {"passed": not missing and not unexpected and exclusive and
-                      (fixed_ac_validation_rows is None or relation_assessment["passed"]),
+                      (fixed_ac_link_rows is None or link_assessment["passed"]),
             "required_defects": [defect["defect_id"] for defect in expected], "matched_findings": matched,
             "missing_defects": missing, "unexpected_findings": unexpected,
             "reviewer_detection_complete": not missing, "reviewer_precision_ok": not unexpected,
-            "finding_rating_exclusive": exclusive, "fixed_ac_validation_relation_assessment": relation_assessment}
+            "finding_rating_exclusive": exclusive, "fixed_ac_link_requirement_assessment": link_assessment}
+
+
+def _missing_plan() -> dict[str, Any]:
+    raise InspectionExpectationError("AC_LINK_ASSESSMENT_PLAN_MISSING")

@@ -11,7 +11,7 @@ from flowmarshal.canonical import canonical_json, sha256_bytes, sha256_digest
 from flowmarshal.engine.domain import GoalContractRevision, PlanContractRevision, ProjectMapRevision
 from flowmarshal.engine.plan_inspection import PlanInspectionError, validate_plan_inspection
 from flowmarshal.engine.plan_inspection_eval import (
-    InspectionExpectationError, assess_case_inspection_review, assess_fixed_ac_validation_relations,
+    InspectionExpectationError, assess_case_inspection_review, assess_fixed_ac_link_requirements,
     bind_case_expectation, inspection_input_binding, verify_case_expectation,
 )
 from flowmarshal.engine.planner_roles import PlanReviewEnvelope
@@ -31,7 +31,18 @@ RAW = json.loads((FIXTURES / "plan-inspection-raw-v6-rejected.json").read_text(e
 class InspectionCaseBindingTests(unittest.TestCase):
     def setUp(self):
         self.payload = deepcopy(RAW["request"]["payload"])
-        self.rows = deepcopy(RAW["original_relation_rows"])
+        plan = self.payload["evidence_catalog"]["artifact:plan_contract"]
+        for validation in plan["definition"]["integration_validations"]:
+            validation["criterion_refs"] = [
+                coverage["criterion_id"] for coverage in plan["definition"]["goal_coverage"]
+                if validation["validation_id"] in coverage["validation_ids"]
+            ]
+        plan["definition_digest"] = sha256_digest(plan["definition"])
+        self.rows = [
+            {key: value for key, value in row.items() if key != "relation"}
+            | {"ac_link_required": row["relation"] == "explicit_procedure"}
+            for row in deepcopy(RAW["original_relation_rows"])
+        ]
         self.expected = bind_case_expectation(
             case_id="clean", payload=self.payload, rows=self.rows, defects=[], review_digest="sha256:" + "1" * 64,
         )
@@ -86,7 +97,7 @@ class InspectionCaseBindingTests(unittest.TestCase):
                 bind_case_expectation(case_id="clean", payload=self.payload, rows=rows, defects=[],
                                       review_digest="sha256:" + "1" * 64)
         changed = deepcopy(self.expected)
-        changed["ac_validation_rows"][0]["relation"] = "optional_or_unrelated"
+        changed["ac_validation_rows"][0]["ac_link_required"] = False
         with self.assertRaisesRegex(InspectionExpectationError, "CASE_EXPECTATION_DIGEST_MISMATCH"):
             verify_case_expectation(changed, case_id="clean", payload=self.payload)
         changed = deepcopy(self.payload)
@@ -113,11 +124,16 @@ class InspectionCaseBindingTests(unittest.TestCase):
             runtime.start_turn.assert_not_called()
 
     def test_evaluator_reports_fixed_scope_without_modifying_submission(self):
-        envelope = PlanReviewEnvelope.model_validate(RAW["raw_response"])
+        raw_response = deepcopy(RAW["raw_response"])
+        for row in raw_response["inspection"]["ac_validation_rows"]:
+            row["ac_link_required"] = row.pop("relation") == "explicit_procedure"
+        envelope = PlanReviewEnvelope.model_validate(raw_response)
         before = envelope.model_dump(mode="json")
         report = assess_case_inspection_review(envelope, self.expected, case_id="clean", payload=self.payload)
         self.assertFalse(report["passed"])
-        self.assertEqual(2, len(report["fixed_ac_validation_relation_assessment"]["relation_differences"]))
+        self.assertEqual(2, len(report["fixed_ac_link_requirement_assessment"]["requirement_differences"]))
+        self.assertTrue(all("actual_link_exists" in row
+                            for row in report["fixed_ac_link_requirement_assessment"]["link_presence"]))
         self.assertEqual("not_scored", report["evaluation_scope"]["constraint_semantics"])
         self.assertEqual(before, envelope.model_dump(mode="json"))
 
@@ -173,10 +189,10 @@ class InspectionCaseBindingTests(unittest.TestCase):
                          sha256_bytes(RAW["raw_final_response"].encode("utf-8")))
         self.assertEqual("FAIL", RAW["provenance"]["original_status"])
         self.assertFalse(RAW["original_assessment"]["passed"])
-        envelope = PlanReviewEnvelope.model_validate(RAW["raw_response"])
-        self.assertIsNotNone(envelope.review.ratings)
-        self.assertFalse(envelope.review.findings)
-        self.assertFalse(any(c.selector.endswith("/validation_intent") for c in envelope.inspection.citations))
+        self.assertIsNotNone(RAW["raw_response"]["review"]["ratings"])
+        self.assertFalse(RAW["raw_response"]["review"]["findings"])
+        self.assertFalse(any(c["selector"].endswith("/validation_intent")
+                             for c in RAW["raw_response"]["inspection"]["citations"]))
         catalog = deepcopy(self.payload["evidence_catalog"])
         # 검증한 실제 전송 본문을 사용해 로컬 과거 경로에 의존하지 않는다. 원시는 수정하지 않는다.
         catalog.update({ref: value for ref, value in self.payload["inspection_source_catalog"].items()
@@ -188,9 +204,8 @@ class InspectionCaseBindingTests(unittest.TestCase):
         if project_map is None:
             files = json.loads((FIXTURES / "plan-inspection-regressions.json").read_text(encoding="utf-8"))["files"]
             project_map = ProjectMapRevision.model_validate(files["input-project-map.json"])
-        with self.assertRaisesRegex(PlanInspectionError, "인용 누락"):
-            validate_plan_inspection(envelope.inspection, plan=plan, goal=goal, project_map=project_map,
-                                     evidence_catalog=catalog, findings=envelope.review.findings)
+        with self.assertRaisesRegex(ValueError, "ac_link_required"):
+            PlanReviewEnvelope.model_validate(RAW["raw_response"])
 
     def test_distinct_mechanisms_may_reuse_one_citation_but_one_list_cannot_duplicate_it(self):
         from tests.test_engine_inspection_raw_regressions import (
@@ -260,18 +275,16 @@ class IndependentlyReviewedCaseTests(unittest.TestCase):
 
     def test_revised_sources_keep_goal_task_boundary_and_optional_duplicate_ids(self):
         rows = {(r["criterion_id"], r["validation_id"]): r for r in self.expected["case_ac_validation_rows"]["clean"]}
-        self.assertEqual("explicit_procedure", rows[("ac_003", "val_goal_independent_behavior_contract")]["relation"])
+        self.assertTrue(rows[("ac_003", "val_goal_independent_behavior_contract")]["ac_link_required"])
         for criterion, validation in (("ac_001", "val_task_scope_preservation"), ("ac_002", "val_task_scope_preservation"),
                                      ("ac_003", "val_task_scope_preservation"), ("ac_004", "val_task_scope_preservation"),
                                      ("ac_002", "val_task_unittest"), ("ac_004", "val_task_unittest")):
             row = rows[(criterion, validation)]
-            self.assertEqual("global_constraint_only", row["relation"])
-            self.assertEqual([], row["required_goal_coverage_links"])
-            self.assertTrue(row["optional_connection_allowed"])
+            self.assertFalse(row["ac_link_required"])
         self.assertEqual(6, sum(row["changed_expectation"] for row in self.review["focused_row_decisions"]))
         baseline = json.loads((FIXTURES / "plan-inspection-v2-expectations.json").read_text(encoding="utf-8"))
         self.assertEqual(self.expected["parent_expectations_byte_digest"],
-                         sha256_bytes((FIXTURES / "plan-inspection-v3-expectations.json").read_bytes()))
+                         sha256_bytes((FIXTURES / "plan-inspection-v4-expectations.json").read_bytes()))
         self.assertEqual("optional_or_unrelated", next(row for row in baseline["ac_validation_rows"]
                          if (row["criterion_id"], row["validation_id"]) == ("ac_004", "val_task_scope_preservation"))["relation"])
 

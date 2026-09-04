@@ -59,7 +59,7 @@ def submission(name):
         if defect["defect_kind"] == "missing_validation_link":
             ac = defect["criterion_ids"][0]
             row = next(row for row in inspection["ac_validation_rows"] if (row["criterion_id"], row["validation_id"]) == (ac, vid))
-            row.update(relation="explicit_procedure", finding_codes=[code])
+            row.update(ac_link_required=True, finding_codes=[code])
             basis = list(row["basis_refs"])
             ci = next(i for i, coverage in enumerate(plan.definition.goal_coverage) if coverage.criterion_id == ac)
             basis.append(cite("artifact:plan_contract", f"/definition/goal_coverage/{ci}/validation_ids/0",
@@ -72,9 +72,9 @@ def submission(name):
             basis.append(scope_ref)
             vrow.update(assessment="contradicted", finding_codes=[code],
                         mechanisms=[{"tool": "oracle.py", "phase": "task", "basis_refs": [scope_ref]}])
-            for relation_row in inspection["ac_validation_rows"]:
-                if relation_row["validation_id"] == vid:
-                    relation_row["basis_refs"].append(scope_ref)
+            for ac_row in inspection["ac_validation_rows"]:
+                if ac_row["validation_id"] == vid:
+                    ac_row["basis_refs"].append(scope_ref)
         elif defect["defect_kind"] == "result_order":
             basis.append(cite("artifact:plan_contract", "/definition/tasks/0/acceptance_criteria/4",
                               plan.definition.tasks[0].acceptance_criteria[4]))
@@ -213,7 +213,7 @@ class PlanInspectionTests(unittest.TestCase):
         payload["review"]["findings"].pop(0)
         payload["inspection"]["finding_links"].pop(0)
         for row in payload["inspection"]["ac_validation_rows"]:
-            row.update(relation="optional_or_unrelated", finding_codes=[])
+            row.update(ac_link_required=False, finding_codes=[])
         # 미사용 coverage 인용도 함께 제거해 구조는 일관되지만 의미적으로 불완전한 제출물을 만든다.
         payload["inspection"]["citations"] = [c for c in payload["inspection"]["citations"] if "/goal_coverage/" not in c["selector"]]
         report = assess_inspection_review(validate("stored-multi-defect", payload), EXPECTED["stored-multi-defect"])
@@ -222,20 +222,48 @@ class PlanInspectionTests(unittest.TestCase):
         report = assess_inspection_review(validate("bad", submission("bad")), [])
         self.assertEqual(["FIXTURE_DEFECT_0"], report["unexpected_findings"])
 
-    def test_global_semantic_obligation_is_distinct_from_explicit_ac_procedure(self):
+    def test_global_task_obligation_is_distinct_and_optional_links_may_exist_or_not(self):
         name = "semantic-missing-link"
         payload = submission(name)
         self.assertTrue(assess_inspection_review(validate(name, payload), EXPECTED[name])["passed"])
-        plan, goal, _, _ = inputs("clean")
+        plan, _, _, _ = inputs("clean")
         payload = submission("clean")
         row = next(row for row in payload["inspection"]["ac_validation_rows"]
-                   if (row["criterion_id"], row["validation_id"]) == ("ac_001", "val_task_validator_review"))
-        constraint = next(c for c in payload["inspection"]["citations"] if c["selector"] == "/constraints/2/statement")
-        row.update(relation="global_constraint_only", basis_refs=row["basis_refs"] + [constraint["citation_id"]])
+                   if (row["criterion_id"], row["validation_id"]) == ("ac_002", "val_task_validator_review"))
+        self.assertIn("val_task_validator_review", next(item for item in plan.definition.goal_coverage
+                      if item.criterion_id == "ac_002").validation_ids)
+        row["ac_link_required"] = False
         validate("clean", payload)
-        row["relation"] = "explicit_procedure"
+        unlinked_plan = plan.model_copy(deep=True)
+        coverage = next(item for item in unlinked_plan.definition.goal_coverage if item.criterion_id == "ac_002")
+        object.__setattr__(coverage, "validation_ids", tuple(
+            validation_id for validation_id in coverage.validation_ids if validation_id != "val_task_validator_review"
+        ))
+        from flowmarshal.canonical import sha256_digest
+        object.__setattr__(unlinked_plan, "definition_digest", sha256_digest(unlinked_plan.definition))
+        goal = inputs("clean")[1]
+        envelope = PlanReviewEnvelope.model_validate(payload)
+        validate_plan_inspection(
+            envelope.inspection,
+            plan=unlinked_plan,
+            goal=goal,
+            project_map=inputs("clean")[3],
+            evidence_catalog=plan_review_evidence_catalog(unlinked_plan, goal, inputs("clean")[2], inputs("clean")[3]),
+            findings=envelope.review.findings,
+        )
+        row["ac_link_required"] = True
         with self.assertRaisesRegex(PlanInspectionError, "finding 연결"):
-            validate("clean", payload)
+            envelope = PlanReviewEnvelope.model_validate(payload)
+            validate_plan_inspection(
+                envelope.inspection,
+                plan=unlinked_plan,
+                goal=goal,
+                project_map=inputs("clean")[3],
+                evidence_catalog=plan_review_evidence_catalog(
+                    unlinked_plan, goal, inputs("clean")[2], inputs("clean")[3]
+                ),
+                findings=envelope.review.findings,
+            )
 
     def test_envelope_is_required_and_core_decisions_cannot_be_submitted(self):
         with self.assertRaises(ValueError):
@@ -247,7 +275,7 @@ class PlanInspectionTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate("clean", payload)
 
-    def test_provider_schema_orders_mechanism_evidence_before_ac_relations_without_changing_fields_or_enums(self):
+    def test_provider_schema_orders_mechanism_evidence_before_ac_link_requirements(self):
         schema = PlanReviewEnvelope.model_json_schema()
 
         def resolve(value):
@@ -262,10 +290,9 @@ class PlanInspectionTests(unittest.TestCase):
             list(properties),
         )
         self.assertEqual(["inspection", "review"], list(schema["properties"]))
-        self.assertEqual(
-            ["explicit_procedure", "global_constraint_only", "optional_or_unrelated"],
-            resolve(properties["ac_validation_rows"]["items"])["properties"]["relation"]["enum"],
-        )
+        ac_properties = resolve(properties["ac_validation_rows"]["items"])["properties"]
+        self.assertEqual("boolean", ac_properties["ac_link_required"]["type"])
+        self.assertNotIn("relation", ac_properties)
 
     def test_partial_global_obligation_can_cite_existing_checks_and_missing_responsibility(self):
         payload = submission("clean")

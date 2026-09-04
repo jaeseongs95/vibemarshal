@@ -18,8 +18,8 @@ from flowmarshal.engine.domain import PlanContractRevision
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EXPECTATIONS_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v4-expectations.json"
-INDEPENDENT_REVIEW_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v4-independent-fixture-review.json"
+EXPECTATIONS_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v5-expectations.json"
+INDEPENDENT_REVIEW_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v5-independent-fixture-review.json"
 RAW_REJECTED_MANIFEST_PATH = ROOT / "tests/fixtures/engine/r-s06-12-raw-rejected/manifest.json"
 SYNTHETIC_NORMAL_FIXTURE_PATH = ROOT / "tests/fixtures/engine/plan-inspection-r-s06-13-synthetic-normal.json"
 LEGACY_EXPECTATIONS_PATH = ROOT / "tests/fixtures/engine/plan-inspection-expectations.json"
@@ -89,6 +89,43 @@ def _remove_link(plan: dict[str, Any], criterion_id: str, validation_id: str) ->
     validation_ids.remove(validation_id)
 
 
+def _integration_validation(plan: dict[str, Any], validation_id: str) -> dict[str, Any]:
+    matches = [item for item in plan["definition"]["integration_validations"]
+               if item["validation_id"] == validation_id]
+    if len(matches) != 1:
+        raise FixtureRevisionError(f"integration validation이 하나여야 합니다: {validation_id}")
+    return matches[0]
+
+
+def _add_integration_criterion_ref(plan: dict[str, Any], criterion_id: str, validation_id: str) -> None:
+    refs = _integration_validation(plan, validation_id)["criterion_refs"]
+    if criterion_id in refs:
+        raise FixtureRevisionError(f"이미 존재하는 integration criterion_ref입니다: {criterion_id} -> {validation_id}")
+    refs.append(criterion_id)
+
+
+def _remove_integration_criterion_ref(plan: dict[str, Any], criterion_id: str, validation_id: str) -> None:
+    refs = _integration_validation(plan, validation_id)["criterion_refs"]
+    if criterion_id not in refs:
+        raise FixtureRevisionError(f"제거할 integration criterion_ref가 없습니다: {criterion_id} -> {validation_id}")
+    refs.remove(criterion_id)
+
+
+def verify_integration_criterion_coverage(plan: dict[str, Any]) -> None:
+    """integration criterion_refs와 goal_coverage 연결을 모델 호출 전에 양방향 검사한다."""
+    integrations = {
+        item["validation_id"]: set(item["criterion_refs"])
+        for item in plan["definition"]["integration_validations"]
+    }
+    linked = {validation_id: set() for validation_id in integrations}
+    for coverage in plan["definition"]["goal_coverage"]:
+        for validation_id in coverage["validation_ids"]:
+            if validation_id in linked:
+                linked[validation_id].add(coverage["criterion_id"])
+    if integrations != linked:
+        raise FixtureRevisionError("INTEGRATION_CRITERION_COVERAGE_MISMATCH")
+
+
 def _remove_task_validation(plan: dict[str, Any], validation_id: str) -> None:
     tasks = plan["definition"]["tasks"]
     matches = [(task, index) for task in tasks for index, validation in enumerate(task["validations"])
@@ -110,6 +147,7 @@ def _replace_validation_statement(plan: dict[str, Any], validation_id: str, stat
 def _refresh_and_validate(plan: dict[str, Any]) -> None:
     plan["definition_digest"] = sha256_digest(plan["definition"])
     PlanContractRevision.model_validate(plan)
+    verify_integration_criterion_coverage(plan)
 
 
 def _apply_mutation(plan: dict[str, Any], mutation: dict[str, Any]) -> dict[str, Any]:
@@ -118,6 +156,10 @@ def _apply_mutation(plan: dict[str, Any], mutation: dict[str, Any]) -> dict[str,
         _add_link(revised, criterion_id, validation_id)
     for criterion_id, validation_id in mutation.get("remove_goal_coverage_links", []):
         _remove_link(revised, criterion_id, validation_id)
+    for criterion_id, validation_id in mutation.get("add_integration_criterion_refs", []):
+        _add_integration_criterion_ref(revised, criterion_id, validation_id)
+    for criterion_id, validation_id in mutation.get("remove_integration_criterion_refs", []):
+        _remove_integration_criterion_ref(revised, criterion_id, validation_id)
     for validation_id in mutation.get("remove_task_validations", []):
         _remove_task_validation(revised, validation_id)
     for validation_id, statement in mutation.get("replace_task_validation_statements", []):
@@ -181,8 +223,9 @@ def _independent_fixture_review(
         raw_manifest.get("expected_status") != "FAIL"
         or raw_manifest.get("files", {}).get("summary.json") != provenance.get("raw_summary_byte_digest")
         or normal.get("provenance", {}).get("relation_rows_selector") != "/expected_ac_validation_rows"
-        or normal.get("provenance", {}).get("expectation_revision") != expectations.get("fixture_revision")
-        or review.get("r_s06_13_provenance", {}).get("expectations_path") != EXPECTATIONS_PATH.name
+        or normal.get("provenance", {}).get("expectation_revision") != expectations.get("parent_fixture_revision")
+        or review.get("r_s06_15_provenance", {}).get("parent_expectations") !=
+           expectations.get("r_s06_15_provenance", {}).get("parent_expectations")
     ):
         raise FixtureRevisionError("R-S06-13 provenance 또는 직접 selector 결속이 다릅니다.")
     return review
@@ -192,6 +235,7 @@ def verify_reviewed_case(
     case_id: str, payload: dict[str, Any], expectations: dict[str, Any], review: dict[str, Any],
 ) -> None:
     """사전 검토한 문장·소유 단계·method·mode와 직접 인용을 실제 요청에 재대조한다."""
+    verify_integration_criterion_coverage(payload["evidence_catalog"]["artifact:plan_contract"])
     if sha256_digest(payload["evidence_catalog"]["source:goal"]) != review["case_goal_contract_digests"][case_id]:
         raise FixtureRevisionError("CASE_REVIEWED_GOAL_CONTRACT_MISMATCH")
     if sha256_digest(payload["evidence_catalog"]["artifact:plan_contract"]) != review["case_plan_contract_digests"][case_id]:

@@ -42,7 +42,7 @@ def inspection_fixture(plan: dict, goal: dict, *, revision: bool = False, review
                       "basis_refs": basis})
     return {
         "citations": citations,
-        "ac_validation_rows": [{"criterion_id": ac, "validation_id": vid, "relation": "optional_or_unrelated",
+        "ac_validation_rows": [{"criterion_id": ac, "validation_id": vid, "ac_link_required": False,
                                 "basis_refs": [*arefs, vref], "finding_codes": []}
                                for ac, arefs in ac_refs.items() for vid, vref in val_refs.items()],
         "constraint_task_rows": [{"constraint_id": cid, "task_ref": task["task_ref"], "applicability": "not_applicable",

@@ -22,9 +22,9 @@ class InspectionCitation(EngineModel):
 class ACValidationInspection(EngineModel):
     criterion_id: str
     validation_id: str
-    relation: Literal["explicit_procedure", "global_constraint_only", "optional_or_unrelated"] = Field(description="AC 연결 의무의 출처 분류. 필수가 아닌 기존 선택적 연결을 금지한다는 뜻이 아니다.")
-    basis_refs: tuple[str, ...] = Field(min_length=2, description="해당 AC의 statement·validation_intent 각각, validation statement 전체, global_constraint_only의 constraint 원문 및 같은 validation mechanism이 실제 범위 판단에 사용한 모든 project citation ID. 기존 citation을 재사용하며 새 citation을 만들지 않는다.")
-    finding_codes: tuple[str, ...] = Field(description="explicit_procedure인데 현재 ID 연결이 없는 경우만 missing_validation_link finding. 나머지는 빈 배열.")
+    ac_link_required: bool = Field(description="이 validation이 AC 일부를 직접 검증하여 goal_coverage 연결이 필수인지 여부. false는 선택적 연결을 금지하지 않는다.")
+    basis_refs: tuple[str, ...] = Field(min_length=2, description="해당 AC의 statement·validation_intent 각각, validation statement 전체 및 같은 validation mechanism이 실제 범위 판단에 사용한 모든 project citation ID. 기존 citation을 재사용하며 새 citation을 만들지 않는다.")
+    finding_codes: tuple[str, ...] = Field(description="ac_link_required=true인데 현재 ID 연결이 없는 경우만 missing_validation_link finding. 나머지는 빈 배열.")
 
 
 class ConstraintTaskInspection(EngineModel):
@@ -88,18 +88,17 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "citations 다음에는 모든 validation_rows를 먼저 작성해 validation statement, mechanism, phase와 "
     "별도 실제 검사 책임의 근거를 확정한다. 그 뒤 ac_validation_rows와 constraint_task_rows를 작성한다. "
     "모든 AC × 모든 Task·integration validation 쌍을 ac_validation_rows에 정확히 한 번씩 쓴다. "
-    "작성자는 완성한 plan의 모든 validation ID에서 이 곱집합을 구성한다. 각 행에서 AC가 "
-    "명시한 절차(explicit_procedure), 전역 constraint만의 의무(global_constraint_only), 선택적·무관 "
-    "관계(optional_or_unrelated)를 구분한다. 모든 행의 basis_refs에는 해당 AC의 비어 있지 않은 "
+    "작성자는 완성한 plan의 모든 validation ID에서 이 곱집합을 구성한다. 각 행의 "
+    "ac_link_required는 validation이 AC 일부를 직접 검증하면 true이고 아니면 false다. false는 "
+    "기존 선택적 연결을 금지하지 않는다. 모든 행의 basis_refs에는 해당 AC의 비어 있지 않은 "
     "statement와 validation_intent를 각각 인용하고 validation statement 전체 인용도 연결한다. 전역 의무이면 "
     "constraint 인용도 붙인다. validation_rows의 mechanism으로 등록 자료·구현을 검사 범위 판단에 "
     "사용했다면 그 정확한 project:<entry_id>/content citation_id를 같은 validation의 모든 AC 관계 행 "
     "basis_refs에도 재사용해 두 판단을 함께 추적한다. 제출 직전 validation별 mechanism의 project citation "
     "집합이 관련 모든 AC 행에 들어 있는지 직접 대조한다. 같은 "
-    "citation_id를 여러 행에서 재사용할 수 있다. 다른 ID가 연결되어도 AC가 명시한 복합 검사 절차 ID를 빠뜨리지 않는다. "
-    "반대로 검사 문장의 연관 표현·전역 의무만으로 AC 명시 절차로 분류하지 않는다. relation은 "
-    "연결 의무의 출처이며 선택적 연결 금지가 아니다. global_constraint_only 또는 "
-    "optional_or_unrelated여도 기존 연결을 허용하고 그 이유만으로 finding을 만들지 않는다. "
+    "citation_id를 여러 행에서 재사용할 수 있다. 다른 ID가 연결되어도 AC 일부를 직접 검증하는 "
+    "검사 ID를 빠뜨리지 않는다. 반대로 검사 문장의 연관 표현·전역 의무만으로 AC 직접 검증을 "
+    "추정하지 않는다. 전역 Task 검사 의무는 이 bool에 섞지 않고 constraint_task_rows에서만 판정한다. "
     "모든 constraint × 모든 Task 쌍을 constraint_task_rows에 한 번씩 쓰고 전역 Task 검사 의무와 "
     "그 Task의 실제 validation ID를 대조한다. 검사 의무가 아닌 제약은 not_applicable과 빈 ID로 두되 "
     "모든 행에 해당 constraint 원문을 인용한다. required 의무의 일부만 빠져도 존재하는 ID는 "
@@ -118,7 +117,7 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "실제 수단 범위 인용을 해당 finding_link에도 붙인다. finding summary에는 해당 AC ID와 "
     "validation ID를 원문 그대로 포함한다. integration 결함의 task_refs는 직접 영향 Task만 쓰며 "
     "없으면 비운다. finding의 affected_task_refs와 link.task_refs는 같아야 한다. "
-    "명시 절차인데 ID가 빠진 행만 missing_validation_link finding에 연결하고 나머지 AC 행의 "
+    "ac_link_required=true인데 ID가 빠진 행만 missing_validation_link finding에 연결하고 나머지 AC 행의 "
     "finding_codes는 비운다. 단순 file/diff evidence 언급을 test 입력의 명시적 제외로 추정하지 않는다. "
     "원문이 입력을 제한·제외하여 수단과 충돌하는 경우와 원문 정보가 부족한 경우를 구분한다. contradicted 또는 "
     "unresolved 검사는 각각 validation_scope 또는 insufficient_evidence finding에 연결한다. "
@@ -266,9 +265,7 @@ def validate_plan_inspection(
         ), "대조표 해당 검사 전체 문장 인용 누락")
         _require(mechanism_project_refs_by_validation.get(row.validation_id, set()) <= set(row.basis_refs),
                  "대조표 AC 관계 등록 자료 인용 누락")
-        if row.relation == "global_constraint_only":
-            _require(has(row.basis_refs, "source:goal", set(constraint_selectors.values())), "대조표 전역 constraint 인용 누락")
-        missing = row.relation == "explicit_procedure" and row.validation_id not in coverage[row.criterion_id].validation_ids
+        missing = row.ac_link_required and row.validation_id not in coverage[row.criterion_id].validation_ids
         if missing:
             codes(row.finding_codes, kind="missing_validation_link", criterion=row.criterion_id,
                   validation=row.validation_id, task=validation["task_ref"])
