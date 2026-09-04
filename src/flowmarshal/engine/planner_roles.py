@@ -60,6 +60,10 @@ READ_ONLY_REPORTING_INSTRUCTIONS = (
     "응답 보고로 몰래 바꾸거나 파일 쓰기 예외를 발명하지 않는다."
     "read_only의 응답 보고 Task는 inspect 또는 decide로 분류한다. '작성'이라는 동사만으로 "
     "change Task를 만들거나 분석과 보고를 별도 변경 Task로 분할하지 않는다."
+    "현재 계획 역할에만 적용되는 명령 금지를 미래 Task에 추가하지 않는다. Goal에 명시된 "
+    "실행 금지는 보존하되, 파일 무변경이나 정적 분석 요청만으로 명령 미실행 증명을 새 완료 "
+    "조건으로 요구하지 않는다. 실제 명령 미실행이 계약 조건이면 file·diff만으로 입증했다고 "
+    "하지 말고 실행 관측의 범위와 충분성을 검증 계약에 명시한다."
 )
 
 
@@ -111,8 +115,8 @@ class DetailedTaskDraft(EngineModel):
     produces: tuple[str, ...] = Field(min_length=1)
     consumes: tuple[str, ...] = ()
     preconditions: tuple[PreconditionContract, ...] = ()
-    expected_effects: tuple[EffectContract, ...] = ()
-    prohibited_effects: tuple[EffectContract, ...] = ()
+    expected_effects: tuple[EffectContract, ...] = Field(default=(), description="Task가 실제 발생시키는 효과만 포함한다. 파일 무변경·외부 효과 없음 같은 미발생 조건은 금지 효과나 완료 조건에 둔다.")
+    prohibited_effects: tuple[EffectContract, ...] = Field(default=(), description="Task가 발생시키면 안 되는 효과. 로컬 파일 mutation과 외부 시스템 효과를 별도 항목으로 작성하고 각 external 값을 해당 범위에 맞춘다.")
     required_capabilities: tuple[str, ...] = ()
     acceptance_criteria: tuple[str, ...] = Field(min_length=1)
     validations: tuple[ValidationContract, ...] = Field(min_length=1)
@@ -140,8 +144,8 @@ class PlanExpansionDraft(EngineModel):
     dependencies: tuple[PlanDependencyDraft, ...] = ()
     goal_coverage: tuple[PlanGoalCoverageDraft, ...] = Field(min_length=1)
     integration_validations: tuple[IntegrationValidationContract, ...] = Field(min_length=1)
-    expected_effects: tuple[str, ...] = ()
-    prohibited_effects: tuple[str, ...] = ()
+    expected_effects: tuple[str, ...] = Field(default=(), description="Plan이 실제 발생시키는 효과. 효과가 없다는 부정형 조건은 포함하지 않는다.")
+    prohibited_effects: tuple[str, ...] = Field(default=(), description="Goal이 금지한 효과와 범위를 보존하며 현재 계획 역할의 행동 제한을 새로 추가하지 않는다.")
 
 
 class TaskAssigner(Protocol):
@@ -476,6 +480,8 @@ class PlanExpanderAdapter:
                 "external=true는 외부 시스템·계정·제3자에 대한 효과이며 Goal의 허용 외부 효과에 결속해야 한다. "
                 "expected_effects와 prohibited_effects 모두 로컬 파일 mutation과 외부 시스템 효과를 "
                 "각각 별도 항목으로 작성하고 external 값을 구분한다. 한 항목에 두 범위를 섞지 않는다. "
+                "expected_effects에는 실제 발생시키는 효과만 넣는다. '파일을 변경하지 않는다', "
+                "'외부 효과가 없다'는 미발생 조건은 prohibited_effects나 완료 조건에만 둔다. "
                 "Core의 이후 Plan digest 활성화를 별도 승인 Task나 현재 필요한 승인 입력으로 발명하지 않는다."
                 "Worker 응답 보고는 Core가 external_observation evidence로 수집한다. 응답 내용의 "
                 "의미 검사는 원본 file 근거와 응답 관측을 함께 참조하는 semantic validation으로 "

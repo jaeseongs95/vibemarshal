@@ -42,8 +42,33 @@ class GoalPreparationError(RuntimeError):
     pass
 
 
+GOAL_INTERPRETATION_INSTRUCTIONS = (
+    "Goal은 Plan 활성화 후 달성할 사용자 결과를 나타낸다. 현재 정규화·계획 역할에만 적용되는 "
+    "파일 수정·명령 실행 금지를 미래 Task의 constraint, non-goal, prohibited_effects나 완료 조건으로 "
+    "옮기지 않는다. 각 지침의 출처와 명시된 적용 단계에 따라 판단한다. read_only는 프로젝트 파일의 "
+    "생성·수정·삭제 금지이며 테스트·명령의 일괄 금지를 뜻하지 않는다. 반대로 사용자 원문이나 "
+    "실행에도 적용되는 프로젝트 정책이 실제 명령 미실행을 요구하면 그 금지를 그대로 보존한다. "
+    "정적 분석만 요청한 경우 실행을 필수로 추가하지 않으며, '명령 실행이 불필요함'을 "
+    "'명령이 한 번도 실행되지 않았음을 입증함'이라는 새 요구로 바꾸지 않는다. "
+    "migration처럼 특정 작업의 실행 금지를 모든 읽기·검증 명령의 금지로 넓히지 않는다. "
+    "공개 API 보존은 요청의 작업 종류에 맞게 구체화한다. 구현 변경이나 API 보존 전략을 "
+    "요청하면 이름·import·시그니처와 함께 문서·테스트가 요구하는 반환값·상태 변화·오류 등 "
+    "정상 계약을 실제 값이나 관계로 명시한다. '관찰된 반환 동작 보존'처럼 보존 대상을 "
+    "생략하지 않는다. 현재 구현이 문서·테스트 계약과 다르면 그 동작은 결함으로 구분하고 "
+    "bugfix Goal에서 결함 수정 자체를 금지 효과로 기록하지 않는다. 비교·제안 Goal에는 "
+    "각 대안의 보존 방안을 요구하되 실제 수정이나 migration 실행 의무를 추가하지 않는다. "
+    "읽기 전용 원인 분석은 원인·근거 AC에 필요한 정상 기대값과 현재 불일치가 명시되면 "
+    "충분하다. 이를 별도 구현·호환성 보존 의무로 승격하지 않는다. 전체 proposal의 Hard AC와 "
+    "constraint를 함께 읽고 이미 명시된 같은 의미를 특정 항목에 반복하도록 요구하지 않는다. "
+    "allowed_external_effects에는 사용자 목표가 허용한 외부 시스템·계정·제3자 효과만 넣는다. "
+    "로컬 파일 변경·로컬 검증 명령·함수 반환·응답 보고는 외부 효과가 아니다. 허용된 외부 효과가 "
+    "없으면 빈 배열로 둔다. 효과가 발생하지 않는다는 조건은 허용 효과가 아니라 금지·제약으로 "
+    "표현하고, 한 금지 항목에 로컬 파일 mutation과 외부 시스템 효과를 섞지 않는다. "
+)
+
+
 class AcceptanceDraft(EngineModel):
-    statement: str = Field(min_length=1, max_length=5000)
+    statement: str = Field(min_length=1, max_length=5000, description="출처가 있는 관측 가능한 사용자 결과. API 변경·보존 전략은 문서·테스트의 정상 동작 계약을 구체화한다. 원인 분석에는 기대값과 현재 불일치의 근거를 담고 별도 구현·보존 의무나 현재 역할 한정 제한을 추가하지 않는다.")
     validation_intent: str = Field(min_length=1, max_length=5000)
 
 
@@ -54,7 +79,7 @@ class PreferenceDraft(EngineModel):
 
 class ConstraintDraft(EngineModel):
     category: str = Field(min_length=1, max_length=80)
-    statement: str = Field(min_length=1, max_length=5000)
+    statement: str = Field(min_length=1, max_length=5000, description="사용자 목표 또는 승인 후 Task에도 적용되는 제약. 현재 계획 생성 호출에만 적용되는 파일·명령 금지를 미래 Task로 전사하지 않는다.")
 
 
 class AssumptionDraft(EngineModel):
@@ -79,8 +104,8 @@ class GoalNormalizationProposal(EngineModel):
     unresolved_questions: tuple[QuestionDraft, ...] = ()
     mutation_policy: MutationPolicy
     behavior_policy: BehaviorPolicy
-    allowed_external_effects: tuple[str, ...] = ()
-    prohibited_effects: tuple[str, ...] = ()
+    allowed_external_effects: tuple[str, ...] = Field(default=(), description="목표가 허용한 외부 시스템·계정·제3자 효과만 포함한다. 로컬 파일 변경·검증 명령·응답 보고와 효과 미발생 조건은 제외하며 허용 효과가 없으면 빈 배열이다.")
+    prohibited_effects: tuple[str, ...] = Field(default=(), description="사용자 목표에 적용되는 금지 효과. 로컬 파일 mutation과 외부 시스템 효과는 별도 항목으로 구분하고 현재 계획 역할의 행동 제한을 추가하지 않는다.")
 
     @model_validator(mode="after")
     def values_are_consistent(self) -> "GoalNormalizationProposal":
@@ -374,7 +399,7 @@ class GoalNormalizerAdapter:
                 "이미 관찰된 사실은 assumption에 재작성하지 않고, 정말 검증해야 할 가정만 남긴다. "
                 "사용자 요구와 별개인 플랫폼 승인 절차를 새 Hard AC로 발명하지 않는다. "
                 "출력 JSON에 상태나 점수를 넣지 않는다."
-            ),
+            ) + GOAL_INTERPRETATION_INSTRUCTIONS,
             payload={
                 "source_request": source_request,
                 "project_profile": profile.definition.model_dump(mode="json"),
@@ -434,9 +459,12 @@ class GoalReviewerAdapter:
                 "필수 외부 사실의 부재와 계획에서 정할 설계 선택·운영 상세를 구분한다. 프로젝트 내부 "
                 "명령 선택이나 비교 대안 제안을 위해 사용자에게 별도 사실 제공을 요구하지 않는다. "
                 "변경 계획의 mutation policy는 승인 후 사용자 목표의 효과를 뜻한다. "
+                "constraint·non-goal·effect policy에도 원문 또는 승인 후 Goal·Task 실행 단계에 적용되는 정책의 "
+                "근거가 있는지 확인한다. 적용 범위 누출이나 요청에 필요한 공개 동작 계약이 "
+                "전체 proposal에서 빠진 경우 제공된 source와 proposal을 참조하는 finding으로 제출한다. "
                 "finding code, 직접 evidence ref, remediable만 구조화해 제출한다. admission 상태, "
                 "최종 점수, weakest item을 선언하지 않는다. 같은 증상에서 상관 결함을 늘리지 않는다."
-            ),
+            ) + GOAL_INTERPRETATION_INSTRUCTIONS,
             payload={"case_ref": "goal-review", "evidence_catalog": evidence_catalog},
             output_schema=ReviewDraft.model_json_schema(),
             model=self.model,

@@ -4,14 +4,15 @@
 
 ## 결론
 
-현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. 읽기 전용 응답 보고와 프로젝트 파일 무변경 계약을 구분하고, Worker 응답을 독립 검사의 자료로 전달하는 경로를 연결했다. 첫 수정 source에서 **실제 역할 회귀 48/48 PASS, 실제 E2E 4/4 PASS**, Planning은 **18/18건 수집 완료·12건 통과·6건 실패**다. 후속 지침까지 반영한 최종 코드의 **464개 테스트와 결정적 Gate는 PASS**다. source별 근거와 남은 작업은 [읽기 전용 보고 검증 기록](readonly-report-requalification-20260904.md)에 정리한다.
+현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. Goal의 적용 단계, 정상 동작과 결함, 로컬·외부 효과와 미발생 조건의 해석을 보완했다. 후속 확정 source의 **464개 테스트와 결정적 Gate, 실제 역할 회귀 48/48, 실제 E2E 4/4는 PASS**다. 같은 source의 Planning은 **18/18건 수집 완료·13건 통과·5건 실패**다. 현재 근거와 다음 작업은 [Goal 계약 해석 재검증 기록](goal-contract-boundaries-requalification-20260904.md)에 정리한다.
 
-전체 평가 종료 후 읽기 전용 Task 종류와 로컬·외부 금지 효과 분류 지침을 추가 보완했으므로 앞선 실제 평가를 최종 source의 전체 qualification으로 사용하지 않는다. Goal 정규화의 반환 동작 계약 누락과 로컬 효과의 외부 효과 오분류를 보완한 뒤 하나의 확정 source로 기능 Gate를 대조해야 한다. 별도 성능 Gate도 남아 있다. 이전 결과는 [최종 source 재평가 기록](final-source-requalification-20260904.md)과 [A4·A5 실행 기록](alpha-a4-a5-execution.md)에 보존한다.
+남은 실패는 Profile 정책의 Goal 중복 요구, 독립 Goal Test의 diff evidence 누락, Skeleton 생성·보정·상세화의 유일성 및 의미 보존 위반이다. 정상 입력은 7/12 Plan 선택, 정보 부족 입력은 6/6 질문·차단이며 최종 schema failure는 3건이다. source와 정규화 역할 모델을 함께 변경했으므로 결과 차이를 어느 한 변경의 효과로 단정하지 않는다. 별도 성능 Gate는 미실행이며, 일부 순서의 성공으로 전체 Planning 안정성을 선언하지 않는다.
 
-최종 source의 읽기 전용 S02 seed 17·89 재검증도 모두 Plan 선택에 실패했다. Task 종류 오류는 관측되지 않았지만 부정형 외부 효과 오분류와 명령 미실행 조건의 evidence 누락이 남았다. 단일 override 진단의 성공으로 실제 Planning 안정성을 선언하지 않는다. 세부 원시 finding과 source binding은 위 읽기 전용 보고 검증 기록에 보존한다.
+이전 source의 결과는 [읽기 전용 보고 검증 기록](readonly-report-requalification-20260904.md), [최종 source 재평가 기록](final-source-requalification-20260904.md), [A4·A5 실행 기록](alpha-a4-a5-execution.md)에 보존한다. 아래 역사적 수치도 현재 source의 qualification으로 재사용하지 않는다.
 
 ## 반영한 구현
 
+- Goal normalizer와 Reviewer가 단계별 제한, 정상 API 계약과 현재 결함, 로컬·외부 효과를 같은 기준으로 해석하도록 공통 지침과 provider 필드 설명을 보완했다. 명시적인 미래 명령 금지는 보존하고 현재 계획 역할의 제한이나 미발생 조건을 새 실행 요구·기대 효과로 추가하지 않는다.
 - 읽기 전용 분석 보고를 응답 본문의 논리 산출물로 명시한다. Task semantic 검사가 요구할 때 현재 성공 실행의 Worker 응답을 원본 evidence와 함께 전달하고 prompt·intent·결과 검사를 같은 catalog에 결속한다. 잘린 응답은 Task·Goal 검사에서 제외한다. 고정된 합성 lifecycle fixture와 파일 digest를 평가 계약에 결속한다.
 - Task 실행 준비의 Core 계약 결합 검사와 Goal Test의 활성 계약 일치 검사를 기존 structured recovery 안에서 수행한다. 저장 응답도 재검증하며 실제 receipt 비용은 call ID로 한 번만 보존한다. 잘못된 필드 자동 삭제나 재시도 한도 확대는 하지 않는다.
 - `ExecutionSpecProposal`을 Core가 최신 Goal·Plan·State·Project Map과 실제 model inventory에 결속해 컴파일한다.
@@ -116,13 +117,14 @@ SDK에 묶인 Codex 0.147.0에서는 응답 API의 404로 첫 역할 cell을 완
 
 ## 남은 작업
 
-아래 항목은 장기 qualification 후속 목록이다. 현재 실행 참조는 [A4·A5 실행 기록](alpha-a4-a5-execution.md)이다. 전체 campaign은 아래 범위를 같은 최종 source·고정 계약으로 다시 검증해야 한다.
+아래 항목은 qualification 후속 목록이다. 현재 실행 참조는 [Goal 계약 해석 재검증 기록](goal-contract-boundaries-requalification-20260904.md)이다. 다음 source 변경 후 각 scope의 고정 계약으로 검증하며 oracle와 합격선은 유지한다.
 
-1. 역할 회귀의 직접 evidence를 분석해 검토 입력·역할 지침의 최소 범위만 보완하고 새 계약으로 다시 평가한다. oracle와 합격선은 유지한다.
-2. 전체 planning Gate를 통과시키고 사용량 제한 재개의 실제 qualification을 보강한다. 실제 E2E 네 시나리오는 통과했지만 사용량 제한을 고의로 유발한 별도 실측을 대신하지 않는다. 모의 회귀 테스트를 실제 PASS로 대체하지 않는다.
-3. 구현한 별도 중립 입력 benchmark harness로 실제 36 cell을 수집한다. 모의 수집·재개 검사는 성능 수치의 실측을 대신하지 않는다.
-4. 새 자동 상세화·semantic Goal Test의 실제 모델 연결 범위를 추가 검증하고, 준비 역할의 세부 receipt 유실은 명시적 reconciliation 대상으로 보존한다. 명령·정상 실행의 E2E PASS를 모든 semantic 경로의 PASS로 확대하지 않는다.
-5. 동일한 최종 source와 고정 계약으로 필요한 보고서를 모두 확보한 뒤에만 cutover를 판정한다.
+1. Profile 정책을 Goal에 중복 요구하는 과잉 검토와 Skeleton·Plan의 정책 투영 범위를 정리한다. 독립 Goal Test의 대상 AC·검사 문장·필수 evidence 종류를 일치시킨다.
+2. Skeleton 생성의 Task ID 유일성과 refinement·상세화의 불변 필드를 생성 계약에 반영하고, 거부 후보·필드 차이를 입력·receipt에 결속한 비권위 artifact로 보존한다. 기존 Core 거부 검사는 유지한다.
+3. 전체 Planning Gate를 통과시키고 사용량 제한 재개의 실제 qualification을 보강한다. 실제 E2E 네 시나리오는 사용량 제한을 고의로 유발한 별도 실측을 대신하지 않는다.
+4. 기능 Gate가 갖춰지면 별도 중립 입력 benchmark harness로 실제 36 cell을 수집한다. 모의 수집·재개 검사는 성능 수치의 실측을 대신하지 않는다.
+5. 읽기 전용 응답 보고 Goal의 전체 실행과 semantic Goal Test의 실제 모델 연결 범위를 추가 검증한다. 준비 역할의 세부 receipt 유실은 명시적 reconciliation 대상으로 보존하며, 명령·정상 실행의 E2E PASS를 모든 semantic 경로로 확대하지 않는다.
+6. 동일한 최종 source와 각 범위의 고정 계약으로 필요한 보고서를 모두 확보한 뒤에만 cutover를 판정한다.
 
 ## Git 보관 정책
 
