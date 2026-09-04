@@ -206,6 +206,17 @@ class InspectionFixtureRevisionTests(unittest.TestCase):
                           ("ac_004", "val_task_scope_preservation"))
         self.assertFalse(task_scope["ac_link_required"])
 
+    def test_ac004_composite_phases_require_each_oracle_without_infecting_siblings(self):
+        rows = {
+            row["validation_id"]: row["ac_link_required"]
+            for row in EXPECTATIONS["case_ac_validation_rows"]["clean"]
+            if row["criterion_id"] == "ac_004"
+        }
+        self.assertTrue(rows["val_task_add_behavior_contract"])
+        self.assertTrue(rows["val_goal_independent_behavior_contract"])
+        self.assertFalse(rows["val_task_unittest"])
+        self.assertFalse(rows["val_task_scope_preservation"])
+
     def test_r_s06_13_provenance_binds_the_raw_rejection_and_normal_fixture_selectors(self):
         provenance = EXPECTATIONS["r_s06_13_provenance"]
         raw_manifest = json.loads((ROOT / provenance["raw_rejection_fixture"]).read_text(encoding="utf-8"))

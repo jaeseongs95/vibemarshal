@@ -22,7 +22,7 @@ class InspectionCitation(EngineModel):
 class ACValidationInspection(EngineModel):
     criterion_id: str
     validation_id: str
-    ac_link_required: bool = Field(description="이 validation이 AC 일부를 직접 검증하여 goal_coverage 연결이 필수인지 여부. false는 선택적 연결을 금지하지 않는다.")
+    ac_link_required: bool = Field(description="이 validation이 AC 일부를 직접 검증하여 goal_coverage 연결이 필수인지 여부. AC statement 또는 validation_intent가 동일 절차의 task/goal phase를 각각 명시하면, 명시된 각 phase를 실제 수행하는 validation은 각각 true다. 별도 실행은 실행·evidence 분리이며 task phase를 선택 사항으로 만들지 않는다. 명시되지 않은 sibling unittest·scope·semantic validation에는 이 규칙을 전염시키지 않는다. false는 선택적 연결을 금지하지 않는다.")
     basis_refs: tuple[str, ...] = Field(min_length=2, description="해당 AC의 statement·validation_intent 각각, validation statement 전체 및 같은 validation mechanism이 실제 범위 판단에 사용한 모든 project citation ID. 기존 citation을 재사용하며 새 citation을 만들지 않는다.")
     finding_codes: tuple[str, ...] = Field(description="ac_link_required=true인데 현재 ID 연결이 없는 경우만 missing_validation_link finding. 나머지는 빈 배열.")
 
@@ -89,8 +89,11 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "별도 실제 검사 책임의 근거를 확정한다. 그 뒤 ac_validation_rows와 constraint_task_rows를 작성한다. "
     "모든 AC × 모든 Task·integration validation 쌍을 ac_validation_rows에 정확히 한 번씩 쓴다. "
     "작성자는 완성한 plan의 모든 validation ID에서 이 곱집합을 구성한다. 각 행의 "
-    "ac_link_required는 validation이 AC 일부를 직접 검증하면 true이고 아니면 false다. false는 "
-    "기존 선택적 연결을 금지하지 않는다. 모든 행의 basis_refs에는 해당 AC의 비어 있지 않은 "
+    "ac_link_required는 validation이 AC 일부를 직접 검증하면 true이고 아니면 false다. AC statement 또는 "
+    "validation_intent가 동일 절차의 task/goal phase를 각각 명시하면, 명시된 각 phase를 실제 수행하는 "
+    "validation은 각각 true다. 별도 실행은 실행·evidence 분리이며 task phase를 선택 사항으로 만들지 "
+    "않는다. 그 다음에만 명시되지 않은 sibling unittest·scope·semantic validation로 이 규칙을 전염시키지 "
+    "않는지 판정한다. false는 기존 선택적 연결을 금지하지 않는다. 모든 행의 basis_refs에는 해당 AC의 비어 있지 않은 "
     "statement와 validation_intent를 각각 인용하고 validation statement 전체 인용도 연결한다. 전역 의무이면 "
     "constraint 인용도 붙인다. validation_rows의 mechanism으로 등록 자료·구현을 검사 범위 판단에 "
     "사용했다면 그 정확한 project:<entry_id>/content citation_id를 같은 validation의 모든 AC 관계 행 "

@@ -6,9 +6,18 @@ from pathlib import Path
 import unittest
 
 from flowmarshal.engine.domain import GoalContractRevision, PlanContractRevision, ProjectMapRevision, StateSnapshot
-from flowmarshal.engine.plan_inspection import PlanInspection, PlanInspectionError, validate_plan_inspection
+from flowmarshal.engine.plan_inspection import (
+    PLAN_INSPECTION_INSTRUCTIONS,
+    PlanInspection,
+    PlanInspectionError,
+    validate_plan_inspection,
+)
 from flowmarshal.engine.plan_inspection_eval import assess_inspection_review
-from flowmarshal.engine.planner_roles import PlanExpansionEnvelope, PlanReviewEnvelope
+from flowmarshal.engine.planner_roles import (
+    PLAN_VALIDATION_TRACE_INSTRUCTIONS,
+    PlanExpansionEnvelope,
+    PlanReviewEnvelope,
+)
 from flowmarshal.engine.planning import plan_review_evidence_catalog, validation_comparison_targets
 from tests.engine_inspection_helpers import inspection_fixture
 
@@ -293,6 +302,20 @@ class PlanInspectionTests(unittest.TestCase):
         ac_properties = resolve(properties["ac_validation_rows"]["items"])["properties"]
         self.assertEqual("boolean", ac_properties["ac_link_required"]["type"])
         self.assertNotIn("relation", ac_properties)
+
+    def test_composite_phase_positive_rule_precedes_sibling_overlink_guard(self):
+        positive = "동일 절차의 task/goal phase를 각각 명시하면"
+        negative = "명시되지 않은 sibling unittest·scope·semantic validation"
+        for instructions in (PLAN_INSPECTION_INSTRUCTIONS, PLAN_VALIDATION_TRACE_INSTRUCTIONS):
+            with self.subTest(instructions=instructions[:40]):
+                self.assertIn(positive, instructions)
+                self.assertIn(negative, instructions)
+                self.assertLess(instructions.index(positive), instructions.index(negative))
+
+        schema = PlanInspection.model_json_schema()
+        row = schema["$defs"]["ACValidationInspection"]["properties"]["ac_link_required"]
+        self.assertIn(positive, row["description"])
+        self.assertIn(negative, row["description"])
 
     def test_partial_global_obligation_can_cite_existing_checks_and_missing_responsibility(self):
         payload = submission("clean")

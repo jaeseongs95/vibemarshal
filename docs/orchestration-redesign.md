@@ -203,7 +203,7 @@ Goal의 AC 또는 전역 constraint가 각 Task 또는 특정 범위 Task의 완
 
 ### 6.1 Reviewer와 Core 판정
 
-검사 연결은 먼저 모든 검사 문장의 복합 책임과 등록 수단·phase의 실제 절차를 확인하고, 다음 전역 constraint가 요구한 Task 자체 validation, 다음 Goal의 statement·validation_intent·적용 범위, 마지막 현재 연결과 finding을 양방향 대조한다. AC가 절차 자체를 직접 요구한 경우와 특정 도구·phase 실행을 요구하여 그 실제 phase가 절차를 포함하는 경우를 구분하며, 같은 목적의 별도 검사나 다른 phase까지 확대하지 않는다. 전역 constraint가 요구한 Task 자체 validation의 존재와 AC가 명시한 절차의 validation ID 연결은 별도 판정이다. ID 이름이나 이미 연결된 대표 검사만으로 AC가 명시한 필수 검사 ID를 생략하지 않으며, 전역 semantic 의무·검사 문장의 연관 표현·evidence 종류나 단순 선후조건만으로 모든 AC에 연결을 강제하지 않는다. 연결만 빠졌다면 실행 누락이나 새 검사 의무로 확대하지 않는다. 상세화와 Reviewer는 같은 기준을 공유하며 Goal·검사 원문·현재 coverage를 직접 근거로 사용한다.
+검사 연결은 먼저 모든 검사 문장의 복합 책임과 등록 수단·phase의 실제 절차를 확인하고, 다음 전역 constraint가 요구한 Task 자체 validation, 다음 Goal의 statement·validation_intent·적용 범위, 마지막 현재 연결과 finding을 양방향 대조한다. AC가 동일 절차의 task/goal phase를 각각 명시하면 명시된 각 phase를 실제 수행하는 validation은 각각 필수 연결이며, 별도 실행은 실행·evidence 분리일 뿐 task phase를 선택 사항으로 만들지 않고 이 규칙을 명시되지 않은 sibling 검사에 전염시키지 않는다. AC가 절차 자체를 직접 요구한 경우와 특정 도구·phase 실행을 요구하여 그 실제 phase가 절차를 포함하는 경우를 구분하며, 같은 목적의 별도 검사나 다른 phase까지 확대하지 않는다. 전역 constraint가 요구한 Task 자체 validation의 존재와 AC가 명시한 절차의 validation ID 연결은 별도 판정이다. ID 이름이나 이미 연결된 대표 검사만으로 AC가 명시한 필수 검사 ID를 생략하지 않으며, 전역 semantic 의무·검사 문장의 연관 표현·evidence 종류나 단순 선후조건만으로 모든 AC에 연결을 강제하지 않는다. 연결만 빠졌다면 실행 누락이나 새 검사 의무로 확대하지 않는다. 상세화와 Reviewer는 같은 기준을 공유하며 Goal·검사 원문·현재 coverage를 직접 근거로 사용한다.
 
 Worker의 작업·응답 제출, 이후 Task 검증과 Core의 완료 판정을 구분한다. Task 완료 조건에 독립 Validator 통과를 요구할 수 있지만, Worker 응답을 입력으로 뒤에 수행하는 Validator의 결과를 같은 Worker가 미리 제출하도록 요구하지 않는다. 검증된 선행 Task 결과의 후속 인용은 허용하며 자연어 시점 충돌을 실제 runtime 교착으로 단정하지 않는다. produces·consumes·preconditions·완료 조건과 validation 입력을 함께 대조하여 Worker 실행 보고와 Validator의 별도 검사 결과를 구분한다.
 
