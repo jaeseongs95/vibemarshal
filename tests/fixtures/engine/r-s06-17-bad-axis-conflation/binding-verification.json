@@ -1,0 +1,1 @@
+{"checks":{"instructions":true,"model_effort":true,"payload":true,"prompt":true,"receipt":true,"schema":true,"thread_turn":true},"passed":true,"receipt_digest":"sha256:8e5baa368d38bf337b40a4d6434a6b6e3faedc0e7c51cfcdaeb7fdc60725f23c","request_digest":"sha256:938380b196716a7d395736d225f7afc7f8c719a82221b01b1cd0135e8f5f8f7b"}

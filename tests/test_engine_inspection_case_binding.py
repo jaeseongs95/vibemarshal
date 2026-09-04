@@ -22,6 +22,7 @@ from scripts.diagnostics.r_s06_10 import (
 )
 from scripts.diagnostics.r_s06_10_fixtures import FixtureRevisionError, build_revision, verify_reviewed_case
 from tests.test_engine_inspection_fixture_revision import _write_portable_source
+from tests.test_engine_inspection_raw_regressions import _current_contract
 
 
 FIXTURES = Path(__file__).parent / "fixtures/engine"
@@ -124,9 +125,7 @@ class InspectionCaseBindingTests(unittest.TestCase):
             runtime.start_turn.assert_not_called()
 
     def test_evaluator_reports_fixed_scope_without_modifying_submission(self):
-        raw_response = deepcopy(RAW["raw_response"])
-        for row in raw_response["inspection"]["ac_validation_rows"]:
-            row["ac_link_required"] = row.pop("relation") == "explicit_procedure"
+        raw_response = _current_contract(RAW["raw_response"])
         envelope = PlanReviewEnvelope.model_validate(raw_response)
         before = envelope.model_dump(mode="json")
         report = assess_case_inspection_review(envelope, self.expected, case_id="clean", payload=self.payload)

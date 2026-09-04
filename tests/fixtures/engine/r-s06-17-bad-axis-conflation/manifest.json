@@ -1,0 +1,47 @@
+{
+  "source_run": ".flowmarshal-engine-eval/runs/r-s06-17-20260905-v2",
+  "case_id": "bad",
+  "original_status": "FAIL",
+  "preservation": "R-S06-17 bad 원본 bytes와 FAIL을 보존하며 현재 provider 계약으로 보정하지 않는다.",
+  "expected_missing_defects": [
+    "task-phase-overclaim"
+  ],
+  "expected_requirement_differences": [
+    {
+      "criterion_id": "ac_003",
+      "validation_id": "val_goal_independent_behavior_contract",
+      "expected": true,
+      "actual": false
+    },
+    {
+      "criterion_id": "ac_003",
+      "validation_id": "val_task_add_behavior_contract",
+      "expected": true,
+      "actual": false
+    },
+    {
+      "criterion_id": "ac_004",
+      "validation_id": "val_task_add_behavior_contract",
+      "expected": true,
+      "actual": false
+    }
+  ],
+  "files": {
+    "bad-assessment.json": "sha256:88ede2071f82160c58c3543af0c6bb074e854656eabf1ce69d3c13f42609b189",
+    "binding-verification.json": "sha256:f21bd17c95f47a5527b8de623b9e64648c7eb72d051a812439079883b9f673af",
+    "case-expectation.json": "sha256:bf2d9120f50dbe41becd8b5f507b15bf0d237bef354973cdfa66469b5b8019e5",
+    "request.json": "sha256:7708234f40b7939459bbc7065824c536625d3b2b390b3b0ca7358b01752eb592",
+    "result.json": "sha256:bf537ed3262fb509ed9ae7bc69bbdf3642cbeecfa1aaf531cf4541a6f4175b19",
+    "strict-schema.json": "sha256:641bdea1f19ac53bd8e283f61227aedd44aea7bd2fae2d33bcca3ba29572ec5e",
+    "summary.json": "sha256:82dc9b610511b27d2790420c505c63fa1b0bd3db138e989600ffd543470104bc",
+    "terminal.json": "sha256:101b17aef3ff65ad610f0af2540c6099f286aca50a5f3f424eecdf192b5f6fe4",
+    "thread.receipt.json": "sha256:c2b3918baed92b79c8b21ca2b8b4aaeda894438238c42f097fa6ab6fdc4d0892",
+    "turn.receipt.json": "sha256:872ecd04639b1045789d17192bc6d18e0f6361b0518ad09949140ec089ba4672"
+  },
+  "preserved_baselines": {
+    "plan-inspection-v4-expectations.json": "sha256:f132337b8b237e2379c6315a3b12ff18bfd5d24f8d62be6e29608b8bf963b011",
+    "plan-inspection-v4-independent-fixture-review.json": "sha256:7b664981550bd50d53f19345052da0f92410e44f44458a9eb55fb3b291a3bd2d",
+    "plan-inspection-v5-expectations.json": "sha256:a826a9da5ef2faad40da1e8462206598f2a69bcc6dd52efa34a2b0791c871ba1",
+    "plan-inspection-v5-independent-fixture-review.json": "sha256:9e89d0a70cc178ee9032bd9e36659eea4baea619dcc4871a00cbd6279402ba27"
+  }
+}

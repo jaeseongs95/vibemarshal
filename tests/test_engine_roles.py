@@ -117,7 +117,8 @@ class EngineStructuredRoleTests(unittest.TestCase):
 
         inspection = {
             "citations": [{"citation_id": "C1", "source_ref": "source:goal", "selector": "/x", "quote": "x"}],
-            "ac_validation_rows": [], "constraint_task_rows": [], "validation_rows": [], "finding_links": [],
+            "ac_validation_rows": [], "constraint_task_rows": [], "validation_rows": [],
+            "validation_scope_rows": [], "finding_links": [],
         }
         ratings_at_bounds = {
             "goal_fit": 0, "grounding": 1, "engineering": 2, "verification": 3, "execution_safety": 4,

@@ -43,6 +43,7 @@ def inspection_fixture(plan: dict, goal: dict, *, revision: bool = False, review
     return {
         "citations": citations,
         "ac_validation_rows": [{"criterion_id": ac, "validation_id": vid, "ac_link_required": False,
+                                "scope_ids": [],
                                 "basis_refs": [*arefs, vref], "finding_codes": []}
                                for ac, arefs in ac_refs.items() for vid, vref in val_refs.items()],
         "constraint_task_rows": [{"constraint_id": cid, "task_ref": task["task_ref"], "applicability": "not_applicable",
@@ -50,8 +51,12 @@ def inspection_fixture(plan: dict, goal: dict, *, revision: bool = False, review
                                  for cid, ref in constraint_refs.items() for task in definition["tasks"]],
         "validation_rows": [{"validation_id": vid, "claim_ref": ref,
                              "mechanisms": [{"tool": "합성 검사 책임", "phase": None, "basis_refs": [ref]}],
-                             "separate_check_refs": [], "assessment": "supported", "finding_codes": []}
+                             "separate_check_refs": []}
                             for vid, ref in val_refs.items()],
+        "validation_scope_rows": [{"scope_id": f"scope_{index}", "validation_id": vid,
+                                   "claim_ref": ref, "procedure": "합성 검사 책임", "phase": None,
+                                   "basis_refs": [ref], "assessment": "supported", "finding_codes": []}
+                                  for index, (vid, ref) in enumerate(val_refs.items())],
         "finding_links": links,
     }
 

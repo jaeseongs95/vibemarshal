@@ -60,6 +60,10 @@ def submission(name):
         inspection["citations"].append({"citation_id": ref, "source_ref": source, "selector": selector, "quote": text})
         return ref
 
+    def supported_scope_id(validation_id):
+        return next(row["scope_id"] for row in inspection["validation_scope_rows"]
+                    if row["validation_id"] == validation_id and row["assessment"] == "supported")
+
     for index, defect in enumerate(EXPECTED[name]):
         code = f"FIXTURE_DEFECT_{index}"
         vid = defect["validation_ids"][0]
@@ -68,7 +72,7 @@ def submission(name):
         if defect["defect_kind"] == "missing_validation_link":
             ac = defect["criterion_ids"][0]
             row = next(row for row in inspection["ac_validation_rows"] if (row["criterion_id"], row["validation_id"]) == (ac, vid))
-            row.update(ac_link_required=True, finding_codes=[code])
+            row.update(ac_link_required=True, scope_ids=[supported_scope_id(vid)], finding_codes=[code])
             basis = list(row["basis_refs"])
             ci = next(i for i, coverage in enumerate(plan.definition.goal_coverage) if coverage.criterion_id == ac)
             basis.append(cite("artifact:plan_contract", f"/definition/goal_coverage/{ci}/validation_ids/0",
@@ -79,8 +83,17 @@ def submission(name):
             start = content.index("기존 도구를")
             scope_ref = cite(f"project:{entry.entry_id}", "/content", content[start:start + 240])
             basis.append(scope_ref)
-            vrow.update(assessment="contradicted", finding_codes=[code],
-                        mechanisms=[{"tool": "oracle.py", "phase": "task", "basis_refs": [scope_ref]}])
+            vrow.update(mechanisms=[{"tool": "oracle.py", "phase": "task", "basis_refs": [scope_ref]}])
+            supported_scope = next(row for row in inspection["validation_scope_rows"]
+                                   if row["validation_id"] == vid and row["assessment"] == "supported")
+            supported_scope.update(procedure="oracle.py", phase="task",
+                                   basis_refs=[vrow["claim_ref"], scope_ref])
+            inspection["validation_scope_rows"].append({
+                "scope_id": f"scope_{vid}_overclaim", "validation_id": vid,
+                "claim_ref": vrow["claim_ref"], "procedure": "oracle.py",
+                "phase": "task", "basis_refs": [vrow["claim_ref"], scope_ref],
+                "assessment": "contradicted", "finding_codes": [code],
+            })
             for ac_row in inspection["ac_validation_rows"]:
                 if ac_row["validation_id"] == vid:
                     ac_row["basis_refs"].append(scope_ref)
@@ -185,6 +198,8 @@ class PlanInspectionTests(unittest.TestCase):
         validation_row = next(row for row in payload["inspection"]["validation_rows"]
                               if row["validation_id"] == validation_id)
         validation_row["mechanisms"][0]["basis_refs"].append(citation_id)
+        next(row for row in payload["inspection"]["validation_scope_rows"]
+             if row["validation_id"] == validation_id)["basis_refs"].append(citation_id)
         for row in payload["inspection"]["ac_validation_rows"]:
             if row["validation_id"] == validation_id:
                 row["basis_refs"].append(citation_id)
@@ -198,12 +213,16 @@ class PlanInspectionTests(unittest.TestCase):
 
     def test_two_defects_require_separate_consistent_finding_links(self):
         payload = submission("stored-multi-defect")
-        payload["inspection"]["validation_rows"][0]["finding_codes"] = ["FIXTURE_DEFECT_0"]
+        scope = next(row for row in payload["inspection"]["validation_scope_rows"]
+                     if row["assessment"] == "contradicted")
+        scope["finding_codes"] = ["FIXTURE_DEFECT_0"]
         with self.assertRaisesRegex(PlanInspectionError, "결함 종류"):
             validate("stored-multi-defect", payload)
         payload = submission("stored-multi-defect")
-        payload["inspection"]["validation_rows"][0]["assessment"] = "supported"
-        with self.assertRaisesRegex(PlanInspectionError, "정상 검사"):
+        scope = next(row for row in payload["inspection"]["validation_scope_rows"]
+                     if row["assessment"] == "contradicted")
+        scope["assessment"] = "supported"
+        with self.assertRaisesRegex(PlanInspectionError, "정상 검사 scope"):
             validate("stored-multi-defect", payload)
 
     def test_adapter_does_not_infer_semantic_answer_or_fix_coverage(self):
@@ -217,12 +236,17 @@ class PlanInspectionTests(unittest.TestCase):
         self.assertFalse(report["passed"])
         self.assertEqual(["ac003-task-oracle-link"], report["missing_defects"])
 
+        missing_scope = submission("clean")
+        missing_scope["inspection"]["validation_scope_rows"] = []
+        with self.assertRaisesRegex(PlanInspectionError, "scope 행 집합 불완전"):
+            validate("clean", missing_scope)
+
     def test_fixed_evaluator_does_not_accept_only_one_of_two_defects_or_extra_findings(self):
         payload = submission("stored-multi-defect")
         payload["review"]["findings"].pop(0)
         payload["inspection"]["finding_links"].pop(0)
         for row in payload["inspection"]["ac_validation_rows"]:
-            row.update(ac_link_required=False, finding_codes=[])
+            row.update(ac_link_required=False, scope_ids=[], finding_codes=[])
         # 미사용 coverage 인용도 함께 제거해 구조는 일관되지만 의미적으로 불완전한 제출물을 만든다.
         payload["inspection"]["citations"] = [c for c in payload["inspection"]["citations"] if "/goal_coverage/" not in c["selector"]]
         report = assess_inspection_review(validate("stored-multi-defect", payload), EXPECTED["stored-multi-defect"])
@@ -242,6 +266,7 @@ class PlanInspectionTests(unittest.TestCase):
         self.assertIn("val_task_validator_review", next(item for item in plan.definition.goal_coverage
                       if item.criterion_id == "ac_002").validation_ids)
         row["ac_link_required"] = False
+        row["scope_ids"] = []
         validate("clean", payload)
         unlinked_plan = plan.model_copy(deep=True)
         coverage = next(item for item in unlinked_plan.definition.goal_coverage if item.criterion_id == "ac_002")
@@ -261,6 +286,8 @@ class PlanInspectionTests(unittest.TestCase):
             findings=envelope.review.findings,
         )
         row["ac_link_required"] = True
+        row["scope_ids"] = [next(scope["scope_id"] for scope in payload["inspection"]["validation_scope_rows"]
+                                 if scope["validation_id"] == row["validation_id"])]
         with self.assertRaisesRegex(PlanInspectionError, "finding 연결"):
             envelope = PlanReviewEnvelope.model_validate(payload)
             validate_plan_inspection(
@@ -295,13 +322,80 @@ class PlanInspectionTests(unittest.TestCase):
         inspection = resolve(schema["properties"]["inspection"])
         properties = inspection["properties"]
         self.assertEqual(
-            ["citations", "validation_rows", "ac_validation_rows", "constraint_task_rows", "finding_links"],
+            ["citations", "validation_rows", "validation_scope_rows", "ac_validation_rows",
+             "constraint_task_rows", "finding_links"],
             list(properties),
         )
         self.assertEqual(["inspection", "review"], list(schema["properties"]))
         ac_properties = resolve(properties["ac_validation_rows"]["items"])["properties"]
         self.assertEqual("boolean", ac_properties["ac_link_required"]["type"])
+        self.assertEqual("array", ac_properties["scope_ids"]["type"])
         self.assertNotIn("relation", ac_properties)
+
+    def test_contradicted_scope_and_three_required_ac_links_are_independent(self):
+        payload = submission("bad")
+        plan, goal, state, project_map = inputs("bad")
+        normalized = plan.model_dump(mode="json")
+        next(row for row in normalized["definition"]["goal_coverage"]
+             if row["criterion_id"] == "ac_003")["validation_ids"].append(
+                 "val_goal_independent_behavior_contract"
+             )
+        next(row for row in normalized["definition"]["integration_validations"]
+             if row["validation_id"] == "val_goal_independent_behavior_contract")["criterion_refs"].append("ac_003")
+        from flowmarshal.canonical import sha256_digest
+        normalized["definition_digest"] = sha256_digest(normalized["definition"])
+        plan = PlanContractRevision.model_validate(normalized)
+        supported = {
+            row["validation_id"]: row["scope_id"]
+            for row in payload["inspection"]["validation_scope_rows"]
+            if row["assessment"] == "supported"
+        }
+        for criterion_id, validation_id in (
+            ("ac_003", "val_task_add_behavior_contract"),
+            ("ac_003", "val_goal_independent_behavior_contract"),
+            ("ac_004", "val_task_add_behavior_contract"),
+        ):
+            row = next(row for row in payload["inspection"]["ac_validation_rows"]
+                       if (row["criterion_id"], row["validation_id"]) == (criterion_id, validation_id))
+            row.update(ac_link_required=True, scope_ids=[supported[validation_id]])
+
+        envelope = PlanReviewEnvelope.model_validate(payload)
+        validate_plan_inspection(
+            envelope.inspection,
+            plan=plan,
+            goal=goal,
+            project_map=project_map,
+            evidence_catalog=plan_review_evidence_catalog(plan, goal, state, project_map),
+            findings=envelope.review.findings,
+        )
+        contradicted = [row for row in envelope.inspection.validation_scope_rows
+                        if row.validation_id == "val_task_add_behavior_contract" and
+                        row.assessment == "contradicted"]
+        self.assertEqual(1, len(contradicted))
+        rows = {(row.criterion_id, row.validation_id): row for row in envelope.inspection.ac_validation_rows}
+        for pair in (
+            ("ac_003", "val_task_add_behavior_contract"),
+            ("ac_003", "val_goal_independent_behavior_contract"),
+            ("ac_004", "val_task_add_behavior_contract"),
+        ):
+            self.assertTrue(rows[pair].ac_link_required)
+            self.assertTrue(rows[pair].scope_ids)
+
+        altered = deepcopy(payload)
+        row = next(row for row in altered["inspection"]["ac_validation_rows"]
+                   if (row["criterion_id"], row["validation_id"]) ==
+                   ("ac_003", "val_task_add_behavior_contract"))
+        row["scope_ids"] = [contradicted[0].scope_id]
+        with self.assertRaisesRegex(PlanInspectionError, "supported scope"):
+            altered_envelope = PlanReviewEnvelope.model_validate(altered)
+            validate_plan_inspection(
+                altered_envelope.inspection,
+                plan=plan,
+                goal=goal,
+                project_map=project_map,
+                evidence_catalog=plan_review_evidence_catalog(plan, goal, state, project_map),
+                findings=altered_envelope.review.findings,
+            )
 
     def test_composite_phase_positive_rule_precedes_sibling_overlink_guard(self):
         positive = "동일 절차의 task/goal phase를 각각 명시하면"

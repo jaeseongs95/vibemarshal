@@ -76,6 +76,7 @@ def _fixed_envelope(expected: list[dict]) -> PlanReviewEnvelope:
               {"goal_fit": 4, "grounding": 4, "engineering": 4, "verification": 4, "execution_safety": 4}}
     return PlanReviewEnvelope.model_validate({"review": review, "inspection": {
         "citations": citations, "ac_validation_rows": [], "constraint_task_rows": [], "validation_rows": [],
+        "validation_scope_rows": [],
         "finding_links": links,
     }})
 
@@ -216,6 +217,27 @@ class InspectionFixtureRevisionTests(unittest.TestCase):
         self.assertTrue(rows["val_goal_independent_behavior_contract"])
         self.assertFalse(rows["val_task_unittest"])
         self.assertFalse(rows["val_task_scope_preservation"])
+
+    def test_bad_axis_conflation_expectation_keeps_scope_defect_and_three_true_rows(self):
+        defects = json.loads((ROOT / "plan-inspection-expectations.json").read_text(encoding="utf-8"))["bad"]
+        self.assertEqual(["task-phase-overclaim"], [row["defect_id"] for row in defects])
+        self.assertEqual(["val_task_add_behavior_contract"], defects[0]["validation_ids"])
+        rows = {
+            (row["criterion_id"], row["validation_id"]): row["ac_link_required"]
+            for row in EXPECTATIONS["case_ac_validation_rows"]["bad"]
+        }
+        for pair in (
+            ("ac_003", "val_task_add_behavior_contract"),
+            ("ac_003", "val_goal_independent_behavior_contract"),
+            ("ac_004", "val_task_add_behavior_contract"),
+        ):
+            self.assertTrue(rows[pair], pair)
+        for pair in (
+            ("ac_003", "val_task_scope_preservation"),
+            ("ac_004", "val_task_scope_preservation"),
+            ("ac_004", "val_task_unittest"),
+        ):
+            self.assertFalse(rows[pair], pair)
 
     def test_r_s06_13_provenance_binds_the_raw_rejection_and_normal_fixture_selectors(self):
         provenance = EXPECTATIONS["r_s06_13_provenance"]

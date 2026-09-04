@@ -23,9 +23,10 @@ from flowmarshal.engine.domain import (
     StateSnapshot,
 )
 from flowmarshal.engine.plan_inspection import PlanInspection, PlanInspectionError, validate_plan_inspection
-from flowmarshal.engine.plan_inspection_eval import assess_fixed_ac_link_requirements
+from flowmarshal.engine.plan_inspection_eval import assess_fixed_ac_link_requirements, assess_inspection_review
 from flowmarshal.engine.planning import plan_review_evidence_catalog
 from flowmarshal.engine.planner_roles import PlanReviewEnvelope
+from flowmarshal.engine.roles import RoleCallRequest
 
 
 ROOT = Path(__file__).resolve().parent / "fixtures" / "engine"
@@ -33,6 +34,8 @@ RAW = json.loads((ROOT / "plan-inspection-raw-v1.json").read_text(encoding="utf-
 RAW_V3_REJECTED = json.loads((ROOT / "plan-inspection-raw-v3-rejected.json").read_text(encoding="utf-8"))
 RAW_S06_12_ROOT = ROOT / "r-s06-12-raw-rejected"
 RAW_S06_12_MANIFEST = json.loads((RAW_S06_12_ROOT / "manifest.json").read_text(encoding="utf-8"))
+RAW_S06_17_ROOT = ROOT / "r-s06-17-bad-axis-conflation"
+RAW_S06_17_MANIFEST = json.loads((RAW_S06_17_ROOT / "manifest.json").read_text(encoding="utf-8"))
 FILES = json.loads((ROOT / "plan-inspection-regressions.json").read_text(encoding="utf-8"))["files"]
 V3_EXPECTATIONS = json.loads((ROOT / "plan-inspection-v2-expectations.json").read_text(encoding="utf-8"))
 REFERENCE_ENTRY = "project:entry_ad363844d3392d9ef718d2d6"
@@ -58,10 +61,35 @@ def _payload() -> dict:
 
 
 def _current_contract(payload: dict) -> dict:
-    """byte-preserved 과거 relation 제출을 현재 bool 계약으로 메모리에서만 투영한다."""
+    """byte-preserved 과거 제출을 현재 provider 계약으로 메모리에서만 투영한다."""
     converted = deepcopy(payload)
-    for row in converted["inspection"]["ac_validation_rows"]:
-        row["ac_link_required"] = row.pop("relation") == "explicit_procedure"
+    inspection = converted["inspection"]
+    scope_ids = {}
+    scopes = []
+    for index, row in enumerate(inspection["validation_rows"]):
+        assessment = row.pop("assessment")
+        finding_codes = row.pop("finding_codes")
+        supported_id = f"legacy_scope_{index}_supported"
+        scope_ids[row["validation_id"]] = supported_id
+        basis_refs = list(dict.fromkeys(
+            [row["claim_ref"], *(ref for mechanism in row["mechanisms"] for ref in mechanism["basis_refs"])]
+        ))
+        phase = row["mechanisms"][0]["phase"] if len({item["phase"] for item in row["mechanisms"]}) == 1 else None
+        scopes.append({"scope_id": supported_id, "validation_id": row["validation_id"],
+                       "claim_ref": row["claim_ref"], "procedure": row["mechanisms"][0]["tool"],
+                       "phase": phase, "basis_refs": basis_refs, "assessment": "supported",
+                       "finding_codes": []})
+        if assessment != "supported":
+            scopes.append({"scope_id": f"legacy_scope_{index}_{assessment}",
+                           "validation_id": row["validation_id"], "claim_ref": row["claim_ref"],
+                           "procedure": row["mechanisms"][0]["tool"], "phase": phase,
+                           "basis_refs": basis_refs, "assessment": assessment,
+                           "finding_codes": finding_codes})
+    inspection["validation_scope_rows"] = scopes
+    for row in inspection["ac_validation_rows"]:
+        if "relation" in row:
+            row["ac_link_required"] = row.pop("relation") == "explicit_procedure"
+        row["scope_ids"] = [scope_ids[row["validation_id"]]] if row["ac_link_required"] else []
     return converted
 
 
@@ -94,7 +122,7 @@ def _remove_finding(payload: dict, code: str) -> None:
     payload["inspection"]["finding_links"] = [
         link for link in payload["inspection"]["finding_links"] if link["finding_code"] != code
     ]
-    for section in ("ac_validation_rows", "constraint_task_rows", "validation_rows"):
+    for section in ("ac_validation_rows", "constraint_task_rows", "validation_scope_rows"):
         for row in payload["inspection"][section]:
             row["finding_codes"] = [item for item in row["finding_codes"] if item != code]
 
@@ -165,7 +193,9 @@ def _clean_non_target_conflicts(payload: dict, goal: GoalContractRevision) -> di
     _make_constraint_citations(payload, goal)
     _remove_finding(payload, "F003")
     _remove_finding(payload, "F004")
-    payload["inspection"]["validation_rows"][3]["assessment"] = "supported"
+    for row in payload["inspection"]["validation_scope_rows"]:
+        if row["validation_id"] == payload["inspection"]["validation_rows"][3]["validation_id"]:
+            row["assessment"] = "supported"
     # C_REF_TASK/C_REF_GOAL은 등록 파일을 가리키므로 finding의 원본 evidence
     # 집합에도 source:project_map을 명시해야 한다.
     finding = next(item for item in payload["review"]["findings"] if item["finding_code"] == "F002")
@@ -189,6 +219,50 @@ def _validate(payload: dict, *, goal_data: dict | None = None):
 
 
 class RawPlanInspectionRegressionTests(unittest.TestCase):
+    def test_r_s06_17_bad_axis_conflation_raw_reproduces_one_missing_finding_and_three_booleans(self):
+        for filename, digest in RAW_S06_17_MANIFEST["files"].items():
+            with self.subTest(filename=filename):
+                self.assertEqual(digest, sha256_bytes((RAW_S06_17_ROOT / filename).read_bytes()))
+        for filename, digest in RAW_S06_17_MANIFEST["preserved_baselines"].items():
+            with self.subTest(baseline=filename):
+                self.assertEqual(digest, sha256_bytes((ROOT / filename).read_bytes()))
+
+        result = json.loads((RAW_S06_17_ROOT / "result.json").read_text(encoding="utf-8"))
+        terminal = json.loads((RAW_S06_17_ROOT / "terminal.json").read_text(encoding="utf-8"))
+        request = RoleCallRequest.model_validate_json((RAW_S06_17_ROOT / "request.json").read_text(encoding="utf-8"))
+        expectation = json.loads((RAW_S06_17_ROOT / "case-expectation.json").read_text(encoding="utf-8"))
+        recorded = json.loads((RAW_S06_17_ROOT / "bad-assessment.json").read_text(encoding="utf-8"))
+        binding = json.loads((RAW_S06_17_ROOT / "binding-verification.json").read_text(encoding="utf-8"))
+        summary = json.loads((RAW_S06_17_ROOT / "summary.json").read_text(encoding="utf-8"))
+
+        self.assertEqual(result["payload"], json.loads(terminal["final_response"]))
+        self.assertEqual(result["receipt"]["input_digest"], request.request_digest)
+        self.assertEqual(result["receipt"]["output_digest"], sha256_digest(result["payload"]))
+        self.assertTrue(binding["passed"])
+        self.assertTrue(all(binding["checks"].values()))
+        self.assertEqual("FAIL", summary["status"])
+        self.assertEqual((2, 2), (summary["logical_calls"], summary["provider_turns"]))
+        self.assertEqual(0, result["receipt"]["schema_recovery_attempts"])
+
+        envelope = PlanReviewEnvelope.model_validate(_current_contract(result["payload"]))
+        reproduced = assess_inspection_review(
+            envelope,
+            expectation["expected_defects"],
+            fixed_ac_link_rows=expectation["ac_validation_rows"],
+            plan=request.payload["evidence_catalog"]["artifact:plan_contract"],
+        )
+        self.assertFalse(reproduced["passed"])
+        self.assertEqual(RAW_S06_17_MANIFEST["expected_missing_defects"], reproduced["missing_defects"])
+        self.assertEqual(
+            RAW_S06_17_MANIFEST["expected_requirement_differences"],
+            reproduced["fixed_ac_link_requirement_assessment"]["requirement_differences"],
+        )
+        self.assertEqual(recorded["missing_defects"], reproduced["missing_defects"])
+        self.assertEqual(
+            recorded["fixed_ac_link_requirement_assessment"]["requirement_differences"],
+            reproduced["fixed_ac_link_requirement_assessment"]["requirement_differences"],
+        )
+
     def test_r_s06_12_raw_rejection_is_byte_preserved_and_keeps_missing_registered_citation_rows(self):
         for filename, digest in RAW_S06_12_MANIFEST["files"].items():
             with self.subTest(filename=filename):
@@ -336,9 +410,11 @@ class RawPlanInspectionRegressionTests(unittest.TestCase):
                 "대조표 finding 결함 종류 불일치",
             ),
             "validation_contradicted_f004_kind": (
-                lambda p: p["inspection"]["validation_rows"][3].update(
-                    assessment="contradicted", finding_codes=["F004"]
-                ),
+                lambda p: next(
+                    row for row in p["inspection"]["validation_scope_rows"]
+                    if row["validation_id"] == raw["inspection"]["validation_rows"][3]["validation_id"]
+                    and row["assessment"] == "supported"
+                ).update(assessment="contradicted", finding_codes=["F004"]),
                 "대조표 finding 결함 종류 불일치",
             ),
         }
