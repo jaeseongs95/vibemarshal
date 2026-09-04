@@ -1,0 +1,49 @@
+{
+  "input-skeleton.json": {
+    "approach": {
+      "change_shape": "단일 app.py add 구현 수정",
+      "compatibility": "공개 함수명·인자명·정수 annotation·호출 방식을 유지",
+      "rollout_recovery": "검증 실패 시 변경 Task를 재검토·복구",
+      "strategy_family": "최소 범위 직접 수정"
+    },
+    "candidate_id": "candidate_528a49109f2f417b91fe78cadcdbb3ae",
+    "dependencies": [],
+    "estimated_change_cost": 1,
+    "estimated_context_tokens": 1200,
+    "goal_contract_digest": "sha256:e43e73deb801e42b7762d474afcb62917d19d39dbbfbfb54e4f90424eba2bedd",
+    "goal_coverage": [
+      {"criterion_id": "ac_001", "task_refs": ["task_change_add"]},
+      {"criterion_id": "ac_002", "task_refs": ["task_change_add"]},
+      {"criterion_id": "ac_003", "task_refs": ["task_change_add"]},
+      {"criterion_id": "ac_004", "task_refs": ["task_change_add"]}
+    ],
+    "refinement_round": 0,
+    "schema_version": "1.0",
+    "state_signature": "sha256:0043d3a9f243e48df2768b2ce33019451a26094f665f46a20dd8b85c62efe56e",
+    "tasks": [
+      {
+        "consumes": [
+          "input:app.py",
+          "input:test_app.py",
+          "input:AGENTS.md",
+          "input:D:\\codex\\flowmarshal\\.flowmarshal-engine-eval\\runs\\s06-bugfix-trace-20260904-v4\\validation-reference.md",
+          "project:map",
+          "project:root",
+          "state:fact_project_map"
+        ],
+        "contributes_to": ["ac_001", "ac_002", "ac_003", "ac_004"],
+        "detail_requirements": ["Task 완료 전 실제 unittest, 프로젝트 파일 변경 범위, 분리된 Validator의 직접 검토 evidence를 확보한다."],
+        "kind": "change",
+        "no_op_when": ["add 구현이 이미 요구된 합산 동작과 계약을 충족하는 경우"],
+        "objective": "app.py의 add 구현만 수정하여 두 정수의 합을 반환하고, 공개 호출 계약과 보존 범위를 유지한다.",
+        "produces": ["artifact:add_implementation_change", "evidence:task_change_scope", "evidence:task_unittest", "evidence:task_validator_review"],
+        "required_capabilities": ["python_change", "unittest_validation", "independent_validator_review"],
+        "risk_tags": ["scoped_mutation", "public_contract"],
+        "task_ref": "task_change_add",
+        "unknown_refs": []
+      }
+    ],
+    "unknowns": [],
+    "version": 1
+  }
+}

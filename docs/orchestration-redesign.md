@@ -223,6 +223,12 @@ Skeleton·`PlanExpansionDraft`의 `task_refs`는 Compiler가 `Task.task_id`에 �
 
 adapter는 행 집합의 완전성·중복·ID·selector·인용 일치와 제출물 내부 일관성만 검증한다. 파일 인용은 Project Map의 정확한 entry 경로와 content digest를 검증하고 원본 Project Map evidence에 대응시킨다. 관계나 도구 능력의 의미 정답을 코드로 추정하거나 coverage를 자동 보정하지 않는다. 상세화는 결함을 보정한 완성 draft를 제출하므로 남은 결함을 선언한 대조표와 성공 draft를 함께 통과시키지 않는다. 구조적으로 일관된 잘못된 의미 판단은 별도 고정 의미 평가에서 검출한다. 대조표를 GoalContractRevision·PlanContractRevision·ReviewerSubmission 또는 DB schema에 추가하지 않으며 Core의 판정·Skeleton 기여 집합·독립 Goal Test·ready-time 명령 경계는 유지한다. 평가 digest는 실제 adapter의 strict 출력 schema와 공유 지침을 함께 결속한다.
 
+등록 참고자료와 지침 entry의 본문은 공통 입력 projection에서 실제 bytes의 digest를 확인한 뒤 정식 `source_ref=project:<entry_id>`, `selector=/content`, `content_digest`와 함께 제공한다. 등록 자료의 검사 범위 인용은 이 정식 주소를 사용한다. Goal trace 배열의 복제 본문은 파일 주소의 대체물이 아니며 잘못된 주소에 대한 자동 교정·사후 alias는 금지한다. 인용 수용 시에도 원본 파일의 digest와 선택 문자열을 다시 확인한다. 다른 Project Map 파일은 정확한 경로를 통해 읽고 같은 인용 검사를 적용한다.
+
+대조표의 relation은 AC 연결 의무의 출처를 분류하며 선택적 연결을 금지하지 않는다. `global_constraint_only`나 `optional_or_unrelated`에 이미 연결된 ID가 있다는 사실만으로 결함을 만들지 않는다. 모든 constraint 행은 비적용일 때도 해당 원문을 인용한다. 전역 검사 의무의 일부만 빠지면 존재하는 validation ID와 `missing_task_validation` finding을 함께 제출한다. `explicit_procedure`의 ID 연결만 빠진 경우는 `missing_validation_link`, 검사 주장과 수단의 직접 모순은 `validation_scope`/`contradicted`, 근거 부족은 `insufficient_evidence`/`unresolved`로 분리한다. Plan의 file·diff 등 단순 evidence 언급을 다른 입력의 명시적 제외로 간주하지 않는다.
+
+제한 실제 진단은 실제 adapter schema·공유 지침·입력 projection·고정한 원문 근거와 기대값을 하나의 새 평가 계약으로 잠근다. 자동 주입되는 전역·프로젝트·workspace 지침은 경로와 본문 digest를 잠그고 실제 thread receipt의 `instructionSources`와 provider turn 전에 대조한다. 과거 입력의 숨은 결함이 확인되면 과거 fixture와 판정을 보존하고 별도 revision의 정상·독립 결함 사례를 만든다. 결정적 구조 회귀의 통과를 실제 모델의 의미 검출 성공으로 대체하지 않는다.
+
 Core에 전달하는 ReviewerSubmission은 다음으로 제한한다.
 
 - `finding_code`

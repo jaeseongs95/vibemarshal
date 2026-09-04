@@ -53,6 +53,8 @@ class EvaluationBindingTests(unittest.TestCase):
             name: value for module in (goal_roles, planner_roles) for name, value in vars(module).items()
             if name.endswith("_INSTRUCTIONS") and isinstance(value, str)
         }
+        prompts["inspection_input_projection"] = inspect.getsource(planner_roles.inspection_source_catalog)
+        prompts["inspection_source_verification"] = inspect.getsource(planner_roles.inspection_file_content)
         schemas = {model.__name__: strict_json_output_schema(model.model_json_schema()) for model in (
             GoalNormalizationProposal, SkeletonBatchDraft, SkeletonCandidateDraft, PlanExpansionEnvelope, PlanReviewEnvelope, ReviewDraft)}
         self.assertEqual(sha256_digest(prompts), contract.prompt_digest)
@@ -76,11 +78,21 @@ class EvaluationBindingTests(unittest.TestCase):
             PlanReviewerAdapter(capture, **options).review(plan=plan, goal=goal, state=snapshot,
                                                            project_map=project_map, risk_route="compact_plan_reviewer")
         self.assertEqual(schemas["PlanReviewEnvelope"], strict_json_output_schema(capture.request.output_schema))
+        review_catalog = capture.request.payload["inspection_source_catalog"]
         models = assignment()
         with self.assertRaises(Captured):
             PlanExpanderAdapter(capture, RuleBasedTaskAssigner(models, models, models), **options).expand(
                 candidate=skeleton(goal, snapshot), goal=goal, state=snapshot, project_map=project_map)
         self.assertEqual(schemas["PlanExpansionEnvelope"], strict_json_output_schema(capture.request.output_schema))
+        for entry in project_map.entries:
+            if entry.kind.value in {"reference", "instruction"}:
+                ref = f"project:{entry.entry_id}"
+                projected = capture.request.payload["inspection_source_catalog"][ref]
+                self.assertEqual(review_catalog[ref], projected)
+                self.assertEqual(ref, projected["source_ref"])
+                self.assertEqual("/content", projected["selector"])
+                self.assertEqual(entry.content_digest, projected["content_digest"])
+                self.assertTrue(projected["content"])
         changed = dict(prompts)
         changed["GoalNormalizerAdapter"] += "\n실제 지침 변경"
         self.assertNotEqual(sha256_digest(changed), contract.prompt_digest)

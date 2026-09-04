@@ -167,8 +167,8 @@ def _manifest(root: Path) -> LegacyFreezeManifest:
     return LegacyFreezeManifest.load(root / "config" / "legacy-freeze-manifest.json")
 
 
-def source_manifest_digest(root: Path) -> str:
-    """현재 Engine/eval 입력과 frozen legacy manifest를 하나의 source lock으로 묶는다."""
+def source_manifest_files(root: Path) -> dict[str, str]:
+    """현재 Engine/eval 입력과 frozen legacy manifest의 실제 파일 결속을 반환한다."""
 
     paths: set[Path] = {
         root / "AGENTS.md",
@@ -197,12 +197,11 @@ def source_manifest_digest(root: Path) -> str:
         ),
         key=lambda item: item.relative_to(root).as_posix(),
     )
-    return sha256_digest(
-        {
-            path.relative_to(root).as_posix(): sha256_bytes(path.read_bytes())
-            for path in files
-        }
-    )
+    return {path.relative_to(root).as_posix(): sha256_bytes(path.read_bytes()) for path in files}
+
+
+def source_manifest_digest(root: Path) -> str:
+    return sha256_digest(source_manifest_files(root))
 
 
 def _default_run_root(root: Path, scope_name: str, contract_hint: str) -> Path:
@@ -693,7 +692,9 @@ def _planning_contract(
                     name: value for module in (goal_roles, planner_roles)
                     for name, value in vars(module).items()
                     if name.endswith("_INSTRUCTIONS") and isinstance(value, str)
-                }
+                },
+                "inspection_input_projection": inspect.getsource(planner_roles.inspection_source_catalog),
+                "inspection_source_verification": inspect.getsource(planner_roles.inspection_file_content),
             }
         ),
         output_schema_digest=sha256_digest(

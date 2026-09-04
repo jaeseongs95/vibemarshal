@@ -1,0 +1,434 @@
+{
+  "fixture_revision": "plan-inspection-v2-r-s06-10",
+  "legacy_expectations_digest": "sha256:5e99c5b4ef1ca3367e499b815f4206c7eae338e32e6e1bd253d6291fa48fc9e6",
+  "source_input_canonical_digests": {
+    "input-bad-plan.json": "sha256:99c581b90f1d83cad7bb3565f57be235f4bf83d5ff982be3e2283cf8248a42ba",
+    "input-boundary-clean-plan.json": "sha256:98000adb707f4851fc8452931cd230ec1fb7d6f97c0aadc4ebdfeef3ccd6b4ae",
+    "input-clean-plan.json": "sha256:e6fe17c80464d9070b513f270f2102c63b69655d6be7e24a5401a310434308e7",
+    "input-combined-plan.json": "sha256:db2f2a6d53068cf763b2b334df258cdbb9a112536c058d5afd646f7189e0da59",
+    "input-future-result-plan.json": "sha256:d493029d85166e85e35bb2eb8fec9987b0be9107be1a13a34cc1c10c9d87ea42",
+    "input-goal.json": "sha256:50ebac6022d51962b57cc15e273f2d0990a58e4c984def27398c8057a46a5b47",
+    "input-missing-link-plan.json": "sha256:0f2eeb7eaca2044e8cef7e6dad9c81a7df0455e28b2fdb2fd2a82a48dc11dce2",
+    "input-project-map.json": "sha256:f368288758203af746d640a57c1cd03bd66fe65ea19344dfb979f1bf7289ac9a",
+    "input-semantic-explicit-goal.json": "sha256:aae66b5b409c950849cd32343f91eafc298820970fe6d8b6d96717bf395211f7",
+    "input-semantic-explicit-plan.json": "sha256:ddabd2531851e5bc77be7b2f0f0fe996c40ec15483fbdfdd7ae27b23c4bef3a6",
+    "input-semantic-explicit-state.json": "sha256:7b9aecdb8ead6ee76f0396526316ee06e7b0abc62c678473d7b7ef9aa5bf7f41",
+    "input-semantic-missing-link-plan.json": "sha256:764c93363b1603bf2d9c071bcc9c6c19b2f18530a2326b5b9f385a087741f58b",
+    "input-skeleton.json": "sha256:d758b38cbc6dca2091480122403897b801b540e83770fc9a6228ebb853f99254",
+    "input-state.json": "sha256:ff1e4dd1f7f7e7a430c4544dc1123e458577a701f019f2a134bbc7fda4b19444",
+    "input-stored-expanded-plan.json": "sha256:dd0e03b3d5d22d61f1aa14494f1d8a6d42fdc6606240d0f26a9bc82d16856699",
+    "input-stored-multi-defect-plan.json": "sha256:0b7e5515cd8b67ecf4ade7532cf95f4d29a7fa964237e0da1d46e75ea825cd0d",
+    "input-wrong-goal-plan.json": "sha256:03cdaf6d481c982adbc6185cdf0116597f3853a3bdbf8c4b354166bebd7905dd"
+  },
+  "authority_sources": [
+    {
+      "source": "R-S06-09 input-goal.json",
+      "selectors": [
+        "/definition/hard_acceptance/0/validation_intent",
+        "/definition/hard_acceptance/1/validation_intent",
+        "/definition/hard_acceptance/2/validation_intent",
+        "/definition/hard_acceptance/3/validation_intent",
+        "/definition/constraints/2/statement"
+      ],
+      "role": "Goal 원문과 전역 검증 의무"
+    },
+    {
+      "source": "R-S06-09 input-clean-plan.json",
+      "selectors": [
+        "/definition/goal_coverage",
+        "/definition/tasks/0/validations",
+        "/definition/integration_validations"
+      ],
+      "role": "Plan의 기존 validation ID와 phase"
+    },
+    {
+      "source": "tests/fixtures/engine/plan-inspection-reference.md",
+      "role": "등록된 task/goal phase 검증 자료"
+    },
+    {
+      "source": "tests/fixtures/engine/bugfix-trace/contract.json",
+      "role": "등록 oracle의 evidence·phase 계약"
+    },
+    {
+      "source": "tests/fixtures/engine/bugfix-trace/oracle.py",
+      "role": "고정된 결정적 관측 구현"
+    },
+    {
+      "source": "AGENTS.md",
+      "role": "AC 명시 절차와 전역 constraint를 분리하는 권위 규칙"
+    }
+  ],
+  "provider_call_order": [
+    "clean",
+    "bad",
+    "wrong-goal",
+    "combined",
+    "boundary-clean",
+    "missing-link",
+    "future-result",
+    "stored-expanded",
+    "semantic-explicit",
+    "stored-multi-defect",
+    "semantic-missing-link",
+    "expansion",
+    "expanded-review"
+  ],
+  "normalizations": [
+    {
+      "input": "input-clean-plan.json",
+      "add_goal_coverage_links": [
+        ["ac_001", "val_goal_independent_unittest"],
+        ["ac_003", "val_goal_independent_behavior_contract"]
+      ]
+    },
+    {
+      "input": "input-combined-plan.json",
+      "add_goal_coverage_links": [
+        ["ac_001", "val_goal_independent_unittest"],
+        ["ac_003", "val_goal_independent_behavior_contract"]
+      ]
+    },
+    {
+      "input": "input-semantic-explicit-plan.json",
+      "add_goal_coverage_links": [
+        ["ac_001", "val_goal_independent_unittest"],
+        ["ac_003", "val_goal_independent_behavior_contract"]
+      ]
+    },
+    {
+      "input": "input-semantic-missing-link-plan.json",
+      "add_goal_coverage_links": [
+        ["ac_001", "val_goal_independent_unittest"],
+        ["ac_003", "val_goal_independent_behavior_contract"]
+      ]
+    },
+    {
+      "input": "input-bad-plan.json",
+      "add_goal_coverage_links": [
+        ["ac_001", "val_goal_independent_unittest"],
+        ["ac_003", "val_goal_independent_behavior_contract"]
+      ]
+    },
+    {
+      "input": "input-wrong-goal-plan.json",
+      "add_goal_coverage_links": [
+        ["ac_001", "val_goal_independent_unittest"],
+        ["ac_003", "val_goal_independent_behavior_contract"]
+      ]
+    }
+  ],
+  "normalization_assertions": [
+    {
+      "case_ids": ["clean", "combined", "semantic-explicit", "bad", "wrong-goal", "semantic-missing-link"],
+      "criterion_id": "ac_001",
+      "validation_id": "val_goal_independent_unittest",
+      "relation": "explicit_procedure",
+      "reason": "AC-001은 등록 oracle의 task·goal phase와 기존 unittest를 함께 요구한다."
+    },
+    {
+      "case_ids": ["clean", "combined", "semantic-explicit", "bad", "wrong-goal", "semantic-missing-link"],
+      "criterion_id": "ac_003",
+      "validation_id": "val_goal_independent_behavior_contract",
+      "relation": "explicit_procedure",
+      "reason": "AC-003의 새 프로세스 unittest는 goal phase oracle의 task phase 재검사와 독립 unittest에 모두 걸쳐 있다."
+    }
+  ],
+  "derived_cases": [
+    {
+      "case_id": "semantic-explicit-removal",
+      "input": "input-v2-semantic-explicit-removal-plan.json",
+      "base_input": "input-semantic-explicit-plan.json",
+      "remove_goal_coverage_links": [
+        ["ac_001", "val_task_validator_review"]
+      ]
+    },
+    {
+      "case_id": "missing-ac001-goal-unittest-link",
+      "input": "input-v2-missing-ac001-goal-unittest-link-plan.json",
+      "base_input": "input-clean-plan.json",
+      "remove_goal_coverage_links": [
+        ["ac_001", "val_goal_independent_unittest"]
+      ]
+    },
+    {
+      "case_id": "missing-ac003-goal-behavior-link",
+      "input": "input-v2-missing-ac003-goal-behavior-link-plan.json",
+      "base_input": "input-clean-plan.json",
+      "remove_goal_coverage_links": [
+        ["ac_003", "val_goal_independent_behavior_contract"]
+      ]
+    },
+    {
+      "case_id": "partial-task-inspection-missing",
+      "input": "input-v2-partial-task-inspection-missing-plan.json",
+      "base_input": "input-clean-plan.json",
+      "remove_goal_coverage_links": [
+        ["ac_002", "val_task_validator_review"]
+      ],
+      "remove_task_validations": [
+        "val_task_validator_review"
+      ]
+    },
+    {
+      "case_id": "evidence-explicit-exclusion",
+      "input": "input-v2-evidence-explicit-exclusion-plan.json",
+      "base_input": "input-clean-plan.json",
+      "replace_task_validation_statements": [
+        [
+          "val_task_validator_review",
+          "실행 역할과 분리된 Validator가 Task의 직접 file·diff evidence만 검토하며 test evidence는 검토 대상에서 명시적으로 제외한다. 검토 결과를 제출한다."
+        ]
+      ]
+    }
+  ],
+  "validation_ids": [
+    "val_task_add_behavior_contract",
+    "val_task_unittest",
+    "val_task_scope_preservation",
+    "val_task_validator_review",
+    "val_goal_independent_behavior_contract",
+    "val_goal_independent_unittest",
+    "val_goal_independent_scope_preservation"
+  ],
+  "ac_validation_rows": [
+    {"criterion_id": "ac_001", "validation_id": "val_task_add_behavior_contract", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_task_add_behavior_contract"], "optional_connection_allowed": true},
+    {"criterion_id": "ac_001", "validation_id": "val_task_unittest", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_task_unittest"], "optional_connection_allowed": true},
+    {"criterion_id": "ac_001", "validation_id": "val_task_scope_preservation", "relation": "optional_or_unrelated", "required_goal_coverage_links": [], "optional_connection_allowed": true},
+    {"criterion_id": "ac_001", "validation_id": "val_task_validator_review", "relation": "global_constraint_only", "required_goal_coverage_links": [], "optional_connection_allowed": true},
+    {"criterion_id": "ac_001", "validation_id": "val_goal_independent_behavior_contract", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_goal_independent_behavior_contract"], "optional_connection_allowed": true},
+    {"criterion_id": "ac_001", "validation_id": "val_goal_independent_unittest", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_goal_independent_unittest"], "optional_connection_allowed": true},
+    {"criterion_id": "ac_001", "validation_id": "val_goal_independent_scope_preservation", "relation": "optional_or_unrelated", "required_goal_coverage_links": [], "optional_connection_allowed": true},
+
+    {"criterion_id": "ac_002", "validation_id": "val_task_add_behavior_contract", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_task_add_behavior_contract"], "optional_connection_allowed": true},
+    {"criterion_id": "ac_002", "validation_id": "val_task_unittest", "relation": "optional_or_unrelated", "required_goal_coverage_links": [], "optional_connection_allowed": true},
+    {"criterion_id": "ac_002", "validation_id": "val_task_scope_preservation", "relation": "optional_or_unrelated", "required_goal_coverage_links": [], "optional_connection_allowed": true},
+    {"criterion_id": "ac_002", "validation_id": "val_task_validator_review", "relation": "global_constraint_only", "required_goal_coverage_links": [], "optional_connection_allowed": true},
+    {"criterion_id": "ac_002", "validation_id": "val_goal_independent_behavior_contract", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_goal_independent_behavior_contract"], "optional_connection_allowed": true},
+    {"criterion_id": "ac_002", "validation_id": "val_goal_independent_unittest", "relation": "optional_or_unrelated", "required_goal_coverage_links": [], "optional_connection_allowed": true},
+    {"criterion_id": "ac_002", "validation_id": "val_goal_independent_scope_preservation", "relation": "optional_or_unrelated", "required_goal_coverage_links": [], "optional_connection_allowed": true},
+
+    {"criterion_id": "ac_003", "validation_id": "val_task_add_behavior_contract", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_task_add_behavior_contract"], "optional_connection_allowed": true},
+    {"criterion_id": "ac_003", "validation_id": "val_task_unittest", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_task_unittest"], "optional_connection_allowed": true},
+    {"criterion_id": "ac_003", "validation_id": "val_task_scope_preservation", "relation": "optional_or_unrelated", "required_goal_coverage_links": [], "optional_connection_allowed": true},
+    {"criterion_id": "ac_003", "validation_id": "val_task_validator_review", "relation": "global_constraint_only", "required_goal_coverage_links": [], "optional_connection_allowed": true},
+    {"criterion_id": "ac_003", "validation_id": "val_goal_independent_behavior_contract", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_goal_independent_behavior_contract"], "optional_connection_allowed": true},
+    {"criterion_id": "ac_003", "validation_id": "val_goal_independent_unittest", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_goal_independent_unittest"], "optional_connection_allowed": true},
+    {"criterion_id": "ac_003", "validation_id": "val_goal_independent_scope_preservation", "relation": "optional_or_unrelated", "required_goal_coverage_links": [], "optional_connection_allowed": true},
+
+    {"criterion_id": "ac_004", "validation_id": "val_task_add_behavior_contract", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_task_add_behavior_contract"], "optional_connection_allowed": true},
+    {"criterion_id": "ac_004", "validation_id": "val_task_unittest", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_task_unittest"], "optional_connection_allowed": true},
+    {"criterion_id": "ac_004", "validation_id": "val_task_scope_preservation", "relation": "optional_or_unrelated", "required_goal_coverage_links": [], "optional_connection_allowed": true},
+    {"criterion_id": "ac_004", "validation_id": "val_task_validator_review", "relation": "global_constraint_only", "required_goal_coverage_links": [], "optional_connection_allowed": true},
+    {"criterion_id": "ac_004", "validation_id": "val_goal_independent_behavior_contract", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_goal_independent_behavior_contract"], "optional_connection_allowed": true},
+    {"criterion_id": "ac_004", "validation_id": "val_goal_independent_unittest", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_goal_independent_unittest"], "optional_connection_allowed": true},
+    {"criterion_id": "ac_004", "validation_id": "val_goal_independent_scope_preservation", "relation": "explicit_procedure", "required_goal_coverage_links": ["val_goal_independent_scope_preservation"], "optional_connection_allowed": true}
+  ],
+  "constraint_task_rows": [
+    {
+      "constraint_id": "constraint_001",
+      "task_ref": "task_change_add",
+      "applicability": "not_applicable",
+      "required_validation_ids": [],
+      "meaning": "수정 범위 원문이며 자체 검사 호출 의무를 추가하지 않는다. 원문 인용은 필요하다."
+    },
+    {
+      "constraint_id": "constraint_002",
+      "task_ref": "task_change_add",
+      "applicability": "not_applicable",
+      "required_validation_ids": [],
+      "meaning": "보존 범위 원문이며 자체 검사 호출 의무를 추가하지 않는다. 원문 인용은 필요하다."
+    },
+    {
+      "constraint_id": "constraint_003",
+      "task_ref": "task_change_add",
+      "applicability": "required",
+      "required_responsibilities": [
+        "existing_unittest",
+        "scope_preservation",
+        "independent_validator_review"
+      ],
+      "satisfying_validation_ids": {
+        "existing_unittest": ["val_task_add_behavior_contract", "val_task_unittest"],
+        "scope_preservation": ["val_task_add_behavior_contract", "val_task_scope_preservation"],
+        "independent_validator_review": ["val_task_validator_review"]
+      },
+      "meaning": "실제 unittest·파일 변경 범위·분리 Validator의 직접 evidence 검토는 Task에 보존하고, Goal Test는 모든 Task 검증 뒤 독립적으로 수행한다. 특정 중복 validation ID 전체를 필수라고 추정하지 않는다."
+    }
+  ],
+  "evidence_semantics": {
+    "simple_mention_case": "evidence-simple-mention",
+    "simple_mention_statement": "실행 역할과 분리된 Validator가 Task의 직접 file·diff evidence를 검토하여 app.py의 add 구현 변경이 요구된 동작·공개 호출 계약·최소 수정 범위를 충족하는지 독립적으로 판단하고 검토 결과를 제출한다.",
+    "simple_mention_expected_defects": [],
+    "explicit_exclusion_case": "evidence-explicit-exclusion",
+    "explicit_exclusion_statement": "실행 역할과 분리된 Validator가 Task의 직접 file·diff evidence만 검토하며 test evidence는 검토 대상에서 명시적으로 제외한다. 검토 결과를 제출한다.",
+    "explicit_exclusion_expected_defects": ["validator-explicitly-excludes-test-evidence"],
+    "rule": "file/diff의 단순 언급은 test evidence 제외를 뜻하지 않는다. 명시적 제외만 고정된 별도 결함으로 평가한다."
+  },
+  "historical_counterexamples": [
+    {
+      "case_id": "historical-r-s06-09-clean",
+      "input": "input-historical-r-s06-09-clean-plan.json",
+      "raw_finding_code": "F001",
+      "criterion_id": "ac_001",
+      "validation_id": "val_goal_independent_unittest",
+      "disposition": "actual_missing_link",
+      "reason": "R-S06-09 clean 입력에는 이 명시 goal unittest 연결이 없었다."
+    },
+    {
+      "case_id": "historical-r-s06-09-clean",
+      "input": "input-historical-r-s06-09-clean-plan.json",
+      "raw_finding_code": "F002",
+      "criterion_id": "ac_003",
+      "validation_id": "val_goal_independent_behavior_contract",
+      "disposition": "actual_missing_link",
+      "reason": "R-S06-09 clean 입력에는 이 명시 goal behavior 연결이 없었다."
+    },
+    {
+      "case_id": "historical-r-s06-09-clean",
+      "raw_finding_code": "F003",
+      "disposition": "false_positive",
+      "reason": "전역 semantic 의무는 선택적 AC 연결을 금지하지 않는다."
+    },
+    {
+      "case_id": "historical-r-s06-09-clean",
+      "raw_finding_code": "F004",
+      "disposition": "false_positive",
+      "reason": "file/diff 언급만으로 test evidence가 제외되었다고 확대할 수 없다."
+    }
+  ],
+  "revision_review_expectations": {
+    "historical-r-s06-09-clean": [
+      {
+        "defect_id": "ac001-goal-unittest-link",
+        "defect_kind": "missing_validation_link",
+        "criterion_ids": ["ac_001"],
+        "allowed_criterion_ids": ["ac_001"],
+        "validation_ids": ["val_goal_independent_unittest"],
+        "allowed_task_ref_sets": [[]],
+        "required_evidence_refs": ["source:goal", "artifact:plan_contract"],
+        "required_citations": [
+          {"source_ref": "source:goal", "selectors": ["/hard_acceptance/0/statement", "/hard_acceptance/0/validation_intent"]},
+          {"source_ref": "artifact:plan_contract", "selectors": ["/definition/integration_validations/1/statement"]}
+        ]
+      },
+      {
+        "defect_id": "ac003-goal-behavior-link",
+        "defect_kind": "missing_validation_link",
+        "criterion_ids": ["ac_003"],
+        "allowed_criterion_ids": ["ac_003"],
+        "validation_ids": ["val_goal_independent_behavior_contract"],
+        "allowed_task_ref_sets": [[]],
+        "required_evidence_refs": ["source:goal", "artifact:plan_contract"],
+        "required_citations": [
+          {"source_ref": "source:goal", "selectors": ["/hard_acceptance/2/statement", "/hard_acceptance/2/validation_intent"]},
+          {"source_ref": "artifact:plan_contract", "selectors": ["/definition/integration_validations/0/statement"]}
+        ]
+      }
+    ],
+    "semantic-explicit-removal": [
+      {
+        "defect_id": "ac001-explicit-semantic-link",
+        "defect_kind": "missing_validation_link",
+        "criterion_ids": ["ac_001"],
+        "allowed_criterion_ids": ["ac_001"],
+        "validation_ids": ["val_task_validator_review"],
+        "allowed_task_ref_sets": [["task_change_add"]],
+        "required_evidence_refs": ["source:goal", "artifact:plan_contract"],
+        "required_citations": [
+          {"source_ref": "source:goal", "selectors": ["/hard_acceptance/0/statement", "/hard_acceptance/0/validation_intent"]},
+          {"source_ref": "artifact:plan_contract", "selectors": ["/definition/tasks/0/validations/3/statement"]}
+        ]
+      }
+    ],
+    "missing-ac001-goal-unittest-link": [
+      {
+        "defect_id": "ac001-goal-unittest-link",
+        "defect_kind": "missing_validation_link",
+        "criterion_ids": ["ac_001"],
+        "allowed_criterion_ids": ["ac_001"],
+        "validation_ids": ["val_goal_independent_unittest"],
+        "allowed_task_ref_sets": [[]],
+        "required_evidence_refs": ["source:goal", "artifact:plan_contract"],
+        "required_citations": [
+          {"source_ref": "source:goal", "selectors": ["/hard_acceptance/0/statement", "/hard_acceptance/0/validation_intent"]},
+          {"source_ref": "artifact:plan_contract", "selectors": ["/definition/integration_validations/1/statement"]}
+        ]
+      }
+    ],
+    "missing-ac003-goal-behavior-link": [
+      {
+        "defect_id": "ac003-goal-behavior-link",
+        "defect_kind": "missing_validation_link",
+        "criterion_ids": ["ac_003"],
+        "allowed_criterion_ids": ["ac_003"],
+        "validation_ids": ["val_goal_independent_behavior_contract"],
+        "allowed_task_ref_sets": [[]],
+        "required_evidence_refs": ["source:goal", "artifact:plan_contract"],
+        "required_citations": [
+          {"source_ref": "source:goal", "selectors": ["/hard_acceptance/2/statement", "/hard_acceptance/2/validation_intent"]},
+          {"source_ref": "artifact:plan_contract", "selectors": ["/definition/integration_validations/0/statement"]}
+        ]
+      }
+    ],
+    "partial-task-inspection-missing": [
+      {
+        "defect_id": "partial-task-inspection-missing",
+        "defect_kind": "missing_task_validation",
+        "criterion_ids": [],
+        "allowed_criterion_ids": [],
+        "validation_ids": [],
+        "allowed_task_ref_sets": [["task_change_add"]],
+        "required_evidence_refs": ["source:goal", "artifact:plan_contract"],
+        "required_citations": [
+          {"source_ref": "source:goal", "selectors": ["/constraints/2/statement"]},
+          {"source_ref": "artifact:plan_contract", "selectors": ["/definition/tasks/0/acceptance_criteria/4"]}
+        ]
+      }
+    ],
+    "evidence-explicit-exclusion": [
+      {
+        "defect_id": "validator-explicitly-excludes-test-evidence",
+        "defect_kind": "validation_scope",
+        "criterion_ids": [],
+        "allowed_criterion_ids": [],
+        "validation_ids": ["val_task_validator_review"],
+        "allowed_task_ref_sets": [["task_change_add"]],
+        "required_evidence_refs": ["source:goal", "artifact:plan_contract"],
+        "required_citations": [
+          {"source_ref": "source:goal", "selectors": ["/constraints/2/statement"]},
+          {"source_ref": "artifact:plan_contract", "selectors": ["/definition/tasks/0/validations/3/statement"]}
+        ]
+      }
+    ]
+  },
+  "cases": {
+    "clean": {"input": "input-clean-plan.json", "expected_defects": []},
+    "combined": {"input": "input-combined-plan.json", "expected_defects": []},
+    "boundary-clean": {"input": "input-boundary-clean-plan.json", "expected_defects": []},
+    "semantic-explicit": {"input": "input-semantic-explicit-plan.json", "expected_defects": []},
+    "bad": {"input": "input-bad-plan.json", "expected_defects": ["task-phase-overclaim"]},
+    "wrong-goal": {"input": "input-wrong-goal-plan.json", "expected_defects": ["goal-uses-task-phase"]},
+    "missing-link": {"input": "input-missing-link-plan.json", "expected_defects": ["ac003-task-oracle-link"]},
+    "stored-expanded": {"input": "input-stored-expanded-plan.json", "expected_defects": ["ac004-combined-task-link"]},
+    "stored-multi-defect": {"input": "input-stored-multi-defect-plan.json", "expected_defects": ["ac004-task-oracle-link", "task-phase-overclaim"]},
+    "semantic-missing-link": {"input": "input-semantic-missing-link-plan.json", "expected_defects": ["ac001-explicit-semantic-link"]},
+    "future-result": {"input": "input-future-result-plan.json", "expected_defects": ["worker-future-validator-result"]},
+    "semantic-explicit-removal": {"input": "input-v2-semantic-explicit-removal-plan.json", "expected_defects": ["ac001-explicit-semantic-link"]},
+    "missing-ac001-goal-unittest-link": {"input": "input-v2-missing-ac001-goal-unittest-link-plan.json", "expected_defects": ["ac001-goal-unittest-link"]},
+    "missing-ac003-goal-behavior-link": {"input": "input-v2-missing-ac003-goal-behavior-link-plan.json", "expected_defects": ["ac003-goal-behavior-link"]},
+    "partial-task-inspection-missing": {"input": "input-v2-partial-task-inspection-missing-plan.json", "expected_defects": ["partial-task-inspection-missing"]},
+    "evidence-simple-mention": {"input": "input-clean-plan.json", "expected_defects": []},
+    "evidence-explicit-exclusion": {"input": "input-v2-evidence-explicit-exclusion-plan.json", "expected_defects": ["validator-explicitly-excludes-test-evidence"]},
+    "expansion": {"input": "input-clean-plan.json", "expected_defects": []},
+    "expanded-review": {"input": "generated expanded-plan.json", "expected_defects": []}
+  },
+  "deterministic_only_cases": [
+    "historical-r-s06-09-clean",
+    "semantic-explicit-removal",
+    "missing-ac001-goal-unittest-link",
+    "missing-ac003-goal-behavior-link",
+    "partial-task-inspection-missing",
+    "evidence-simple-mention",
+    "evidence-explicit-exclusion"
+  ]
+}

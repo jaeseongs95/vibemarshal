@@ -8,13 +8,13 @@ from typing import Any, Literal
 from pydantic import Field
 
 from ..canonical import sha256_bytes
-from .domain import EngineModel, GoalContractRevision, ProjectMapRevision
+from .domain import EngineModel, GoalContractRevision, ProjectMapEntry, ProjectMapRevision
 from .planning import validation_comparison_targets
 
 
 class InspectionCitation(EngineModel):
     citation_id: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_]{0,59}$")
-    source_ref: str
+    source_ref: str = Field(description="Goal/Plan 원문 ref 또는 정확한 project:<entry_id>. 등록 자료의 검사 범위는 inspection_source_catalog의 정식 project ref로 인용한다.")
     selector: str = Field(description="source_ref 원문 값에 대한 RFC 6901 JSON pointer. 파일 본문은 /content.")
     quote: str = Field(min_length=1, max_length=240, description="선택한 문자열에 그대로 존재하는 짧은 연속 인용. 요약·생략 기호를 삽입하지 않는다.")
 
@@ -22,18 +22,18 @@ class InspectionCitation(EngineModel):
 class ACValidationInspection(EngineModel):
     criterion_id: str
     validation_id: str
-    relation: Literal["explicit_procedure", "global_constraint_only", "optional_or_unrelated"]
+    relation: Literal["explicit_procedure", "global_constraint_only", "optional_or_unrelated"] = Field(description="AC 연결 의무의 출처 분류. 필수가 아닌 기존 선택적 연결을 금지한다는 뜻이 아니다.")
     basis_refs: tuple[str, ...] = Field(min_length=2, description="해당 AC와 validation statement 인용 ID. global_constraint_only이면 constraint 원문도 포함한다.")
-    finding_codes: tuple[str, ...]
+    finding_codes: tuple[str, ...] = Field(description="explicit_procedure인데 현재 ID 연결이 없는 경우만 missing_validation_link finding. 나머지는 빈 배열.")
 
 
 class ConstraintTaskInspection(EngineModel):
     constraint_id: str
     task_ref: str
     applicability: Literal["required", "not_applicable"]
-    validation_ids: tuple[str, ...]
-    basis_refs: tuple[str, ...] = Field(min_length=1)
-    finding_codes: tuple[str, ...]
+    validation_ids: tuple[str, ...] = Field(description="해당 Task에 실제 존재하는 검사 ID. 일부 의무가 누락되어도 존재하는 ID와 누락 finding을 함께 제출한다.")
+    basis_refs: tuple[str, ...] = Field(min_length=1, description="required와 not_applicable 모두 해당 constraint 원문 인용을 반드시 포함한다.")
+    finding_codes: tuple[str, ...] = Field(description="required 의무의 전체/부분 실행 계약 누락은 missing_task_validation. AC 연결 누락이나 검사 범위 모순은 각 전용 행에 둔다.")
 
 
 class InspectionMechanism(EngineModel):
@@ -47,8 +47,8 @@ class ValidationInspection(EngineModel):
     claim_ref: str = Field(description="해당 validation statement의 주장 인용 ID.")
     mechanisms: tuple[InspectionMechanism, ...] = Field(min_length=1)
     separate_check_refs: tuple[str, ...] = Field(description="같은 statement 안 별도 실제 실행·기대값 비교 책임의 인용 ID. 목적만 덧붙인 문장은 포함하지 않는다.")
-    assessment: Literal["supported", "contradicted", "unresolved"]
-    finding_codes: tuple[str, ...]
+    assessment: Literal["supported", "contradicted", "unresolved"] = Field(description="원문 수단 범위와 주장: 지지됨/직접 모순/근거 부족. evidence의 단순 언급은 다른 입력의 명시적 제외가 아니다.")
+    finding_codes: tuple[str, ...] = Field(description="supported이면 빈 배열. contradicted는 validation_scope, unresolved는 insufficient_evidence finding에 연결한다.")
 
 
 class InspectionFindingLink(EngineModel):
@@ -74,8 +74,10 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "같은 원문 인용은 citations에 한 번 등록하고 나머지 행은 citation_id를 참조한다. "
     "source:goal은 Goal definition, Reviewer의 artifact:plan_contract는 revision 전체, 작성자의 "
     "artifact:plan_draft는 응답 plan 전체다. JSON pointer는 이 값의 루트부터 쓰며 배열은 /0 형식이다. "
-    "Project Map의 정확한 entry_id는 project:<entry_id>로 인용할 수 있다. 이 경우 selector는 /content이고 "
-    "Map.root 기준 파일 또는 등록 절대 경로의 실제 UTF-8 본문에서 짧게 인용한다. 파일 인용은 "
+    "등록 자료의 검사 범위는 inspection_source_catalog가 제공하는 정식 project:<entry_id>와 "
+    "selector=/content를 반드시 사용한다. 함께 제공한 content는 content_digest로 검증한 UTF-8 "
+    "원문이다. Goal source_traces의 복제 본문이나 배열 번호로 등록 파일의 주소를 재구성하지 않는다. "
+    "그 밖의 Project Map 파일도 정확한 entry_id와 /content로 실제 본문을 인용한다. 파일 인용은 "
     "finding의 source:project_map evidence에 대응한다. 모든 quote는 240자 이내의 연속 원문이며 "
     "의역·생략 표시를 넣지 않는다. 등록 문서가 부족하면 관련 구현도 읽되 제공된 원문으로 "
     "확인한 범위만 주장한다. "
@@ -84,9 +86,14 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "명시한 절차(explicit_procedure), 전역 constraint만의 의무(global_constraint_only), 선택적·무관 "
     "관계(optional_or_unrelated)를 구분한다. AC와 검사 statement 인용을 모두 연결하고 전역 의무이면 "
     "constraint 인용도 붙인다. 다른 ID가 연결되어도 AC가 명시한 복합 검사 절차 ID를 빠뜨리지 않는다. "
-    "반대로 검사 문장의 연관 표현·전역 의무만으로 AC 명시 절차로 분류하지 않는다. "
+    "반대로 검사 문장의 연관 표현·전역 의무만으로 AC 명시 절차로 분류하지 않는다. relation은 "
+    "연결 의무의 출처이며 선택적 연결 금지가 아니다. global_constraint_only 또는 "
+    "optional_or_unrelated여도 기존 연결을 허용하고 그 이유만으로 finding을 만들지 않는다. "
     "모든 constraint × 모든 Task 쌍을 constraint_task_rows에 한 번씩 쓰고 전역 Task 검사 의무와 "
-    "그 Task의 실제 validation ID를 대조한다. 검사 의무가 아닌 제약은 not_applicable과 빈 ID로 둔다. "
+    "그 Task의 실제 validation ID를 대조한다. 검사 의무가 아닌 제약은 not_applicable과 빈 ID로 두되 "
+    "모든 행에 해당 constraint 원문을 인용한다. required 의무의 일부만 빠져도 존재하는 ID는 "
+    "보존하고 누락 책임의 missing_task_validation finding을 함께 연결한다. 검사 자체의 존재와 "
+    "AC 연결 누락을 구분하고, 실제 수단 범위 모순은 validation_rows에 둔다. "
     "모든 validation을 validation_rows에 한 번씩 쓰고 주장·도구·phase·등록 범위와 같은 문장의 "
     "별도 실제 실행 및 기대값 비교 책임을 구분한다. 독립 결함은 각각 finding과 finding_links로 "
     "연결한다. finding_code는 제출물 안에서 유일해야 한다. finding_links는 AC·validation·Task ID와 "
@@ -95,7 +102,9 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "실제 수단 범위 인용을 해당 finding_link에도 붙인다. finding summary에는 해당 AC ID와 "
     "validation ID를 원문 그대로 포함한다. integration 결함의 task_refs는 직접 영향 Task만 쓰며 "
     "없으면 비운다. finding의 affected_task_refs와 link.task_refs는 같아야 한다. "
-    "명시 절차인데 ID가 빠진 행은 missing_validation_link finding에 연결한다. contradicted 또는 "
+    "명시 절차인데 ID가 빠진 행만 missing_validation_link finding에 연결하고 나머지 AC 행의 "
+    "finding_codes는 비운다. 단순 file/diff evidence 언급을 test 입력의 명시적 제외로 추정하지 않는다. "
+    "원문이 입력을 제한·제외하여 수단과 충돌하는 경우와 원문 정보가 부족한 경우를 구분한다. contradicted 또는 "
     "unresolved 검사는 각각 validation_scope 또는 insufficient_evidence finding에 연결한다. "
     "독립적으로 확인한 다른 결함을 이미 제출한 finding이나 낮은 rating으로 대신하지 않는다. "
     "작성자는 결함을 보정한 완성 plan과 대조표를 제출하므로 finding_links와 모든 finding_codes는 "
@@ -105,6 +114,18 @@ PLAN_INSPECTION_INSTRUCTIONS = (
 
 class PlanInspectionError(ValueError):
     pass
+
+
+def inspection_file_content(entry: ProjectMapEntry, project_map: ProjectMapRevision) -> str:
+    """입력 projection과 인용 검증에서 동일한 원본 bytes·digest 검사를 사용한다."""
+    path = Path(entry.path)
+    path = path if path.is_absolute() else Path(project_map.root) / path
+    try:
+        body = path.read_bytes()
+        _require(sha256_bytes(body) == entry.content_digest, "대조표 파일 원문 digest 불일치")
+        return body.decode("utf-8")
+    except (OSError, UnicodeError) as error:
+        raise PlanInspectionError("대조표 파일 원문을 확인할 수 없습니다.") from error
 
 
 def _require(condition: bool, message: str) -> None:
@@ -149,15 +170,7 @@ def validate_plan_inspection(
     entries = {f"project:{entry.entry_id}": entry for entry in project_map.entries}
     for citation in citations.values():
         if citation.source_ref not in sources and citation.source_ref in entries:
-            entry = entries[citation.source_ref]
-            path = Path(entry.path)
-            path = path if path.is_absolute() else Path(project_map.root) / path
-            try:
-                body = path.read_bytes()
-                _require(sha256_bytes(body) == entry.content_digest, "대조표 파일 원문 digest 불일치")
-                sources[citation.source_ref] = {"content": body.decode("utf-8")}
-            except (OSError, UnicodeError) as error:
-                raise PlanInspectionError("대조표 파일 원문을 확인할 수 없습니다.") from error
+            sources[citation.source_ref] = {"content": inspection_file_content(entries[citation.source_ref], project_map)}
         _require(citation.source_ref in sources, "대조표 source_ref가 입력에 없습니다.")
         selected = _pointer(sources[citation.source_ref], citation.selector)
         _require(isinstance(selected, str) and citation.quote in selected,

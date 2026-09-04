@@ -54,6 +54,7 @@ from .planning import (
 from .plan_inspection import (
     PLAN_INSPECTION_INSTRUCTIONS,
     PlanInspection,
+    inspection_file_content,
     validate_plan_inspection,
 )
 from .roles import RoleCallReceipt, RoleCallRequest, StructuredRolePort
@@ -122,7 +123,8 @@ PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS = (
     "validations에 그 검사가 존재하는지 먼저 확인한다. 이 전역 의무만으로 특정 AC의 validation_ids "
     "연결을 추정하지 않는다. 반대로 AC의 statement 또는 validation_intent가 검사 대상·절차·적용 "
     "범위를 명시하면, 그 절차를 실제 수행하는 validation ID를 해당 AC에 연결한다. AC가 명시적으로 "
-    "semantic 검토를 요구한 경우에만 그 semantic ID도 같은 방식으로 연결한다. 검사 문장의 동작·공개 "
+    "semantic 검토를 요구하면 그 semantic ID의 필수 연결도 같은 방식으로 확인한다. 명시 요구가 "
+    "없는 기존 선택적 연결도 허용한다. 검사 문장의 동작·공개 "
     "계약 언급, 전역 의무, evidence 종류나 단순 선후조건만으로 다른 AC에 semantic ID를 일괄 연결하지 "
     "않는다. "
     "Skeleton과 Plan 작성 draft의 goal_coverage.task_refs는 기여 Task 집합이다. Compiler는 "
@@ -188,9 +190,33 @@ PLAN_VALIDATION_TRACE_INSTRUCTIONS = (
     "ID가 이미 연결되어 있어도 적용 대상의 명시 검사 연결을 대신하지 않는다. 검사 자체가 존재하지만 "
     "ID만 빠진 경우에는 연결 누락으로 지적하고 실행 누락이나 새 검사 의무로 바꾸지 않는다. 단순 "
     "선후조건, 같은 파일·evidence 종류 또는 선택적 부가 검사만으로 모든 AC에 연결하지 않는다. "
+    "필수 연결이 아니라는 분류는 이미 존재하는 선택적 연결을 금지하지 않는다. 전역 semantic 의무와 "
+    "선택적 semantic 연결은 함께 존재할 수 있다. Plan이 특정 evidence를 언급해도 다른 evidence를 "
+    "명시적으로 제외한 것으로 추정하지 않는다. 명시적 제외·범위 충돌과 단순 언급은 구분한다. "
     "Reviewer는 Goal·검사 원문·실제 coverage를 직접 evidence로 대조하고, 작성자는 동일한 기준으로 "
     "검사 문장과 연결을 함께 완성한다."
 )
+
+
+def inspection_source_catalog(project_map: ProjectMapRevision, sources: dict[str, str]) -> dict[str, Any]:
+    """등록 자료의 정식 주소와 검증한 원문을 두 Plan 역할에 동일하게 투영한다.
+
+    원래 ID·본문을 보존하며 관계·검사 능력·필수 연결 판정을 추가하지 않는다.
+    """
+    catalog: dict[str, Any] = dict(sources)
+    for entry in project_map.entries:
+        source_ref = f"project:{entry.entry_id}"
+        item = {
+            "source_ref": source_ref,
+            "selector": "/content",
+            "path": entry.path,
+            "content_digest": entry.content_digest,
+            "evidence_ref": "source:project_map",
+        }
+        if entry.kind.value in {"reference", "instruction"}:
+            item["content"] = inspection_file_content(entry, project_map)
+        catalog[source_ref] = item
+    return catalog
 
 
 PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS = (
@@ -660,7 +686,8 @@ class PlanExpanderAdapter:
                 "보존하되 실제 실행 명령은 ready-time 명세로 남긴다. "
                 "payload의 goal_validation_requirement_rows는 AC 원문과 전역 constraint 원문을 구분한 "
                 "비권위 색인이다. 전역 constraint가 요구한 Task 검사 존재를 먼저 보존하고, 각 AC의 "
-                "statement·validation_intent가 명시한 절차만 goal_coverage.validation_ids에 연결한다. "
+                "statement·validation_intent가 명시한 절차의 필수 ID를 goal_coverage.validation_ids에 연결한다. "
+                "선택적 연결은 허용하되 필수 연결로 확대하지 않는다. "
                 "검사 statement를 작성한 뒤 각 AC가 명시한 검사 절차에 해당하는 ID를 다시 확인한다. "
                 "예를 들어 한 AC가 Task phase와 Goal phase를 구분해 요구하면 두 phase의 검사 ID를 "
                 "연결한다. 단순한 선후조건만으로 모든 검사 ID를 모든 AC에 연결하지 않는다. "
@@ -690,15 +717,10 @@ class PlanExpanderAdapter:
                 "project_map": compact_project_map(project_map),
                 "skeleton": candidate.model_dump(mode="json"),
                 "goal_validation_requirement_rows": goal_validation_requirement_rows(goal),
-                "inspection_source_catalog": {
+                "inspection_source_catalog": inspection_source_catalog(project_map, {
                     "source:goal": "payload.goal",
                     "artifact:plan_draft": "output.plan",
-                    **{f"project:{entry.entry_id}": {
-                        "path": entry.path,
-                        "content_digest": entry.content_digest,
-                        "evidence_ref": "source:project_map",
-                    } for entry in project_map.entries},
-                },
+                }),
             },
             output_schema=PlanExpansionEnvelope.model_json_schema(),
             model=self.model,
@@ -909,14 +931,9 @@ class PlanReviewerAdapter:
                 "validation_scope_rows": plan_validation_scope_rows(plan),
                 "goal_validation_requirement_rows": goal_validation_requirement_rows(goal),
                 "validation_comparison_targets": validation_comparison_targets(goal, plan),
-                "inspection_source_catalog": {
-                    **{key: f"payload.evidence_catalog.{key}" for key in evidence_catalog},
-                    **{f"project:{entry.entry_id}": {
-                        "path": entry.path,
-                        "content_digest": entry.content_digest,
-                        "evidence_ref": "source:project_map",
-                    } for entry in project_map.entries},
-                },
+                "inspection_source_catalog": inspection_source_catalog(project_map, {
+                    key: f"payload.evidence_catalog.{key}" for key in evidence_catalog
+                }),
             },
             output_schema=PlanReviewEnvelope.model_json_schema(),
             model=selected_model,
