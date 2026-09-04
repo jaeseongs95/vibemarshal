@@ -154,6 +154,14 @@ Worker PromptBundle에는 전체 Task 계약, Execution Spec의 운영 상세 pr
 
 Dispatcher는 초기 실행과 기존 thread 재개 모두 저장된 bundle의 binding·segment digest를 검증하여 실제 본문을 전송한다. 누락·변조 시 임의 Prompt나 과거 Task·Spec 문자열 조립으로 우회하지 않는다. Worker가 변경한 파일로 재개 Prompt를 다시 만들지 않고 원래 저장 본문을 유지하며, 재개 안내문까지 포함한 최종 전송 문자열의 canonical digest를 turn intent의 `prompt_digest`에 기록한다. semantic Validator는 실행 후 직접 evidence catalog를 사용해 독립 입력을 구성한다. 이 artifact 무결성 계약은 OS 권한을 제한하는 보안 경계나 저장장치 전원 장애에 대한 완전한 내구성 보장이 아니다.
 
+### Worker 완료 usage의 영속 연결
+
+Worker의 새 turn intent에는 기존 Prompt binding과 Execution Spec digest, 최종 전송 문자열 digest, 별도의 UTF-8 byte/4 Prompt token 추정치를 기록한다. adapter는 SDK에 실제로 넘긴 문자열의 digest를 start receipt에 남긴다. Core는 이 receipt와 완료 관측의 thread·turn·Prompt를 대조한 뒤 기존 `BudgetUsageRecord`에 원시 관측, 관측 digest, Attempt·intent·receipt 참조를 기록한다. 같은 provider thread/turn의 재관측은 한 행을 재사용하고 다른 실제 turn은 별도 행으로 보존한다. 충돌하는 실측 값은 덮어쓰지 않는다.
+
+연결을 소유한 프로세스는 완료 usage를 원장에 기록한 뒤 정상 종료한다. 이 기록은 Task/Attempt의 완료 판정이 아니며 기존 다음 관측 단계가 evidence 수집과 상태 전이를 담당한다. 저장된 turn 조회에 usage가 없더라도 이미 기록한 usage는 유지한다. 기록 전에 프로세스가 강제 종료되거나 SDK가 실패 usage를 제공하지 않으면 unavailable과 이유를 남기며, 이를 완전한 crash-safe 수집으로 표현하지 않는다.
+
+provider의 `last`·`total` 원형과 원시 scope를 보존한다. provider가 turn 단위를 명시한 경우에는 해당 값을 사용한다. 새 빈 thread 생성과 그 첫 turn의 receipt가 확인된 경우에는 그 thread의 raw total 전체를 해당 유일한 turn에 귀속하고 `first_empty_thread` 근거를 남긴다. 이는 provider가 `total`을 turn 단위로 보장한다는 뜻이 아니다. 재개 turn의 누적값은 차분·임의 배분하지 않고 raw 관측과 unavailable로 남긴다. 새 Worker unavailable의 token 필드는 null이며 measured zero와 구분한다. 과거 usage 및 기존 계측 계약 표시가 없는 turn은 자동 backfill하지 않는다. 전체 역할 계측·Goal 집계·예산 집행은 별도 완료 단위다.
+
 ## 6. Skeleton-first Planning
 
 ```text

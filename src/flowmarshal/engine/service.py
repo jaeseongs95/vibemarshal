@@ -13,6 +13,7 @@ from .domain import (
     AttemptRecord,
     AttemptStatus,
     BudgetUsageRecord,
+    BudgetStage,
     CandidateDecision,
     CandidateStatus,
     ContextManifest,
@@ -1752,6 +1753,9 @@ class EngineService:
                 provider_operation_id=provider_operation_id,
                 response_digest=response_digest,
                 binding=binding,
+                response_payload=(response if isinstance(response, dict) and
+                                  attempt["kind"] == AttemptKind.EXECUTION.value and
+                                  intent["kind"] in {"create_thread", "start_turn"} else None),
                 received_at=utc_now(),
             )
             tx.connection.execute(
@@ -2238,30 +2242,170 @@ class EngineService:
                 {"status": verdict.status.value, "plan_revision_id": plan_revision_id},
             )
 
+    def record_worker_usage(
+        self, *, attempt_id: str, thread_id: str, turn_id: str,
+        terminal_status: str, provider_payload: dict[str, Any],
+        output_digest: str | None = None,
+    ) -> BudgetUsageRecord | None:
+        """새 Worker turn의 관측만 기록하며 Task/Attempt 상태는 전이하지 않는다."""
+        if terminal_status not in {"completed", "success", "succeeded", "failed", "error", "systemError", "system_error", "interrupted"}:
+            raise EngineServiceError("종료를 관측한 Worker turn만 usage를 기록합니다.")
+        with self.ledger.transaction() as tx:
+            attempt = tx.one("SELECT * FROM attempts WHERE id = ?", (attempt_id,))
+            if attempt["kind"] != AttemptKind.EXECUTION.value:
+                return None
+            matches = []
+            for item in tx.all(
+                "SELECT i.*, r.payload_json AS receipt_json FROM runtime_intents i "
+                "JOIN runtime_receipts r ON r.intent_id = i.id "
+                "WHERE i.attempt_id = ? AND i.kind = 'start_turn' AND i.status = 'received'",
+                (attempt_id,),
+            ):
+                receipt = RuntimeReceipt.model_validate_json(item["receipt_json"])
+                if receipt.binding and (receipt.binding.thread_id, receipt.binding.turn_id) == (thread_id, turn_id):
+                    matches.append((item, receipt))
+            if len(matches) != 1:
+                raise EngineServiceError("WORKER_USAGE_BINDING_MISMATCH: provider turn의 receipt가 유일하지 않습니다.")
+            intent, receipt = matches[0]
+            request = json.loads(intent["request_json"])
+            # 기존 실행은 소급 계측하거나 새 schema로 다시 저장하지 않는다.
+            if request.get("worker_usage_contract") != 1:
+                return None
+            if sha256_digest(request) != intent["request_digest"]:
+                raise EngineServiceError("WORKER_USAGE_BINDING_MISMATCH: intent digest가 다릅니다.")
+            start = receipt.response_payload
+            if not isinstance(start, dict) or (
+                start.get("thread_id") != thread_id or start.get("turn_id") != turn_id
+                or start.get("prompt_digest") != request.get("prompt_digest")
+                or receipt.provider_operation_id != turn_id
+                or start.get("permission_profile") != ":danger-full-access"
+                or start.get("approval_policy") != "never"
+            ):
+                raise EngineServiceError("WORKER_USAGE_BINDING_MISMATCH: 실제 전송 Prompt/turn이 다릅니다.")
+            if any(provider_payload.get(key, expected) != expected for key, expected in (
+                ("thread_id", thread_id), ("turn_id", turn_id), ("prompt_digest", request["prompt_digest"]),
+            )):
+                raise EngineServiceError("WORKER_USAGE_BINDING_MISMATCH: 완료 관측이 다른 전송을 가리킵니다.")
+            spec_row = tx.one(
+                "SELECT payload_json FROM execution_spec_revisions WHERE task_id = ? AND definition_digest = ?",
+                (attempt["task_id"], attempt["execution_spec_digest"]),
+            )
+            spec = TaskExecutionSpecRevision.model_validate_json(spec_row["payload_json"])
+            if (request.get("execution_spec_digest") != spec.definition_digest or
+                    request.get("prompt_binding_digest") != spec.definition.context_manifest.prompt_binding.binding_digest or
+                    request.get("model") != spec.definition.executor.model or
+                    request.get("effort") != spec.definition.executor.effort):
+                raise EngineServiceError("WORKER_USAGE_BINDING_MISMATCH: ExecutionSpec/Prompt binding이 다릅니다.")
+            plan = PlanContractRevision.model_validate_json(tx.one(
+                "SELECT payload_json FROM plan_revisions WHERE id = ?", (attempt["plan_revision_id"],),
+            )["payload_json"])
+            call_ref = "worker-turn:" + sha256_digest({"thread_id": thread_id, "turn_id": turn_id})
+            existing_row = tx.maybe_one(
+                "SELECT payload_json FROM budget_usage WHERE project_id = ? AND goal_contract_digest = ? AND logical_call_ref = ?",
+                (attempt["project_id"], plan.definition.goal_contract_digest, call_ref),
+            )
+            existing = None if existing_row is None else BudgetUsageRecord.model_validate_json(existing_row["payload_json"])
+            if existing is not None and (existing.attempt_id != attempt_id or existing.runtime_intent_id != intent["id"]):
+                raise EngineServiceError("WORKER_USAGE_BINDING_MISMATCH: 이미 다른 Attempt에 귀속된 turn입니다.")
+            raw = provider_payload.get("usage")
+            scope = provider_payload.get("usage_scope", "unavailable")
+            first_empty_thread = False
+            if start.get("first_empty_thread") is True:
+                for created in tx.all(
+                    "SELECT r.payload_json FROM runtime_receipts r JOIN runtime_intents i ON i.id = r.intent_id "
+                    "WHERE i.attempt_id = ? AND i.kind = 'create_thread'", (attempt_id,),
+                ):
+                    creation = RuntimeReceipt.model_validate_json(created["payload_json"])
+                    thread = (creation.response_payload or {}).get("thread", {})
+                    if (creation.provider_operation_id == thread_id and creation.binding and creation.binding.thread_id == thread_id and
+                            isinstance(thread, dict) and thread.get("id") == thread_id and thread.get("turns") == []):
+                        first_empty_thread = True
+                if not first_empty_thread:
+                    raise EngineServiceError("WORKER_USAGE_BINDING_MISMATCH: 빈 thread 생성 receipt가 없습니다.")
+                prior_turn = tx.one(
+                    "SELECT i.id FROM runtime_intents i JOIN runtime_receipts r ON r.intent_id = i.id "
+                    "WHERE i.attempt_id = ? AND i.kind = 'start_turn' "
+                    "AND json_extract(r.binding_json, '$.thread_id') = ? ORDER BY i.rowid LIMIT 1",
+                    (attempt_id, thread_id),
+                )
+                if prior_turn["id"] != intent["id"]:
+                    raise EngineServiceError("WORKER_USAGE_BINDING_MISMATCH: 첫 turn이 아닌 누적 usage입니다.")
+            counts = None
+            basis = "unavailable"
+            reason = "PROVIDER_USAGE_UNAVAILABLE"
+            if isinstance(raw, dict) and scope == "turn":
+                counts, basis = raw, "provider_turn"
+            elif isinstance(raw, dict) and scope == "thread":
+                # raw total은 복수 turn에 배분하지 않는다. 시작 전 빈 thread임을
+                # 실제 adapter receipt가 확인한 첫 turn만 전체 raw total에 귀속한다.
+                if first_empty_thread:
+                    counts, basis = raw.get("total"), "first_empty_thread"
+                else:
+                    reason = "CUMULATIVE_USAGE_NOT_ATTRIBUTABLE_TO_TURN"
+            elif raw is not None:
+                reason = "PROVIDER_USAGE_SCOPE_UNDETERMINED"
+            keys = ("inputTokens", "cachedInputTokens", "outputTokens", "reasoningOutputTokens")
+            values = tuple(counts.get(key) for key in keys) if isinstance(counts, dict) else (None,) * 4
+            valid = all(type(value) is int and value >= 0 for value in values)
+            if valid:
+                valid = values[1] <= values[0] and values[3] <= values[2]
+                if "totalTokens" in counts:
+                    valid = valid and type(counts["totalTokens"]) is int and counts["totalTokens"] == values[0] + values[2]
+            if basis != "unavailable" and not valid:
+                reason = "PROVIDER_USAGE_FIELDS_INCOMPLETE_OR_INVALID"
+            available = basis != "unavailable" and valid
+            if not available:
+                values, basis = (None,) * 4, "unavailable"
+            if existing is not None:
+                if raw is not None and available and (
+                    not existing.usage_available or values != (
+                        existing.input_tokens, existing.cached_input_tokens, existing.output_tokens, existing.reasoning_tokens,
+                    )
+                ):
+                    raise EngineServiceError("WORKER_USAGE_CONFLICT: 같은 turn의 기존 usage를 변경하지 않습니다.")
+                return existing
+            duration = provider_payload.get("duration_ms")
+            observation = {"thread_id": thread_id, "turn_id": turn_id, "terminal_status": terminal_status,
+                           "output_digest": output_digest, "payload": provider_payload}
+            usage = BudgetUsageRecord(
+                usage_id=new_id("usage"), project_id=attempt["project_id"],
+                goal_contract_digest=plan.definition.goal_contract_digest, stage=BudgetStage.EXECUTION,
+                logical_call_ref=call_ref, role=spec.definition.executor.role, call_status=terminal_status,
+                model=request["model"], effort=request["effort"],
+                permission_profile=start["permission_profile"], approval_policy=start["approval_policy"],
+                thread_id=thread_id, turn_ids=(turn_id,), input_digest=request["prompt_digest"],
+                output_digest=output_digest, output_schema_digest=sha256_digest(None),
+                runner_receipt_digest=sha256_digest(observation),
+                input_tokens=values[0], cached_input_tokens=values[1], output_tokens=values[2], reasoning_tokens=values[3],
+                latency_ms=duration if type(duration) is int and duration >= 0 else None,
+                usage_available=available, attempt_id=attempt_id, runtime_intent_id=intent["id"],
+                runtime_receipt_id=receipt.receipt_id, execution_spec_digest=spec.definition_digest,
+                prompt_binding_digest=spec.definition.context_manifest.prompt_binding.binding_digest,
+                prompt_token_estimate=request["prompt_token_estimate"],
+                usage_scope=scope if scope in {"turn", "thread"} else "unavailable",
+                usage_source=provider_payload.get("usage_source", "runtime.read"), attribution_basis=basis,
+                unavailable_reason=None if available else reason, provider_observation=observation,
+                recorded_at=utc_now(),
+            )
+            self._insert_budget_usage(tx, usage)
+            return usage
+
+    @staticmethod
+    def _insert_budget_usage(tx: Any, usage: BudgetUsageRecord) -> None:
+        payload = usage.model_dump(mode="json") if usage.attempt_id is not None else usage
+        tx.connection.execute(
+            "INSERT INTO budget_usage (id, project_id, goal_contract_digest, stage, logical_call_ref, payload_json, recorded_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (usage.usage_id, usage.project_id, usage.goal_contract_digest, usage.stage.value,
+             usage.logical_call_ref, canonical_json(payload), usage.recorded_at.isoformat()),
+        )
+        tx.history(usage.project_id, "budget.recorded", "budget_usage", usage.usage_id,
+                   {"stage": usage.stage.value, "optimization_tokens": usage.optimization_tokens})
+
     def record_budget_usage(self, usage: BudgetUsageRecord) -> None:
         with self.ledger.transaction() as tx:
             tx.one("SELECT id FROM projects WHERE id = ?", (usage.project_id,))
-            tx.connection.execute(
-                "INSERT INTO budget_usage "
-                "(id, project_id, goal_contract_digest, stage, logical_call_ref, payload_json, recorded_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (
-                    usage.usage_id,
-                    usage.project_id,
-                    usage.goal_contract_digest,
-                    usage.stage.value,
-                    usage.logical_call_ref,
-                    canonical_json(usage),
-                    usage.recorded_at.isoformat(),
-                ),
-            )
-            tx.history(
-                usage.project_id,
-                "budget.recorded",
-                "budget_usage",
-                usage.usage_id,
-                {"stage": usage.stage.value, "optimization_tokens": usage.optimization_tokens},
-            )
+            self._insert_budget_usage(tx, usage)
 
     def recover_inspect(self, project_id: str) -> tuple[str, ...]:
         unknown: list[str] = []

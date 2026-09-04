@@ -67,6 +67,7 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 - Context가 부족하면 추측하지 않고 필요한 source·selector·이유가 포함된 구조화 요청을 반환한다.
 - Context 예산 적용 뒤에도 정책과 모든 필수 need의 실제 선택 본문을 확인한다. 누락되면 불완전한 manifest나 실행 명세를 성공으로 등록하지 않는다. Python symbol은 AST 행 범위로 선택하고, 전체 파일 digest로 freshness를 검사하며 범위·본문을 Prompt binding에 결속한다. token 추정치는 실제 선택 문자열에서 계산하고 provider 실측 사용량과 구분한다.
 - Worker Prompt는 Task 계약·운영 상세·선택 Context를 담은 불변 artifact로 명세 등록 전에 게시한다. 본문에서 자기참조 binding과 파생 spec digest를 제외하고, 초기 실행·재개 직전에 저장 본문과 binding·segment digest를 검증한다. 누락·변조를 임의 Prompt로 대체하지 않으며 재개 안내문까지 포함한 최종 전송 문자열을 turn intent에 결속한다. semantic Validator 입력은 실행 후 evidence로 독립 구성한다.
+- Worker usage는 최종 전송 Prompt·실행 명세·Attempt·provider turn·원시 관측에 결속하고 Core가 기존 원장에 멱등 기록한다. 연결 종료 전 usage 기록과 Task 완료 판정을 분리한다. provider 원시 scope를 보존하며, 빈 새 thread의 첫 turn임이 확인된 경우 외에는 누적값을 단일 turn에 귀속하지 않는다. 미제공은 null과 이유로 남기고 과거 실행을 소급 보정하지 않는다.
 - 기본 Engine·평가 디렉터리와 설정된 artifact root는 일반 Project Map 탐색에서 제외한다. 명시적으로 등록한 참고자료·지침은 정상 입력으로 유지한다.
 - 필수 외부 사실과 설계 선택을 구분한다. 계획에서 제안할 전략·새 산출물 배치와 늦게 확정할 명령을 외부에서 제공받아야 하는 사실로 취급하지 않는다.
 - Task의 context, target, expected/prohibited effects와 execution requirements는 분배·검토·감사 계약이다. 모든 로컬 파일과 socket을 막는 OS 보안 경계로 과장하지 않는다.

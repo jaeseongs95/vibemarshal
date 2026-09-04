@@ -158,24 +158,61 @@ class CodexAppServerRuntime:
         )
         self._turn_futures: dict[str, tuple[Any, Future[Any]]] = {}
         self._ephemeral_thread_ids: set[str] = set()
+        self._first_empty_threads: set[str] = set()
+        self._turn_usage_context: dict[str, dict[str, Any]] = {}
+        self._completion_observers: dict[str, tuple[str, Callable[[RuntimeObservation], None]]] = {}
 
     def close(self) -> None:
-        for handle, future in tuple(self._turn_futures.values()):
-            if future.done():
-                continue
-            try:
-                handle.interrupt()
-            except Exception:
-                pass
-        self._codex.close()
+        try:
+            for thread_id, (handle, future) in tuple(self._turn_futures.items()):
+                if future.done():
+                    self._flush_completion_observer(thread_id)
+                    continue
+                try:
+                    handle.interrupt()
+                except Exception:
+                    pass
+                if thread_id in getattr(self, "_completion_observers", {}):
+                    # 종료와 완료 이벤트의 경합에서도 도착한 usage를 버리지 않는다.
+                    # 응답이 없는 연결을 무기한 기다리는 복구 보장은 하지 않는다.
+                    try:
+                        future.result(timeout=5.0)
+                    except BaseException:
+                        pass
+                    self._flush_completion_observer(thread_id)
+        finally:
+            self._codex.close()
+
+    def register_completion_observer(
+        self, *, thread_id: str, turn_id: str, observer: Callable[[RuntimeObservation], None],
+    ) -> None:
+        """start receipt가 원장에 기록된 뒤 완료 usage의 영속 관측자를 연결한다."""
+        handle, _future = self._turn_futures[thread_id]
+        if handle.id != turn_id:
+            raise RuntimePolicyError("WORKER_USAGE_BINDING_MISMATCH: 완료 handle이 다릅니다.")
+        if not hasattr(self, "_completion_observers"):
+            self._completion_observers = {}
+        self._completion_observers[thread_id] = (turn_id, observer)
+        self._flush_completion_observer(thread_id)
+
+    def _flush_completion_observer(self, thread_id: str) -> None:
+        entry = getattr(self, "_completion_observers", {}).get(thread_id)
+        tracked = self._turn_futures.get(thread_id)
+        if entry is None or tracked is None or not tracked[1].done():
+            return
+        observation = self.read(thread_id=thread_id)
+        if observation.turn_id != entry[0] or observation.active:
+            raise RuntimePolicyError("WORKER_USAGE_BINDING_MISMATCH: 완료 관측 turn이 다릅니다.")
+        entry[1](observation)
+        del self._completion_observers[thread_id]
 
     def wait_for_active_turns(self, *, timeout_seconds: float) -> bool:
         """CLI가 소유한 연결을 dispatch 직후 닫아 실행을 끊지 않도록 유지한다.
 
-        Core 상태는 전이하지 않는다. 성공·실패의 원장 반영은 다음 observe가 한다.
+        usage 근거만 영속화한다. Task/Attempt 완료 판정은 다음 observe가 한다.
         """
         deadline = time.monotonic() + timeout_seconds
-        for _handle, future in tuple(self._turn_futures.values()):
+        for thread_id, (_handle, future) in tuple(self._turn_futures.items()):
             remaining = max(0.0, deadline - time.monotonic())
             try:
                 future.result(timeout=remaining)
@@ -186,6 +223,7 @@ class CodexAppServerRuntime:
                 # provider 오류도 종료 관측값이며 이 메서드에서 완료를 판정하지 않는다.
                 if not future.done():
                     raise
+            self._flush_completion_observer(thread_id)
         return True
 
     def __enter__(self) -> "CodexAppServerRuntime":
@@ -311,6 +349,8 @@ class CodexAppServerRuntime:
         binding = ThreadBinding(thread_id=thread_id, bound_at=utc_now())
         if ephemeral:
             self._ephemeral_thread_ids.add(thread_id)
+        if thread.get("turns") == []:
+            self._first_empty_threads.add(thread_id)
         return RuntimeOperationReceipt(
             operation_id=thread_id,
             payload=response,
@@ -344,7 +384,14 @@ class CodexAppServerRuntime:
         }
         if output_schema is not None:
             turn_arguments["output_schema"] = output_schema
+        # SDK에 넘기는 바로 이 문자열의 digest를 provider start receipt와 함께 보존한다.
+        prompt_digest = sha256_digest(prompt)
+        first_empty_thread = thread_id in getattr(self, "_first_empty_threads", set())
         handle = thread.turn(prompt, **turn_arguments)
+        getattr(self, "_first_empty_threads", set()).discard(thread_id)
+        if not hasattr(self, "_turn_usage_context"):
+            self._turn_usage_context = {}
+        self._turn_usage_context[thread_id] = {"prompt_digest": prompt_digest}
         future: Future[Any] = Future()
 
         def consume_turn() -> None:
@@ -369,6 +416,8 @@ class CodexAppServerRuntime:
                 "effort": effort,
                 "permission_profile": REQUIRED_PERMISSION_PROFILE,
                 "approval_policy": REQUIRED_APPROVAL_POLICY,
+                "prompt_digest": prompt_digest,
+                "first_empty_thread": first_empty_thread,
             },
             binding=binding,
         )
@@ -398,6 +447,8 @@ class CodexAppServerRuntime:
                         "turn_id": handle.id,
                         "error": f"{type(error).__name__}: {error}",
                         "usage": None,
+                        "usage_source": "sdk.turn_result.error",
+                        **getattr(self, "_turn_usage_context", {}).get(thread_id, {}),
                     },
                 )
             usage = turn_result.usage
@@ -419,6 +470,9 @@ class CodexAppServerRuntime:
                     "duration_ms": turn_result.duration_ms,
                     "item_count": len(turn_result.items),
                     "usage": usage_document,
+                    "usage_scope": "thread",
+                    "usage_source": "thread/tokenUsage/updated",
+                    **getattr(self, "_turn_usage_context", {}).get(thread_id, {}),
                 },
             )
         if thread_id in self._ephemeral_thread_ids:
@@ -451,6 +505,7 @@ class CodexAppServerRuntime:
                 "turn_count": len(turns),
                 "turn_status": status,
                 "usage": latest_document.get("usage"),
+                "usage_source": "thread/read",
             },
         )
 
@@ -532,7 +587,7 @@ class FakeCodexRuntime:
         binding = ThreadBinding(thread_id=thread_id, bound_at=utc_now())
         return RuntimeOperationReceipt(
             operation_id=thread_id,
-            payload={"thread_id": thread_id},
+            payload={"thread_id": thread_id, "thread": {"id": thread_id, "turns": []}},
             binding=binding,
         )
 
@@ -546,10 +601,11 @@ class FakeCodexRuntime:
         effort: str,
         output_schema: dict[str, Any] | None = None,
     ) -> RuntimeOperationReceipt:
-        del prompt, model, effort, output_schema
+        del model, effort, output_schema
         self.verify_execution_policy(cwd)
         self.turn_calls += 1
         thread = self.threads[thread_id]
+        first_empty_thread = thread.turn_id is None
         turn_id = new_id("runtime_turn")
         thread.turn_id = turn_id
         thread.terminal_status = None
@@ -557,7 +613,9 @@ class FakeCodexRuntime:
         binding = ThreadBinding(thread_id=thread_id, turn_id=turn_id, bound_at=utc_now())
         return RuntimeOperationReceipt(
             operation_id=turn_id,
-            payload={"thread_id": thread_id, "turn_id": turn_id},
+            payload={"thread_id": thread_id, "turn_id": turn_id, "prompt_digest": sha256_digest(prompt),
+                     "first_empty_thread": first_empty_thread, "permission_profile": REQUIRED_PERMISSION_PROFILE,
+                     "approval_policy": REQUIRED_APPROVAL_POLICY},
             binding=binding,
         )
 
@@ -1164,6 +1222,14 @@ class EngineDispatcher:
             "effort": role.effort,
             "validation_id": validation_id,
         }
+        if row["kind"] == AttemptKind.EXECUTION.value:
+            request.update({
+                "worker_usage_contract": 1,
+                "execution_spec_digest": spec.definition_digest,
+                "prompt_binding_digest": spec.definition.context_manifest.prompt_binding.binding_digest,
+                # Context selector와 같은 UTF-8 byte/4 추정이며 실제 usage와 분리한다.
+                "prompt_token_estimate": max(1, (len(prompt.encode("utf-8")) + 3) // 4),
+            })
         self._hit("before_turn_intent")
         turn_intent = self.service.prepare_runtime_intent(
             attempt_id=row["id"],
@@ -1187,7 +1253,22 @@ class EngineDispatcher:
             response=turn_receipt.payload,
             binding=turn_receipt.binding,
         )
+        register = getattr(self.runtime, "register_completion_observer", None)
+        if row["kind"] == AttemptKind.EXECUTION.value and register is not None and turn_receipt.binding is not None:
+            register(
+                thread_id=thread_id, turn_id=turn_receipt.binding.turn_id,
+                observer=lambda observation: self._record_worker_usage(row["id"], observation),
+            )
         self._hit("after_turn_receipt")
+
+    def _record_worker_usage(self, attempt_id: str, observation: RuntimeObservation) -> Any:
+        if observation.active or observation.turn_id is None or observation.terminal_status is None:
+            return None
+        return self.service.record_worker_usage(
+            attempt_id=attempt_id, thread_id=observation.thread_id, turn_id=observation.turn_id,
+            terminal_status=observation.terminal_status, provider_payload=observation.payload,
+            output_digest=None if observation.final_response is None else sha256_digest(observation.final_response),
+        )
 
     def _resume_bound_attempt(self, row: Any, spec: TaskExecutionSpecRevision) -> None:
         binding = ThreadBinding.model_validate_json(row["binding_json"])
@@ -1271,6 +1352,8 @@ class EngineDispatcher:
                 detail="기존 Attempt가 아직 실행 중입니다.",
             )
         terminal = observation.terminal_status
+        if row["kind"] == AttemptKind.EXECUTION.value:
+            self._record_worker_usage(attempt_id, observation)
         if terminal in self._SUCCESS:
             if row["kind"] == AttemptKind.VALIDATION.value:
                 evidence_ids, result_id = self._record_semantic_observation(
@@ -1835,8 +1918,13 @@ class EngineDispatcher:
             raise EngineServiceError("Attempt runtime binding이 없습니다.")
         binding = ThreadBinding.model_validate_json(row["binding_json"])
         observation = self.runtime.read(thread_id=binding.thread_id)
+        usage = self._record_worker_usage(attempt_id, observation)
         if row["status"] in {"reserved", "starting", "running"}:
             self._observe_as_outcome(attempt_id)
+        if usage is not None:
+            observation = observation.model_copy(update={"payload": observation.payload | {
+                "worker_usage_id": usage.usage_id, "usage_available": usage.usage_available,
+            }})
         return observation
 
     def resume_attempt(self, attempt_id: str) -> RuntimeOperationReceipt:

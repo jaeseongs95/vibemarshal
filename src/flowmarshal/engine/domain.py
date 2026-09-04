@@ -1755,9 +1755,16 @@ class RuntimeReceipt(EngineModel):
     provider_operation_id: str = Field(min_length=1, max_length=500)
     response_digest: str = Field(pattern=_DIGEST_PATTERN)
     binding: ThreadBinding | None = None
+    response_payload: dict[str, Any] | None = None
     received_at: datetime
 
     _received_at_is_aware = field_validator("received_at")(_aware)
+
+    @model_validator(mode="after")
+    def response_matches_digest(self) -> "RuntimeReceipt":
+        if self.response_payload is not None and sha256_digest(self.response_payload) != self.response_digest:
+            raise ValueError("runtime receipt 본문과 digest가 다릅니다.")
+        return self
 
 
 class EvidenceRecord(EngineModel):
@@ -1956,12 +1963,23 @@ class BudgetUsageRecord(EngineModel):
     output_digest: str | None = Field(default=None, pattern=_DIGEST_PATTERN)
     output_schema_digest: str = Field(pattern=_DIGEST_PATTERN)
     runner_receipt_digest: str = Field(pattern=_DIGEST_PATTERN)
-    input_tokens: int = Field(ge=0)
-    cached_input_tokens: int = Field(ge=0)
-    output_tokens: int = Field(ge=0)
-    reasoning_tokens: int = Field(ge=0)
-    latency_ms: int = Field(ge=0)
+    input_tokens: int | None = Field(default=None, ge=0)
+    cached_input_tokens: int | None = Field(default=None, ge=0)
+    output_tokens: int | None = Field(default=None, ge=0)
+    reasoning_tokens: int | None = Field(default=None, ge=0)
+    latency_ms: int | None = Field(default=None, ge=0)
     usage_available: bool = True
+    attempt_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
+    runtime_intent_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
+    runtime_receipt_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
+    execution_spec_digest: str | None = Field(default=None, pattern=_DIGEST_PATTERN)
+    prompt_binding_digest: str | None = Field(default=None, pattern=_DIGEST_PATTERN)
+    prompt_token_estimate: int | None = Field(default=None, ge=0)
+    usage_scope: Literal["unspecified", "turn", "thread", "unavailable"] = "unspecified"
+    usage_source: str | None = Field(default=None, min_length=1, max_length=300)
+    attribution_basis: Literal["provider_turn", "first_empty_thread", "unavailable"] | None = None
+    unavailable_reason: str | None = Field(default=None, min_length=1, max_length=500)
+    provider_observation: dict[str, Any] | None = None
     retry_count: int = Field(default=0, ge=0)
     discarded_output: bool = False
     recorded_at: datetime
@@ -1971,23 +1989,52 @@ class BudgetUsageRecord(EngineModel):
     @model_validator(mode="after")
     def token_counts_are_consistent(self) -> "BudgetUsageRecord":
         _unique(self.turn_ids, "budget usage turn")
-        if self.cached_input_tokens > self.input_tokens:
+        counts = (self.input_tokens, self.cached_input_tokens, self.output_tokens, self.reasoning_tokens)
+        if self.usage_available and any(value is None for value in counts):
+            raise ValueError("실측 usage에는 모든 token 필드가 필요합니다.")
+        if self.cached_input_tokens is not None and self.input_tokens is not None and self.cached_input_tokens > self.input_tokens:
             raise ValueError("cached input token은 input token보다 클 수 없습니다.")
-        if self.reasoning_tokens > self.output_tokens:
+        if self.reasoning_tokens is not None and self.output_tokens is not None and self.reasoning_tokens > self.output_tokens:
             raise ValueError("reasoning token은 output token보다 클 수 없습니다.")
-        if not self.usage_available and any(
-            (self.input_tokens, self.cached_input_tokens, self.output_tokens, self.reasoning_tokens)
-        ):
+        if not self.usage_available and any(value not in (None, 0) for value in counts):
             raise ValueError("usage unavailable 레코드에는 token 수를 추정해 넣지 않습니다.")
+        if self.attempt_id is not None:
+            if self.stage is not BudgetStage.EXECUTION or len(self.turn_ids) != 1 or not self.thread_id:
+                raise ValueError("Worker usage는 실행 Attempt와 provider turn 하나에 결속합니다.")
+            if any(value is None for value in (
+                self.runtime_intent_id, self.runtime_receipt_id, self.execution_spec_digest,
+                self.prompt_binding_digest, self.prompt_token_estimate, self.usage_source,
+                self.attribution_basis, self.provider_observation,
+            )):
+                raise ValueError("Worker usage의 Prompt/receipt 근거가 누락됐습니다.")
+            if not self.usage_available and (any(value is not None for value in counts) or not self.unavailable_reason):
+                raise ValueError("새 Worker unavailable은 null token과 명시적 이유로 보존합니다.")
+            if self.usage_available and (self.attribution_basis == "unavailable" or self.unavailable_reason is not None):
+                raise ValueError("실측 usage와 unavailable 근거를 혼합할 수 없습니다.")
+            if self.usage_available and (self.usage_scope, self.attribution_basis) not in {
+                ("turn", "provider_turn"), ("thread", "first_empty_thread"),
+            }:
+                raise ValueError("실측 usage의 원시 scope와 귀속 근거가 다릅니다.")
+            if sha256_digest(self.provider_observation) != self.runner_receipt_digest:
+                raise ValueError("Worker usage 원시 관측과 digest가 다릅니다.")
+            if (self.provider_observation.get("thread_id") != self.thread_id or
+                    self.provider_observation.get("turn_id") != self.turn_ids[0]):
+                raise ValueError("Worker usage 원시 관측의 provider turn이 다릅니다.")
         return self
 
     @property
-    def uncached_input_tokens(self) -> int:
+    def uncached_input_tokens(self) -> int | None:
+        if not self.usage_available:
+            return None
+        assert self.input_tokens is not None and self.cached_input_tokens is not None
         return self.input_tokens - self.cached_input_tokens
 
     @property
-    def optimization_tokens(self) -> int:
-        return self.uncached_input_tokens + self.output_tokens
+    def optimization_tokens(self) -> int | None:
+        uncached = self.uncached_input_tokens
+        if uncached is None or self.output_tokens is None:
+            return None
+        return uncached + self.output_tokens
 
 
 class RecoveryAssessment(EngineModel):
