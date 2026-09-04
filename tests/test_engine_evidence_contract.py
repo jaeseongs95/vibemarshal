@@ -49,7 +49,7 @@ class EvidenceContractTests(unittest.TestCase):
                 schema = strict_json_output_schema(model.model_json_schema())
                 self.assertEqual(expected, schema['properties']['required_evidence_kinds']['items']['enum'])
         schema = strict_json_output_schema(PlanExpansionDraft.model_json_schema())
-        for name in ('ValidationContract', 'IntegrationValidationContract'):
+        for name in ('PlanTaskValidationDraft', 'PlanIntegrationValidationDraft'):
             self.assertEqual(expected, schema['$defs'][name]['properties']['required_evidence_kinds']['items']['enum'])
 
     def test_manual_execution_step_cannot_introduce_an_unknown_kind(self):

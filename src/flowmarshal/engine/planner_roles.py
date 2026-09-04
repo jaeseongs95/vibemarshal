@@ -27,6 +27,7 @@ from .domain import (
     ProjectMapRevision,
     RecoveryEnvelope,
     ReviewFinding,
+    ReviewRatings,
     ReviewerSubmission,
     RevisionStatus,
     RiskLevel,
@@ -45,6 +46,7 @@ from .planning import (
     compact_project_map,
     skeleton_input_catalog,
     plan_review_evidence_catalog,
+    plan_validation_scope_rows,
     skeleton_review_evidence_catalog,
 )
 from .roles import RoleCallReceipt, RoleCallRequest, StructuredRolePort
@@ -128,30 +130,48 @@ PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS = (
 
 
 PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS = (
-    "상세 Plan의 Task validation과 integration validation마다 검사 목적과 그 목적을 실제로 "
-    "수행하는 수단의 범위를 대조한다. Goal이나 후보가 등록 검사 도구·자료의 특정 phase·mode·"
-    "절차를 참조하면 Project Map의 등록 경로에서 관련 본문을 읽고, 필요하면 그 본문이 가리킨 "
-    "검사 구현의 분기·입력·출력을 확인한다. 경로·도구 이름·test evidence 종류만으로 검사 능력을 "
-    "추정하지 않는다. Goal이 요구하는 동작 범위와 특정 검사 수단이 관측하는 범위는 다르다. "
-    "같은 도구라도 선택한 phase에 없는 검사 능력을 부여하거나 다른 phase의 검사를 합쳐 "
-    "설명하지 않는다. 선언·시그니처 검사나 기존 테스트의 통과를 실제로 실행하지 않는 입력·"
-    "호출 방식의 검사로 확대하지 않는다. "
-    "계약의 검사 도구·phase 참조는 의미를 식별하기 위해 보존할 수 있으며, 실제 argv·실행 경로 "
-    "등 운영 상세는 ready-time 명세에서 확정한다. 이미 명시한 phase와 검사 범위가 충돌하면 "
-    "현재 Plan의 의미 결함이다. 나중에 명령을 바꾸면 된다는 이유로 허용하지 않는다. "
-    "상세화는 Goal의 Task별 필수 검증을 유지하면서 참조 도구가 지원하는 범위만 명시한다. "
-    "그 도구로 부족한 필수 검사는 별도의 실제 검사 책임으로 계약하고, 단순한 도구 설명 수정으로 "
-    "Task의 검증 의무를 약화하거나 독립 Goal Test로 넘기지 않는다. Goal이 Task에 요구하지 않은 "
-    "검사를 Goal 전체의 동작 요구만으로 모든 Task에 추가하지도 않는다. "
-    "Reviewer는 후보 검사 문장·Goal·등록 자료를 직접 대조하고 범위 충돌을 최소 finding으로 "
-    "제출한다. 정상 Task 검사와 별도 independent Goal Test가 각각 자기 범위를 보존하면 허용한다. "
-    "자료가 불완전해 능력을 확인하지 못한 경우와 자료로 확인된 모순을 구분하고, 없는 검사 "
-    "능력이나 근거 없는 누락을 만들어 판단하지 않는다."
+    "검사 수단과 검사 주장은 다음 순서로 대조한다. "
+    "1. 모든 Task.validations와 integration_validations의 statement를 읽고, 각 검사 목적에 "
+    "대응하는 수단(도구·phase·mode 또는 별도 실제 검사)을 구분한다. 참조한 등록 자료의 관련 "
+    "본문과 필요한 구현 분기·입력·출력을 Project Map의 경로에서 확인한다. 경로·도구 이름·"
+    "evidence enum·Goal의 기대 동작만으로 그 수단의 검사 능력을 추정하지 않는다. "
+    "2. 선택한 수단이 실제 관측하는 범위와 문장이 그 수단에 부여한 범위를 대조한다. 같은 "
+    "도구라도 다른 phase의 검사를 합치지 않는다. 선언·시그니처 검사나 기존 unittest 통과는 "
+    "해당 절차가 실행하지 않는 입력·호출 방식까지 검사했다는 근거가 아니다. 독립 실행 여부와 "
+    "검사 범위도 별개다. 지원하지 않는 검사를 같은 phase로 새로 실행해도 범위 모순은 남는다. "
+    "3. 수단에 없는 검사가 필요하면 별도로 무엇을 실행하고 어떤 기대 결과와 비교할지 "
+    "statement에 명시한다. 같은 validation ID·문장 안에 이 별도 검사 책임을 둘 수 있으며 "
+    "새 ID나 구체 argv가 필수는 아니다. 예를 들어 '도구 실행에 더해 별도로 입력을 호출하고 "
+    "기대값과 비교한다'는 추가 책임이다. '도구 실행으로 입력 동작까지 확인한다'처럼 목적만 "
+    "덧붙이면 그 도구의 능력 주장이다. 등록 수단의 범위만 정확히 쓰는 경우도 허용하되 Goal이 "
+    "해당 Task에 요구한 필수 검사를 약화하거나 Goal Test에만 넘기지 않는다. Goal이 요구하지 "
+    "않은 포괄 검사를 모든 Task에 추가하지 않는다. "
+    "4. Reviewer는 각 문장과 실제 수단의 직접 모순을 verification finding으로 제출한다. "
+    "summary에 validation ID·명시한 수단·실제로 지원하지 않는 주장과 근거를 간결히 적고 "
+    "제공된 Plan·등록 자료의 evidence ref에 결속한다. 낮은 rating은 확인된 계약 모순의 finding을 "
+    "대신하지 않는다. 다른 연결 결함을 발견해도 남은 검사 문장의 대조를 끝내며, 별도 직접 "
+    "증거가 있는 범위 모순을 빠뜨리지 않는다. 최소 finding은 같은 원인의 중복·추측을 줄이라는 "
+    "뜻이며 독립적으로 확인한 결함을 숨기라는 뜻이 아니다. "
+    "검사 수단·phase는 계약 의미로 식별할 수 있고 구체 argv는 ready-time에 확정한다. 이미 "
+    "명시한 수단과 검사 목적의 충돌을 이후 명령 변경으로 해결할 운영 상세로 분류하지 않는다. "
+    "정상 Task 검사와 independent Goal Test의 범위 차이, 명시된 별도 실제 검사 책임은 허용한다. "
+    "불완전한 자료와 확인된 모순은 구분하며, 없는 검사 능력이나 근거 없는 누락을 만들지 않는다."
 )
 
 
 class PlannerRoleAdapterError(RuntimeError):
     pass
+
+
+class PlanReviewDraft(ReviewDraft):
+    findings: tuple[FindingDraft, ...] = Field(
+        default=(),
+        description="직접 확인한 Plan 계약 결함. 검사 statement가 명시한 수단·phase의 실제 범위와 모순되면 validation ID와 양쪽 근거를 finding에 보존한다. 다른 결함의 finding이나 낮은 rating으로 그 모순을 대신하지 않는다. 같은 원인의 중복·추측은 제외한다.",
+    )
+    ratings: ReviewRatings | None = Field(
+        default=None,
+        description="직접 근거가 있는 finding이 전혀 없을 때만 후보 품질을 평가한다. 확인된 계약 모순이 있으면 findings를 제출하고 ratings는 null이다. 낮은 점수는 후보 차단이나 finding을 대신하지 않는다.",
+    )
 
 
 class SkeletonTaskDraft(EngineModel):
@@ -190,6 +210,22 @@ class SkeletonBatchDraft(EngineModel):
     candidates: tuple[SkeletonCandidateDraft, ...] = Field(min_length=1, max_length=3)
 
 
+class PlanTaskValidationDraft(ValidationContract):
+    statement: str = Field(
+        min_length=1,
+        max_length=3000,
+        description="이 Task 완료 전에 실제 수행할 검사 수단과 그 수단이 관측하는 범위. 선언·annotation·시그니처를 확인하는 절차에는 실행하지 않는 입력·호출 검사를 부여하지 않는다. 별도 실제 검사가 필요하면 같은 문장에 추가 실행과 기대값 비교 책임을 명시한다. Goal이 요구한 해당 Task의 검사 의무를 유지하며 구체 argv는 나중에 확정한다.",
+    )
+
+
+class PlanIntegrationValidationDraft(IntegrationValidationContract):
+    statement: str = Field(
+        min_length=1,
+        max_length=5000,
+        description="Task 검사 이후 수행할 Goal 검사 수단과 실제 검사 범위. independent는 새 실행·evidence의 구분이며 도구의 선택 phase가 수행하지 않는 검사 능력을 보충하지 않는다. 필요한 입력·호출·기대값 비교를 지원하는 수단 또는 별도 실제 검사 책임을 명시한다. 구체 argv는 나중에 확정한다.",
+    )
+
+
 class DetailedTaskDraft(EngineModel):
     task_ref: str
     kind: TaskKind
@@ -202,7 +238,7 @@ class DetailedTaskDraft(EngineModel):
     prohibited_effects: tuple[EffectContract, ...] = Field(default=(), description="Task가 발생시키면 안 되는 효과. 로컬 파일 mutation과 외부 시스템 효과를 별도 항목으로 작성하고 각 external 값을 해당 범위에 맞춘다.")
     required_capabilities: tuple[str, ...] = ()
     acceptance_criteria: tuple[str, ...] = Field(min_length=1)
-    validations: tuple[ValidationContract, ...] = Field(min_length=1, description="이 Task 완료 전에 필요한 실제 검사 계약. statement에 Goal이 이 Task에 요구한 검사 대상·종류·실행 목적을 보존하고 method·필수 evidence 종류를 함께 명시한다. 등록 도구·phase를 참조하면 제공된 자료의 실제 검사 범위와 일치해야 한다. 부족한 필수 검사는 별도 검사 책임으로 명시하며 다른 phase의 능력을 부여하지 않는다. 기존 unittest 실행 요구를 일반 동작 확인이나 test enum만으로 대체하지 않는다. 후속 Task 검사, 모델 배정, AC 문장이나 integration validation으로 자체 필수 검증을 대체하지 않는다.")
+    validations: tuple[PlanTaskValidationDraft, ...] = Field(min_length=1, description="이 Task 완료 전에 필요한 실제 검사 계약. statement에 Goal이 이 Task에 요구한 검사 대상·종류·실행 목적을 보존하고 method·필수 evidence 종류를 함께 명시한다. 등록 도구·phase를 참조하면 제공된 자료의 실제 검사 범위와 일치해야 한다. 부족한 필수 검사는 별도 검사 책임으로 명시하며 다른 phase의 능력을 부여하지 않는다. 기존 unittest 실행 요구를 일반 동작 확인이나 test enum만으로 대체하지 않는다. 후속 Task 검사, 모델 배정, AC 문장이나 integration validation으로 자체 필수 검증을 대체하지 않는다.")
     risk_level: RiskLevel
     risk_tags: tuple[str, ...] = ()
     approval_class: ApprovalClass = ApprovalClass.PLAN_ACTIVATION
@@ -226,7 +262,7 @@ class PlanExpansionDraft(EngineModel):
     tasks: tuple[DetailedTaskDraft, ...] = Field(min_length=1)
     dependencies: tuple[PlanDependencyDraft, ...] = ()
     goal_coverage: tuple[PlanGoalCoverageDraft, ...] = Field(min_length=1)
-    integration_validations: tuple[IntegrationValidationContract, ...] = Field(min_length=1, description="Task 검사와 분리한 plan-level Goal 검사 계약. 참조한 등록 도구·phase가 statement의 검사 범위를 실제 지원하는지 대조한다. 다른 phase의 검사 능력이나 Task evidence로 independent 검사를 대체하지 않는다.")
+    integration_validations: tuple[PlanIntegrationValidationDraft, ...] = Field(min_length=1, description="Task 검사와 분리한 plan-level Goal 검사 계약. 참조한 등록 도구·phase가 statement의 검사 범위를 실제 지원하는지 대조한다. 다른 phase의 검사 능력이나 Task evidence로 independent 검사를 대체하지 않는다.")
     expected_effects: tuple[str, ...] = Field(default=(), description="Plan이 실제 발생시키는 효과. 효과가 없다는 부정형 조건은 포함하지 않는다.")
     prohibited_effects: tuple[str, ...] = Field(default=(), description="Goal이 금지한 효과와 범위를 보존하며 현재 계획 역할의 행동 제한을 새로 추가하지 않는다.")
 
@@ -564,6 +600,9 @@ class PlanExpanderAdapter:
                 "종류나 후속 Task의 unittest 실행으로 대체하지 않는다. 명시된 검사 대상과 종류를 "
                 "보존하되 실제 실행 명령은 ready-time 명세로 남긴다. "
                 "각 AC의 적용 범위와 Task별 검사 ID를 대조해 goal_coverage.validation_ids에도 연결한다. "
+                "검사 statement를 작성한 뒤 각 AC가 명시한 검사 절차에 해당하는 ID를 다시 확인한다. "
+                "예를 들어 한 AC가 Task phase와 Goal phase를 구분해 요구하면 두 phase의 검사 ID를 "
+                "연결한다. 단순한 선후조건만으로 모든 검사 ID를 모든 AC에 연결하지 않는다. "
                 "기여 Task 집합인 task_refs를 검사 ID의 소유 Task 제한으로 해석하지 않는다. "
                 "Skeleton의 detail_requirements도 같은 적용 범위로 해석하며, 모든 Task 완료 후 "
                 "Goal Test 책임만 별도 integration validation에 반영한다. "
@@ -771,16 +810,24 @@ class PlanReviewerAdapter:
                 "파일·명령의 운영 상세는 ExecutionSpec에 확정한다. read_only는 산출물 mutation 정책이며 "
                 "읽기 검사와 계획 생성 자체를 금지하지 않는다. 외부 효과는 외부 시스템·계정·제3자에 대한 효과다."
                 "affected_task_refs는 Task.task_ref를 참조하며 Core의 task_id와 혼동하지 않는다."
+                "validation_scope_rows는 원본 Plan의 모든 Task·integration 검사를 펼친 비권위 색인이다. "
+                "각 행의 statement를 등록 자료의 실제 수단·phase와 대조하고 마지막 integration 행까지 "
+                "확인한다. linked_criterion_ids는 현재 연결 사실이며 필수 연결의 판정이 아니다. "
+                "색인 자체를 새 evidence ref나 별도 권위로 사용하지 않고 finding은 원본 evidence_catalog에 결속한다."
             ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS,
-            payload={"case_ref": _case_ref(digest), "evidence_catalog": evidence_catalog},
-            output_schema=ReviewDraft.model_json_schema(),
+            payload={
+                "case_ref": _case_ref(digest),
+                "evidence_catalog": evidence_catalog,
+                "validation_scope_rows": plan_validation_scope_rows(plan),
+            },
+            output_schema=PlanReviewDraft.model_json_schema(),
             model=selected_model,
             effort=selected_effort,
             inventory_digest=self.inventory_digest,
             cwd=str(Path(self.cwd).resolve()),
         )
         def validate_review(value: dict[str, Any]) -> ReviewDraft:
-            draft = ReviewDraft.model_validate(value)
+            draft = PlanReviewDraft.model_validate(value)
             submission = _review_submission(
                 role=risk_route,
                 artifact_digest=digest,
@@ -800,5 +847,5 @@ class PlanReviewerAdapter:
             role=risk_route,
             artifact_digest=digest,
             evidence_catalog=evidence_catalog,
-            draft=ReviewDraft.model_validate(result.payload),
+            draft=PlanReviewDraft.model_validate(result.payload),
         )

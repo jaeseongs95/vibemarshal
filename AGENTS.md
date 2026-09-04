@@ -105,6 +105,8 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 - Skeleton·Plan 작성 draft의 `task_refs`는 Compiler가 권위 Plan의 `task_ids`로 변환한다. Reviewer는 실제 Task ID 결속과 대응하는 기여 집합을 확인하며, finding의 `affected_task_refs`에는 `Task.task_ref`를 사용한다. 정상적인 내부 ID 표현을 후보 결함으로 판정하지 않는다.
 - 검증 계약의 statement에는 Goal이 명시한 검사 대상·종류·실행 목적을 보존한다. evidence 종류가 같아도 특정 unittest 실행을 일반 동작 검사로 바꿀 수 없다. 실제 명령은 ready-time 명세에 둔다.
 - 상세 Plan이 등록 검사 도구·phase를 참조하면 상세화와 Reviewer는 관련 자료·구현의 실제 검사 범위를 대조한다. 다른 phase의 능력을 부여하지 않으며, 부족한 필수 검사는 별도 실제 검사 책임으로 보존한다. 정상 Task 검사와 독립 Goal Test의 범위 차이는 허용한다. 명시한 도구·phase와 검사 의미의 충돌은 새 Plan Contract로 수정하고 운영 명령 변경으로 숨기지 않는다.
+- 같은 validation ID·문장에 별도 실행과 기대 결과 비교를 명시해 추가 검사 책임을 둘 수 있다. 도구의 결과에 검사 목적만 덧붙이는 것은 별도 책임이 아니다. Reviewer는 독립적으로 확인한 범위 모순을 다른 결함의 finding이나 낮은 rating으로 대신하지 않으며, 직접 근거 없는 상관 결함은 추가하지 않는다.
+- Plan 검토용 검사 색인은 모든 Task·integration validation의 원문·소유자·mode·AC 연결을 그대로 투영한 비권위 입력이다. 색인에 검사 능력이나 필수 연결 판정을 추정해 넣지 않으며 finding은 원본 evidence catalog에 결속한다. 단순한 검사 선후조건만으로 모든 검사 ID를 모든 AC에 연결하지 않는다.
 - 실제 모델 이름을 제품 코드에 하드코딩하지 않는다. 호출자가 역할 설정을 주입하고 실제 호출 직전 App Server `model/list`로 지원 여부를 확인한다.
 - 실행과 검사를 별도로 배정하고 선택 이유·inventory digest·허용 fallback envelope를 Plan Contract에 남긴다.
 - 지원되지 않는 model/effort를 조용히 fallback하지 않는다. 모델 변경 재시도는 새 Attempt 또는 새 Plan Contract에 기록한다.

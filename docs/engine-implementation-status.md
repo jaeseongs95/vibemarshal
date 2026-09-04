@@ -4,9 +4,11 @@
 
 ## 결론
 
-현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [R-S06-05](r-s06-05-handoff.md)에서 상세 Plan의 등록 검사 도구·phase 범위 대조와 draft `task_refs`·권위 Plan `task_ids` 구분을 보완했다. **최종 source의 495개 테스트·결정적 Gate 5/5·legacy freeze 40개와 실제 호출 결속 검증은 PASS지만, 제한된 실제 진단은 FAIL**이다. 1차의 ID 표기 오판·당시 source와 최종 재진단의 원본 결과를 모두 보존했다.
+현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [R-S06-06](r-s06-06-handoff.md)에서 정상 비교 입력의 검사 ID 연결, 모든 Task·integration 검사 원문을 펼친 비권위 Reviewer 색인과 provider 작성·검토 설명을 보완했다. **최종 source의 496개 테스트·결정적 Gate 5/5·legacy freeze 40개와 실제 호출 결속 검증은 PASS지만, 제한된 실제 진단은 FAIL**이다. 중간 schema 이름 참조 테스트 실패와 당시 source, 두 실제 진단의 원본을 모두 보존했다.
 
-최종 진단에서 정상으로 분류한 입력의 `ac_003` 검사 ID 추적 누락을 확인했고, 잘못된 Goal phase 후보에는 finding 없이 낮은 rating만 반환해 Core 재계산상 score 25의 `admissible`이 됐다. 새 상세 Plan에서도 task phase 능력 과장이 재발했으며 Reviewer는 별도 파일 범위 검사 ID 연결 오류만 찾아 후보를 차단했다. 입력 분류 오류·검출 실패·다른 결함에 의한 차단을 구분한다. 다음 작업은 **R-S06-06: 검사 ID 추적 입력 보완·phase 주장 대조·Reviewer의 finding 반환 보완**이다. 새 S06, Plan 활성화와 Worker 실행은 수행하지 않았다.
+최종 진단의 정상·Task phase 과장·Goal phase 오지정·별도 실제 검사 책임 사례 4개는 기대한 결과를 냈고 새 상세화도 phase 범위를 보존했다. 그러나 새 Plan의 `ac_003`에서 기존 unittest를 실행하는 `val_task_oracle` ID가 다시 빠졌고, 분리 Validator의 결과를 Worker 응답으로 제출하라는 역할·시점 충돌이 생겼다. Reviewer는 finding 없이 모든 rating을 4로 반환했으며 읽기 전용 Core 재계산상 score 100의 `admissible`이다. 실제 Plan 등록·선택·활성화는 없었다. 다음 작업은 **R-S06-07: 검사 ID 연결·Worker와 Validator의 결과 제출 경계 보완**이다. 새 S06과 Worker 실행은 수행하지 않았다.
+
+이전 [R-S06-05](r-s06-05-handoff.md)의 495개 테스트·결정적 Gate 통과와 실제 진단 FAIL은 당시 source의 역사적 결과로 보존한다. 정상 입력 분류 오류, 잘못된 Goal phase의 검출 누락과 다른 결함에 의한 후보 차단을 현재 qualification으로 재사용하지 않는다.
 
 이전 [S06-RETRY-03](s06-planning-goal-reference-handoff.md)의 단일 Task Plan 선택·Core `admissible` 기록과 독립 의미 대조의 **S06 FAIL**은 보존한다. 당시 task phase에 없는 양·음·0 및 위치·키워드 호출 능력을 기재한 결함이 있었다. 전체 Trace는 **INCOMPLETE**이며, 실제 진단 통과와 고정 원문부터의 새 Plan 의미 검증을 거친 뒤 S07로 진행한다.
 

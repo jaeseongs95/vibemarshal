@@ -93,6 +93,37 @@ def plan_review_evidence_catalog(
     }
 
 
+def plan_validation_scope_rows(plan: PlanContractRevision) -> list[dict[str, Any]]:
+    """검사 원문과 연결을 빠짐없이 펼친 비권위 검토 색인이다."""
+
+    linked: dict[str, list[str]] = {}
+    for coverage in plan.definition.goal_coverage:
+        for validation_id in coverage.validation_ids:
+            linked.setdefault(validation_id, []).append(coverage.criterion_id)
+    rows = []
+    owners = [
+        ("task", task.task_ref, validation)
+        for task in plan.definition.tasks
+        for validation in task.validations
+    ] + [
+        ("integration", None, validation)
+        for validation in plan.definition.integration_validations
+    ]
+    for scope, task_ref, validation in owners:
+        rows.append({
+            "scope": scope,
+            "task_ref": task_ref,
+            "validation_id": validation.validation_id,
+            "statement": validation.statement,
+            "method": validation.method,
+            "evidence_mode": validation.evidence_mode if scope == "integration" else None,
+            "required_evidence_kinds": validation.required_evidence_kinds,
+            "linked_criterion_ids": tuple(linked.get(validation.validation_id, ())),
+            "declared_criterion_ids": validation.criterion_refs if scope == "integration" else None,
+        })
+    return rows
+
+
 class SkeletonGenerator(Protocol):
     def generate(
         self,
