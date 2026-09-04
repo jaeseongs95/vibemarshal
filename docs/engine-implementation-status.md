@@ -4,11 +4,13 @@
 
 ## 결론
 
-현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [S06 실제 Planning](s06-planning-handoff.md)의 선택 Plan 생성 실패를 보존하고, [R-S06-01](r-s06-01-handoff.md)에서 생성·검토·보정·상세화의 독립 Goal Test 책임 경계를 보완했다. Task coverage를 직접 검사 실행 책임으로 오인하거나 선택 detail requirement의 반복 부재로 Skeleton을 차단하지 않도록 했다. 최종 source의 **484개 테스트·결정적 Gate 5/5와 제한된 실제 역할 진단 5/5는 PASS**다. 정상 Skeleton·Plan은 불필요한 Task 없이 검토를 통과하고 기존 자기의존 Plan은 계속 거부됐다. 진단은 과거 Goal·State를 입력으로 사용했으며 새 전체 Planning 실행·계획 선택·원장 등록·활성화가 아니다. 기존 S06의 선택 digest는 null, 활성화·Worker 실행은 0건이며 자연어부터 Goal 완료까지 전체 Trace는 **INCOMPLETE**다. 다음 세션은 **새 source 계약의 S06 재평가**이며 실제 선택 Plan을 확보하기 전에는 S07로 진입하지 않는다.
+현재 판정은 **NO-GO**다. package는 `flowmarshal-engine 0.2.0a1`, Engine DB revision은 2를 유지한다. [S06 재평가](s06-planning-retry-handoff.md)에서 현재 source로 고정 원문부터 새 Goal·독립 검토·Skeleton·Plan까지 실제 실행했다. 이전 Goal Test의 일반 Task 재귀 배치는 나타나지 않았지만, 수정 Task에 필수 unittest·독립 Validator 검증이 빠져 최종 Plan이 `VERIFICATION_TASK_VALIDATOR_GAP`으로 거부됐다. **선택 digest는 null이며 S06은 FAIL**이다. 같은 source의 **484개 테스트·결정적 Gate 5/5는 재실행 PASS**다. 실제 역할 6 logical calls·11 provider turns를 원장과 대조했고 활성화·Worker·Task/Goal validation은 0건이다. 자연어부터 Goal 완료까지 전체 Trace는 **INCOMPLETE**다. 다음 세션은 **R-S06-02 — Goal의 Task별 필수 검증 요구를 Planning 상세화에 보존하는 Repair**이며 실제 선택 Plan을 확보하기 전에는 S07로 진입하지 않는다.
+
+[첫 S06](s06-planning-handoff.md)의 실패와 [R-S06-01](r-s06-01-handoff.md)의 제한된 실제 역할 진단 5/5 PASS는 각각 보존한다. R-S06-01 진단은 과거 Goal·State를 입력으로 사용한 경계 검증이었으며 이번 새 전체 Planning의 성공을 미리 보장하는 증거가 아니다.
 
 그 이전 Goal 계약 해석 source의 **464개 테스트와 결정적 Gate, 실제 역할 회귀 48/48, 실제 E2E 4/4는 PASS**였고 같은 source의 Planning은 **18/18건 수집 완료·13건 통과·5건 실패**였다. 이 결과는 [Goal 계약 해석 재검증 기록](goal-contract-boundaries-requalification-20260904.md)에 보존하며 현재 source의 실제 역할·Planning·E2E 완료 증거로 재사용하지 않는다.
 
-남은 실패는 Profile 정책의 Goal 중복 요구, 독립 Goal Test의 diff evidence 누락, Skeleton 생성·보정·상세화의 유일성 및 의미 보존 위반이다. 정상 입력은 7/12 Plan 선택, 정보 부족 입력은 6/6 질문·차단이며 최종 schema failure는 3건이다. source와 정규화 역할 모델을 함께 변경했으므로 결과 차이를 어느 한 변경의 효과로 단정하지 않는다. 별도 성능 Gate는 미실행이며, 일부 순서의 성공으로 전체 Planning 안정성을 선언하지 않는다.
+이 과거 18-cell Planning 평가의 실패는 Profile 정책의 Goal 중복 요구, 독립 Goal Test의 diff evidence 누락, Skeleton 생성·보정·상세화의 유일성 및 의미 보존 위반이다. 정상 입력은 7/12 Plan 선택, 정보 부족 입력은 6/6 질문·차단이며 최종 schema failure는 3건이다. 당시 source와 정규화 역할 모델을 함께 변경했으므로 결과 차이를 어느 한 변경의 효과로 단정하지 않는다. 별도 성능 Gate는 미실행이며, 일부 순서의 성공으로 전체 Planning 안정성을 선언하지 않는다.
 
 이전 source의 결과는 [읽기 전용 보고 검증 기록](readonly-report-requalification-20260904.md), [최종 source 재평가 기록](final-source-requalification-20260904.md), [A4·A5 실행 기록](alpha-a4-a5-execution.md)에 보존한다. 아래 역사적 수치도 현재 source의 qualification으로 재사용하지 않는다.
 
