@@ -1,5 +1,7 @@
 # plan-inspection-v2 scope 양의 연결 계약 보정
 
+> 이 문서는 커밋 `12e496a`의 4차 계약과 그 결정적 검증을 기록한 역사 문서다. 후속 실제 실행에서 scope의 검사 능력과 AC 연결 의미가 다시 결합되는 문제가 확인되어 [v2r4 부분 실행 기준선](inspection-v2r4-partial-baseline.md)과 [v2r5 희소 양의 링크 계약](inspection-v2r5-sparse-link-contract.md)으로 이어졌다.
+
 ## 변경 결과
 
 v2r3에서 모델은 원자 scope의 검사 능력을 먼저 판단한 뒤 같은 의미를 28개 `ac_validation_rows`에 다시 옮겼다. clean 응답은 supported scope를 만들고도 AC-003의 Task·Goal oracle과 unittest 연결을 누락했고, `semantic-explicit`은 sibling Task 검사 세 개를 과잉 연결했다. 새 계약은 이 중복 제출을 제거한다.
@@ -36,4 +38,4 @@ v1 raw·schema·validator·evaluator·checkpoint는 변경하지 않았다. v1�
 
 동일 clean Reviewer 표본에서 strict schema는 8,725 bytes다. citation catalog는 86개·21,035자이고, instructions 12,976자·payload 53,386자·schema 7,931자를 단순 합산한 request 표본은 74,293자다. provider inspection 최상위 필드는 `validation_rows`, `validation_scope_rows`, `constraint_task_rows` 세 개이며 scope 필드는 `scope_id`, `validation_id`, `mechanism_id`, `claim`, `criterion_refs`, `direct_extra_refs`, `status`다.
 
-이 수치는 구조 검증이며 실제 모델 정확도 증거가 아니다. 커밋을 고정한 새 detached worktree에서 Gate·preflight·prepare를 다시 수행하고 static 11 전체 결과로 계약을 판정한다.
+이 수치는 구조 검증이며 실제 모델 정확도 증거가 아니다. 후속 고정 실행은 4번째 사례 timeout으로 전수 관측되지 않았고, 완료된 clean에서 scope 22개와 양의 criterion ref 32개, 잘못된 관계 3개가 관측됐다. 원본과 판정은 [v2r4 부분 실행 기준선](inspection-v2r4-partial-baseline.md)에 보존한다.

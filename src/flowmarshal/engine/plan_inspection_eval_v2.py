@@ -1,7 +1,7 @@
 """v2 직접 제출물과 동결된 사례 기대값의 평가.
 
 compiler가 만든 closure는 citation/evidence 결속을 확인하는 데만 쓴다. AC 관계의
-의미 판단은 모델이 scope에 제출한 양의 criterion_refs를 전체 행렬로 확장할 뿐이며,
+의미 판단은 모델이 제출한 sparse 양의 link를 전체 행렬로 확장할 뿐이며,
 finding·scope 판단을 생성하지 않는다.
 """
 from __future__ import annotations
@@ -23,7 +23,7 @@ V2_EVALUATION_CONTRACT = "plan-inspection-evaluation-v2"
 def _fixed_ac_link_requirement_assessment(
         compiled: CompiledPlanInspectionV2, expected_rows: list[dict[str, Any]], plan: Any,
 ) -> dict[str, Any]:
-    """scope의 양의 연결에서 파생한 AC×validation bool을 동결 행과 정확히 대조한다."""
+    """희소 양의 연결에서 파생한 AC×validation bool을 동결 행과 정확히 대조한다."""
     expected = {(row["criterion_id"], row["validation_id"]): row["ac_link_required"]
                 for row in expected_rows}
     actual = {(row.criterion_id, row.validation_id): row.ac_link_required
