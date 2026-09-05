@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
@@ -29,6 +30,7 @@ STATIC_CASES = ("clean", "bad", "wrong-goal", "combined", "boundary-clean", "mis
                 "stored-expanded", "semantic-explicit", "stored-multi-defect", "semantic-missing-link")
 CALL_ORDER = (*STATIC_CASES, "expansion", "expanded-review")
 MAXIMUM_CALLS = 13
+CAPTURE_PHASES = ("prepare", "run", "review-generated")
 
 
 def read(path):
@@ -105,18 +107,39 @@ def claim_turn(run: Path, capture: Path, intent: Any):
     write_new(capture / "turn.intent.json", intent)
 
 
+def claim_runtime_phase(run: Path, phase: str) -> Path:
+    """단계별 preflight 기록을 독점해 기존 raw 관측을 덮어쓰지 않는다."""
+    if phase not in CAPTURE_PHASES:
+        raise RuntimeError(f"지원하지 않는 runtime preflight phase입니다: {phase}")
+    capture = run / "runtime-preflight" / phase
+    write_new(capture / "phase-claim.json", {"phase": phase})
+    return capture
+
+
 class CapturingRuntime(CodexAppServerRuntime):
-    def __init__(self, *, run: Path, **kwargs):
-        super().__init__(**kwargs)
+    def __init__(self, *, run: Path, phase: str, **kwargs):
         self.run = run
-        self.capture = run / "runtime-preflight"
+        self.phase = phase
+        self.capture = claim_runtime_phase(run, phase)
         self.indices = {}
+        super().__init__(**kwargs)
 
     def record(self, kind, value):
         key = (str(self.capture), kind)
         number = self.indices.get(key, 0) + 1
-        self.indices[key] = number
         write_new(self.capture / f"{kind}-{number:02d}.json", value)
+        self.indices[key] = number
+
+    @contextmanager
+    def call_capture(self, capture: Path):
+        if not capture.resolve().is_relative_to((self.run / "calls").resolve()):
+            raise RuntimeError("진단 call capture가 호출 경로 밖입니다.")
+        previous = self.capture
+        self.capture = capture
+        try:
+            yield
+        finally:
+            self.capture = previous
 
     def verify_execution_policy(self, cwd):
         result = super().verify_execution_policy(cwd)
@@ -287,7 +310,7 @@ def prepare(run):
         plan = PlanContractRevision.model_validate(read(run / f"input-{name}-plan.json"))
         if plan_gate(plan, source=skeleton, goal=case_goal, state=case_state, project_map=project_map):
             raise RuntimeError(f"FIXED_INPUT_GATE_FAILED: {name}")
-    with CapturingRuntime(run=run, codex_bin=Path(old_lock["codex_bin"])) as runtime:
+    with CapturingRuntime(run=run, phase="prepare", codex_bin=Path(old_lock["codex_bin"])) as runtime:
         policy = runtime.verify_execution_policy(run / "workspace")
         inventory = runtime.list_models()
         roles.validate_inventory(inventory)
@@ -384,31 +407,31 @@ class RecordedRunner:
         number = CALL_ORDER.index(self.name) + 1
         capture = self.run_root / "calls" / f"{number:02d}-{request.role}"
         capture.mkdir(parents=True, exist_ok=False)
-        self.runtime.capture = capture
-        write_new(capture / "request.json", request)
-        write_new(capture / "strict-schema.json", actual_schema)
-        try:
-            result = self.runner.run(request, validator=validator)
-        except Exception as error:
-            write_new(capture / "failed.json", {"error_type": type(error).__name__, "error": str(error),
-                                              "receipts": getattr(error, "receipts", ()), "observed_at": utc_now()})
-            raise
-        verify_role_receipt(request, result)
-        self.last_result = result
-        write_new(capture / "result.json", result)
-        receipt = result.receipt
-        if (receipt.input_digest != request.request_digest or receipt.output_digest != sha256_digest(result.payload) or
-                receipt.output_schema_digest != sha256_digest(strict_json_output_schema(request.output_schema)) or
-                receipt.schema_recovery_attempts != 0 or len(receipt.turn_ids) != 1):
-            raise RuntimeError("ACTUAL_RECEIPT_BINDING_MISMATCH")
-        terminal = read(capture / "terminal.json")
-        if json.loads(terminal["final_response"]) != result.payload:
-            raise RuntimeError("RAW_RESULT_BINDING_MISMATCH")
-        verification = completed_call_verification(capture, json_value(receipt))
-        write_new(capture / "binding-verification.json", verification)
-        if not verification["passed"]:
-            raise RuntimeError("ACTUAL_COMPLETED_CALL_BINDING_MISMATCH")
-        return result
+        with self.runtime.call_capture(capture):
+            write_new(capture / "request.json", request)
+            write_new(capture / "strict-schema.json", actual_schema)
+            try:
+                result = self.runner.run(request, validator=validator)
+            except Exception as error:
+                write_new(capture / "failed.json", {"error_type": type(error).__name__, "error": str(error),
+                                                  "receipts": getattr(error, "receipts", ()), "observed_at": utc_now()})
+                raise
+            verify_role_receipt(request, result)
+            self.last_result = result
+            write_new(capture / "result.json", result)
+            receipt = result.receipt
+            if (receipt.input_digest != request.request_digest or receipt.output_digest != sha256_digest(result.payload) or
+                    receipt.output_schema_digest != sha256_digest(strict_json_output_schema(request.output_schema)) or
+                    receipt.schema_recovery_attempts != 0 or len(receipt.turn_ids) != 1):
+                raise RuntimeError("ACTUAL_RECEIPT_BINDING_MISMATCH")
+            terminal = read(capture / "terminal.json")
+            if json.loads(terminal["final_response"]) != result.payload:
+                raise RuntimeError("RAW_RESULT_BINDING_MISMATCH")
+            verification = completed_call_verification(capture, json_value(receipt))
+            write_new(capture / "binding-verification.json", verification)
+            if not verification["passed"]:
+                raise RuntimeError("ACTUAL_COMPLETED_CALL_BINDING_MISMATCH")
+            return result
 
 
 def completed_call_verification(capture: Path, receipt: dict[str, Any] | None) -> dict[str, Any]:
@@ -517,15 +540,35 @@ def verify_generation_pending(run: Path) -> None:
         raise RuntimeError("GENERATION_PENDING_FAILED_OR_INCOMPLETE")
 
 
+def incomplete_provider_intents(run: Path) -> list[Path]:
+    incomplete = []
+    for capture in sorted((run / "calls").glob("*")):
+        if not capture.is_dir():
+            continue
+        if (capture / "thread.intent.json").exists() and not (capture / "thread.receipt.json").exists():
+            incomplete.append(capture / "thread.intent.json")
+        if (capture / "turn.intent.json").exists() and not (capture / "turn.receipt.json").exists():
+            incomplete.append(capture / "turn.intent.json")
+    return incomplete
+
+
+def claim_execution_phase(run: Path, marker: str, preflight_digest: str) -> None:
+    incomplete = incomplete_provider_intents(run)
+    if incomplete:
+        raise RuntimeError("INCOMPLETE_PROVIDER_INTENT_EXISTS: " + ", ".join(str(path) for path in incomplete))
+    write_new(run / marker, {"preflight_digest": preflight_digest, "observed_at": utc_now()})
+
+
 def execute(run, generated=False):
     marker = "generated-review-started.json" if generated else "execution-started.json"
     if (run / "summary.json").exists():
         raise RuntimeError("완료·실패한 진단을 반복하지 않습니다.")
+    lock = verify_lock(run)
+    # claim은 요약 예외 처리보다 앞에 둔다. 패자는 summary나 provider 효과를 만들 수 없다.
+    claim_execution_phase(run, marker, lock["lock_digest"])
     status = "FAIL"
     error = None
     try:
-        lock = verify_lock(run)
-        write_new(run / marker, {"preflight_digest": lock["lock_digest"], "observed_at": utc_now()})
         roles = EngineRoleConfiguration.model_validate(read(run / "roles.json"))
         # 첫 turn 전 모든 고정 사례의 표 존재·입력 결속을 확인한다.
         for name in STATIC_CASES:
@@ -564,7 +607,8 @@ def execute(run, generated=False):
             names = ("expanded-review",)
         else:
             names = CALL_ORDER[:-1]
-        with CapturingRuntime(run=run, codex_bin=Path(lock["codex_bin"])) as runtime:
+        phase = "review-generated" if generated else "run"
+        with CapturingRuntime(run=run, phase=phase, codex_bin=Path(lock["codex_bin"])) as runtime:
             runner = RecordedRunner(runtime, run, lock)
             for name in names:
                 runner.name = name
