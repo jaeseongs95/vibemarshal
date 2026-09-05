@@ -72,18 +72,16 @@ class ValidationScopeInspectionV2(EngineModel):
         return _unique(value, "scope direct_extra_refs")
 
 
-class ACValidationLinkInspectionV2(EngineModel):
-    """모델이 직접 판단한 필수 AC×validation 양의 연결."""
+class ACScopeRequirementInspectionV2(EngineModel):
+    """모델이 직접 판단한 AC별 필수 supported scope 선택."""
 
     criterion_id: str
-    validation_id: str
     scope_ids: tuple[str, ...] = Field(min_length=1)
-    requirement_claim: str = Field(min_length=1, max_length=1000)
 
     @field_validator("scope_ids")
     @classmethod
     def scopes_are_unique(cls, value: tuple[str, ...]) -> tuple[str, ...]:
-        return _unique(value, "AC validation link scope_ids")
+        return _unique(value, "AC scope requirement scope_ids")
 
 
 class ConstraintTaskInspectionV2(EngineModel):
@@ -101,7 +99,7 @@ class ConstraintTaskInspectionV2(EngineModel):
 class PlanInspectionV2(EngineModel):
     validation_rows: tuple[ValidationInspectionV2, ...] = Field(min_length=1)
     validation_scope_rows: tuple[ValidationScopeInspectionV2, ...] = Field(min_length=1)
-    ac_validation_links: tuple[ACValidationLinkInspectionV2, ...]
+    ac_scope_requirements: tuple[ACScopeRequirementInspectionV2, ...]
     constraint_task_rows: tuple[ConstraintTaskInspectionV2, ...]
 
 
@@ -243,16 +241,18 @@ PLAN_INSPECTION_V2_INSTRUCTIONS = (
     "실제 절차나 status가 다를 때만 나눈다. AC마다 scope를 다시 만들거나 citation별로 쪼개지 않는다. 같은 validation의 "
     "mechanism_id와 supported·contradicted·unresolved 중 하나를 직접 판단한다. "
     "mechanism의 근거를 direct_extra_refs에 반복하지 말고 해당 scope에만 추가로 필요한 citation만 쓴다. "
-    "scope 판정 뒤 AC statement·validation_intent가 그 validation의 실제 supported 절차를 명시적으로 요구하는 "
-    "양의 관계만 ac_validation_links에 제출한다. 각 행에는 criterion_id·validation_id, 그 절차를 입증하는 "
-    "supported scope_ids와 간결한 requirement_claim을 쓴다. 결과·주제의 관련성만으로 연결하지 말고 Goal이 "
+    "scope 판정 뒤 AC statement·validation_intent가 실제 supported 절차를 명시적으로 요구하는 경우만 "
+    "ac_scope_requirements에 criterion_id와 해당 supported scope_ids를 제출한다. 같은 AC의 모든 양의 scope는 "
+    "한 행에 모은다. 결과·주제의 관련성만으로 선택하지 말고 Goal이 "
     "요구한 실제 검사 절차·도구·phase·Task 또는 integration 범위가 일치해야 한다. 같은 실제 절차를 Task·Goal "
-    "validation이 각각 실행하면 둘을 모두 연결한다. AC가 독립 Task 또는 Goal validation 단계를 하나의 묶음으로 "
-    "명시하고 그 단계에서 수행할 검사 책임을 열거하면, 그 단계에서 열거된 책임을 실제 수행하는 각 validation을 "
-    "연결한다. 이는 같은 단계에 있다는 이유만으로 열거되지 않은 sibling을 연결하는 규칙이 아니다. 별도 unittest "
+    "validation이 각각 실행하면 양쪽의 실제 scope를 모두 선택한다. AC가 독립 Task 또는 Goal validation 단계를 하나의 묶음으로 "
+    "명시하고 그 단계에서 수행할 검사 책임을 열거하면, 그 단계에서 열거된 책임을 실제 수행하는 각 scope를 "
+    "선택한다. 이는 같은 단계에 있다는 이유만으로 열거되지 않은 sibling을 선택하는 규칙이 아니다. 별도 unittest "
     "validation의 존재만으로 oracle validation "
     "안에서 실제 실행되는 unittest 책임을 생략하지 않는다. 같은 Task·phase·실행 순서라는 이유만으로 sibling "
-    "validation을 연결하지 않는다. false 관계는 제출하지 않는다. Adapter가 sparse 양의 관계를 모든 "
+    "validation을 선택하지 않는다. Task 검증을 Goal Test와 구분하거나 Goal Test 전에 완료한다고만 한 경계·순서 "
+    "표현은 Task validation 전체를 요구한 것이 아니다. 단계에 결속된 도구·절차·검사 책임만 그 단계의 scope로 "
+    "선택한다. false 관계는 제출하지 않는다. Adapter가 scope의 소유 validation을 join해 sparse 양의 선택을 모든 "
     "AC×validation의 true/false 행렬과 scope_ids로 확장하고 Goal·validation·mechanism 근거 closure를 파생한다. "
     "모든 전역 constraint×Task 조합도 constraint_task_rows에 정확히 한 번씩 제출한다. Task 검사가 직접 "
     "요구되면 applicability=required와 실제 Task validation ID를 쓰고, 그렇지 않으면 not_applicable과 빈 "
@@ -268,7 +268,7 @@ PLAN_INSPECTION_V2_INSTRUCTIONS = (
     "direct_task_refs에 쓴다. 영향 Task는 주 target 소유 관계와 이 직접 Task 선택에서 adapter가 계산한다. 표준 "
     "finding의 gate·severity와 모든 finding의 summary·evidence_refs·finding_links는 adapter가 taxonomy와 "
     "target closure에서 파생한다. "
-    "모델은 scope claim·status, 양의 AC validation link, finding 종류·target ID 또는 direct evidence 선택을 adapter가 "
+    "모델은 scope claim·status, 양의 AC scope 선택, finding 종류·target ID 또는 direct evidence 선택을 adapter가 "
     "채울 것이라고 "
     "가정하지 않는다. "
     "Adapter는 이 의미 판단을 생성·삭제·교정하지 않으며 존재와 closure만 검증한다. "
@@ -729,26 +729,34 @@ def compile_plan_inspection_v2(
     expected_ac_rows = targets["ac_validation_pairs"]
     expected_ac_keys = tuple((row["criterion_id"], row["validation_id"]) for row in expected_ac_rows)
     _require(len(expected_ac_keys) == len(set(expected_ac_keys)), "v2 입력 AC 검사 조합 중복")
-    link_pairs = {(row.criterion_id, row.validation_id): row for row in inspection.ac_validation_links}
-    _require(len(link_pairs) == len(inspection.ac_validation_links), "v2 양의 AC 검사 연결 중복")
-    unknown_link_pairs = set(link_pairs) - set(expected_ac_keys)
+    requirements_by_criterion = {
+        row.criterion_id: row for row in inspection.ac_scope_requirements
+    }
     _require(
-        not unknown_link_pairs,
-        f"v2 양의 AC 검사 연결 ID 오류: unknown={sorted(unknown_link_pairs)}",
+        len(requirements_by_criterion) == len(inspection.ac_scope_requirements),
+        "v2 AC scope requirement criterion 중복",
     )
-    for (criterion_id, validation_id), link in link_pairs.items():
-        for scope_id in link.scope_ids:
-            _require(scope_id in scope_by_id, f"v2 AC link scope ID 오류: {scope_id}")
+    unknown_criteria = set(requirements_by_criterion) - set(criterion_selectors)
+    _require(
+        not unknown_criteria,
+        f"v2 AC scope requirement criterion 오류: unknown={sorted(unknown_criteria)}",
+    )
+    scopes_by_pair: dict[tuple[str, str], list[str]] = {}
+    for criterion_id, requirement in requirements_by_criterion.items():
+        for scope_id in requirement.scope_ids:
+            _require(scope_id in scope_by_id, f"v2 AC requirement scope ID 오류: {scope_id}")
             scope = scope_by_id[scope_id]
-            _require(scope.validation_id == validation_id, "v2 AC link scope validation 불일치")
-            _require(scope.status == "supported", "v2 양의 AC 연결에는 supported scope가 필요합니다.")
+            _require(
+                scope.status == "supported",
+                "v2 양의 AC requirement에는 supported scope가 필요합니다.",
+            )
+            scopes_by_pair.setdefault((criterion_id, scope.validation_id), []).append(scope_id)
     derived_ac_rows = tuple(
         ACValidationDecisionV2(
             criterion_id=criterion_id,
             validation_id=validation_id,
-            scope_ids=link_pairs[(criterion_id, validation_id)].scope_ids
-            if (criterion_id, validation_id) in link_pairs else (),
-            ac_link_required=(criterion_id, validation_id) in link_pairs,
+            scope_ids=tuple(scopes_by_pair.get((criterion_id, validation_id), ())),
+            ac_link_required=(criterion_id, validation_id) in scopes_by_pair,
         )
         for criterion_id, validation_id in expected_ac_keys
     )

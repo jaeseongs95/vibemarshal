@@ -73,15 +73,13 @@ def v2_inputs():
             "direct_extra_refs": [],
             "status": row["assessment"],
         } for row in old["validation_scope_rows"]],
-        "ac_validation_links": [
+        "ac_scope_requirements": [
             {
                 "criterion_id": coverage.criterion_id,
-                "validation_id": validation_id,
-                "scope_ids": [supported_scopes[validation_id]],
-                "requirement_claim": f"{coverage.criterion_id}의 명시 검사 절차",
+                "scope_ids": [supported_scopes[validation_id]
+                              for validation_id in coverage.validation_ids],
             }
             for coverage in plan.definition.goal_coverage
-            for validation_id in coverage.validation_ids
         ],
         "constraint_task_rows": [{
             "constraint_id": row["constraint_id"],
@@ -143,15 +141,13 @@ def v2_table_from_v1(
             "direct_extra_refs": [],
             "status": row["assessment"],
         } for row in old["validation_scope_rows"]],
-        "ac_validation_links": [
+        "ac_scope_requirements": [
             {
                 "criterion_id": criterion_id,
-                "validation_id": validation_id,
-                "scope_ids": [supported_scopes[validation_id]],
-                "requirement_claim": f"{criterion_id}의 명시 검사 절차",
+                "scope_ids": [supported_scopes[validation_id]
+                              for validation_id in validation_ids],
             }
             for criterion_id, validation_ids in coverage.items()
-            for validation_id in validation_ids
         ],
         "constraint_task_rows": [{
             "constraint_id": row["constraint_id"],
@@ -216,7 +212,7 @@ class PlanInspectionV2Tests(unittest.TestCase):
     def test_clean_compiles_repeated_closure_without_provider_repetition(self):
         plan, goal, _, _, inspection = v2_inputs()
         before = inspection.model_dump(mode="json")
-        self.assertTrue(inspection.ac_validation_links)
+        self.assertTrue(inspection.ac_scope_requirements)
         compiled = compile_fixture(inspection)
         self.assertTrue(any(row.ac_link_required for row in compiled.ac_validation_decisions))
         self.assertTrue(any(not row.ac_link_required for row in compiled.ac_validation_decisions))
@@ -338,33 +334,29 @@ class PlanInspectionV2Tests(unittest.TestCase):
         with self.assertRaisesRegex(PlanInspectionError, "소유 validation 불일치"):
             compile_fixture(PlanInspectionV2.model_validate(raw))
 
-    def test_positive_links_require_supported_scope_and_known_pair(self):
+    def test_positive_scope_requirements_require_supported_scope_and_known_criterion(self):
         *_, inspection = v2_inputs()
         raw = inspection.model_dump(mode="json")
-        link = raw["ac_validation_links"][0]
+        requirement = raw["ac_scope_requirements"][0]
         scope = next(item for item in raw["validation_scope_rows"]
-                     if item["scope_id"] == link["scope_ids"][0])
+                     if item["scope_id"] == requirement["scope_ids"][0])
         scope["status"] = "unresolved"
         with self.assertRaisesRegex(PlanInspectionError, "supported scope"):
             compile_fixture(PlanInspectionV2.model_validate(raw))
 
         raw = inspection.model_dump(mode="json")
-        raw["ac_validation_links"][0]["criterion_id"] = "ac_unknown"
-        with self.assertRaisesRegex(PlanInspectionError, "연결 ID 오류"):
+        raw["ac_scope_requirements"][0]["criterion_id"] = "ac_unknown"
+        with self.assertRaisesRegex(PlanInspectionError, "criterion 오류"):
             compile_fixture(PlanInspectionV2.model_validate(raw))
 
         raw = inspection.model_dump(mode="json")
-        raw["ac_validation_links"].append(dict(raw["ac_validation_links"][0]))
-        with self.assertRaisesRegex(PlanInspectionError, "양의 AC 검사 연결 중복"):
+        raw["ac_scope_requirements"].append(dict(raw["ac_scope_requirements"][0]))
+        with self.assertRaisesRegex(PlanInspectionError, "criterion 중복"):
             compile_fixture(PlanInspectionV2.model_validate(raw))
 
         raw = inspection.model_dump(mode="json")
-        link = raw["ac_validation_links"][0]
-        link["scope_ids"] = [next(
-            item["scope_id"] for item in raw["validation_scope_rows"]
-            if item["validation_id"] != link["validation_id"] and item["status"] == "supported"
-        )]
-        with self.assertRaisesRegex(PlanInspectionError, "scope validation 불일치"):
+        raw["ac_scope_requirements"][0]["scope_ids"] = ["scope_unknown"]
+        with self.assertRaisesRegex(PlanInspectionError, "scope ID 오류"):
             compile_fixture(PlanInspectionV2.model_validate(raw))
 
     def test_constraint_partial_is_explicit_and_empty_missing_is_rejected(self):
@@ -404,9 +396,14 @@ class PlanInspectionV2Tests(unittest.TestCase):
         raw = inspection.model_dump(mode="json")
         raw["validation_scope_rows"][0]["status"] = "contradicted"
         changed_scope_id = raw["validation_scope_rows"][0]["scope_id"]
-        raw["ac_validation_links"] = [
-            link for link in raw["ac_validation_links"]
-            if changed_scope_id not in link["scope_ids"]
+        for requirement in raw["ac_scope_requirements"]:
+            requirement["scope_ids"] = [
+                scope_id for scope_id in requirement["scope_ids"]
+                if scope_id != changed_scope_id
+            ]
+        raw["ac_scope_requirements"] = [
+            requirement for requirement in raw["ac_scope_requirements"]
+            if requirement["scope_ids"]
         ]
         with self.assertRaisesRegex(PlanInspectionError, "finding이 누락"):
             compile_fixture(PlanInspectionV2.model_validate(raw))
@@ -628,10 +625,10 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
                  "direct_extra_refs", "status"},
                 set(request.output_schema["$defs"]["ValidationScopeInspectionV2"]["properties"]),
             )
-            self.assertIn("ac_validation_links", inspection_properties)
+            self.assertIn("ac_scope_requirements", inspection_properties)
             self.assertEqual(
-                {"criterion_id", "validation_id", "scope_ids", "requirement_claim"},
-                set(request.output_schema["$defs"]["ACValidationLinkInspectionV2"]["properties"]),
+                {"criterion_id", "scope_ids"},
+                set(request.output_schema["$defs"]["ACScopeRequirementInspectionV2"]["properties"]),
             )
             expected_catalog = plan_inspection_citation_catalog_v2(
                 {

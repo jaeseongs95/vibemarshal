@@ -103,11 +103,16 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
                  "direct_extra_refs": [], "status": row["assessment"]}
                 for row in v1["validation_scope_rows"]
             ],
-            "ac_validation_links": [
-                {"criterion_id": row["criterion_id"], "validation_id": row["validation_id"],
-                 "scope_ids": row["scope_ids"],
-                 "requirement_claim": f"{row['criterion_id']}의 명시 검사 절차"}
-                for row in v1["ac_validation_rows"] if row["ac_link_required"]
+            "ac_scope_requirements": [
+                {"criterion_id": criterion.criterion_id,
+                 "scope_ids": [scope_id
+                               for row in v1["ac_validation_rows"]
+                               if row["criterion_id"] == criterion.criterion_id
+                               and row["ac_link_required"]
+                               for scope_id in row["scope_ids"]]}
+                for criterion in goal.definition.hard_acceptance
+                if any(row["criterion_id"] == criterion.criterion_id and row["ac_link_required"]
+                       for row in v1["ac_validation_rows"])
             ],
             "constraint_task_rows": [
                 {"constraint_id": row["constraint_id"], "task_ref": row["task_ref"],
@@ -133,22 +138,27 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
         payload, plan, goal, project_map, expectation, inspection, catalog = self._baseline()
         raw = inspection.model_dump(mode="json")
         expected = expectation["ac_validation_rows"][0]
-        key = (expected["criterion_id"], expected["validation_id"])
+        criterion_id = expected["criterion_id"]
+        requirement = next(
+            row for row in raw["ac_scope_requirements"]
+            if row["criterion_id"] == criterion_id
+        )
         if expected["ac_link_required"]:
-            raw["ac_validation_links"] = [
-                row for row in raw["ac_validation_links"]
-                if (row["criterion_id"], row["validation_id"]) != key
+            validation_scope_ids = {
+                row["scope_id"] for row in raw["validation_scope_rows"]
+                if row["validation_id"] == expected["validation_id"]
+            }
+            requirement["scope_ids"] = [
+                scope_id for scope_id in requirement["scope_ids"]
+                if scope_id not in validation_scope_ids
             ]
+            if not requirement["scope_ids"]:
+                raw["ac_scope_requirements"].remove(requirement)
         else:
             scope = next(row for row in raw["validation_scope_rows"]
                          if row["validation_id"] == expected["validation_id"]
                          and row["status"] == "supported")
-            raw["ac_validation_links"].append({
-                "criterion_id": expected["criterion_id"],
-                "validation_id": expected["validation_id"],
-                "scope_ids": [scope["scope_id"]],
-                "requirement_claim": "잘못 추가한 필수 관계",
-            })
+            requirement["scope_ids"].append(scope["scope_id"])
         report = assess_case_inspection_review_v2(
             PlanInspectionV2.model_validate(raw), (), RATINGS, expectation, case_id="clean", payload=payload,
             plan=plan, goal=goal, project_map=project_map, evidence_catalog=catalog,
@@ -251,11 +261,16 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
                 )),
                 "status": row["assessment"],
             } for row in raw["validation_scope_rows"]],
-            "ac_validation_links": [{
-                "criterion_id": row["criterion_id"], "validation_id": row["validation_id"],
-                "scope_ids": row["scope_ids"],
-                "requirement_claim": f"{row['criterion_id']}의 명시 검사 절차",
-            } for row in raw["ac_validation_rows"] if row["ac_link_required"]],
+            "ac_scope_requirements": [{
+                "criterion_id": criterion.criterion_id,
+                "scope_ids": [scope_id
+                              for row in raw["ac_validation_rows"]
+                              if row["criterion_id"] == criterion.criterion_id
+                              and row["ac_link_required"]
+                              for scope_id in row["scope_ids"]],
+            } for criterion in goal.definition.hard_acceptance
+              if any(row["criterion_id"] == criterion.criterion_id and row["ac_link_required"]
+                     for row in raw["ac_validation_rows"])],
             "constraint_task_rows": [{
                 "constraint_id": row["constraint_id"], "task_ref": row["task_ref"],
                 "applicability": row["applicability"], "required_validation_ids": row["validation_ids"],

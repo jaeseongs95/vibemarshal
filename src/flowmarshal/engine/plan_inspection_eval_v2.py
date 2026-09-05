@@ -1,7 +1,7 @@
 """v2 직접 제출물과 동결된 사례 기대값의 평가.
 
 compiler가 만든 closure는 citation/evidence 결속을 확인하는 데만 쓴다. AC 관계의
-의미 판단은 모델이 제출한 sparse 양의 link를 전체 행렬로 확장할 뿐이며,
+의미 판단은 모델이 제출한 sparse 양의 AC scope 선택을 전체 행렬로 확장할 뿐이며,
 finding·scope 판단을 생성하지 않는다.
 """
 from __future__ import annotations
