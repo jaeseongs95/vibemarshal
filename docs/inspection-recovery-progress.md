@@ -9,7 +9,7 @@
 | A. 실행 기반 격리 | 고정 worktree·공통 preflight·독립 fixture package·결정적 Gate | 완료 · `22d68c0` |
 | B. 기존 계약 기준선 | 같은 역할로 static 11사례, 사례별 형식·참조·의미·운영 결과 | 완료 · PASS 7 / FAIL 4 |
 | C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | 구현·결정적 검증 완료, provider schema 호환 보정 검증 중 |
-| D. 새 계약 비교 | 새 실행의 static 11사례와 고정 기대표·실측 usage | NOT_RUN |
+| D. 새 계약 비교 | 새 실행의 static 11사례와 고정 기대표·실측 usage | 완료 · PASS 1 / FAIL 10, 후속 구조 보정 필요 |
 | E. S06 재진입 검사 | static·expansion·독립 생성 검토·expanded-review 13단계 | NOT_RUN |
 | F. 실제 Goal 경로 | 고정 자연어에서 실제 Goal·Plan 선택·활성화·실행·독립 검증·GoalVerdict | NOT_RUN |
 
@@ -42,5 +42,6 @@ Codex executable은 `D:\codex\fm-inspection-runtime\codex-935a1911.exe`에 복�
 - v2는 직접 의미 필드와 typed target을 보존하고 반복 row·finding closure, project evidence 환산, taxonomy 값을 adapter가 계산하도록 별도 schema·compiler·evaluator·request binding으로 구현했다. 동일 clean 표본의 반복 참조 항목은 101개에서 22개로, provider 호환 target 보정 뒤 Reviewer strict schema는 16,512 bytes에서 10,609 bytes로 줄었다. 이 수치는 결정적 표본이며 실제 모델 성공률 증거가 아니다.
 - v2 및 기존 경계의 전체 단위·통합 테스트와 누적 error receipt 분류 회귀가 통과했고, 커밋 `880874d5`의 최종 결정적 Gate는 669개 테스트를 포함해 5/5 통과했다. 같은 커밋의 고정 v2 worktree에서도 Gate 5/5와 preflight/prepare가 통과했다.
 - 첫 v2 static 실행의 `clean` 호출은 모델 추론 전에 provider가 `target_refs.items.oneOf is not permitted`로 400을 반환해 중단됐다. 이 실행은 `D:\codex\fm-inspection-v2\.flowmarshal-engine-eval\runs\inspection-v2-static11-20260906`에 보존했다. v1 artifact·oracle·재시도 경계를 바꾸지 않고, union target을 같은 직접 의미를 담는 단일 `{kind, primary_ref, secondary_ref}` 구조로 바꾸며 kind별 ref 개수를 결정적으로 검사한다.
+- provider 호환 보정 뒤 새 고정본의 static 11은 11/11 호출을 완료했지만 PASS 1, model output FAIL 6, semantic FAIL 4였다. v1보다 total token은 17.61%, provider duration은 9.65% 줄었으나 PASS는 7건에서 1건으로 감소했다. model output FAIL 중 5건은 직접 citation 객체 장부, 1건은 target과 영향 Task의 중복 작성에서 발생했다. 상세 근거는 [v2 독립 11사례 기준선](inspection-v2-static11-baseline.md)에 있다.
 
 전체 qualification, Functional Alpha와 1.0 cutover는 아직 NO-GO다. 실제 모델 응답의 개선이나 최종 Goal 완료는 아직 증명하지 않았다.
