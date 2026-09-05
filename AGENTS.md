@@ -129,7 +129,7 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 
 ## GitHub commit과 push
 
-- 권위 원격은 비공개 `https://github.com/jaeseongs95/flowmarshal`이다.
+- 권위 원격은 비공개 `https://github.com/jaeseongs95/flowmarshal-vibe-coding-framework`이다.
 - 세션의 요청 작업과 검증이 끝나면 그 세션 변경만 하나의 한국어 commit으로 기록해 push한다. 무관한 사용자 변경을 포함하지 않는다.
 - commit 전 관련 테스트·결정적 Gate·`git diff --check`를 실행하고 실제로 통과하지 않은 qualification을 PASS 또는 1.0 완료로 기록하지 않는다.
 - 비밀·인증정보, 로컬 Engine DB, cache, 임시 디렉터리와 미완료 evaluation cell을 commit하지 않는다.
