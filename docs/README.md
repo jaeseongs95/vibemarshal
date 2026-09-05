@@ -9,6 +9,7 @@
 - [Plan inspection v2 4차 부분 실행 기준선](inspection-v2r4-partial-baseline.md): clean의 scope 확장·3개 과잉 연결과 4번째 사례 timeout을 보존한 실행 결과
 - [Plan inspection v2 5차 희소 양의 링크 계약](inspection-v2r5-sparse-link-contract.md): scope 능력과 AC 요구 관계를 분리하고 전체 음의 행을 adapter에서 파생하는 현재 개발 계약
 - [Plan inspection v2 5차 독립 11사례 기준선](inspection-v2r5-static11-baseline.md): 9 PASS·2 FAIL, scope 축소와 남은 target arity·독립 Goal Test 구성 관계 실패
+- [Plan inspection v2 6차 finding target catalog 계약](inspection-v2r6-target-catalog-contract.md): 복합 target 참조 조립을 adapter catalog로 이전하고 독립 validation 단계의 열거 책임 연결 규칙을 명시한 현재 개발 계약
 - [Inspection Provider v2 계약](inspection-provider-v2.md): 모델의 직접 의미 판단과 adapter의 결정적 참조 전개 경계, 호환성·평가·승격 조건
 
 ## 현재 권위 문서

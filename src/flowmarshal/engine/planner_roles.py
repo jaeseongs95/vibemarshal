@@ -72,6 +72,7 @@ from .plan_inspection_v2 import (
     ReviewFindingV2,
     compile_plan_inspection_v2,
     plan_inspection_citation_catalog_v2,
+    plan_inspection_target_catalog_v2,
 )
 from .roles import RoleCallReceipt, RoleCallRequest, StructuredRolePort
 from .domain import GoalContractRevision
@@ -255,7 +256,7 @@ PLAN_VALIDATION_TRACE_V2_INSTRUCTIONS = (
     "inspection_citation_catalog는 결속된 의미 원문의 선택 가능한 ID 목록이다. 원문 객체를 다시 "
     "작성하지 말고, 검사 수단의 능력을 판단하는 데 직접 사용한 ID만 direct_refs로 선택한다. "
     "validation statement, Goal AC·constraint 원문, coverage membership, 행 사이의 반복 closure와 "
-    "finding의 최종 evidence는 adapter가 원본 ID·selector와 typed target에서 계산한다. "
+    "finding의 최종 evidence는 adapter가 원본 ID·selector와 선택한 target ID에서 계산한다. "
     "1) 검사와 scope 판정: 모든 validation.statement 전체와 등록 수단의 실제 본문을 읽고, 각 "
     "validation_rows에 실제 수단·phase를 mechanism으로 작성한다. 복합 책임은 실제 절차·phase·부분 "
     "claim별 최소 validation_scope_rows로 나누고, 각 scope의 검사 절차·주장을 claim에 명시한 뒤 "
@@ -275,7 +276,10 @@ PLAN_VALIDATION_TRACE_V2_INSTRUCTIONS = (
     "다른 절차나 명시 phase의 연결을 false로 만들지 않는다. AC가 task/goal phase를 각각 명시하면 "
     "각 phase의 실제 validation scope에 각각 연결한다. 별도 unittest validation이 있어도 oracle scope "
     "자체가 실제 unittest를 실행하고 AC가 그 절차를 요구하면 둘을 모두 연결한다. 명시되지 않은 sibling "
-    "unittest·scope·semantic "
+    "검사로 확대하지 않는다. AC가 독립 Task 또는 Goal validation 단계를 하나의 묶음으로 명시하고 그 안의 "
+    "검사 책임을 열거하면, 그 단계에서 열거된 책임을 실제 수행하는 각 validation을 연결한다. 이는 같은 "
+    "단계에 있다는 사실만으로 열거되지 않은 sibling을 연결하는 규칙이 아니다. "
+    "명시되지 않은 unittest·scope·semantic "
     "validation, 전역 의무, 연관 표현, 단순 선후조건이나 같은 evidence만으로 다른 AC나 phase에 "
     "연결 의무를 전염시키지 않는다. 이 비전염 규칙은 Goal에 명시된 독립 검사 의무를 없애지 않는다. "
     "특정 oracle phase를 지목한 문장은 그 phase의 oracle 절차를 수행하는 validation을 요구하지만, "
@@ -289,8 +293,8 @@ PLAN_VALIDATION_TRACE_V2_INSTRUCTIONS = (
     "선택하고, 적용되지 않으면 not_applicable과 빈 목록을 쓴다. 검사 ID 연결만 빠진 결함과 실행 "
     "자체가 빠진 결함을 구분한다. "
     "4) finding: contradicted·unresolved scope, 필수 coverage 누락, 필수 Task 검사 누락, 미래 Validator "
-    "결과의 선행 요구를 각각 해당 typed target에 결속한다. 모델이 판단한 scope claim·status·양의 link·finding 종류·"
-    "target·직접 근거는 adapter가 보정하지 않는다. 같은 원인의 중복 finding은 만들지 않되 직접 "
+    "결과의 선행 요구를 각각 해당 주 target ID에 결속한다. 모델이 판단한 scope claim·status·양의 link·finding 종류·"
+    "target ID·직접 근거는 adapter가 보정하지 않는다. 같은 원인의 중복 finding은 만들지 않되 직접 "
     "확인한 독립 결함은 빠뜨리지 않는다. 한 Task의 sibling deterministic validation들이 생산하는 "
     "file·diff·command·test evidence와 semantic validation 자체가 생산하는 model_review evidence를 "
     "구분한다. semantic validation의 required_evidence_kinds나 statement가 입력 catalog의 모든 sibling "
@@ -353,7 +357,7 @@ class PlanReviewDraftV2(ReviewDraft):
     findings: tuple[ReviewFindingV2, ...] = Field(
         description=(
             "직접 확인한 Plan 결함의 최소 의미 제출물. 표준 defect_kind의 gate·severity와 모든 "
-            "요약·evidence 귀속·영향 Task는 typed target closure와 동결 taxonomy에서 "
+            "요약·evidence 귀속·영향 Task는 선택한 target ID closure와 동결 taxonomy에서 "
             "adapter가 계산한다. "
             "표준 taxonomy 밖의 other 결함만 gate·severity를 직접 제출한다."
         ),
@@ -1230,6 +1234,10 @@ class PlanReviewerAdapter:
             plan_inspection_citation_catalog_v2(evidence_catalog, project_map)
             if use_v2 else ()
         )
+        target_catalog = (
+            plan_inspection_target_catalog_v2(goal, plan)
+            if use_v2 else ()
+        )
         use_critical = risk_route != "compact_plan_reviewer"
         selected_model = (self.critical_model or self.model) if use_critical else self.model
         selected_effort = (
@@ -1253,7 +1261,9 @@ class PlanReviewerAdapter:
                 "파일·명령의 운영 상세는 ExecutionSpec에 확정한다. read_only는 산출물 mutation 정책이며 "
                 "읽기 검사와 계획 생성 자체를 금지하지 않는다. 외부 효과는 외부 시스템·계정·제3자에 대한 효과다."
                 + (
-                    "v2에서는 영향 Task를 제출하지 않고 typed target만 선택한다. "
+                    "v2에서는 target의 kind·primary·secondary를 조립하지 않는다. 복합 target은 "
+                    "inspection_target_catalog의 target_id, scope 결함은 직접 작성한 scope_id, "
+                    "result_order는 validation_id, other는 citation ID를 primary_target_ids에서 선택한다. "
                     if use_v2 else
                     "affected_task_refs는 Task.task_ref를 참조하며 Core의 task_id와 혼동하지 않는다."
                 )
@@ -1276,6 +1286,8 @@ class PlanReviewerAdapter:
                 }),
                 **({"inspection_citation_catalog": [
                     item.model_dump(mode="json") for item in citation_catalog
+                ], "inspection_target_catalog": [
+                    item.model_dump(mode="json") for item in target_catalog
                 ]} if use_v2 else {}),
             },
             output_schema=envelope_model.model_json_schema(),
@@ -1299,6 +1311,7 @@ class PlanReviewerAdapter:
                     project_map=project_map,
                     evidence_catalog=evidence_catalog,
                     citation_catalog=citation_catalog,
+                    target_catalog=target_catalog,
                 )
                 submission = _review_submission_v2(
                     role=risk_route,

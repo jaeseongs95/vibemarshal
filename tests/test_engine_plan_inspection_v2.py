@@ -14,11 +14,11 @@ from flowmarshal.engine.plan_inspection_provider import (
     verify_plan_inspection_result_binding,
 )
 from flowmarshal.engine.plan_inspection_v2 import (
-    InspectionTargetV2,
     PlanInspectionV2,
     ReviewFindingV2,
     compile_plan_inspection_v2,
     plan_inspection_citation_catalog_v2,
+    plan_inspection_target_catalog_v2,
 )
 from flowmarshal.engine.planning import plan_review_evidence_catalog, validation_comparison_targets
 from flowmarshal.engine.planner_roles import (
@@ -176,7 +176,35 @@ def compile_fixture(inspection, findings=(), *, plan=None):
         project_map=project_map,
         evidence_catalog=catalog,
         citation_catalog=citation_catalog,
+        target_catalog=plan_inspection_target_catalog_v2(goal, plan),
     )
+
+
+def finding_targets(
+        kind: str, *primary_refs: str, secondary_ref: str | None = None,
+        plan=None, direct_extra_refs=(), direct_task_refs=(),
+) -> dict:
+    """테스트 finding의 의미 target 선택을 provider v2r6 계약으로 작성한다."""
+    if kind in {"ac_validation", "constraint_task"}:
+        if len(primary_refs) != 1 or secondary_ref is None:
+            raise AssertionError("복합 target 테스트 입력에는 primary/secondary 참조가 하나씩 필요합니다.")
+        base_plan, goal, *_ = v2_inputs()
+        selected_plan = plan or base_plan
+        target = next(
+            item for item in plan_inspection_target_catalog_v2(goal, selected_plan)
+            if item.kind == kind and item.primary_ref == primary_refs[0]
+            and item.secondary_ref == secondary_ref
+        )
+        primary_target_ids = [target.target_id]
+    else:
+        if secondary_ref is not None:
+            raise AssertionError("단일 target 테스트 입력에는 secondary 참조를 쓰지 않습니다.")
+        primary_target_ids = list(primary_refs)
+    return {
+        "primary_target_ids": primary_target_ids,
+        "direct_extra_refs": list(direct_extra_refs),
+        "direct_task_refs": list(direct_task_refs),
+    }
 
 
 def owner_for(plan, goal, validation_id):
@@ -283,10 +311,10 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "finding_code": "MISSING_LINK",
             "defect_kind": "missing_validation_link",
             "remediable": True,
-            "target_refs": [{
-                "kind": "ac_validation", "primary_ref": row.criterion_id,
-                "secondary_ref": row.validation_id,
-            }],
+            **finding_targets(
+                "ac_validation", row.criterion_id,
+                secondary_ref=row.validation_id, plan=changed_plan,
+            ),
         },)
         compiled = compile_fixture(inspection, findings, plan=changed_plan)
         witness = next(item for item in compiled.membership_witnesses
@@ -349,8 +377,9 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "finding_code": "PARTIAL_TASK_VALIDATION",
             "defect_kind": "missing_task_validation",
             "remediable": True,
-            "target_refs": [{"kind": "constraint_task", "primary_ref": row["constraint_id"],
-                             "secondary_ref": row["task_ref"]}],
+            **finding_targets(
+                "constraint_task", row["constraint_id"], secondary_ref=row["task_ref"]
+            ),
         }
         compiled = compile_fixture(PlanInspectionV2.model_validate(raw), (finding,))
         self.assertEqual("PARTIAL_TASK_VALIDATION", compiled.derived_findings[0].finding_code)
@@ -367,8 +396,7 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "finding_code": "FALSE_SCOPE_FINDING",
             "defect_kind": "validation_scope",
             "remediable": True,
-            "target_refs": [{"kind": "validation_scope", "primary_ref": scope.scope_id,
-                             "secondary_ref": None}],
+            **finding_targets("validation_scope", scope.scope_id),
         }
         with self.assertRaisesRegex(PlanInspectionError, "supported scope에 finding"):
             compile_fixture(inspection, (finding,))
@@ -392,8 +420,7 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "finding_code": "ORDER_ERROR",
             "defect_kind": "result_order",
             "remediable": True,
-            "target_refs": [{"kind": "validation", "primary_ref": validation_id,
-                             "secondary_ref": None}],
+            **finding_targets("validation", validation_id),
         }
         compiled = compile_fixture(inspection, (finding,))
         self.assertEqual((owner,), compiled.derived_findings[0].affected_task_refs)
@@ -404,11 +431,11 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "finding_code": "WRONG_TARGET",
             "defect_kind": "missing_validation_link",
             "remediable": True,
-            "target_refs": [{"kind": "validation_scope",
-                             "primary_ref": inspection.validation_scope_rows[0].scope_id,
-                             "secondary_ref": None}],
+            **finding_targets(
+                "validation_scope", inspection.validation_scope_rows[0].scope_id
+            ),
         }
-        with self.assertRaisesRegex(PlanInspectionError, "target 종류 불일치"):
+        with self.assertRaisesRegex(PlanInspectionError, "target ID 종류 불일치"):
             compile_fixture(inspection, (finding,))
 
     def test_multi_target_closure_unions_direct_sources(self):
@@ -419,8 +446,7 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "finding_code": "MULTI_ORDER",
             "defect_kind": "result_order",
             "remediable": True,
-            "target_refs": [{"kind": "validation", "primary_ref": item, "secondary_ref": None}
-                            for item in validation_ids],
+            **finding_targets("validation", *validation_ids),
         }
         compiled = compile_fixture(inspection, (finding,))
         closure = next(row for row in compiled.row_closures if row.row_id == "MULTI_ORDER")
@@ -448,8 +474,7 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "finding_code": "PROJECT_ORDER",
             "defect_kind": "result_order",
             "remediable": True,
-            "target_refs": [{"kind": "validation", "primary_ref": validation_id,
-                             "secondary_ref": None}],
+            **finding_targets("validation", validation_id),
         }
         compiled = compile_fixture(changed, (finding,))
         self.assertIn("source:project_map", compiled.derived_findings[0].evidence_refs)
@@ -470,11 +495,10 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "gate": "grounding",
             "severity": "error",
             "remediable": True,
-            "target_refs": [
-                {"kind": "citation", "primary_ref": goal_ref, "secondary_ref": None},
-                {"kind": "task", "primary_ref": plan.definition.tasks[0].task_ref,
-                 "secondary_ref": None},
-            ],
+            **finding_targets(
+                "citation", goal_ref,
+                direct_task_refs=(plan.definition.tasks[0].task_ref,),
+            ),
         }
         compiled = compile_fixture(inspection, (finding,))
         derived = compiled.derived_findings[0]
@@ -487,8 +511,7 @@ class PlanInspectionV2Tests(unittest.TestCase):
         common = {
             "finding_code": "CLASSIFICATION_BOUNDARY",
             "remediable": True,
-            "target_refs": [{"kind": "validation", "primary_ref": "val_example",
-                             "secondary_ref": None}],
+            **finding_targets("validation", "val_example"),
         }
         with self.assertRaisesRegex(ValueError, "표준 finding"):
             ReviewFindingV2.model_validate(
@@ -498,19 +521,30 @@ class PlanInspectionV2Tests(unittest.TestCase):
             ReviewFindingV2.model_validate(
                 common | {
                     "defect_kind": "other",
-                    "target_refs": [{"kind": "citation", "primary_ref": "citation_example",
-                                     "secondary_ref": None}],
+                    **finding_targets("citation", "citation_example"),
                 }
             )
 
-    def test_uniform_target_requires_exact_reference_arity(self):
-        with self.assertRaisesRegex(ValueError, "secondary_ref가 필요"):
-            InspectionTargetV2(
-                kind="ac_validation", primary_ref="ac_001", secondary_ref=None
-            )
-        with self.assertRaisesRegex(ValueError, "secondary_ref는 null"):
-            InspectionTargetV2(
-                kind="validation", primary_ref="val_001", secondary_ref="unexpected"
+    def test_target_catalog_is_deterministic_and_exactly_bound(self):
+        plan, goal, project_map, catalog, inspection = v2_inputs()
+        first = plan_inspection_target_catalog_v2(goal, plan)
+        self.assertEqual(first, plan_inspection_target_catalog_v2(goal, plan))
+        self.assertEqual(len(first), len({item.target_id for item in first}))
+        self.assertTrue(all(item.target_id.startswith("target_") for item in first))
+
+        changed = list(first)
+        changed[0] = changed[0].model_copy(update={"target_id": "target_" + "f" * 24})
+        citation_catalog = plan_inspection_citation_catalog_v2(catalog, project_map)
+        with self.assertRaisesRegex(PlanInspectionError, "target catalog 입력 결속 불일치"):
+            compile_plan_inspection_v2(
+                inspection,
+                findings=(),
+                plan=plan,
+                goal=goal,
+                project_map=project_map,
+                evidence_catalog=catalog,
+                citation_catalog=citation_catalog,
+                target_catalog=tuple(changed),
             )
 
     def test_compiler_preserves_all_provider_semantic_fields(self):
@@ -577,6 +611,7 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
             ):
                 self.assertNotIn(v1_field, request.instructions)
             self.assertIn("기계 메타데이터를 서로 비교해 semantic finding을 만들지 않는다", request.instructions)
+            self.assertIn("검사 책임을 열거하면", request.instructions)
             self.assertIn("direct_extra_refs", str(request.output_schema))
             self.assertNotIn("finding_links", str(request.output_schema))
             inspection_properties = request.output_schema["$defs"]["PlanInspectionV2"]["properties"]
@@ -640,19 +675,25 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
         request = runner.calls[-1]
         self.assertEqual((), submission.findings)
         self.assertEqual(4, submission.ratings.verification)
-        self.assertIn("target_refs", str(request.output_schema))
+        self.assertNotIn("target_refs", str(request.output_schema))
+        self.assertNotIn("InspectionTargetV2", str(request.output_schema))
         finding_properties = request.output_schema["properties"]["review"]["anyOf"][1][
             "properties"
         ]["findings"]["items"]["properties"]
         self.assertNotIn("evidence_refs", finding_properties)
         self.assertNotIn("summary", finding_properties)
         self.assertNotIn("affected_task_refs", finding_properties)
-        target_items = finding_properties["target_refs"]["items"]
-        self.assertNotIn("discriminator", target_items)
-        self.assertNotIn("oneOf", target_items)
         self.assertEqual(
-            {"kind", "primary_ref", "secondary_ref"},
-            set(target_items["properties"]),
+            {
+                "finding_code", "defect_kind", "gate", "severity", "remediable",
+                "primary_target_ids", "direct_extra_refs", "direct_task_refs",
+            },
+            set(finding_properties),
+        )
+        self.assertEqual(
+            [item.model_dump(mode="json")
+             for item in plan_inspection_target_catalog_v2(current_goal, plan)],
+            request.payload["inspection_target_catalog"],
         )
         binding = bind_plan_inspection_request(request, PLAN_INSPECTION_PROVIDER_V2)
         verify_plan_inspection_result_binding(

@@ -11,8 +11,9 @@ from flowmarshal.engine.plan_inspection_eval_v2 import (
     V2_EVALUATION_CONTRACT, assess_case_inspection_review_v2, assess_inspection_review_v2,
 )
 from flowmarshal.engine.plan_inspection_v2 import (
-    CompiledPlanInspectionV2, InspectionRowClosureV2, PlanInspectionV2,
-    ReviewFindingV2, plan_inspection_citation_catalog_v2,
+    CompiledPlanInspectionV2, InspectionRowClosureV2, InspectionTargetV2,
+    PlanInspectionV2, ResolvedFindingTargetsV2, ReviewFindingV2,
+    plan_inspection_citation_catalog_v2, plan_inspection_target_catalog_v2,
 )
 from flowmarshal.engine.planning import plan_review_evidence_catalog, plan_validation_scope_rows, validation_comparison_targets
 from tests.engine_inspection_helpers import inspection_fixture
@@ -69,6 +70,10 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
         citation_catalog = plan_inspection_citation_catalog_v2(evidence_catalog, project_map)
         payload["inspection_citation_catalog"] = [
             item.model_dump(mode="json") for item in citation_catalog
+        ]
+        payload["inspection_target_catalog"] = [
+            item.model_dump(mode="json")
+            for item in plan_inspection_target_catalog_v2(goal, plan)
         ]
         expectation = bind_case_expectation(
             case_id="clean", payload=payload, rows=rows, defects=[], review_digest="sha256:" + "1" * 64,
@@ -182,6 +187,14 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
                     summary="derived", evidence_refs=evidence, affected_task_refs=(owner,),
                     remediable=item.remediable,
                 ) for item in findings),
+                resolved_finding_targets=tuple(ResolvedFindingTargetsV2(
+                    finding_code=item.finding_code,
+                    target_refs=(InspectionTargetV2(
+                        kind="validation",
+                        primary_ref=item.primary_target_ids[0],
+                        secondary_ref=None,
+                    ),),
+                ) for item in findings),
                 row_closures=tuple(InspectionRowClosureV2(row_kind="finding", row_id=item.finding_code,
                                                           citation_ids=closure) for item in findings),
                 membership_witnesses=(),
@@ -191,16 +204,14 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
 
         valid = ReviewFindingV2(finding_code="ORDER_DEFECT", defect_kind="result_order",
                                 remediable=True,
-                                target_refs=({"kind": "validation", "primary_ref": validation.validation_id,
-                                              "secondary_ref": None},))
+                                primary_target_ids=(validation.validation_id,),
+                                direct_extra_refs=(), direct_task_refs=())
         self.assertTrue(report((valid,))["passed"])
         self.assertEqual(["required-order"], report(())["missing_defects"])
         self.assertEqual(["ORDER_DEFECT"], report((valid,), expected=())["unexpected_findings"])
         self.assertFalse(report((valid,), evidence=("source:goal",))["passed"])
         wrong_raw = valid.model_dump(mode="json")
-        wrong_raw["target_refs"] = [{"kind": "validation",
-                                     "primary_ref": inspection.validation_rows[1].validation_id,
-                                     "secondary_ref": None}]
+        wrong_raw["primary_target_ids"] = [inspection.validation_rows[1].validation_id]
         wrong_target = ReviewFindingV2.model_validate(wrong_raw)
         self.assertFalse(report((wrong_target,))["passed"])
         duplicate = dict(defect, defect_id="independent-order")
@@ -255,14 +266,16 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
         finding = ReviewFindingV2.model_validate({
             "finding_code": source_finding["finding_code"], "defect_kind": "validation_scope",
             "remediable": True,
-            "target_refs": [{"kind": "validation_scope", "primary_ref": scope["scope_id"],
-                             "secondary_ref": None}],
+            "primary_target_ids": [scope["scope_id"]],
+            "direct_extra_refs": [],
+            "direct_task_refs": [],
         })
         from flowmarshal.engine.plan_inspection_v2 import compile_plan_inspection_v2
         compiled = compile_plan_inspection_v2(
             inspection, findings=(finding,), plan=plan, goal=goal, project_map=project_map,
             evidence_catalog=evidence_catalog,
             citation_catalog=citation_catalog,
+            target_catalog=plan_inspection_target_catalog_v2(goal, plan),
         )
         report = assess_inspection_review_v2(inspection, (finding,), None, compiled, EXPECTED["bad"])
         self.assertTrue(report["passed"])

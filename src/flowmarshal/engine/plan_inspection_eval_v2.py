@@ -14,7 +14,12 @@ from .plan_inspection_eval import (
     verify_case_expectation,
 )
 from .plan_inspection import InspectionCitation
-from .plan_inspection_v2 import CompiledPlanInspectionV2, PlanInspectionV2, ReviewFindingV2
+from .plan_inspection_v2 import (
+    CompiledPlanInspectionV2,
+    InspectionTargetCatalogEntryV2,
+    PlanInspectionV2,
+    ReviewFindingV2,
+)
 
 
 V2_EVALUATION_CONTRACT = "plan-inspection-evaluation-v2"
@@ -53,14 +58,20 @@ def _fixed_ac_link_requirement_assessment(
 
 def _target_values(
         finding: ReviewFindingV2, inspection: PlanInspectionV2,
+        compiled: CompiledPlanInspectionV2,
 ) -> tuple[set[str], set[str], set[str], set[str]]:
-    """typed target에서만 defect 대상 AC·validation·scope를 읽는다."""
+    """adapter가 target ID에서 해석한 typed target만 평가한다."""
     scopes = {row.scope_id: row for row in inspection.validation_scope_rows}
+    resolved = next(
+        (row.target_refs for row in compiled.resolved_finding_targets
+         if row.finding_code == finding.finding_code),
+        (),
+    )
     criteria: set[str] = set()
     validations: set[str] = set()
     target_kinds: set[str] = set()
     labels: set[str] = set()
-    for target in finding.target_refs:
+    for target in resolved:
         target_kinds.add(target.kind)
         labels.add(":".join(
             str(value) for value in (target.kind, target.primary_ref, target.secondary_ref)
@@ -96,7 +107,7 @@ def assess_inspection_review_v2(
         closure = finding_closures.get(code)
         if direct is None or derived is None or closure is None or direct.defect_kind != defect["defect_kind"]:
             return False
-        criteria, validations, target_kinds, _labels = _target_values(direct, inspection)
+        criteria, validations, target_kinds, _labels = _target_values(direct, inspection, compiled)
         primary = {
             "missing_validation_link": "ac_validation", "validation_scope": "validation_scope",
             "missing_task_validation": "constraint_task", "result_order": "validation",
@@ -160,6 +171,10 @@ def assess_case_inspection_review_v2(
         citation_catalog=tuple(
             InspectionCitation.model_validate(item)
             for item in payload["inspection_citation_catalog"]
+        ),
+        target_catalog=tuple(
+            InspectionTargetCatalogEntryV2.model_validate(item)
+            for item in payload["inspection_target_catalog"]
         ),
     )
     assessment = assess_inspection_review_v2(

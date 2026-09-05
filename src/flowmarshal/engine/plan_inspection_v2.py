@@ -106,12 +106,7 @@ class PlanInspectionV2(EngineModel):
 
 
 class InspectionTargetV2(EngineModel):
-    """Provider가 직접 선택하는 단일 형태의 typed target.
-
-    배열 item의 discriminated union은 Codex strict response schema에서 허용되지
-    않으므로 kind별 객체를 한 형태로 표현한다. 복합 target만 secondary_ref를
-    사용하며 model validator가 kind와 ref 개수를 엄격히 대조한다.
-    """
+    """모델이 선택한 target ID를 adapter가 해석한 내부 typed target."""
 
     kind: Literal[
         "ac_validation", "validation_scope", "constraint_task", "validation", "task", "citation"
@@ -127,6 +122,15 @@ class InspectionTargetV2(EngineModel):
         if not composite and self.secondary_ref is not None:
             raise ValueError(f"{self.kind} target의 secondary_ref는 null이어야 합니다.")
         return self
+
+
+class InspectionTargetCatalogEntryV2(EngineModel):
+    """모델이 두 참조를 다시 조립하지 않도록 제공하는 고정 복합 target."""
+
+    target_id: str = Field(pattern=r"^target_[0-9a-f]{24}$")
+    kind: Literal["ac_validation", "constraint_task"]
+    primary_ref: str = Field(min_length=1)
+    secondary_ref: str = Field(min_length=1)
 
 
 class ReviewFindingV2(EngineModel):
@@ -147,7 +151,25 @@ class ReviewFindingV2(EngineModel):
         ),
     )
     remediable: bool
-    target_refs: tuple[InspectionTargetV2, ...] = Field(min_length=1)
+    primary_target_ids: tuple[str, ...] = Field(
+        min_length=1,
+        description=(
+            "결함 종류가 missing_validation_link 또는 missing_task_validation이면 payload의 "
+            "inspection_target_catalog.target_id, validation_scope 또는 insufficient_evidence면 "
+            "직접 작성한 scope_id, result_order면 validation_id, other면 citation ID를 쓴다."
+        ),
+    )
+    direct_extra_refs: tuple[str, ...] = Field(
+        description="주 target closure 외에 이 finding이 직접 사용한 citation catalog ID."
+    )
+    direct_task_refs: tuple[str, ...] = Field(
+        description="주 target 소유 관계로 계산할 수 없는 직접 영향 Task의 task_ref."
+    )
+
+    @field_validator("primary_target_ids", "direct_extra_refs", "direct_task_refs")
+    @classmethod
+    def direct_ids_are_unique(cls, value: tuple[str, ...], info: Any) -> tuple[str, ...]:
+        return _unique(value, f"finding {info.field_name}")
 
     @model_validator(mode="after")
     def direct_classification_and_targets_are_valid(self) -> "ReviewFindingV2":
@@ -156,8 +178,6 @@ class ReviewFindingV2(EngineModel):
                 raise ValueError("other finding은 gate와 severity를 직접 제출해야 합니다.")
         elif self.gate is not None or self.severity is not None:
             raise ValueError("표준 finding의 gate와 severity는 adapter가 계산하므로 null이어야 합니다.")
-        keys = tuple(repr(item.model_dump(mode="json")) for item in self.target_refs)
-        _unique(keys, "finding target_refs")
         return self
 
 
@@ -186,9 +206,15 @@ class InspectionRowClosureV2(EngineModel):
     citation_ids: tuple[str, ...]
 
 
+class ResolvedFindingTargetsV2(EngineModel):
+    finding_code: str
+    target_refs: tuple[InspectionTargetV2, ...] = Field(min_length=1)
+
+
 class CompiledPlanInspectionV2(EngineModel):
     ac_validation_decisions: tuple[ACValidationDecisionV2, ...]
     derived_findings: tuple[ReviewFinding, ...]
+    resolved_finding_targets: tuple[ResolvedFindingTargetsV2, ...]
     row_closures: tuple[InspectionRowClosureV2, ...]
     membership_witnesses: tuple[CoverageMembershipWitnessV2, ...]
     used_citations: tuple[InspectionCitation, ...]
@@ -221,27 +247,28 @@ PLAN_INSPECTION_V2_INSTRUCTIONS = (
     "양의 관계만 ac_validation_links에 제출한다. 각 행에는 criterion_id·validation_id, 그 절차를 입증하는 "
     "supported scope_ids와 간결한 requirement_claim을 쓴다. 결과·주제의 관련성만으로 연결하지 말고 Goal이 "
     "요구한 실제 검사 절차·도구·phase·Task 또는 integration 범위가 일치해야 한다. 같은 실제 절차를 Task·Goal "
-    "validation이 각각 실행하면 둘을 모두 연결하며, 별도 unittest validation의 존재만으로 oracle validation "
+    "validation이 각각 실행하면 둘을 모두 연결한다. AC가 독립 Task 또는 Goal validation 단계를 하나의 묶음으로 "
+    "명시하고 그 단계에서 수행할 검사 책임을 열거하면, 그 단계에서 열거된 책임을 실제 수행하는 각 validation을 "
+    "연결한다. 이는 같은 단계에 있다는 이유만으로 열거되지 않은 sibling을 연결하는 규칙이 아니다. 별도 unittest "
+    "validation의 존재만으로 oracle validation "
     "안에서 실제 실행되는 unittest 책임을 생략하지 않는다. 같은 Task·phase·실행 순서라는 이유만으로 sibling "
     "validation을 연결하지 않는다. false 관계는 제출하지 않는다. Adapter가 sparse 양의 관계를 모든 "
     "AC×validation의 true/false 행렬과 scope_ids로 확장하고 Goal·validation·mechanism 근거 closure를 파생한다. "
     "모든 전역 constraint×Task 조합도 constraint_task_rows에 정확히 한 번씩 제출한다. Task 검사가 직접 "
     "요구되면 applicability=required와 실제 Task validation ID를 쓰고, 그렇지 않으면 not_applicable과 빈 "
     "required_validation_ids를 쓴다. AC 관계와 전역 Task 의무를 서로 추정하지 않는다. "
-    "Reviewer finding은 finding_code·defect_kind·gate·severity·remediable·target_refs를 제출한다. "
+    "Reviewer finding은 finding_code·defect_kind·gate·severity·remediable·primary_target_ids·direct_extra_refs·"
+    "direct_task_refs를 제출한다. "
     "다섯 표준 defect_kind의 gate·severity는 null이고 adapter가 taxonomy에서 계산한다. 표준 taxonomy로 "
     "표현할 수 없는 직접 결함은 defect_kind=other와 직접 gate·severity를 사용한다. "
-    "target_refs는 단일 {kind, primary_ref, secondary_ref} 형태를 사용한다. ac_validation은 "
-    "criterion_id와 validation_id, constraint_task는 constraint_id와 task_ref를 각각 primary_ref와 "
-    "secondary_ref에 쓰고, 나머지 kind는 자신의 ID를 primary_ref에 쓰며 secondary_ref는 null이다. "
-    "defect_kind에 맞는 typed target을 사용한다: missing_validation_link=ac_validation, "
-    "validation_scope 또는 insufficient_evidence=validation_scope, missing_task_validation=constraint_task, "
-    "result_order=validation, other=citation. 직접 관련된 citation이나 Task target만 추가할 수 있다. 영향 "
-    "Task는 target에서 adapter가 계산한다. other finding이 특정 Task에 영향을 준다고 판단하면 citation과 "
-    "함께 그 Task target을 직접 선택한다. 표준 "
+    "missing_validation_link와 missing_task_validation의 primary_target_ids는 payload의 inspection_target_catalog에서 "
+    "각각 ac_validation·constraint_task target_id를 선택한다. validation_scope와 insufficient_evidence는 직접 만든 "
+    "scope_id, result_order는 validation_id, other는 citation ID를 쓴다. target kind·primary·secondary 참조를 다시 "
+    "작성하지 않는다. 직접 관련된 추가 citation은 direct_extra_refs, 소유 관계로 계산할 수 없는 영향 Task는 "
+    "direct_task_refs에 쓴다. 영향 Task는 주 target 소유 관계와 이 직접 Task 선택에서 adapter가 계산한다. 표준 "
     "finding의 gate·severity와 모든 finding의 summary·evidence_refs·finding_links는 adapter가 taxonomy와 "
     "target closure에서 파생한다. "
-    "모델은 scope claim·status, 양의 AC validation link, finding, target 또는 direct evidence 선택을 adapter가 "
+    "모델은 scope claim·status, 양의 AC validation link, finding 종류·target ID 또는 direct evidence 선택을 adapter가 "
     "채울 것이라고 "
     "가정하지 않는다. "
     "Adapter는 이 의미 판단을 생성·삭제·교정하지 않으며 존재와 closure만 검증한다. "
@@ -491,6 +518,37 @@ def plan_inspection_citation_catalog_v2(
     )
 
 
+def plan_inspection_target_catalog_v2(
+        goal: GoalContractRevision, plan: Any,
+) -> tuple[InspectionTargetCatalogEntryV2, ...]:
+    """복합 finding target의 두 참조를 하나의 고정 선택 ID로 투영한다."""
+    targets = validation_comparison_targets(goal, plan)
+    identities = [
+        ("ac_validation", row["criterion_id"], row["validation_id"])
+        for row in targets["ac_validation_pairs"]
+    ] + [
+        ("constraint_task", row["constraint_id"], row["task_ref"])
+        for row in targets["constraint_task_pairs"]
+    ]
+    rows: list[InspectionTargetCatalogEntryV2] = []
+    seen: dict[str, tuple[str, str, str]] = {}
+    for kind, primary_ref, secondary_ref in identities:
+        identity = (kind, primary_ref, secondary_ref)
+        digest = hashlib.sha256("\0".join(identity).encode("utf-8")).hexdigest()
+        target_id = f"target_{digest[:24]}"
+        previous = seen.get(target_id)
+        if previous is not None and previous != identity:
+            raise PlanInspectionError("v2 target catalog ID 충돌")
+        seen[target_id] = identity
+        rows.append(InspectionTargetCatalogEntryV2(
+            target_id=target_id,
+            kind=kind,
+            primary_ref=primary_ref,
+            secondary_ref=secondary_ref,
+        ))
+    return tuple(rows)
+
+
 def _ordered_union(*groups: Any) -> tuple[str, ...]:
     result: list[str] = []
     seen: set[str] = set()
@@ -516,6 +574,7 @@ def compile_plan_inspection_v2(
     project_map: ProjectMapRevision,
     evidence_catalog: dict[str, Any],
     citation_catalog: tuple[InspectionCitation, ...],
+    target_catalog: tuple[InspectionTargetCatalogEntryV2, ...] | None = None,
 ) -> CompiledPlanInspectionV2:
     """직접 제출된 의미 판단을 검증하고 반복 인용 closure만 결정적으로 파생한다."""
     before_inspection = inspection.model_dump(mode="json")
@@ -585,6 +644,16 @@ def compile_plan_inspection_v2(
         return matches[0]
 
     targets = validation_comparison_targets(goal, plan)
+    expected_target_catalog = plan_inspection_target_catalog_v2(goal, plan)
+    if target_catalog is not None:
+        _require(target_catalog == expected_target_catalog, "v2 target catalog 입력 결속 불일치")
+    elif findings:
+        raise PlanInspectionError("v2 Reviewer finding target catalog가 없습니다.")
+    target_catalog_by_id = {row.target_id: row for row in expected_target_catalog}
+    _require(
+        len(target_catalog_by_id) == len(expected_target_catalog),
+        "v2 target catalog ID 중복",
+    )
     validation_by_id = {row["validation_id"]: row for row in targets["validations"]}
     _require(len(validation_by_id) == len(targets["validations"]), "v2 입력 validation ID 중복")
     task_by_ref = {task.task_ref: task for task in definition.tasks}
@@ -773,17 +842,49 @@ def compile_plan_inspection_v2(
         "other": "citation",
     }
     derived_findings: list[ReviewFinding] = []
+    resolved_finding_targets: list[ResolvedFindingTargetsV2] = []
     finding_targets: dict[str, set[str]] = {}
     for finding in findings:
-        target_kinds = {item.kind for item in finding.target_refs}
         primary = allowed_primary[finding.defect_kind]
-        _require(primary in target_kinds, f"v2 finding target 종류 불일치: {finding.finding_code}")
-        allowed = {primary, "citation", "task"}
-        _require(target_kinds <= allowed, f"v2 finding에 호환되지 않는 target이 있습니다: {finding.finding_code}")
+        primary_targets: list[InspectionTargetV2] = []
+        for target_id in finding.primary_target_ids:
+            if primary in {"ac_validation", "constraint_task"}:
+                catalog_target = target_catalog_by_id.get(target_id)
+                _require(
+                    catalog_target is not None and catalog_target.kind == primary,
+                    f"v2 finding 복합 target ID 종류 불일치: {finding.finding_code}, target_id={target_id}",
+                )
+                primary_targets.append(InspectionTargetV2(
+                    kind=catalog_target.kind,
+                    primary_ref=catalog_target.primary_ref,
+                    secondary_ref=catalog_target.secondary_ref,
+                ))
+            else:
+                primary_targets.append(InspectionTargetV2(
+                    kind=primary,
+                    primary_ref=target_id,
+                    secondary_ref=None,
+                ))
+        target_refs = tuple(primary_targets) + tuple(
+            InspectionTargetV2(kind="citation", primary_ref=ref, secondary_ref=None)
+            for ref in finding.direct_extra_refs
+        ) + tuple(
+            InspectionTargetV2(kind="task", primary_ref=ref, secondary_ref=None)
+            for ref in finding.direct_task_refs
+        )
+        target_keys = tuple(_target_key(item) for item in target_refs)
+        _require(
+            len(target_keys) == len(set(target_keys)),
+            f"v2 finding target 중복: {finding.finding_code}",
+        )
+        resolved_finding_targets.append(ResolvedFindingTargetsV2(
+            finding_code=finding.finding_code,
+            target_refs=target_refs,
+        ))
         closure_parts: list[tuple[str, ...]] = []
         affected: set[str] = set()
         labels: list[str] = []
-        for target in finding.target_refs:
+        for target in target_refs:
             labels.append(_target_key(target))
             if target.kind == "ac_validation":
                 key = (target.primary_ref, target.secondary_ref)
@@ -886,6 +987,7 @@ def compile_plan_inspection_v2(
     return CompiledPlanInspectionV2(
         ac_validation_decisions=derived_ac_rows,
         derived_findings=tuple(derived_findings),
+        resolved_finding_targets=tuple(resolved_finding_targets),
         row_closures=tuple(row_closures),
         membership_witnesses=tuple(witnesses.values()),
         used_citations=tuple(citations[item] for item in sorted(used)),
