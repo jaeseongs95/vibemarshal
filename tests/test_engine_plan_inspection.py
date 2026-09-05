@@ -312,7 +312,9 @@ class PlanInspectionTests(unittest.TestCase):
             validate("clean", payload)
 
     def test_provider_schema_orders_mechanism_evidence_before_ac_link_requirements(self):
-        schema = PlanReviewEnvelope.model_json_schema()
+        from flowmarshal.engine.roles import strict_json_output_schema
+
+        schema = strict_json_output_schema(PlanReviewEnvelope.model_json_schema())
 
         def resolve(value):
             while "$ref" in value:
@@ -326,10 +328,18 @@ class PlanInspectionTests(unittest.TestCase):
              "constraint_task_rows", "finding_links"],
             list(properties),
         )
+        self.assertEqual(list(properties), inspection["required"])
         self.assertEqual(["inspection", "review"], list(schema["properties"]))
         ac_properties = resolve(properties["ac_validation_rows"]["items"])["properties"]
+        self.assertEqual(
+            ["criterion_id", "validation_id", "basis_refs", "scope_ids", "ac_link_required", "finding_codes"],
+            list(ac_properties),
+        )
+        self.assertEqual(list(ac_properties), resolve(properties["ac_validation_rows"]["items"])["required"])
         self.assertEqual("boolean", ac_properties["ac_link_required"]["type"])
         self.assertEqual("array", ac_properties["scope_ids"]["type"])
+        self.assertLess(list(ac_properties).index("basis_refs"), list(ac_properties).index("ac_link_required"))
+        self.assertLess(list(ac_properties).index("scope_ids"), list(ac_properties).index("ac_link_required"))
         self.assertNotIn("relation", ac_properties)
 
     def test_contradicted_scope_and_three_required_ac_links_are_independent(self):

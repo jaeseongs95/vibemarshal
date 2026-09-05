@@ -8,6 +8,7 @@
 - [저장소 작업 지침](../AGENTS.md): 구현 시 지켜야 할 안정된 불변조건
 - [Engine 1.0 qualification](engine-qualification.md): 네 실행 scope, immutable checkpoint, benchmark와 cutover 절차
 - [Engine 실행 구현 현황](engine-implementation-status.md): 실제 실행 결과, NO-GO 근거와 남은 qualification 범위
+- [근거 우선 strict schema 순서 보정](r-s06-evidence-first-schema-order-fix-handoff.md): 선언 property 순서의 canonical 왕복 보존, 근거 우선 Reviewer envelope와 R25 의미 실패 회귀
 
 ## 동결 기준선과 회귀 입력
 

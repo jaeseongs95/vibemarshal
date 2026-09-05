@@ -70,6 +70,9 @@ def make_role_request(*, inventory: ModelInventory | None = None, allowed_fallba
         inventory, (role_lock(kwargs["role"], kwargs["model"], kwargs["effort"], allowed_fallbacks),),
         required_capabilities=ROLE_CAPABILITIES,
     )
+    # request 자체에 완성된 strict schema를 보존해 canonical key 정렬 뒤에도
+    # required 배열에 기록한 선언 순서로 transport schema를 재구성한다.
+    kwargs["output_schema"] = strict_json_output_schema(kwargs["output_schema"])
     return RoleCallRequest(**kwargs, operational_binding=binding)
 
 
@@ -130,10 +133,21 @@ def strict_json_output_schema(schema: dict[str, Any]) -> dict[str, Any]:
         if node.get("type") == "object" or "properties" in node:
             properties = node.get("properties", {})
             if isinstance(properties, dict):
-                # request 저장은 key를 정렬한다. properties와 required를 같은
-                # locale 비의존 순서로 만들면 저장 뒤 재구성한 transport schema도
-                # 최초 전송 schema와 같은 digest를 갖는다.
-                property_names = sorted(properties)
+                # 최초 변환에서는 properties의 schema 선언 순서를 사용한다. 이미
+                # strict인 schema는 전체 required 배열이 그 순서를 보존하므로,
+                # canonical JSON이 object key를 정렬한 뒤 재로드해도 같은 순서를
+                # 복원할 수 있다.
+                declared_required = node.get("required")
+                if (
+                    isinstance(declared_required, list)
+                    and all(isinstance(name, str) for name in declared_required)
+                    and len(declared_required) == len(properties)
+                    and len(set(declared_required)) == len(declared_required)
+                    and set(declared_required) == set(properties)
+                ):
+                    property_names = list(declared_required)
+                else:
+                    property_names = list(properties)
                 node["properties"] = {name: properties[name] for name in property_names}
                 node["additionalProperties"] = False
                 node["required"] = property_names
@@ -144,10 +158,13 @@ def strict_json_output_schema(schema: dict[str, Any]) -> dict[str, Any]:
             if isinstance(definitions, dict):
                 for child in definitions.values():
                     visit(child)
-        for key in ("items", "prefixItems", "anyOf", "oneOf", "allOf", "not", "if", "then", "else",
-                    "dependentSchemas"):
+        for key in ("items", "prefixItems", "anyOf", "oneOf", "allOf", "not", "if", "then", "else"):
             if key in node:
                 visit(node[key])
+        dependent_schemas = node.get("dependentSchemas")
+        if isinstance(dependent_schemas, dict):
+            for child in dependent_schemas.values():
+                visit(child)
 
     visit(normalized)
     return normalized

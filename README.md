@@ -16,6 +16,8 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고
 
 [R-S06-25 제한 역할 검증](docs/r-s06-25-post-diagnostics-fix-limited-validation-handoff.md)은 사례별 성공 결속·assessment를 다음 호출의 Gate로 사용하는 확정 경계에서 새 결정론 Gate 5/5와 fresh v2 prepare를 통과했다. 첫 clean의 result·receipt·terminal 결속은 성공했지만 고정 AC 연결 3개가 불일치해 assessment와 최종 summary는 FAIL이다. logical/provider/recovery는 1/1/0, 총 52,278 token이며 이후 12사례는 NOT_RUN이다. 기존 S06 FAIL·Functional Alpha 미완료·1.0 NO-GO를 유지한다.
 
+[근거 우선 strict schema 순서 보정](docs/r-s06-evidence-first-schema-order-fix-handoff.md)은 R-S06-25 뒤 transport schema가 선언된 property 순서를 canonical 저장 왕복에서도 보존하고, 검사 envelope와 AC 행에서 근거·scope를 boolean 판정보다 먼저 전송하도록 수정했다. 고정 기대표·evaluator·oracle·threshold와 `gpt-5.6-terra/high` Reviewer 설정은 유지한다. 결정적 회귀는 R25 원본 응답의 구조 PASS와 동일한 세 관계 의미 FAIL도 보존하며, 실제 provider 의미 검증은 별도 fresh 제한 경계에 남긴다.
+
 - 새 Engine은 비권위 `ExecutionSpecProposal`을 최신 Goal·Plan·State·Project Map에 컴파일하고, `run once` 호출마다 materialize·dispatch·observe·validate·complete 중 한 단계만 전진한다.
 - worker 종료 문구는 관측값으로만 보존하고 파일·diff·command·test evidence와 별도 validator 결과로 Task 및 Goal을 판정한다.
 - 완료 Task 뒤 Project Map·State 재관측, 저장 thread의 `thread/read` 우선 복구, receipt 불명확 시 중복 생성 방지가 구현돼 있다.

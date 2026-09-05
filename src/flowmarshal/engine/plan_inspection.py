@@ -22,9 +22,9 @@ class InspectionCitation(EngineModel):
 class ACValidationInspection(EngineModel):
     criterion_id: str
     validation_id: str
-    ac_link_required: bool = Field(description="이 validation이 AC 일부를 직접 검증하여 goal_coverage 연결이 필수인지 여부. AC statement 또는 validation_intent가 동일 절차의 task/goal phase를 각각 명시하면, 명시된 각 phase를 실제 수행하는 validation은 각각 true다. 별도 실행은 실행·evidence 분리이며 task phase를 선택 사항으로 만들지 않는다. 명시되지 않은 sibling unittest·scope·semantic validation에는 이 규칙을 전염시키지 않는다. false는 선택적 연결을 금지하지 않는다.")
-    scope_ids: tuple[str, ...] = Field(description="true 판정의 근거가 되는 동일 validation의 supported validation_scope_rows ID. true이면 하나 이상, false이면 빈 배열이다. 다른 scope 부분의 contradicted·unresolved 판정을 이 행의 false 근거로 자동 전파하지 않는다.")
     basis_refs: tuple[str, ...] = Field(min_length=2, description="해당 AC의 statement·validation_intent 각각, validation statement 전체, 참조한 scope 행의 claim·근거 및 같은 validation이 실제 범위 판단에 사용한 모든 project citation ID. 기존 citation을 재사용하며 새 citation을 만들지 않는다.")
+    scope_ids: tuple[str, ...] = Field(description="true 판정의 근거가 되는 동일 validation의 supported validation_scope_rows ID. true이면 하나 이상, false이면 빈 배열이다. 다른 scope 부분의 contradicted·unresolved 판정을 이 행의 false 근거로 자동 전파하지 않는다.")
+    ac_link_required: bool = Field(description="앞선 basis_refs와 scope_ids의 근거에 따라 이 validation이 AC 일부를 직접 검증하여 goal_coverage 연결이 필수인지 표시한다. AC statement 또는 validation_intent가 동일 절차의 task/goal phase를 각각 명시하면, 명시된 각 phase를 실제 수행하는 validation은 각각 true다. 별도 실행은 실행·evidence 분리이며 task phase를 선택 사항으로 만들지 않는다. 명시되지 않은 sibling unittest·scope·semantic validation에는 이 규칙을 전염시키지 않는다. false는 선택적 연결을 금지하지 않는다.")
     finding_codes: tuple[str, ...] = Field(description="ac_link_required=true인데 현재 ID 연결이 없는 경우만 missing_validation_link finding. 나머지는 빈 배열.")
 
 
@@ -101,7 +101,9 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "실제 절차·phase·부분 claim별로 나누어 supported·contradicted·unresolved를 각각 판정한다. 각 validation은 "
     "scope 행이 하나 이상 있어야 하며 scope 행의 claim_ref와 basis_refs는 원문 주장과 실제 절차 근거를 "
     "함께 결속한다. AC가 특정 phase의 절차 실행 자체를 명시하면 세부 관측 scope와 별도로 그 실제 phase "
-    "실행을 나타내는 supported scope도 둔다. 그 뒤 ac_validation_rows와 constraint_task_rows를 작성한다. "
+    "실행을 나타내는 supported scope도 둔다. 그 뒤 ac_validation_rows에서는 criterion_id·validation_id, "
+    "basis_refs·scope_ids를 먼저 작성하고 그 근거에 따른 ac_link_required를 판단한다. 이어 "
+    "constraint_task_rows를 작성한다. "
     "모든 AC × 모든 Task·integration validation 쌍을 ac_validation_rows에 정확히 한 번씩 쓴다. "
     "작성자는 완성한 plan의 모든 validation ID에서 이 곱집합을 구성한다. 각 행의 "
     "ac_link_required는 validation이 AC 일부를 직접 검증하면 true이고 아니면 false다. AC statement 또는 "
