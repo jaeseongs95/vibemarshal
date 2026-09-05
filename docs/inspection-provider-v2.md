@@ -17,11 +17,11 @@ v1의 raw 입력, strict schema, validator, evaluator와 이미 기록된 artifa
 | validation scope | 선택한 `mechanism_id`, 원문을 가리키는 `claim_ref`, 직접 추가 근거, scope `status` |
 | AC×validation 행 | `criterion_id`, `validation_id`, `ac_link_required` bool, `scope_ids`, 직접 추가 근거 |
 | constraint×Task 행 | `constraint_id`, `task_ref`, `applicability`, 적용될 때의 `required_validation_ids` |
-| finding | `finding_code`, `defect_kind`, `affected_task_refs`, `remediable`, typed target. 표준 taxonomy 밖의 `other`는 직접 `gate`·`severity`도 제출 |
+| finding | `finding_code`, `defect_kind`, `affected_task_refs`, `remediable`, 단일 형태의 typed target. 표준 taxonomy 밖의 `other`는 직접 `gate`·`severity`도 제출 |
 
 `tool`과 `phase`는 등록 자료·구현에서 직접 확인한 mechanism을 식별한다. 같은 이름의 도구, 다른 phase, 단순 evidence 종류, 인접한 validation 또는 선후관계만으로 검사 능력이나 scope를 확대하지 않는다. `status`는 해당 scope의 직접 관측 상태이며 다른 scope·AC 행·finding의 결론을 암시하지 않는다.
 
-AC×validation의 bool은 필수 연결 여부만 표현한다. false는 선택 연결을 금지하지 않으며, true는 새 검사 책임·새 Task·새 validation ID를 만들지 않는다. constraint×Task의 `applicability`도 AC 관계를 추정하지 않는다. finding의 typed target은 요청에 제공된 Task·validation·criterion·scope 등의 허용 target 종류와 ID에 맞아야 하며, 존재하지 않는 target을 결함 설명으로 사용할 수 없다.
+AC×validation의 bool은 필수 연결 여부만 표현한다. false는 선택 연결을 금지하지 않으며, true는 새 검사 책임·새 Task·새 validation ID를 만들지 않는다. constraint×Task의 `applicability`도 AC 관계를 추정하지 않는다. finding target은 모두 `{kind, primary_ref, secondary_ref}` 한 형태로 제출한다. `ac_validation`과 `constraint_task`만 두 ID를 순서대로 쓰고, 나머지는 `primary_ref` 하나와 `secondary_ref: null`을 쓴다. 이 표현은 provider strict schema가 배열 item의 `oneOf`를 거부하는 경계에서도 직접 target 선택을 그대로 보존한다. target은 요청에 제공된 Task·validation·criterion·scope 등의 허용 종류와 ID에 맞아야 하며, 존재하지 않는 target을 결함 설명으로 사용할 수 없다.
 
 ## Adapter가 결정적으로 파생하는 값
 

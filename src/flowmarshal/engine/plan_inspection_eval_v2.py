@@ -59,17 +59,19 @@ def _target_values(
     labels: set[str] = set()
     for target in finding.target_refs:
         target_kinds.add(target.kind)
-        values = target.model_dump(mode="json")
-        labels.add(":".join(str(values[key]) for key in values))
+        labels.add(":".join(
+            str(value) for value in (target.kind, target.primary_ref, target.secondary_ref)
+            if value is not None
+        ))
         if target.kind == "ac_validation":
-            criteria.add(target.criterion_id)
-            validations.add(target.validation_id)
+            criteria.add(target.primary_ref)
+            validations.add(target.secondary_ref)
         elif target.kind == "validation_scope":
-            scope = scopes.get(target.scope_id)
+            scope = scopes.get(target.primary_ref)
             if scope is not None:
                 validations.add(scope.validation_id)
         elif target.kind == "validation":
-            validations.add(target.validation_id)
+            validations.add(target.primary_ref)
     return criteria, validations, target_kinds, labels
 
 

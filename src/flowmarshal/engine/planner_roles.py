@@ -470,18 +470,6 @@ class PlanReviewEnvelopeV2(EngineModel):
         schema = handler(core_schema)
         review_schema = _inline_local_schema_refs(PlanReviewDraftV2.model_json_schema())
 
-        def remove_inlined_discriminators(value: Any) -> None:
-            if isinstance(value, list):
-                for item in value:
-                    remove_inlined_discriminators(item)
-            elif isinstance(value, dict):
-                # target oneOf는 이미 const branch로 전개됐다. 제거된 local $defs를
-                # 가리키는 discriminator mapping을 provider schema에 남기지 않는다.
-                value.pop("discriminator", None)
-                for item in value.values():
-                    remove_inlined_discriminators(item)
-
-        remove_inlined_discriminators(review_schema)
         properties = review_schema["properties"]
         empty_findings = deepcopy(properties["findings"])
         empty_findings["maxItems"] = 0

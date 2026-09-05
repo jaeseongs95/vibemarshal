@@ -145,13 +145,16 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
 
         valid = ReviewFindingV2(finding_code="ORDER_DEFECT", defect_kind="result_order",
                                 affected_task_refs=(owner,), remediable=True,
-                                target_refs=({"kind": "validation", "validation_id": validation.validation_id},))
+                                target_refs=({"kind": "validation", "primary_ref": validation.validation_id,
+                                              "secondary_ref": None},))
         self.assertTrue(report((valid,))["passed"])
         self.assertEqual(["required-order"], report(())["missing_defects"])
         self.assertEqual(["ORDER_DEFECT"], report((valid,), expected=())["unexpected_findings"])
         self.assertFalse(report((valid,), evidence=("source:goal",))["passed"])
         wrong_raw = valid.model_dump(mode="json")
-        wrong_raw["target_refs"] = [{"kind": "validation", "validation_id": inspection.validation_rows[1].validation_id}]
+        wrong_raw["target_refs"] = [{"kind": "validation",
+                                     "primary_ref": inspection.validation_rows[1].validation_id,
+                                     "secondary_ref": None}]
         wrong_target = ReviewFindingV2.model_validate(wrong_raw)
         self.assertFalse(report((wrong_target,))["passed"])
         duplicate = dict(defect, defect_id="independent-order")
@@ -199,7 +202,8 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
         finding = ReviewFindingV2.model_validate({
             "finding_code": source_finding["finding_code"], "defect_kind": "validation_scope",
             "affected_task_refs": source_finding["affected_task_refs"], "remediable": True,
-            "target_refs": [{"kind": "validation_scope", "scope_id": scope["scope_id"]}],
+            "target_refs": [{"kind": "validation_scope", "primary_ref": scope["scope_id"],
+                             "secondary_ref": None}],
         })
         from flowmarshal.engine.plan_inspection_v2 import compile_plan_inspection_v2
         compiled = compile_plan_inspection_v2(

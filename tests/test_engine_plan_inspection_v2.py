@@ -14,6 +14,7 @@ from flowmarshal.engine.plan_inspection_provider import (
     verify_plan_inspection_result_binding,
 )
 from flowmarshal.engine.plan_inspection_v2 import (
+    InspectionTargetV2,
     PlanInspectionV2,
     ReviewFindingV2,
     compile_plan_inspection_v2,
@@ -200,8 +201,8 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "affected_task_refs": [owner] if owner else [],
             "remediable": True,
             "target_refs": [{
-                "kind": "ac_validation", "criterion_id": row.criterion_id,
-                "validation_id": row.validation_id,
+                "kind": "ac_validation", "primary_ref": row.criterion_id,
+                "secondary_ref": row.validation_id,
             }],
         },)
         compiled = compile_fixture(changed, findings, plan=changed_plan)
@@ -256,8 +257,8 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "defect_kind": "missing_task_validation",
             "affected_task_refs": [row["task_ref"]],
             "remediable": True,
-            "target_refs": [{"kind": "constraint_task", "constraint_id": row["constraint_id"],
-                             "task_ref": row["task_ref"]}],
+            "target_refs": [{"kind": "constraint_task", "primary_ref": row["constraint_id"],
+                             "secondary_ref": row["task_ref"]}],
         }
         compiled = compile_fixture(PlanInspectionV2.model_validate(raw), (finding,))
         self.assertEqual("PARTIAL_TASK_VALIDATION", compiled.derived_findings[0].finding_code)
@@ -275,7 +276,8 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "defect_kind": "validation_scope",
             "affected_task_refs": [owner] if owner else [],
             "remediable": True,
-            "target_refs": [{"kind": "validation_scope", "scope_id": scope.scope_id}],
+            "target_refs": [{"kind": "validation_scope", "primary_ref": scope.scope_id,
+                             "secondary_ref": None}],
         }
         with self.assertRaisesRegex(PlanInspectionError, "supported scope에 finding"):
             compile_fixture(inspection, (finding,))
@@ -298,7 +300,8 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "defect_kind": "result_order",
             "affected_task_refs": [],
             "remediable": True,
-            "target_refs": [{"kind": "validation", "validation_id": validation_id}],
+            "target_refs": [{"kind": "validation", "primary_ref": validation_id,
+                             "secondary_ref": None}],
         }
         with self.assertRaisesRegex(PlanInspectionError, "affected Task 불일치"):
             compile_fixture(inspection, (finding,))
@@ -311,7 +314,8 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "affected_task_refs": [],
             "remediable": True,
             "target_refs": [{"kind": "validation_scope",
-                             "scope_id": inspection.validation_scope_rows[0].scope_id}],
+                             "primary_ref": inspection.validation_scope_rows[0].scope_id,
+                             "secondary_ref": None}],
         }
         with self.assertRaisesRegex(PlanInspectionError, "target 종류 불일치"):
             compile_fixture(inspection, (finding,))
@@ -325,7 +329,7 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "defect_kind": "result_order",
             "affected_task_refs": [owner],
             "remediable": True,
-            "target_refs": [{"kind": "validation", "validation_id": item}
+            "target_refs": [{"kind": "validation", "primary_ref": item, "secondary_ref": None}
                             for item in validation_ids],
         }
         compiled = compile_fixture(inspection, (finding,))
@@ -354,7 +358,8 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "defect_kind": "result_order",
             "affected_task_refs": [owner] if owner else [],
             "remediable": True,
-            "target_refs": [{"kind": "validation", "validation_id": validation_id}],
+            "target_refs": [{"kind": "validation", "primary_ref": validation_id,
+                             "secondary_ref": None}],
         }
         compiled = compile_fixture(changed, (finding,))
         self.assertIn("source:project_map", compiled.derived_findings[0].evidence_refs)
@@ -378,8 +383,9 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "affected_task_refs": [plan.definition.tasks[0].task_ref],
             "remediable": True,
             "target_refs": [
-                {"kind": "citation", "citation_id": "state_map_value"},
-                {"kind": "task", "task_ref": plan.definition.tasks[0].task_ref},
+                {"kind": "citation", "primary_ref": "state_map_value", "secondary_ref": None},
+                {"kind": "task", "primary_ref": plan.definition.tasks[0].task_ref,
+                 "secondary_ref": None},
             ],
         }
         compiled = compile_fixture(PlanInspectionV2.model_validate(raw), (finding,))
@@ -393,7 +399,8 @@ class PlanInspectionV2Tests(unittest.TestCase):
             "finding_code": "CLASSIFICATION_BOUNDARY",
             "affected_task_refs": [],
             "remediable": True,
-            "target_refs": [{"kind": "validation", "validation_id": "val_example"}],
+            "target_refs": [{"kind": "validation", "primary_ref": "val_example",
+                             "secondary_ref": None}],
         }
         with self.assertRaisesRegex(ValueError, "표준 finding"):
             ReviewFindingV2.model_validate(
@@ -403,8 +410,19 @@ class PlanInspectionV2Tests(unittest.TestCase):
             ReviewFindingV2.model_validate(
                 common | {
                     "defect_kind": "other",
-                    "target_refs": [{"kind": "citation", "citation_id": "citation_example"}],
+                    "target_refs": [{"kind": "citation", "primary_ref": "citation_example",
+                                     "secondary_ref": None}],
                 }
+            )
+
+    def test_uniform_target_requires_exact_reference_arity(self):
+        with self.assertRaisesRegex(ValueError, "secondary_ref가 필요"):
+            InspectionTargetV2(
+                kind="ac_validation", primary_ref="ac_001", secondary_ref=None
+            )
+        with self.assertRaisesRegex(ValueError, "secondary_ref는 null"):
+            InspectionTargetV2(
+                kind="validation", primary_ref="val_001", secondary_ref="unexpected"
             )
 
     def test_compiler_preserves_all_provider_semantic_fields(self):
@@ -493,7 +511,13 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
         ]["findings"]["items"]["properties"]
         self.assertNotIn("evidence_refs", finding_properties)
         self.assertNotIn("summary", finding_properties)
-        self.assertNotIn("discriminator", finding_properties["target_refs"]["items"])
+        target_items = finding_properties["target_refs"]["items"]
+        self.assertNotIn("discriminator", target_items)
+        self.assertNotIn("oneOf", target_items)
+        self.assertEqual(
+            {"kind", "primary_ref", "secondary_ref"},
+            set(target_items["properties"]),
+        )
         binding = bind_plan_inspection_request(request, PLAN_INSPECTION_PROVIDER_V2)
         verify_plan_inspection_result_binding(
             binding, request, RoleCallResult(payload=envelope, receipt=adapter.receipts[-1]),

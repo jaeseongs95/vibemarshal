@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from types import MappingProxyType
 import re
-from typing import Annotated, Any, Literal, Union
+from typing import Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
@@ -105,49 +105,28 @@ class PlanInspectionV2(EngineModel):
     constraint_task_rows: tuple[ConstraintTaskInspectionV2, ...]
 
 
-class ACValidationTargetV2(EngineModel):
-    kind: Literal["ac_validation"]
-    criterion_id: str
-    validation_id: str
+class InspectionTargetV2(EngineModel):
+    """Provider가 직접 선택하는 단일 형태의 typed target.
 
+    배열 item의 discriminated union은 Codex strict response schema에서 허용되지
+    않으므로 kind별 객체를 한 형태로 표현한다. 복합 target만 secondary_ref를
+    사용하며 model validator가 kind와 ref 개수를 엄격히 대조한다.
+    """
 
-class ValidationScopeTargetV2(EngineModel):
-    kind: Literal["validation_scope"]
-    scope_id: str
+    kind: Literal[
+        "ac_validation", "validation_scope", "constraint_task", "validation", "task", "citation"
+    ]
+    primary_ref: str = Field(min_length=1)
+    secondary_ref: str | None
 
-
-class ConstraintTaskTargetV2(EngineModel):
-    kind: Literal["constraint_task"]
-    constraint_id: str
-    task_ref: str
-
-
-class ValidationTargetV2(EngineModel):
-    kind: Literal["validation"]
-    validation_id: str
-
-
-class TaskTargetV2(EngineModel):
-    kind: Literal["task"]
-    task_ref: str
-
-
-class CitationTargetV2(EngineModel):
-    kind: Literal["citation"]
-    citation_id: str
-
-
-InspectionTargetV2 = Annotated[
-    Union[
-        ACValidationTargetV2,
-        ValidationScopeTargetV2,
-        ConstraintTaskTargetV2,
-        ValidationTargetV2,
-        TaskTargetV2,
-        CitationTargetV2,
-    ],
-    Field(discriminator="kind"),
-]
+    @model_validator(mode="after")
+    def reference_arity_matches_kind(self) -> "InspectionTargetV2":
+        composite = self.kind in {"ac_validation", "constraint_task"}
+        if composite and self.secondary_ref is None:
+            raise ValueError(f"{self.kind} target에는 secondary_ref가 필요합니다.")
+        if not composite and self.secondary_ref is not None:
+            raise ValueError(f"{self.kind} target의 secondary_ref는 null이어야 합니다.")
+        return self
 
 
 class ReviewFindingV2(EngineModel):
@@ -242,7 +221,10 @@ PLAN_INSPECTION_V2_INSTRUCTIONS = (
     "Reviewer finding은 finding_code·defect_kind·gate·severity·affected_task_refs·remediable·target_refs를 제출한다. "
     "다섯 표준 defect_kind의 gate·severity는 null이고 adapter가 taxonomy에서 계산한다. 표준 taxonomy로 "
     "표현할 수 없는 직접 결함은 defect_kind=other와 직접 gate·severity를 사용한다. "
-    "target_refs는 defect_kind에 맞는 typed target을 사용한다: missing_validation_link=ac_validation, "
+    "target_refs는 단일 {kind, primary_ref, secondary_ref} 형태를 사용한다. ac_validation은 "
+    "criterion_id와 validation_id, constraint_task는 constraint_id와 task_ref를 각각 primary_ref와 "
+    "secondary_ref에 쓰고, 나머지 kind는 자신의 ID를 primary_ref에 쓰며 secondary_ref는 null이다. "
+    "defect_kind에 맞는 typed target을 사용한다: missing_validation_link=ac_validation, "
     "validation_scope 또는 insufficient_evidence=validation_scope, missing_task_validation=constraint_task, "
     "result_order=validation, other=citation. 직접 관련된 citation이나 Task target만 추가할 수 있다. 표준 "
     "finding의 gate·severity와 모든 finding의 summary·evidence_refs·finding_links는 adapter가 taxonomy와 "
@@ -289,8 +271,8 @@ def _ordered_union(*groups: Any) -> tuple[str, ...]:
 
 
 def _target_key(target: InspectionTargetV2) -> str:
-    values = target.model_dump(mode="json")
-    return ":".join(str(values[name]) for name in values)
+    values = (target.kind, target.primary_ref, target.secondary_ref)
+    return ":".join(str(value) for value in values if value is not None)
 
 
 def compile_plan_inspection_v2(
@@ -533,36 +515,36 @@ def compile_plan_inspection_v2(
         for target in finding.target_refs:
             labels.append(_target_key(target))
             if target.kind == "ac_validation":
-                key = (target.criterion_id, target.validation_id)
+                key = (target.primary_ref, target.secondary_ref)
                 _require(key in ac_closures, "v2 finding AC target이 없습니다.")
                 closure_parts.append(ac_closures[key])
-                owner = validation_by_id[target.validation_id]["task_ref"]
+                owner = validation_by_id[target.secondary_ref]["task_ref"]
                 if owner is not None:
                     affected.add(owner)
             elif target.kind == "validation_scope":
-                _require(target.scope_id in scope_closures, "v2 finding scope target이 없습니다.")
-                closure_parts.append(scope_closures[target.scope_id])
-                owner = validation_by_id[scope_by_id[target.scope_id].validation_id]["task_ref"]
+                _require(target.primary_ref in scope_closures, "v2 finding scope target이 없습니다.")
+                closure_parts.append(scope_closures[target.primary_ref])
+                owner = validation_by_id[scope_by_id[target.primary_ref].validation_id]["task_ref"]
                 if owner is not None:
                     affected.add(owner)
             elif target.kind == "constraint_task":
-                key = (target.constraint_id, target.task_ref)
+                key = (target.primary_ref, target.secondary_ref)
                 _require(key in constraint_closures, "v2 finding constraint target이 없습니다.")
                 closure_parts.append(constraint_closures[key])
-                affected.add(target.task_ref)
+                affected.add(target.secondary_ref)
             elif target.kind == "validation":
-                _require(target.validation_id in validation_closures, "v2 finding validation target이 없습니다.")
-                closure_parts.append(validation_closures[target.validation_id])
-                owner = validation_by_id[target.validation_id]["task_ref"]
+                _require(target.primary_ref in validation_closures, "v2 finding validation target이 없습니다.")
+                closure_parts.append(validation_closures[target.primary_ref])
+                owner = validation_by_id[target.primary_ref]["task_ref"]
                 if owner is not None:
                     affected.add(owner)
             elif target.kind == "task":
-                _require(target.task_ref in task_by_ref, "v2 finding Task target이 없습니다.")
-                affected.add(target.task_ref)
+                _require(target.primary_ref in task_by_ref, "v2 finding Task target이 없습니다.")
+                affected.add(target.primary_ref)
             else:
-                _require(target.citation_id in citations, "v2 finding citation target이 없습니다.")
-                direct_refs((target.citation_id,), f"finding={finding.finding_code}")
-                closure_parts.append((target.citation_id,))
+                _require(target.primary_ref in citations, "v2 finding citation target이 없습니다.")
+                direct_refs((target.primary_ref,), f"finding={finding.finding_code}")
+                closure_parts.append((target.primary_ref,))
         _require(affected == set(finding.affected_task_refs),
                  f"v2 finding affected Task 불일치: {finding.finding_code}")
         closure = _ordered_union(*closure_parts)
@@ -599,7 +581,9 @@ def compile_plan_inspection_v2(
                      if item.defect_kind == code_kind and label in finding_targets[item.finding_code])
 
     for scope_id, row in scope_by_id.items():
-        label = _target_key(ValidationScopeTargetV2(kind="validation_scope", scope_id=scope_id))
+        label = _target_key(InspectionTargetV2(
+            kind="validation_scope", primary_ref=scope_id, secondary_ref=None
+        ))
         scope_findings = tuple(item for item in findings if label in finding_targets[item.finding_code])
         expected_kind = {"contradicted": "validation_scope", "unresolved": "insufficient_evidence"}.get(row.status)
         if expected_kind is None:
@@ -609,16 +593,16 @@ def compile_plan_inspection_v2(
                      f"v2 non-supported scope finding이 누락되거나 종류가 다릅니다: {scope_id}")
 
     for key, row in ac_pairs.items():
-        label = _target_key(ACValidationTargetV2(
-            kind="ac_validation", criterion_id=key[0], validation_id=key[1]
+        label = _target_key(InspectionTargetV2(
+            kind="ac_validation", primary_ref=key[0], secondary_ref=key[1]
         ))
         missing = row.ac_link_required and not witnesses[key].observed_present
         linked = targeted("missing_validation_link", label)
         _require(bool(linked) == missing, f"v2 AC coverage finding 일관성 오류: {key}")
 
     for key, row in constraint_pairs.items():
-        label = _target_key(ConstraintTaskTargetV2(
-            kind="constraint_task", constraint_id=key[0], task_ref=key[1]
+        label = _target_key(InspectionTargetV2(
+            kind="constraint_task", primary_ref=key[0], secondary_ref=key[1]
         ))
         linked = targeted("missing_task_validation", label)
         if row.applicability == "not_applicable":
