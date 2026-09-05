@@ -19,6 +19,7 @@
 
 - [R-S06-30 scope→finding link 참조 결속 보정](r-s06-30-scope-finding-binding-handoff.md): citation ID 포함관계 설명·정렬된 진단·R30 원본 회귀와 결정적 검증
 - [R-S06-31 Sol/xhigh 제한 실제 재검증 결과](r-s06-31-sol-xhigh-actual-validation-handoff.md): 새 Gate 5/5, 호출 전 HEAD 불일치로 경계 FAIL·13사례 NOT_RUN·0/0/0, 1.0 NO-GO
+- [R-S06-32 Sol/xhigh 제한 실제 재검증 결과](r-s06-32-sol-xhigh-actual-validation-handoff.md): 새 Gate 5/5, clean·bad PASS 뒤 wrong-goal AC 관계 26/28로 FAIL·후속 10사례 NOT_RUN·3/3/0, Functional Alpha·1.0 NO-GO
 
 ## 동결 기준선과 회귀 입력
 
