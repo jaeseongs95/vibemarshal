@@ -8,7 +8,7 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고
 
 ## 현재 판정
 
-2026-09-05 [R-S06-19-CLOSE](docs/r-s06-19-close-handoff.md)에서 provider 검사 계약의 기존 보정을 확정했다. 당시 설명 변형·구조 거부의 오프라인 회귀와 558개 테스트·결정론 Gate 5/5는 PASS였다. 최신 [R-S06-26 제한 검증](docs/r-s06-26-evidence-order-limited-validation-handoff.md)은 근거 우선 schema가 적용된 source의 새 결정론 Gate 5/5·584 tests를 통과했지만, 첫 clean의 AC 연결 2개 불일치와 예상 밖 finding 1개로 의미 평가에서 FAIL했다. 기존 S06 FAIL, Functional Alpha 미완료와 1.0 **NO-GO**를 유지한다.
+2026-09-05 [R-S06-19-CLOSE](docs/r-s06-19-close-handoff.md)에서 provider 검사 계약의 기존 보정을 확정했다. 최신 [R-S06-27 Sol/high 제한 검증](docs/r-s06-27-sol-high-limited-validation-handoff.md)은 지정 결정론 Gate 5/5·596 tests의 계약·source·Python 환경 동일성을 확인해 재사용했다. 첫 clean은 scope 근거 결속 오류로 `schema_failed`가 발생해 FAIL로 중단했다. 성공 result·의미 assessment는 없고 이후 12사례는 NOT_RUN이다. 기존 S06 FAIL, Functional Alpha 미완료와 1.0 **NO-GO**를 유지한다.
 
 모델 목록 변화로 제한 검증이 차단된 원인은 [inventory 실행 잠금 v2](docs/model-inventory-lock-v2-handoff.md)에서 수정했다. [R-S06-21 제한 검증](docs/r-s06-21-model-lock-v2-limited-validation-handoff.md)은 fresh v2 prepare 성공 후 inventory 기록 충돌로 역할 호출 0/13에서 FAIL했다. [R-S06-22 제한 검증](docs/r-s06-22-post-capture-fix-limited-validation-handoff.md)은 첫 clean provider 응답 뒤 저장 request의 strict schema 재구성에서 `required` 배열 순서가 달라져 FAIL했다. [strict schema 저장 왕복 보정](docs/r-s06-strict-schema-roundtrip-fix-handoff.md)은 object `properties`와 `required`를 같은 결정적 순서로 생성하고 receipt 관계 검사를 분리했다. [R-S06-23 제한 검증](docs/r-s06-23-post-schema-fix-limited-validation-handoff.md)은 prepare와 실제 schema 왕복 결속을 통과했지만 첫 clean 응답의 scope 근거 누락으로 1/13에서 FAIL했고, 성공 result가 없는 경로의 요약 오류도 확인했다. [실패 안전 diagnostics summary 보정](docs/r-s06-diagnostics-failure-summary-fix-handoff.md)은 원래 역할 실패·usage·효과 수를 보존하는 요약 경로와 결정적 회귀를 추가했다. 새 실제 qualification은 미실행이며 과거 원본 판정과 기존 S06 FAIL·Functional Alpha 미완료·1.0 NO-GO는 유지한다.
 
@@ -20,7 +20,9 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고
 
 [R-S06-26 제한 역할 검증](docs/r-s06-26-evidence-order-limited-validation-handoff.md)은 fresh v2 prepare와 clean의 실제 result·receipt·terminal 결속을 통과했다. 고정 평가에서 `ac_004`의 별도 Task scope·unittest 연결을 과잉 필수화했고 예상 밖 `VAL_SCOPE_001`을 제출해 최종 summary는 FAIL이다. logical/provider/recovery는 1/1/0, 총 53,092 token이며 이후 12사례는 NOT_RUN이다. 원본·source를 보존했으며 기존 S06 FAIL·Functional Alpha 미완료·1.0 NO-GO를 유지한다.
 
-[역할 설정 주입 경계와 R26 회귀](docs/r-s06-role-configuration-boundary-handoff.md)는 외부 `--role-config`의 원문·경로·digest·snapshot 및 요청의 v2 결속을 검증한다. general Reviewer `gpt-5.6-sol/high`는 명시적으로 선택할 후보 파일에만 두며 기본 역할은 유지한다. R26 원본의 구조 PASS·동일 의미 FAIL과 semantic Validator의 file/test 전달 경계를 오프라인 회귀로 보존한다. 새 실제 역할 검증은 별도 fresh 실행 조건에 남아 있다.
+[역할 설정 주입 경계와 R26 회귀](docs/r-s06-role-configuration-boundary-handoff.md)는 외부 `--role-config`의 원문·경로·digest·snapshot 및 요청의 v2 결속을 검증한다. general Reviewer `gpt-5.6-sol/high`는 명시적으로 선택할 후보 파일에만 두며 기본 역할은 유지한다. R26 원본의 구조 PASS·동일 의미 FAIL과 semantic Validator의 file/test 전달 경계를 오프라인 회귀로 보존한다. 후속 후보 실제 검증은 아래 R27에 기록했다.
+
+[R-S06-27 Sol/high 제한 역할 검증](docs/r-s06-27-sol-high-limited-validation-handoff.md)은 절대 경로 `--role-config`와 fresh inventory/v2 lock을 결속해 prepare·run을 각각 한 번 실행했다. 첫 clean의 완료 terminal·실패 receipt 공통 결속은 PASS였지만 scope의 mechanism 근거 누락으로 `schema_failed`가 발생했다. logical/provider/recovery는 1/1/0, 총 55,529 tokens이며 최종 summary는 FAIL·diagnostic error 0이다. 원본을 보존하고 이후 12사례는 NOT_RUN으로 남겼다.
 
 - 새 Engine은 비권위 `ExecutionSpecProposal`을 최신 Goal·Plan·State·Project Map에 컴파일하고, `run once` 호출마다 materialize·dispatch·observe·validate·complete 중 한 단계만 전진한다.
 - worker 종료 문구는 관측값으로만 보존하고 파일·diff·command·test evidence와 별도 validator 결과로 Task 및 Goal을 판정한다.
