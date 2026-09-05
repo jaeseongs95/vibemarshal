@@ -8,14 +8,14 @@
 |---|---|---|
 | A. 실행 기반 격리 | 고정 worktree·공통 preflight·독립 fixture package·결정적 Gate | 완료 · `22d68c0` |
 | B. 기존 계약 기준선 | 같은 역할로 static 11사례, 사례별 형식·참조·의미·운영 결과 | 완료 · PASS 7 / FAIL 4 |
-| C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | 2차 구조 보정·전체 671개 테스트·결정적 Gate 5/5 완료 |
-| D. 새 계약 비교 | 새 실행의 static 11사례와 고정 기대표·실측 usage | 1차 완료 · PASS 1 / FAIL 10, 2차 재실행 NOT_RUN |
+| C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | 3차 prompt·catalog 분리·전체 671개 테스트·결정적 Gate 5/5 완료 |
+| D. 새 계약 비교 | 새 실행의 static 11사례와 고정 기대표·실측 usage | 1차 완료 · PASS 1 / FAIL 10, 2차는 8번째 `external_unknown`으로 불완결, 3차 NOT_RUN |
 | E. S06 재진입 검사 | static·expansion·독립 생성 검토·expanded-review 13단계 | NOT_RUN |
 | F. 실제 Goal 경로 | 고정 자연어에서 실제 Goal·Plan 선택·활성화·실행·독립 검증·GoalVerdict | NOT_RUN |
 
 ## 실행 기반
 
-개발 checkout은 `D:\codex\fm-recovery`, v1 검증 checkout은 `D:\codex\fm-inspection-v1`이다. 첫 v2 고정본은 `D:\codex\fm-inspection-v2`의 detached `880874d5b5ae7e14183ecc2e2e17c10f4cc76a26`이며, 첫 provider 호출에서 발견한 schema 호환 실패 원본을 보존한다. 각 검증본은 detached HEAD와 전용 `.venv`를 사용한다. 원격 추적 브랜치와 다른 checkout의 HEAD는 시작 provenance이며 실행 중에는 자신의 HEAD·source·Python·import origin·입력만 대조한다.
+개발 checkout은 `D:\codex\fm-recovery`, v1 검증 checkout은 `D:\codex\fm-inspection-v1`이다. 첫 v2 고정본은 `D:\codex\fm-inspection-v2`의 detached `880874d5b5ae7e14183ecc2e2e17c10f4cc76a26`이며, 첫 provider 호출에서 발견한 schema 호환 실패 원본을 보존한다. 첫 완전 v2는 `D:\codex\fm-inspection-v2r1`의 `7d3b2013`, 두 번째 구조 보정본은 `D:\codex\fm-inspection-v2r2`의 `19055d71`에 각각 고정돼 있다. 각 검증본은 detached HEAD와 전용 `.venv`를 사용한다. 원격 추적 브랜치와 다른 checkout의 HEAD는 시작 provenance이며 실행 중에는 자신의 HEAD·source·Python·import origin·입력만 대조한다.
 
 독립 입력 package는 `D:\codex\fm-inspection-inputs\r32-v1`이다. whitelist 입력 17개, 프로젝트 파일 3개, 등록 참고자료 1개를 byte 보존했다. manifest digest는 `sha256:091bde16cb39ac26ee66df7e4fd30a54388443ef48088fa661fd0138fb6f0866`이다. 새 실행으로 옮길 때 ProjectMap의 물리 경로와 해당 digest 결속만 바꾸고, 허용 필드 밖 변경을 거부하는 relocation proof를 남긴다.
 
@@ -43,6 +43,8 @@ Codex executable은 `D:\codex\fm-inspection-runtime\codex-935a1911.exe`에 복�
 - v2 및 기존 경계의 전체 단위·통합 테스트와 누적 error receipt 분류 회귀가 통과했고, 커밋 `880874d5`의 최종 결정적 Gate는 669개 테스트를 포함해 5/5 통과했다. 같은 커밋의 고정 v2 worktree에서도 Gate 5/5와 preflight/prepare가 통과했다.
 - 첫 v2 static 실행의 `clean` 호출은 모델 추론 전에 provider가 `target_refs.items.oneOf is not permitted`로 400을 반환해 중단됐다. 이 실행은 `D:\codex\fm-inspection-v2\.flowmarshal-engine-eval\runs\inspection-v2-static11-20260906`에 보존했다. v1 artifact·oracle·재시도 경계를 바꾸지 않고, union target을 같은 직접 의미를 담는 단일 `{kind, primary_ref, secondary_ref}` 구조로 바꾸며 kind별 ref 개수를 결정적으로 검사한다.
 - provider 호환 보정 뒤 새 고정본의 static 11은 11/11 호출을 완료했지만 PASS 1, model output FAIL 6, semantic FAIL 4였다. v1보다 total token은 17.61%, provider duration은 9.65% 줄었으나 PASS는 7건에서 1건으로 감소했다. model output FAIL 중 5건은 직접 citation 객체 장부, 1건은 target과 영향 Task의 중복 작성에서 발생했다. 상세 근거는 [v2 독립 11사례 기준선](inspection-v2-static11-baseline.md)에 있다.
-- 위 전체 실패 분포를 한 원인군으로 묶어 2차 구조 보정을 구현했다. adapter가 결속 입력에서 immutable citation catalog를 만들고 모델은 직접 evidence ID만 선택한다. validation·scope의 claim ref는 원본 ID·selector join으로 붙이고, finding의 affected Task는 typed target의 소유 관계와 직접 `task` target에서 계산한다. 모델의 bool·scope status·finding·target·직접 evidence 선택은 그대로 보존한다. Reviewer strict schema는 첫 v2의 10,609 bytes에서 9,258 bytes로 줄었다. 집중 회귀 22개와 전체 671개 테스트가 통과했고, 새 artifact root의 결정적 Gate도 contract `sha256:673fae74fb4637dcfe0b05fb747b8d1820031615cf6c76ebbdcaf0f92b240f83`로 5/5 통과했다. 새 고정 worktree의 static 11은 아직 실행 전이므로 실제 모델 성공률 개선 근거로 쓰지 않는다.
+- 위 전체 실패 분포를 한 원인군으로 묶어 2차 구조 보정을 구현했다. adapter가 결속 입력에서 immutable citation catalog를 만들고 모델은 직접 evidence ID만 선택한다. validation·scope의 claim ref는 원본 ID·selector join으로 붙이고, finding의 affected Task는 typed target의 소유 관계와 직접 `task` target에서 계산한다. 모델의 bool·scope status·finding·target·직접 evidence 선택은 그대로 보존한다. Reviewer strict schema는 첫 v2의 10,609 bytes에서 9,258 bytes로 줄었다. 집중 회귀 22개와 전체 671개 테스트가 통과했고, 새 artifact root의 결정적 Gate도 contract `sha256:673fae74fb4637dcfe0b05fb747b8d1820031615cf6c76ebbdcaf0f92b240f83`로 5/5 통과했다.
+- 2차 구조 보정의 고정 static 실행은 완료된 첫 7건 모두 schema·compiler를 통과해 중복 장부 실패가 제거됐음을 확인했다. 결과는 PASS 1, semantic FAIL 6 뒤 8번째 `stored-expanded`가 900초 timeout으로 `external_unknown`, 나머지 3건은 NOT_RUN이다. 미완료 ephemeral thread는 종료 뒤 관측할 수 없어 재호출·재개하지 않았다. 상세 근거는 [v2 2차 구조 보정 부분 실행](inspection-v2r2-partial-baseline.md)에 있다.
+- 2차 실행의 요청 artifact에서 v1 trace 작성 규칙과 v2 금지 규칙이 동시에 제공되고, Goal source trace와 State·ProjectMap의 기계 메타데이터까지 citation 후보로 복제된 사실을 확인했다. 3차 보정은 v2 전용 trace 지침을 분리하고 semantic citation projection을 추가했다. State·ProjectMap 결속은 Core·preflight의 결정적 책임으로 유지하며 모델의 bool·status·finding·target은 보정하지 않는다. 동일 clean 표본의 catalog는 334개·67,857자에서 86개·21,035자로, 전체 request는 129,360자에서 74,789자로 줄었다. v1 장부 필드 지침이 v2 요청에 없음을 회귀로 고정했다. 집중 47개와 전체 671개 테스트가 통과했고, 새 결정적 Gate는 contract `sha256:6d8614e1678873c4ad4c3a00500aa8cd893a867cf49c8365a8a686df9acb1af5`로 5/5 통과했다. 실제 모델 개선은 새 고정 worktree의 별도 static 11에서 판정한다.
 
 전체 qualification, Functional Alpha와 1.0 cutover는 아직 NO-GO다. 실제 모델 응답의 개선이나 최종 Goal 완료는 아직 증명하지 않았다.

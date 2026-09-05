@@ -232,6 +232,66 @@ PLAN_VALIDATION_TRACE_INSTRUCTIONS = (
 )
 
 
+PLANNING_PROJECT_PATH_V2_INSTRUCTIONS = (
+    "대상 프로젝트는 Goal의 명시적 대상과 Project Map.root를 대조해 판단한다. "
+    "Project Map.entries의 kind=reference 또는 registered_reference 자료는 등록 참고자료이며 "
+    "그 파일의 부모 디렉터리가 대상 프로젝트라는 뜻이 아니다. 자료 경로의 실행명·날짜·버전이나 "
+    "역할 실행 cwd가 다르다는 사실만으로 target 변경이나 stale root를 추론하지 않는다. 역할 cwd는 "
+    "계획·검토 프로세스의 실행 위치이며 Goal의 대상 프로젝트를 변경하지 않는다. "
+    "State·ProjectMap의 revision, digest, root, freshness와 요청 결속은 역할 호출 전에 Core와 adapter가 "
+    "결정적으로 검사했다. 이 기계 메타데이터를 서로 비교해 semantic finding을 만들지 않는다. "
+    "등록 참고자료의 실제 본문과 Goal·Plan 의미가 충돌하는지는 계속 직접 검토한다."
+)
+
+
+PLANNING_VALIDATION_BOUNDARY_V2_INSTRUCTIONS = PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS.replace(
+    "Reviewer finding의 affected_task_refs는 별도로 Task.task_ref를 사용한다. ",
+    "Reviewer finding이 영향을 주는 Task는 선택한 typed target의 소유 관계에서 adapter가 계산한다. ",
+)
+
+
+PLAN_VALIDATION_TRACE_V2_INSTRUCTIONS = (
+    "상세 Plan v2 검토는 모델의 의미 판단과 adapter의 참조 전개를 분리한다. 요청의 "
+    "inspection_citation_catalog는 결속된 의미 원문의 선택 가능한 ID 목록이다. 원문 객체를 다시 "
+    "작성하지 말고, 검사 수단의 능력을 판단하는 데 직접 사용한 ID만 direct_refs로 선택한다. "
+    "validation statement, Goal AC·constraint 원문, coverage membership, 행 사이의 반복 closure와 "
+    "finding의 최종 evidence는 adapter가 원본 ID·selector와 typed target에서 계산한다. "
+    "1) 검사와 scope 판정: 모든 validation.statement 전체와 등록 수단의 실제 본문을 읽고, 각 "
+    "validation_rows에 실제 수단·phase를 mechanism으로 작성한다. 복합 책임은 실제 절차·phase·부분 "
+    "claim별 validation_scope_rows로 나누고 supported·contradicted·unresolved 중 하나를 직접 판단한다. "
+    "한 부분의 판단을 sibling scope에 전파하지 않는다. 전체 문장에 실제 책임과 과장 책임이 함께 "
+    "있으면 supported와 contradicted scope를 함께 둔다. AC가 특정 phase 실행 자체를 명시하면 세부 "
+    "관측 scope와 별도로 그 phase 실행을 나타내는 supported scope도 둔다. mechanism 근거를 scope나 "
+    "AC 행에 반복하지 않고, 해당 scope에만 추가 근거가 있을 때 direct_extra_refs를 사용한다. "
+    "2) AC 연결 판정: scope 결과를 bool로 복사하지 말고 AC statement·validation_intent가 직접 요구한 "
+    "절차 또는 특정 수단·phase와 supported scope를 다시 대조해 ac_link_required를 독립 판정한다. "
+    "true이면 그 의무를 입증하는 supported scope ID를 선택하고 false이면 scope_ids를 비운다. task "
+    "validation이 goal 전용 관측까지 과장했어도 task phase가 실제 unittest를 수행하고 AC가 그 task "
+    "phase를 명시하면 그 supported scope를 근거로 연결은 true다. 한 scope의 모순은 실제 수행되는 "
+    "다른 절차나 명시 phase의 연결을 false로 만들지 않는다. AC가 task/goal phase를 각각 명시하면 "
+    "각 phase의 실제 validation ID를 각각 연결한다. 명시되지 않은 sibling unittest·scope·semantic "
+    "validation, 전역 의무, 연관 표현, 단순 선후조건이나 같은 evidence만으로 다른 AC나 phase에 "
+    "연결 의무를 전염시키지 않는다. 이 비전염 규칙은 Goal에 명시된 독립 검사 의무를 없애지 않는다. "
+    "특정 oracle phase를 지목한 문장은 그 phase의 oracle 절차를 수행하는 validation을 요구하지만, "
+    "같은 Task 또는 phase에 있는 별도 unittest·파일 범위·semantic validation까지 모두 지목한 것은 "
+    "아니다. 'Task 검증 후'처럼 완료 순서만 정한 표현도 개별 Task validation 전부의 AC 연결이 아니다. "
+    "false는 기존의 선택적 연결을 금지한다는 뜻이 아니다. "
+    "3) 전역 Task 의무 판정: AC 연결 뒤 전역 constraint가 적용 Task에 요구한 검사 존재를 "
+    "constraint_task_rows에서 별도로 판정한다. required이면 그 Task에 실제 존재하는 validation ID를 "
+    "선택하고, 적용되지 않으면 not_applicable과 빈 목록을 쓴다. 검사 ID 연결만 빠진 결함과 실행 "
+    "자체가 빠진 결함을 구분한다. "
+    "4) finding: contradicted·unresolved scope, 필수 coverage 누락, 필수 Task 검사 누락, 미래 Validator "
+    "결과의 선행 요구를 각각 해당 typed target에 결속한다. 모델이 판단한 status·bool·finding 종류·"
+    "target·직접 근거는 adapter가 보정하지 않는다. 같은 원인의 중복 finding은 만들지 않되 직접 "
+    "확인한 독립 결함은 빠뜨리지 않는다. 한 Task의 sibling deterministic validation들이 생산하는 "
+    "file·diff·command·test evidence와 semantic validation 자체가 생산하는 model_review evidence를 "
+    "구분한다. semantic validation의 required_evidence_kinds나 statement가 입력 catalog의 모든 sibling "
+    "evidence 종류를 반복하지 않았다는 사실만으로 입력 누락 finding을 만들지 않는다. 필요한 직접 "
+    "evidence가 Task 전체에 없거나 완료 순서·precondition이 그 전달을 막는 직접 근거가 있을 때만 "
+    "별도 결함으로 판단한다."
+)
+
+
 def inspection_source_catalog(project_map: ProjectMapRevision, sources: dict[str, str]) -> dict[str, Any]:
     """등록 자료의 정식 주소와 검증한 원문을 두 Plan 역할에 동일하게 투영한다.
 
@@ -285,7 +345,7 @@ class PlanReviewDraftV2(ReviewDraft):
     findings: tuple[ReviewFindingV2, ...] = Field(
         description=(
             "직접 확인한 Plan 결함의 최소 의미 제출물. 표준 defect_kind의 gate·severity와 모든 "
-            "summary·evidence_refs·affected_task_refs는 typed target closure와 동결 taxonomy에서 "
+            "요약·evidence 귀속·영향 Task는 typed target closure와 동결 taxonomy에서 "
             "adapter가 계산한다. "
             "표준 taxonomy 밖의 other 결함만 gate·severity를 직접 제출한다."
         ),
@@ -559,6 +619,20 @@ def _uses_plan_inspection_v2(provider: PlanInspectionProviderVersion) -> bool:
     if provider == PLAN_INSPECTION_PROVIDER_V2:
         return True
     raise PlannerRoleAdapterError(f"지원하지 않는 Plan inspection provider입니다: {provider}")
+
+
+def _inspection_prompt_components(use_v2: bool) -> tuple[str, str, str]:
+    if use_v2:
+        return (
+            PLANNING_PROJECT_PATH_V2_INSTRUCTIONS,
+            PLANNING_VALIDATION_BOUNDARY_V2_INSTRUCTIONS,
+            PLAN_VALIDATION_TRACE_V2_INSTRUCTIONS,
+        )
+    return (
+        PLANNING_PROJECT_PATH_INSTRUCTIONS,
+        PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS,
+        PLAN_VALIDATION_TRACE_INSTRUCTIONS,
+    )
 
 
 def _review_submission_v2(
@@ -864,6 +938,11 @@ class PlanExpanderAdapter:
         inspection_instructions = (
             _PLAN_INSPECTION_V2_GUIDANCE if use_v2 else PLAN_INSPECTION_INSTRUCTIONS
         )
+        (
+            project_path_instructions,
+            validation_boundary_instructions,
+            validation_trace_instructions,
+        ) = _inspection_prompt_components(use_v2)
         inspection_evidence_catalog = {
             "source:goal": goal.definition.model_dump(mode="json"),
             "source:state": state.model_dump(mode="json"),
@@ -914,7 +993,7 @@ class PlanExpanderAdapter:
                 "의미 검사는 원본 file 근거와 응답 관측을 함께 참조하는 semantic validation으로 "
                 "계약하고 required_evidence_kinds에 model_review·external_observation·file을 모두 "
                 "요구한다. 이는 외부 시스템 변경 효과를 뜻하지 않는다."
-            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS + PLAN_VALIDATION_TRACE_INSTRUCTIONS + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS + inspection_instructions,
+            ) + project_path_instructions + validation_boundary_instructions + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS + validation_trace_instructions + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS + inspection_instructions,
             payload={
                 "case_ref": _case_ref(sha256_digest(candidate)),
                 "goal": goal.definition.model_dump(mode="json"),
@@ -1134,6 +1213,11 @@ class PlanReviewerAdapter:
         inspection_instructions = (
             _PLAN_INSPECTION_V2_GUIDANCE if use_v2 else PLAN_INSPECTION_INSTRUCTIONS
         )
+        (
+            project_path_instructions,
+            validation_boundary_instructions,
+            validation_trace_instructions,
+        ) = _inspection_prompt_components(use_v2)
         citation_catalog = (
             plan_inspection_citation_catalog_v2(evidence_catalog, project_map)
             if use_v2 else ()
@@ -1161,7 +1245,7 @@ class PlanReviewerAdapter:
                 "파일·명령의 운영 상세는 ExecutionSpec에 확정한다. read_only는 산출물 mutation 정책이며 "
                 "읽기 검사와 계획 생성 자체를 금지하지 않는다. 외부 효과는 외부 시스템·계정·제3자에 대한 효과다."
                 + (
-                    "v2에서는 영향 Task를 typed target에서 계산하므로 affected_task_refs를 제출하지 않는다. "
+                    "v2에서는 영향 Task를 제출하지 않고 typed target만 선택한다. "
                     if use_v2 else
                     "affected_task_refs는 Task.task_ref를 참조하며 Core의 task_id와 혼동하지 않는다."
                 )
@@ -1172,7 +1256,7 @@ class PlanReviewerAdapter:
                 "각 행의 statement를 등록 자료의 실제 수단·phase와 대조하고 마지막 integration 행까지 "
                 "확인한다. linked_criterion_ids는 현재 연결 사실이며 필수 연결의 판정이 아니다. "
                 "색인 자체를 새 evidence ref나 별도 권위로 사용하지 않고 finding은 원본 evidence_catalog에 결속한다."
-            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + PLAN_VALIDATION_TRACE_INSTRUCTIONS + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS + inspection_instructions,
+            ) + project_path_instructions + validation_boundary_instructions + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + validation_trace_instructions + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS + inspection_instructions,
             payload={
                 "case_ref": _case_ref(digest),
                 "evidence_catalog": evidence_catalog,

@@ -22,6 +22,7 @@ from flowmarshal.engine.plan_inspection_v2 import (
 )
 from flowmarshal.engine.planning import plan_review_evidence_catalog, validation_comparison_targets
 from flowmarshal.engine.planner_roles import (
+    PLAN_VALIDATION_TRACE_V2_INSTRUCTIONS,
     PlanExpanderAdapter,
     PlanReviewerAdapter,
     RuleBasedTaskAssigner,
@@ -225,7 +226,29 @@ class PlanInspectionV2Tests(unittest.TestCase):
             item.source_ref for item in first if item.source_ref.startswith("project:")
         }
         self.assertEqual(exposed_project_refs, observed_project_refs)
+        self.assertNotIn("source:state", {item.source_ref for item in first})
+        self.assertNotIn("source:project_map", {item.source_ref for item in first})
+        self.assertFalse(any(item.selector.startswith("/source_traces") for item in first))
+        goal_sources = {(item.selector, item.quote) for item in first
+                        if item.source_ref == "source:goal"}
+        for index, criterion in enumerate(goal.definition.hard_acceptance):
+            self.assertIn((f"/hard_acceptance/{index}/statement", criterion.statement), goal_sources)
+            self.assertIn(
+                (f"/hard_acceptance/{index}/validation_intent", criterion.validation_intent),
+                goal_sources,
+            )
+        for index, constraint in enumerate(goal.definition.constraints):
+            self.assertIn((f"/constraints/{index}/statement", constraint.statement), goal_sources)
         self.assertTrue(all(item.citation_id.startswith("cite_") for item in first))
+
+        machine_only_changes = deepcopy(catalog)
+        machine_only_changes["source:state"]["facts"][0]["value"] = "sha256:" + "f" * 64
+        machine_only_changes["source:project_map"]["revision_digest"] = "sha256:" + "e" * 64
+        machine_only_changes["source:goal"]["source_traces"][0]["statement"] = "변경된 provenance 장부"
+        self.assertEqual(
+            first,
+            plan_inspection_citation_catalog_v2(machine_only_changes, project_map),
+        )
 
         changed = list(first)
         changed[0] = changed[0].model_copy(update={"citation_id": "cite_" + "f" * 32})
@@ -424,22 +447,22 @@ class PlanInspectionV2Tests(unittest.TestCase):
         self.assertNotIn(f"project:{entry.entry_id}", compiled.derived_findings[0].evidence_refs)
 
     def test_other_finding_preserves_direct_classification_and_citation_targets(self):
-        plan, _goal, project_map, catalog, inspection = v2_inputs()
-        state_value = catalog["source:state"]["facts"][0]["value"]
+        plan, current_goal, project_map, catalog, inspection = v2_inputs()
+        goal_value = current_goal.definition.observable_outcome
         citation_catalog = plan_inspection_citation_catalog_v2(catalog, project_map)
-        state_ref = next(
+        goal_ref = next(
             item.citation_id for item in citation_catalog
-            if item.source_ref == "source:state" and item.selector == "/facts/0/value"
-            and item.quote == state_value
+            if item.source_ref == "source:goal" and item.selector == "/observable_outcome"
+            and item.quote == goal_value
         )
         finding = {
-            "finding_code": "STATE_PROJECT_MAP_BINDING_MISMATCH",
+            "finding_code": "GOAL_OUTCOME_CONTRACT_MISMATCH",
             "defect_kind": "other",
             "gate": "grounding",
             "severity": "error",
             "remediable": True,
             "target_refs": [
-                {"kind": "citation", "primary_ref": state_ref, "secondary_ref": None},
+                {"kind": "citation", "primary_ref": goal_ref, "secondary_ref": None},
                 {"kind": "task", "primary_ref": plan.definition.tasks[0].task_ref,
                  "secondary_ref": None},
             ],
@@ -448,7 +471,7 @@ class PlanInspectionV2Tests(unittest.TestCase):
         derived = compiled.derived_findings[0]
         self.assertEqual("grounding", derived.gate.value)
         self.assertEqual("error", derived.severity.value)
-        self.assertEqual(("source:state",), derived.evidence_refs)
+        self.assertEqual(("source:goal",), derived.evidence_refs)
         self.assertEqual((plan.definition.tasks[0].task_ref,), derived.affected_task_refs)
 
     def test_standard_and_other_finding_classification_boundaries_are_strict(self):
@@ -538,6 +561,10 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
             request = runner.calls[-1]
             self.assertEqual(draft["tasks"][0]["objective"], plan.definition.tasks[0].objective)
             self.assertIn("plan-inspection-v2", request.instructions)
+            self.assertIn(PLAN_VALIDATION_TRACE_V2_INSTRUCTIONS, request.instructions)
+            for v1_field in ("citations에 원문", "basis_refs", "claim_ref", "affected_task_refs"):
+                self.assertNotIn(v1_field, request.instructions)
+            self.assertIn("기계 메타데이터를 서로 비교해 semantic finding을 만들지 않는다", request.instructions)
             self.assertIn("direct_extra_refs", str(request.output_schema))
             self.assertNotIn("finding_links", str(request.output_schema))
             inspection_properties = request.output_schema["$defs"]["PlanInspectionV2"]["properties"]

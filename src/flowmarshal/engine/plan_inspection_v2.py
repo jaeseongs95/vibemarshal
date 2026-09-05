@@ -273,6 +273,136 @@ def _string_leaves(value: Any, selector: str = ""):
             yield from _string_leaves(item, f"{selector}/{index}")
 
 
+def _selected_string_leaves(
+        value: Any, selectors: tuple[str, ...],
+) -> tuple[tuple[str, str], ...]:
+    """원본 selector를 유지하며 명시적으로 선택한 의미 문자열만 투영한다."""
+    rows: list[tuple[str, str]] = []
+    for selector in selectors:
+        selected = _pointer(value, selector)
+        if isinstance(selected, str):
+            if selected:
+                rows.append((selector, selected))
+        elif isinstance(selected, (list, tuple)):
+            for index, item in enumerate(selected):
+                if isinstance(item, str) and item:
+                    rows.append((f"{selector}/{index}", item))
+    return tuple(rows)
+
+
+def _goal_semantic_leaves(value: dict[str, Any]) -> tuple[tuple[str, str], ...]:
+    """Goal provenance 장부를 제외하고 사용자가 판단할 의미만 고른다."""
+    selectors = ["/source_request", "/observable_outcome", "/non_goals"]
+    for index, _item in enumerate(value.get("hard_acceptance", ())):
+        selectors.extend((
+            f"/hard_acceptance/{index}/statement",
+            f"/hard_acceptance/{index}/validation_intent",
+        ))
+    for index, _item in enumerate(value.get("quality_preferences", ())):
+        selectors.append(f"/quality_preferences/{index}/statement")
+    for index, _item in enumerate(value.get("constraints", ())):
+        selectors.extend((
+            f"/constraints/{index}/category",
+            f"/constraints/{index}/statement",
+        ))
+    for index, _item in enumerate(value.get("assumptions", ())):
+        selectors.append(f"/assumptions/{index}/statement")
+    for index, _item in enumerate(value.get("unresolved_questions", ())):
+        selectors.extend((
+            f"/unresolved_questions/{index}/question",
+            f"/unresolved_questions/{index}/impact",
+        ))
+    effect_policy = value.get("effect_policy", {})
+    if isinstance(effect_policy, dict):
+        selectors.extend((
+            "/effect_policy/allowed_external_effects",
+            "/effect_policy/prohibited_effects",
+        ))
+    return _selected_string_leaves(value, tuple(selectors))
+
+
+def _skeleton_semantic_leaves(value: dict[str, Any]) -> tuple[tuple[str, str], ...]:
+    """Skeleton의 의미·위험·입출력을 남기고 ID·digest 장부는 제외한다."""
+    selectors: list[str] = []
+    approach = value.get("approach", {})
+    if isinstance(approach, dict):
+        selectors.extend(f"/approach/{key}" for key in (
+            "strategy_family", "change_shape", "compatibility", "rollout_recovery"
+        ))
+    for index, _item in enumerate(value.get("tasks", ())):
+        selectors.extend(
+            f"/tasks/{index}/{key}" for key in (
+                "objective", "produces", "consumes", "risk_tags",
+                "required_capabilities", "no_op_when", "unknown_refs", "detail_requirements",
+            )
+        )
+    for index, _item in enumerate(value.get("dependencies", ())):
+        selectors.extend(
+            f"/dependencies/{index}/{key}" for key in ("produces", "consumes")
+        )
+    selectors.append("/unknowns")
+    return _selected_string_leaves(value, tuple(selectors))
+
+
+def _plan_semantic_leaves(value: dict[str, Any]) -> tuple[tuple[str, str], ...]:
+    """Plan의 계약 문장을 남기고 기계적 ID·digest·membership 장부는 제외한다."""
+    is_revision = isinstance(value.get("definition"), dict)
+    definition = value["definition"] if is_revision else value
+    prefix = "/definition" if is_revision else ""
+    selectors: list[str] = []
+    for index, task in enumerate(definition.get("tasks", ())):
+        base = f"{prefix}/tasks/{index}"
+        selectors.extend(f"{base}/{key}" for key in (
+            "objective", "produces", "consumes", "required_capabilities",
+            "acceptance_criteria", "risk_tags",
+        ))
+        for item_index, _item in enumerate(task.get("preconditions", ())):
+            selectors.append(f"{base}/preconditions/{item_index}/statement")
+        for collection in ("expected_effects", "prohibited_effects"):
+            for item_index, _item in enumerate(task.get(collection, ())):
+                selectors.append(f"{base}/{collection}/{item_index}/statement")
+        for item_index, _item in enumerate(task.get("validations", ())):
+            selectors.append(f"{base}/validations/{item_index}/statement")
+    for index, _item in enumerate(definition.get("dependencies", ())):
+        selectors.append(f"{prefix}/dependencies/{index}/products")
+    for index, _item in enumerate(definition.get("integration_validations", ())):
+        selectors.append(f"{prefix}/integration_validations/{index}/statement")
+    selectors.extend((f"{prefix}/expected_effects", f"{prefix}/prohibited_effects"))
+    return _selected_string_leaves(value, tuple(selectors))
+
+
+def _semantic_citation_leaves_v2(
+        evidence_catalog: dict[str, Any], project_map: ProjectMapRevision,
+) -> tuple[tuple[str, str, str], ...]:
+    """Reviewer 의미 판단에 필요한 원문만 catalog 후보로 투영한다.
+
+    State·ProjectMap의 revision/digest 결속은 Core가 결정적으로 검사한다. 이 함수는
+    그 기계 메타데이터와 Goal source trace 장부를 모델의 직접 evidence 후보로 만들지 않는다.
+    """
+    rows: list[tuple[str, str, str]] = []
+    for source_ref in sorted(evidence_catalog):
+        value = evidence_catalog[source_ref]
+        if not isinstance(value, dict):
+            continue
+        if source_ref == "source:goal":
+            leaves = _goal_semantic_leaves(value)
+        elif source_ref == "artifact:skeleton":
+            leaves = _skeleton_semantic_leaves(value)
+        elif source_ref in {"artifact:plan_contract", "artifact:plan_draft"}:
+            leaves = _plan_semantic_leaves(value)
+        else:
+            # source:state와 source:project_map을 포함한 운영 장부는 여기서 제외한다.
+            continue
+        rows.extend((source_ref, selector, text) for selector, text in leaves)
+    for entry in sorted(project_map.entries, key=lambda item: item.entry_id):
+        if entry.kind.value in {"reference", "instruction"}:
+            rows.append((
+                f"project:{entry.entry_id}", "/content",
+                inspection_file_content(entry, project_map),
+            ))
+    return tuple(rows)
+
+
 def _quote_segments(value: str) -> tuple[str, ...]:
     candidates: list[str] = []
     if len(value) <= 5000:
@@ -298,42 +428,47 @@ def _quote_segments(value: str) -> tuple[str, ...]:
 
 
 def _citation_catalog_from_sources(sources: dict[str, Any]) -> tuple[InspectionCitation, ...]:
+    return _citation_catalog_from_leaves(
+        (source_ref, selector, value)
+        for source_ref in sorted(sources)
+        for selector, value in _string_leaves(sources[source_ref])
+    )
+
+
+def _citation_catalog_from_leaves(
+        leaves: Any,
+) -> tuple[InspectionCitation, ...]:
     rows: list[InspectionCitation] = []
     seen_ids: dict[str, tuple[str, str, str]] = {}
     seen_values: set[tuple[str, str, str]] = set()
-    for source_ref in sorted(sources):
-        for selector, value in _string_leaves(sources[source_ref]):
-            for quote in _quote_segments(value):
-                identity = (source_ref, selector, quote)
-                if identity in seen_values:
-                    continue
-                seen_values.add(identity)
-                digest = hashlib.sha256("\0".join(identity).encode("utf-8")).hexdigest()
-                citation_id = f"cite_{digest[:32]}"
-                previous = seen_ids.get(citation_id)
-                if previous is not None and previous != identity:
-                    raise PlanInspectionError("v2 citation catalog ID 충돌")
-                seen_ids[citation_id] = identity
-                rows.append(InspectionCitation(
-                    citation_id=citation_id,
-                    source_ref=source_ref,
-                    selector=selector,
-                    quote=quote,
-                ))
+    for source_ref, selector, value in leaves:
+        for quote in _quote_segments(value):
+            identity = (source_ref, selector, quote)
+            if identity in seen_values:
+                continue
+            seen_values.add(identity)
+            digest = hashlib.sha256("\0".join(identity).encode("utf-8")).hexdigest()
+            citation_id = f"cite_{digest[:32]}"
+            previous = seen_ids.get(citation_id)
+            if previous is not None and previous != identity:
+                raise PlanInspectionError("v2 citation catalog ID 충돌")
+            seen_ids[citation_id] = identity
+            rows.append(InspectionCitation(
+                citation_id=citation_id,
+                source_ref=source_ref,
+                selector=selector,
+                quote=quote,
+            ))
     return tuple(rows)
 
 
 def plan_inspection_citation_catalog_v2(
         evidence_catalog: dict[str, Any], project_map: ProjectMapRevision,
 ) -> tuple[InspectionCitation, ...]:
-    """원문을 바꾸지 않고 모델이 선택할 수 있는 고정 citation 후보를 만든다."""
-    sources = dict(evidence_catalog)
-    for entry in project_map.entries:
-        if entry.kind.value in {"reference", "instruction"}:
-            sources[f"project:{entry.entry_id}"] = {
-                "content": inspection_file_content(entry, project_map)
-            }
-    return _citation_catalog_from_sources(sources)
+    """의미 원문을 바꾸지 않고 모델이 선택할 수 있는 고정 citation 후보를 만든다."""
+    return _citation_catalog_from_leaves(
+        _semantic_citation_leaves_v2(evidence_catalog, project_map)
+    )
 
 
 def _ordered_union(*groups: Any) -> tuple[str, ...]:
