@@ -67,7 +67,7 @@ class InspectionFindingLink(EngineModel):
     criterion_ids: tuple[str, ...]
     validation_ids: tuple[str, ...]
     task_refs: tuple[str, ...]
-    basis_refs: tuple[str, ...] = Field(min_length=1)
+    basis_refs: tuple[str, ...] = Field(min_length=1, description="이 finding link가 실제로 인용한 citation ID. 각 ID의 source_ref를 원본 evidence ref로 환산한다: source:goal과 Reviewer의 artifact:plan_contract는 그대로, 검증된 project:<entry_id>는 source:project_map이다. 이 link의 환산 집합 ⊆ 같은 finding_code의 finding.evidence_refs ⊆ 실제 evidence_catalog key 집합이어야 한다. 다른 link나 대조표 전체의 Goal 인용을 일괄 포함하지 않으며 유효한 추가 catalog ref는 허용한다. citation ID·project:<entry_id>·source:plan을 직접 evidence_refs로 쓰지 않는다.")
 
 
 class PlanInspection(EngineModel):
@@ -89,6 +89,15 @@ PLAN_INSPECTION_SHARED_INSTRUCTIONS = (
     "scope_ids=[]를 유지한다. 참조는 목록 안에서 중복 없이 재사용한다. 근거 반복은 추적 결속일 "
     "뿐 다른 부분의 검사 능력·판정을 scope에 부여하지 않는다. adapter가 누락 참조·인용·boolean을 "
     "자동 보정한다고 가정하지 않는다. "
+    "Reviewer는 제출 직전에 각 finding_link의 basis_refs에 있는 citation ID를 citations에서 찾아 "
+    "source_ref를 원본 evidence ref로 환산한다. source:goal과 artifact:plan_contract는 그대로, "
+    "검증된 project:<entry_id>는 source:project_map으로 환산한다. link별 환산 집합이 같은 "
+    "finding_code의 finding.evidence_refs에 모두 포함되는지, finding.evidence_refs가 실제 "
+    "evidence_catalog key 집합의 부분집합인지 대조한다. 해당 link가 Goal을 인용할 때만 "
+    "source:goal이 필요하며, 다른 link나 대조표 전체의 모든 citation·Goal ref를 각 finding에 "
+    "일괄 포함하지 않는다. 유효한 추가 catalog ref는 허용한다. citation ID·project:<entry_id>·"
+    "source:plan을 직접 evidence_refs로 쓰지 않는다. adapter가 evidence 추가·인용 삭제·finding "
+    "생성·의미 판정·silent fallback을 수행한다고 가정하지 않는다. "
 )
 
 
@@ -270,8 +279,20 @@ def validate_plan_inspection(
         _require(_unique(link.task_refs, "finding Task") <= task_by_ref.keys(), "대조표 finding Task ID 오류")
         finding = findings_by_code[link.finding_code]
         _require(set(link.task_refs) == set(finding.affected_task_refs), "대조표 finding affected Task 불일치")
-        cited_sources = {"source:project_map" if item.source_ref in entries else item.source_ref for item in refs(link.basis_refs)}
-        _require(cited_sources <= set(finding.evidence_refs), "대조표 finding evidence ref 불일치")
+        cited_evidence = {
+            item.citation_id: "source:project_map" if item.source_ref in entries else item.source_ref
+            for item in refs(link.basis_refs)
+        }
+        cited_sources = set(cited_evidence.values())
+        actual_sources = set(finding.evidence_refs)
+        missing_sources = cited_sources - actual_sources
+        missing_citations = sorted(key for key, source in cited_evidence.items() if source in missing_sources)
+        _require(
+            cited_sources <= set(finding.evidence_refs),
+            f"대조표 finding evidence ref 불일치: finding_code={link.finding_code}, "
+            f"required_evidence_refs={sorted(cited_sources)}, actual_evidence_refs={sorted(actual_sources)}, "
+            f"missing_evidence_refs={sorted(missing_sources)}, missing_citation_ids={missing_citations}",
+        )
 
     def codes(values: tuple[str, ...], *, kind: str, criterion: str | None = None,
               validation: str | None = None, task: str | None = None) -> None:

@@ -262,7 +262,7 @@ class PlannerRoleAdapterError(RuntimeError):
 
 class PlanReviewDraft(ReviewDraft):
     findings: tuple[FindingDraft, ...] = Field(
-        description="직접 확인한 Plan 계약 결함. 검사 수단·phase의 범위, 복합 검사 문장 전체와 AC의 필수 ID 연결, Worker 산출물과 후속 Validator 입력·결과 순서를 각각 대조한다. 연결 누락과 실행 누락, Task의 Validator 통과 조건과 Worker가 미래 검토 결과를 미리 제출하는 충돌을 구분한다. 독립 결함은 각각 직접 evidence로 제출하고 다른 finding이나 낮은 rating으로 대신하지 않는다. 같은 원인의 중복·추측은 제외한다.",
+        description="직접 확인한 Plan 계약 결함. 검사 수단·phase의 범위, 복합 검사 문장 전체와 AC의 필수 ID 연결, Worker 산출물과 후속 Validator 입력·결과 순서를 각각 대조한다. 연결 누락과 실행 누락, Task의 Validator 통과 조건과 Worker가 미래 검토 결과를 미리 제출하는 충돌을 구분한다. 독립 결함은 각각 직접 evidence로 제출하고 다른 finding이나 낮은 rating으로 대신하지 않는다. 같은 원인의 중복·추측은 제외한다. 같은 finding_code의 InspectionFindingLink.basis_refs에 있는 citation ID를 원본 evidence ref로 환산한다: source:goal과 artifact:plan_contract는 그대로, 검증된 project:<entry_id>는 source:project_map이다. 해당 link의 환산 집합 ⊆ finding.evidence_refs ⊆ 실제 evidence_catalog key 집합을 제출 전에 대조한다. Goal ref는 해당 link가 Goal을 인용할 때 필요하며 대조표 전체 인용을 각 finding에 강제하지 않는다. 유효한 추가 catalog ref는 허용하고 citation ID·project:<entry_id>·source:plan은 직접 evidence_refs로 쓰지 않는다.",
     )
     ratings: ReviewRatings | None = Field(
         description="직접 근거가 있는 finding이 전혀 없을 때만 후보 품질을 평가한다. 확인된 계약 모순이 있으면 findings를 제출하고 ratings는 null이다. 낮은 점수는 후보 차단이나 finding을 대신하지 않는다.",

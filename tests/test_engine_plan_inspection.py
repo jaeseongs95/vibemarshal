@@ -122,6 +122,99 @@ def validate(name, payload):
 
 
 class PlanInspectionTests(unittest.TestCase):
+    def _review_with_local_receipt(self, payload):
+        from flowmarshal.engine.planner_roles import PlanReviewerAdapter
+        from flowmarshal.engine.roles import CodexStructuredRoleRunner
+        from tests.test_engine_roles import ImmediateRoleRuntime
+
+        runtime = ImmediateRoleRuntime([json.dumps(payload, ensure_ascii=False)])
+        runner = CodexStructuredRoleRunner(runtime, max_schema_recovery_attempts=0)
+        plan, goal, state, project_map = inputs("bad")
+        with tempfile.TemporaryDirectory() as temp:
+            adapter = PlanReviewerAdapter(
+                runner, model="available", effort="low", inventory=runtime.inventory,
+                inventory_digest=runtime.inventory.inventory_digest, cwd=temp,
+            )
+            reviewed = adapter.review(plan=plan, goal=goal, state=state, project_map=project_map,
+                                      risk_route="compact_plan_reviewer")
+        self.assertEqual(1, len(runner.receipts))
+        self.assertEqual(0, runner.receipts[0].schema_recovery_attempts)
+        self.assertEqual("succeeded", runner.receipts[0].status)
+        return reviewed
+
+    def test_finding_evidence_is_conditional_on_its_link_and_allows_extra_catalog_refs(self):
+        payload = submission("bad")
+        finding = payload["review"]["findings"][0]
+        link = payload["inspection"]["finding_links"][0]
+        citations = {item["citation_id"]: item for item in payload["inspection"]["citations"]}
+        goal_id = next(key for key, item in citations.items() if item["source_ref"] == "source:goal")
+        self.assertNotIn("source:goal", finding["evidence_refs"])
+        self.assertTrue(all(citations[key]["source_ref"] != "source:goal" for key in link["basis_refs"]))
+        for case in ("no_goal_in_link", "complete", "extra_catalog_ref"):
+            with self.subTest(case=case):
+                if case == "complete":
+                    link["basis_refs"].append(goal_id)
+                    finding["evidence_refs"].append("source:goal")
+                elif case == "extra_catalog_ref":
+                    finding["evidence_refs"].append("source:state")
+                before = deepcopy(payload)
+                reviewed = self._review_with_local_receipt(payload)
+                self.assertEqual(tuple(finding["evidence_refs"]), reviewed.findings[0].evidence_refs)
+                self.assertEqual(before, payload)
+
+    def test_finding_missing_evidence_diagnostic_survives_failed_receipt_without_recovery(self):
+        from flowmarshal.engine.roles import StructuredRoleError
+
+        base = submission("bad")
+        citations = {item["citation_id"]: item for item in base["inspection"]["citations"]}
+        goal_ids = sorted(key for key, item in citations.items() if item["source_ref"] == "source:goal")[:2]
+        for missing in ("source:goal", "artifact:plan_contract", "source:project_map"):
+            with self.subTest(missing=missing):
+                payload = deepcopy(base)
+                link = payload["inspection"]["finding_links"][0]
+                finding = payload["review"]["findings"][0]
+                link["basis_refs"].extend(goal_ids)
+                finding["evidence_refs"] = [ref for ref in
+                    ("artifact:plan_contract", "source:goal", "source:project_map") if ref != missing]
+                expected_ids = sorted(key for key in link["basis_refs"] if
+                    ("source:project_map" if citations[key]["source_ref"].startswith("project:")
+                     else citations[key]["source_ref"]) == missing)
+                before = deepcopy(payload)
+                with self.assertRaises(StructuredRoleError) as failure:
+                    self._review_with_local_receipt(payload)
+                receipt = failure.exception.receipt
+                self.assertEqual("schema_failed", receipt.status)
+                self.assertEqual(0, receipt.schema_recovery_attempts)
+                self.assertEqual(1, len(receipt.turn_ids))
+                self.assertIsNone(receipt.output_digest)
+                self.assertEqual(
+                    f"대조표 finding evidence ref 불일치: finding_code={finding['finding_code']}, "
+                    "required_evidence_refs=['artifact:plan_contract', 'source:goal', 'source:project_map'], "
+                    f"actual_evidence_refs={sorted(finding['evidence_refs'])}, "
+                    f"missing_evidence_refs={[missing]}, missing_citation_ids={expected_ids}",
+                    receipt.error_summary,
+                )
+                self.assertEqual(before, payload)
+
+    def test_finding_rejects_project_citation_id_and_source_plan_as_direct_evidence(self):
+        from flowmarshal.engine.roles import StructuredRoleError
+
+        base = submission("bad")
+        project = next(item for item in base["inspection"]["citations"]
+                       if item["source_ref"].startswith("project:"))
+        for invalid in (project["source_ref"], project["citation_id"], "source:plan"):
+            with self.subTest(invalid=invalid):
+                payload = deepcopy(base)
+                payload["review"]["findings"][0]["evidence_refs"].append(invalid)
+                before = deepcopy(payload)
+                with self.assertRaises(StructuredRoleError) as failure:
+                    self._review_with_local_receipt(payload)
+                self.assertEqual(f"Reviewer finding이 제공되지 않은 evidence를 참조합니다: {[invalid]}",
+                                 failure.exception.receipt.error_summary)
+                self.assertEqual(0, failure.exception.receipt.schema_recovery_attempts)
+                self.assertEqual(1, len(failure.exception.receipt.turn_ids))
+                self.assertEqual(before, payload)
+
     def test_scope_binds_one_complete_same_phase_mechanism_without_union_or_intersection_shortcuts(self):
         payload = submission("clean")
         inspection = payload["inspection"]
