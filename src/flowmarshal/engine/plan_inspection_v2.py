@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from types import MappingProxyType
 import re
 from typing import Any, Literal
@@ -49,7 +50,6 @@ class InspectionMechanismV2(EngineModel):
 
 class ValidationInspectionV2(EngineModel):
     validation_id: str
-    claim_ref: str
     mechanisms: tuple[InspectionMechanismV2, ...] = Field(min_length=1)
 
     @model_validator(mode="after")
@@ -62,7 +62,6 @@ class ValidationScopeInspectionV2(EngineModel):
     scope_id: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_]{0,79}$")
     validation_id: str
     mechanism_id: str
-    claim_ref: str
     direct_extra_refs: tuple[str, ...]
     status: ScopeStatus
 
@@ -98,7 +97,6 @@ class ConstraintTaskInspectionV2(EngineModel):
 
 
 class PlanInspectionV2(EngineModel):
-    citations: tuple[InspectionCitation, ...] = Field(min_length=1)
     validation_rows: tuple[ValidationInspectionV2, ...] = Field(min_length=1)
     validation_scope_rows: tuple[ValidationScopeInspectionV2, ...] = Field(min_length=1)
     ac_validation_rows: tuple[ACValidationInspectionV2, ...]
@@ -146,14 +144,8 @@ class ReviewFindingV2(EngineModel):
             "adapter가 taxonomy에서 계산한다."
         ),
     )
-    affected_task_refs: tuple[str, ...]
     remediable: bool
     target_refs: tuple[InspectionTargetV2, ...] = Field(min_length=1)
-
-    @field_validator("affected_task_refs")
-    @classmethod
-    def tasks_are_unique(cls, value: tuple[str, ...]) -> tuple[str, ...]:
-        return _unique(value, "finding affected_task_refs")
 
     @model_validator(mode="after")
     def direct_classification_and_targets_are_valid(self) -> "ReviewFindingV2":
@@ -187,6 +179,7 @@ class CompiledPlanInspectionV2(EngineModel):
     derived_findings: tuple[ReviewFinding, ...]
     row_closures: tuple[InspectionRowClosureV2, ...]
     membership_witnesses: tuple[CoverageMembershipWitnessV2, ...]
+    used_citations: tuple[InspectionCitation, ...]
 
 
 FINDING_TAXONOMY_V2 = MappingProxyType({
@@ -201,15 +194,14 @@ FINDING_TAXONOMY_V2 = MappingProxyType({
 PLAN_INSPECTION_V2_INSTRUCTIONS = (
     "응답은 기존 plan 또는 review와 inspection을 감싼 plan-inspection-v2 전용 envelope다. "
     "inspection은 의미 판단에 필요한 원자 관측만 제출하고 반복 가능한 참조 closure는 쓰지 않는다. "
-    "citations에는 실제 사용한 source_ref·JSON pointer selector·연속 quote를 한 번씩 등록한다. "
-    "source:goal은 Goal definition, Reviewer의 artifact:plan_contract는 revision 전체, Expander의 "
-    "artifact:plan_draft는 출력 plan 전체다. 등록 파일은 inspection_source_catalog의 정확한 "
-    "project:<entry_id>와 selector=/content를 사용한다. quote를 의역하거나 없는 원문을 만들지 않는다. "
-    "모든 Task·integration validation마다 validation_rows를 정확히 하나 만들고 statement 전체 citation을 "
-    "claim_ref로 선택한다. mechanisms에는 실제 확인한 tool·phase와 그 판단에 직접 필요한 citation ID만 "
+    "원문 citation 객체를 다시 쓰지 않는다. 요청의 inspection_citation_catalog는 adapter가 원문에서 "
+    "고정한 비권위 후보이며, 모델은 실제 판단에 직접 사용한 citation ID만 direct_refs에서 선택한다. "
+    "모든 Task·integration validation마다 validation_rows를 정확히 하나 만든다. validation statement와 "
+    "Goal AC·constraint의 고정 claim citation은 ID join으로 adapter가 붙인다. mechanisms에는 실제 확인한 "
+    "tool·phase와 그 판단에 직접 필요한 catalog citation ID만 "
     "direct_refs로 쓴다. mechanism_id는 응답 전체에서 유일해야 한다. "
     "각 validation의 주장 범위를 빠짐없이 validation_scope_rows로 나누고, 같은 validation의 mechanism_id와 "
-    "plan statement를 가리키는 claim_ref를 선택한 뒤 supported·contradicted·unresolved 중 하나를 직접 판단한다. "
+    "supported·contradicted·unresolved 중 하나를 직접 판단한다. "
     "mechanism의 근거를 direct_extra_refs에 반복하지 말고 해당 scope에만 추가로 필요한 citation만 쓴다. "
     "모든 AC×모든 validation 조합을 ac_validation_rows에 정확히 한 번씩 제출한다. ac_link_required는 "
     "AC 원문이 그 검사를 필수로 연결하는지 직접 판단한다. true이면 해당 validation의 supported scope ID를 "
@@ -218,7 +210,7 @@ PLAN_INSPECTION_V2_INSTRUCTIONS = (
     "모든 전역 constraint×Task 조합도 constraint_task_rows에 정확히 한 번씩 제출한다. Task 검사가 직접 "
     "요구되면 applicability=required와 실제 Task validation ID를 쓰고, 그렇지 않으면 not_applicable과 빈 "
     "required_validation_ids를 쓴다. AC 관계와 전역 Task 의무를 서로 추정하지 않는다. "
-    "Reviewer finding은 finding_code·defect_kind·gate·severity·affected_task_refs·remediable·target_refs를 제출한다. "
+    "Reviewer finding은 finding_code·defect_kind·gate·severity·remediable·target_refs를 제출한다. "
     "다섯 표준 defect_kind의 gate·severity는 null이고 adapter가 taxonomy에서 계산한다. 표준 taxonomy로 "
     "표현할 수 없는 직접 결함은 defect_kind=other와 직접 gate·severity를 사용한다. "
     "target_refs는 단일 {kind, primary_ref, secondary_ref} 형태를 사용한다. ac_validation은 "
@@ -226,10 +218,12 @@ PLAN_INSPECTION_V2_INSTRUCTIONS = (
     "secondary_ref에 쓰고, 나머지 kind는 자신의 ID를 primary_ref에 쓰며 secondary_ref는 null이다. "
     "defect_kind에 맞는 typed target을 사용한다: missing_validation_link=ac_validation, "
     "validation_scope 또는 insufficient_evidence=validation_scope, missing_task_validation=constraint_task, "
-    "result_order=validation, other=citation. 직접 관련된 citation이나 Task target만 추가할 수 있다. 표준 "
+    "result_order=validation, other=citation. 직접 관련된 citation이나 Task target만 추가할 수 있다. 영향 "
+    "Task는 target에서 adapter가 계산한다. other finding이 특정 Task에 영향을 준다고 판단하면 citation과 "
+    "함께 그 Task target을 직접 선택한다. 표준 "
     "finding의 gate·severity와 모든 finding의 summary·evidence_refs·finding_links는 adapter가 taxonomy와 "
     "target closure에서 파생한다. "
-    "모델은 citation, bool, status, finding, target 또는 direct ref를 adapter가 채울 것이라고 가정하지 않는다. "
+    "모델은 bool, status, finding, target 또는 direct evidence 선택을 adapter가 채울 것이라고 가정하지 않는다. "
     "Adapter는 이 의미 판단을 생성·삭제·교정하지 않으며 존재와 closure만 검증한다. "
     "Expander 응답에는 finding branch가 없다. 생성 Plan에 contradicted/unresolved scope, 필수 coverage 누락 또는 "
     "필수 Task validation 누락이 있으면 출력으로 숨기지 말고 유효한 Plan을 작성한다. Reviewer는 findings와 "
@@ -259,6 +253,89 @@ def _pointer(value: Any, selector: str) -> Any:
         raise PlanInspectionError("v2 대조표 selector가 원문에 없습니다.") from error
 
 
+def _pointer_token(value: Any) -> str:
+    return str(value).replace("~", "~0").replace("/", "~1")
+
+
+def _string_leaves(value: Any, selector: str = ""):
+    if isinstance(value, str):
+        if value:
+            yield selector or "/", value
+        return
+    if isinstance(value, dict):
+        for key in sorted(value, key=str):
+            yield from _string_leaves(
+                value[key], f"{selector}/{_pointer_token(key)}"
+            )
+        return
+    if isinstance(value, (list, tuple)):
+        for index, item in enumerate(value):
+            yield from _string_leaves(item, f"{selector}/{index}")
+
+
+def _quote_segments(value: str) -> tuple[str, ...]:
+    candidates: list[str] = []
+    if len(value) <= 5000:
+        candidates.append(value)
+    for block in re.split(r"\n\s*\n", value):
+        block = block.strip()
+        if not block or block == value:
+            continue
+        if len(block) <= 5000:
+            candidates.append(block)
+        else:
+            candidates.extend(
+                block[index:index + 5000]
+                for index in range(0, len(block), 5000)
+            )
+    if not candidates:
+        candidates.extend(
+            value[index:index + 5000]
+            for index in range(0, len(value), 5000)
+            if value[index:index + 5000]
+        )
+    return tuple(dict.fromkeys(candidates))
+
+
+def _citation_catalog_from_sources(sources: dict[str, Any]) -> tuple[InspectionCitation, ...]:
+    rows: list[InspectionCitation] = []
+    seen_ids: dict[str, tuple[str, str, str]] = {}
+    seen_values: set[tuple[str, str, str]] = set()
+    for source_ref in sorted(sources):
+        for selector, value in _string_leaves(sources[source_ref]):
+            for quote in _quote_segments(value):
+                identity = (source_ref, selector, quote)
+                if identity in seen_values:
+                    continue
+                seen_values.add(identity)
+                digest = hashlib.sha256("\0".join(identity).encode("utf-8")).hexdigest()
+                citation_id = f"cite_{digest[:32]}"
+                previous = seen_ids.get(citation_id)
+                if previous is not None and previous != identity:
+                    raise PlanInspectionError("v2 citation catalog ID 충돌")
+                seen_ids[citation_id] = identity
+                rows.append(InspectionCitation(
+                    citation_id=citation_id,
+                    source_ref=source_ref,
+                    selector=selector,
+                    quote=quote,
+                ))
+    return tuple(rows)
+
+
+def plan_inspection_citation_catalog_v2(
+        evidence_catalog: dict[str, Any], project_map: ProjectMapRevision,
+) -> tuple[InspectionCitation, ...]:
+    """원문을 바꾸지 않고 모델이 선택할 수 있는 고정 citation 후보를 만든다."""
+    sources = dict(evidence_catalog)
+    for entry in project_map.entries:
+        if entry.kind.value in {"reference", "instruction"}:
+            sources[f"project:{entry.entry_id}"] = {
+                "content": inspection_file_content(entry, project_map)
+            }
+    return _citation_catalog_from_sources(sources)
+
+
 def _ordered_union(*groups: Any) -> tuple[str, ...]:
     result: list[str] = []
     seen: set[str] = set()
@@ -283,6 +360,7 @@ def compile_plan_inspection_v2(
     goal: GoalContractRevision,
     project_map: ProjectMapRevision,
     evidence_catalog: dict[str, Any],
+    citation_catalog: tuple[InspectionCitation, ...],
 ) -> CompiledPlanInspectionV2:
     """직접 제출된 의미 판단을 검증하고 반복 인용 closure만 결정적으로 파생한다."""
     before_inspection = inspection.model_dump(mode="json")
@@ -294,9 +372,32 @@ def compile_plan_inspection_v2(
     sources = dict(evidence_catalog)
     sources[plan_ref] = plan.model_dump(mode="json")
 
-    citations = {item.citation_id: item for item in inspection.citations}
-    _require(len(citations) == len(inspection.citations), "v2 대조표 citation ID 중복")
     entries = {f"project:{entry.entry_id}": entry for entry in project_map.entries}
+    expected_catalog = plan_inspection_citation_catalog_v2(evidence_catalog, project_map)
+    _require(
+        citation_catalog == expected_catalog,
+        "v2 citation catalog 입력 결속 불일치",
+    )
+    for source_ref, entry in entries.items():
+        if entry.kind.value in {"reference", "instruction"}:
+            sources[source_ref] = {"content": inspection_file_content(entry, project_map)}
+    selectable_citations = {item.citation_id: item for item in citation_catalog}
+    _require(
+        len(selectable_citations) == len(citation_catalog),
+        "v2 citation catalog ID 중복",
+    )
+    automatic = _citation_catalog_from_sources({
+        "source:goal": goal.definition.model_dump(mode="json"),
+        plan_ref: plan.model_dump(mode="json"),
+    })
+    citations = dict(selectable_citations)
+    for item in automatic:
+        previous = citations.get(item.citation_id)
+        _require(
+            previous is None or previous == item,
+            "v2 citation catalog ID 충돌",
+        )
+        citations[item.citation_id] = item
     for citation in citations.values():
         if citation.source_ref in entries:
             sources[citation.source_ref] = {
@@ -313,14 +414,14 @@ def compile_plan_inspection_v2(
 
     def direct_refs(values: tuple[str, ...], context: str) -> tuple[str, ...]:
         _require(len(values) == len(set(values)), f"v2 대조표 직접 인용 중복: {context}")
-        missing = set(values) - citations.keys()
+        missing = set(values) - selectable_citations.keys()
         _require(not missing, f"v2 대조표에 없는 인용 ID: {context}, missing_refs={sorted(missing)}")
         used.update(values)
         return values
 
     def source_citation(source_ref: str, selector: str, context: str, *, full_quote: bool) -> str:
         selected = _pointer(sources[source_ref], selector)
-        matches = [item.citation_id for item in inspection.citations
+        matches = [item.citation_id for item in citations.values()
                    if item.source_ref == source_ref and item.selector == selector and
                    (not full_quote or item.quote == selected)]
         qualifier = "전체 " if full_quote else ""
@@ -352,11 +453,8 @@ def compile_plan_inspection_v2(
     row_closures: list[InspectionRowClosureV2] = []
     for validation_id, row in validation_rows.items():
         selector = validation_by_id[validation_id]["selector"] + "/statement"
-        _require(
-            row.claim_ref == source_citation(
-                plan_ref, selector, f"validation_id={validation_id}", full_quote=True
-            ),
-            f"v2 검사 주장 인용 오류: validation_id={validation_id}",
+        claim_ref = source_citation(
+            plan_ref, selector, f"validation_id={validation_id}", full_quote=True
         )
         mechanism_refs: list[tuple[str, ...]] = []
         for mechanism in row.mechanisms:
@@ -367,7 +465,7 @@ def compile_plan_inspection_v2(
             row_closures.append(InspectionRowClosureV2(
                 row_kind="mechanism", row_id=mechanism.mechanism_id, citation_ids=refs
             ))
-        closure = _ordered_union((row.claim_ref,), *mechanism_refs)
+        closure = _ordered_union((claim_ref,), *mechanism_refs)
         validation_closures[validation_id] = closure
         row_closures.append(InspectionRowClosureV2(
             row_kind="validation", row_id=validation_id, citation_ids=closure
@@ -390,15 +488,12 @@ def compile_plan_inspection_v2(
             f"v2 scope mechanism 소유 validation 불일치: scope_id={scope_id}",
         )
         validation_selector = validation_by_id[row.validation_id]["selector"] + "/statement"
-        claim = citations.get(row.claim_ref)
-        _require(
-            claim is not None and claim.source_ref == plan_ref and claim.selector == validation_selector,
-            f"v2 scope 주장 인용 오류: scope_id={scope_id}",
+        claim_ref = source_citation(
+            plan_ref, validation_selector, f"scope_id={scope_id}", full_quote=True
         )
-        used.add(row.claim_ref)
         extras = direct_refs(row.direct_extra_refs, f"scope_id={scope_id}")
         mechanism = mechanism_binding[1]
-        closure = _ordered_union((row.claim_ref,), mechanism.direct_refs, extras)
+        closure = _ordered_union((claim_ref,), mechanism.direct_refs, extras)
         scope_closures[scope_id] = closure
         project_refs_by_validation[row.validation_id].update(
             ref for ref in closure if citations[ref].source_ref in entries
@@ -545,8 +640,6 @@ def compile_plan_inspection_v2(
                 _require(target.primary_ref in citations, "v2 finding citation target이 없습니다.")
                 direct_refs((target.primary_ref,), f"finding={finding.finding_code}")
                 closure_parts.append((target.primary_ref,))
-        _require(affected == set(finding.affected_task_refs),
-                 f"v2 finding affected Task 불일치: {finding.finding_code}")
         closure = _ordered_union(*closure_parts)
         used.update(closure)
         evidence_refs = _ordered_union(*(
@@ -568,7 +661,7 @@ def compile_plan_inspection_v2(
             severity=severity,
             summary=f"{finding.defect_kind}: {', '.join(labels)}",
             evidence_refs=evidence_refs,
-            affected_task_refs=finding.affected_task_refs,
+            affected_task_refs=tuple(sorted(affected)),
             remediable=finding.remediable,
         ))
         finding_targets[finding.finding_code] = set(labels)
@@ -611,8 +704,6 @@ def compile_plan_inspection_v2(
             _require(bool(row.required_validation_ids) or bool(linked),
                      f"v2 required constraint의 validation과 finding이 모두 없습니다: {key}")
 
-    unused = citations.keys() - used
-    _require(not unused, f"v2 사용되지 않은 citation이 있습니다: {sorted(unused)}")
     _require(inspection.model_dump(mode="json") == before_inspection and
              tuple(item.model_dump(mode="json") for item in findings) == before_findings,
              "v2 compiler가 provider 의미 필드를 변경했습니다.")
@@ -620,4 +711,5 @@ def compile_plan_inspection_v2(
         derived_findings=tuple(derived_findings),
         row_closures=tuple(row_closures),
         membership_witnesses=tuple(witnesses.values()),
+        used_citations=tuple(citations[item] for item in sorted(used)),
     )

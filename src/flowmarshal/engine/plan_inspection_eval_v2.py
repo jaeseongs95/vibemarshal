@@ -12,6 +12,7 @@ from .plan_inspection_eval import (
     InspectionExpectationError,
     verify_case_expectation,
 )
+from .plan_inspection import InspectionCitation
 from .plan_inspection_v2 import CompiledPlanInspectionV2, PlanInspectionV2, ReviewFindingV2
 
 
@@ -85,7 +86,7 @@ def assess_inspection_review_v2(
     derived_by_code = {item.finding_code: item for item in compiled.derived_findings}
     finding_closures = {item.row_id: item.citation_ids for item in compiled.row_closures
                         if item.row_kind == "finding"}
-    citations = {item.citation_id: item for item in inspection.citations}
+    citations = {item.citation_id: item for item in compiled.used_citations}
 
     def matches(code: str, defect: dict[str, Any]) -> bool:
         direct = direct_by_code.get(code)
@@ -103,9 +104,9 @@ def assess_inspection_review_v2(
             return False
         if not set(defect["criterion_ids"]) <= criteria <= set(defect["allowed_criterion_ids"]):
             return False
-        if sorted(direct.affected_task_refs) not in [sorted(items) for items in defect["allowed_task_ref_sets"]]:
-            return False
-        if tuple(direct.affected_task_refs) != tuple(derived.affected_task_refs):
+        if sorted(derived.affected_task_refs) not in [
+            sorted(items) for items in defect["allowed_task_ref_sets"]
+        ]:
             return False
         if not set(defect["required_evidence_refs"]) <= set(derived.evidence_refs):
             return False
@@ -154,6 +155,10 @@ def assess_case_inspection_review_v2(
     compiled = compile_plan_inspection_v2(
         inspection, findings=findings, plan=plan, goal=goal, project_map=project_map,
         evidence_catalog=evidence_catalog,
+        citation_catalog=tuple(
+            InspectionCitation.model_validate(item)
+            for item in payload["inspection_citation_catalog"]
+        ),
     )
     assessment = assess_inspection_review_v2(
         inspection, findings, ratings, compiled, expectation["expected_defects"],

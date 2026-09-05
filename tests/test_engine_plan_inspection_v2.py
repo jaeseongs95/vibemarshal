@@ -18,6 +18,7 @@ from flowmarshal.engine.plan_inspection_v2 import (
     PlanInspectionV2,
     ReviewFindingV2,
     compile_plan_inspection_v2,
+    plan_inspection_citation_catalog_v2,
 )
 from flowmarshal.engine.planning import plan_review_evidence_catalog, validation_comparison_targets
 from flowmarshal.engine.planner_roles import (
@@ -35,9 +36,12 @@ from tests.test_engine_plan_inspection import inputs
 
 def v2_inputs():
     plan, goal, state, project_map = inputs("clean")
+    catalog = plan_review_evidence_catalog(plan, goal, state, project_map)
+    citation_catalog = plan_inspection_citation_catalog_v2(catalog, project_map)
     old = inspection_fixture(
         plan.model_dump(mode="json"), goal.definition.model_dump(mode="json"), revision=True
     )
+    ref_map = citation_ref_map(old, citation_catalog)
     mechanism_ids: dict[str, str] = {}
     validation_rows = []
     for index, row in enumerate(old["validation_rows"]):
@@ -46,22 +50,19 @@ def v2_inputs():
         mechanism = row["mechanisms"][0]
         validation_rows.append({
             "validation_id": row["validation_id"],
-            "claim_ref": row["claim_ref"],
             "mechanisms": [{
                 "mechanism_id": mechanism_id,
                 "tool": mechanism["tool"],
                 "phase": mechanism["phase"],
-                "direct_refs": mechanism["basis_refs"],
+                "direct_refs": list(dict.fromkeys(ref_map[item] for item in mechanism["basis_refs"])),
             }],
         })
     inspection = PlanInspectionV2.model_validate({
-        "citations": old["citations"],
         "validation_rows": validation_rows,
         "validation_scope_rows": [{
             "scope_id": row["scope_id"],
             "validation_id": row["validation_id"],
             "mechanism_id": mechanism_ids[row["validation_id"]],
-            "claim_ref": row["claim_ref"],
             "direct_extra_refs": [],
             "status": row["assessment"],
         } for row in old["validation_scope_rows"]],
@@ -88,11 +89,32 @@ def v2_inputs():
             "required_validation_ids": row["validation_ids"],
         } for row in old["constraint_task_rows"]],
     })
-    catalog = plan_review_evidence_catalog(plan, goal, state, project_map)
     return plan, goal, project_map, catalog, inspection
 
 
-def v2_table_from_v1(old: dict, coverage: dict[str, list[str]]) -> dict:
+def citation_ref_map(old: dict, citation_catalog) -> dict[str, str]:
+    mapped: dict[str, str] = {}
+    for old_citation in old["citations"]:
+        candidates = [
+            item for item in citation_catalog
+            if item.source_ref == old_citation["source_ref"]
+            and item.selector == old_citation["selector"]
+            and (old_citation["quote"] in item.quote or item.quote in old_citation["quote"])
+        ]
+        if candidates:
+            mapped[old_citation["citation_id"]] = max(candidates, key=lambda item: len(item.quote)).citation_id
+    return mapped
+
+
+def v2_table_from_v1(
+        old: dict, coverage: dict[str, list[str]], citation_catalog,
+) -> dict:
+    ref_map = citation_ref_map(old, citation_catalog)
+    fallback_ref = citation_catalog[0].citation_id
+
+    def translated(values):
+        return list(dict.fromkeys(ref_map.get(item, fallback_ref) for item in values))
+
     mechanism_ids = {
         row["validation_id"]: f"mechanism_{index}"
         for index, row in enumerate(old["validation_rows"])
@@ -103,22 +125,19 @@ def v2_table_from_v1(old: dict, coverage: dict[str, list[str]]) -> dict:
         if row["assessment"] == "supported"
     }
     return {
-        "citations": old["citations"],
         "validation_rows": [{
             "validation_id": row["validation_id"],
-            "claim_ref": row["claim_ref"],
             "mechanisms": [{
                 "mechanism_id": mechanism_ids[row["validation_id"]],
                 "tool": mechanism["tool"],
                 "phase": mechanism["phase"],
-                "direct_refs": mechanism["basis_refs"],
+                "direct_refs": translated(mechanism["basis_refs"]),
             } for mechanism in row["mechanisms"]],
         } for row in old["validation_rows"]],
         "validation_scope_rows": [{
             "scope_id": row["scope_id"],
             "validation_id": row["validation_id"],
             "mechanism_id": mechanism_ids[row["validation_id"]],
-            "claim_ref": row["claim_ref"],
             "direct_extra_refs": [],
             "status": row["assessment"],
         } for row in old["validation_scope_rows"]],
@@ -144,6 +163,7 @@ def compile_fixture(inspection, findings=(), *, plan=None):
     plan = plan or base_plan
     catalog = dict(catalog)
     catalog["artifact:plan_contract"] = plan.model_dump(mode="json")
+    citation_catalog = plan_inspection_citation_catalog_v2(catalog, project_map)
     return compile_plan_inspection_v2(
         inspection,
         findings=tuple(ReviewFindingV2.model_validate(item) for item in findings),
@@ -151,6 +171,7 @@ def compile_fixture(inspection, findings=(), *, plan=None):
         goal=goal,
         project_map=project_map,
         evidence_catalog=catalog,
+        citation_catalog=citation_catalog,
     )
 
 
@@ -176,6 +197,48 @@ class PlanInspectionV2Tests(unittest.TestCase):
             len(validation_comparison_targets(goal, plan)["validations"]),
             len(compiled.membership_witnesses),
         )
+        validation = inspection.validation_rows[0]
+        selector = next(
+            row["selector"] for row in validation_comparison_targets(goal, plan)["validations"]
+            if row["validation_id"] == validation.validation_id
+        ) + "/statement"
+        claim = next(
+            item for item in compiled.used_citations
+            if item.source_ref == "artifact:plan_contract" and item.selector == selector
+        )
+        closure = next(
+            row for row in compiled.row_closures
+            if row.row_kind == "validation" and row.row_id == validation.validation_id
+        )
+        self.assertIn(claim.citation_id, closure.citation_ids)
+
+    def test_citation_catalog_is_deterministic_exposes_only_registered_text_and_is_bound(self):
+        plan, goal, project_map, catalog, inspection = v2_inputs()
+        first = plan_inspection_citation_catalog_v2(catalog, project_map)
+        second = plan_inspection_citation_catalog_v2(catalog, project_map)
+        self.assertEqual(first, second)
+        exposed_project_refs = {
+            f"project:{entry.entry_id}" for entry in project_map.entries
+            if entry.kind.value in {"reference", "instruction"}
+        }
+        observed_project_refs = {
+            item.source_ref for item in first if item.source_ref.startswith("project:")
+        }
+        self.assertEqual(exposed_project_refs, observed_project_refs)
+        self.assertTrue(all(item.citation_id.startswith("cite_") for item in first))
+
+        changed = list(first)
+        changed[0] = changed[0].model_copy(update={"citation_id": "cite_" + "f" * 32})
+        with self.assertRaisesRegex(PlanInspectionError, "catalog 입력 결속 불일치"):
+            compile_plan_inspection_v2(
+                inspection,
+                findings=(),
+                plan=plan,
+                goal=goal,
+                project_map=project_map,
+                evidence_catalog=catalog,
+                citation_catalog=tuple(changed),
+            )
 
     def test_missing_coverage_member_has_typed_witness_without_fake_quote(self):
         plan, goal, _, _, inspection = v2_inputs()
@@ -198,7 +261,6 @@ class PlanInspectionV2Tests(unittest.TestCase):
         findings = ({
             "finding_code": "MISSING_LINK",
             "defect_kind": "missing_validation_link",
-            "affected_task_refs": [owner] if owner else [],
             "remediable": True,
             "target_refs": [{
                 "kind": "ac_validation", "primary_ref": row.criterion_id,
@@ -255,7 +317,6 @@ class PlanInspectionV2Tests(unittest.TestCase):
         finding = {
             "finding_code": "PARTIAL_TASK_VALIDATION",
             "defect_kind": "missing_task_validation",
-            "affected_task_refs": [row["task_ref"]],
             "remediable": True,
             "target_refs": [{"kind": "constraint_task", "primary_ref": row["constraint_id"],
                              "secondary_ref": row["task_ref"]}],
@@ -274,7 +335,6 @@ class PlanInspectionV2Tests(unittest.TestCase):
         finding = {
             "finding_code": "FALSE_SCOPE_FINDING",
             "defect_kind": "validation_scope",
-            "affected_task_refs": [owner] if owner else [],
             "remediable": True,
             "target_refs": [{"kind": "validation_scope", "primary_ref": scope.scope_id,
                              "secondary_ref": None}],
@@ -291,27 +351,26 @@ class PlanInspectionV2Tests(unittest.TestCase):
         with self.assertRaisesRegex(PlanInspectionError, "finding이 누락"):
             compile_fixture(PlanInspectionV2.model_validate(raw))
 
-    def test_finding_target_must_match_affected_task(self):
+    def test_finding_affected_tasks_are_derived_from_targets(self):
         plan, goal, _, _, inspection = v2_inputs()
         validation_id = inspection.validation_rows[0].validation_id
-        self.assertIsNotNone(owner_for(plan, goal, validation_id))
+        owner = owner_for(plan, goal, validation_id)
+        self.assertIsNotNone(owner)
         finding = {
             "finding_code": "ORDER_ERROR",
             "defect_kind": "result_order",
-            "affected_task_refs": [],
             "remediable": True,
             "target_refs": [{"kind": "validation", "primary_ref": validation_id,
                              "secondary_ref": None}],
         }
-        with self.assertRaisesRegex(PlanInspectionError, "affected Task 불일치"):
-            compile_fixture(inspection, (finding,))
+        compiled = compile_fixture(inspection, (finding,))
+        self.assertEqual((owner,), compiled.derived_findings[0].affected_task_refs)
 
     def test_finding_kind_rejects_incompatible_target_kind(self):
         *_, inspection = v2_inputs()
         finding = {
             "finding_code": "WRONG_TARGET",
             "defect_kind": "missing_validation_link",
-            "affected_task_refs": [],
             "remediable": True,
             "target_refs": [{"kind": "validation_scope",
                              "primary_ref": inspection.validation_scope_rows[0].scope_id,
@@ -327,36 +386,35 @@ class PlanInspectionV2Tests(unittest.TestCase):
         finding = {
             "finding_code": "MULTI_ORDER",
             "defect_kind": "result_order",
-            "affected_task_refs": [owner],
             "remediable": True,
             "target_refs": [{"kind": "validation", "primary_ref": item, "secondary_ref": None}
                             for item in validation_ids],
         }
         compiled = compile_fixture(inspection, (finding,))
         closure = next(row for row in compiled.row_closures if row.row_id == "MULTI_ORDER")
-        claims = {row.claim_ref for row in inspection.validation_rows[:2]}
-        self.assertTrue(claims <= set(closure.citation_ids))
+        validation_refs = set().union(*(
+            set(row.citation_ids) for row in compiled.row_closures
+            if row.row_kind == "validation" and row.row_id in validation_ids
+        ))
+        self.assertTrue(validation_refs <= set(closure.citation_ids))
 
     def test_project_citation_maps_only_to_project_map_evidence(self):
         plan, goal, project_map, _, inspection = v2_inputs()
         entry = next(item for item in project_map.entries if item.kind.value == "reference")
         from pathlib import Path
-        content = Path(entry.path).read_text(encoding="utf-8")
+        evidence_catalog = plan_review_evidence_catalog(plan, goal, inputs("clean")[2], project_map)
+        citation_catalog = plan_inspection_citation_catalog_v2(evidence_catalog, project_map)
+        project_ref = next(
+            item.citation_id for item in citation_catalog
+            if item.source_ref == f"project:{entry.entry_id}" and item.selector == "/content"
+        )
         raw = inspection.model_dump(mode="json")
-        raw["citations"].append({
-            "citation_id": "project_scope",
-            "source_ref": f"project:{entry.entry_id}",
-            "selector": "/content",
-            "quote": content[:80],
-        })
         validation_id = raw["validation_rows"][0]["validation_id"]
-        raw["validation_rows"][0]["mechanisms"][0]["direct_refs"].append("project_scope")
+        raw["validation_rows"][0]["mechanisms"][0]["direct_refs"].append(project_ref)
         changed = PlanInspectionV2.model_validate(raw)
-        owner = owner_for(plan, goal, validation_id)
         finding = {
             "finding_code": "PROJECT_ORDER",
             "defect_kind": "result_order",
-            "affected_task_refs": [owner] if owner else [],
             "remediable": True,
             "target_refs": [{"kind": "validation", "primary_ref": validation_id,
                              "secondary_ref": None}],
@@ -366,38 +424,36 @@ class PlanInspectionV2Tests(unittest.TestCase):
         self.assertNotIn(f"project:{entry.entry_id}", compiled.derived_findings[0].evidence_refs)
 
     def test_other_finding_preserves_direct_classification_and_citation_targets(self):
-        plan, _goal, _project_map, catalog, inspection = v2_inputs()
-        raw = inspection.model_dump(mode="json")
+        plan, _goal, project_map, catalog, inspection = v2_inputs()
         state_value = catalog["source:state"]["facts"][0]["value"]
-        raw["citations"].append({
-            "citation_id": "state_map_value",
-            "source_ref": "source:state",
-            "selector": "/facts/0/value",
-            "quote": state_value,
-        })
+        citation_catalog = plan_inspection_citation_catalog_v2(catalog, project_map)
+        state_ref = next(
+            item.citation_id for item in citation_catalog
+            if item.source_ref == "source:state" and item.selector == "/facts/0/value"
+            and item.quote == state_value
+        )
         finding = {
             "finding_code": "STATE_PROJECT_MAP_BINDING_MISMATCH",
             "defect_kind": "other",
             "gate": "grounding",
             "severity": "error",
-            "affected_task_refs": [plan.definition.tasks[0].task_ref],
             "remediable": True,
             "target_refs": [
-                {"kind": "citation", "primary_ref": "state_map_value", "secondary_ref": None},
+                {"kind": "citation", "primary_ref": state_ref, "secondary_ref": None},
                 {"kind": "task", "primary_ref": plan.definition.tasks[0].task_ref,
                  "secondary_ref": None},
             ],
         }
-        compiled = compile_fixture(PlanInspectionV2.model_validate(raw), (finding,))
+        compiled = compile_fixture(inspection, (finding,))
         derived = compiled.derived_findings[0]
         self.assertEqual("grounding", derived.gate.value)
         self.assertEqual("error", derived.severity.value)
         self.assertEqual(("source:state",), derived.evidence_refs)
+        self.assertEqual((plan.definition.tasks[0].task_ref,), derived.affected_task_refs)
 
     def test_standard_and_other_finding_classification_boundaries_are_strict(self):
         common = {
             "finding_code": "CLASSIFICATION_BOUNDARY",
-            "affected_task_refs": [],
             "remediable": True,
             "target_refs": [{"kind": "validation", "primary_ref": "val_example",
                              "secondary_ref": None}],
@@ -450,7 +506,15 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
             draft = _plan_response()
             old = inspection_fixture(draft, current_goal.definition.model_dump(mode="json"))
             coverage = {row["criterion_id"]: row["validation_ids"] for row in draft["goal_coverage"]}
-            envelope = {"inspection": v2_table_from_v1(old, coverage), "plan": draft}
+            citation_catalog = plan_inspection_citation_catalog_v2({
+                "source:goal": current_goal.definition.model_dump(mode="json"),
+                "source:state": current_state.model_dump(mode="json"),
+                "source:project_map": current_map.model_dump(mode="json"),
+            }, current_map)
+            envelope = {
+                "inspection": v2_table_from_v1(old, coverage, citation_catalog),
+                "plan": draft,
+            }
             runner = ScriptedStructuredRoleRunner({
                 "skeleton_generator": [_skeleton_response()],
                 "plan_expander": [envelope],
@@ -476,6 +540,27 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
             self.assertIn("plan-inspection-v2", request.instructions)
             self.assertIn("direct_extra_refs", str(request.output_schema))
             self.assertNotIn("finding_links", str(request.output_schema))
+            inspection_properties = request.output_schema["$defs"]["PlanInspectionV2"]["properties"]
+            self.assertNotIn("citations", inspection_properties)
+            self.assertNotIn(
+                "claim_ref", request.output_schema["$defs"]["ValidationInspectionV2"]["properties"]
+            )
+            self.assertNotIn(
+                "claim_ref", request.output_schema["$defs"]["ValidationScopeInspectionV2"]["properties"]
+            )
+            expected_catalog = plan_inspection_citation_catalog_v2(
+                {
+                    "source:goal": request.payload["goal"],
+                    "source:state": request.payload["state"],
+                    "source:project_map": request.payload["project_map"],
+                    "artifact:skeleton": request.payload["skeleton"],
+                },
+                current_map,
+            )
+            self.assertEqual(
+                [item.model_dump(mode="json") for item in expected_catalog],
+                request.payload["inspection_citation_catalog"],
+            )
             binding = bind_plan_inspection_request(request, PLAN_INSPECTION_PROVIDER_V2)
             verify_plan_inspection_result_binding(
                 binding, request, RoleCallResult(payload=envelope, receipt=adapter.receipts[-1]),
@@ -511,6 +596,7 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
         ]["findings"]["items"]["properties"]
         self.assertNotIn("evidence_refs", finding_properties)
         self.assertNotIn("summary", finding_properties)
+        self.assertNotIn("affected_task_refs", finding_properties)
         target_items = finding_properties["target_refs"]["items"]
         self.assertNotIn("discriminator", target_items)
         self.assertNotIn("oneOf", target_items)

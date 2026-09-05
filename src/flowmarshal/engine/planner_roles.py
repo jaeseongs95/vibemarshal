@@ -71,6 +71,7 @@ from .plan_inspection_v2 import (
     PlanInspectionV2,
     ReviewFindingV2,
     compile_plan_inspection_v2,
+    plan_inspection_citation_catalog_v2,
 )
 from .roles import RoleCallReceipt, RoleCallRequest, StructuredRolePort
 from .domain import GoalContractRevision
@@ -284,7 +285,8 @@ class PlanReviewDraftV2(ReviewDraft):
     findings: tuple[ReviewFindingV2, ...] = Field(
         description=(
             "직접 확인한 Plan 결함의 최소 의미 제출물. 표준 defect_kind의 gate·severity와 모든 "
-            "summary·evidence_refs는 typed target closure와 동결 taxonomy에서 adapter가 계산한다. "
+            "summary·evidence_refs·affected_task_refs는 typed target closure와 동결 taxonomy에서 "
+            "adapter가 계산한다. "
             "표준 taxonomy 밖의 other 결함만 gate·severity를 직접 제출한다."
         ),
     )
@@ -862,6 +864,16 @@ class PlanExpanderAdapter:
         inspection_instructions = (
             _PLAN_INSPECTION_V2_GUIDANCE if use_v2 else PLAN_INSPECTION_INSTRUCTIONS
         )
+        inspection_evidence_catalog = {
+            "source:goal": goal.definition.model_dump(mode="json"),
+            "source:state": state.model_dump(mode="json"),
+            "source:project_map": compact_project_map(project_map),
+            "artifact:skeleton": candidate.model_dump(mode="json"),
+        }
+        citation_catalog = (
+            plan_inspection_citation_catalog_v2(inspection_evidence_catalog, project_map)
+            if use_v2 else ()
+        )
         request = make_role_request(
             inventory=self.inventory, allowed_fallbacks=self.allowed_fallbacks,
             role="plan_expander",
@@ -914,6 +926,9 @@ class PlanExpanderAdapter:
                     "source:goal": "payload.goal",
                     "artifact:plan_draft": "output.plan",
                 }),
+                **({"inspection_citation_catalog": [
+                    item.model_dump(mode="json") for item in citation_catalog
+                ]} if use_v2 else {}),
             },
             output_schema=envelope_model.model_json_schema(),
             model=self.model,
@@ -935,12 +950,7 @@ class PlanExpanderAdapter:
                 project_map=project_map,
                 planning_budget=applied_budget,
             )
-            evidence_catalog = {
-                "source:goal": goal.definition.model_dump(mode="json"),
-                "source:state": state.model_dump(mode="json"),
-                "source:project_map": compact_project_map(project_map),
-                "artifact:skeleton": candidate.model_dump(mode="json"),
-            }
+            evidence_catalog = inspection_evidence_catalog
             if use_v2:
                 compile_plan_inspection_v2(
                     envelope.inspection,
@@ -948,6 +958,7 @@ class PlanExpanderAdapter:
                     goal=goal,
                     project_map=project_map,
                     evidence_catalog=evidence_catalog,
+                    citation_catalog=citation_catalog,
                     findings=(),
                 )
             else:
@@ -1123,6 +1134,10 @@ class PlanReviewerAdapter:
         inspection_instructions = (
             _PLAN_INSPECTION_V2_GUIDANCE if use_v2 else PLAN_INSPECTION_INSTRUCTIONS
         )
+        citation_catalog = (
+            plan_inspection_citation_catalog_v2(evidence_catalog, project_map)
+            if use_v2 else ()
+        )
         use_critical = risk_route != "compact_plan_reviewer"
         selected_model = (self.critical_model or self.model) if use_critical else self.model
         selected_effort = (
@@ -1145,8 +1160,12 @@ class PlanReviewerAdapter:
                 "현재는 활성화 전 Plan 후보이므로 미래 activation receipt는 아직 없는 것이 정상이다. "
                 "파일·명령의 운영 상세는 ExecutionSpec에 확정한다. read_only는 산출물 mutation 정책이며 "
                 "읽기 검사와 계획 생성 자체를 금지하지 않는다. 외부 효과는 외부 시스템·계정·제3자에 대한 효과다."
-                "affected_task_refs는 Task.task_ref를 참조하며 Core의 task_id와 혼동하지 않는다."
-                "goal_validation_requirement_rows는 AC 원문과 전역 constraint 원문을 구분한 비권위 "
+                + (
+                    "v2에서는 영향 Task를 typed target에서 계산하므로 affected_task_refs를 제출하지 않는다. "
+                    if use_v2 else
+                    "affected_task_refs는 Task.task_ref를 참조하며 Core의 task_id와 혼동하지 않는다."
+                )
+                + "goal_validation_requirement_rows는 AC 원문과 전역 constraint 원문을 구분한 비권위 "
                 "색인이다. 전역 constraint의 Task 검사 존재와 AC별 명시 절차의 validation_ids 연결을 "
                 "각각 검토한다. 색인에서 필수 연결 ID·phase 능력·runtime evidence 누락을 추정하지 않는다. "
                 "validation_scope_rows는 원본 Plan의 모든 Task·integration 검사를 펼친 비권위 색인이다. "
@@ -1163,6 +1182,9 @@ class PlanReviewerAdapter:
                 "inspection_source_catalog": inspection_source_catalog(project_map, {
                     key: f"payload.evidence_catalog.{key}" for key in evidence_catalog
                 }),
+                **({"inspection_citation_catalog": [
+                    item.model_dump(mode="json") for item in citation_catalog
+                ]} if use_v2 else {}),
             },
             output_schema=envelope_model.model_json_schema(),
             model=selected_model,
@@ -1184,6 +1206,7 @@ class PlanReviewerAdapter:
                     goal=goal,
                     project_map=project_map,
                     evidence_catalog=evidence_catalog,
+                    citation_catalog=citation_catalog,
                 )
                 submission = _review_submission_v2(
                     role=risk_route,
