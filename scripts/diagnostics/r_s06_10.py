@@ -17,7 +17,26 @@ from flowmarshal.engine.model_lock import LOCK_FORMAT, ModelInventory, Operation
 from flowmarshal.engine.plan_inspection_eval import (
     assess_case_inspection_review, bind_case_expectation, verify_case_expectation,
 )
-from flowmarshal.engine.planner_roles import PlanExpanderAdapter, PlanReviewerAdapter, PlanReviewEnvelope, RuleBasedTaskAssigner
+from flowmarshal.engine.plan_inspection_eval_v2 import assess_case_inspection_review_v2
+from flowmarshal.engine.plan_inspection_provider import (
+    PLAN_INSPECTION_PROVIDER_V1,
+    PLAN_INSPECTION_PROVIDER_V2,
+    PlanInspectionRequestBinding,
+    bind_plan_inspection_request,
+    verify_plan_inspection_result_binding,
+)
+from flowmarshal.engine.plan_inspection_v2 import PLAN_INSPECTION_V2_INSTRUCTIONS
+from flowmarshal.engine.planner_roles import (
+    PlanExpanderAdapter,
+    PlanExpansionEnvelope,
+    PlanExpansionEnvelopeV2,
+    PlanReviewerAdapter,
+    PlanReviewEnvelope,
+    PlanReviewEnvelopeV2,
+    RuleBasedTaskAssigner,
+)
+from flowmarshal.engine.plan_inspection import PLAN_INSPECTION_INSTRUCTIONS
+from flowmarshal.engine.planning import plan_review_evidence_catalog
 from flowmarshal.engine.planning import plan_gate, risk_route
 from flowmarshal.engine.qualification import PlanningScenarioCatalog, ScopeQualificationReport, _model_lock, _planning_contract, source_manifest_digest, source_manifest_files
 from flowmarshal.engine.roles import (
@@ -35,7 +54,8 @@ STATIC_CASES = ("clean", "bad", "wrong-goal", "combined", "boundary-clean", "mis
 CALL_ORDER = (*STATIC_CASES, "expansion", "expanded-review")
 MAXIMUM_CALLS = 13
 EXECUTION_MODES = ("qualification", "development-diagnostic")
-INSPECTION_PROVIDER_CONTRACT = "plan-inspection-v1"
+INSPECTION_PROVIDER_CONTRACT = PLAN_INSPECTION_PROVIDER_V1
+INSPECTION_PROVIDER_CONTRACTS = (PLAN_INSPECTION_PROVIDER_V1, PLAN_INSPECTION_PROVIDER_V2)
 CAPTURE_PHASES = ("prepare", "run", "review-generated")
 ROLE_CONFIGURATION_IDS = tuple(EngineRoleConfiguration.model_fields)
 ROLE_CONFIGURATION_INPUT_FORMAT = "flowmarshal-role-configuration-input-v1"
@@ -100,6 +120,30 @@ def execution_order(lock: dict[str, Any]) -> tuple[str, ...]:
     return STATIC_CASES if mode == "development-diagnostic" else CALL_ORDER
 
 
+def inspection_provider_manifest(provider: str) -> dict[str, Any]:
+    """fixture와 무관한 provider 버전·지침·역할 schema 계약을 만든다."""
+    if provider == PLAN_INSPECTION_PROVIDER_V1:
+        expansion_model, review_model = PlanExpansionEnvelope, PlanReviewEnvelope
+        instructions = PLAN_INSPECTION_INSTRUCTIONS
+    elif provider == PLAN_INSPECTION_PROVIDER_V2:
+        expansion_model, review_model = PlanExpansionEnvelopeV2, PlanReviewEnvelopeV2
+        instructions = PLAN_INSPECTION_V2_INSTRUCTIONS
+    else:
+        raise RuntimeError("INSPECTION_PROVIDER_CONTRACT_UNSUPPORTED")
+    schemas = {
+        "plan_expander": sha256_digest(strict_json_output_schema(expansion_model.model_json_schema())),
+        "plan_reviewer": sha256_digest(strict_json_output_schema(review_model.model_json_schema())),
+    }
+    body = {
+        "format": "flowmarshal-plan-inspection-provider-contract-v1",
+        "provider_version": provider,
+        "inspection_instructions_digest": sha256_digest({"instructions": instructions}),
+        "role_output_schema_digests": schemas,
+        "provider_schema_set_digest": sha256_digest(schemas),
+    }
+    return body | {"provider_contract_digest": sha256_digest(body)}
+
+
 def record_case_result(run: Path, name: str, *, status: str, failure_kind: str | None,
                        semantic_evaluated: bool, error: str | None = None) -> None:
     """후속 사례와 무관하게 현재 사례의 판정·평가 도달 여부를 한 번 보존한다."""
@@ -123,10 +167,11 @@ def completed_output_failure(run: Path, name: str, lock: dict[str, Any]) -> str 
     failure_kind = call.get("failure_kind")
     if failure_kind not in {"model_output", "provider_terminal_failed"}:
         return None
-    failed = read(run / "calls" / call["capture"] / "failed.json")
-    receipts = failed.get("receipts", [])
-    receipt_status = "schema_failed" if failure_kind == "model_output" else "failed"
-    return failure_kind if len(receipts) == 1 and receipts[0].get("status") == receipt_status else None
+    # collect_call_artifacts가 request·thread·turn에 맞는 현재 receipt를 유일하게
+    # 귀속하고 상태까지 검사했다. StructuredRoleError.receipts에는 같은 runner의
+    # 앞선 성공 receipt가 누적될 수 있으므로 failed.json의 전체 길이를 1로
+    # 제한하면 마지막 schema 실패를 external_unknown으로 잘못 분류한다.
+    return failure_kind
 
 
 def _strict_json_document(raw_bytes: bytes) -> Any:
@@ -294,7 +339,8 @@ def instruction_binding(run: Path, *, observed_sources: list[str] | None = None,
 
 
 def portable_preflight(run: Path, *, fixture_package: Path, codex_bin: Path,
-                       role_configuration: RoleConfigurationInput, execution_mode: str) -> dict[str, Any]:
+                       role_configuration: RoleConfigurationInput, execution_mode: str,
+                       inspection_provider_contract: str = INSPECTION_PROVIDER_CONTRACT) -> dict[str, Any]:
     """모델 호출·fixture 생성 전에 고정 checkout과 외부 입력 경로를 검사한다."""
     from scripts.diagnostics.inspection_inputs import verify_fixture_package
     from scripts.diagnostics.inspection_workspace import capture_workspace_binding
@@ -304,10 +350,13 @@ def portable_preflight(run: Path, *, fixture_package: Path, codex_bin: Path,
         raise RuntimeError("PORTABLE_INPUT_PATH_MUST_BE_ABSOLUTE")
     if role_configuration.selection_reason != "caller_provided_explicit_role_configuration":
         raise RuntimeError("PORTABLE_ROLE_CONFIGURATION_MUST_BE_EXPLICIT")
+    provider_manifest = inspection_provider_manifest(inspection_provider_contract)
     executable = codex_bin.resolve(strict=True)
     body = {
         "format": "flowmarshal-inspection-preflight-v1", "execution_mode": execution_mode,
-        "inspection_provider_contract": INSPECTION_PROVIDER_CONTRACT,
+        "inspection_provider_contract": inspection_provider_contract,
+        "inspection_provider_manifest": provider_manifest,
+        "inspection_provider_manifest_digest": provider_manifest["provider_contract_digest"],
         "workspace_binding": capture_workspace_binding(ROOT),
         "fixture_package_binding": verify_fixture_package(fixture_package),
         "codex_bin": str(executable), "codex_bin_digest": sha256_bytes(executable.read_bytes()),
@@ -406,6 +455,15 @@ class CapturingRuntime(CodexAppServerRuntime):
     def start_turn(self, **kwargs):
         verify_lock(self.run)
         request = RoleCallRequest.model_validate(read(self.capture / "request.json"))
+        provider_binding_path = self.capture / "provider-binding.json"
+        if provider_binding_path.exists():
+            provider_binding = PlanInspectionRequestBinding.model_validate(
+                read(provider_binding_path)
+            )
+            if provider_binding != bind_plan_inspection_request(
+                request, provider_binding.provider_version
+            ):
+                raise RuntimeError("ACTUAL_PROVIDER_REQUEST_BINDING_MISMATCH")
         thread = read(self.capture / "thread.receipt.json")
         verify_instruction_sources(self.run, thread["payload"].get("instructionSources", []))
         expected = {"prompt": canonical_json(request.payload), "model": request.model, "effort": request.effort,
@@ -444,7 +502,8 @@ def options(role, inventory_digest, workspace):
             "inventory": inventory, "allowed_fallbacks": role.allowed_fallbacks, "cwd": workspace}
 
 
-def invoke(name, runner, run, roles, inventory_digest):
+def invoke(name, runner, run, roles, inventory_digest,
+           inspection_provider_contract=INSPECTION_PROVIDER_CONTRACT):
     goal = GoalContractRevision.model_validate(read(run / "input-goal.json"))
     state = StateSnapshot.model_validate(read(run / "input-state.json"))
     project_map = ProjectMapRevision.model_validate(read(run / "input-project-map.json"))
@@ -455,21 +514,24 @@ def invoke(name, runner, run, roles, inventory_digest):
         source = PlanContractRevision.model_validate(read(run / "input-clean-plan.json"))
         assignment = source.definition.tasks[0].assignment
         expander = PlanExpanderAdapter(runner, RuleBasedTaskAssigner(assignment, assignment, assignment),
-                                      **options(roles.plan_expander, inventory_digest, run / "workspace"))
+                                      **options(roles.plan_expander, inventory_digest, run / "workspace"),
+                                      inspection_provider_contract=inspection_provider_contract)
         skeleton = PlanSkeletonCandidate.model_validate(read(run / "input-skeleton.json"))
         return expander.expand(candidate=skeleton, goal=goal, state=state, project_map=project_map)
     path = run / ("expanded-plan.json" if name == "expanded-review" else f"input-{name}-plan.json")
     plan = PlanContractRevision.model_validate(read(path))
     reviewer = PlanReviewerAdapter(runner, **options(roles.general_reviewer, inventory_digest, run / "workspace"),
                                    critical_model=roles.critical_reviewer.model, critical_effort=roles.critical_reviewer.effort,
-                                   critical_allowed_fallbacks=roles.critical_reviewer.allowed_fallbacks)
+                                   critical_allowed_fallbacks=roles.critical_reviewer.allowed_fallbacks,
+                                   inspection_provider_contract=inspection_provider_contract)
     return reviewer.review(plan=plan, goal=goal, state=state, project_map=project_map, risk_route=risk_route(plan))
 
 
-def capture_request(name, run, roles, inventory_digest):
+def capture_request(name, run, roles, inventory_digest,
+                    inspection_provider_contract=INSPECTION_PROVIDER_CONTRACT):
     capture = RequestCapture()
     try:
-        invoke(name, capture, run, roles, inventory_digest)
+        invoke(name, capture, run, roles, inventory_digest, inspection_provider_contract)
     except CapturedRequest:
         return capture.request
     raise AssertionError("요청이 생성되지 않았습니다.")
@@ -495,8 +557,17 @@ def verify_lock(run):
         raise RuntimeError("PREFLIGHT_LOCK_CHANGED")
     if source_manifest_digest(ROOT) != lock["source_manifest_digest"]:
         raise RuntimeError("SOURCE_LOCK_CHANGED")
-    if lock.get("inspection_provider_contract", "plan-inspection-v1") != INSPECTION_PROVIDER_CONTRACT:
-        raise RuntimeError("INSPECTION_PROVIDER_CONTRACT_CHANGED")
+    provider = lock.get("inspection_provider_contract", PLAN_INSPECTION_PROVIDER_V1)
+    if provider not in INSPECTION_PROVIDER_CONTRACTS:
+        raise RuntimeError("INSPECTION_PROVIDER_CONTRACT_UNSUPPORTED")
+    expected_provider_manifest = inspection_provider_manifest(provider)
+    if "inspection_provider_manifest" in lock:
+        if (lock["inspection_provider_manifest"] != expected_provider_manifest or
+                lock.get("inspection_provider_manifest_digest") !=
+                expected_provider_manifest["provider_contract_digest"]):
+            raise RuntimeError("INSPECTION_PROVIDER_CONTRACT_CHANGED")
+    elif provider != PLAN_INSPECTION_PROVIDER_V1 or "workspace_binding" in lock:
+        raise RuntimeError("INSPECTION_PROVIDER_MANIFEST_MISSING")
     if "workspace_binding" in lock:
         verify_portable_inputs(lock)
     roles = verify_role_configuration_artifacts(run, lock.get("role_configuration_input", {}))
@@ -510,6 +581,17 @@ def verify_lock(run):
     for name, expected in lock["locked_files"].items():
         if sha256_bytes((run / name).read_bytes()) != expected:
             raise RuntimeError(f"INPUT_LOCK_CHANGED: {name}")
+    request_binding_digests = lock.get("provider_request_binding_digests", {})
+    if "workspace_binding" in lock and not request_binding_digests:
+        raise RuntimeError("PLAN_INSPECTION_REQUEST_BINDINGS_MISSING")
+    for name, expected_digest in request_binding_digests.items():
+        request = RoleCallRequest.model_validate(read(run / "requests" / f"{name}.json"))
+        binding = PlanInspectionRequestBinding.model_validate(
+            read(run / "provider-bindings" / f"{name}.json")
+        )
+        if (binding.binding_digest != expected_digest or
+                binding != bind_plan_inspection_request(request, provider)):
+            raise RuntimeError(f"PLAN_INSPECTION_REQUEST_BINDING_CHANGED: {name}")
     binding = read(run / "instruction-binding.json")
     for item in binding["sources"]:
         if sha256_bytes(Path(item["path"]).read_bytes()) != item["content_digest"]:
@@ -524,8 +606,13 @@ def verify_lock(run):
     if generated_lock_path.exists():
         generated = read(generated_lock_path)
         request = RoleCallRequest.model_validate(read(run / "requests/expanded-review.json"))
+        generated_provider_binding = PlanInspectionRequestBinding.model_validate(
+            read(run / "provider-bindings/expanded-review.json")
+        )
         expectation = case_expectation(run, "expanded-review", request)
         if (generated["request_digest"] != request.request_digest or
+                generated.get("provider_binding_digest") != generated_provider_binding.binding_digest or
+                generated_provider_binding != bind_plan_inspection_request(request, provider) or
                 generated["expectation_digest"] != expectation["expectation_digest"] or
                 generated["assessment_digest"] != sha256_bytes((run / "generation-assessment.json").read_bytes()) or
                 generated["preflight_digest"] != lock["lock_digest"] or
@@ -535,9 +622,11 @@ def verify_lock(run):
 
 
 def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, execution_mode="qualification",
-            fixture_package: Path | None = None, codex_bin: Path | None = None):
+            fixture_package: Path | None = None, codex_bin: Path | None = None,
+            inspection_provider_contract: str = INSPECTION_PROVIDER_CONTRACT):
     if execution_mode not in EXECUTION_MODES:
         raise RuntimeError("UNKNOWN_EXECUTION_MODE")
+    provider_manifest = inspection_provider_manifest(inspection_provider_contract)
     call_order = execution_order({"execution_mode": execution_mode})
     role_configuration = role_configuration or load_role_configuration_input()
     if (run / "preflight.json").exists() or (run / "calls").exists():
@@ -556,7 +645,9 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, ex
             raise RuntimeError("WORKSPACE_PREFLIGHT_CHANGED")
         verify_portable_inputs(isolation)
         if (isolation["execution_mode"] != execution_mode or
-                isolation["inspection_provider_contract"] != INSPECTION_PROVIDER_CONTRACT or
+                isolation["inspection_provider_contract"] != inspection_provider_contract or
+                isolation.get("inspection_provider_manifest") != provider_manifest or
+                isolation.get("inspection_provider_manifest_digest") != provider_manifest["provider_contract_digest"] or
                 isolation["role_configuration_input"] != role_configuration.binding or
                 isolation["codex_bin"] != str(codex_bin.resolve(strict=True)) or
                 isolation["fixture_package_binding"]["package"] != str(fixture_package.resolve(strict=True))):
@@ -617,11 +708,15 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, ex
                 raise RuntimeError("INSTRUCTION_PROBE_REQUIRES_EMPTY_THREAD")
             write_new(run / "instruction-binding.json", instruction_binding(
                 run, observed_sources=probe.payload.get("instructionSources", []), probe_receipt=probe_path))
+        provider_request_binding_digests = {}
         for name in (call_order if execution_mode == "development-diagnostic" else call_order[:-1]):
-            request = capture_request(name, run, roles, inventory)
+            request = capture_request(name, run, roles, inventory, inspection_provider_contract)
             verify_role_request_binding(request, roles, inventory)
             write_new(run / "requests" / f"{name}.json", request)
             write_new(run / "schemas" / f"{name}.json", strict_json_output_schema(request.output_schema))
+            provider_binding = bind_plan_inspection_request(request, inspection_provider_contract)
+            write_new(run / "provider-bindings" / f"{name}.json", provider_binding)
+            provider_request_binding_digests[name] = provider_binding.binding_digest
             if name in STATIC_CASES:
                 expectations = read(run / "expectations.json")
                 verify_reviewed_case(name, request.payload, expectations, review)
@@ -632,12 +727,15 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, ex
                 )
                 write_new(run / "case-expectations" / f"{name}.json", expectation)
         catalog = PlanningScenarioCatalog.model_validate(read(ROOT / "tests/fixtures/engine/planning-scenarios.json"))
-        contract = _planning_contract(ROOT, catalog, inventory, roles)
+        contract = _planning_contract(
+            ROOT, catalog, inventory, roles,
+            inspection_provider_contract=inspection_provider_contract,
+        )
         write_new(run / "planning-binding.json", json_value(contract) | {
             "role_configuration_input": role_configuration.binding,
         })
         templates = {}
-        base = capture_request("clean", run, roles, inventory)
+        base = capture_request("clean", run, roles, inventory, inspection_provider_contract)
         for role, binding in (("compact_plan_reviewer", roles.general_reviewer),
                               ("critical_effect_reviewer", roles.critical_reviewer),
                               ("high_risk_reviewer", roles.critical_reviewer),
@@ -646,6 +744,8 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, ex
                                "model": binding.model, "effort": binding.effort}
         write_new(run / "generated-review-template.json", {
             "input_dependency": "expanded-plan.json", "templates": templates, "expected_generation": "결함 없는 Plan",
+            "inspection_provider_contract": inspection_provider_contract,
+            "inspection_provider_manifest_digest": provider_manifest["provider_contract_digest"],
             "generation_gate": "호출 전 고정 기준으로 생성 결과를 독립 대조한다. 결함이면 FAIL로 종료하고 재생성하지 않는다.",
             "expected_review_defects": [], "generation_criteria": [
                 "AC가 명시한 task/goal 절차와 복합 unittest ID 연결을 모두 보존한다.",
@@ -672,7 +772,10 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, ex
                 "codex_bin": old_lock["codex_bin"], "codex_bin_digest": runtime.executable_digest,
                 "role_configuration_digest": roles.configuration_digest,
                 "role_configuration_input": role_configuration.binding, "execution_mode": execution_mode,
-                "inspection_provider_contract": INSPECTION_PROVIDER_CONTRACT,
+                "inspection_provider_contract": inspection_provider_contract,
+                "inspection_provider_manifest": provider_manifest,
+                "inspection_provider_manifest_digest": provider_manifest["provider_contract_digest"],
+                "provider_request_binding_digests": provider_request_binding_digests,
                 "call_order": call_order,
                 "maximum_logical_calls": len(call_order), "maximum_provider_turns": len(call_order), "schema_recovery_attempts": 0,
                 "prompt_digest": contract.prompt_digest, "output_schema_digest": contract.output_schema_digest,
@@ -703,6 +806,12 @@ class RecordedRunner:
         expected = RoleCallRequest.model_validate(read(self.run_root / "requests" / f"{self.name}.json"))
         if request.request_digest != expected.request_digest:
             raise RuntimeError("ACTUAL_REQUEST_BINDING_MISMATCH")
+        provider = self.lock.get("inspection_provider_contract", PLAN_INSPECTION_PROVIDER_V1)
+        provider_binding = PlanInspectionRequestBinding.model_validate(
+            read(self.run_root / "provider-bindings" / f"{self.name}.json")
+        )
+        if provider_binding != bind_plan_inspection_request(request, provider):
+            raise RuntimeError("ACTUAL_PROVIDER_REQUEST_BINDING_MISMATCH")
         if self.name != "expansion":
             case_expectation(self.run_root, self.name, request)
         baseline = OperationalBinding.model_validate(self.lock["operational_binding"])
@@ -724,6 +833,7 @@ class RecordedRunner:
         with self.runtime.call_capture(capture):
             write_new(capture / "request.json", request)
             write_new(capture / "strict-schema.json", actual_schema)
+            write_new(capture / "provider-binding.json", provider_binding)
             try:
                 result = self.runner.run(request, validator=validator)
             except Exception as error:
@@ -731,6 +841,7 @@ class RecordedRunner:
                                                   "receipts": getattr(error, "receipts", ()), "observed_at": utc_now()})
                 raise
             verify_role_receipt(request, result)
+            verify_plan_inspection_result_binding(provider_binding, request, result)
             self.last_result = result
             write_new(capture / "result.json", result)
             receipt = result.receipt
@@ -809,6 +920,19 @@ def common_call_verification(
         "receipt_terminal_usage": receipt_usage_valid,
         "model_observation": observation_valid,
     }
+    provider_binding_path = capture / "provider-binding.json"
+    if provider_binding_path.exists():
+        try:
+            provider_binding = PlanInspectionRequestBinding.model_validate(read(provider_binding_path))
+            expected_binding = bind_plan_inspection_request(request, provider_binding.provider_version)
+            checks["inspection_provider_binding"] = (
+                provider_binding == expected_binding
+                and receipt_value.get("input_digest") == provider_binding.request_digest
+                and receipt_value.get("output_schema_digest") == provider_binding.output_schema_digest
+                and receipt_value.get("role") == provider_binding.role
+            )
+        except (ValueError, KeyError, TypeError):
+            checks["inspection_provider_binding"] = False
     if receipt_statuses is not None:
         checks["receipt_status"] = receipt_value.get("status") in receipt_statuses
     return {"passed": all(checks.values()), "checks": checks, "request_digest": request.request_digest,
@@ -841,7 +965,7 @@ def completed_call_verification(capture: Path, receipt: dict[str, Any] | None) -
 CALL_ARTIFACT_NAMES = (
     "request.json", "strict-schema.json", "thread.intent.json", "thread.receipt.json",
     "turn.intent.json", "turn.receipt.json", "terminal.json", "result.json", "failed.json",
-    "binding-verification.json",
+    "binding-verification.json", "provider-binding.json",
 )
 
 
@@ -1221,6 +1345,15 @@ def summarize(run, status, error=None):
     summary = {"status": final_status, "error": error, "checks": checks,
                "isolation_error": isolation_error,
                "execution_mode": lock.get("execution_mode", "qualification"),
+               "inspection_provider_contract": lock.get(
+                   "inspection_provider_contract", PLAN_INSPECTION_PROVIDER_V1
+               ),
+               "inspection_provider_manifest_digest": lock.get(
+                   "inspection_provider_manifest_digest"
+               ),
+               "provider_request_binding_digests": lock.get(
+                   "provider_request_binding_digests", {}
+               ),
                "case_results": case_results,
                "collection_complete": all(case["status"] != "NOT_RUN" for case in case_results),
                "diagnostic_errors": collected["issues"], "call_artifacts": collected["calls"],
@@ -1279,6 +1412,9 @@ def execute(run, generated=False):
     if (run / "summary.json").exists():
         raise RuntimeError("완료·실패한 진단을 반복하지 않습니다.")
     lock = verify_lock(run)
+    inspection_provider_contract = lock.get(
+        "inspection_provider_contract", PLAN_INSPECTION_PROVIDER_V1
+    )
     diagnostic = lock.get("execution_mode", "qualification") == "development-diagnostic"
     if generated and diagnostic:
         raise RuntimeError("GENERATED_REVIEW_NOT_IN_STATIC_DIAGNOSTIC")
@@ -1299,9 +1435,16 @@ def execute(run, generated=False):
             template_document = read(run / "generated-review-template.json")
             if (assessment["plan_digest"] != plan.activation_digest or not assessment["generation_acceptable"] or
                     assessment.get("preflight_digest") != lock["lock_digest"] or
-                    assessment.get("criteria_digest") != sha256_digest(template_document["generation_criteria"])):
+                    assessment.get("criteria_digest") != sha256_digest(template_document["generation_criteria"]) or
+                    template_document.get("inspection_provider_contract") != inspection_provider_contract or
+                    template_document.get("inspection_provider_manifest_digest") !=
+                    lock.get("inspection_provider_manifest_digest")):
                 raise RuntimeError("GENERATION_DEFECT_OR_BINDING_FAILURE")
-            request = capture_request("expanded-review", run, roles, OperationalBinding.model_validate(lock["operational_binding"]).inventory)
+            request = capture_request(
+                "expanded-review", run, roles,
+                OperationalBinding.model_validate(lock["operational_binding"]).inventory,
+                inspection_provider_contract,
+            )
             template = read(run / "generated-review-template.json")["templates"][request.role]
             for key in ("instructions", "model", "effort"):
                 if getattr(request, key) != template[key]:
@@ -1309,6 +1452,10 @@ def execute(run, generated=False):
             if strict_json_output_schema(request.output_schema) != template["output_schema"]:
                 raise RuntimeError("GENERATED_REVIEW_SCHEMA_CHANGED")
             write_new(run / "requests/expanded-review.json", request)
+            generated_provider_binding = bind_plan_inspection_request(
+                request, inspection_provider_contract
+            )
+            write_new(run / "provider-bindings/expanded-review.json", generated_provider_binding)
             generated_expectation = bind_case_expectation(
                 case_id="expanded-review", payload=request.payload,
                 rows=assessment["ac_validation_rows"], defects=[],
@@ -1321,7 +1468,8 @@ def execute(run, generated=False):
             write_new(run / "generated-input-lock.json", {"request_digest": request.request_digest,
                       "plan_digest": plan.activation_digest, "assessment_digest": sha256_bytes((run / "generation-assessment.json").read_bytes()),
                       "expectation_digest": generated_expectation["expectation_digest"],
-                      "expected_defects": [], "preflight_digest": lock["lock_digest"]})
+                      "expected_defects": [], "preflight_digest": lock["lock_digest"],
+                      "provider_binding_digest": generated_provider_binding.binding_digest})
             names = ("expanded-review",)
         else:
             names = execution_order(lock) if diagnostic else execution_order(lock)[:-1]
@@ -1333,7 +1481,11 @@ def execute(run, generated=False):
                 runner.name = name
                 print(json.dumps({"starting_case": name, "maximum_calls": len(execution_order(lock))}), flush=True)
                 try:
-                    result = invoke(name, runner, run, roles, OperationalBinding.model_validate(lock["operational_binding"]).inventory)
+                    result = invoke(
+                        name, runner, run, roles,
+                        OperationalBinding.model_validate(lock["operational_binding"]).inventory,
+                        inspection_provider_contract,
+                    )
                 except StructuredRoleError as exc:
                     failure_kind = completed_output_failure(run, name, lock)
                     record_case_result(run, name, status="FAIL",
@@ -1349,11 +1501,44 @@ def execute(run, generated=False):
                     status = "GENERATION_REVIEW_REQUIRED"
                 else:
                     write_new(run / f"{name}-review.json", result)
-                    envelope = PlanReviewEnvelope.model_validate(runner.last_result.payload)
                     request = RoleCallRequest.model_validate(read(run / "requests" / f"{name}.json"))
-                    assessment = assess_case_inspection_review(
-                        envelope, case_expectation(run, name, request), case_id=name, payload=request.payload,
-                    )
+                    expectation = case_expectation(run, name, request)
+                    if inspection_provider_contract == PLAN_INSPECTION_PROVIDER_V2:
+                        envelope = PlanReviewEnvelopeV2.model_validate(runner.last_result.payload)
+                        goal = GoalContractRevision.model_validate(read(run / "input-goal.json"))
+                        state = StateSnapshot.model_validate(read(run / "input-state.json"))
+                        if name in {"semantic-explicit", "semantic-missing-link"}:
+                            goal = GoalContractRevision.model_validate(
+                                read(run / "input-semantic-explicit-goal.json")
+                            )
+                            state = StateSnapshot.model_validate(
+                                read(run / "input-semantic-explicit-state.json")
+                            )
+                        project_map = ProjectMapRevision.model_validate(read(run / "input-project-map.json"))
+                        plan_path = run / (
+                            "expanded-plan.json" if name == "expanded-review"
+                            else f"input-{name}-plan.json"
+                        )
+                        plan = PlanContractRevision.model_validate(read(plan_path))
+                        assessment = assess_case_inspection_review_v2(
+                            envelope.inspection,
+                            envelope.review.findings,
+                            envelope.review.ratings,
+                            expectation,
+                            case_id=name,
+                            payload=request.payload,
+                            plan=plan,
+                            goal=goal,
+                            project_map=project_map,
+                            evidence_catalog=plan_review_evidence_catalog(
+                                plan, goal, state, project_map
+                            ),
+                        )
+                    else:
+                        envelope = PlanReviewEnvelope.model_validate(runner.last_result.payload)
+                        assessment = assess_case_inspection_review(
+                            envelope, expectation, case_id=name, payload=request.payload,
+                        )
                     write_new(run / f"{name}-assessment.json", assessment)
                     record_case_result(run, name, status="PASS" if assessment["passed"] else "FAIL",
                                        failure_kind=None if assessment["passed"] else "semantic", semantic_evaluated=True)
@@ -1379,10 +1564,14 @@ def parse_arguments(argv=None):
     parser.add_argument("--role-config", type=Path,
                         help="preflight/prepare의 절대 역할 설정 경로. 기존 진단의 prepare에서만 S05 기본 설정 생략을 허용합니다.")
     parser.add_argument("--execution-mode", choices=EXECUTION_MODES)
+    parser.add_argument("--inspection-contract", choices=INSPECTION_PROVIDER_CONTRACTS)
     parser.add_argument("--fixture-package", type=Path)
     parser.add_argument("--codex-bin", type=Path)
     arguments = parser.parse_args(argv)
-    preparation_options = (arguments.role_config, arguments.execution_mode, arguments.fixture_package, arguments.codex_bin)
+    preparation_options = (
+        arguments.role_config, arguments.execution_mode, arguments.inspection_contract,
+        arguments.fixture_package, arguments.codex_bin,
+    )
     if any(option is not None for option in preparation_options) and arguments.mode not in ("preflight", "prepare"):
         parser.error("입력 설정은 preflight/prepare에서만 사용할 수 있습니다.")
     if (arguments.fixture_package is None) != (arguments.codex_bin is None):
@@ -1404,13 +1593,15 @@ if __name__ == "__main__":
     if arguments.mode == "preflight":
         binding = portable_preflight(destination, fixture_package=arguments.fixture_package,
             codex_bin=arguments.codex_bin, role_configuration=load_role_configuration_input(arguments.role_config),
-            execution_mode=arguments.execution_mode or "qualification")
+            execution_mode=arguments.execution_mode or "qualification",
+            inspection_provider_contract=arguments.inspection_contract or INSPECTION_PROVIDER_CONTRACT)
         print(json.dumps({"preflight_passed": True, "binding_digest": sha256_digest(binding)}), flush=True)
     elif arguments.mode == "prepare":
         try:
             prepare(destination, load_role_configuration_input(arguments.role_config),
                     execution_mode=arguments.execution_mode or "qualification",
-                    fixture_package=arguments.fixture_package, codex_bin=arguments.codex_bin)
+                    fixture_package=arguments.fixture_package, codex_bin=arguments.codex_bin,
+                    inspection_provider_contract=arguments.inspection_contract or INSPECTION_PROVIDER_CONTRACT)
         except Exception as error:
             write_new(destination / "preparation-failed.json", {
                 "status": "FAIL", "error": f"{type(error).__name__}: {error}",

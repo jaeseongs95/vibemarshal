@@ -10,10 +10,15 @@ from unittest.mock import patch
 from flowmarshal.canonical import sha256_digest
 from flowmarshal.engine.goal import GoalNormalizerAdapter, GoalReviewerAdapter, GoalNormalizationProposal, ReviewDraft
 from flowmarshal.engine.planner_roles import (
-    PlanExpanderAdapter, PlanReviewerAdapter, PlanExpansionEnvelope, PlanReviewEnvelope, SkeletonBatchDraft,
+    PlanExpanderAdapter, PlanReviewerAdapter, PlanExpansionEnvelope, PlanExpansionEnvelopeV2,
+    PlanReviewEnvelope, PlanReviewEnvelopeV2, SkeletonBatchDraft,
     SkeletonCandidateDraft, SkeletonGeneratorAdapter, SkeletonReviewerAdapter,
     READ_ONLY_REPORTING_INSTRUCTIONS,
 )
+from flowmarshal.engine.plan_inspection_provider import (
+    PLAN_INSPECTION_PROVIDER_V1, PLAN_INSPECTION_PROVIDER_V2,
+)
+from flowmarshal.engine.evaluation import CheckpointContractError, ImmutableCheckpointStore
 from flowmarshal.engine.qualification import (
     PlanningScenarioCatalog, _planning_contract, _role_progress, default_role_configuration,
 )
@@ -24,6 +29,36 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class EvaluationBindingTests(unittest.TestCase):
+    def test_v2_pipeline_contract_is_opt_in_and_cannot_reuse_v1_checkpoint(self):
+        catalog = PlanningScenarioCatalog.model_validate_json(
+            (ROOT / "tests/fixtures/engine/planning-scenarios.json").read_text(encoding="utf-8")
+        )
+        args = (ROOT, catalog, qualification_inventory(), default_role_configuration(ROOT))
+        v1 = _planning_contract(*args)
+        explicit_v1 = _planning_contract(
+            *args, inspection_provider_contract=PLAN_INSPECTION_PROVIDER_V1
+        )
+        v2 = _planning_contract(
+            *args, inspection_provider_contract=PLAN_INSPECTION_PROVIDER_V2
+        )
+        self.assertEqual(v1.contract_digest, explicit_v1.contract_digest)
+        self.assertNotEqual(v1.contract_digest, v2.contract_digest)
+        self.assertNotEqual(v1.prompt_digest, v2.prompt_digest)
+        self.assertNotEqual(v1.output_schema_digest, v2.output_schema_digest)
+        v2_schemas = {
+            model.__name__: strict_json_output_schema(model.model_json_schema())
+            for model in (
+                GoalNormalizationProposal, SkeletonBatchDraft, SkeletonCandidateDraft,
+                PlanExpansionEnvelopeV2, PlanReviewEnvelopeV2, ReviewDraft,
+            )
+        }
+        self.assertEqual(sha256_digest(v2_schemas), v2.output_schema_digest)
+        with tempfile.TemporaryDirectory() as temp:
+            store = ImmutableCheckpointStore(Path(temp), v1)
+            store.initialize()
+            with self.assertRaises(CheckpointContractError):
+                ImmutableCheckpointStore(Path(temp), v2).initialize()
+
     def test_e2e_contract_locks_provider_schema_and_separate_goal_instructions(self):
         from flowmarshal.engine.e2e_qualification import _contract
         from flowmarshal.engine.execution import ExecutionPreparation, ProviderExecutionPreparation, GoalTestPreparation

@@ -120,6 +120,34 @@ class InspectionCollectAllTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "반복하지 않습니다"):
                 execute(run)
 
+    def test_diagnostic_uses_uniquely_attributed_current_receipt_when_error_receipts_are_cumulative(self):
+        with tempfile.TemporaryDirectory() as temp:
+            run = Path(temp)
+            lock = self._lock("development-diagnostic")
+            self._run(run, lock)
+            names: list[str] = []
+            cumulative_receipts: list[dict] = []
+
+            def cumulative_schema_failure(name, _runner, *_args):
+                names.append(name)
+                capture, _ = self.artifacts._call(run, len(names), status="failure")
+                failed = json.loads((capture / "failed.json").read_text(encoding="utf-8"))
+                cumulative_receipts.append(failed["receipts"][0])
+                failed["receipts"] = list(cumulative_receipts)
+                (capture / "failed.json").write_text(json.dumps(failed), encoding="utf-8")
+                raise StructuredRoleError("structured output이 유효하지 않습니다. schema recovery 0회")
+
+            with self._patches(run, lock, cumulative_schema_failure):
+                self.assertIsNone(execute(run))
+
+            summary = json.loads((run / "summary.json").read_text(encoding="utf-8"))
+            self.assertEqual(list(STATIC_CASES), names)
+            self.assertTrue(summary["collection_complete"])
+            self.assertFalse(summary["diagnostic_errors"])
+            self.assertTrue(all(
+                item["failure_kind"] == "model_output" for item in summary["case_results"]
+            ))
+
     def test_qualification_stops_after_first_completed_schema_failure(self):
         with tempfile.TemporaryDirectory() as temp:
             run = Path(temp)

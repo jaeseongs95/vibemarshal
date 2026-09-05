@@ -102,13 +102,15 @@ def submission(name):
         elif defect["defect_kind"] == "result_order":
             basis.append(cite("artifact:plan_contract", "/definition/tasks/0/acceptance_criteria/4",
                               plan.definition.tasks[0].acceptance_criteria[4]))
-        refs = defect["allowed_task_ref_sets"][-1]
+        # Scripted payload를 바꾸는 반례가 동결 expectation까지 공유 변경하지 않도록 복사한다.
+        refs = list(defect["allowed_task_ref_sets"][-1])
         inspection["finding_links"].append({
             "finding_code": code, "defect_kind": defect["defect_kind"], "criterion_ids": defect["criterion_ids"],
             "validation_ids": [vid], "task_refs": refs, "basis_refs": basis})
         findings.append({"finding_code": code, "gate": "verification", "severity": "error",
                          "summary": " ".join((*defect["criterion_ids"], vid, defect["defect_kind"])),
-                         "evidence_refs": defect["required_evidence_refs"], "affected_task_refs": refs, "remediable": True})
+                         "evidence_refs": list(defect["required_evidence_refs"]),
+                         "affected_task_refs": list(refs), "remediable": True})
     return {"review": {"findings": findings, "ratings": None if findings else RATINGS}, "inspection": inspection}
 
 

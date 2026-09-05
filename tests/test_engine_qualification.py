@@ -242,7 +242,7 @@ class EngineQualificationTests(unittest.TestCase):
             selector = Path("tests/fixtures/engine/synthetic-lifecycle-project")
             fixture = base / selector
             shutil.copytree(ROOT / selector, fixture)
-            before = {path.name: path.read_bytes() for path in fixture.iterdir()}
+            before = {path.name: path.read_bytes() for path in fixture.iterdir() if path.is_file()}
             (base / "AGENTS.md").write_text("검사 프로젝트 밖의 큰 지침" * 20000, encoding="utf-8")
             with patch("flowmarshal.engine.qualification.source_manifest_digest", return_value="sha256:" + "1" * 64), \
                  patch("flowmarshal.engine.qualification.default_role_configuration", return_value=self.roles):
@@ -251,7 +251,10 @@ class EngineQualificationTests(unittest.TestCase):
                                                 artifact_root=base / "artifacts")
                 self.assertEqual("completed", status["project"]["run_state"])
                 self.assertTrue(status["history_valid"])
-                self.assertEqual(before, {path.name: path.read_bytes() for path in fixture.iterdir()})
+                self.assertEqual(
+                    before,
+                    {path.name: path.read_bytes() for path in fixture.iterdir() if path.is_file()},
+                )
                 (fixture / "app.py").write_text("value = 2\n", encoding="utf-8")
                 changed = _deterministic_contract(base)
             self.assertEqual(original.fixture_digests[:3], changed.fixture_digests[:3])

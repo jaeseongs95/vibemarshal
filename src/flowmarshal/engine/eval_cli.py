@@ -21,6 +21,10 @@ from .evaluation import (
 )
 from .models import EngineRoleConfiguration
 from .models import AssignmentResolutionError
+from .plan_inspection_provider import (
+    PLAN_INSPECTION_PROVIDER_V1,
+    PLAN_INSPECTION_PROVIDER_V2,
+)
 from .qualification import (
     QualificationRunError,
     ORDER_SEEDS,
@@ -75,6 +79,7 @@ def _run(arguments: argparse.Namespace) -> int:
                 run_root=destination,
                 role_configuration=roles,
                 codex_bin=arguments.codex_bin,
+                inspection_provider_contract=arguments.inspection_contract,
             )
         else:
             run_root, report = run_project_e2e(
@@ -272,6 +277,12 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--run-root")
     run.add_argument("--role-config")
     run.add_argument("--codex-bin")
+    run.add_argument(
+        "--inspection-contract",
+        choices=(PLAN_INSPECTION_PROVIDER_V1, PLAN_INSPECTION_PROVIDER_V2),
+        default=PLAN_INSPECTION_PROVIDER_V1,
+        help="full-planning-pipeline의 Plan inspection provider. 기본값은 v1입니다.",
+    )
     run.set_defaults(handler=_run)
 
     resume = commands.add_parser("resume")

@@ -68,6 +68,10 @@ from .planner_roles import (
     SkeletonGeneratorAdapter,
     SkeletonReviewerAdapter,
 )
+from .plan_inspection_provider import (
+    PLAN_INSPECTION_PROVIDER_V1,
+    PLAN_INSPECTION_PROVIDER_V2,
+)
 from .planning import PlanningError, PlanningSearchOutcome
 from .planning import SkeletonFirstPlanner
 from .runtime import CodexAppServerRuntime, EngineDispatcher, RuntimePolicyError
@@ -654,6 +658,7 @@ def _cmd_plan_search(arguments: argparse.Namespace) -> None:
                 effort=expander_effort,
                 inventory_digest=inventory.inventory_digest, inventory=inventory,
                 cwd=root,
+                inspection_provider_contract=arguments.inspection_contract,
             )
             plan_reviewer = PlanReviewerAdapter(
                 runner,
@@ -663,6 +668,7 @@ def _cmd_plan_search(arguments: argparse.Namespace) -> None:
                 cwd=root,
                 critical_model=critical_model,
                 critical_effort=critical_effort,
+                inspection_provider_contract=arguments.inspection_contract,
             )
             outcome = SkeletonFirstPlanner(
                 generator,
@@ -1089,6 +1095,12 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--live", action="store_true")
     search.add_argument("--codex-bin")
     search.add_argument("--role-config")
+    search.add_argument(
+        "--inspection-contract",
+        choices=(PLAN_INSPECTION_PROVIDER_V1, PLAN_INSPECTION_PROVIDER_V2),
+        default=PLAN_INSPECTION_PROVIDER_V1,
+        help="Plan expander/reviewer provider 형식. 기본값은 v1입니다.",
+    )
     search.add_argument("--candidate-count", type=int, choices=(1, 2, 3))
     search.add_argument("--generator-model")
     search.add_argument("--generator-effort")

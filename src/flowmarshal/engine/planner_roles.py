@@ -61,6 +61,17 @@ from .plan_inspection import (
     inspection_file_content,
     validate_plan_inspection,
 )
+from .plan_inspection_provider import (
+    PLAN_INSPECTION_PROVIDER_V1,
+    PLAN_INSPECTION_PROVIDER_V2,
+    PlanInspectionProviderVersion,
+)
+from .plan_inspection_v2 import (
+    PLAN_INSPECTION_V2_INSTRUCTIONS as _PLAN_INSPECTION_V2_GUIDANCE,
+    PlanInspectionV2,
+    ReviewFindingV2,
+    compile_plan_inspection_v2,
+)
 from .roles import RoleCallReceipt, RoleCallRequest, StructuredRolePort
 from .domain import GoalContractRevision
 
@@ -269,6 +280,19 @@ class PlanReviewDraft(ReviewDraft):
     )
 
 
+class PlanReviewDraftV2(ReviewDraft):
+    findings: tuple[ReviewFindingV2, ...] = Field(
+        description=(
+            "직접 확인한 Plan 결함의 최소 의미 제출물. 표준 defect_kind의 gate·severity와 모든 "
+            "summary·evidence_refs는 typed target closure와 동결 taxonomy에서 adapter가 계산한다. "
+            "표준 taxonomy 밖의 other 결함만 gate·severity를 직접 제출한다."
+        ),
+    )
+    ratings: ReviewRatings | None = Field(
+        description="직접 근거가 있는 finding이 전혀 없을 때만 후보 품질을 평가한다. 확인된 계약 모순이 있으면 findings를 제출하고 ratings는 null이다. 낮은 점수는 후보 차단이나 finding을 대신하지 않는다.",
+    )
+
+
 class SkeletonTaskDraft(EngineModel):
     task_ref: str
     kind: TaskKind
@@ -431,6 +455,64 @@ class PlanReviewEnvelope(EngineModel):
         return schema
 
 
+class PlanExpansionEnvelopeV2(EngineModel):
+    inspection: PlanInspectionV2
+    plan: PlanExpansionDraft
+
+
+class PlanReviewEnvelopeV2(EngineModel):
+    inspection: PlanInspectionV2
+    review: PlanReviewDraftV2
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema: Any, handler: Any) -> dict[str, Any]:
+        """v2 typed finding과 rating의 배타 분기를 provider schema에도 보존한다."""
+        schema = handler(core_schema)
+        review_schema = _inline_local_schema_refs(PlanReviewDraftV2.model_json_schema())
+
+        def remove_inlined_discriminators(value: Any) -> None:
+            if isinstance(value, list):
+                for item in value:
+                    remove_inlined_discriminators(item)
+            elif isinstance(value, dict):
+                # target oneOf는 이미 const branch로 전개됐다. 제거된 local $defs를
+                # 가리키는 discriminator mapping을 provider schema에 남기지 않는다.
+                value.pop("discriminator", None)
+                for item in value.values():
+                    remove_inlined_discriminators(item)
+
+        remove_inlined_discriminators(review_schema)
+        properties = review_schema["properties"]
+        empty_findings = deepcopy(properties["findings"])
+        empty_findings["maxItems"] = 0
+        nonempty_findings = deepcopy(properties["findings"])
+        nonempty_findings["minItems"] = 1
+        rating_value = deepcopy(properties["ratings"])
+        rating_value["anyOf"] = [
+            value for value in rating_value.get("anyOf", ()) if value != {"type": "null"}
+        ]
+        if not rating_value["anyOf"]:
+            raise RuntimeError("v2 Plan review rating schema에 non-null ReviewRatings branch가 없습니다.")
+        schema["properties"]["review"] = {
+            "description": "v2 finding/rating 두 key가 항상 있는 비권위 Reviewer 제출물",
+            "anyOf": [
+                {
+                    "type": "object",
+                    "properties": {"findings": empty_findings, "ratings": rating_value},
+                    "required": ["findings", "ratings"],
+                    "additionalProperties": False,
+                },
+                {
+                    "type": "object",
+                    "properties": {"findings": nonempty_findings, "ratings": {"type": "null"}},
+                    "required": ["findings", "ratings"],
+                    "additionalProperties": False,
+                },
+            ],
+        }
+        return schema
+
+
 class TaskAssigner(Protocol):
     def assign(self, task: DetailedTaskDraft) -> ModelAssignmentContract: ...
 
@@ -477,6 +559,31 @@ def _review_submission(
         candidate_digest=artifact_digest,
         findings=findings,
         ratings=draft.ratings,
+        evidence_catalog_digest=sha256_digest(evidence_catalog),
+    )
+
+
+def _uses_plan_inspection_v2(provider: PlanInspectionProviderVersion) -> bool:
+    if provider == PLAN_INSPECTION_PROVIDER_V1:
+        return False
+    if provider == PLAN_INSPECTION_PROVIDER_V2:
+        return True
+    raise PlannerRoleAdapterError(f"지원하지 않는 Plan inspection provider입니다: {provider}")
+
+
+def _review_submission_v2(
+    *,
+    role: str,
+    artifact_digest: str,
+    evidence_catalog: dict[str, Any],
+    ratings: ReviewRatings | None,
+    compiled_findings: tuple[ReviewFinding, ...],
+) -> ReviewerSubmission:
+    return ReviewerSubmission(
+        reviewer_role=role,
+        candidate_digest=artifact_digest,
+        findings=compiled_findings,
+        ratings=ratings,
         evidence_catalog_digest=sha256_digest(evidence_catalog),
     )
 
@@ -749,6 +856,7 @@ class PlanExpanderAdapter:
     allowed_fallbacks: tuple[ModelChoice, ...] = ()
     planning_budget: PlanningBudgetPolicy = PlanningBudgetPolicy()
     commit_horizon: CommitHorizon = CommitHorizon()
+    inspection_provider_contract: PlanInspectionProviderVersion = PLAN_INSPECTION_PROVIDER_V1
     receipts: list[RoleCallReceipt] = field(default_factory=list)
 
     def expand(
@@ -761,6 +869,11 @@ class PlanExpanderAdapter:
         planning_budget: PlanningBudgetPolicy | None = None,
     ) -> PlanContractRevision:
         applied_budget = planning_budget or self.planning_budget
+        use_v2 = _uses_plan_inspection_v2(self.inspection_provider_contract)
+        envelope_model = PlanExpansionEnvelopeV2 if use_v2 else PlanExpansionEnvelope
+        inspection_instructions = (
+            _PLAN_INSPECTION_V2_GUIDANCE if use_v2 else PLAN_INSPECTION_INSTRUCTIONS
+        )
         request = make_role_request(
             inventory=self.inventory, allowed_fallbacks=self.allowed_fallbacks,
             role="plan_expander",
@@ -801,7 +914,7 @@ class PlanExpanderAdapter:
                 "의미 검사는 원본 file 근거와 응답 관측을 함께 참조하는 semantic validation으로 "
                 "계약하고 required_evidence_kinds에 model_review·external_observation·file을 모두 "
                 "요구한다. 이는 외부 시스템 변경 효과를 뜻하지 않는다."
-            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS + PLAN_VALIDATION_TRACE_INSTRUCTIONS + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS + PLAN_INSPECTION_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS + PLAN_VALIDATION_TRACE_INSTRUCTIONS + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS + inspection_instructions,
             payload={
                 "case_ref": _case_ref(sha256_digest(candidate)),
                 "goal": goal.definition.model_dump(mode="json"),
@@ -814,16 +927,19 @@ class PlanExpanderAdapter:
                     "artifact:plan_draft": "output.plan",
                 }),
             },
-            output_schema=PlanExpansionEnvelope.model_json_schema(),
+            output_schema=envelope_model.model_json_schema(),
             model=self.model,
             effort=self.effort,
             inventory_digest=self.inventory_digest,
             cwd=str(Path(self.cwd).resolve()),
         )
-        def validate_expansion(value: dict[str, Any]) -> PlanExpansionEnvelope:
-            envelope = PlanExpansionEnvelope.model_validate(value)
+        accepted_plan: PlanContractRevision | None = None
+
+        def validate_expansion(value: dict[str, Any]) -> PlanExpansionEnvelope | PlanExpansionEnvelopeV2:
+            nonlocal accepted_plan
+            envelope = envelope_model.model_validate(value)
             draft = envelope.plan
-            self._compile(
+            accepted_plan = self._compile(
                 draft,
                 candidate=candidate,
                 goal=goal,
@@ -831,25 +947,40 @@ class PlanExpanderAdapter:
                 project_map=project_map,
                 planning_budget=applied_budget,
             )
-            validate_plan_inspection(
-                envelope.inspection,
-                plan=draft,
-                goal=goal,
-                project_map=project_map,
-                evidence_catalog={
-                    "source:goal": goal.definition.model_dump(mode="json"),
-                    "source:state": state.model_dump(mode="json"),
-                    "source:project_map": compact_project_map(project_map),
-                    "artifact:skeleton": candidate.model_dump(mode="json"),
-                },
-                findings=(),
-            )
+            evidence_catalog = {
+                "source:goal": goal.definition.model_dump(mode="json"),
+                "source:state": state.model_dump(mode="json"),
+                "source:project_map": compact_project_map(project_map),
+                "artifact:skeleton": candidate.model_dump(mode="json"),
+            }
+            if use_v2:
+                compile_plan_inspection_v2(
+                    envelope.inspection,
+                    plan=draft,
+                    goal=goal,
+                    project_map=project_map,
+                    evidence_catalog=evidence_catalog,
+                    findings=(),
+                )
+            else:
+                validate_plan_inspection(
+                    envelope.inspection,
+                    plan=draft,
+                    goal=goal,
+                    project_map=project_map,
+                    evidence_catalog=evidence_catalog,
+                    findings=(),
+                )
             return envelope
 
         result = self.runner.run(request, validator=validate_expansion)
         verify_role_receipt(request, result)
         self.receipts.append(result.receipt)
-        draft = validate_expansion(result.payload).plan
+        if use_v2:
+            if accepted_plan is None:
+                raise PlannerRoleAdapterError("v2 Plan expansion 검증 결과가 보존되지 않았습니다.")
+            return accepted_plan
+        draft = PlanExpansionEnvelope.model_validate(result.payload).plan
         return self._compile(
             draft,
             candidate=candidate,
@@ -993,11 +1124,17 @@ class PlanReviewerAdapter:
     critical_model: str | None = None
     critical_effort: str | None = None
     critical_allowed_fallbacks: tuple[ModelChoice, ...] = ()
+    inspection_provider_contract: PlanInspectionProviderVersion = PLAN_INSPECTION_PROVIDER_V1
     receipts: list[RoleCallReceipt] = field(default_factory=list)
 
     def review(self, *, plan, goal, state, project_map, risk_route) -> ReviewerSubmission:
         digest = plan.activation_digest
         evidence_catalog = plan_review_evidence_catalog(plan, goal, state, project_map)
+        use_v2 = _uses_plan_inspection_v2(self.inspection_provider_contract)
+        envelope_model = PlanReviewEnvelopeV2 if use_v2 else PlanReviewEnvelope
+        inspection_instructions = (
+            _PLAN_INSPECTION_V2_GUIDANCE if use_v2 else PLAN_INSPECTION_INSTRUCTIONS
+        )
         use_critical = risk_route != "compact_plan_reviewer"
         selected_model = (self.critical_model or self.model) if use_critical else self.model
         selected_effort = (
@@ -1028,7 +1165,7 @@ class PlanReviewerAdapter:
                 "각 행의 statement를 등록 자료의 실제 수단·phase와 대조하고 마지막 integration 행까지 "
                 "확인한다. linked_criterion_ids는 현재 연결 사실이며 필수 연결의 판정이 아니다. "
                 "색인 자체를 새 evidence ref나 별도 권위로 사용하지 않고 finding은 원본 evidence_catalog에 결속한다."
-            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + PLAN_VALIDATION_TRACE_INSTRUCTIONS + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS + PLAN_INSPECTION_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS + PLAN_VALIDATION_TRACE_INSTRUCTIONS + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS + inspection_instructions,
             payload={
                 "case_ref": _case_ref(digest),
                 "evidence_catalog": evidence_catalog,
@@ -1039,42 +1176,68 @@ class PlanReviewerAdapter:
                     key: f"payload.evidence_catalog.{key}" for key in evidence_catalog
                 }),
             },
-            output_schema=PlanReviewEnvelope.model_json_schema(),
+            output_schema=envelope_model.model_json_schema(),
             model=selected_model,
             effort=selected_effort,
             inventory_digest=self.inventory_digest,
             cwd=str(Path(self.cwd).resolve()),
         )
-        def validate_review(value: dict[str, Any]) -> PlanReviewEnvelope:
-            envelope = PlanReviewEnvelope.model_validate(value)
+        accepted_submission: ReviewerSubmission | None = None
+
+        def validate_review(value: dict[str, Any]) -> PlanReviewEnvelope | PlanReviewEnvelopeV2:
+            nonlocal accepted_submission
+            envelope = envelope_model.model_validate(value)
             draft = envelope.review
-            submission = _review_submission(
-                role=risk_route,
-                artifact_digest=digest,
-                evidence_catalog=evidence_catalog,
-                draft=draft,
-            )
+            if use_v2:
+                compiled = compile_plan_inspection_v2(
+                    envelope.inspection,
+                    findings=draft.findings,
+                    plan=plan,
+                    goal=goal,
+                    project_map=project_map,
+                    evidence_catalog=evidence_catalog,
+                )
+                submission = _review_submission_v2(
+                    role=risk_route,
+                    artifact_digest=digest,
+                    evidence_catalog=evidence_catalog,
+                    ratings=draft.ratings,
+                    compiled_findings=compiled.derived_findings,
+                )
+            else:
+                submission = _review_submission(
+                    role=risk_route,
+                    artifact_digest=digest,
+                    evidence_catalog=evidence_catalog,
+                    draft=draft,
+                )
             validate_reviewer_submission_evidence(
                 submission,
                 evidence_catalog=evidence_catalog,
                 known_task_refs={item.task_ref for item in plan.definition.tasks},
             )
-            validate_plan_inspection(
-                envelope.inspection,
-                plan=plan,
-                goal=goal,
-                project_map=project_map,
-                evidence_catalog=evidence_catalog,
-                findings=draft.findings,
-            )
+            if not use_v2:
+                validate_plan_inspection(
+                    envelope.inspection,
+                    plan=plan,
+                    goal=goal,
+                    project_map=project_map,
+                    evidence_catalog=evidence_catalog,
+                    findings=draft.findings,
+                )
+            accepted_submission = submission
             return envelope
 
         result = self.runner.run(request, validator=validate_review)
         verify_role_receipt(request, result)
         self.receipts.append(result.receipt)
+        if use_v2:
+            if accepted_submission is None:
+                raise PlannerRoleAdapterError("v2 Plan review 검증 결과가 보존되지 않았습니다.")
+            return accepted_submission
         return _review_submission(
             role=risk_route,
             artifact_digest=digest,
             evidence_catalog=evidence_catalog,
-            draft=validate_review(result.payload).review,
+            draft=PlanReviewEnvelope.model_validate(result.payload).review,
         )

@@ -6,9 +6,9 @@
 
 | 단계 | 완료를 증명할 근거 | 현재 상태 |
 |---|---|---|
-| A. 실행 기반 격리 | 고정 worktree·공통 preflight·독립 fixture package·결정적 Gate | 구현 및 통합 검증 중 |
-| B. 기존 계약 기준선 | 같은 역할로 static 11사례, 사례별 형식·참조·의미·운영 결과 | NOT_RUN |
-| C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | 설계 검토 |
+| A. 실행 기반 격리 | 고정 worktree·공통 preflight·독립 fixture package·결정적 Gate | 완료 · `22d68c0` |
+| B. 기존 계약 기준선 | 같은 역할로 static 11사례, 사례별 형식·참조·의미·운영 결과 | 완료 · PASS 7 / FAIL 4 |
+| C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | 구현·결정적 검증 완료, 고정 실행 준비 |
 | D. 새 계약 비교 | 새 실행의 static 11사례와 고정 기대표·실측 usage | NOT_RUN |
 | E. S06 재진입 검사 | static·expansion·독립 생성 검토·expanded-review 13단계 | NOT_RUN |
 | F. 실제 Goal 경로 | 고정 자연어에서 실제 Goal·Plan 선택·활성화·실행·독립 검증·GoalVerdict | NOT_RUN |
@@ -38,5 +38,8 @@ Codex executable은 `D:\codex\fm-inspection-runtime\codex-935a1911.exe`에 복�
 - 개발 Gate 첫 실행: 전체 642개 테스트 중 legacy 환경 의존 4건 실패. 나머지 Gate 4/4 통과. 실패 artifact는 `inspection-stage-a-devgate`에 보존했다.
 - 환경 의존 4건은 직접 재검증하여 모두 통과했다. 다음 전체 실행은 새 summary 분류 key에 대한 기존 기대값 2건을 찾아 보완했고, 해당 실패를 `inspection-stage-a-devgate-v2`에 보존했다.
 - 세 번째 결정적 Gate는 5/5 통과했다. 전체 테스트는 646개였다. 관련 최종 경계 회귀 26개도 통과했다.
+- v1 독립 기준선은 고정 worktree에서 11/11 사례를 호출했다. 결과는 PASS 7, 의미 FAIL 3, model output FAIL 1이며 logical/provider/recovery는 11/11/0이다. 상세 근거는 [v1 독립 11사례 기준선](inspection-v1-static11-baseline.md)에 있다.
+- v2는 직접 의미 필드와 typed target을 보존하고 반복 row·finding closure, project evidence 환산, taxonomy 값을 adapter가 계산하도록 별도 schema·compiler·evaluator·request binding으로 구현했다. 동일 clean 표본의 반복 참조 항목은 101개에서 22개로, Reviewer strict schema는 16,512 bytes에서 12,253 bytes로 줄었다. 이 수치는 결정적 표본이며 실제 모델 성공률 증거가 아니다.
+- v2 및 기존 경계의 전체 단위·통합 테스트와 누적 error receipt 분류 회귀 15개가 통과했다. 고정 v2 worktree를 만들기 전에 최종 source 기준 결정적 Gate를 다시 실행한다.
 
 전체 qualification, Functional Alpha와 1.0 cutover는 아직 NO-GO다. 실제 모델 응답의 개선이나 최종 Goal 완료는 아직 증명하지 않았다.

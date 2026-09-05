@@ -1,6 +1,8 @@
 # VibeMarshal 문서 지도
 
 - [검사 계약 구조 개선 진행 기록](inspection-recovery-progress.md): 고정 검증 환경, 독립 11사례 기준선, 참조 계약 개선과 실제 Goal 경로의 공통 완료 조건
+- [Plan inspection v1 독립 11사례 기준선](inspection-v1-static11-baseline.md): 고정 환경에서 전수 관측한 7 PASS·4 FAIL 분포와 실측 usage
+- [Inspection Provider v2 계약](inspection-provider-v2.md): 모델의 직접 의미 판단과 adapter의 결정적 참조 전개 경계, 호환성·평가·승격 조건
 
 ## 현재 권위 문서
 

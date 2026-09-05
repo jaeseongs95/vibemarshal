@@ -5,16 +5,45 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from flowmarshal.canonical import canonical_json, sha256_bytes
+from flowmarshal.canonical import canonical_json, sha256_bytes, sha256_digest
 from flowmarshal.engine.domain import ProjectMapRevision
 from flowmarshal.engine.plan_inspection import PlanInspectionError
 from flowmarshal.engine.planner_roles import inspection_source_catalog
-from flowmarshal.engine.roles import RoleCallRequest, strict_json_output_schema
-from scripts.diagnostics.r_s06_10 import CALL_ORDER, MAXIMUM_CALLS, CapturingRuntime, claim_turn, locked_input_files, verify_instruction_sources, write_new
+from flowmarshal.engine.roles import RoleCallRequest, make_role_request, strict_json_output_schema
+from flowmarshal.engine.plan_inspection_provider import (
+    PLAN_INSPECTION_PROVIDER_V1, PLAN_INSPECTION_PROVIDER_V2,
+    bind_plan_inspection_request,
+)
+from scripts.diagnostics.r_s06_10 import (
+    CALL_ORDER, MAXIMUM_CALLS, CapturingRuntime, claim_turn, inspection_provider_manifest,
+    locked_input_files, verify_instruction_sources, write_new,
+)
 from tests.test_engine_plan_inspection import inputs
 
 
 class InspectionSourceContractTests(unittest.TestCase):
+    def test_provider_manifest_and_request_binding_separate_v1_from_v2(self):
+        v1 = inspection_provider_manifest(PLAN_INSPECTION_PROVIDER_V1)
+        v2 = inspection_provider_manifest(PLAN_INSPECTION_PROVIDER_V2)
+        self.assertNotEqual(v1["provider_contract_digest"], v2["provider_contract_digest"])
+        self.assertNotEqual(v1["provider_schema_set_digest"], v2["provider_schema_set_digest"])
+        request = RoleCallRequest(
+            role="compact_plan_reviewer", instructions="검사 지침", payload={"input": "value"},
+            output_schema={"type": "object", "properties": {"value": {"type": "string"}}},
+            model="fixture-model", effort="high", inventory_digest="sha256:" + "1" * 64,
+            cwd=str(Path.cwd()),
+        )
+        binding = bind_plan_inspection_request(request, PLAN_INSPECTION_PROVIDER_V2)
+        self.assertEqual(request.request_digest, binding.request_digest)
+        self.assertEqual(
+            sha256_digest(strict_json_output_schema(request.output_schema)),
+            binding.output_schema_digest,
+        )
+        self.assertNotEqual(
+            binding.binding_digest,
+            bind_plan_inspection_request(request, PLAN_INSPECTION_PROVIDER_V1).binding_digest,
+        )
+
     def test_preflight_does_not_lock_its_ongoing_output_log_but_keeps_nested_input_logs(self):
         with tempfile.TemporaryDirectory() as temp:
             run = Path(temp)
@@ -92,12 +121,16 @@ class InspectionSourceContractTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             run = Path(temp)
             capture = run / "calls/01-review"
-            request = RoleCallRequest(role="compact_plan_reviewer", instructions="검사 지침", payload={"입력": "원문"},
+            request = make_role_request(role="compact_plan_reviewer", instructions="검사 지침", payload={"입력": "원문"},
                 output_schema={"type": "object", "properties": {"z": {"type": "string"}, "a": {"type": "string"}}},
                 model="fixture-model", effort="high", inventory_digest="sha256:" + "1" * 64, cwd=str(run))
             schema = strict_json_output_schema(request.output_schema)
             write_new(capture / "request.json", request)
             write_new(capture / "strict-schema.json", schema)
+            write_new(
+                capture / "provider-binding.json",
+                bind_plan_inspection_request(request, PLAN_INSPECTION_PROVIDER_V2),
+            )
             write_new(capture / "thread.receipt.json", {"binding": {"thread_id": "thread_fixture"},
                                                        "payload": {"instructionSources": []}})
             write_new(run / "instruction-binding.json", {"sources": []})

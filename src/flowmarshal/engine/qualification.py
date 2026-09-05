@@ -55,6 +55,11 @@ from .evaluation import (
 from .freeze import LegacyFreezeManifest, verify_legacy_freeze
 from .goal import GoalNormalizerAdapter, GoalPreparationPipeline, GoalReviewerAdapter, ReviewDraft
 from .models import AssignmentResolver, EngineRoleConfiguration, ModelInventory
+from .plan_inspection_provider import (
+    PLAN_INSPECTION_PROVIDER_V1,
+    PLAN_INSPECTION_PROVIDER_V2,
+    PlanInspectionProviderVersion,
+)
 from .planner_roles import (
     PlanExpanderAdapter,
     PlanReviewerAdapter,
@@ -716,13 +721,34 @@ def _planning_contract(
     catalog: PlanningScenarioCatalog,
     inventory: ModelInventory,
     roles: EngineRoleConfiguration,
+    *,
+    inspection_provider_contract: PlanInspectionProviderVersion = PLAN_INSPECTION_PROVIDER_V1,
 ) -> EvaluationContract:
     import inspect
     from . import goal as goal_roles, planner_roles
     from .goal import GoalNormalizationProposal
     from .planner_roles import (
-        PlanExpansionEnvelope, PlanReviewEnvelope, SkeletonBatchDraft, SkeletonCandidateDraft,
+        PlanExpansionEnvelope, PlanExpansionEnvelopeV2,
+        PlanReviewEnvelope, PlanReviewEnvelopeV2,
+        SkeletonBatchDraft, SkeletonCandidateDraft,
     )
+    from .plan_inspection_v2 import FINDING_TAXONOMY_V2, PLAN_INSPECTION_V2_INSTRUCTIONS
+
+    if inspection_provider_contract == PLAN_INSPECTION_PROVIDER_V1:
+        expansion_envelope, review_envelope = PlanExpansionEnvelope, PlanReviewEnvelope
+        provider_contract_values: dict[str, Any] = {}
+    elif inspection_provider_contract == PLAN_INSPECTION_PROVIDER_V2:
+        expansion_envelope, review_envelope = PlanExpansionEnvelopeV2, PlanReviewEnvelopeV2
+        provider_contract_values = {
+            "inspection_provider_contract": inspection_provider_contract,
+            "inspection_provider_instructions": PLAN_INSPECTION_V2_INSTRUCTIONS,
+            "inspection_provider_taxonomy": {
+                key: (gate.value, severity.value)
+                for key, (gate, severity) in FINDING_TAXONOMY_V2.items()
+            },
+        }
+    else:
+        raise QualificationRunError("INSPECTION_PROVIDER_CONTRACT_UNSUPPORTED")
 
     return EvaluationContract(
         model_lock_format="flowmarshal-model-lock-v2",
@@ -733,12 +759,16 @@ def _planning_contract(
         expected_cell_count=len(catalog.scenarios) * len(ORDER_SEEDS),
         role_configuration_digest=roles.configuration_digest,
         source_manifest_digest=source_manifest_digest(root),
-        rules_digest=sha256_digest({"pipeline": "goal-to-selected-plan", "budget_calls": 14, "versions": 5}),
+        rules_digest=sha256_digest(
+            {"pipeline": "goal-to-selected-plan", "budget_calls": 14, "versions": 5}
+            | ({"inspection_provider_contract": inspection_provider_contract}
+               if provider_contract_values else {})
+        ),
         threshold_digest=sha256_digest({"clean_selected": True, "adversarial_blocked": True, "defect_count": 0}),
         taxonomy_digest=sha256_digest({"dispositions": ["selected", "blocked"],
                                       "review_findings": ReviewDraft.model_json_schema()}),
         prompt_digest=sha256_digest(
-            {
+            ({
                 role.__name__: inspect.getsource(role)
                 for role in (GoalNormalizerAdapter, GoalReviewerAdapter, SkeletonGeneratorAdapter,
                              SkeletonReviewerAdapter, PlanExpanderAdapter, PlanReviewerAdapter)
@@ -750,13 +780,13 @@ def _planning_contract(
                 },
                 "inspection_input_projection": inspect.getsource(planner_roles.inspection_source_catalog),
                 "inspection_source_verification": inspect.getsource(planner_roles.inspection_file_content),
-            }
+            } | provider_contract_values)
         ),
         output_schema_digest=sha256_digest(
             {
                 model.__name__: strict_json_output_schema(model.model_json_schema())
                 for model in (GoalNormalizationProposal, SkeletonBatchDraft, SkeletonCandidateDraft,
-                              PlanExpansionEnvelope, PlanReviewEnvelope, ReviewDraft)
+                              expansion_envelope, review_envelope, ReviewDraft)
             }
         ),
         model_lock_digest=_model_lock(inventory, roles),
@@ -794,6 +824,7 @@ def _planning_cell(
     runtime: CodexAppServerRuntime,
     inventory: ModelInventory,
     roles: EngineRoleConfiguration,
+    inspection_provider_contract: PlanInspectionProviderVersion = PLAN_INSPECTION_PROVIDER_V1,
     work_root: Path | None = None,
     progress_sink: Callable[[dict[str, Any]], None] | None = None,
 ) -> tuple[dict[str, Any], tuple[RoleCallReceipt, ...]]:
@@ -947,6 +978,7 @@ def _planning_cell(
             allowed_fallbacks=roles.plan_expander.allowed_fallbacks,
             inventory_digest=inventory.inventory_digest, inventory=inventory,
             cwd=workspace,
+            inspection_provider_contract=inspection_provider_contract,
         )
         plan_reviewer = PlanReviewerAdapter(
             runner,
@@ -958,6 +990,7 @@ def _planning_cell(
             critical_model=roles.critical_reviewer.model,
             critical_effort=roles.critical_reviewer.effort,
             critical_allowed_fallbacks=roles.critical_reviewer.allowed_fallbacks,
+            inspection_provider_contract=inspection_provider_contract,
         )
         outcome = SkeletonFirstPlanner(
             generator, skeleton_reviewer, expander, plan_reviewer
@@ -1024,6 +1057,7 @@ def run_full_planning_pipeline(
     run_root: Path | None = None,
     role_configuration: EngineRoleConfiguration | None = None,
     codex_bin: Path | str | None = None,
+    inspection_provider_contract: PlanInspectionProviderVersion = PLAN_INSPECTION_PROVIDER_V1,
 ) -> tuple[Path, ScopeQualificationReport]:
     base = (root or project_root()).resolve(strict=True)
     preflight_failures = _preflight(base)
@@ -1036,7 +1070,10 @@ def run_full_planning_pipeline(
     with CodexAppServerRuntime(codex_bin=codex_bin) as runtime:
         inventory = runtime.list_models()
         roles.validate_inventory(inventory)
-        contract = _planning_contract(base, catalog, inventory, roles)
+        contract = _planning_contract(
+            base, catalog, inventory, roles,
+            inspection_provider_contract=inspection_provider_contract,
+        )
         destination = (
             run_root
             or _default_run_root(base, "full-planning-pipeline", contract.contract_digest[7:15])
@@ -1055,6 +1092,7 @@ def run_full_planning_pipeline(
                 "project_root": str(base),
                 "role_configuration": roles.model_dump(mode="json"),
                 "codex_bin": None if codex_bin is None else str(Path(codex_bin).resolve()),
+                "inspection_provider_contract": inspection_provider_contract,
             },
         )
         fixture_root = base / "tests" / "fixtures" / "engine" / "live-smoke-project"
@@ -1074,6 +1112,7 @@ def run_full_planning_pipeline(
                             runtime=runtime,
                             inventory=inventory,
                             roles=roles,
+                            inspection_provider_contract=inspection_provider_contract,
                             work_root=destination / "work" / f"seed-{seed}" / scenario.scenario_id,
                             progress_sink=_role_progress(destination, scenario_id=scenario.scenario_id, order_seed=seed),
                         )
@@ -1214,6 +1253,9 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
             run_root=destination,
             role_configuration=roles,
             codex_bin=codex_bin,
+            inspection_provider_contract=metadata.get(
+                "inspection_provider_contract", PLAN_INSPECTION_PROVIDER_V1
+            ),
         )
     if scope == "project-e2e":
         from .e2e_qualification import run_project_e2e
