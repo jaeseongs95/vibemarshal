@@ -1,7 +1,8 @@
 """v2 직접 제출물과 동결된 사례 기대값의 평가.
 
-compiler가 만든 closure는 citation/evidence 결속을 확인하는 데만 쓰며, AC 관계의
-의미 정답이나 finding·scope 판단을 생성하지 않는다.
+compiler가 만든 closure는 citation/evidence 결속을 확인하는 데만 쓴다. AC 관계의
+의미 판단은 모델이 scope에 제출한 양의 criterion_refs를 전체 행렬로 확장할 뿐이며,
+finding·scope 판단을 생성하지 않는다.
 """
 from __future__ import annotations
 
@@ -20,15 +21,16 @@ V2_EVALUATION_CONTRACT = "plan-inspection-evaluation-v2"
 
 
 def _fixed_ac_link_requirement_assessment(
-        inspection: PlanInspectionV2, expected_rows: list[dict[str, Any]], plan: Any,
+        compiled: CompiledPlanInspectionV2, expected_rows: list[dict[str, Any]], plan: Any,
 ) -> dict[str, Any]:
-    """직접 제출한 AC×validation bool을 동결 행과 정확히 대조한다."""
+    """scope의 양의 연결에서 파생한 AC×validation bool을 동결 행과 정확히 대조한다."""
     expected = {(row["criterion_id"], row["validation_id"]): row["ac_link_required"]
                 for row in expected_rows}
     actual = {(row.criterion_id, row.validation_id): row.ac_link_required
-              for row in inspection.ac_validation_rows}
+              for row in compiled.ac_validation_decisions}
     pair_set_matches = (bool(expected_rows) and len(expected) == len(expected_rows) and
-                        len(actual) == len(inspection.ac_validation_rows) and set(actual) == set(expected))
+                        len(actual) == len(compiled.ac_validation_decisions) and
+                        set(actual) == set(expected))
     requirement_differences = [
         {"criterion_id": criterion_id, "validation_id": validation_id,
          "expected": expected[(criterion_id, validation_id)],
@@ -127,7 +129,7 @@ def assess_inspection_review_v2(
          "link_presence": [], "passed": None}
         if fixed_ac_link_rows is None
         else _fixed_ac_link_requirement_assessment(
-            inspection, fixed_ac_link_rows,
+            compiled, fixed_ac_link_rows,
             plan if plan is not None else _missing_plan(),
         )
     )

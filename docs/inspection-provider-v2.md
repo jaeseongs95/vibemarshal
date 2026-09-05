@@ -12,16 +12,17 @@ v1의 raw 입력, strict schema, validator, evaluator와 이미 기록된 artifa
 
 | 작성물 | 직접 제출해야 하는 내용 |
 |---|---|
-| citation 선택 | mechanism·scope·AC 행의 `direct_refs`와 finding의 citation target에서 실제 판단에 사용한 `inspection_citation_catalog` ID |
+| citation 선택 | mechanism·scope의 `direct_refs`와 finding의 citation target에서 실제 판단에 사용한 `inspection_citation_catalog` ID |
 | validation claim | `validation_id`, `mechanism_id`, `tool`, `phase`, 직접 `direct_refs` |
-| validation scope | 선택한 `mechanism_id`, 직접 추가 근거, scope `status` |
-| AC×validation 행 | `criterion_id`, `validation_id`, `ac_link_required` bool, `scope_ids`, 직접 추가 근거 |
+| validation scope | 원자적 검사 절차·주장인 `claim`, 선택한 `mechanism_id`, 직접 추가 근거, scope `status`, 그 실제 절차를 명시적으로 요구하는 AC의 양의 `criterion_refs` |
 | constraint×Task 행 | `constraint_id`, `task_ref`, `applicability`, 적용될 때의 `required_validation_ids` |
 | finding | `finding_code`, `defect_kind`, `remediable`, 단일 형태의 typed target. 표준 taxonomy 밖의 `other`는 직접 `gate`·`severity`도 제출 |
 
-`tool`과 `phase`는 등록 자료·구현에서 직접 확인한 mechanism을 식별한다. 같은 이름의 도구, 다른 phase, 단순 evidence 종류, 인접한 validation 또는 선후관계만으로 검사 능력이나 scope를 확대하지 않는다. `status`는 해당 scope의 직접 관측 상태이며 다른 scope·AC 행·finding의 결론을 암시하지 않는다.
+`tool`과 `phase`는 등록 자료·구현에서 직접 확인한 mechanism을 식별한다. 같은 이름의 도구, 다른 phase, 단순 evidence 종류, 인접한 validation 또는 선후관계만으로 검사 능력이나 scope를 확대하지 않는다. `status`는 해당 scope의 직접 관측 상태이며 다른 scope·AC 관계·finding의 결론을 암시하지 않는다.
 
-AC×validation의 bool은 필수 연결 여부만 표현한다. false는 선택 연결을 금지하지 않으며, true는 새 검사 책임·새 Task·새 validation ID를 만들지 않는다. constraint×Task의 `applicability`도 AC 관계를 추정하지 않는다. finding target은 모두 `{kind, primary_ref, secondary_ref}` 한 형태로 제출한다. `ac_validation`과 `constraint_task`만 두 ID를 순서대로 쓰고, 나머지는 `primary_ref` 하나와 `secondary_ref: null`을 쓴다. 이 표현은 provider strict schema가 배열 item의 `oneOf`를 거부하는 경계에서도 직접 target 선택을 그대로 보존한다. target은 요청에 제공된 Task·validation·criterion·scope 등의 허용 종류와 ID에 맞아야 하며, 존재하지 않는 target을 결함 설명으로 사용할 수 없다. 영향 Task는 이 target에서 adapter가 계산한다. `other` 결함이 특정 Task에 영향을 준다는 의미 판단은 citation target과 함께 `task` target을 직접 선택해 보존한다.
+각 supported scope의 `criterion_refs`는 그 scope가 실제 수행하는 절차를 Goal이 명시적으로 요구할 때만 해당 AC를 포함한다. 동일한 실제 절차를 Task와 Goal validation이 각각 실행하면 각 scope에 같은 AC를 연결한다. 별도 unittest validation의 존재는 oracle scope 안에서 실제 실행되는 unittest 책임을 대체하지 않는다. 같은 Task·phase·순서·evidence 종류만 공유하는 sibling scope에는 연결을 전파하지 않는다. contradicted·unresolved scope의 `criterion_refs`는 빈 배열이다. 빈 양의 연결에서 파생되는 false는 현재 Plan의 선택 연결을 금지하지 않으며, 양의 연결은 새 검사 책임·Task·validation ID를 만들지 않는다. constraint×Task의 `applicability`도 AC 관계를 추정하지 않는다.
+
+finding target은 모두 `{kind, primary_ref, secondary_ref}` 한 형태로 제출한다. `ac_validation`과 `constraint_task`만 두 ID를 순서대로 쓰고, 나머지는 `primary_ref` 하나와 `secondary_ref: null`을 쓴다. 이 표현은 provider strict schema가 배열 item의 `oneOf`를 거부하는 경계에서도 직접 target 선택을 그대로 보존한다. target은 요청에 제공된 Task·validation·criterion·scope 등의 허용 종류와 ID에 맞아야 하며, 존재하지 않는 target을 결함 설명으로 사용할 수 없다. 영향 Task는 이 target에서 adapter가 계산한다. `other` 결함이 특정 Task에 영향을 준다는 의미 판단은 citation target과 함께 `task` target을 직접 선택해 보존한다.
 
 ## Adapter가 결정적으로 파생하는 값
 
@@ -31,6 +32,7 @@ adapter는 직접 작성물을 받아 다음 값만 결정적으로 계산한다
 |---|---|
 | citation catalog | 결속된 Goal의 사용자 요청·outcome·AC·constraint·preference·assumption·effect, Skeleton/Plan의 목적·입출력·완료·검사·효과 문장과 등록 자료 본문만 `source_ref`·JSON pointer·연속 quote의 content hash ID로 고정한다. Goal source trace와 State·ProjectMap의 ID·digest·path 장부는 직접 의미 근거 후보에서 제외한다. 등록 파일 본문은 요청에 실제 노출한 instruction·reference entry만 포함한다. |
 | 고정 claim ref | validation statement, Goal AC statement·validation intent, constraint statement의 citation ID를 원본 ID·selector join으로 붙인다. 모델이 같은 원문 주소를 반복 제출하지 않는다. |
+| AC×validation 전체 행렬 | supported scope의 양의 `criterion_refs`를 해당 scope의 `validation_id`와 join한다. 모든 Goal AC×모든 validation 조합을 정확히 한 번 생성하고, 선택 scope가 하나 이상이면 `ac_link_required=true`와 그 `scope_ids`, 없으면 false와 빈 scope 목록을 만든다. |
 | 행 closure | 고정 claim ref, 모델이 선택한 직접 refs, 그 행이 선택한 mechanism·scope의 refs를 대조한다. |
 | target closure | finding이 가리키는 typed target과 그 finding의 직접 근거가 현재 target·evidence catalog 안에서 닫히는지 확인한다. |
 | project evidence 환산 | 검증된 `project:*` citation은 Reviewer evidence에서 `source:project_map`으로 환산한다. `source:goal`과 `artifact:plan_contract`는 그대로 유지한다. |
@@ -39,7 +41,7 @@ adapter는 직접 작성물을 받아 다음 값만 결정적으로 계산한다
 | taxonomy 값 | 다섯 표준 `defect_kind`의 gate·severity와 모든 finding의 결정적인 summary 형식을 계산한다. `other`의 gate·severity는 모델의 직접 제출값을 보존한다. |
 | 빈 coverage membership witness | 빈 coverage나 빈 scope membership은 후보 집합과 join 결과가 실제로 비어 있음을 보여 주는 witness로 남긴다. adapter는 빈 집합을 연결 누락·무결함·새 관계로 해석하지 않는다. |
 
-adapter가 만든 catalog와 고정 claim ref는 입력 원문의 기계적 주소와 내용만 표현한다. adapter는 모델의 direct ref 선택, 행의 bool·status, finding·typed target, `other`의 직접 gate·severity, coverage, 관계 의미를 생성·삭제·교정하지 않는다. closure 실패는 정확한 행·target·누락 ref를 오류로 보고하고 제출을 거부한다. `project:*` 환산과 영향 Task 계산도 모델이 선택한 target의 표현 변환일 뿐, 해당 Project Map 본문·검사 능력·finding 근거를 새로 추가하는 작업이 아니다.
+adapter가 만든 catalog와 고정 claim ref는 입력 원문의 기계적 주소와 내용만 표현한다. 전체 행렬은 모델이 제출한 scope의 양의 criterion 연결을 반복 가능한 cross-product 장부로 표현한 것이다. adapter는 scope의 claim·status·criterion refs, direct ref 선택, finding·typed target, `other`의 직접 gate·severity, coverage 또는 관계 의미를 생성·삭제·교정하지 않는다. closure 실패는 정확한 행·target·누락 ref를 오류로 보고하고 제출을 거부한다. `project:*` 환산과 영향 Task 계산도 모델이 선택한 target의 표현 변환일 뿐, 해당 Project Map 본문·검사 능력·finding 근거를 새로 추가하는 작업이 아니다.
 
 State·ProjectMap revision, digest, root, freshness와 요청 binding은 기존 Core·preflight가 역할 호출 전에 결정적으로 검사한다. v2 Reviewer에게는 v1 장부 작성 지침을 함께 제공하지 않으며, 이 기계 메타데이터의 문자열 비교를 semantic finding으로 요구하지 않는다. 등록 본문과 Goal·Plan 의미의 실제 충돌은 계속 모델이 직접 판단한다.
 
@@ -47,7 +49,7 @@ State·ProjectMap revision, digest, root, freshness와 요청 binding은 기존 
 
 다음은 model과 adapter 모두에게 금지된다.
 
-- bool, scope status, finding, typed target, 모델의 direct ref 선택을 추측해 채우거나 수정하는 행위
+- scope claim·status·criterion refs, finding, typed target, 모델의 direct ref 선택을 추측해 채우거나 수정하는 행위
 - 선언·시그니처·evidence 종류만으로 새 검사 능력, tool/phase 범위 또는 의미 관계를 만드는 행위
 - AC 연결 누락을 근거로 새 validation·Task·완료 조건을 추가하는 행위
 - 찾은 결함을 이유로 Goal·Plan 원문, oracle, taxonomy, 기대값 또는 과거 판정을 보정하는 행위
@@ -61,11 +63,12 @@ v2 adapter는 다음 순서를 유지한다. 앞 단계가 실패하면 뒤 단�
 
 1. raw JSON의 중복 key, 최상위 타입, strict schema, unknown field와 필수 field를 검사한다.
 2. 요청 전에 의미 projection으로 생성한 citation catalog의 ID·순서·source·selector·quote·content digest를 현재 입력에서 다시 계산해 결속한다. projection 밖의 기계 장부 변경은 별도 입력 binding 검사가 담당한다.
-3. validation claim, mechanism, scope, AC×validation, constraint×Task, finding의 ID·typed target·형식을 각각 검사한다.
-4. 원본 ID·selector join으로 고정 claim ref를 찾고 각 행 closure와 scope가 선택한 mechanism의 직접 근거를 검사한다.
-5. target closure, `project:* → source:project_map` 환산, finding별 Reviewer evidence refs와 영향 Task refs를 계산한다.
-6. taxonomy gate·severity·결정적 summary와 빈 coverage membership witness를 계산하고 제출물 내부 일관성을 검사한다.
-7. 통과한 비권위 submission만 Core 입력으로 전달한다. Core는 기존 규칙으로 status와 판정을 다시 계산한다.
+3. validation claim, mechanism, scope의 claim·status·criterion refs, constraint×Task, finding의 ID·typed target·형식을 각각 검사한다.
+4. supported scope의 양의 criterion refs를 완전한 AC×validation 행렬로 확장하고 contradicted·unresolved scope에 양의 연결이 없는지 검사한다.
+5. 원본 ID·selector join으로 고정 claim ref를 찾고 각 행 closure와 scope가 선택한 mechanism의 직접 근거를 검사한다.
+6. target closure, `project:* → source:project_map` 환산, finding별 Reviewer evidence refs와 영향 Task refs를 계산한다.
+7. taxonomy gate·severity·결정적 summary와 coverage membership witness를 계산하고 제출물 내부 일관성을 검사한다.
+8. 통과한 비권위 submission만 Core 입력으로 전달한다. Core는 기존 규칙으로 status와 판정을 다시 계산한다.
 
 이 순서는 v1의 행 내부 검사와 첫 실패 중단을 약화하지 않는다. v2는 전체 오류 수집을 명분으로 첫 실패 이후의 citation·finding·관계 값을 생성하거나 의미 평가를 계속하지 않는다.
 

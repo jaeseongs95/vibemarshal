@@ -58,31 +58,25 @@ def v2_inputs():
                 "direct_refs": list(dict.fromkeys(ref_map[item] for item in mechanism["basis_refs"])),
             }],
         })
+    criterion_refs_by_validation = {
+        row["validation_id"]: [
+            item.criterion_id for item in plan.definition.goal_coverage
+            if row["validation_id"] in item.validation_ids
+        ]
+        for row in old["validation_scope_rows"]
+    }
     inspection = PlanInspectionV2.model_validate({
         "validation_rows": validation_rows,
         "validation_scope_rows": [{
             "scope_id": row["scope_id"],
             "validation_id": row["validation_id"],
             "mechanism_id": mechanism_ids[row["validation_id"]],
+            "claim": row["procedure"],
+            "criterion_refs": criterion_refs_by_validation[row["validation_id"]]
+            if row["assessment"] == "supported" else [],
             "direct_extra_refs": [],
             "status": row["assessment"],
         } for row in old["validation_scope_rows"]],
-        "ac_validation_rows": [{
-            "criterion_id": row["criterion_id"],
-            "validation_id": row["validation_id"],
-            "ac_link_required": row["validation_id"] in next(
-                item.validation_ids for item in plan.definition.goal_coverage
-                if item.criterion_id == row["criterion_id"]
-            ),
-            "scope_ids": [next(
-                item["scope_id"] for item in old["validation_scope_rows"]
-                if item["validation_id"] == row["validation_id"] and item["assessment"] == "supported"
-            )] if row["validation_id"] in next(
-                item.validation_ids for item in plan.definition.goal_coverage
-                if item.criterion_id == row["criterion_id"]
-            ) else [],
-            "direct_extra_refs": [],
-        } for row in old["ac_validation_rows"]],
         "constraint_task_rows": [{
             "constraint_id": row["constraint_id"],
             "task_ref": row["task_ref"],
@@ -120,11 +114,6 @@ def v2_table_from_v1(
         row["validation_id"]: f"mechanism_{index}"
         for index, row in enumerate(old["validation_rows"])
     }
-    supported_scopes = {
-        row["validation_id"]: row["scope_id"]
-        for row in old["validation_scope_rows"]
-        if row["assessment"] == "supported"
-    }
     return {
         "validation_rows": [{
             "validation_id": row["validation_id"],
@@ -139,17 +128,14 @@ def v2_table_from_v1(
             "scope_id": row["scope_id"],
             "validation_id": row["validation_id"],
             "mechanism_id": mechanism_ids[row["validation_id"]],
+            "claim": row["procedure"],
+            "criterion_refs": [
+                criterion_id for criterion_id, validation_ids in coverage.items()
+                if row["validation_id"] in validation_ids
+            ] if row["assessment"] == "supported" else [],
             "direct_extra_refs": [],
             "status": row["assessment"],
         } for row in old["validation_scope_rows"]],
-        "ac_validation_rows": [{
-            "criterion_id": row["criterion_id"],
-            "validation_id": row["validation_id"],
-            "ac_link_required": row["validation_id"] in coverage[row["criterion_id"]],
-            "scope_ids": [supported_scopes[row["validation_id"]]]
-            if row["validation_id"] in coverage[row["criterion_id"]] else [],
-            "direct_extra_refs": [],
-        } for row in old["ac_validation_rows"]],
         "constraint_task_rows": [{
             "constraint_id": row["constraint_id"],
             "task_ref": row["task_ref"],
@@ -185,11 +171,10 @@ class PlanInspectionV2Tests(unittest.TestCase):
     def test_clean_compiles_repeated_closure_without_provider_repetition(self):
         plan, goal, _, _, inspection = v2_inputs()
         before = inspection.model_dump(mode="json")
-        self.assertTrue(all(not row.direct_extra_refs for row in inspection.ac_validation_rows))
-        self.assertTrue(any(row.ac_link_required for row in inspection.ac_validation_rows))
         compiled = compile_fixture(inspection)
+        self.assertTrue(any(row.ac_link_required for row in compiled.ac_validation_decisions))
         ac_closures = [row for row in compiled.row_closures if row.row_kind == "ac_validation"]
-        self.assertEqual(len(inspection.ac_validation_rows), len(ac_closures))
+        self.assertEqual(len(compiled.ac_validation_decisions), len(ac_closures))
         self.assertTrue(all(len(row.citation_ids) >= 3 for row in ac_closures))
         self.assertEqual((), compiled.derived_findings)
         self.assertEqual(before, inspection.model_dump(mode="json"))
@@ -265,22 +250,14 @@ class PlanInspectionV2Tests(unittest.TestCase):
 
     def test_missing_coverage_member_has_typed_witness_without_fake_quote(self):
         plan, goal, _, _, inspection = v2_inputs()
-        row = inspection.ac_validation_rows[0]
+        row = next(item for item in compile_fixture(inspection).ac_validation_decisions
+                   if item.ac_link_required)
         raw_plan = plan.model_dump(mode="json")
         coverage_index = next(i for i, item in enumerate(raw_plan["definition"]["goal_coverage"])
                               if item["criterion_id"] == row.criterion_id)
         raw_plan["definition"]["goal_coverage"][coverage_index]["validation_ids"].remove(row.validation_id)
         raw_plan["definition_digest"] = sha256_digest(raw_plan["definition"])
         changed_plan = PlanContractRevision.model_validate(raw_plan)
-        scope = next(item for item in inspection.validation_scope_rows
-                     if item.validation_id == row.validation_id and item.status == "supported")
-        raw_inspection = inspection.model_dump(mode="json")
-        target_row = next(item for item in raw_inspection["ac_validation_rows"]
-                          if (item["criterion_id"], item["validation_id"]) ==
-                          (row.criterion_id, row.validation_id))
-        target_row.update(ac_link_required=True, scope_ids=[scope.scope_id])
-        changed = PlanInspectionV2.model_validate(raw_inspection)
-        owner = owner_for(changed_plan, goal, row.validation_id)
         findings = ({
             "finding_code": "MISSING_LINK",
             "defect_kind": "missing_validation_link",
@@ -290,7 +267,7 @@ class PlanInspectionV2Tests(unittest.TestCase):
                 "secondary_ref": row.validation_id,
             }],
         },)
-        compiled = compile_fixture(changed, findings, plan=changed_plan)
+        compiled = compile_fixture(inspection, findings, plan=changed_plan)
         witness = next(item for item in compiled.membership_witnesses
                        if (item.criterion_id, item.validation_id) ==
                        (row.criterion_id, row.validation_id))
@@ -312,24 +289,18 @@ class PlanInspectionV2Tests(unittest.TestCase):
         with self.assertRaisesRegex(PlanInspectionError, "소유 validation 불일치"):
             compile_fixture(PlanInspectionV2.model_validate(raw))
 
-    def test_ac_true_requires_supported_scope_and_false_requires_no_scopes(self):
+    def test_scope_criterion_refs_require_supported_scope_and_known_criterion(self):
         *_, inspection = v2_inputs()
-        for case in ("true_nonsupported", "false_with_scope"):
-            with self.subTest(case=case):
-                raw = inspection.model_dump(mode="json")
-                row = raw["ac_validation_rows"][0]
-                scope = next(item for item in raw["validation_scope_rows"]
-                             if item["validation_id"] == row["validation_id"])
-                row["scope_ids"] = [scope["scope_id"]]
-                if case == "true_nonsupported":
-                    row["ac_link_required"] = True
-                    scope["status"] = "unresolved"
-                    expected = "supported scope"
-                else:
-                    row["ac_link_required"] = False
-                    expected = "scope_ids는 비어야"
-                with self.assertRaisesRegex(PlanInspectionError, expected):
-                    compile_fixture(PlanInspectionV2.model_validate(raw))
+        raw = inspection.model_dump(mode="json")
+        scope = next(item for item in raw["validation_scope_rows"] if item["criterion_refs"])
+        scope["status"] = "unresolved"
+        with self.assertRaisesRegex(ValueError, "supported가 아닌 scope"):
+            PlanInspectionV2.model_validate(raw)
+
+        raw = inspection.model_dump(mode="json")
+        raw["validation_scope_rows"][0]["criterion_refs"] = ["ac_unknown"]
+        with self.assertRaisesRegex(PlanInspectionError, "scope criterion ID 오류"):
+            compile_fixture(PlanInspectionV2.model_validate(raw))
 
     def test_constraint_partial_is_explicit_and_empty_missing_is_rejected(self):
         plan, goal, _, _, inspection = v2_inputs()
@@ -367,10 +338,7 @@ class PlanInspectionV2Tests(unittest.TestCase):
 
         raw = inspection.model_dump(mode="json")
         raw["validation_scope_rows"][0]["status"] = "contradicted"
-        changed_validation_id = raw["validation_scope_rows"][0]["validation_id"]
-        for ac_row in raw["ac_validation_rows"]:
-            if ac_row["validation_id"] == changed_validation_id:
-                ac_row.update(ac_link_required=False, scope_ids=[])
+        raw["validation_scope_rows"][0]["criterion_refs"] = []
         with self.assertRaisesRegex(PlanInspectionError, "finding이 누락"):
             compile_fixture(PlanInspectionV2.model_validate(raw))
 
@@ -562,18 +530,27 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
             self.assertEqual(draft["tasks"][0]["objective"], plan.definition.tasks[0].objective)
             self.assertIn("plan-inspection-v2", request.instructions)
             self.assertIn(PLAN_VALIDATION_TRACE_V2_INSTRUCTIONS, request.instructions)
-            for v1_field in ("citations에 원문", "basis_refs", "claim_ref", "affected_task_refs"):
+            for v1_field in (
+                "citations에 원문", "basis_refs", "claim_ref", "affected_task_refs",
+                "ac_validation_rows",
+            ):
                 self.assertNotIn(v1_field, request.instructions)
             self.assertIn("기계 메타데이터를 서로 비교해 semantic finding을 만들지 않는다", request.instructions)
             self.assertIn("direct_extra_refs", str(request.output_schema))
             self.assertNotIn("finding_links", str(request.output_schema))
             inspection_properties = request.output_schema["$defs"]["PlanInspectionV2"]["properties"]
             self.assertNotIn("citations", inspection_properties)
+            self.assertNotIn("ac_validation_rows", inspection_properties)
             self.assertNotIn(
                 "claim_ref", request.output_schema["$defs"]["ValidationInspectionV2"]["properties"]
             )
             self.assertNotIn(
                 "claim_ref", request.output_schema["$defs"]["ValidationScopeInspectionV2"]["properties"]
+            )
+            self.assertEqual(
+                {"scope_id", "validation_id", "mechanism_id", "claim", "criterion_refs",
+                 "direct_extra_refs", "status"},
+                set(request.output_schema["$defs"]["ValidationScopeInspectionV2"]["properties"]),
             )
             expected_catalog = plan_inspection_citation_catalog_v2(
                 {

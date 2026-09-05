@@ -62,26 +62,26 @@ class ValidationScopeInspectionV2(EngineModel):
     scope_id: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_]{0,79}$")
     validation_id: str
     mechanism_id: str
+    claim: str = Field(min_length=1, max_length=1000)
+    criterion_refs: tuple[str, ...]
     direct_extra_refs: tuple[str, ...]
     status: ScopeStatus
+
+    @field_validator("criterion_refs")
+    @classmethod
+    def criteria_are_unique(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+        return _unique(value, "scope criterion_refs")
 
     @field_validator("direct_extra_refs")
     @classmethod
     def refs_are_unique(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         return _unique(value, "scope direct_extra_refs")
 
-
-class ACValidationInspectionV2(EngineModel):
-    criterion_id: str
-    validation_id: str
-    ac_link_required: bool
-    scope_ids: tuple[str, ...]
-    direct_extra_refs: tuple[str, ...]
-
-    @field_validator("scope_ids", "direct_extra_refs")
-    @classmethod
-    def refs_are_unique(cls, value: tuple[str, ...]) -> tuple[str, ...]:
-        return _unique(value, "AC 행 참조")
+    @model_validator(mode="after")
+    def only_supported_scope_can_link_criteria(self) -> "ValidationScopeInspectionV2":
+        if self.status != "supported" and self.criterion_refs:
+            raise ValueError("supported가 아닌 scope는 criterion_refs를 가질 수 없습니다.")
+        return self
 
 
 class ConstraintTaskInspectionV2(EngineModel):
@@ -99,7 +99,6 @@ class ConstraintTaskInspectionV2(EngineModel):
 class PlanInspectionV2(EngineModel):
     validation_rows: tuple[ValidationInspectionV2, ...] = Field(min_length=1)
     validation_scope_rows: tuple[ValidationScopeInspectionV2, ...] = Field(min_length=1)
-    ac_validation_rows: tuple[ACValidationInspectionV2, ...]
     constraint_task_rows: tuple[ConstraintTaskInspectionV2, ...]
 
 
@@ -167,6 +166,15 @@ class CoverageMembershipWitnessV2(EngineModel):
     member_selector: str | None
 
 
+class ACValidationDecisionV2(EngineModel):
+    """scope의 양의 의미 연결에서 compiler가 확장한 전체 AC×validation 행."""
+
+    criterion_id: str
+    validation_id: str
+    ac_link_required: bool
+    scope_ids: tuple[str, ...]
+
+
 class InspectionRowClosureV2(EngineModel):
     row_kind: Literal[
         "validation", "mechanism", "validation_scope", "ac_validation", "constraint_task", "finding"
@@ -176,6 +184,7 @@ class InspectionRowClosureV2(EngineModel):
 
 
 class CompiledPlanInspectionV2(EngineModel):
+    ac_validation_decisions: tuple[ACValidationDecisionV2, ...]
     derived_findings: tuple[ReviewFinding, ...]
     row_closures: tuple[InspectionRowClosureV2, ...]
     membership_witnesses: tuple[CoverageMembershipWitnessV2, ...]
@@ -200,13 +209,16 @@ PLAN_INSPECTION_V2_INSTRUCTIONS = (
     "Goal AC·constraint의 고정 claim citation은 ID join으로 adapter가 붙인다. mechanisms에는 실제 확인한 "
     "tool·phase와 그 판단에 직접 필요한 catalog citation ID만 "
     "direct_refs로 쓴다. mechanism_id는 응답 전체에서 유일해야 한다. "
-    "각 validation의 주장 범위를 빠짐없이 validation_scope_rows로 나누고, 같은 validation의 mechanism_id와 "
-    "supported·contradicted·unresolved 중 하나를 직접 판단한다. "
+    "각 validation의 주장 범위를 빠짐없이 validation_scope_rows로 나누고, 각 원자 scope가 실제로 검사하는 "
+    "절차·주장을 claim에 명시한다. 같은 validation의 mechanism_id와 supported·contradicted·unresolved 중 "
+    "하나를 직접 판단한다. "
     "mechanism의 근거를 direct_extra_refs에 반복하지 말고 해당 scope에만 추가로 필요한 citation만 쓴다. "
-    "모든 AC×모든 validation 조합을 ac_validation_rows에 정확히 한 번씩 제출한다. ac_link_required는 "
-    "AC 원문이 그 검사를 필수로 연결하는지 직접 판단한다. true이면 해당 validation의 supported scope ID를 "
-    "하나 이상 선택하고 false이면 scope_ids를 빈 배열로 둔다. Goal·validation·mechanism 근거는 adapter가 "
-    "closure로 파생하므로 direct_extra_refs에 반복하지 않는다. false는 기존 선택 연결을 금지하지 않는다. "
+    "supported scope의 criterion_refs에는 그 scope가 실제 수행하는 절차를 명시적으로 요구하는 모든 AC ID만 "
+    "양의 연결로 쓴다. 같은 실제 절차를 Task·Goal validation이 각각 실행하면 둘의 scope에 모두 연결하며, "
+    "별도 unittest validation의 존재만으로 oracle validation 안에서 실제 실행되는 unittest 책임을 생략하지 "
+    "않는다. 같은 Task·phase·실행 순서라는 이유만으로 다른 scope를 연결하지 않는다. contradicted 또는 "
+    "unresolved scope의 criterion_refs는 빈 배열이다. Adapter가 이 양의 연결을 모든 AC×validation의 "
+    "true/false 행렬과 scope_ids로 확장하고 Goal·validation·mechanism 근거 closure를 파생한다. "
     "모든 전역 constraint×Task 조합도 constraint_task_rows에 정확히 한 번씩 제출한다. Task 검사가 직접 "
     "요구되면 applicability=required와 실제 Task validation ID를 쓰고, 그렇지 않으면 not_applicable과 빈 "
     "required_validation_ids를 쓴다. AC 관계와 전역 Task 의무를 서로 추정하지 않는다. "
@@ -223,7 +235,8 @@ PLAN_INSPECTION_V2_INSTRUCTIONS = (
     "함께 그 Task target을 직접 선택한다. 표준 "
     "finding의 gate·severity와 모든 finding의 summary·evidence_refs·finding_links는 adapter가 taxonomy와 "
     "target closure에서 파생한다. "
-    "모델은 bool, status, finding, target 또는 direct evidence 선택을 adapter가 채울 것이라고 가정하지 않는다. "
+    "모델은 scope claim·status·criterion_refs, finding, target 또는 direct evidence 선택을 adapter가 채울 것이라고 "
+    "가정하지 않는다. "
     "Adapter는 이 의미 판단을 생성·삭제·교정하지 않으며 존재와 closure만 검증한다. "
     "Expander 응답에는 finding branch가 없다. 생성 Plan에 contradicted/unresolved scope, 필수 coverage 누락 또는 "
     "필수 Task validation 누락이 있으면 출력으로 숨기지 말고 유효한 Plan을 작성한다. Reviewer는 findings와 "
@@ -610,6 +623,7 @@ def compile_plan_inspection_v2(
     _require(len(scope_by_id) == len(inspection.validation_scope_rows), "v2 검사 scope ID 중복")
     scope_validation_ids = {row.validation_id for row in inspection.validation_scope_rows}
     _require(scope_validation_ids == validation_by_id.keys(), "v2 검사 scope 행 집합 불완전")
+    criterion_ids = set(criterion_selectors)
     scope_closures: dict[str, tuple[str, ...]] = {}
     project_refs_by_validation = {
         validation_id: {ref for ref in closure if citations[ref].source_ref in entries}
@@ -617,6 +631,11 @@ def compile_plan_inspection_v2(
     }
     for scope_id, row in scope_by_id.items():
         _require(row.validation_id in validation_by_id, f"v2 scope validation ID 오류: {scope_id}")
+        unknown_criteria = set(row.criterion_refs) - criterion_ids
+        _require(
+            not unknown_criteria,
+            f"v2 scope criterion ID 오류: scope_id={scope_id}, unknown={sorted(unknown_criteria)}",
+        )
         mechanism_binding = mechanism_by_id.get(row.mechanism_id)
         _require(
             mechanism_binding is not None and mechanism_binding[0] == row.validation_id,
@@ -637,10 +656,30 @@ def compile_plan_inspection_v2(
             row_kind="validation_scope", row_id=scope_id, citation_ids=closure
         ))
 
-    ac_pairs = {(row.criterion_id, row.validation_id): row for row in inspection.ac_validation_rows}
-    _require(len(ac_pairs) == len(inspection.ac_validation_rows), "v2 AC 검사 행 중복")
-    expected_ac_pairs = {(row["criterion_id"], row["validation_id"]) for row in targets["ac_validation_pairs"]}
-    _require(ac_pairs.keys() == expected_ac_pairs, "v2 AC 검사 행 집합 불완전")
+    expected_ac_rows = targets["ac_validation_pairs"]
+    expected_ac_keys = tuple((row["criterion_id"], row["validation_id"]) for row in expected_ac_rows)
+    _require(len(expected_ac_keys) == len(set(expected_ac_keys)), "v2 입력 AC 검사 조합 중복")
+    derived_ac_rows = tuple(
+        ACValidationDecisionV2(
+            criterion_id=criterion_id,
+            validation_id=validation_id,
+            scope_ids=tuple(
+                scope.scope_id
+                for scope in inspection.validation_scope_rows
+                if scope.validation_id == validation_id
+                and scope.status == "supported"
+                and criterion_id in scope.criterion_refs
+            ),
+            ac_link_required=any(
+                scope.validation_id == validation_id
+                and scope.status == "supported"
+                and criterion_id in scope.criterion_refs
+                for scope in inspection.validation_scope_rows
+            ),
+        )
+        for criterion_id, validation_id in expected_ac_keys
+    )
+    ac_pairs = {(row.criterion_id, row.validation_id): row for row in derived_ac_rows}
     coverage = {item.criterion_id: item for item in definition.goal_coverage}
     ac_closures: dict[tuple[str, str], tuple[str, ...]] = {}
     witnesses: dict[tuple[str, str], CoverageMembershipWitnessV2] = {}
@@ -666,17 +705,15 @@ def compile_plan_inspection_v2(
             scope = scope_by_id[scope_id]
             _require(scope.validation_id == validation_id, "v2 AC scope validation 불일치")
             selected_scopes.append(scope)
-        if row.ac_link_required:
-            _require(bool(selected_scopes) and all(item.status == "supported" for item in selected_scopes),
-                     "v2 필수 AC 연결에는 supported scope가 필요합니다.")
-        else:
-            _require(not row.scope_ids, "v2 비필수 AC 연결의 scope_ids는 비어야 합니다.")
-        extras = direct_refs(row.direct_extra_refs, f"AC={criterion_id}, validation={validation_id}")
+        _require(
+            row.ac_link_required == bool(selected_scopes)
+            and all(item.status == "supported" for item in selected_scopes),
+            "v2 파생 AC 연결과 supported scope가 일치하지 않습니다.",
+        )
         closure = _ordered_union(
             required_refs,
             tuple(sorted(project_refs_by_validation[validation_id])),
             *(scope_closures[item.scope_id] for item in selected_scopes),
-            extras,
         )
         used.update(closure)
         ac_closures[(criterion_id, validation_id)] = closure
@@ -843,6 +880,7 @@ def compile_plan_inspection_v2(
              tuple(item.model_dump(mode="json") for item in findings) == before_findings,
              "v2 compiler가 provider 의미 필드를 변경했습니다.")
     return CompiledPlanInspectionV2(
+        ac_validation_decisions=derived_ac_rows,
         derived_findings=tuple(derived_findings),
         row_closures=tuple(row_closures),
         membership_witnesses=tuple(witnesses.values()),

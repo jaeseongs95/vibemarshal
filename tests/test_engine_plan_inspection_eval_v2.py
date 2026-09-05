@@ -80,6 +80,10 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
             required = expected_bool[(row["criterion_id"], row["validation_id"])]
             row["ac_link_required"] = required
             row["scope_ids"] = [scopes[row["validation_id"]]] if required else []
+        criteria_by_scope = {row["scope_id"]: [] for row in v1["validation_scope_rows"]}
+        for row in v1["ac_validation_rows"]:
+            for scope_id in row["scope_ids"]:
+                criteria_by_scope[scope_id].append(row["criterion_id"])
         ref_map = _citation_ref_map(v1, citation_catalog)
         v2 = {
             "validation_rows": [
@@ -94,14 +98,11 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
             "validation_scope_rows": [
                 {"scope_id": row["scope_id"], "validation_id": row["validation_id"],
                  "mechanism_id": f"mech_{row['validation_id']}_0",
+                 "claim": row["procedure"],
+                 "criterion_refs": criteria_by_scope[row["scope_id"]]
+                 if row["assessment"] == "supported" else [],
                  "direct_extra_refs": [], "status": row["assessment"]}
                 for row in v1["validation_scope_rows"]
-            ],
-            "ac_validation_rows": [
-                {"criterion_id": row["criterion_id"], "validation_id": row["validation_id"],
-                 "ac_link_required": row["ac_link_required"], "scope_ids": row["scope_ids"],
-                 "direct_extra_refs": []}
-                for row in v1["ac_validation_rows"]
             ],
             "constraint_task_rows": [
                 {"constraint_id": row["constraint_id"], "task_ref": row["task_ref"],
@@ -123,14 +124,19 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
         self.assertTrue(report["fixed_ac_link_requirement_assessment"]["passed"])
         self.assertEqual(V2_EVALUATION_CONTRACT, report["v2_contract"])
 
-    def test_wrong_boolean_fails_without_treating_compiled_closure_as_meaning_answer(self):
+    def test_wrong_positive_scope_link_fails_without_treating_compiled_closure_as_meaning_answer(self):
         payload, plan, goal, project_map, expectation, inspection, catalog = self._baseline()
         raw = inspection.model_dump(mode="json")
-        raw["ac_validation_rows"][0]["ac_link_required"] = not raw["ac_validation_rows"][0]["ac_link_required"]
-        if raw["ac_validation_rows"][0]["ac_link_required"]:
-            raw["ac_validation_rows"][0]["scope_ids"] = [raw["validation_scope_rows"][0]["scope_id"]]
+        expected = expectation["ac_validation_rows"][0]
+        related = [row for row in raw["validation_scope_rows"]
+                   if row["validation_id"] == expected["validation_id"] and row["status"] == "supported"]
+        self.assertTrue(related)
+        if expected["ac_link_required"]:
+            for scope in related:
+                scope["criterion_refs"] = [item for item in scope["criterion_refs"]
+                                           if item != expected["criterion_id"]]
         else:
-            raw["ac_validation_rows"][0]["scope_ids"] = []
+            related[0]["criterion_refs"].append(expected["criterion_id"])
         report = assess_case_inspection_review_v2(
             PlanInspectionV2.model_validate(raw), (), RATINGS, expectation, case_id="clean", payload=payload,
             plan=plan, goal=goal, project_map=project_map, evidence_catalog=catalog,
@@ -163,6 +169,7 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
 
         def report(findings, *, evidence=("artifact:plan_contract",), closure=(claim_ref,), expected=(defect,)):
             compiled = CompiledPlanInspectionV2(
+                ac_validation_decisions=(),
                 derived_findings=tuple(ReviewFinding(
                     finding_code=item.finding_code, gate=GateName.EXECUTION, severity=FindingSeverity.ERROR,
                     summary="derived", evidence_refs=evidence, affected_task_refs=(owner,),
@@ -207,6 +214,11 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
             row["validation_id"]: set(row["mechanisms"][0]["basis_refs"])
             for row in raw["validation_rows"]
         }
+        criteria_by_scope = {row["scope_id"]: [] for row in raw["validation_scope_rows"]}
+        for row in raw["ac_validation_rows"]:
+            if row["ac_link_required"]:
+                for scope_id in row["scope_ids"]:
+                    criteria_by_scope[scope_id].append(row["criterion_id"])
         inspection = PlanInspectionV2.model_validate({
             "validation_rows": [{
                 "validation_id": row["validation_id"],
@@ -219,17 +231,15 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
             "validation_scope_rows": [{
                 "scope_id": row["scope_id"], "validation_id": row["validation_id"],
                 "mechanism_id": mechanisms[row["validation_id"]],
+                "claim": row["procedure"],
+                "criterion_refs": criteria_by_scope[row["scope_id"]]
+                if row["assessment"] == "supported" else [],
                 "direct_extra_refs": list(dict.fromkeys(
                     ref_map[ref] for ref in row["basis_refs"]
                     if ref != row["claim_ref"] and ref not in mechanism_refs[row["validation_id"]]
                 )),
                 "status": row["assessment"],
             } for row in raw["validation_scope_rows"]],
-            "ac_validation_rows": [{
-                "criterion_id": row["criterion_id"], "validation_id": row["validation_id"],
-                "ac_link_required": row["ac_link_required"], "scope_ids": row["scope_ids"],
-                "direct_extra_refs": [],
-            } for row in raw["ac_validation_rows"]],
             "constraint_task_rows": [{
                 "constraint_id": row["constraint_id"], "task_ref": row["task_ref"],
                 "applicability": row["applicability"], "required_validation_ids": row["validation_ids"],
