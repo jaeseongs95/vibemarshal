@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .model_lock import OperationalBinding, verify_binding
+
 import json
 import subprocess
 from pathlib import Path
@@ -206,12 +208,15 @@ class GoalValidationBinding(EngineModel):
     context_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     role_configuration_digest: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
     model_inventory_digest: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
+    operational_binding: OperationalBinding | None = None
     retry: GoalValidationRetryBinding | None = None
     step: ValidationExecutionStep
 
     def payload(self) -> dict[str, Any]:
         """이전 binding을 다시 실행할 때 기존 Core operation 입력을 바꾸지 않는다."""
         payload = self.model_dump(mode="json")
+        if self.operational_binding is None:
+            payload.pop("operational_binding")
         if self.goal_validation_binding_id is None:
             payload.pop("goal_validation_binding_id")
             payload.pop("retry")
@@ -374,11 +379,15 @@ def advance_independent_goal_test(
             )
         else:
             retry = None
+        inventory = runtime.list_models() if step.method == "semantic" else None
+        model_binding = (provider.roles.operational_binding(inventory)
+                         if inventory is not None and provider is not None else None)
         binding = GoalValidationBinding(
             goal_validation_binding_id=new_id("goal_binding"), plan_revision_id=plan.plan_revision_id,
                                         plan_activation_digest=plan.activation_digest,
                                         context_digest=sha256_digest(context), step=step,
-                                        model_inventory_digest=(runtime.list_models().inventory_digest if step.method == "semantic" else None),
+                                        model_inventory_digest=(inventory.inventory_digest if inventory is not None else None),
+                                        operational_binding=model_binding,
                                         role_configuration_digest=(None if provider is None else provider.roles.configuration_digest),
                                         retry=retry)
         with service.ledger.transaction() as tx:
@@ -400,8 +409,15 @@ def advance_independent_goal_test(
         if binding.role_configuration_digest != provider.roles.configuration_digest:
             return blocked(project_id, "MODEL_BINDING_CHANGED", "Goal Test의 역할 설정이 바뀌었습니다.")
         inventory = runtime.list_models()
-        if binding.model_inventory_digest != inventory.inventory_digest:
-            return blocked(project_id, "MODEL_INVENTORY_CHANGED", "Goal Test의 model inventory가 바뀌었습니다.")
+        try:
+            if (binding.operational_binding is not None
+                    and binding.model_inventory_digest != binding.operational_binding.inventory_digest):
+                raise ValueError("MODEL_LOCK_EVIDENCE_DIGEST_MISMATCH")
+            verify_binding(binding.operational_binding, inventory)
+            if provider.roles.operational_binding(inventory).lock_digest != binding.operational_binding.lock_digest:
+                raise ValueError("MODEL_LOCK_ROLE_BINDING_MISMATCH")
+        except ValueError as error:
+            return blocked(project_id, "MODEL_BINDING_CHANGED", str(error))
         with service.ledger.read() as connection:
             rows = connection.execute(
                 "SELECT e.* FROM evidence_records e JOIN task_contracts t ON t.id = e.task_id "

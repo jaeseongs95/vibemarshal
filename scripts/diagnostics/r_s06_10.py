@@ -11,13 +11,14 @@ from typing import Any
 from flowmarshal.canonical import canonical_json, json_value, sha256_bytes, sha256_digest
 from flowmarshal.engine.domain import GoalContractRevision, PlanContractRevision, PlanSkeletonCandidate, ProjectMapRevision, StateSnapshot, utc_now
 from flowmarshal.engine.models import EngineRoleConfiguration
+from flowmarshal.engine.model_lock import LOCK_FORMAT, ModelInventory, OperationalBinding, verify_binding
 from flowmarshal.engine.plan_inspection_eval import (
     assess_case_inspection_review, bind_case_expectation, verify_case_expectation,
 )
 from flowmarshal.engine.planner_roles import PlanExpanderAdapter, PlanReviewerAdapter, PlanReviewEnvelope, RuleBasedTaskAssigner
 from flowmarshal.engine.planning import plan_gate, risk_route
 from flowmarshal.engine.qualification import PlanningScenarioCatalog, ScopeQualificationReport, _model_lock, _planning_contract, source_manifest_digest, source_manifest_files
-from flowmarshal.engine.roles import CodexStructuredRoleRunner, RoleCallRequest, strict_json_output_schema
+from flowmarshal.engine.roles import CodexStructuredRoleRunner, RoleCallRequest, RoleCallResult, strict_json_output_schema, verify_role_receipt
 from flowmarshal.engine.runtime import CodexAppServerRuntime
 
 
@@ -171,7 +172,10 @@ class RequestCapture:
 
 
 def options(role, inventory_digest, workspace):
-    return {"model": role.model, "effort": role.effort, "inventory_digest": inventory_digest, "cwd": workspace}
+    inventory = inventory_digest if isinstance(inventory_digest, ModelInventory) else None
+    return {"model": role.model, "effort": role.effort,
+            "inventory_digest": inventory.inventory_digest if inventory is not None else inventory_digest,
+            "inventory": inventory, "allowed_fallbacks": role.allowed_fallbacks, "cwd": workspace}
 
 
 def invoke(name, runner, run, roles, inventory_digest):
@@ -191,7 +195,8 @@ def invoke(name, runner, run, roles, inventory_digest):
     path = run / ("expanded-plan.json" if name == "expanded-review" else f"input-{name}-plan.json")
     plan = PlanContractRevision.model_validate(read(path))
     reviewer = PlanReviewerAdapter(runner, **options(roles.general_reviewer, inventory_digest, run / "workspace"),
-                                   critical_model=roles.critical_reviewer.model, critical_effort=roles.critical_reviewer.effort)
+                                   critical_model=roles.critical_reviewer.model, critical_effort=roles.critical_reviewer.effort,
+                                   critical_allowed_fallbacks=roles.critical_reviewer.allowed_fallbacks)
     return reviewer.review(plan=plan, goal=goal, state=state, project_map=project_map, risk_route=risk_route(plan))
 
 
@@ -213,6 +218,11 @@ def case_expectation(run: Path, name: str, request: RoleCallRequest) -> dict[str
 
 def verify_lock(run):
     lock = read(run / "preflight.json")
+    if lock.get("model_lock_format") != LOCK_FORMAT:
+        raise RuntimeError("MODEL_LOCK_VERSION_UNSUPPORTED: v1 preflight를 v2로 재사용할 수 없습니다.")
+    operational = OperationalBinding.model_validate(lock["operational_binding"])
+    if operational.lock_digest != lock["model_lock_digest"] or operational.inventory_digest != lock["inventory_digest"]:
+        raise RuntimeError("MODEL_LOCK_EVIDENCE_DIGEST_MISMATCH")
     body = dict(lock)
     digest = body.pop("lock_digest")
     if sha256_digest(body) != digest:
@@ -283,11 +293,12 @@ def prepare(run):
         roles.validate_inventory(inventory)
         if policy.permission_profile != ":danger-full-access" or policy.approval_policy != "never":
             raise RuntimeError("PERMISSION_POLICY_MISMATCH")
-        if (_model_lock(inventory, roles) != old_lock["model_lock_digest"] or
-                inventory.inventory_digest != old_lock["inventory_digest"] or runtime.executable_digest != old_lock["codex_bin_digest"]):
+        # v1은 historical provenance다. 새 run에서 명시적 v2 운영 계약을 만든다.
+        if runtime.executable_digest != old_lock["codex_bin_digest"]:
             raise RuntimeError("MODEL_OR_EXECUTABLE_LOCK_CHANGED")
+        operational = roles.operational_binding(inventory)
         for name in CALL_ORDER[:-1]:
-            request = capture_request(name, run, roles, inventory.inventory_digest)
+            request = capture_request(name, run, roles, inventory)
             write_new(run / "requests" / f"{name}.json", request)
             write_new(run / "schemas" / f"{name}.json", strict_json_output_schema(request.output_schema))
             if name in STATIC_CASES:
@@ -303,7 +314,7 @@ def prepare(run):
         contract = _planning_contract(ROOT, catalog, inventory, roles)
         write_new(run / "planning-binding.json", contract)
         templates = {}
-        base = capture_request("clean", run, roles, inventory.inventory_digest)
+        base = capture_request("clean", run, roles, inventory)
         for role, binding in (("compact_plan_reviewer", roles.general_reviewer),
                               ("critical_effect_reviewer", roles.critical_reviewer),
                               ("high_risk_reviewer", roles.critical_reviewer),
@@ -329,7 +340,9 @@ def prepare(run):
         body = {"session": "R-S06-19", "source_manifest_digest": source, "locked_files": locked,
                 "harness_digest": sha256_bytes(Path(__file__).read_bytes()), "original_files": preserved_files(run),
                 "base_head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
-                "policy": policy, "inventory_digest": inventory.inventory_digest, "model_lock_digest": _model_lock(inventory, roles),
+                "policy": policy, "model_lock_format": LOCK_FORMAT, "operational_binding": operational,
+                "historical_model_lock_digest": old_lock["model_lock_digest"],
+                "inventory_digest": inventory.inventory_digest, "model_lock_digest": _model_lock(inventory, roles),
                 "codex_bin": old_lock["codex_bin"], "codex_bin_digest": runtime.executable_digest,
                 "role_configuration_digest": roles.configuration_digest, "call_order": CALL_ORDER,
                 "maximum_logical_calls": MAXIMUM_CALLS, "maximum_provider_turns": MAXIMUM_CALLS, "schema_recovery_attempts": 0,
@@ -344,7 +357,9 @@ def prepare(run):
 class RecordedRunner:
     def __init__(self, runtime, run, lock):
         self.runtime, self.run_root, self.lock = runtime, run, lock
-        self.runner = CodexStructuredRoleRunner(runtime, max_schema_recovery_attempts=0)
+        self.runner = CodexStructuredRoleRunner(runtime, max_schema_recovery_attempts=0,
+                    operational_binding=(OperationalBinding.model_validate(lock["operational_binding"])
+                                         if "operational_binding" in lock else None))
         self.name = None
         self.last_result = None
 
@@ -355,6 +370,12 @@ class RecordedRunner:
             raise RuntimeError("ACTUAL_REQUEST_BINDING_MISMATCH")
         if self.name != "expansion":
             case_expectation(self.run_root, self.name, request)
+        baseline = OperationalBinding.model_validate(self.lock["operational_binding"])
+        current_inventory = self.runtime.list_models()
+        verify_binding(baseline, current_inventory)
+        roles = EngineRoleConfiguration.model_validate(read(self.run_root / "roles.json"))
+        if roles.operational_binding(current_inventory).lock_digest != baseline.lock_digest:
+            raise RuntimeError("MODEL_OR_EXECUTABLE_LOCK_CHANGED")
         actual_schema = strict_json_output_schema(request.output_schema)
         expected_schema = (read(self.run_root / "schemas" / f"{self.name}.json") if self.name != "expanded-review" else
                            read(self.run_root / "generated-review-template.json")["templates"][request.role]["output_schema"])
@@ -372,6 +393,7 @@ class RecordedRunner:
             write_new(capture / "failed.json", {"error_type": type(error).__name__, "error": str(error),
                                               "receipts": getattr(error, "receipts", ()), "observed_at": utc_now()})
             raise
+        verify_role_receipt(request, result)
         self.last_result = result
         write_new(capture / "result.json", result)
         receipt = result.receipt
@@ -396,7 +418,16 @@ def completed_call_verification(capture: Path, receipt: dict[str, Any] | None) -
     thread = read(capture / "thread.receipt.json")["payload"]["thread"]
     intent = read(capture / "turn.intent.json")
     turn_receipt = read(capture / "turn.receipt.json")
+    observation_valid = False
+    if receipt is not None:
+        try:
+            verify_role_receipt(request, RoleCallResult.model_validate({"receipt": receipt,
+                                "payload": json.loads(read(capture / "terminal.json")["final_response"])}))
+            observation_valid = True
+        except (ValueError, RuntimeError, KeyError, TypeError):
+            pass
     checks = {
+        "model_observation": observation_valid,
         "payload": json.loads(intent["prompt"]) == request.payload,
         "prompt": terminal.get("prompt_digest") == sha256_digest(intent["prompt"]),
         "instructions": read(capture / "thread.intent.json")["developer_instructions"] == request.instructions,
@@ -509,7 +540,7 @@ def execute(run, generated=False):
                     assessment.get("preflight_digest") != lock["lock_digest"] or
                     assessment.get("criteria_digest") != sha256_digest(template_document["generation_criteria"])):
                 raise RuntimeError("GENERATION_DEFECT_OR_BINDING_FAILURE")
-            request = capture_request("expanded-review", run, roles, lock["inventory_digest"])
+            request = capture_request("expanded-review", run, roles, OperationalBinding.model_validate(lock["operational_binding"]).inventory)
             template = read(run / "generated-review-template.json")["templates"][request.role]
             for key in ("instructions", "model", "effort"):
                 if getattr(request, key) != template[key]:
@@ -538,7 +569,7 @@ def execute(run, generated=False):
             for name in names:
                 runner.name = name
                 print(json.dumps({"starting_case": name, "maximum_calls": MAXIMUM_CALLS}), flush=True)
-                result = invoke(name, runner, run, roles, lock["inventory_digest"])
+                result = invoke(name, runner, run, roles, OperationalBinding.model_validate(lock["operational_binding"]).inventory)
                 if name == "expansion":
                     write_new(run / "expanded-plan.json", result)
                     status = "GENERATION_REVIEW_REQUIRED"

@@ -233,6 +233,7 @@ class EngineEvaluationTests(unittest.TestCase):
 
     def test_checkpoint_reuse_requires_identical_immutable_contract(self) -> None:
         contract = EvaluationContract(
+            model_lock_format="flowmarshal-model-lock-v2",
             scope=EvaluationScope.ROLE_FIXTURE,
             fixture_digests=tuple(item.fixture_digest for item in self.catalog.fixtures),
             scenario_set_digest=self.catalog.catalog_digest,
@@ -249,6 +250,7 @@ class EngineEvaluationTests(unittest.TestCase):
         )
         fixture_digest = self.catalog.fixtures[0].fixture_digest
         checkpoint = EvaluationCellCheckpoint(
+            model_lock_format="flowmarshal-model-lock-v2",
             contract_digest=contract.contract_digest,
             fixture_digest=fixture_digest,
             order_seed=1,

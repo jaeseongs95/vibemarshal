@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from .model_lock import ModelInventory, ModelChoice
+from .roles import make_role_request, verify_role_receipt
+
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -384,11 +387,15 @@ class GoalNormalizerAdapter:
         effort: str,
         inventory_digest: str,
         cwd: Path | str,
+        inventory: ModelInventory | None = None,
+        allowed_fallbacks: tuple[ModelChoice, ...] = (),
     ) -> None:
         self.runner = runner
         self.model = model
         self.effort = effort
         self.inventory_digest = inventory_digest
+        self.inventory = inventory
+        self.allowed_fallbacks = allowed_fallbacks
         self.cwd = str(Path(cwd).resolve())
 
     def normalize(
@@ -398,7 +405,8 @@ class GoalNormalizerAdapter:
         profile: ProjectProfileRevision,
         observed_facts: tuple[dict[str, Any], ...] = (),
     ) -> tuple[GoalNormalizationProposal, RoleCallReceipt]:
-        request = RoleCallRequest(
+        request = make_role_request(
+            inventory=self.inventory, allowed_fallbacks=self.allowed_fallbacks,
             role="goal_normalizer",
             instructions=(
                 "사용자 원문과 관찰 사실에서 Goal 후보를 한 번만 정규화한다. "
@@ -433,6 +441,7 @@ class GoalNormalizerAdapter:
             request,
             validator=lambda value: GoalNormalizationProposal.model_validate(value),
         )
+        verify_role_receipt(request, result)
         return GoalNormalizationProposal.model_validate(result.payload), result.receipt
 
 
@@ -445,11 +454,15 @@ class GoalReviewerAdapter:
         effort: str,
         inventory_digest: str,
         cwd: Path | str,
+        inventory: ModelInventory | None = None,
+        allowed_fallbacks: tuple[ModelChoice, ...] = (),
     ) -> None:
         self.runner = runner
         self.model = model
         self.effort = effort
         self.inventory_digest = inventory_digest
+        self.inventory = inventory
+        self.allowed_fallbacks = allowed_fallbacks
         self.cwd = str(Path(cwd).resolve())
 
     def review(
@@ -467,7 +480,8 @@ class GoalReviewerAdapter:
             proposal=proposal,
             observed_facts=observed_facts,
         )
-        request = RoleCallRequest(
+        request = make_role_request(
+            inventory=self.inventory, allowed_fallbacks=self.allowed_fallbacks,
             role="goal_reviewer",
             instructions=(
                 "원문, ProjectProfile과 동일하게 제공된 관찰 사실에 비춰 Goal proposal의 "
@@ -505,6 +519,7 @@ class GoalReviewerAdapter:
             return draft
 
         result = self.runner.run(request, validator=validate_review)
+        verify_role_receipt(request, result)
         draft = ReviewDraft.model_validate(result.payload)
         submission = _goal_review_submission(
             artifact_digest=artifact_digest,

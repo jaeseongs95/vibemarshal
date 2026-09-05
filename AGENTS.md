@@ -115,7 +115,9 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 - 실제 평가의 기대표는 사례별 사전 검토 원문·Goal 전체·Plan의 검사 전체 계약과 소유 단계·method·mode·등록 근거 digest에 결속한다. ID가 같아도 의미 입력이 다르면 다른 사례의 표를 재사용하지 않는다. 평가할 AC 연결 필수성 표와 결함 근거 범위를 호출 전에 명시하며 표 누락을 미평가 PASS로 처리하지 않는다. 생성 Plan은 독립 정상성 대조와 생성 전용 기대표·입력 digest 결속 뒤에만 Reviewer로 보낸다. 모델 결과 이후 기대값·합격선을 변경하지 않고 과거 원시 응답·기대값·FAIL을 보존한다.
 - 실제 모델 이름을 제품 코드에 하드코딩하지 않는다. 호출자가 역할 설정을 주입하고 실제 호출 직전 App Server `model/list`로 지원 여부를 확인한다.
 - 실행과 검사를 별도로 배정하고 선택 이유·inventory digest·허용 fallback envelope를 Plan Contract에 남긴다.
-- 지원되지 않는 model/effort를 조용히 fallback하지 않는다. 모델 변경 재시도는 새 Attempt 또는 새 Plan Contract에 기록한다.
+- 전체 수신 inventory는 projection 전에 중복·빈 값·null·잘못된 model/effort를 엄격히 검사하고 원문과 digest를 감사 evidence로 보존한다. 실행 허용은 명시적 v2 operational lock의 역할별 선택 model/effort, 순서가 있는 허용 fallback envelope와 각 조합의 지원 상태, executable digest와 필요한 runtime capability로 판정한다. 무관한 model·effort나 목록 순서 변경은 실행 잠금을 바꾸지 않는다.
+- prepare·역할 호출·dispatch·resume·독립 Goal Test는 같은 v2 잠금과 요청·관측·receipt digest를 검사한다. 선택·fallback·runtime 계약이 달라지면 효과 전에 차단하거나 명시적 새 운영 binding을 요구한다. 지원되지 않는 model/effort를 조용히 fallback하지 않으며 허용 fallback도 이유·새 binding·Attempt 없이 자동 선택하지 않는다.
+- 이 잠금 revision은 qualification/execution 운영 계약 변경이다. 기존 Goal·Plan의 의미와 historical inventory digest, 과거 run·artifact를 덮어쓰거나 재해석하지 않으며 v1 checkpoint를 v2로 재사용하지 않는다.
 
 ## 실행·검사·복구
 

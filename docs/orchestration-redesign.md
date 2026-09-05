@@ -249,10 +249,31 @@ Reviewer schema에는 `status`, `admissible`, `score`, `weakest_task` 필드가 
 
 - 실제 모델 이름은 제품 코드에 하드코딩하지 않는다.
 - 호출자는 역할별 기본 model/effort와 허용 fallback을 제공한다.
-- 실제 호출 직전에 App Server `model/list`를 읽고 inventory digest를 결속한다.
+- 실제 호출 직전에 App Server `model/list` 원본 JSON 전체를 엄격히 검증하고 감사용 inventory 원문·digest와 실행용 v2 operational lock을 각각 결속한다.
 - 지원되지 않는 모델이나 effort를 조용히 다른 값으로 바꾸지 않는다.
 - 실행과 검사는 별도 역할로 배정하며, 중요한 작업에서는 서로 다른 역할 설정을 우선한다.
-- model 변경 재시도는 새 Attempt 또는 새 Plan revision에 이유와 receipt를 남긴다.
+- model 변경은 허용 envelope 안에서도 이유가 있는 새 operational binding과 Attempt를 요구한다. Goal·Task 의미가 바뀌면 기존 규칙대로 Goal·Plan revision을 만든다.
+
+### 7.1 Inventory 감사와 operational lock v2
+
+`flowmarshal-model-lock-v2`는 qualification/execution의 운영 계약 format이다. Goal·Plan의 의미 변경이나 Plan 재승인이 아니다. `PlanContractDefinition.model_inventory_digest`는 계획 작성 당시의 historical evidence로 그대로 보존한다. 과거 run·raw·artifact와 v1 lock을 덮어쓰거나 새 의미로 계산하지 않는다. v1 evaluation contract·checkpoint·진단 preflight에는 명시적 버전 거부를 적용하고 새 run에서만 v2를 만든다.
+
+전체 `model/list` JSON은 SDK의 typed coercion 전에 검사한다. 수신한 모든 행은 hidden 여부와 무관하게 검사하며, duplicate model/effort, 빈 목록, 빈/null/공백 포함·잘못된 model ID와 effort를 제거·정규화·생략하지 않는다. 불완전한 pagination도 거부한다. 전체 원문·모델 순서·effort 순서와 전체 digest는 audit observation에 보존한다.
+
+실행 잠금에는 다음만 포함한다.
+
+- 역할별 선택 model/effort와 현재 지원 여부
+- 명시적으로 허용된 fallback model/effort의 순서와 각 조합의 현재 지원 여부
+- 실행 중인 Codex executable digest
+- 해당 경로가 사용하는 runtime capability의 이름과 protocol 계약
+
+역할과 capability key는 정렬하지만 fallback 순서는 유지한다. 무관한 모델 추가·삭제, inventory/model/effort 순서, 사용하지 않는 effort와 capability 변화는 전체 감사 digest가 달라도 같은 실행 projection이다. 선택 model/effort가 사라지면 차단한다. fallback 추가·삭제·effort·순서·가용성 또는 필요한 runtime capability·executable이 달라져도 기존 lock은 사용할 수 없다. 초기 binding에서 사용할 수 없는 fallback은 `supported=false`로 기록할 수 있으며, 이후 가용성 변화도 새 binding을 요구한다. resolver는 preferred가 없을 때 허용 fallback을 자동 선택하지 않는다.
+
+runtime capability는 adapter가 사용하는 `thread/start`, `turn/start`, `thread/read`, 필요한 `thread/resume`·구조화 출력·실제 local 권한 계약이다. 이 값은 전체 서버 기능 목록에 대한 추정이 아니며 executable identity와 실제 정책 검증에 결속된 adapter 계약이다. Worker와 구조화 역할은 각각 사용하는 capability만 잠근다.
+
+`OperationalBinding`은 전체 inventory와 그 digest, v2 projection과 그 digest를 함께 보존하고 역산 검증한다. 역할 요청은 준비 당시 binding을 보유하고, receipt는 호출 직전 실제 observation을 별도로 기록한다. 두 전체 digest가 달라도 projection이 같으면 실행하며, 요청·관측·receipt를 서로 다른 digest로 위조한 경우에는 거부한다. Task intent에는 실제 inventory observation을 기록한다. materialize, 역할 호출, dispatch, 내부·공개 resume, 독립 Goal Test가 같은 검증기를 사용한다. 선택을 바꿔 실패를 감추거나 preflight 실패 후 schema recovery로 재호출하지 않는다.
+
+제한 진단의 새 prepare는 과거 입력·모델 설정·executable 기준을 provenance로 읽고 새로운 v2 preflight를 만든다. 과거 전체 inventory digest와의 정확한 일치를 실행 조건으로 사용하지 않는다. 평가의 검사·threshold·oracle·taxonomy, 역할 모델 설정과 fallback 정책은 이 revision으로 보정하지 않는다. 결정적 구현 검증과 실제 역할 qualification은 계속 별개의 Gate다.
 
 현재 transport는 `CodexRuntimePort` 뒤에 둔다. 새 엔진은 기존 `flowmarshal.core`나 `flowmarshal.planning` 도메인을 import하지 않는다.
 

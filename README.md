@@ -10,6 +10,8 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고
 
 2026-09-05 [R-S06-19-CLOSE](docs/r-s06-19-close-handoff.md)에서 provider 검사 계약의 기존 보정을 확정했다. 설명 변형·구조 거부의 오프라인 회귀와 558개 테스트·결정론 Gate 5/5는 PASS다. 마지막 실제 R19는 FAIL이며, 현재 source의 실모델 의미 검증은 미실행이다. 기존 S06 FAIL, Functional Alpha 미완료와 1.0 **NO-GO**를 유지한다. 다음 경계는 별도 제한 역할 검증이며 이번 CLOSE에서는 실행하지 않았다.
 
+모델 목록 변화로 제한 검증이 차단된 원인은 [inventory 실행 잠금 v2](docs/model-inventory-lock-v2-handoff.md)에서 수정했다. 전체 inventory는 감사 기록으로 보존하고 선택·허용 조합과 runtime 계약만 실행 잠금에 사용한다. 결정적 검증은 통과했으며 실제 제한 역할 검증은 별도 fresh v2 run이 필요하다.
+
 - 새 Engine은 비권위 `ExecutionSpecProposal`을 최신 Goal·Plan·State·Project Map에 컴파일하고, `run once` 호출마다 materialize·dispatch·observe·validate·complete 중 한 단계만 전진한다.
 - worker 종료 문구는 관측값으로만 보존하고 파일·diff·command·test evidence와 별도 validator 결과로 Task 및 Goal을 판정한다.
 - 완료 Task 뒤 Project Map·State 재관측, 저장 thread의 `thread/read` 우선 복구, receipt 불명확 시 중복 생성 방지가 구현돼 있다.

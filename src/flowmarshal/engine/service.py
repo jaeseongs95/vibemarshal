@@ -84,7 +84,19 @@ def _dt(value: str | None) -> datetime | None:
 
 
 def _same_assignment(left: Any, right: Any) -> bool:
-    return left.model_dump(mode="json") == right.model_dump(mode="json")
+    from .model_lock import verify_binding
+    try:
+        if right is None or left.operational_binding is None or right.operational_binding is None:
+            return False
+        if right.inventory_digest != right.operational_binding.inventory_digest:
+            return False
+        verify_binding(right.operational_binding, left.operational_binding.inventory,
+                       role=right.role, model=right.model, effort=right.effort)
+        return (left.model_dump(exclude={"inventory_digest", "operational_binding"})
+                == right.model_dump(exclude={"inventory_digest", "operational_binding"})
+                and left.operational_binding.lock_digest == right.operational_binding.lock_digest)
+    except ValueError:
+        return False
 
 
 class EngineService:

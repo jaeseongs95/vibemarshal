@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from ..canonical import canonical_json, sha256_digest
 from .domain import EngineModel, new_id, utc_now
@@ -16,6 +16,11 @@ from .runtime import (
     REQUIRED_APPROVAL_POLICY,
     REQUIRED_PERMISSION_PROFILE,
     RuntimePolicyError,
+)
+
+
+from .model_lock import (
+    ModelInventory, OperationalBinding, ROLE_CAPABILITIES, bind_models, role_lock, verify_binding,
 )
 
 
@@ -42,10 +47,30 @@ class RoleCallRequest(EngineModel):
     inventory_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     cwd: str = Field(min_length=1, max_length=2000)
     timeout_seconds: float = Field(default=900, gt=0, le=3600)
+    operational_binding: OperationalBinding | None = None
+
+    @model_validator(mode="after")
+    def audit_matches_request(self):
+        if self.operational_binding is not None:
+            if not set(ROLE_CAPABILITIES).issubset(x.name for x in self.operational_binding.lock.runtime_capabilities):
+                raise ValueError("MODEL_LOCK_REQUIRED_CAPABILITY_MISSING")
+            if self.inventory_digest != self.operational_binding.inventory_digest:
+                raise ValueError("MODEL_LOCK_REQUEST_DIGEST_MISMATCH")
+            verify_binding(self.operational_binding, self.operational_binding.inventory,
+                           role=self.role, model=self.model, effort=self.effort)
+        return self
 
     @property
     def request_digest(self) -> str:
         return sha256_digest(self)
+
+
+def make_role_request(*, inventory: ModelInventory | None = None, allowed_fallbacks=(), **kwargs) -> RoleCallRequest:
+    binding = None if inventory is None else bind_models(
+        inventory, (role_lock(kwargs["role"], kwargs["model"], kwargs["effort"], allowed_fallbacks),),
+        required_capabilities=ROLE_CAPABILITIES,
+    )
+    return RoleCallRequest(**kwargs, operational_binding=binding)
 
 
 class RoleCallReceipt(EngineModel):
@@ -71,6 +96,7 @@ class RoleCallReceipt(EngineModel):
     schema_recovery_attempts: int = Field(default=0, ge=0, le=1)
     error_summary: str | None = None
     recorded_at: datetime
+    observed_binding: OperationalBinding | None = None
 
 
 class RoleCallResult(EngineModel):
@@ -160,14 +186,22 @@ class CodexStructuredRoleRunner:
 
     def __init__(self, runtime: CodexRuntimePort, *, poll_interval_seconds: float = 0.25,
                  progress_sink: Callable[[dict[str, Any]], None] | None = None,
-                 max_schema_recovery_attempts: int = 1) -> None:
+                 max_schema_recovery_attempts: int = 1,
+                 operational_binding: OperationalBinding | None = None) -> None:
         if type(max_schema_recovery_attempts) is not int or max_schema_recovery_attempts not in {0, 1}:
             raise ValueError("schema recovery 상한은 0 또는 1이어야 합니다.")
         self.runtime = runtime
+        self.operational_binding = operational_binding
         self.max_schema_recovery_attempts = max_schema_recovery_attempts
         self.poll_interval_seconds = poll_interval_seconds
         self.progress_sink = progress_sink
         self.receipts: list[RoleCallReceipt] = []
+
+    def _verify_inventory(self, request: RoleCallRequest, inventory: ModelInventory) -> OperationalBinding:
+        if self.operational_binding is not None:
+            verify_binding(self.operational_binding, inventory)
+        return verify_binding(request.operational_binding, inventory,
+                              role=request.role, model=request.model, effort=request.effort)
 
     def _progress(self, event: str, request: RoleCallRequest, call_id: str, **details: Any) -> None:
         if self.progress_sink is not None:
@@ -194,10 +228,11 @@ class CodexStructuredRoleRunner:
         ):
             raise StructuredRoleError("PERMISSION_POLICY_MISMATCH", receipts=tuple(self.receipts))
         inventory = self.runtime.list_models()
-        if inventory.inventory_digest != request.inventory_digest:
-            raise StructuredRoleError("MODEL_INVENTORY_CHANGED", receipts=tuple(self.receipts))
-        if not inventory.supports(request.model, request.effort):
-            raise StructuredRoleError("MODEL_BINDING_UNAVAILABLE", receipts=tuple(self.receipts))
+        try:
+            request = RoleCallRequest.model_validate(request.model_dump(mode="python"))
+            observed_binding = self._verify_inventory(request, inventory)
+        except ValueError as error:
+            raise StructuredRoleError(str(error), receipts=tuple(self.receipts)) from error
         self._progress("role_requested", request, call_id, model=request.model, effort=request.effort)
         thread = self.runtime.create_thread(
             cwd=cwd,
@@ -230,6 +265,10 @@ class CodexStructuredRoleRunner:
                         },
                     }
                 )
+            try:
+                observed_binding = self._verify_inventory(request, self.runtime.list_models())
+            except ValueError as error:
+                raise StructuredRoleError(str(error), receipts=tuple(self.receipts)) from error
             turn = self.runtime.start_turn(
                 thread_id=thread_id,
                 cwd=cwd,
@@ -253,7 +292,7 @@ class CodexStructuredRoleRunner:
                         pass
                     receipt = self._receipt(
                         call_id=call_id,
-                        request=request,
+                        request=request, observed_binding=observed_binding,
                         schema_digest=schema_digest,
                         thread_id=thread_id,
                         turn_ids=tuple(turn_ids),
@@ -273,7 +312,7 @@ class CodexStructuredRoleRunner:
             if observation.terminal_status not in {"completed", "success", "succeeded"}:
                 receipt = self._receipt(
                     call_id=call_id,
-                    request=request,
+                    request=request, observed_binding=observed_binding,
                     schema_digest=schema_digest,
                     thread_id=thread_id,
                     turn_ids=tuple(turn_ids),
@@ -302,7 +341,7 @@ class CodexStructuredRoleRunner:
                     validator(decoded)
                 receipt = self._receipt(
                     call_id=call_id,
-                    request=request,
+                    request=request, observed_binding=observed_binding,
                     schema_digest=schema_digest,
                     thread_id=thread_id,
                     turn_ids=tuple(turn_ids),
@@ -320,7 +359,7 @@ class CodexStructuredRoleRunner:
                     continue
         receipt = self._receipt(
             call_id=call_id,
-            request=request,
+            request=request, observed_binding=observed_binding,
             schema_digest=schema_digest,
             thread_id=thread_id,
             turn_ids=tuple(turn_ids),
@@ -343,6 +382,7 @@ class CodexStructuredRoleRunner:
         call_id: str,
         request: RoleCallRequest,
         schema_digest: str,
+        observed_binding: OperationalBinding,
         thread_id: str,
         turn_ids: tuple[str, ...],
         started: float,
@@ -376,6 +416,7 @@ class CodexStructuredRoleRunner:
             schema_recovery_attempts=recovery_attempts,
             error_summary=error,
             recorded_at=utc_now(),
+            observed_binding=observed_binding,
         )
         self._progress("role_receipt", request, call_id, receipt=receipt.model_dump(mode="json"))
         return receipt
@@ -415,5 +456,27 @@ class ScriptedStructuredRoleRunner:
             output_schema_digest=sha256_digest(strict_json_output_schema(request.output_schema)),
             latency_ms=0,
             recorded_at=utc_now(),
+            observed_binding=request.operational_binding,
         )
         return RoleCallResult(payload=payload, receipt=receipt)
+
+
+def verify_role_receipt(request: RoleCallRequest, result: RoleCallResult) -> None:
+    """provider 관측을 받아들이기 전에 요청·응답·inventory 증거를 함께 검사한다."""
+    request = RoleCallRequest.model_validate(request.model_dump(mode="python"))
+    receipt = RoleCallReceipt.model_validate(result.receipt.model_dump(mode="python"))
+    if (receipt.input_digest != request.request_digest or receipt.output_digest != sha256_digest(result.payload)
+            or receipt.output_schema_digest != sha256_digest(strict_json_output_schema(request.output_schema))
+            or (receipt.role, receipt.model, receipt.effort, receipt.inventory_digest)
+            != (request.role, request.model, request.effort, request.inventory_digest)):
+        raise StructuredRoleError("ROLE_RECEIPT_BINDING_MISMATCH")
+    if request.operational_binding is not None:
+        if receipt.observed_binding is None:
+            raise StructuredRoleError("MODEL_LOCK_RECEIPT_OBSERVATION_MISSING")
+        try:
+            observed = verify_binding(request.operational_binding, receipt.observed_binding.inventory,
+                                      role=request.role, model=request.model, effort=request.effort)
+            if observed != receipt.observed_binding:
+                raise ValueError("MODEL_LOCK_RECEIPT_DIGEST_MISMATCH")
+        except ValueError as error:
+            raise StructuredRoleError(str(error)) from error

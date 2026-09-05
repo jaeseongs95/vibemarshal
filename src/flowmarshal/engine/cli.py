@@ -357,14 +357,14 @@ def _cmd_goal_create(arguments: argparse.Namespace) -> None:
                 runner,
                 model=normalizer_model,
                 effort=normalizer_effort,
-                inventory_digest=inventory.inventory_digest,
+                inventory_digest=inventory.inventory_digest, inventory=inventory,
                 cwd=Path(service.status(arguments.project_id)["project"]["root"]),
             )
             reviewer = GoalReviewerAdapter(
                 runner,
                 model=reviewer_model,
                 effort=reviewer_effort,
-                inventory_digest=inventory.inventory_digest,
+                inventory_digest=inventory.inventory_digest, inventory=inventory,
                 cwd=Path(service.status(arguments.project_id)["project"]["root"]),
             )
             outcome = GoalPreparationPipeline(normalizer, reviewer).prepare(
@@ -454,14 +454,14 @@ def _cmd_goal_revise(arguments: argparse.Namespace) -> None:
                 runner,
                 model=normalizer_model,
                 effort=normalizer_effort,
-                inventory_digest=inventory.inventory_digest,
+                inventory_digest=inventory.inventory_digest, inventory=inventory,
                 cwd=Path(service.status(arguments.project_id)["project"]["root"]),
             )
             reviewer = GoalReviewerAdapter(
                 runner,
                 model=reviewer_model,
                 effort=reviewer_effort,
-                inventory_digest=inventory.inventory_digest,
+                inventory_digest=inventory.inventory_digest, inventory=inventory,
                 cwd=Path(service.status(arguments.project_id)["project"]["root"]),
             )
             outcome = GoalPreparationPipeline(normalizer, reviewer).prepare(
@@ -637,14 +637,14 @@ def _cmd_plan_search(arguments: argparse.Namespace) -> None:
                 runner,
                 model=generator_model,
                 effort=generator_effort,
-                inventory_digest=inventory.inventory_digest,
+                inventory_digest=inventory.inventory_digest, inventory=inventory,
                 cwd=root,
             )
             skeleton_reviewer = SkeletonReviewerAdapter(
                 runner,
                 model=reviewer_model,
                 effort=reviewer_effort,
-                inventory_digest=inventory.inventory_digest,
+                inventory_digest=inventory.inventory_digest, inventory=inventory,
                 cwd=root,
             )
             expander = PlanExpanderAdapter(
@@ -652,14 +652,14 @@ def _cmd_plan_search(arguments: argparse.Namespace) -> None:
                 assigner,
                 model=expander_model,
                 effort=expander_effort,
-                inventory_digest=inventory.inventory_digest,
+                inventory_digest=inventory.inventory_digest, inventory=inventory,
                 cwd=root,
             )
             plan_reviewer = PlanReviewerAdapter(
                 runner,
                 model=reviewer_model,
                 effort=reviewer_effort,
-                inventory_digest=inventory.inventory_digest,
+                inventory_digest=inventory.inventory_digest, inventory=inventory,
                 cwd=root,
                 critical_model=critical_model,
                 critical_effort=critical_effort,

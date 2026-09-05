@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from pydantic import Field, model_validator
+from pydantic import model_validator
 
 from ..canonical import sha256_digest
 from .domain import (
@@ -14,45 +14,23 @@ from .domain import (
 )
 
 
-class ModelCapability(EngineModel):
-    model: str = Field(min_length=1, max_length=200)
-    supported_efforts: tuple[str, ...] = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def efforts_are_unique(self) -> "ModelCapability":
-        if len(self.supported_efforts) != len(set(self.supported_efforts)):
-            raise ValueError("model reasoning effort가 중복됐습니다.")
-        return self
-
-
-class ModelInventory(EngineModel):
-    source: str = Field(min_length=1, max_length=500)
-    models: tuple[ModelCapability, ...] = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def models_are_unique(self) -> "ModelInventory":
-        names = tuple(item.model for item in self.models)
-        if len(names) != len(set(names)):
-            raise ValueError("model inventory에 모델이 중복됐습니다.")
-        return self
-
-    @property
-    def inventory_digest(self) -> str:
-        return sha256_digest(self)
-
-    def supports(self, model: str, effort: str) -> bool:
-        return any(
-            item.model == model and effort in item.supported_efforts for item in self.models
-        )
+from .model_lock import (
+    ModelCapability, ModelInventory, ModelChoice, OperationalBinding,
+    WORKER_CAPABILITIES, ROLE_CAPABILITIES, bind_models, role_lock,
+)
 
 
 class ModelInventoryPort(Protocol):
     def list_models(self) -> ModelInventory: ...
 
 
-class RoleModelBinding(EngineModel):
-    model: str = Field(min_length=1, max_length=200)
-    effort: str = Field(min_length=1, max_length=50)
+class RoleModelBinding(ModelChoice):
+    allowed_fallbacks: tuple[ModelChoice, ...] = ()
+
+    @model_validator(mode="after")
+    def explicit_fallbacks(self):
+        role_lock("configured", self.model, self.effort, self.allowed_fallbacks)
+        return self
 
 
 class EngineRoleConfiguration(EngineModel):
@@ -93,6 +71,13 @@ class EngineRoleConfiguration(EngineModel):
         except KeyError as error:
             raise AssignmentResolutionError(f"알 수 없는 Engine 역할입니다: {role}") from error
 
+    def operational_binding(self, inventory: ModelInventory) -> OperationalBinding:
+        return bind_models(inventory, tuple(
+            role_lock(name, self.binding_for(name).model, self.binding_for(name).effort,
+                      self.binding_for(name).allowed_fallbacks)
+            for name in type(self).model_fields
+        ))
+
     def validate_inventory(self, inventory: ModelInventory) -> None:
         missing = [
             role
@@ -129,25 +114,21 @@ class AssignmentResolver:
         policy: RoleAssignmentPolicy,
         inventory: ModelInventory,
     ) -> ResolvedRoleAssignment:
-        if inventory.supports(policy.preferred_model, policy.preferred_effort):
-            return ResolvedRoleAssignment(
-                role=policy.role,
-                model=policy.preferred_model,
-                effort=policy.preferred_effort,
-                inventory_digest=inventory.inventory_digest,
-                fallback_used=False,
+        if not inventory.supports(policy.preferred_model, policy.preferred_effort):
+            raise AssignmentResolutionError(
+                f"MODEL_BINDING_UNAVAILABLE: {policy.role}의 명시적 새 binding과 Attempt가 필요합니다."
             )
-        for fallback in policy.allowed_fallbacks:
-            if inventory.supports(fallback.model, fallback.effort):
-                return ResolvedRoleAssignment(
-                    role=policy.role,
-                    model=fallback.model,
-                    effort=fallback.effort,
-                    inventory_digest=inventory.inventory_digest,
-                    fallback_used=True,
-                )
-        raise AssignmentResolutionError(
-            f"역할 {policy.role!r}에 허용된 model/effort가 현재 inventory에 없습니다."
+        try:
+            binding = bind_models(
+                inventory, (role_lock(policy.role, policy.preferred_model, policy.preferred_effort,
+                                      policy.allowed_fallbacks),),
+                required_capabilities=(ROLE_CAPABILITIES if policy.role == "validator" else WORKER_CAPABILITIES),
+            )
+        except ValueError as error:
+            raise AssignmentResolutionError(str(error)) from error
+        return ResolvedRoleAssignment(
+            role=policy.role, model=policy.preferred_model, effort=policy.preferred_effort,
+            inventory_digest=inventory.inventory_digest, fallback_used=False, operational_binding=binding,
         )
 
     def resolve_contract(

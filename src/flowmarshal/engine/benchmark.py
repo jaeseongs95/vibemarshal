@@ -217,6 +217,7 @@ def run_benchmark(*, root: Path | None = None, run_root: Path | None = None,
                     _write_json(work / "raw-result.json", raw)
                     cell = benchmark_cell(scenario, seed, implementation, model_lock, raw)
                     store.put(EvaluationCellCheckpoint(
+                        model_lock_format="flowmarshal-model-lock-v2",
                         contract_digest=contract.contract_digest, fixture_digest=identity, order_seed=seed,
                         raw_structured_assessment={"benchmark_cell": cell.model_dump(mode="json"), "raw": raw},
                         runner_receipts=tuple(raw["receipts"]),

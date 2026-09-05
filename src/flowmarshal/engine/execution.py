@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .roles import make_role_request, verify_role_receipt, RoleCallResult
+
 import json
 import sys
 from pathlib import Path
@@ -229,7 +231,8 @@ class ExecutionProposalAdapter:
         self.roles.validate_inventory(inventory)
         output_validator = validator or model_type.model_validate
         binding = self.roles.plan_expander
-        request = RoleCallRequest(
+        request = make_role_request(
+            inventory=inventory, allowed_fallbacks=binding.allowed_fallbacks,
             role=kind, instructions=instructions or EXECUTION_PREPARATION_INSTRUCTIONS,
             payload=payload, output_schema=model_type.model_json_schema(),
             model=binding.model, effort=binding.effort,
@@ -241,6 +244,7 @@ class ExecutionProposalAdapter:
             request={"role_request": request.model_dump(mode="json"), "authority_context_digest": sha256_digest(context)},
             execute=lambda: self.runner.run(request, validator=output_validator).model_dump(mode="json"),
         )
+        verify_role_receipt(request, RoleCallResult.model_validate(result))
         self._record_usage(project_id, context, result,
                            BudgetStage.EXECUTION_PREPARATION if kind == "execution_preparation" else BudgetStage.VALIDATION)
         # operation.completed 재생도 최초 role 출력과 같은 계약으로 검증한다.
@@ -312,7 +316,8 @@ class ExecutionProposalAdapter:
                       step: ValidationExecutionStep) -> dict[str, Any]:
         self.roles.validate_inventory(inventory)
         binding = self.roles.validator
-        request = RoleCallRequest(
+        request = make_role_request(
+            inventory=inventory, allowed_fallbacks=binding.allowed_fallbacks,
             role="goal_validator",
             instructions=("독립 Goal Validator다. 파일을 수정하거나 명령을 실행하지 않는다. "
                           "제공된 직접 관측과 evidence만 검토하고 Goal Test 의미의 충족 여부를 제출한다. "
@@ -337,5 +342,6 @@ class ExecutionProposalAdapter:
             project_id=project_id, kind="goal_validation", request=request.model_dump(mode="json"),
             execute=lambda: self.runner.run(request, validator=validate).model_dump(mode="json"),
         )
+        verify_role_receipt(request, RoleCallResult.model_validate(result))
         self._record_usage(project_id, context, result, BudgetStage.VALIDATION)
         return result

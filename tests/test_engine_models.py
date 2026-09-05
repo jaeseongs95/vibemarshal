@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from flowmarshal.engine.model_lock import RUNTIME_CAPABILITIES
+
 import inspect
 import unittest
 
@@ -19,8 +21,9 @@ from flowmarshal.engine.roles import _usage
 
 
 class EngineModelAssignmentTests(unittest.TestCase):
-    def test_allowed_fallback_is_explicit_and_recorded(self) -> None:
+    def test_allowed_fallback_requires_explicit_new_binding(self) -> None:
         inventory = ModelInventory(
+            executable_digest="sha256:" + "0" * 64, runtime_capabilities=RUNTIME_CAPABILITIES,
             source="model/list",
             models=(ModelCapability(model="available", supported_efforts=("high",)),),
         )
@@ -30,13 +33,12 @@ class EngineModelAssignmentTests(unittest.TestCase):
             preferred_effort="medium",
             allowed_fallbacks=(ModelFallback(model="available", effort="high"),),
         )
-        resolved = AssignmentResolver().resolve_policy(policy, inventory)
-        self.assertEqual("available", resolved.model)
-        self.assertTrue(resolved.fallback_used)
-        self.assertEqual(inventory.inventory_digest, resolved.inventory_digest)
+        with self.assertRaisesRegex(AssignmentResolutionError, "명시적 새 binding"):
+            AssignmentResolver().resolve_policy(policy, inventory)
 
     def test_unsupported_model_is_not_silently_replaced(self) -> None:
         inventory = ModelInventory(
+            executable_digest="sha256:" + "0" * 64, runtime_capabilities=RUNTIME_CAPABILITIES,
             source="model/list",
             models=(ModelCapability(model="available", supported_efforts=("low",)),),
         )
@@ -50,6 +52,7 @@ class EngineModelAssignmentTests(unittest.TestCase):
 
     def test_independent_validator_cannot_resolve_to_same_binding(self) -> None:
         inventory = ModelInventory(
+            executable_digest="sha256:" + "0" * 64, runtime_capabilities=RUNTIME_CAPABILITIES,
             source="model/list",
             models=(ModelCapability(model="only", supported_efforts=("high",)),),
         )

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from .model_lock import ModelInventory, ModelChoice
+from .roles import make_role_request, verify_role_receipt
+
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -475,6 +478,8 @@ class SkeletonGeneratorAdapter:
     effort: str
     inventory_digest: str
     cwd: Path | str
+    inventory: ModelInventory | None = None
+    allowed_fallbacks: tuple[ModelChoice, ...] = ()
     receipts: list[RoleCallReceipt] = field(default_factory=list)
 
     def generate(
@@ -485,7 +490,8 @@ class SkeletonGeneratorAdapter:
         project_map: ProjectMapRevision,
         candidate_count: int,
     ) -> tuple[PlanSkeletonCandidate, ...]:
-        request = RoleCallRequest(
+        request = make_role_request(
+            inventory=self.inventory, allowed_fallbacks=self.allowed_fallbacks,
             role="skeleton_generator",
             instructions=(
                 "Goal과 현재 State에 맞는 최소 Plan Skeleton을 만든다. 실제 파일·symbol·명령은 "
@@ -528,6 +534,7 @@ class SkeletonGeneratorAdapter:
             return batch
 
         result = self.runner.run(request, validator=validate_batch)
+        verify_role_receipt(request, result)
         self.receipts.append(result.receipt)
         batch = SkeletonBatchDraft.model_validate(result.payload)
         if len(batch.candidates) != candidate_count:
@@ -553,7 +560,8 @@ class SkeletonGeneratorAdapter:
         state: StateSnapshot,
         project_map: ProjectMapRevision,
     ) -> PlanSkeletonCandidate:
-        request = RoleCallRequest(
+        request = make_role_request(
+            inventory=self.inventory, allowed_fallbacks=self.allowed_fallbacks,
             role="skeleton_refiner",
             instructions=(
                 "기존 Skeleton의 remediable finding만 한 번 수정한다. Goal 의미나 접근 전략을 "
@@ -594,6 +602,7 @@ class SkeletonGeneratorAdapter:
             return draft
 
         result = self.runner.run(request, validator=validate_refinement)
+        verify_role_receipt(request, result)
         self.receipts.append(result.receipt)
         refined = self._compile(
             SkeletonCandidateDraft.model_validate(result.payload),
@@ -665,6 +674,8 @@ class SkeletonReviewerAdapter:
     effort: str
     inventory_digest: str
     cwd: Path | str
+    inventory: ModelInventory | None = None
+    allowed_fallbacks: tuple[ModelChoice, ...] = ()
     receipts: list[RoleCallReceipt] = field(default_factory=list)
 
     def review(self, *, candidate, goal, state, project_map) -> ReviewerSubmission:
@@ -672,7 +683,8 @@ class SkeletonReviewerAdapter:
         evidence_catalog = skeleton_review_evidence_catalog(
             candidate, goal, state, project_map
         )
-        request = RoleCallRequest(
+        request = make_role_request(
+            inventory=self.inventory, allowed_fallbacks=self.allowed_fallbacks,
             role="skeleton_reviewer",
             instructions=(
                 "Skeleton의 goal fit, grounding, DAG, dead-end, 실제 전략 차이를 compact하게 검토한다. "
@@ -705,6 +717,7 @@ class SkeletonReviewerAdapter:
             return draft
 
         result = self.runner.run(request, validator=validate_review)
+        verify_role_receipt(request, result)
         self.receipts.append(result.receipt)
         return _review_submission(
             role="skeleton_reviewer",
@@ -722,6 +735,8 @@ class PlanExpanderAdapter:
     effort: str
     inventory_digest: str
     cwd: Path | str
+    inventory: ModelInventory | None = None
+    allowed_fallbacks: tuple[ModelChoice, ...] = ()
     planning_budget: PlanningBudgetPolicy = PlanningBudgetPolicy()
     commit_horizon: CommitHorizon = CommitHorizon()
     receipts: list[RoleCallReceipt] = field(default_factory=list)
@@ -736,7 +751,8 @@ class PlanExpanderAdapter:
         planning_budget: PlanningBudgetPolicy | None = None,
     ) -> PlanContractRevision:
         applied_budget = planning_budget or self.planning_budget
-        request = RoleCallRequest(
+        request = make_role_request(
+            inventory=self.inventory, allowed_fallbacks=self.allowed_fallbacks,
             role="plan_expander",
             instructions=(
                 "선택된 Skeleton 하나만 Task 계약으로 상세화한다. 목표·Task 목적·dependency·"
@@ -821,6 +837,7 @@ class PlanExpanderAdapter:
             return envelope
 
         result = self.runner.run(request, validator=validate_expansion)
+        verify_role_receipt(request, result)
         self.receipts.append(result.receipt)
         draft = validate_expansion(result.payload).plan
         return self._compile(
@@ -961,8 +978,11 @@ class PlanReviewerAdapter:
     effort: str
     inventory_digest: str
     cwd: Path | str
+    inventory: ModelInventory | None = None
+    allowed_fallbacks: tuple[ModelChoice, ...] = ()
     critical_model: str | None = None
     critical_effort: str | None = None
+    critical_allowed_fallbacks: tuple[ModelChoice, ...] = ()
     receipts: list[RoleCallReceipt] = field(default_factory=list)
 
     def review(self, *, plan, goal, state, project_map, risk_route) -> ReviewerSubmission:
@@ -973,7 +993,8 @@ class PlanReviewerAdapter:
         selected_effort = (
             (self.critical_effort or self.effort) if use_critical else self.effort
         )
-        request = RoleCallRequest(
+        request = make_role_request(
+            inventory=self.inventory, allowed_fallbacks=(self.critical_allowed_fallbacks if use_critical else self.allowed_fallbacks),
             role=risk_route,
             instructions=(
                 "반드시 review.findings와 review.ratings 두 key를 함께 제출한다. 허용 조합은 정확히 둘이다: "
@@ -1039,6 +1060,7 @@ class PlanReviewerAdapter:
             return envelope
 
         result = self.runner.run(request, validator=validate_review)
+        verify_role_receipt(request, result)
         self.receipts.append(result.receipt)
         return _review_submission(
             role=risk_route,

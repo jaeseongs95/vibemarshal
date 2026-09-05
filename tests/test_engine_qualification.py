@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from flowmarshal.engine.model_lock import RUNTIME_CAPABILITIES
+
 import tempfile
 import unittest
 import sqlite3
@@ -73,6 +75,7 @@ def qualification_inventory() -> ModelInventory:
         binding = roles.binding_for(role)
         grouped[binding.model].add(binding.effort)
     return ModelInventory(
+        executable_digest="sha256:" + "0" * 64, runtime_capabilities=RUNTIME_CAPABILITIES,
         source="qualification-test-model-list",
         models=tuple(
             ModelCapability(model=model, supported_efforts=tuple(sorted(efforts)))

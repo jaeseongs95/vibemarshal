@@ -47,6 +47,9 @@ REQUIRED_PERMISSION_PROFILE = ":danger-full-access"
 REQUIRED_APPROVAL_POLICY = "never"
 
 
+from .model_lock import RUNTIME_CAPABILITIES, parse_inventory_models, verify_binding
+
+
 class RuntimePolicyError(RuntimeError):
     pass
 
@@ -280,34 +283,16 @@ class CodexAppServerRuntime:
         )
 
     def list_models(self) -> ModelInventory:
-        response = self._codex.models(include_hidden=False)
-        if _get(response, "next_cursor") is not None:
-            raise RuntimePolicyError("model/list pagination을 완전히 읽지 못했습니다.")
-        raw_models = _get(response, "data")
-        if not isinstance(raw_models, list):
-            raw_models = tuple(raw_models or ())
-        models: list[ModelCapability] = []
-        for item in raw_models:
-            if bool(_get(item, "hidden", False)):
-                continue
-            model_id = str(_get(item, "id", _get(item, "model", ""))).strip()
-            options = _get(item, "supported_reasoning_efforts", ())
-            efforts = tuple(
-                sorted(
-                    {
-                        _enum(_get(option, "reasoning_effort", _get(option, "effort", option)))
-                        for option in options
-                    }
-                )
+        # SDK typed response의 coercion보다 먼저 전체 원본 JSON을 검사한다.
+        raw = self._raw("model/list", {"includeHidden": False})
+        try:
+            return ModelInventory(
+                source=f"codex-app-server:model/list@{self.executable_digest}",
+                models=parse_inventory_models(raw), raw_response=raw,
+                executable_digest=self.executable_digest, runtime_capabilities=RUNTIME_CAPABILITIES,
             )
-            if model_id and efforts:
-                models.append(ModelCapability(model=model_id, supported_efforts=efforts))
-        if not models:
-            raise RuntimePolicyError("model/list에 visible model이 없습니다.")
-        return ModelInventory(
-            source=f"codex-app-server:model/list@{self.executable_digest}",
-            models=tuple(models),
-        )
+        except ValueError as error:
+            raise RuntimePolicyError(f"INVALID_MODEL_INVENTORY: {error}") from error
 
     def create_thread(
         self,
@@ -1141,6 +1126,16 @@ class EngineDispatcher:
             if actual != observation["after_digest"]:
                 raise EngineServiceError("STALE_EXECUTION_INPUT: 직접 semantic evidence 이후 파일이 바뀌었습니다.")
 
+    @staticmethod
+    def _verify_role_binding(role, inventory):
+        try:
+            if role.operational_binding is not None and role.inventory_digest != role.operational_binding.inventory_digest:
+                raise ValueError("MODEL_LOCK_EVIDENCE_DIGEST_MISMATCH")
+            return verify_binding(role.operational_binding, inventory,
+                                  role=role.role, model=role.model, effort=role.effort)
+        except ValueError as error:
+            raise RuntimePolicyError(str(error)) from error
+
     def _dispatch_reserved(self, attempt_id: str, *, validation_id: str | None = None) -> None:
         row, spec = self._attempt_context(attempt_id)
         cwd = Path(row["root"])
@@ -1149,16 +1144,17 @@ class EngineDispatcher:
         )
         self._verify_policy(cwd)
         inventory = self.runtime.list_models()
-        if inventory.inventory_digest != role.inventory_digest:
-            raise RuntimePolicyError("MODEL_INVENTORY_CHANGED: materialization 이후 model/list가 변경됐습니다.")
-        if not inventory.supports(role.model, role.effort):
-            raise RuntimePolicyError("MODEL_BINDING_UNAVAILABLE")
+        for resolved_role in (spec.definition.executor, spec.definition.validator):
+            if resolved_role is not None:
+                self._verify_role_binding(resolved_role, inventory)
+        current_binding = self._verify_role_binding(role, inventory)
         attempt_key = f"{spec.definition.idempotency_key}:attempt:{row['attempt_no']}:{row['kind']}"
         request = {
             "cwd": str(cwd.resolve()),
             "task_id": row["task_id"],
             "model": role.model,
             "attempt_kind": row["kind"],
+            "model_observation": current_binding.model_dump(mode="json"),
             "validation_id": validation_id,
         }
         if row["kind"] == AttemptKind.VALIDATION.value:
@@ -1213,11 +1209,17 @@ class EngineDispatcher:
     ) -> None:
         # 전송 직전에 다시 읽는다. 호출자가 임의 본문으로 대체할 인자는 두지 않는다.
         role, prompt, output_schema = self._role_for_attempt(row, spec, validation_id=validation_id)
+        current_inventory = self.runtime.list_models()
+        for resolved_role in (spec.definition.executor, spec.definition.validator):
+            if resolved_role is not None:
+                self._verify_role_binding(resolved_role, current_inventory)
+        current_binding = self._verify_role_binding(role, current_inventory)
         if resumed:
             prompt = "이전 turn이 중단되었습니다. 같은 TaskContract 범위에서 재개하세요.\n" + prompt
         request = {
             "thread_id": thread_id,
             "prompt_digest": sha256_digest(prompt),
+            "model_observation": current_binding.model_dump(mode="json"),
             "model": role.model,
             "effort": role.effort,
             "validation_id": validation_id,
@@ -1283,10 +1285,10 @@ class EngineDispatcher:
         cwd = Path(row["root"])
         self._verify_policy(cwd)
         inventory = self.runtime.list_models()
-        if inventory.inventory_digest != role.inventory_digest or not inventory.supports(
-            role.model, role.effort
-        ):
-            raise RuntimePolicyError("MODEL_BINDING_UNAVAILABLE_AFTER_RESUME")
+        for resolved_role in (spec.definition.executor, spec.definition.validator):
+            if resolved_role is not None:
+                self._verify_role_binding(resolved_role, inventory)
+        current_binding = self._verify_role_binding(role, inventory)
         attempt_key = f"{spec.definition.idempotency_key}:attempt:{row['attempt_no']}:{row['kind']}"
         resume_count = 0
         with self.service.ledger.read() as connection:
@@ -1301,7 +1303,8 @@ class EngineDispatcher:
             attempt_id=row["id"],
             kind=RuntimeIntentKind.RESUME_TURN,
             idempotency_key=f"{attempt_key}:resume",
-            request={"thread_id": binding.thread_id, "cwd": str(cwd.resolve())},
+            request={"thread_id": binding.thread_id, "cwd": str(cwd.resolve()),
+                     "model_observation": current_binding.model_dump(mode="json")},
         )
         receipt = self.runtime.resume(thread_id=binding.thread_id, cwd=cwd)
         self.service.record_runtime_receipt(
@@ -1940,6 +1943,12 @@ class EngineDispatcher:
         observation = self.runtime.read(thread_id=binding.thread_id)
         if observation.active:
             raise EngineServiceError("thread/read 결과가 active이므로 resume하지 않습니다.")
+        _attempt, spec = self._attempt_context(attempt_id)
+        self._verify_policy(Path(row["root"]))
+        inventory = self.runtime.list_models()
+        for role in (spec.definition.executor, spec.definition.validator):
+            if role is not None:
+                self._verify_role_binding(role, inventory)
         receipt = self.runtime.resume(thread_id=binding.thread_id, cwd=Path(row["root"]))
         return receipt.model_copy(
             update={

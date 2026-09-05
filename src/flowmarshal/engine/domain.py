@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .model_lock import OperationalBinding
+
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Annotated, Any, Literal
@@ -1520,6 +1522,7 @@ class ResolvedRoleAssignment(EngineModel):
     effort: str = Field(min_length=1, max_length=50)
     inventory_digest: str = Field(pattern=_DIGEST_PATTERN)
     fallback_used: bool = False
+    operational_binding: OperationalBinding | None = None
 
 
 class TaskExecutionSpecDefinition(EngineModel):

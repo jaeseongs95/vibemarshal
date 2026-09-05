@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .domain import ModelFallback
+
 import json
 import shutil
 import sys
@@ -239,11 +241,13 @@ def _assignment(roles: EngineRoleConfiguration) -> ModelAssignmentContract:
             role="executor",
             preferred_model=roles.executor.model,
             preferred_effort=roles.executor.effort,
+            allowed_fallbacks=tuple(ModelFallback(model=x.model, effort=x.effort) for x in roles.executor.allowed_fallbacks),
         ),
         validator=RoleAssignmentPolicy(
             role="validator",
             preferred_model=roles.validator.model,
             preferred_effort=roles.validator.effort,
+            allowed_fallbacks=tuple(ModelFallback(model=x.model, effort=x.effort) for x in roles.validator.allowed_fallbacks),
         ),
         independence_required=True,
     )
@@ -830,6 +834,7 @@ def _contract(
         for scenario in E2E_SCENARIOS
     )
     return EvaluationContract(
+        model_lock_format="flowmarshal-model-lock-v2",
         scope=EvaluationScope.PROJECT_E2E,
         fixture_digests=fixture_digests,
         scenario_set_digest=sha256_digest(
@@ -971,6 +976,7 @@ def run_project_e2e(
                 cell.update({"scenario": scenario, "order_seed": 0})
                 store.put(
                     EvaluationCellCheckpoint(
+                        model_lock_format="flowmarshal-model-lock-v2",
                         contract_digest=contract.contract_digest,
                         fixture_digest=digest,
                         order_seed=0,

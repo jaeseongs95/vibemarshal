@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from flowmarshal.engine.model_lock import RUNTIME_CAPABILITIES
+
 import tempfile
 import unittest
 from pathlib import Path
@@ -10,7 +12,7 @@ from flowmarshal.engine.domain import ThreadBinding, new_id, utc_now
 from flowmarshal.engine.models import ModelCapability, ModelInventory
 from flowmarshal.engine.roles import (
     CodexStructuredRoleRunner,
-    RoleCallRequest,
+    RoleCallRequest, make_role_request,
     StructuredRoleError,
     strict_json_output_schema,
 )
@@ -26,6 +28,7 @@ class ImmediateRoleRuntime:
         self.outputs = list(outputs)
         self.latest: dict[str, tuple[str, str]] = {}
         self.inventory = ModelInventory(
+            executable_digest="sha256:" + "0" * 64, runtime_capabilities=RUNTIME_CAPABILITIES,
             source="test:model/list",
             models=(ModelCapability(model="available", supported_efforts=("low",)),),
         )
@@ -160,7 +163,7 @@ class EngineStructuredRoleTests(unittest.TestCase):
         runtime = ImmediateRoleRuntime(["not-json", '{"answer":"would-pass"}'])
         runner = CodexStructuredRoleRunner(runtime, max_schema_recovery_attempts=0)
         with tempfile.TemporaryDirectory() as temp:
-            request = RoleCallRequest(role="bounded-diagnostic", instructions="고정 응답 계약을 따른다.",
+            request = make_role_request(inventory=runtime.inventory,role="bounded-diagnostic", instructions="고정 응답 계약을 따른다.",
                                       payload={}, output_schema={"type": "object"}, model="available", effort="low",
                                       inventory_digest=runtime.inventory.inventory_digest, cwd=temp)
             with self.assertRaises(StructuredRoleError) as raised:
@@ -216,7 +219,7 @@ class EngineStructuredRoleTests(unittest.TestCase):
         progress = []
         runner = CodexStructuredRoleRunner(runtime, progress_sink=progress.append)
         with tempfile.TemporaryDirectory() as temp:
-            request = RoleCallRequest(
+            request = make_role_request(inventory=runtime.inventory,
                 role="test-role",
                 instructions="JSON만 반환한다.",
                 payload={"request": "ok"},

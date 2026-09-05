@@ -163,12 +163,14 @@ class InspectionCaseBindingTests(unittest.TestCase):
                    "output_schema_digest": sha256_digest(schema), "schema_recovery_attempts": 0,
                    "model": request.model, "effort": request.effort, "role": request.role,
                    "inventory_digest": request.inventory_digest, "permission_profile": ":danger-full-access",
-                   "approval_policy": "never"}
+                   "approval_policy": "never", "call_id": "model_call_fixture", "status": "succeeded",
+                   "output_digest": sha256_digest({}), "latency_ms": 0,
+                   "recorded_at": "2026-09-05T00:00:00Z"}
         with tempfile.TemporaryDirectory() as temp:
             capture = Path(temp)
             values = {
                 "request.json": request, "strict-schema.json": schema,
-                "terminal.json": {"payload": {"thread_id": "thread_actual", "turn_id": "turn_actual", "prompt_digest": sha256_digest(prompt)}},
+                "terminal.json": {"final_response": "{}", "payload": {"thread_id": "thread_actual", "turn_id": "turn_actual", "prompt_digest": sha256_digest(prompt)}},
                 "thread.receipt.json": {"payload": {"thread": {"id": "thread_actual"}}},
                 "thread.intent.json": {"developer_instructions": request.instructions},
                 "turn.intent.json": {"prompt": prompt, "thread_id": "thread_actual", "model": request.model,

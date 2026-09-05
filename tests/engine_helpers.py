@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from flowmarshal.engine.model_lock import RUNTIME_CAPABILITIES
+
 from pathlib import Path
 
 from flowmarshal.canonical import sha256_bytes, sha256_digest
@@ -133,6 +135,7 @@ def state(project_id: str, goal_digest: str, map_digest: str) -> StateSnapshot:
 
 def inventory() -> ModelInventory:
     return ModelInventory(
+        executable_digest="sha256:" + "0" * 64, runtime_capabilities=RUNTIME_CAPABILITIES,
         source="test-model-list",
         models=(
             ModelCapability(model="worker", supported_efforts=("medium",)),

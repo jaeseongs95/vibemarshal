@@ -957,10 +957,18 @@ class ExecutionAutomationTests(unittest.TestCase):
 
         with prepared.service.ledger.read() as connection:
             before_usage = connection.execute("SELECT COUNT(*) FROM budget_usage").fetchone()[0]
+        def replay(**kwargs):
+            from flowmarshal.engine.roles import RoleCallRequest, strict_json_output_schema
+            request = RoleCallRequest.model_validate(kwargs["request"]["role_request"])
+            bound = receipt.model_copy(update={
+                "input_digest": request.request_digest,
+                "output_schema_digest": sha256_digest(strict_json_output_schema(request.output_schema)),
+                "observed_binding": request.operational_binding,
+            })
+            return {"payload": bad, "receipt": bound.model_dump(mode="json")}
+
         for _ in range(2):
-            with patch.object(provider.operations, "invoke", return_value={
-                "payload": bad, "receipt": receipt.model_dump(mode="json"),
-            }):
+            with patch.object(provider.operations, "invoke", side_effect=replay):
                 with self.assertRaises(ValidationError):
                     provider._run(
                         prepared.project_id, self.inventory, context, ProviderExecutionPreparation,

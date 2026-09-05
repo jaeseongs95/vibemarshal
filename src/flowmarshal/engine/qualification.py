@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+from .domain import ModelFallback
+
+from .roles import make_role_request, verify_role_receipt
+
 import json
 import random
 import shutil
@@ -345,6 +349,7 @@ def _deterministic_contract(root: Path) -> EvaluationContract:
     )
     roles = default_role_configuration(root)
     return EvaluationContract(
+        model_lock_format="flowmarshal-model-lock-v2",
         scope=EvaluationScope.DETERMINISTIC,
         fixture_digests=fixture_digests,
         scenario_set_digest=sha256_digest(names),
@@ -381,6 +386,7 @@ def run_deterministic(
             continue
         store.put(
             EvaluationCellCheckpoint(
+                model_lock_format="flowmarshal-model-lock-v2",
                 contract_digest=contract.contract_digest,
                 fixture_digest=fixture_digest,
                 order_seed=0,
@@ -428,9 +434,7 @@ def _combined_role_catalog(root: Path) -> RegressionCatalog:
 
 
 def _model_lock(inventory: ModelInventory, roles: EngineRoleConfiguration) -> str:
-    return sha256_digest(
-        {"inventory_digest": inventory.inventory_digest, "roles": roles.model_dump(mode="json")}
-    )
+    return roles.operational_binding(inventory).lock_digest
 
 
 def _role_contract(
@@ -452,6 +456,7 @@ def _role_contract(
     if not isinstance(taxonomy, dict) or not fixture_codes.issubset(set(taxonomy)):
         raise QualificationRunError("finding taxonomy가 fixture oracle 코드를 모두 정의하지 않습니다.")
     return EvaluationContract(
+        model_lock_format="flowmarshal-model-lock-v2",
         scope=EvaluationScope.ROLE_FIXTURE,
         fixture_digests=tuple(item.fixture_digest for item in catalog.fixtures),
         scenario_set_digest=catalog.catalog_digest,
@@ -549,6 +554,9 @@ def run_role_fixture(
         ).resolve()
         store = ImmutableCheckpointStore(destination, contract)
         store.initialize()
+        audit_path = destination / ("inventory-observation-" + inventory.inventory_digest[7:] + ".json")
+        if not audit_path.exists():
+            _write_json(audit_path, roles.operational_binding(inventory))
         if store.state().status is EvaluationRunStatus.PAUSED_RATE_LIMIT:
             store.set_state(EvaluationRunStatus.RUNNING, updated_at=utc_now())
         _write_json(
@@ -560,7 +568,8 @@ def run_role_fixture(
                 "codex_bin": None if codex_bin is None else str(Path(codex_bin).resolve()),
             },
         )
-        runner = CodexStructuredRoleRunner(runtime, progress_sink=_role_progress(destination))
+        runner = CodexStructuredRoleRunner(runtime, progress_sink=_role_progress(destination),
+                                           operational_binding=roles.operational_binding(inventory))
         results: list[FixtureResult] = []
         by_digest = {item.fixture_digest: item for item in catalog.fixtures}
         try:
@@ -575,7 +584,7 @@ def run_role_fixture(
                     binding = roles.critical_reviewer if fixture.critical else roles.general_reviewer
                     reviewer_role = "critical_reviewer" if fixture.critical else "general_reviewer"
                     evidence_catalog = {"artifact:candidate": fixture.artifact}
-                    request = RoleCallRequest(
+                    request = make_role_request(
                         role=reviewer_role,
                         instructions=ROLE_INSTRUCTIONS,
                         payload=fixture.model_input()
@@ -585,8 +594,8 @@ def run_role_fixture(
                         },
                         output_schema=ReviewDraft.model_json_schema(),
                         model=binding.model,
-                        effort=binding.effort,
-                        inventory_digest=inventory.inventory_digest,
+                        effort=binding.effort, allowed_fallbacks=binding.allowed_fallbacks,
+                        inventory_digest=inventory.inventory_digest, inventory=inventory,
                         cwd=str(base),
                     )
 
@@ -612,6 +621,7 @@ def run_role_fixture(
                     start = len(runner.receipts)
                     try:
                         result = runner.run(request, validator=validate)
+                        verify_role_receipt(request, result)
                         fixture_result = _review_result(
                             fixture,
                             order_seed=seed,
@@ -651,6 +661,7 @@ def run_role_fixture(
                             schema_valid=False,
                         )
                     checkpoint = EvaluationCellCheckpoint(
+                        model_lock_format="flowmarshal-model-lock-v2",
                         contract_digest=contract.contract_digest,
                         fixture_digest=fixture.fixture_digest,
                         order_seed=seed,
@@ -714,6 +725,7 @@ def _planning_contract(
     )
 
     return EvaluationContract(
+        model_lock_format="flowmarshal-model-lock-v2",
         scope=EvaluationScope.FULL_PLANNING_PIPELINE,
         fixture_digests=tuple(item.scenario_digest for item in catalog.scenarios),
         scenario_set_digest=catalog.catalog_digest,
@@ -814,20 +826,22 @@ def _planning_cell(
         project_id = new_id("project")
         profile = _profile(project_id)
         project_map = ProjectMapper().build(project_id=project_id, root=workspace, revision_no=1)
-        runner = (CodexStructuredRoleRunner(runtime) if progress_sink is None else
-                  CodexStructuredRoleRunner(runtime, progress_sink=progress_sink))
+        runner = CodexStructuredRoleRunner(runtime, progress_sink=progress_sink,
+                                           operational_binding=roles.operational_binding(inventory))
         normalizer = GoalNormalizerAdapter(
             runner,
             model=roles.normalizer.model,
             effort=roles.normalizer.effort,
-            inventory_digest=inventory.inventory_digest,
+            allowed_fallbacks=roles.normalizer.allowed_fallbacks,
+            inventory_digest=inventory.inventory_digest, inventory=inventory,
             cwd=workspace,
         )
         goal_reviewer = GoalReviewerAdapter(
             runner,
             model=roles.critical_reviewer.model,
             effort=roles.critical_reviewer.effort,
-            inventory_digest=inventory.inventory_digest,
+            allowed_fallbacks=roles.critical_reviewer.allowed_fallbacks,
+            inventory_digest=inventory.inventory_digest, inventory=inventory,
             cwd=workspace,
         )
         prepared = GoalPreparationPipeline(normalizer, goal_reviewer).prepare(
@@ -893,11 +907,13 @@ def _planning_cell(
                 role="executor",
                 preferred_model=roles.executor.model,
                 preferred_effort=roles.executor.effort,
+                allowed_fallbacks=tuple(ModelFallback(model=x.model, effort=x.effort) for x in roles.executor.allowed_fallbacks),
             ),
             validator=RoleAssignmentPolicy(
                 role="validator",
                 preferred_model=roles.validator.model,
                 preferred_effort=roles.validator.effort,
+                allowed_fallbacks=tuple(ModelFallback(model=x.model, effort=x.effort) for x in roles.validator.allowed_fallbacks),
             ),
             independence_required=True,
         )
@@ -911,14 +927,16 @@ def _planning_cell(
             runner,
             model=roles.skeleton_generator.model,
             effort=roles.skeleton_generator.effort,
-            inventory_digest=inventory.inventory_digest,
+            allowed_fallbacks=roles.skeleton_generator.allowed_fallbacks,
+            inventory_digest=inventory.inventory_digest, inventory=inventory,
             cwd=workspace,
         )
         skeleton_reviewer = SkeletonReviewerAdapter(
             runner,
             model=roles.general_reviewer.model,
             effort=roles.general_reviewer.effort,
-            inventory_digest=inventory.inventory_digest,
+            allowed_fallbacks=roles.general_reviewer.allowed_fallbacks,
+            inventory_digest=inventory.inventory_digest, inventory=inventory,
             cwd=workspace,
         )
         expander = PlanExpanderAdapter(
@@ -926,17 +944,20 @@ def _planning_cell(
             assigner,
             model=roles.plan_expander.model,
             effort=roles.plan_expander.effort,
-            inventory_digest=inventory.inventory_digest,
+            allowed_fallbacks=roles.plan_expander.allowed_fallbacks,
+            inventory_digest=inventory.inventory_digest, inventory=inventory,
             cwd=workspace,
         )
         plan_reviewer = PlanReviewerAdapter(
             runner,
             model=roles.general_reviewer.model,
             effort=roles.general_reviewer.effort,
-            inventory_digest=inventory.inventory_digest,
+            allowed_fallbacks=roles.general_reviewer.allowed_fallbacks,
+            inventory_digest=inventory.inventory_digest, inventory=inventory,
             cwd=workspace,
             critical_model=roles.critical_reviewer.model,
             critical_effort=roles.critical_reviewer.effort,
+            critical_allowed_fallbacks=roles.critical_reviewer.allowed_fallbacks,
         )
         outcome = SkeletonFirstPlanner(
             generator, skeleton_reviewer, expander, plan_reviewer
@@ -1022,6 +1043,9 @@ def run_full_planning_pipeline(
         ).resolve()
         store = ImmutableCheckpointStore(destination, contract)
         store.initialize()
+        audit_path = destination / ("inventory-observation-" + inventory.inventory_digest[7:] + ".json")
+        if not audit_path.exists():
+            _write_json(audit_path, roles.operational_binding(inventory))
         if store.state().status is EvaluationRunStatus.PAUSED_RATE_LIMIT:
             store.set_state(EvaluationRunStatus.RUNNING, updated_at=utc_now())
         _write_json(
@@ -1087,6 +1111,7 @@ def run_full_planning_pipeline(
                         }
                     store.put(
                         EvaluationCellCheckpoint(
+                            model_lock_format="flowmarshal-model-lock-v2",
                             contract_digest=contract.contract_digest,
                             fixture_digest=scenario.scenario_digest,
                             order_seed=seed,

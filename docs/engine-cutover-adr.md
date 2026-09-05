@@ -17,6 +17,7 @@
 6. prototype DB를 자동 또는 제자리 migration하지 않는다. 필요성이 확인된 뒤 별도 검증을 거친 일회성 import만 허용한다.
 7. 개발 CLI와 package는 `flowmarshal-engine` 이름을 사용한다.
 8. `flowmarshal` package·기본 CLI 승격은 네 qualification 범위와 token/latency Gate가 모두 통과한 뒤 수행한다.
+9. model inventory 전체 원문·digest는 감사용으로 보존하고 qualification/execution에는 `flowmarshal-model-lock-v2`의 선택·허용 조합과 executable·필수 capability projection을 사용한다. 이 운영 계약 revision은 과거 Goal·Plan·raw의 재해석이나 migration을 허용하지 않으며 v1 checkpoint를 명시적으로 거부한다. 세부 규칙은 권위 설계 §7.1을 따른다.
 
 ## Consequences
 
@@ -37,4 +38,3 @@
 - 같은 입력의 R3.1 대비 token/latency Gate
 
 하나라도 누락되거나 실패하면 cutover는 `NO-GO`다. 합성 smoke나 일부 fixture 통과를 전체 qualification으로 승격하지 않는다.
-

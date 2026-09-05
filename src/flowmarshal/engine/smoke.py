@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from flowmarshal.engine.model_lock import RUNTIME_CAPABILITIES
+
 import json
 import sys
 from pathlib import Path
@@ -224,6 +226,7 @@ def run_synthetic_lifecycle(
     )
 
     inventory = ModelInventory(
+        executable_digest="sha256:" + "0" * 64, runtime_capabilities=RUNTIME_CAPABILITIES,
         source="synthetic-model-list",
         models=(
             ModelCapability(model="fake-balanced", supported_efforts=("medium",)),

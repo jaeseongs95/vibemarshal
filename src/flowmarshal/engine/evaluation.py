@@ -21,6 +21,7 @@ class EvaluationScope(StrEnum):
 
 
 class EvaluationContract(EngineModel):
+    model_lock_format: Literal["flowmarshal-model-lock-v2"]
     scope: EvaluationScope
     fixture_digests: tuple[str, ...] = Field(min_length=1)
     scenario_set_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
@@ -65,6 +66,7 @@ class EvaluationContract(EngineModel):
 
 
 class EvaluationCellCheckpoint(EngineModel):
+    model_lock_format: Literal["flowmarshal-model-lock-v2"]
     contract_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     fixture_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     order_seed: int = Field(ge=0)
@@ -118,6 +120,8 @@ class ImmutableCheckpointStore:
             self.contract.model_dump(mode="json"), ensure_ascii=False, sort_keys=True, indent=2
         ) + "\n"
         if manifest.exists():
+            if json.loads(manifest.read_text(encoding="utf-8")).get("model_lock_format") != self.contract.model_lock_format:
+                raise CheckpointContractError("MODEL_LOCK_VERSION_UNSUPPORTED: v1 checkpoint를 v2로 재사용할 수 없습니다.")
             existing = EvaluationContract.model_validate_json(manifest.read_text(encoding="utf-8"))
             if existing.contract_digest != self.contract.contract_digest:
                 raise CheckpointContractError("기존 checkpoint의 evaluation 계약이 다릅니다.")
