@@ -17,6 +17,9 @@ from flowmarshal.engine.plan_inspection_eval import (
 from flowmarshal.engine.planner_roles import PlanReviewEnvelope
 from flowmarshal.engine.planning import plan_validation_scope_rows, validation_comparison_targets
 from flowmarshal.engine.roles import RoleCallRequest, strict_json_output_schema
+from flowmarshal.engine.model_lock import (
+    ROLE_CAPABILITIES, ModelCapability, ModelInventory, RUNTIME_CAPABILITIES, bind_models, role_lock,
+)
 from scripts.diagnostics.r_s06_10 import (
     RecordedRunner, case_expectation, completed_call_verification, verify_generation_pending, write_new,
 )
@@ -155,8 +158,21 @@ class InspectionCaseBindingTests(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "FAILED_OR_INCOMPLETE"):
                     verify_generation_pending(run)
 
-    def test_wrong_receipt_thread_stops_at_completed_call_before_next_case(self):
+    def test_completed_call_relations_are_independent_and_observation_is_not_a_schema_proxy(self):
         request = RoleCallRequest.model_validate(RAW["request"])
+        inventory = ModelInventory(
+            source="synthetic:model/list", executable_digest="sha256:" + "0" * 64,
+            runtime_capabilities=RUNTIME_CAPABILITIES,
+            models=(ModelCapability(model=request.model, supported_efforts=(request.effort,)),),
+        )
+        binding = bind_models(
+            inventory, (role_lock(request.role, request.model, request.effort),),
+            required_capabilities=ROLE_CAPABILITIES,
+        )
+        request = RoleCallRequest.model_validate(request.model_dump(mode="python") | {
+            "inventory_digest": inventory.inventory_digest,
+            "operational_binding": binding,
+        })
         schema = strict_json_output_schema(request.output_schema)
         prompt = canonical_json(request.payload)
         receipt = {"input_digest": request.request_digest, "thread_id": "thread_actual", "turn_ids": ["turn_actual"],
@@ -165,24 +181,62 @@ class InspectionCaseBindingTests(unittest.TestCase):
                    "inventory_digest": request.inventory_digest, "permission_profile": ":danger-full-access",
                    "approval_policy": "never", "call_id": "model_call_fixture", "status": "succeeded",
                    "output_digest": sha256_digest({}), "latency_ms": 0,
-                   "recorded_at": "2026-09-05T00:00:00Z"}
-        with tempfile.TemporaryDirectory() as temp:
-            capture = Path(temp)
+                   "recorded_at": "2026-09-05T00:00:00Z", "observed_binding": binding.model_dump(mode="json")}
+
+        def write_capture(capture, *, active_request=request, active_schema=schema, active_receipt=receipt,
+                          active_terminal="{}", active_result=None, active_intent=None):
+            intent = active_intent or {"prompt": prompt, "thread_id": "thread_actual", "model": request.model,
+                                       "effort": request.effort, "output_schema": active_schema}
             values = {
-                "request.json": request, "strict-schema.json": schema,
-                "terminal.json": {"final_response": "{}", "payload": {"thread_id": "thread_actual", "turn_id": "turn_actual", "prompt_digest": sha256_digest(prompt)}},
+                "request.json": active_request, "strict-schema.json": active_schema,
+                "result.json": {"payload": {} if active_result is None else active_result, "receipt": active_receipt},
+                "terminal.json": {"final_response": active_terminal, "payload": {
+                    "thread_id": "thread_actual", "turn_id": "turn_actual", "prompt_digest": sha256_digest(prompt)}},
                 "thread.receipt.json": {"payload": {"thread": {"id": "thread_actual"}}},
                 "thread.intent.json": {"developer_instructions": request.instructions},
-                "turn.intent.json": {"prompt": prompt, "thread_id": "thread_actual", "model": request.model,
-                                     "effort": request.effort, "output_schema": schema},
+                "turn.intent.json": intent,
                 "turn.receipt.json": {"operation_id": "turn_actual"},
             }
             for name, value in values.items():
                 write_new(capture / name, value)
-            self.assertTrue(completed_call_verification(capture, receipt)["passed"])
-            for altered in (dict(receipt, thread_id="thread_other"), dict(receipt, model="other_model"),
-                            dict(receipt, approval_policy="on-request")):
-                self.assertFalse(completed_call_verification(capture, altered)["passed"])
+
+        with tempfile.TemporaryDirectory() as temp:
+            capture = Path(temp)
+            write_capture(capture)
+            verification = completed_call_verification(capture, receipt)
+            self.assertTrue(verification["passed"])
+            self.assertEqual({"request_strict_artifact", "strict_artifact_turn_intent",
+                              "strict_artifact_receipt_digest", "terminal_result_output_digest",
+                              "prompt_instruction", "receipt_request_identity", "model_effort", "thread_turn",
+                              "model_observation"},
+                             set(verification["checks"]))
+
+        def verify_failure(**kwargs):
+            with tempfile.TemporaryDirectory() as temp:
+                capture = Path(temp)
+                write_capture(capture, **kwargs)
+                return completed_call_verification(capture, kwargs.get("active_receipt", receipt))
+
+        changed_request = request.model_copy(update={"output_schema": {"type": "object", "properties": {"changed": {"type": "string"}}}})
+        self.assertFalse(verify_failure(active_request=changed_request)["passed"])
+        self.assertFalse(verify_failure(active_schema={"type": "object", "properties": {}})["passed"])
+        self.assertFalse(verify_failure(active_intent={"prompt": prompt, "thread_id": "thread_actual", "model": request.model,
+                                                       "effort": request.effort, "output_schema": {}})["passed"])
+        bad_schema_receipt = dict(receipt, output_schema_digest="sha256:" + "f" * 64)
+        verification = verify_failure(active_receipt=bad_schema_receipt)
+        self.assertFalse(verification["passed"])
+        self.assertTrue(verification["checks"]["model_observation"])
+        self.assertFalse(verify_failure(active_terminal='{"changed":true}')["passed"])
+        self.assertFalse(verify_failure(active_intent={"prompt": prompt, "thread_id": "thread_actual", "model": "other_model",
+                                                       "effort": request.effort, "output_schema": schema})["passed"])
+        self.assertFalse(verify_failure(active_receipt=dict(receipt, thread_id="thread_other"))["passed"])
+
+        forged_schema = {"type": "object", "properties": {"forged": {"type": "string"}},
+                         "required": ["forged"], "additionalProperties": False}
+        forged_receipt = dict(receipt, output_schema_digest=sha256_digest(forged_schema))
+        forged = verify_failure(active_schema=forged_schema, active_receipt=forged_receipt)
+        self.assertFalse(forged["passed"])
+        self.assertFalse(forged["checks"]["request_strict_artifact"])
 
     def test_v6_raw_keeps_valid_ratings_original_fail_and_rejects_missing_ac_basis(self):
         self.assertEqual(RAW["raw_response"], json.loads(RAW["raw_final_response"]))

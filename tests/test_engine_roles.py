@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+
+from flowmarshal.canonical import sha256_digest
 from flowmarshal.engine.model_lock import RUNTIME_CAPABILITIES
 
 import tempfile
@@ -112,7 +115,7 @@ class EngineStructuredRoleTests(unittest.TestCase):
         self.assertEqual({"type": "null"}, branches[1]["properties"]["ratings"])
         ratings = branches[0]["properties"]["ratings"]["anyOf"][0]
         self.assertEqual(
-            ["goal_fit", "grounding", "engineering", "verification", "execution_safety"],
+            ["engineering", "execution_safety", "goal_fit", "grounding", "verification"],
             ratings["required"],
         )
         for field in ratings["properties"].values():
@@ -204,6 +207,50 @@ class EngineStructuredRoleTests(unittest.TestCase):
                 self.assertEqual(model.model_json_schema(), original)
         original = PlanExpansionDraft.model_json_schema()
         self.assertIn("default", original["$defs"]["DetailedTaskDraft"]["properties"]["approval_class"])
+
+    def test_strict_schema_canonicalizes_object_keys_without_reordering_ordered_arrays(self) -> None:
+        source = {
+            "type": "object",
+            "properties": {
+                "zeta": {"type": "string"},
+                "alpha": {
+                    "type": "object",
+                    "properties": {"zulu": {"type": "string"}, "able": {"type": "string"}},
+                },
+            },
+            "prefixItems": [
+                {"type": "object", "properties": {"last": {"type": "string"}, "first": {"type": "string"}}},
+                {"enum": ["second", "first"]},
+            ],
+            "anyOf": [{"const": "first"}, {"const": "second"}],
+            "oneOf": [{"const": 2}, {"const": 1}],
+        }
+        normalized = strict_json_output_schema(source)
+        restored = strict_json_output_schema(json.loads(json.dumps(normalized, sort_keys=True)))
+
+        self.assertEqual(["alpha", "zeta"], list(normalized["properties"]))
+        self.assertEqual(["alpha", "zeta"], normalized["required"])
+        self.assertEqual(["able", "zulu"], list(normalized["properties"]["alpha"]["properties"]))
+        self.assertEqual(["able", "zulu"], normalized["properties"]["alpha"]["required"])
+        self.assertEqual(["first", "last"], normalized["prefixItems"][0]["required"])
+        self.assertEqual(["second", "first"], normalized["prefixItems"][1]["enum"])
+        self.assertEqual([{"const": "first"}, {"const": "second"}], normalized["anyOf"])
+        self.assertEqual([{"const": 2}, {"const": 1}], normalized["oneOf"])
+        self.assertEqual(normalized, restored)
+        self.assertEqual(sha256_digest(normalized), sha256_digest(restored))
+
+        request = RoleCallRequest(
+            role="schema_test", instructions="결정적 schema 검사", payload={"input": True}, output_schema=source,
+            model="fixture-model", effort="high", inventory_digest="sha256:" + "0" * 64, cwd="D:\\fixture",
+        )
+        reloaded = RoleCallRequest.model_validate(json.loads(json.dumps(request.model_dump(mode="json"), sort_keys=True)))
+        self.assertEqual(strict_json_output_schema(request.output_schema), strict_json_output_schema(reloaded.output_schema))
+        self.assertEqual(sha256_digest(strict_json_output_schema(request.output_schema)),
+                         sha256_digest(strict_json_output_schema(reloaded.output_schema)))
+
+        reordered = json.loads(json.dumps(source))
+        reordered["prefixItems"].reverse()
+        self.assertNotEqual(sha256_digest(normalized), sha256_digest(strict_json_output_schema(reordered)))
 
     def test_validation_argv_preserves_repeated_arguments(self) -> None:
         from flowmarshal.engine.domain import ValidationExecutionStep

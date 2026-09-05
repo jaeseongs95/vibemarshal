@@ -130,16 +130,22 @@ def strict_json_output_schema(schema: dict[str, Any]) -> dict[str, Any]:
         if node.get("type") == "object" or "properties" in node:
             properties = node.get("properties", {})
             if isinstance(properties, dict):
+                # request 저장은 key를 정렬한다. properties와 required를 같은
+                # locale 비의존 순서로 만들면 저장 뒤 재구성한 transport schema도
+                # 최초 전송 schema와 같은 digest를 갖는다.
+                property_names = sorted(properties)
+                node["properties"] = {name: properties[name] for name in property_names}
                 node["additionalProperties"] = False
-                node["required"] = list(properties)
-                for child in properties.values():
+                node["required"] = property_names
+                for child in node["properties"].values():
                     visit(child)
         for key in ("$defs", "definitions"):
             definitions = node.get(key)
             if isinstance(definitions, dict):
                 for child in definitions.values():
                     visit(child)
-        for key in ("items", "anyOf", "oneOf", "allOf"):
+        for key in ("items", "prefixItems", "anyOf", "oneOf", "allOf", "not", "if", "then", "else",
+                    "dependentSchemas"):
             if key in node:
                 visit(node[key])
 

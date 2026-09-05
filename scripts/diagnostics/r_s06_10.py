@@ -437,34 +437,50 @@ class RecordedRunner:
 def completed_call_verification(capture: Path, receipt: dict[str, Any] | None) -> dict[str, Any]:
     """완료 receipt 결속은 다음 사례를 호출하기 전에 확인한다."""
     request = RoleCallRequest.model_validate(read(capture / "request.json"))
-    terminal = read(capture / "terminal.json")["payload"]
+    terminal_record = read(capture / "terminal.json")
+    terminal = terminal_record["payload"]
     thread = read(capture / "thread.receipt.json")["payload"]["thread"]
     intent = read(capture / "turn.intent.json")
     turn_receipt = read(capture / "turn.receipt.json")
+    strict_artifact = read(capture / "strict-schema.json")
+    result = read(capture / "result.json")
+    receipt_value = receipt if isinstance(receipt, dict) else {}
+    try:
+        terminal_payload = json.loads(terminal_record["final_response"])
+    except (KeyError, TypeError, json.JSONDecodeError):
+        terminal_payload = None
     observation_valid = False
-    if receipt is not None:
+    if receipt_value and request.operational_binding is not None:
         try:
-            verify_role_receipt(request, RoleCallResult.model_validate({"receipt": receipt,
-                                "payload": json.loads(read(capture / "terminal.json")["final_response"])}))
-            observation_valid = True
+            observed = OperationalBinding.model_validate(receipt_value["observed_binding"])
+            observation_valid = verify_binding(
+                request.operational_binding, observed.inventory,
+                role=request.role, model=request.model, effort=request.effort,
+            ) == observed
         except (ValueError, RuntimeError, KeyError, TypeError):
             pass
     checks = {
-        "model_observation": observation_valid,
-        "payload": json.loads(intent["prompt"]) == request.payload,
-        "prompt": terminal.get("prompt_digest") == sha256_digest(intent["prompt"]),
-        "instructions": read(capture / "thread.intent.json")["developer_instructions"] == request.instructions,
-        "schema": intent["output_schema"] == read(capture / "strict-schema.json"),
-        "model_effort": intent["model"] == request.model and intent["effort"] == request.effort,
+        "request_strict_artifact": strict_artifact == strict_json_output_schema(request.output_schema),
+        "strict_artifact_turn_intent": strict_artifact == intent["output_schema"],
+        "strict_artifact_receipt_digest": receipt_value.get("output_schema_digest") == sha256_digest(strict_artifact),
+        "terminal_result_output_digest": terminal_payload == result["payload"] and
+                                          receipt_value.get("output_digest") == sha256_digest(result["payload"]),
+        "prompt_instruction": json.loads(intent["prompt"]) == request.payload and
+                              terminal.get("prompt_digest") == sha256_digest(intent["prompt"]) and
+                              read(capture / "thread.intent.json")["developer_instructions"] == request.instructions,
+        "receipt_request_identity": receipt_value.get("input_digest") == request.request_digest and
+                                    receipt_value.get("role") == request.role and
+                                    receipt_value.get("inventory_digest") == request.inventory_digest and
+                                    receipt_value.get("permission_profile") == ":danger-full-access" and
+                                    receipt_value.get("approval_policy") == "never" and
+                                    receipt_value.get("schema_recovery_attempts") == 0,
+        "model_effort": intent["model"] == request.model and intent["effort"] == request.effort and
+                        receipt_value.get("model") == request.model and receipt_value.get("effort") == request.effort,
         "thread_turn": intent["thread_id"] == thread["id"] == terminal.get("thread_id") and
-                       terminal.get("turn_id") == turn_receipt["operation_id"],
-        "receipt": receipt is not None and receipt["input_digest"] == request.request_digest and
-                   receipt["thread_id"] == terminal.get("thread_id") == intent["thread_id"] and
-                   receipt["role"] == request.role and receipt["model"] == request.model and
-                   receipt["effort"] == request.effort and receipt["inventory_digest"] == request.inventory_digest and
-                   receipt["permission_profile"] == ":danger-full-access" and receipt["approval_policy"] == "never" and
-                   receipt["output_schema_digest"] == sha256_digest(intent["output_schema"]) and
-                   receipt["schema_recovery_attempts"] == 0 and receipt["turn_ids"] == [terminal.get("turn_id")],
+                       terminal.get("turn_id") == turn_receipt["operation_id"] and
+                       receipt_value.get("thread_id") == intent["thread_id"] and
+                       receipt_value.get("turn_ids") == [terminal.get("turn_id")],
+        "model_observation": observation_valid,
     }
     return {"passed": all(checks.values()), "checks": checks, "request_digest": request.request_digest,
             "receipt_digest": sha256_digest(receipt) if receipt else None}

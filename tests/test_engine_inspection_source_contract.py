@@ -109,7 +109,7 @@ class InspectionSourceContractTests(unittest.TestCase):
                     "flowmarshal.engine.runtime.CodexAppServerRuntime.start_turn", return_value={"fixture": True}) as provider:
                 runtime.start_turn(**arguments)
                 self.assertEqual(1, provider.call_count)
-                altered = dict(schema, required=["a", "z"])
+                altered = dict(schema, required=["z", "a"])
                 with self.assertRaisesRegex(RuntimeError, "ACTUAL_TURN_BINDING_MISMATCH"):
                     runtime.start_turn(**dict(arguments, output_schema=altered))
                 self.assertEqual(1, provider.call_count)
