@@ -8,7 +8,7 @@
 |---|---|---|
 | A. 실행 기반 격리 | 고정 worktree·공통 preflight·독립 fixture package·결정적 Gate | 완료 · `22d68c0` |
 | B. 기존 계약 기준선 | 같은 역할로 static 11사례, 사례별 형식·참조·의미·운영 결과 | 완료 · PASS 7 / FAIL 4 |
-| C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | 7차 AC별 supported scope 선택·adapter validation join 구현, 전체 671개·개발 Gate 5/5 통과 |
+| C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | 7차 의미 계약 유지, 저장형 진단 운영 보완 후 전체 673개·개발/고정 Gate 5/5·실제 저장 조회 probe 통과 |
 | D. 새 계약 비교 | 새 실행의 static 11사례와 고정 기대표·실측 usage | 마지막 전수 실행인 5차 PASS 9 / FAIL 2; 최신 7차는 첫 3건 PASS 뒤 프로세스 중단으로 불완결 |
 | E. S06 재진입 검사 | static·expansion·독립 생성 검토·expanded-review 13단계 | NOT_RUN |
 | F. 실제 Goal 경로 | 고정 자연어에서 실제 Goal·Plan 선택·활성화·실행·독립 검증·GoalVerdict | NOT_RUN |
@@ -58,3 +58,5 @@ Codex executable은 `D:\codex\fm-inspection-runtime\codex-935a1911.exe`에 복�
 - 7차 고정 static 실행의 clean·bad·wrong-goal은 모두 PASS였고 AC 관계 차이도 0이었다. 네 번째 combined는 대화 실행 중단 후 프로세스가 사라져 terminal을 확보하지 못했다. 저장 상태 조회도 `thread not loaded`였으므로 `external_unknown`으로 보존했으며 나머지 7건은 NOT_RUN이다. 이는 이전 6차의 900초 timeout과 다른 운영 중단이다. 상세는 [7차 부분 실행 기준선](inspection-v2r7-partial-baseline.md)에 있다.
 
 전체 qualification, Functional Alpha와 1.0 cutover는 아직 NO-GO다. 최신 의미 계약은 7차로 유지하며 운영 복구 보완은 [저장형 진단 실행 준비](inspection-durable-runtime.md)에 분리한다. 새 static 11, qualification 13과 실제 Goal 완료는 아직 증명하지 않았다.
+
+저장형 운영 보완은 `a3d801f`에 커밋·push했고 새 고정 작업본 `D:\codex\fm-inspection-v2r8`에서 preflight·673개 포함 Gate 5/5·prepare를 완료했다. lock은 `sha256:e2d78fe754f67361d1457c285d1a88b40355783aa03d40921c64cc5d21db8fef`이며 11사례 호출은 아직 0회다. 별도 1회 운영 probe는 App Server 종료 후 같은 thread·turn·최종 응답을 재개 없이 읽는 데 성공했다. 기존 combined unknown을 보존한 새 전수 실행의 사용자 결정 이후 준비된 숨김 프로세스 시작 스크립트를 실행한다.
