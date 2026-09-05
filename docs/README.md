@@ -17,6 +17,8 @@
 - [Finding evidence 참조 결속 보정](r-s06-finding-evidence-binding-diagnostics-handoff.md): link별 조건부 원본 ref 결속, R29 원문 거부·진단·receipt 회귀와 R30 fresh 제한 검증 조건
 - [R-S06-30 Sol/xhigh 제한 실제 검증 결과](r-s06-30-sol-xhigh-actual-validation-handoff.md): 새 Gate 5/5, 사례 PASS 1·FAIL 1·NOT_RUN 11, 1.0 NO-GO
 
+- [R-S06-30 scope→finding link 참조 결속 보정](r-s06-30-scope-finding-binding-handoff.md): citation ID 포함관계 설명·정렬된 진단·R30 원본 회귀와 결정적 검증
+
 ## 동결 기준선과 회귀 입력
 
 - [R3.1 최종 동결 기준선](r31-frozen-baseline.md): campaign 10의 150/150 최종 `FAIL`, telemetry와 새 엔진으로 이관한 실패 유형

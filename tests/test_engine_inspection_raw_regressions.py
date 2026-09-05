@@ -43,11 +43,13 @@ RAW_S06_27_PATH = ROOT / "r-s06-27-clean-scope-binding-failure.json"
 RAW_S06_27 = json.loads(RAW_S06_27_PATH.read_text(encoding="utf-8"))
 RAW_S06_29_PATH = ROOT / "r-s06-29-bad-finding-evidence-ref-failure.json"
 RAW_S06_29 = json.loads(RAW_S06_29_PATH.read_text(encoding="utf-8"))
+RAW_S06_30_PATH = ROOT / "r-s06-30-bad-scope-finding-ref-failure.json"
+RAW_S06_30 = json.loads(RAW_S06_30_PATH.read_text(encoding="utf-8"))
 
 
-def _r29_context():
+def _finding_raw_context(raw_fixture):
     data = deepcopy(FILES["input-bad-plan.json"])
-    for selector, value in RAW_S06_29["plan_context_overrides"].items():
+    for selector, value in raw_fixture["plan_context_overrides"].items():
         target = data
         parts = selector.lstrip("/").split("/")
         for part in parts[:-1]:
@@ -56,7 +58,7 @@ def _r29_context():
     data["definition_digest"] = sha256_digest(data["definition"])
     plan = PlanContractRevision.model_validate(data)
     _, goal, project_map, _ = _context()
-    binding = RAW_S06_29["project_file_binding"]
+    binding = raw_fixture["project_file_binding"]
     # 원본 파일과 동일 bytes인 기존 fixture에 경로만 연결한다.
     project_map = project_map.model_copy(update={"entries": tuple(
         entry.model_copy(update={"path": str(ROOT.parents[2] / binding["fixture_path"])})
@@ -67,7 +69,11 @@ def _r29_context():
 
 
 def _validate_r29(payload):
-    plan, goal, project_map, evidence_catalog = _r29_context()
+    return _validate_finding_raw(payload, RAW_S06_29)
+
+
+def _validate_finding_raw(payload, raw_fixture):
+    plan, goal, project_map, evidence_catalog = _finding_raw_context(raw_fixture)
     envelope = PlanReviewEnvelope.model_validate(payload)
     validate_plan_inspection(envelope.inspection, plan=plan, goal=goal, project_map=project_map,
                              evidence_catalog=evidence_catalog, findings=envelope.review.findings)
@@ -300,6 +306,66 @@ def _validate(payload: dict, *, goal_data: dict | None = None):
 
 
 class RawPlanInspectionRegressionTests(unittest.TestCase):
+    def test_r30_raw_provenance_and_first_scope_diagnostic_are_immutable(self):
+        self.assertEqual("sha256:c2be1b55de8ac1824eb6b167a04a2df1f1eb4e064dbd66038132e956d13d6fe6",
+                         sha256_bytes(RAW_S06_30_PATH.read_bytes()))
+        provenance = RAW_S06_30["provenance"]
+        self.assertEqual("sha256:71a94ec76ceda686e7aca10e4d8f1374a3d896cf714e482be8f3fd572e1414dc",
+                         provenance["source_final_response_utf8_digest"])
+        self.assertEqual(provenance["source_final_response_utf8_digest"],
+                         sha256_bytes(RAW_S06_30["raw_final_response"].encode("utf-8")))
+        self.assertEqual(provenance["base_fixture_bytes_digest"],
+                         sha256_bytes((ROOT / "plan-inspection-regressions.json").read_bytes()))
+        self.assertEqual(provenance["reference_bytes_digest"],
+                         sha256_bytes((ROOT / "plan-inspection-reference.md").read_bytes()))
+        binding = RAW_S06_30["project_file_binding"]
+        self.assertEqual(binding["content_digest"],
+                         sha256_bytes((ROOT.parents[2] / binding["fixture_path"]).read_bytes()))
+        self.assertTrue((ROOT / provenance["handoff"]).is_file())
+        plan, goal, _, _ = _finding_raw_context(RAW_S06_30)
+        self.assertEqual(provenance["source_plan_canonical_digest"], sha256_digest(plan.model_dump(mode="json")))
+        self.assertEqual(provenance["source_goal_definition_canonical_digest"],
+                         sha256_digest(goal.definition.model_dump(mode="json")))
+        self.assertEqual(RAW_S06_29["plan_context_overrides"], RAW_S06_30["plan_context_overrides"])
+        for reverse in (False, True):
+            with self.subTest(reverse=reverse):
+                payload = json.loads(RAW_S06_30["raw_final_response"])
+                if reverse:
+                    for row in payload["inspection"]["validation_scope_rows"]:
+                        row["basis_refs"].reverse()
+                    payload["inspection"]["finding_links"][0]["basis_refs"].reverse()
+                before = deepcopy(payload)
+                with self.assertRaises(PlanInspectionError) as failure:
+                    _validate_finding_raw(payload, RAW_S06_30)
+                self.assertEqual(RAW_S06_30["expected_error"], str(failure.exception))
+                self.assertEqual(before, payload)
+
+    def test_r30_values_only_copy_rejects_calls_and_two_citations_accept_structure_only(self):
+        payload = json.loads(RAW_S06_30["raw_final_response"])
+        original = deepcopy(payload)
+        link = payload["inspection"]["finding_links"][0]
+        link["basis_refs"].append("v_task_behavior_values")
+        before = deepcopy(payload)
+        with self.assertRaises(PlanInspectionError) as failure:
+            _validate_finding_raw(payload, RAW_S06_30)
+        self.assertEqual(
+            "대조표 검사 scope finding의 직접 근거 누락: finding_code=VAL_TASK_ORACLE_SCOPE_OVERCLAIM, "
+            "validation_id=val_task_add_behavior_contract, scope_id=scope_task_behavior_calls, "
+            "phase='task', claim_ref=v_task_behavior_calls, "
+            "required_citation_ids=['p_goal_contract', 'p_goal_oracle', 'p_task_oracle', 'v_task_behavior', 'v_task_behavior_calls'], "
+            "actual_citation_ids=['p_goal_contract', 'p_goal_oracle', 'p_goal_pairs', 'p_task_oracle', 'v_task_behavior', 'v_task_behavior_values'], "
+            "missing_citation_ids=['v_task_behavior_calls']", str(failure.exception),
+        )
+        self.assertEqual(before, payload)
+        link["basis_refs"].append("v_task_behavior_calls")
+        before = deepcopy(payload)
+        envelope = _validate_finding_raw(payload, RAW_S06_30)
+        self.assertEqual(before, payload)
+        self.assertEqual(original["review"], envelope.review.model_dump(mode="json"))
+        link["basis_refs"].remove("v_task_behavior_values")
+        link["basis_refs"].remove("v_task_behavior_calls")
+        self.assertEqual(original, payload)
+
     def test_r29_original_finding_evidence_failure_and_exact_diagnostic_are_immutable(self):
         self.assertEqual("sha256:d05c0acfb66d4ce0664e2d3847fdd7276419e19807013d8aadd418f3dd7d66b6",
                          sha256_bytes(RAW_S06_29_PATH.read_bytes()))
@@ -314,7 +380,7 @@ class RawPlanInspectionRegressionTests(unittest.TestCase):
         self.assertEqual(binding["content_digest"],
                          sha256_bytes((ROOT.parents[2] / binding["fixture_path"]).read_bytes()))
         self.assertTrue((ROOT / provenance["handoff"]).is_file())
-        plan, goal, _, _ = _r29_context()
+        plan, goal, _, _ = _finding_raw_context(RAW_S06_29)
         self.assertEqual(provenance["source_plan_canonical_digest"], sha256_digest(plan.model_dump(mode="json")))
         self.assertEqual(provenance["source_goal_definition_canonical_digest"],
                          sha256_digest(goal.definition.model_dump(mode="json")))

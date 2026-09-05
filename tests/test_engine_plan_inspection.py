@@ -215,6 +215,99 @@ class PlanInspectionTests(unittest.TestCase):
                 self.assertEqual(1, len(failure.exception.receipt.turn_ids))
                 self.assertEqual(before, payload)
 
+    def test_scope_finding_requires_nonclaim_basis_and_exact_citation_ids_in_failed_receipt(self):
+        from flowmarshal.engine.roles import StructuredRoleError
+
+        for case in ("nonclaim", "same_source_selector_id", "whole_statement"):
+            with self.subTest(case=case):
+                payload = submission("bad")
+                inspection = payload["inspection"]
+                scope = next(row for row in inspection["validation_scope_rows"] if row["assessment"] == "contradicted")
+                link = inspection["finding_links"][0]
+                if case == "nonclaim":
+                    missing = next(ref for ref in scope["basis_refs"] if ref != scope["claim_ref"])
+                    link["basis_refs"].remove(missing)
+                else:
+                    claim = next(item for item in inspection["citations"] if item["citation_id"] == scope["claim_ref"])
+                    alias = dict(claim, citation_id="alternative_claim")
+                    if case == "same_source_selector_id":
+                        missing = scope["claim_ref"]
+                        link["basis_refs"].remove(missing)
+                        link["basis_refs"].append(alias["citation_id"])
+                    else:
+                        alias["quote"] = claim["quote"][:12]
+                        missing = alias["citation_id"]
+                        scope["claim_ref"] = missing
+                        scope["basis_refs"].append(missing)
+                    inspection["citations"].append(alias)
+                expected = (
+                    f"대조표 검사 scope finding의 직접 근거 누락: finding_code={link['finding_code']}, "
+                    f"validation_id={scope['validation_id']}, scope_id={scope['scope_id']}, "
+                    f"phase={scope['phase']!r}, claim_ref={scope['claim_ref']}, "
+                    f"required_citation_ids={sorted(scope['basis_refs'])}, "
+                    f"actual_citation_ids={sorted(link['basis_refs'])}, missing_citation_ids={[missing]}"
+                )
+                before = deepcopy(payload)
+                with self.assertRaises(StructuredRoleError) as failure:
+                    self._review_with_local_receipt(payload)
+                receipt = failure.exception.receipt
+                self.assertEqual("schema_failed", receipt.status)
+                self.assertEqual(expected, receipt.error_summary)
+                self.assertEqual(1, len(receipt.turn_ids))
+                self.assertEqual(0, receipt.schema_recovery_attempts)
+                self.assertIsNone(receipt.output_digest)
+                self.assertEqual(before, payload)
+
+    def test_each_scope_code_requires_all_its_scopes_without_unrelated_or_supported_basis(self):
+        for assessment, kind in (("contradicted", "validation_scope"), ("unresolved", "insufficient_evidence")):
+            with self.subTest(assessment=assessment):
+                payload = submission("bad")
+                inspection = payload["inspection"]
+                scope = next(row for row in inspection["validation_scope_rows"] if row["assessment"] == "contradicted")
+                link = inspection["finding_links"][0]
+                finding = payload["review"]["findings"][0]
+                claim = next(item for item in inspection["citations"] if item["citation_id"] == scope["claim_ref"])
+                inspection["citations"].extend([
+                    dict(claim, citation_id="second_claim", quote=claim["quote"][:12]),
+                    dict(claim, citation_id="supported_claim", quote=claim["quote"][-12:]),
+                ])
+                scope.update(assessment=assessment, finding_codes=[link["finding_code"], "SECOND_SCOPE_CODE"])
+                second = deepcopy(scope)
+                second.update(scope_id="second_scope", claim_ref="second_claim",
+                              basis_refs=[*scope["basis_refs"], "second_claim"])
+                supported = deepcopy(scope)
+                supported.update(scope_id="supported_sibling", claim_ref="supported_claim", assessment="supported",
+                                 finding_codes=[], basis_refs=[*scope["basis_refs"], "supported_claim"])
+                inspection["validation_scope_rows"].extend([second, supported])
+                link.update(defect_kind=kind, basis_refs=list(second["basis_refs"]))
+                other_link = deepcopy(link)
+                other_link["finding_code"] = "SECOND_SCOPE_CODE"
+                inspection["finding_links"].extend([
+                    other_link, dict(link, finding_code="UNRELATED", defect_kind="other", basis_refs=[claim["citation_id"]]),
+                ])
+                payload["review"]["findings"].extend([
+                    dict(finding, finding_code="SECOND_SCOPE_CODE"),
+                    dict(finding, finding_code="UNRELATED", evidence_refs=["artifact:plan_contract"]),
+                ])
+                before = deepcopy(payload)
+                validate("bad", payload)
+                self.assertEqual(before, payload)
+                for target in (link, other_link):
+                    target["basis_refs"].remove("second_claim")
+                    with self.assertRaises(PlanInspectionError) as failure:
+                        validate("bad", payload)
+                    self.assertIn(f"finding_code={target['finding_code']},", str(failure.exception))
+                    self.assertIn("scope_id=second_scope,", str(failure.exception))
+                    self.assertIn("missing_citation_ids=['second_claim']", str(failure.exception))
+                    target["basis_refs"].append("second_claim")
+                link["defect_kind"] = "insufficient_evidence" if kind == "validation_scope" else "validation_scope"
+                with self.assertRaisesRegex(PlanInspectionError, "finding 결함 종류 불일치"):
+                    validate("bad", payload)
+                link["defect_kind"] = kind
+                supported["finding_codes"] = [link["finding_code"]]
+                with self.assertRaisesRegex(PlanInspectionError, "정상 검사 scope와 finding 모순"):
+                    validate("bad", payload)
+
     def test_scope_binds_one_complete_same_phase_mechanism_without_union_or_intersection_shortcuts(self):
         payload = submission("clean")
         inspection = payload["inspection"]
@@ -365,6 +458,13 @@ class PlanInspectionTests(unittest.TestCase):
                     reloaded = RoleCallRequest.model_validate_json(path.read_text(encoding="utf-8"))
                     original = strict_json_output_schema(request.output_schema)
                     restored = strict_json_output_schema(reloaded.output_schema)
+                    for schema in (original, restored):
+                        for name, field in (("ValidationScopeInspection", "finding_codes"),
+                                            ("InspectionFindingLink", "basis_refs")):
+                            description = schema["$defs"][name]["properties"][field]["description"]
+                            for phrase in ("전체 basis_refs", "claim_ref", "복수", "다른 citation ID", "supported sibling"):
+                                self.assertIn(phrase, description)
+                    self.assertIn("scope→link→finding evidence→catalog", request.instructions)
                     self.assertEqual(sha256_digest(original), sha256_digest(restored))
                     self.assertEqual(request.request_digest, reloaded.request_digest)
                     assert_order(original, restored)

@@ -58,7 +58,7 @@ class ValidationScopeInspection(EngineModel):
     phase: str | None = Field(description="해당 절차가 실제 실행되는 phase/mode. 원문에 없으면 null.")
     basis_refs: tuple[str, ...] = Field(min_length=1, description="자신의 claim_ref와 같은 validation·같은 phase에서 선택한 mechanism 하나의 전체 basis_refs를 반드시 포함한다. 여러 mechanism 전체의 합집합은 요구하지 않는다. scope에서 실제 범위 판단에 추가로 사용한 project citation도 포함하고 같은 validation의 모든 AC 행에 재사용한다. 근거 반복은 추적 결속이며 다른 부분의 검사 능력·판정을 이 scope에 부여하지 않는다.")
     assessment: Literal["supported", "contradicted", "unresolved"] = Field(description="해당 부분 주장만 지지됨/직접 모순/근거 부족으로 판정한다. 한 부분의 결과를 같은 validation의 다른 부분이나 AC 연결 판정으로 전파하지 않는다.")
-    finding_codes: tuple[str, ...] = Field(description="supported이면 빈 배열. contradicted는 validation_scope, unresolved는 insufficient_evidence finding에 연결한다.")
+    finding_codes: tuple[str, ...] = Field(description="supported이면 빈 배열. contradicted는 validation_scope, unresolved는 insufficient_evidence finding에 연결한다. 각 code의 finding link는 자신의 claim_ref를 포함한 이 scope의 전체 basis_refs를 포함해야 한다. 같은 code의 복수 non-supported scope는 전체 근거를 합쳐 해당 link에 포함하고, 한 scope의 복수 code는 각 link에 전체 근거를 포함한다. 전체 validation 문장·동일 source/selector의 다른 citation ID로 대체하지 않으며 무관한 finding이나 supported sibling의 근거는 강제하지 않는다.")
 
 
 class InspectionFindingLink(EngineModel):
@@ -67,7 +67,7 @@ class InspectionFindingLink(EngineModel):
     criterion_ids: tuple[str, ...]
     validation_ids: tuple[str, ...]
     task_refs: tuple[str, ...]
-    basis_refs: tuple[str, ...] = Field(min_length=1, description="이 finding link가 실제로 인용한 citation ID. 각 ID의 source_ref를 원본 evidence ref로 환산한다: source:goal과 Reviewer의 artifact:plan_contract는 그대로, 검증된 project:<entry_id>는 source:project_map이다. 이 link의 환산 집합 ⊆ 같은 finding_code의 finding.evidence_refs ⊆ 실제 evidence_catalog key 집합이어야 한다. 다른 link나 대조표 전체의 Goal 인용을 일괄 포함하지 않으며 유효한 추가 catalog ref는 허용한다. citation ID·project:<entry_id>·source:plan을 직접 evidence_refs로 쓰지 않는다.")
+    basis_refs: tuple[str, ...] = Field(min_length=1, description="이 finding link가 실제로 인용한 citation ID. 같은 finding_code에 연결된 각 non-supported scope의 전체 basis_refs(자신의 claim_ref 포함)를 중복 없이 포함한다. 복수 scope이면 모두 합치고 한 scope가 복수 code에 연결되면 각 link가 전체 근거를 포함한다. 전체 validation 문장·동일 source/selector의 다른 citation ID·다른 finding의 인용으로 대체하지 않는다. 무관한 finding이나 supported sibling의 근거는 강제하지 않는다. 각 ID의 source_ref를 원본 evidence ref로 환산한다: source:goal과 Reviewer의 artifact:plan_contract는 그대로, 검증된 project:<entry_id>는 source:project_map이다. 이 link의 환산 집합 ⊆ 같은 finding_code의 finding.evidence_refs ⊆ 실제 evidence_catalog key 집합이어야 한다. 다른 link나 대조표 전체의 Goal 인용을 일괄 포함하지 않으며 유효한 추가 catalog ref는 허용한다. citation ID·project:<entry_id>·source:plan을 직접 evidence_refs로 쓰지 않는다.")
 
 
 class PlanInspection(EngineModel):
@@ -89,6 +89,13 @@ PLAN_INSPECTION_SHARED_INSTRUCTIONS = (
     "scope_ids=[]를 유지한다. 참조는 목록 안에서 중복 없이 재사용한다. 근거 반복은 추적 결속일 "
     "뿐 다른 부분의 검사 능력·판정을 scope에 부여하지 않는다. adapter가 누락 참조·인용·boolean을 "
     "자동 보정한다고 가정하지 않는다. "
+    "제출 직전 scope→link→finding evidence→catalog 순서로 대조한다. 각 non-supported scope의 "
+    "finding_codes에 있는 각 code에 대해, 자신의 claim_ref를 포함한 scope의 전체 basis_refs가 "
+    "같은 finding_code의 link.basis_refs에 포함되어야 한다. 같은 code의 복수 scope는 전체 근거를 "
+    "중복 없이 합치고, 한 scope의 복수 code는 각 link에 전체 근거를 포함한다. 전체 validation "
+    "문장·동일 source/selector의 다른 citation ID·다른 finding의 인용으로 필요한 citation ID를 "
+    "대체하지 않는다. 무관한 finding이나 supported sibling의 근거는 강제하지 않는다. supported의 "
+    "finding_codes는 빈 배열이며 contradicted는 validation_scope, unresolved는 insufficient_evidence에 연결한다. "
     "Reviewer는 제출 직전에 각 finding_link의 basis_refs에 있는 citation ID를 citations에서 찾아 "
     "source_ref를 원본 evidence ref로 환산한다. source:goal과 artifact:plan_contract는 그대로, "
     "검증된 project:<entry_id>는 source:project_map으로 환산한다. link별 환산 집합이 같은 "
@@ -424,8 +431,14 @@ def validate_plan_inspection(
                   kind="validation_scope" if row.assessment == "contradicted" else "insufficient_evidence",
                   validation=row.validation_id, task=validation["task_ref"])
             for code in row.finding_codes:
+                required = set(row.basis_refs)
+                actual = set(links[code].basis_refs)
                 _require(set(row.basis_refs) <= set(links[code].basis_refs),
-                         "대조표 검사 scope finding의 직접 근거 누락")
+                         f"대조표 검사 scope finding의 직접 근거 누락: finding_code={code}, "
+                         f"validation_id={row.validation_id}, scope_id={row.scope_id}, "
+                         f"phase={row.phase!r}, claim_ref={row.claim_ref}, "
+                         f"required_citation_ids={sorted(required)}, actual_citation_ids={sorted(actual)}, "
+                         f"missing_citation_ids={sorted(required - actual)}")
         else:
             _require(not row.finding_codes, "대조표 정상 검사 scope와 finding 모순")
 
