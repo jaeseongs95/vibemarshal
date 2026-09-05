@@ -113,7 +113,7 @@ class InspectionSummaryTests(unittest.TestCase):
 
             self.assertEqual("FAIL", summary["status"])
             self.assertEqual("StructuredRoleError: 원래 역할 실패", summary["error"])
-            self.assertEqual({"success": 0, "failure": 1, "external_unknown": 0, "incomplete": 0},
+            self.assertEqual({"success": 0, "failure": 1, "provider_terminal_failed": 0, "external_unknown": 0, "incomplete": 0},
                              summary["outcomes"])
             self.assertEqual("StructuredRoleError", summary["call_artifacts"][0]["role_failure"]["error_type"])
             self.assertEqual("대조표 계약 오류",
@@ -185,7 +185,7 @@ class InspectionSummaryTests(unittest.TestCase):
             self.assertEqual(2, len(summary["receipts"]))
             self.assertIn("UNATTRIBUTED_RECEIPT", [item["code"] for item in summary["diagnostic_errors"]])
             self.assertEqual(260, summary["usage"]["total_tokens"])
-            self.assertEqual({"success": 1, "failure": 1, "external_unknown": 0, "incomplete": 0},
+            self.assertEqual({"success": 1, "failure": 1, "provider_terminal_failed": 0, "external_unknown": 0, "incomplete": 0},
                              summary["outcomes"])
 
         with tempfile.TemporaryDirectory() as temp:

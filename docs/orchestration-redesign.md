@@ -378,6 +378,16 @@ report progress|final
 
 각 evaluation cell은 `(fixture digest, order seed)`에 결속하고 원시 structured assessment와 Runner receipt를 저장한다. fixture, prompt, schema, threshold, taxonomy 또는 model lock digest가 다르면 checkpoint를 재사용할 수 없다. 사용량 한도 중단은 완료 cell이 아니다.
 
+### 11.1 Development-diagnostic 단계 A
+
+단계 A의 development-diagnostic 실행 모드는 사전에 고정한 서로 독립적인 static 11사례를 관측한다. 모델 호출은 사례당 하나로 하고 전체 최대 11회이며 schema recovery는 0회다. 이는 기존 Reviewer v1의 행 내부 검사와 첫 실패 중단을 바꾸지 않는다. qualification 13의 기존 첫 실패 정책과 `expansion → 독립 생성 검토 → expanded-review` 경계도 유지한다.
+
+정상 완료 사례와, receipt·terminal·lock 귀속이 완료된 model/schema/semantic FAIL만 다음 독립 사례로 진행할 수 있다. 환경, 계약, 입력 stale 또는 외부 효과 불명은 즉시 전체 실행을 중단한다. 관측한 실패는 FAIL로 그대로 보존하고 호출하지 못한 나머지 사례는 NOT_RUN으로 기록한다. 이 흐름은 실패를 재시도하거나 사례 사이에서 의미 판단을 보정하는 경로가 아니다.
+
+공통 preflight는 실험용 detached worktree의 HEAD, source manifest, clean tracked files, 전용 Python identity와 실제 `flowmarshal` import origin을 결속한다. fixture whitelist package와 relocation proof, 명시한 Codex executable, roles와 instruction의 actual source, model lock도 같은 실행 입력으로 고정한다. origin/main과 다른 checkout의 HEAD는 시작 provenance로만 기록하며 실행 중 비교하지 않는다.
+
+단계 A는 payload 의미나 oracle을 수정하지 않고 과거 FAIL을 보정하지 않는다. 11사례가 모두 관측되어도 이는 development-diagnostic 완료일 뿐 기존 qualification 또는 cutover PASS를 의미하지 않는다.
+
 기능 Gate와 함께 같은 입력의 R3.1 baseline 대비 다음 token/latency Gate를 확인한다.
 
 - multi-path planning token 중앙값 30% 이상 감소

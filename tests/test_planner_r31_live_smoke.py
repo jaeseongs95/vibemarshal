@@ -47,7 +47,7 @@ class PlannerR31LiveSmokeTests(unittest.TestCase):
         self.assertTrue(
             all(item.required_for_all_work_items for item in request.context_sources)
         )
-        self.assertTrue(request.project_root.endswith("flowmarshal"))
+        self.assertEqual(Path(__file__).resolve().parents[1], Path(request.project_root).resolve())
 
     def test_role_configuration_requires_exact_runtime_roles(self) -> None:
         configuration = LiveRoleConfiguration(

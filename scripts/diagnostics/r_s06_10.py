@@ -21,7 +21,7 @@ from flowmarshal.engine.planner_roles import PlanExpanderAdapter, PlanReviewerAd
 from flowmarshal.engine.planning import plan_gate, risk_route
 from flowmarshal.engine.qualification import PlanningScenarioCatalog, ScopeQualificationReport, _model_lock, _planning_contract, source_manifest_digest, source_manifest_files
 from flowmarshal.engine.roles import (
-    CodexStructuredRoleRunner, RoleCallReceipt, RoleCallRequest, RoleCallResult,
+    CodexStructuredRoleRunner, RoleCallReceipt, RoleCallRequest, RoleCallResult, StructuredRoleError,
     strict_json_output_schema, verify_role_receipt,
 )
 from flowmarshal.engine.runtime import CodexAppServerRuntime
@@ -34,6 +34,8 @@ STATIC_CASES = ("clean", "bad", "wrong-goal", "combined", "boundary-clean", "mis
                 "stored-expanded", "semantic-explicit", "stored-multi-defect", "semantic-missing-link")
 CALL_ORDER = (*STATIC_CASES, "expansion", "expanded-review")
 MAXIMUM_CALLS = 13
+EXECUTION_MODES = ("qualification", "development-diagnostic")
+INSPECTION_PROVIDER_CONTRACT = "plan-inspection-v1"
 CAPTURE_PHASES = ("prepare", "run", "review-generated")
 ROLE_CONFIGURATION_IDS = tuple(EngineRoleConfiguration.model_fields)
 ROLE_CONFIGURATION_INPUT_FORMAT = "flowmarshal-role-configuration-input-v1"
@@ -88,6 +90,43 @@ def preserved_files(run: Path | None = None):
 
 def copy_new(source: Path, destination: Path):
     write_new_bytes(destination, source.read_bytes())
+
+
+def execution_order(lock: dict[str, Any]) -> tuple[str, ...]:
+    """독립 진단은 static 사례만 실행하며 기존 qualification 순서는 보존한다."""
+    mode = lock.get("execution_mode", "qualification")
+    if mode not in EXECUTION_MODES:
+        raise RuntimeError("UNKNOWN_EXECUTION_MODE")
+    return STATIC_CASES if mode == "development-diagnostic" else CALL_ORDER
+
+
+def record_case_result(run: Path, name: str, *, status: str, failure_kind: str | None,
+                       semantic_evaluated: bool, error: str | None = None) -> None:
+    """후속 사례와 무관하게 현재 사례의 판정·평가 도달 여부를 한 번 보존한다."""
+    write_new(run / "case-results" / f"{name}.json", {
+        "case_id": name, "status": status, "failure_kind": failure_kind,
+        "semantic_evaluated": semantic_evaluated, "error": error, "observed_at": utc_now(),
+    })
+
+
+def completed_output_failure(run: Path, name: str, lock: dict[str, Any]) -> str | None:
+    """완결 schema 거부와 결속된 provider terminal 실패만 구분한다."""
+    collected = collect_call_artifacts(run)
+    number = execution_order(lock).index(name) + 1
+    calls = [call for call in collected["calls"] if call["capture"].startswith(f"{number:02d}-")]
+    if collected["issues"] or len(calls) != 1:
+        return None
+    call = calls[0]
+    if (call["outcome"] != "failure" or not call["common_binding"] or
+            call["common_binding"]["passed"] is not True):
+        return None
+    failure_kind = call.get("failure_kind")
+    if failure_kind not in {"model_output", "provider_terminal_failed"}:
+        return None
+    failed = read(run / "calls" / call["capture"] / "failed.json")
+    receipts = failed.get("receipts", [])
+    receipt_status = "schema_failed" if failure_kind == "model_output" else "failed"
+    return failure_kind if len(receipts) == 1 and receipts[0].get("status") == receipt_status else None
 
 
 def _strict_json_document(raw_bytes: bytes) -> Any:
@@ -232,21 +271,62 @@ def verify_role_request_binding(
         raise RuntimeError("ROLE_CONFIGURATION_REQUEST_FALLBACK_MISMATCH")
 
 
-def instruction_binding(run: Path) -> dict[str, Any]:
-    """직전 실제 주입 경로를 출발점으로 잠그고 새 thread의 실제 경로와 호출 전에 대조한다."""
-    receipt = OLD / "calls/01-compact_plan_reviewer/thread.receipt.json"
-    paths = read(receipt)["payload"]["instructionSources"]
+def instruction_binding(run: Path, *, observed_sources: list[str] | None = None,
+                        probe_receipt: Path | None = None) -> dict[str, Any]:
+    """실제 주입 경로와 본문을 잠근다. 기존 run의 진입 방식은 그대로 보존한다."""
+    receipt = probe_receipt or OLD / "calls/01-compact_plan_reviewer/thread.receipt.json"
+    paths = (read(receipt)["payload"]["instructionSources"] if observed_sources is None
+             else observed_sources)
+    if not isinstance(paths, list) or not paths or any(not isinstance(path, str) or not path for path in paths):
+        raise RuntimeError("ACTUAL_INSTRUCTION_SOURCES_UNAVAILABLE")
     sources = []
     for index, raw in enumerate(paths):
         path = Path(raw)
-        if path.resolve().is_relative_to((OLD / "workspace").resolve()):
+        if observed_sources is None and path.resolve().is_relative_to((OLD / "workspace").resolve()):
             path = run / "workspace" / path.relative_to(OLD / "workspace")
         body = path.read_bytes()
         snapshot = f"instruction-sources/{index:02d}-AGENTS.md"
         copy_new(path, run / snapshot)
         sources.append({"path": str(path.resolve()), "content_digest": sha256_bytes(body), "snapshot": snapshot})
     return {"sources": sources, "prior_receipt_digest": sha256_bytes(receipt.read_bytes()),
+            "source_observation": "current_ephemeral_thread_probe" if observed_sources is not None else "historical_thread",
             "verification": "현재 thread/start receipt의 instructionSources와 turn 전 정확한 경로·본문 digest를 대조한다."}
+
+
+def portable_preflight(run: Path, *, fixture_package: Path, codex_bin: Path,
+                       role_configuration: RoleConfigurationInput, execution_mode: str) -> dict[str, Any]:
+    """모델 호출·fixture 생성 전에 고정 checkout과 외부 입력 경로를 검사한다."""
+    from scripts.diagnostics.inspection_inputs import verify_fixture_package
+    from scripts.diagnostics.inspection_workspace import capture_workspace_binding
+    if execution_mode not in EXECUTION_MODES:
+        raise RuntimeError("UNKNOWN_EXECUTION_MODE")
+    if not fixture_package.is_absolute() or not codex_bin.is_absolute():
+        raise RuntimeError("PORTABLE_INPUT_PATH_MUST_BE_ABSOLUTE")
+    if role_configuration.selection_reason != "caller_provided_explicit_role_configuration":
+        raise RuntimeError("PORTABLE_ROLE_CONFIGURATION_MUST_BE_EXPLICIT")
+    executable = codex_bin.resolve(strict=True)
+    body = {
+        "format": "flowmarshal-inspection-preflight-v1", "execution_mode": execution_mode,
+        "inspection_provider_contract": INSPECTION_PROVIDER_CONTRACT,
+        "workspace_binding": capture_workspace_binding(ROOT),
+        "fixture_package_binding": verify_fixture_package(fixture_package),
+        "codex_bin": str(executable), "codex_bin_digest": sha256_bytes(executable.read_bytes()),
+        "role_configuration_input": role_configuration.binding,
+    }
+    write_new(run / "workspace-preflight.json", body | {"binding_digest": sha256_digest(body)})
+    return body
+
+
+def verify_portable_inputs(lock: dict[str, Any]) -> None:
+    """다른 checkout의 이동은 무시하고 이 실행에 결속한 입력만 재검사한다."""
+    from scripts.diagnostics.inspection_inputs import verify_fixture_package
+    from scripts.diagnostics.inspection_workspace import verify_workspace_binding
+    verify_workspace_binding(ROOT, lock["workspace_binding"])
+    package = lock["fixture_package_binding"]
+    if verify_fixture_package(Path(package["package"])) != package:
+        raise RuntimeError("FIXTURE_PACKAGE_BINDING_CHANGED")
+    if sha256_bytes(Path(lock["codex_bin"]).read_bytes()) != lock["codex_bin_digest"]:
+        raise RuntimeError("CODEX_EXECUTABLE_CHANGED")
 
 
 def verify_instruction_sources(run: Path, observed: list[str]) -> None:
@@ -263,7 +343,9 @@ def claim_turn(run: Path, capture: Path, intent: Any):
     """공급자 효과 전에 파일로 상한을 소비한다. 실패한 호출도 반환하지 않으며 재개로 우회할 수 없다."""
     if not capture.resolve().is_relative_to((run / "calls").resolve()):
         raise RuntimeError("진단 capture가 호출 경로 밖입니다.")
-    if len(list((run / "calls").glob("*/turn.intent.json"))) >= MAXIMUM_CALLS:
+    limit = (read(run / "preflight.json").get("maximum_provider_turns", MAXIMUM_CALLS)
+             if (run / "preflight.json").exists() else MAXIMUM_CALLS)
+    if len(list((run / "calls").glob("*/turn.intent.json"))) >= limit:
         raise RuntimeError("MAXIMUM_PROVIDER_CALLS_EXCEEDED")
     write_new(capture / "turn.intent.json", intent)
 
@@ -413,13 +495,17 @@ def verify_lock(run):
         raise RuntimeError("PREFLIGHT_LOCK_CHANGED")
     if source_manifest_digest(ROOT) != lock["source_manifest_digest"]:
         raise RuntimeError("SOURCE_LOCK_CHANGED")
+    if lock.get("inspection_provider_contract", "plan-inspection-v1") != INSPECTION_PROVIDER_CONTRACT:
+        raise RuntimeError("INSPECTION_PROVIDER_CONTRACT_CHANGED")
+    if "workspace_binding" in lock:
+        verify_portable_inputs(lock)
     roles = verify_role_configuration_artifacts(run, lock.get("role_configuration_input", {}))
     planning_binding = read(run / "planning-binding.json")
     if (planning_binding.get("role_configuration_input") != lock["role_configuration_input"] or
             planning_binding.get("role_configuration_digest") != roles.configuration_digest or
             lock.get("role_configuration_digest") != roles.configuration_digest):
         raise RuntimeError("ROLE_CONFIGURATION_PLANNING_BINDING_MISMATCH")
-    if preserved_files(run) != lock["original_files"]:
+    if "workspace_binding" not in lock and preserved_files(run) != lock["original_files"]:
         raise RuntimeError("PRESERVED_ORIGINALS_CHANGED")
     for name, expected in lock["locked_files"].items():
         if sha256_bytes((run / name).read_bytes()) != expected:
@@ -430,7 +516,8 @@ def verify_lock(run):
             raise RuntimeError("INSTRUCTION_CONTENT_CHANGED: " + item["path"])
     if sha256_bytes(Path(__file__).read_bytes()) != lock["harness_digest"]:
         raise RuntimeError("HARNESS_LOCK_CHANGED")
-    if lock["call_order"] != list(CALL_ORDER) or any(lock[key] != MAXIMUM_CALLS for key in
+    expected_order = execution_order(lock)
+    if lock["call_order"] != list(expected_order) or any(lock[key] != len(expected_order) for key in
             ("maximum_logical_calls", "maximum_provider_turns")) or lock["schema_recovery_attempts"] != 0:
         raise RuntimeError("CALL_BUDGET_LOCK_CHANGED")
     generated_lock_path = run / "generated-input-lock.json"
@@ -447,25 +534,54 @@ def verify_lock(run):
     return lock
 
 
-def prepare(run, role_configuration: RoleConfigurationInput | None = None):
+def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, execution_mode="qualification",
+            fixture_package: Path | None = None, codex_bin: Path | None = None):
+    if execution_mode not in EXECUTION_MODES:
+        raise RuntimeError("UNKNOWN_EXECUTION_MODE")
+    call_order = execution_order({"execution_mode": execution_mode})
     role_configuration = role_configuration or load_role_configuration_input()
     if (run / "preflight.json").exists() or (run / "calls").exists():
         raise RuntimeError("이미 잠그거나 실행한 진단은 반복하지 않습니다.")
+    incomplete = incomplete_provider_intents(run)
+    if incomplete:
+        raise RuntimeError("INCOMPLETE_PROVIDER_INTENT_EXISTS: " + ", ".join(map(str, incomplete)))
+    portable = fixture_package is not None
+    if portable != (codex_bin is not None):
+        raise RuntimeError("PORTABLE_PACKAGE_AND_EXECUTABLE_REQUIRED_TOGETHER")
+    isolation = None
+    if portable:
+        isolation = read(run / "workspace-preflight.json")
+        isolation_body = dict(isolation)
+        if isolation_body.pop("binding_digest") != sha256_digest(isolation_body):
+            raise RuntimeError("WORKSPACE_PREFLIGHT_CHANGED")
+        verify_portable_inputs(isolation)
+        if (isolation["execution_mode"] != execution_mode or
+                isolation["inspection_provider_contract"] != INSPECTION_PROVIDER_CONTRACT or
+                isolation["role_configuration_input"] != role_configuration.binding or
+                isolation["codex_bin"] != str(codex_bin.resolve(strict=True)) or
+                isolation["fixture_package_binding"]["package"] != str(fixture_package.resolve(strict=True))):
+            raise RuntimeError("WORKSPACE_PREFLIGHT_INPUT_CHANGED")
     report = ScopeQualificationReport.model_validate(read(run / "deterministic/qualification-report.json"))
     source = source_manifest_digest(ROOT)
     if not report.passed or read(run / "deterministic/evaluation-contract.json")["source_manifest_digest"] != source:
         raise RuntimeError("DETERMINISTIC_GATE_FAILED_OR_STALE")
     from scripts.diagnostics.r_s06_10_fixtures import build_revision, verify_reviewed_case
-    build_revision(OLD, run)
+    relocation = None
+    if portable:
+        from scripts.diagnostics.inspection_materialization import prepare_relocated_inputs
+        relocation = prepare_relocated_inputs(fixture_package, run)
+    else:
+        build_revision(OLD, run)
     review = read(run / "independent-fixture-review.json")
     if (review.get("review_complete") is not True or review.get("reviewed_cases") != list(STATIC_CASES) or
             review.get("expectations_digest") != sha256_bytes((run / "expectations.json").read_bytes())):
         raise RuntimeError("INDEPENDENT_FIXTURE_REVIEW_MISSING_OR_STALE")
-    for name in files(OLD / "workspace"):
-        copy_new(OLD / "workspace" / name, run / "workspace" / name)
+    if not portable:
+        for name in files(OLD / "workspace"):
+            copy_new(OLD / "workspace" / name, run / "workspace" / name)
     write_new_bytes(run / "roles.json", role_configuration.raw_bytes)
     roles = role_configuration.roles
-    old_lock = read(S05 / "input-lock.json")
+    old_lock = isolation if portable else read(S05 / "input-lock.json")
     goal = GoalContractRevision.model_validate(read(run / "input-goal.json"))
     state = StateSnapshot.model_validate(read(run / "input-state.json"))
     project_map = ProjectMapRevision.model_validate(read(run / "input-project-map.json"))
@@ -488,7 +604,20 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None):
         if runtime.executable_digest != old_lock["codex_bin_digest"]:
             raise RuntimeError("MODEL_OR_EXECUTABLE_LOCK_CHANGED")
         operational = roles.operational_binding(inventory)
-        for name in CALL_ORDER[:-1]:
+        if portable:
+            # 모델 turn을 시작하지 않는 새 ephemeral thread에서 실제 주입 경로만 관측한다.
+            probe_arguments = {"cwd": run / "workspace", "title": "검사 입력 지침 관측",
+                               "model": roles.general_reviewer.model, "developer_instructions": "",
+                               "ephemeral": True}
+            write_new(runtime.capture / "instructions-probe.intent.json", probe_arguments)
+            probe = CodexAppServerRuntime.create_thread(runtime, **probe_arguments)
+            probe_path = runtime.capture / "instructions-probe.receipt.json"
+            write_new(probe_path, probe)
+            if probe.payload.get("thread", {}).get("turns") != []:
+                raise RuntimeError("INSTRUCTION_PROBE_REQUIRES_EMPTY_THREAD")
+            write_new(run / "instruction-binding.json", instruction_binding(
+                run, observed_sources=probe.payload.get("instructionSources", []), probe_receipt=probe_path))
+        for name in (call_order if execution_mode == "development-diagnostic" else call_order[:-1]):
             request = capture_request(name, run, roles, inventory)
             verify_role_request_binding(request, roles, inventory)
             write_new(run / "requests" / f"{name}.json", request)
@@ -525,7 +654,8 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None):
                 "Worker 응답 제출 뒤 Validator 검사 순서, Skeleton 기여 집합, 독립 Goal Test와 ready-time 명령 경계를 보존한다.",
                 "생성된 AC×validation 전체 관계를 원문과 독립 대조한 새 표를 기록하고 생성 입력·등록 근거 digest에 결속한다.",
             ]})
-        write_new(run / "instruction-binding.json", instruction_binding(run))
+        if not portable:
+            write_new(run / "instruction-binding.json", instruction_binding(run))
         source_files = source_manifest_files(ROOT)
         for name in source_files:
             copy_new(ROOT / name, run / "executed-source" / name)
@@ -533,21 +663,30 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None):
         verify_role_configuration_artifacts(run, role_configuration.binding)
         locked = locked_input_files(run)
         body = {"session": "R-S06-19", "source_manifest_digest": source, "locked_files": locked,
-                "harness_digest": sha256_bytes(Path(__file__).read_bytes()), "original_files": preserved_files(run),
+                "harness_digest": sha256_bytes(Path(__file__).read_bytes()),
+                "original_files": {} if portable else preserved_files(run),
                 "base_head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
                 "policy": policy, "model_lock_format": LOCK_FORMAT, "operational_binding": operational,
-                "historical_model_lock_digest": old_lock["model_lock_digest"],
+                "historical_model_lock_digest": None if portable else old_lock["model_lock_digest"],
                 "inventory_digest": inventory.inventory_digest, "model_lock_digest": _model_lock(inventory, roles),
                 "codex_bin": old_lock["codex_bin"], "codex_bin_digest": runtime.executable_digest,
                 "role_configuration_digest": roles.configuration_digest,
-                "role_configuration_input": role_configuration.binding, "call_order": CALL_ORDER,
-                "maximum_logical_calls": MAXIMUM_CALLS, "maximum_provider_turns": MAXIMUM_CALLS, "schema_recovery_attempts": 0,
+                "role_configuration_input": role_configuration.binding, "execution_mode": execution_mode,
+                "inspection_provider_contract": INSPECTION_PROVIDER_CONTRACT,
+                "call_order": call_order,
+                "maximum_logical_calls": len(call_order), "maximum_provider_turns": len(call_order), "schema_recovery_attempts": 0,
                 "prompt_digest": contract.prompt_digest, "output_schema_digest": contract.output_schema_digest,
                 "deterministic_report_digest": report.report_digest, "observed_at": utc_now(),
                 "scope": "제한 진단. 전체 S06·qualification·Plan 활성화·Worker 실행·1.0 cutover는 수행하지 않는다."}
+        if portable:
+            body.update({"workspace_binding": isolation["workspace_binding"],
+                         "fixture_package_binding": isolation["fixture_package_binding"],
+                         "workspace_files": relocation["workspace_files"],
+                         "relocation_binding": relocation,
+                         "workspace_preflight_digest": isolation["binding_digest"]})
         body = json_value(body)
         write_new(run / "preflight.json", body | {"lock_digest": sha256_digest(body)})
-    print(json.dumps({"prepared": True, "maximum_calls": MAXIMUM_CALLS, "lock_digest": sha256_digest(body)}), flush=True)
+    print(json.dumps({"prepared": True, "maximum_calls": len(call_order), "lock_digest": sha256_digest(body)}), flush=True)
 
 
 class RecordedRunner:
@@ -579,7 +718,7 @@ class RecordedRunner:
                            read(self.run_root / "generated-review-template.json")["templates"][request.role]["output_schema"])
         if actual_schema != expected_schema:
             raise RuntimeError("ACTUAL_SCHEMA_BINDING_MISMATCH")
-        number = CALL_ORDER.index(self.name) + 1
+        number = execution_order(self.lock).index(self.name) + 1
         capture = self.run_root / "calls" / f"{number:02d}-{request.role}"
         capture.mkdir(parents=True, exist_ok=False)
         with self.runtime.call_capture(capture):
@@ -609,7 +748,11 @@ class RecordedRunner:
             return result
 
 
-def common_call_verification(capture: Path, receipt: dict[str, Any] | None) -> dict[str, Any]:
+def common_call_verification(
+        capture: Path, receipt: dict[str, Any] | None, *,
+        terminal_statuses: frozenset[str] | None = None,
+        receipt_statuses: frozenset[str] | None = None,
+) -> dict[str, Any]:
     """성공 payload와 무관한 request·provider 효과·receipt 결속을 확인한다."""
     request = RoleCallRequest.model_validate(read(capture / "request.json"))
     terminal_record = read(capture / "terminal.json")
@@ -640,6 +783,8 @@ def common_call_verification(capture: Path, receipt: dict[str, Any] | None) -> d
         )
     else:
         receipt_usage_valid = receipt_value.get("usage_available") is False and usage_total is None
+    accepted_terminal_statuses = (frozenset({"completed", "success", "succeeded"})
+                                  if terminal_statuses is None else terminal_statuses)
     checks = {
         "request_strict_artifact": strict_artifact == strict_json_output_schema(request.output_schema),
         "strict_artifact_turn_intent": strict_artifact == intent["output_schema"],
@@ -660,10 +805,12 @@ def common_call_verification(capture: Path, receipt: dict[str, Any] | None) -> d
                        receipt_value.get("thread_id") == intent["thread_id"] and
                        receipt_value.get("turn_ids") == [terminal.get("turn_id")],
         "terminal_completed": terminal_record.get("active") is False and
-                              terminal_record.get("terminal_status") in {"completed", "success", "succeeded"},
+                              terminal_record.get("terminal_status") in accepted_terminal_statuses,
         "receipt_terminal_usage": receipt_usage_valid,
         "model_observation": observation_valid,
     }
+    if receipt_statuses is not None:
+        checks["receipt_status"] = receipt_value.get("status") in receipt_statuses
     return {"passed": all(checks.values()), "checks": checks, "request_digest": request.request_digest,
             "receipt_digest": sha256_digest(receipt_value) if receipt_value else None}
 
@@ -851,10 +998,15 @@ def collect_call_artifacts(run: Path) -> dict[str, Any]:
             isinstance(terminal, dict) and terminal.get("active") is False and
             terminal.get("terminal_status") in {"completed", "success", "succeeded"}
         )
+        terminal_provider_failed = bool(
+            isinstance(terminal, dict) and terminal.get("active") is False and
+            terminal.get("terminal_status") in {"failed", "error", "systemError", "system_error", "interrupted"}
+        )
         failed = documents["failed.json"]
         result = documents["result.json"]
         output_binding: dict[str, Any]
         common_binding: dict[str, Any] | None = None
+        failure_kind: str | None = None
         has_malformed = any(state["parse_status"] == "malformed" for state in states.values())
         if (states["terminal.json"]["parse_status"] == "missing" and
                 (states["thread.intent.json"]["exists"] or states["turn.intent.json"]["exists"])):
@@ -865,17 +1017,37 @@ def collect_call_artifacts(run: Path) -> dict[str, Any]:
             outcome = "incomplete"
             output_binding = {"status": "NOT_EVALUATED", "passed": None,
                               "reason": "artifact가 malformed/partial이거나 receipt 귀속이 불완전합니다."}
-        elif failed is not None and result is None and attributed.get("status") != "succeeded" and terminal_complete:
+        elif (failed is not None and result is None and attributed.get("status") != "succeeded" and
+              (terminal_complete or terminal_provider_failed)):
             outcome = "failure"
             output_binding = {"status": "NOT_APPLICABLE", "passed": None,
                               "reason": "역할 실패에는 성공 전용 output payload 결속을 적용하지 않습니다."}
             try:
-                common_binding = common_call_verification(entry["path"], attributed)
+                if terminal_provider_failed:
+                    common_binding = common_call_verification(
+                        entry["path"], attributed,
+                        terminal_statuses=frozenset({"failed", "error", "systemError", "system_error", "interrupted"}),
+                        receipt_statuses=frozenset({"failed"}),
+                    )
+                else:
+                    common_binding = common_call_verification(entry["path"], attributed)
                 if not common_binding["passed"]:
                     _issue(issues, "COMMON_BINDING_FAILED", name, "binding",
                            "실패 artifact의 공통 request/provider/receipt 결속이 일치하지 않습니다.")
+                    if terminal_provider_failed:
+                        outcome = "external_unknown"
+                elif terminal_provider_failed:
+                    failure_kind = "provider_terminal_failed"
+                elif attributed.get("status") == "schema_failed":
+                    failure_kind = "model_output"
             except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
                 _issue(issues, "COMMON_BINDING_ERROR", name, "binding", f"{type(error).__name__}: {error}")
+                if terminal_provider_failed:
+                    outcome = "external_unknown"
+        elif failed is not None and result is None and attributed.get("status") != "succeeded":
+            outcome = "external_unknown"
+            output_binding = {"status": "NOT_EVALUATED", "passed": None,
+                              "reason": "실패 receipt에 대응하는 terminal이 active이거나 알려진 종료 상태가 아닙니다."}
         elif result is not None and attributed.get("status") == "succeeded" and terminal_complete:
             outcome = "success"
             try:
@@ -931,9 +1103,10 @@ def collect_call_artifacts(run: Path) -> dict[str, Any]:
             "receipt_error_summary": None if attributed is None else attributed.get("error_summary"),
         }
         records.append({"capture": name, "artifacts": states, "outcome": outcome,
-                        "receipt_call_id": None if attributed is None else attributed["call_id"],
-                        "common_binding": common_binding, "output_binding": output_binding,
-                        "role_failure": role_failure, "artifact_issue_count": 0})
+                         "receipt_call_id": None if attributed is None else attributed["call_id"],
+                         "common_binding": common_binding, "output_binding": output_binding,
+                         "role_failure": role_failure, "failure_kind": failure_kind,
+                         "artifact_issue_count": 0})
 
     for call_id, capture_names in owners.items():
         if len(set(capture_names)) > 1:
@@ -973,11 +1146,22 @@ def summarize(run, status, error=None):
     lock = read(run / "preflight.json")
     binding = read(run / "instruction-binding.json")
     collected = collect_call_artifacts(run)
+    portable = "workspace_binding" in lock
+    isolation_error = None
+    if portable:
+        try:
+            verify_portable_inputs(lock)
+        except Exception as exc:
+            isolation_error = f"{type(exc).__name__}: {exc}"
     checks = {"source_unchanged": source_manifest_digest(ROOT) == lock["source_manifest_digest"],
-              "preserved_originals": preserved_files(run) == lock["original_files"],
+              "preserved_originals": isolation_error is None if portable else preserved_files(run) == lock["original_files"],
               "instructions_unchanged": all(Path(item["path"]).is_file() and
                   sha256_bytes(Path(item["path"]).read_bytes()) == item["content_digest"] for item in binding["sources"]),
-              "workspace_unchanged": files(run / "workspace") == files(OLD / "workspace")}
+              "workspace_unchanged": ({Path(name).as_posix(): digest for name, digest in files(run / "workspace").items()}
+                                      == lock["workspace_files"] if portable
+                                      else files(run / "workspace") == files(OLD / "workspace"))}
+    if portable:
+        checks["isolated_inputs_unchanged"] = isolation_error is None
     for call in collected["calls"]:
         if call["common_binding"] is not None:
             checks[f"{call['capture']}_common_binding"] = call["common_binding"]["passed"]
@@ -1015,7 +1199,7 @@ def summarize(run, status, error=None):
     usage["unavailable_reason"] = None if usage_available else "모든 시작 turn의 완전한 terminal usage를 유일하게 귀속하지 못했습니다."
     recovery_count = sum(item["schema_recovery_attempts"] for item in receipts) if all_calls_have_receipt else None
     outcomes = {name: sum(call["outcome"] == name for call in collected["calls"])
-                for name in ("success", "failure", "external_unknown", "incomplete")}
+                for name in ("success", "failure", "provider_terminal_failed", "external_unknown", "incomplete")}
     budget = {"maximum_logical_calls": lock.get("maximum_logical_calls"),
               "maximum_provider_turns": lock.get("maximum_provider_turns"),
               "remaining_logical_calls": (lock["maximum_logical_calls"] - effect_counts["logical_calls"]
@@ -1024,8 +1208,21 @@ def summarize(run, status, error=None):
                                              if type(lock.get("maximum_provider_turns")) is int else None)}
     clean_artifacts = not collected["issues"] and outcomes["external_unknown"] == 0 and outcomes["incomplete"] == 0
     final_status = status if all(checks.values()) and clean_artifacts else "FAIL"
+    case_results = []
+    for name in execution_order(lock):
+        path = run / "case-results" / f"{name}.json"
+        case_results.append(read(path) if path.is_file() else {
+            "case_id": name, "status": "NOT_RUN", "failure_kind": None,
+            "semantic_evaluated": False, "error": error or "해당 단계의 완료 관측이 없습니다.",
+        })
+    if any(case["status"] == "FAIL" for case in case_results):
+        final_status = "FAIL"
     summary_path = run / ("generation-pending.json" if final_status == "GENERATION_REVIEW_REQUIRED" else "summary.json")
     summary = {"status": final_status, "error": error, "checks": checks,
+               "isolation_error": isolation_error,
+               "execution_mode": lock.get("execution_mode", "qualification"),
+               "case_results": case_results,
+               "collection_complete": all(case["status"] != "NOT_RUN" for case in case_results),
                "diagnostic_errors": collected["issues"], "call_artifacts": collected["calls"],
                "outcomes": outcomes, "effect_counts": effect_counts,
                "preflight_digest": lock["lock_digest"], "summary_input_digest": input_digest,
@@ -1057,6 +1254,9 @@ def verify_generation_pending(run: Path) -> None:
 
 def incomplete_provider_intents(run: Path) -> list[Path]:
     incomplete = []
+    for intent in sorted((run / "runtime-preflight").glob("*/instructions-probe.intent.json")):
+        if not intent.with_name("instructions-probe.receipt.json").exists():
+            incomplete.append(intent)
     for capture in sorted((run / "calls").glob("*")):
         if not capture.is_dir():
             continue
@@ -1079,6 +1279,9 @@ def execute(run, generated=False):
     if (run / "summary.json").exists():
         raise RuntimeError("완료·실패한 진단을 반복하지 않습니다.")
     lock = verify_lock(run)
+    diagnostic = lock.get("execution_mode", "qualification") == "development-diagnostic"
+    if generated and diagnostic:
+        raise RuntimeError("GENERATED_REVIEW_NOT_IN_STATIC_DIAGNOSTIC")
     # claim은 요약 예외 처리보다 앞에 둔다. 패자는 summary나 provider 효과를 만들 수 없다.
     claim_execution_phase(run, marker, lock["lock_digest"])
     status = "FAIL"
@@ -1121,16 +1324,28 @@ def execute(run, generated=False):
                       "expected_defects": [], "preflight_digest": lock["lock_digest"]})
             names = ("expanded-review",)
         else:
-            names = CALL_ORDER[:-1]
+            names = execution_order(lock) if diagnostic else execution_order(lock)[:-1]
         phase = "review-generated" if generated else "run"
         with CapturingRuntime(run=run, phase=phase, codex_bin=Path(lock["codex_bin"])) as runtime:
             runner = RecordedRunner(runtime, run, lock)
+            failed_cases = []
             for name in names:
                 runner.name = name
-                print(json.dumps({"starting_case": name, "maximum_calls": MAXIMUM_CALLS}), flush=True)
-                result = invoke(name, runner, run, roles, OperationalBinding.model_validate(lock["operational_binding"]).inventory)
+                print(json.dumps({"starting_case": name, "maximum_calls": len(execution_order(lock))}), flush=True)
+                try:
+                    result = invoke(name, runner, run, roles, OperationalBinding.model_validate(lock["operational_binding"]).inventory)
+                except StructuredRoleError as exc:
+                    failure_kind = completed_output_failure(run, name, lock)
+                    record_case_result(run, name, status="FAIL",
+                                       failure_kind=failure_kind or "external_unknown",
+                                       semantic_evaluated=False, error=f"{type(exc).__name__}: {exc}")
+                    if not diagnostic or failure_kind != "model_output":
+                        raise
+                    failed_cases.append(name)
+                    continue
                 if name == "expansion":
                     write_new(run / "expanded-plan.json", result)
+                    record_case_result(run, name, status="PASS", failure_kind=None, semantic_evaluated=False)
                     status = "GENERATION_REVIEW_REQUIRED"
                 else:
                     write_new(run / f"{name}-review.json", result)
@@ -1140,9 +1355,17 @@ def execute(run, generated=False):
                         envelope, case_expectation(run, name, request), case_id=name, payload=request.payload,
                     )
                     write_new(run / f"{name}-assessment.json", assessment)
+                    record_case_result(run, name, status="PASS" if assessment["passed"] else "FAIL",
+                                       failure_kind=None if assessment["passed"] else "semantic", semantic_evaluated=True)
                     if not assessment["passed"]:
+                        if diagnostic:
+                            failed_cases.append(name)
+                            continue
                         raise RuntimeError(f"SEMANTIC_ASSESSMENT_FAILED: {name}: {json.dumps(assessment, ensure_ascii=False)}")
-            if generated:
+            if diagnostic:
+                status = "FAIL" if failed_cases else "PASS"
+                error = "CASE_FAILURES: " + ", ".join(failed_cases) if failed_cases else None
+            elif generated:
                 status = "PASS"
     except Exception as exc:
         status, error = "FAIL", f"{type(exc).__name__}: {exc}"
@@ -1151,24 +1374,43 @@ def execute(run, generated=False):
 
 def parse_arguments(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("prepare", "run", "review-generated"))
+    parser.add_argument("mode", choices=("preflight", "prepare", "run", "review-generated"))
     parser.add_argument("--run-root", type=Path, required=True)
     parser.add_argument("--role-config", type=Path,
-                        help="prepare에만 사용할 절대 경로의 역할 설정 JSON. 생략하면 기존 S05 설정을 사용합니다.")
+                        help="preflight/prepare의 절대 역할 설정 경로. 기존 진단의 prepare에서만 S05 기본 설정 생략을 허용합니다.")
+    parser.add_argument("--execution-mode", choices=EXECUTION_MODES)
+    parser.add_argument("--fixture-package", type=Path)
+    parser.add_argument("--codex-bin", type=Path)
     arguments = parser.parse_args(argv)
-    if arguments.role_config is not None and arguments.mode != "prepare":
-        parser.error("--role-config는 prepare에서만 사용할 수 있습니다.")
+    preparation_options = (arguments.role_config, arguments.execution_mode, arguments.fixture_package, arguments.codex_bin)
+    if any(option is not None for option in preparation_options) and arguments.mode not in ("preflight", "prepare"):
+        parser.error("입력 설정은 preflight/prepare에서만 사용할 수 있습니다.")
+    if (arguments.fixture_package is None) != (arguments.codex_bin is None):
+        parser.error("--fixture-package와 --codex-bin을 함께 지정해야 합니다.")
+    if arguments.mode == "preflight" and (arguments.fixture_package is None or arguments.role_config is None):
+        parser.error("preflight에는 --fixture-package, --codex-bin, --role-config가 필요합니다.")
+    if arguments.fixture_package is not None and arguments.role_config is None:
+        parser.error("독립 package 실행에는 명시적 --role-config가 필요합니다.")
     return arguments
 
 
 if __name__ == "__main__":
     arguments = parse_arguments()
     destination = arguments.run_root.resolve()
-    if not destination.name.startswith(("r-s06-10-", "r-s06-12-", "r-s06-13-", "r-s06-14-", "r-s06-15-", "r-s06-17-", "r-s06-19-")) or destination.parent != OLD.parent:
+    if not destination.name.startswith(("inspection-", "r-s06-10-", "r-s06-12-", "r-s06-13-", "r-s06-14-", "r-s06-15-", "r-s06-17-", "r-s06-19-")) or destination.parent != OLD.parent:
         raise RuntimeError("새 R-S06 검사 진단 디렉터리만 허용합니다.")
-    if arguments.mode == "prepare":
+    if destination.name.startswith("inspection-") and arguments.mode in ("preflight", "prepare") and arguments.fixture_package is None:
+        raise RuntimeError("새 inspection 실행에는 고정 worktree와 독립 fixture package가 필요합니다.")
+    if arguments.mode == "preflight":
+        binding = portable_preflight(destination, fixture_package=arguments.fixture_package,
+            codex_bin=arguments.codex_bin, role_configuration=load_role_configuration_input(arguments.role_config),
+            execution_mode=arguments.execution_mode or "qualification")
+        print(json.dumps({"preflight_passed": True, "binding_digest": sha256_digest(binding)}), flush=True)
+    elif arguments.mode == "prepare":
         try:
-            prepare(destination, load_role_configuration_input(arguments.role_config))
+            prepare(destination, load_role_configuration_input(arguments.role_config),
+                    execution_mode=arguments.execution_mode or "qualification",
+                    fixture_package=arguments.fixture_package, codex_bin=arguments.codex_bin)
         except Exception as error:
             write_new(destination / "preparation-failed.json", {
                 "status": "FAIL", "error": f"{type(error).__name__}: {error}",

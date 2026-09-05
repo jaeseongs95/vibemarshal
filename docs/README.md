@@ -1,5 +1,7 @@
 # VibeMarshal 문서 지도
 
+- [검사 계약 구조 개선 진행 기록](inspection-recovery-progress.md): 고정 검증 환경, 독립 11사례 기준선, 참조 계약 개선과 실제 Goal 경로의 공통 완료 조건
+
 ## 현재 권위 문서
 
 - [전면 재설계 권위 문서](orchestration-redesign.md): `flowmarshal.engine`의 제품 목적, 권위 모델, 승인·lazy expansion 경계, 실행·복구와 cutover Gate
