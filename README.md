@@ -10,7 +10,7 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고
 
 2026-09-05 [R-S06-19-CLOSE](docs/r-s06-19-close-handoff.md)에서 provider 검사 계약의 기존 보정을 확정했다. 설명 변형·구조 거부의 오프라인 회귀와 558개 테스트·결정론 Gate 5/5는 PASS다. 마지막 실제 R19는 FAIL이며, 현재 source의 실모델 의미 검증은 미실행이다. 기존 S06 FAIL, Functional Alpha 미완료와 1.0 **NO-GO**를 유지한다.
 
-모델 목록 변화로 제한 검증이 차단된 원인은 [inventory 실행 잠금 v2](docs/model-inventory-lock-v2-handoff.md)에서 수정했다. [R-S06-21 제한 검증](docs/r-s06-21-model-lock-v2-limited-validation-handoff.md)의 fresh v2 prepare는 성공해 비관련 모델 삭제 차단이 제거됐음을 확인했다. 첫 clean은 inventory 기록 파일명 충돌로 역할 호출 전에 FAIL로 중단됐고 실제 역할 실행은 0/13이다. [runtime preflight 기록 충돌 보정](docs/r-s06-21-runtime-preflight-capture-fix-handoff.md)은 phase별 append-only capture와 재실행 차단을 추가했으며, 실제 역할 검증은 새 제한 run에서만 다시 시작할 수 있다.
+모델 목록 변화로 제한 검증이 차단된 원인은 [inventory 실행 잠금 v2](docs/model-inventory-lock-v2-handoff.md)에서 수정했다. [R-S06-21 제한 검증](docs/r-s06-21-model-lock-v2-limited-validation-handoff.md)은 fresh v2 prepare 성공 후 inventory 기록 충돌로 역할 호출 0/13에서 FAIL했다. [runtime preflight 기록 충돌 보정](docs/r-s06-21-runtime-preflight-capture-fix-handoff.md) 이후 [R-S06-22 제한 검증](docs/r-s06-22-post-capture-fix-limited-validation-handoff.md)은 prepare와 첫 clean provider 응답까지 진행했지만, 저장 request의 strict schema 재구성 시 required 배열 순서가 달라져 receipt binding에서 FAIL했다. logical/provider는 1/1, schema recovery는 0이며 다음 경계는 schema 직렬화 왕복·digest 검증 보정과 결정적 회귀다. 기존 S06 FAIL·Functional Alpha 미완료·1.0 NO-GO는 유지한다.
 
 - 새 Engine은 비권위 `ExecutionSpecProposal`을 최신 Goal·Plan·State·Project Map에 컴파일하고, `run once` 호출마다 materialize·dispatch·observe·validate·complete 중 한 단계만 전진한다.
 - worker 종료 문구는 관측값으로만 보존하고 파일·diff·command·test evidence와 별도 validator 결과로 Task 및 Goal을 판정한다.
