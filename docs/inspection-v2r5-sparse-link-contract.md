@@ -1,5 +1,7 @@
 # Plan inspection v2 5차 희소 양의 링크 계약
 
+> 이 문서는 커밋 `de16afb`의 5차 계약을 기록한다. 후속 고정 static 11은 9 PASS·2 FAIL이었으며, 원본 판정과 남은 경계는 [5차 독립 11사례 기준선](inspection-v2r5-static11-baseline.md)에 보존한다.
+
 ## 변경 목적
 
 v2r3의 전체 28행 직접 제출은 검사 능력 판단과 관계 장부를 중복시켰다. v2r4는 전체 행을 제거했지만 AC ID를 scope의 `criterion_refs`에 넣어 scope 능력과 Goal의 validation 요구 관계를 한 객체에 결합했다. 실제 clean 응답은 22개 scope와 32개 양의 ref를 만들고 관련 sibling validation 세 개를 과잉 연결했다.
@@ -35,7 +37,7 @@ compiler는 양의 link를 추가·삭제하거나 scope 선택과 `requirement_
 | compileall·full tests·pip check·synthetic lifecycle·legacy freeze | 5/5 PASS |
 | 전체 tests | 671 PASS, 82.571초 |
 
-이 결과는 현재 source의 구조·회귀 검증이다. 실제 모델 의미 정확도와 실행 지연은 커밋을 고정한 새 worktree의 static 11에서 별도로 판정한다.
+이 결과는 당시 source의 구조·회귀 검증이다. 후속 실제 모델 결과는 별도 기준선에서 판정하며 이 Gate를 의미 성공으로 확대하지 않는다.
 
 ## 검증 경계
 

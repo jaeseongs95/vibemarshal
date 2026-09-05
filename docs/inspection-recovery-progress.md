@@ -9,7 +9,7 @@
 | A. 실행 기반 격리 | 고정 worktree·공통 preflight·독립 fixture package·결정적 Gate | 완료 · `22d68c0` |
 | B. 기존 계약 기준선 | 같은 역할로 static 11사례, 사례별 형식·참조·의미·운영 결과 | 완료 · PASS 7 / FAIL 4 |
 | C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | 5차 scope/AC 축 분리·희소 양의 link 구현, 전체 671개·개발 Gate 5/5 통과 |
-| D. 새 계약 비교 | 새 실행의 static 11사례와 고정 기대표·실측 usage | 1차 PASS 1 / FAIL 10, 2차 불완결, 3차 PASS 4 / semantic FAIL 7, 4차 3건 완료 뒤 timeout, 5차 NOT_RUN |
+| D. 새 계약 비교 | 새 실행의 static 11사례와 고정 기대표·실측 usage | 1차 PASS 1 / FAIL 10, 2차 불완결, 3차 PASS 4 / semantic FAIL 7, 4차 3건 완료 뒤 timeout, 5차 PASS 9 / FAIL 2 |
 | E. S06 재진입 검사 | static·expansion·독립 생성 검토·expanded-review 13단계 | NOT_RUN |
 | F. 실제 Goal 경로 | 고정 자연어에서 실제 Goal·Plan 선택·활성화·실행·독립 검증·GoalVerdict | NOT_RUN |
 
@@ -50,5 +50,6 @@ Codex executable은 `D:\codex\fm-inspection-runtime\codex-935a1911.exe`에 복�
 - 4차 보정은 모델이 각 원자 scope의 `claim`·status와 실제 절차를 직접 요구하는 AC의 양의 `criterion_refs`만 제출하게 한다. compiler는 이 의미 선택을 바꾸지 않고 모든 AC×validation의 bool·scope ID·closure·coverage witness를 확장한다. v1 상세 필드 규칙은 권위 설계 문서에 남기고 자동 주입되는 저장소 지침에서는 provider version별 경계를 명확히 분리했다. 전체 671개 테스트와 개발 결정적 Gate 5/5가 통과했으며 contract는 `sha256:7e9f81c564f0ffd60baa2fad5a96e98664112ade86702ab8d97b1fedfcbd5a30`이다. 상세는 [scope 양의 연결 계약 보정](inspection-v2r4-scope-link-contract.md)에 기록했다.
 - 4차 고정 static 실행은 clean semantic FAIL, bad·wrong-goal PASS 뒤 combined가 900,125ms timeout으로 `external_unknown`이 되어 나머지 7건을 실행하지 않았다. 완료된 응답은 모두 schema·compiler·binding을 통과했지만 clean은 scope 22개·양의 criterion ref 32개를 만들고 sibling validation 세 개를 과잉 연결했다. 완료·귀속을 확인할 수 없는 turn은 재시도하지 않았다. 상세는 [4차 부분 실행 기준선](inspection-v2r4-partial-baseline.md)에 있다.
 - 5차 보정은 scope를 실제 절차·status의 최소 집합으로 되돌리고, AC가 validation의 supported 절차를 명시적으로 요구한다는 양의 의미 판단만 별도 `ac_validation_links`로 제출하게 한다. compiler는 양의 link의 ID·scope 소유권·supported 상태를 검사하고 생략된 나머지 조합을 false·빈 scope로 확장한다. 집중 회귀 22개와 전체 671개 테스트가 통과했다. 개발 결정적 Gate도 contract `sha256:f8016844b24a240b5880589834379423ed00b98ef52690cdfddec2ebd3f63295`, report SHA-256 `de59d597c273014e345259b306e48f4532739e1abd0380212071ab5a3990224c`로 5/5 통과했다. 상세는 [5차 희소 양의 링크 계약](inspection-v2r5-sparse-link-contract.md)에 있다.
+- 5차 고정 static 11은 11/11 provider turn을 완료했고 PASS 9, model output FAIL 1, semantic FAIL 1, schema recovery·external unknown 0이었다. clean·semantic-explicit를 포함한 9건의 관계 차이는 0이며 scope는 응답별 6~11개로 줄었다. bad는 `validation_scope` target에 기계적으로 불필요한 secondary ref를 작성해 schema 후검증에서 거부됐다. wrong-goal은 의도한 phase overclaim finding을 찾았지만 AC-004가 명시한 독립 Goal Test의 behavior-contract와 unittest validation 연결을 두 개 누락했다. 상세는 [5차 독립 11사례 기준선](inspection-v2r5-static11-baseline.md)에 있다.
 
-전체 qualification, Functional Alpha와 1.0 cutover는 아직 NO-GO다. 5차 계약의 새 고정 static 11, qualification 13과 실제 Goal 완료는 아직 증명하지 않았다.
+전체 qualification, Functional Alpha와 1.0 cutover는 아직 NO-GO다. 5차 static 11은 완료됐지만 두 실패를 해소한 새 고정 static 11, qualification 13과 실제 Goal 완료는 아직 증명하지 않았다.
