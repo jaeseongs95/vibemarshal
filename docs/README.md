@@ -11,6 +11,7 @@
 - [근거 우선 strict schema 순서 보정](r-s06-evidence-first-schema-order-fix-handoff.md): 선언 property 순서의 canonical 왕복 보존, 근거 우선 Reviewer envelope와 R25 의미 실패 회귀
 - [참조 결속 규격 설명·진단 보정](r-s06-scope-binding-spec-diagnostics-handoff.md): mechanism→scope→AC 추적 규칙, R27 원본 거부·boolean 오류 보존 회귀와 fresh 결정론 Gate 5/5
 - [R-S06-28 Sol/high 제한 실제 검증](r-s06-28-sol-high-limited-validation-handoff.md): 새 결정론 Gate 5/5, 첫 clean 구조 PASS·AC 27/28 의미 FAIL, 이후 12사례 NOT_RUN·1.0 NO-GO
+- [R-S06-29 Sol/xhigh 제한 실제 검증 후보](r-s06-29-sol-xhigh-limited-validation-handoff.md): Sol/high 탈락을 보존하고 general Reviewer effort만 올린 미검증 후보의 절대 입력·v2 결속과 다음 fresh 검증 조건
 
 ## 동결 기준선과 회귀 입력
 

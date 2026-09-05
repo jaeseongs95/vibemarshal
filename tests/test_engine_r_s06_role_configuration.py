@@ -25,6 +25,7 @@ from scripts.diagnostics.r_s06_10 import (
 
 FIXTURES = Path(__file__).parent / "fixtures/engine"
 ROLE_FIXTURE = FIXTURES / "plan-inspection-general-reviewer-sol-high-roles.json"
+XHIGH_ROLE_FIXTURE = FIXTURES / "plan-inspection-general-reviewer-sol-xhigh-roles.json"
 R26_FIXTURE = FIXTURES / "r-s06-26-clean-semantic-failure.json"
 
 
@@ -53,6 +54,66 @@ class RS06RoleConfigurationTests(unittest.TestCase):
         self.assertEqual(sha256_digest(json.loads(ROLE_FIXTURE.read_text(encoding="utf-8"))),
                          selected.binding["source_canonical_digest"])
         validate_role_configuration_inventory(selected.roles, self.inventory)
+
+    def test_sol_xhigh_candidate_changes_only_general_reviewer_effort_from_sol_high(self) -> None:
+        high = load_role_configuration_input(ROLE_FIXTURE.resolve())
+        xhigh = load_role_configuration_input(XHIGH_ROLE_FIXTURE.resolve())
+        model_changes = [
+            role_id for role_id in ROLE_CONFIGURATION_IDS
+            if high.roles.binding_for(role_id).model != xhigh.roles.binding_for(role_id).model
+        ]
+        effort_changes = [
+            role_id for role_id in ROLE_CONFIGURATION_IDS
+            if high.roles.binding_for(role_id).effort != xhigh.roles.binding_for(role_id).effort
+        ]
+        self.assertEqual([], model_changes)
+        self.assertEqual(["general_reviewer"], effort_changes)
+        self.assertEqual(("gpt-5.6-sol", "high"),
+                         (high.roles.general_reviewer.model, high.roles.general_reviewer.effort))
+        self.assertEqual(("gpt-5.6-sol", "xhigh"),
+                         (xhigh.roles.general_reviewer.model, xhigh.roles.general_reviewer.effort))
+        self.assertTrue(all(not high.roles.binding_for(role_id).allowed_fallbacks
+                            and not xhigh.roles.binding_for(role_id).allowed_fallbacks
+                            for role_id in ROLE_CONFIGURATION_IDS))
+        self.assertEqual("caller_provided_explicit_role_configuration", xhigh.binding["selection_reason"])
+        self.assertEqual(sha256_bytes(XHIGH_ROLE_FIXTURE.read_bytes()), xhigh.binding["source_bytes_digest"])
+        self.assertEqual(sha256_digest(json.loads(XHIGH_ROLE_FIXTURE.read_text(encoding="utf-8"))),
+                         xhigh.binding["source_canonical_digest"])
+        self.assertEqual(xhigh.roles.configuration_digest, xhigh.binding["configuration_digest"])
+        self.assertNotEqual(high.roles.configuration_digest, xhigh.roles.configuration_digest)
+        self.assertTrue(self.inventory.supports("gpt-5.6-sol", "xhigh"))
+        validate_role_configuration_inventory(xhigh.roles, self.inventory)
+
+    def test_sol_xhigh_absolute_input_snapshot_preflight_and_request_binding_are_immutable(self) -> None:
+        original = XHIGH_ROLE_FIXTURE.read_bytes()
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source = root / "input-roles.json"
+            source.write_bytes(original)
+            selected = load_role_configuration_input(source.resolve())
+            run = root / "run"
+            run.mkdir()
+            (run / "roles.json").write_bytes(selected.raw_bytes)
+            self.assertEqual(selected.roles, verify_role_configuration_artifacts(run, selected.binding))
+            request = make_role_request(
+                inventory=self.inventory,
+                role="compact_plan_reviewer",
+                instructions="고정 입력을 검토한다.",
+                payload={},
+                output_schema={"type": "object", "properties": {}, "required": [], "additionalProperties": False},
+                model=selected.roles.general_reviewer.model,
+                effort=selected.roles.general_reviewer.effort,
+                inventory_digest=self.inventory.inventory_digest,
+                cwd=str(FIXTURES),
+            )
+            verify_role_request_binding(request, selected.roles, self.inventory)
+            source.write_bytes(original + b"\n")
+            with self.assertRaisesRegex(RuntimeError, "SOURCE_CHANGED"):
+                verify_role_configuration_artifacts(run, selected.binding)
+            source.write_bytes(original)
+            (run / "roles.json").write_bytes(original + b"\n")
+            with self.assertRaisesRegex(RuntimeError, "COPY_CHANGED"):
+                verify_role_configuration_artifacts(run, selected.binding)
 
     def test_path_schema_role_ids_model_effort_and_fallback_envelope_fail_closed(self) -> None:
         with self.assertRaisesRegex(RuntimeError, "PATH_MUST_BE_ABSOLUTE"):
