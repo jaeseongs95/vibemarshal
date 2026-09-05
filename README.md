@@ -12,6 +12,8 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고
 
 모델 목록 변화로 제한 검증이 차단된 원인은 [inventory 실행 잠금 v2](docs/model-inventory-lock-v2-handoff.md)에서 수정했다. [R-S06-21 제한 검증](docs/r-s06-21-model-lock-v2-limited-validation-handoff.md)은 fresh v2 prepare 성공 후 inventory 기록 충돌로 역할 호출 0/13에서 FAIL했다. [R-S06-22 제한 검증](docs/r-s06-22-post-capture-fix-limited-validation-handoff.md)은 첫 clean provider 응답 뒤 저장 request의 strict schema 재구성에서 `required` 배열 순서가 달라져 FAIL했다. [strict schema 저장 왕복 보정](docs/r-s06-strict-schema-roundtrip-fix-handoff.md)은 object `properties`와 `required`를 같은 결정적 순서로 생성하고 receipt 관계 검사를 분리했다. [R-S06-23 제한 검증](docs/r-s06-23-post-schema-fix-limited-validation-handoff.md)은 prepare와 실제 schema 왕복 결속을 통과했지만 첫 clean 응답의 scope 근거 누락으로 1/13에서 FAIL했고, 성공 result가 없는 경로의 요약 오류도 확인했다. [실패 안전 diagnostics summary 보정](docs/r-s06-diagnostics-failure-summary-fix-handoff.md)은 원래 역할 실패·usage·효과 수를 보존하는 요약 경로와 결정적 회귀를 추가했다. 새 실제 qualification은 미실행이며 과거 원본 판정과 기존 S06 FAIL·Functional Alpha 미완료·1.0 NO-GO는 유지한다.
 
+[R-S06-24 제한 검증 진입](docs/r-s06-24-post-diagnostics-fix-limited-validation-handoff.md)은 clean의 결속 summary 확인 후 다음 사례로 진행하라는 실행 경계와 기존 진단기의 일괄 호출 순서가 충돌해 provider 호출 전 FAIL로 중단했다. 역할 호출은 0/13, 13사례 모두 NOT_RUN이며 새 contract·inventory lock·Gate는 미준비/미실행이다. 기존 S06 FAIL·Functional Alpha 미완료·1.0 NO-GO를 유지한다.
+
 - 새 Engine은 비권위 `ExecutionSpecProposal`을 최신 Goal·Plan·State·Project Map에 컴파일하고, `run once` 호출마다 materialize·dispatch·observe·validate·complete 중 한 단계만 전진한다.
 - worker 종료 문구는 관측값으로만 보존하고 파일·diff·command·test evidence와 별도 validator 결과로 Task 및 Goal을 판정한다.
 - 완료 Task 뒤 Project Map·State 재관측, 저장 thread의 `thread/read` 우선 복구, receipt 불명확 시 중복 생성 방지가 구현돼 있다.
