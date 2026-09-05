@@ -1,6 +1,6 @@
-# FlowMarshal Vibe Coding Framework
+# VibeMarshal
 
-FlowMarshal Vibe Coding Framework는 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고, Task마다 적절한 Codex 실행·검사 모델과 추론 수준을 배정한 뒤, 작업 생성·재개·진행·결과·실패·재시도를 추적하는 로컬 Workflow Orchestrator다. 코드와 CLI에서는 기존 식별자 `FlowMarshal`을 사용한다.
+VibeMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고, Task마다 적절한 Codex 실행·검사 모델과 추론 수준을 배정한 뒤, 작업 생성·재개·진행·결과·실패·재시도를 추적하는 로컬 Workflow Orchestrator다. 코드와 CLI에서는 기존 식별자 `FlowMarshal`을 사용한다.
 
 현재 권위 구현은 `flowmarshal.engine`이다. R1~R3.1 source와 artifact는 감사 가능한 `legacy/prototype` 기준선으로 동결하며 새 Engine에서 도메인 코드로 import하지 않는다.
 

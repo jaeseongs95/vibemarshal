@@ -150,6 +150,6 @@ SDK에 묶인 Codex 0.147.0에서는 응답 API의 404로 첫 역할 cell을 완
 
 ## Git 보관 정책
 
-원격은 [jaeseongs95/flowmarshal-vibe-coding-framework](https://github.com/jaeseongs95/flowmarshal-vibe-coding-framework) private 저장소다. 한국어 커밋, 검증 후 push, 불완전 qualification의 PASS 표기 금지, 비밀정보·DB·임시 상태 제외 지침을 `AGENTS.md`에 추가했다.
+원격은 [jaeseongs95/vibemarshal](https://github.com/jaeseongs95/vibemarshal) private 저장소다. 한국어 커밋, 검증 후 push, 불완전 qualification의 PASS 표기 금지, 비밀정보·DB·임시 상태 제외 지침을 `AGENTS.md`에 추가했다.
 
 동결 파일 40개 중 33개는 저장소 안, Planner 스킬 7개는 형제 프로젝트의 원본 경로다. 새 clone에서 형제 기준선이 없으면 freeze 검사가 실패한다. 파일을 자동 재생성하거나 검사를 생략하지 않는다. `.gitattributes`는 동결 byte와 PowerShell BOM을 그대로 보존한다. 인증 복제본·DB·임시 산출물은 원격에서 제외했으며 로컬 파일을 삭제하지 않았다.

@@ -1,4 +1,4 @@
-# FlowMarshal Vibe Coding Framework 문서 지도
+# VibeMarshal 문서 지도
 
 ## 현재 권위 문서
 
