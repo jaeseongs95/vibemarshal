@@ -3,11 +3,13 @@ from __future__ import annotations
 from copy import deepcopy
 import json
 from pathlib import Path
+import tempfile
 import unittest
 
 from flowmarshal.engine.domain import GoalContractRevision, PlanContractRevision, ProjectMapRevision, StateSnapshot
 from flowmarshal.engine.plan_inspection import (
     PLAN_INSPECTION_INSTRUCTIONS,
+    PLAN_INSPECTION_SHARED_INSTRUCTIONS,
     PlanInspection,
     PlanInspectionError,
     validate_plan_inspection,
@@ -120,6 +122,160 @@ def validate(name, payload):
 
 
 class PlanInspectionTests(unittest.TestCase):
+    def test_scope_binds_one_complete_same_phase_mechanism_without_union_or_intersection_shortcuts(self):
+        payload = submission("clean")
+        inspection = payload["inspection"]
+        validation = inspection["validation_rows"][0]
+        scope = inspection["validation_scope_rows"][0]
+        claim = scope["claim_ref"]
+        validation["mechanisms"] = [
+            {"tool": "첫 절차", "phase": None, "basis_refs": [claim, "c0", "c1"]},
+            {"tool": "둘째 절차", "phase": None, "basis_refs": [claim, "c2", "c3"]},
+        ]
+        for basis in ([claim, "c0", "c1"], [claim, "c2", "c3"]):
+            with self.subTest(basis=basis):
+                scope["basis_refs"] = basis
+                validate("clean", payload)
+        scope["basis_refs"] = [claim, "c0", "c2"]
+        with self.assertRaises(PlanInspectionError) as failure:
+            validate("clean", payload)
+        self.assertIn(f"validation_id={validation['validation_id']}, scope_id={scope['scope_id']}", str(failure.exception))
+        self.assertIn("[(0, None, ['c1']), (1, None, ['c3'])]", str(failure.exception))
+        scope["basis_refs"] = [claim, "c0", "c1"]
+        scope["phase"] = "goal"
+        with self.assertRaisesRegex(PlanInspectionError, "phase='goal'.*mechanism_candidates"):
+            validate("clean", payload)
+
+    def test_scope_claim_wrong_validation_unknown_and_duplicate_citation_diagnostics(self):
+        clean = submission("clean")
+        for kind in ("claim", "wrong_claim", "validation", "unknown", "duplicate"):
+            with self.subTest(kind=kind):
+                payload = deepcopy(clean)
+                scope = payload["inspection"]["validation_scope_rows"][0]
+                if kind == "claim":
+                    scope["basis_refs"] = ["c0"]
+                    expected = "claim 근거 누락.*scope_id=scope_0.*missing_refs="
+                elif kind == "wrong_claim":
+                    scope["claim_ref"] = payload["inspection"]["validation_scope_rows"][1]["claim_ref"]
+                    expected = "scope 주장 인용 오류.*scope_id=scope_0.*claim_ref="
+                elif kind == "validation":
+                    scope["validation_id"] = "unknown_validation"
+                    expected = "scope 행 집합 불완전.*unknown_validation.*scope_0"
+                elif kind == "unknown":
+                    scope["basis_refs"].append("unknown_citation")
+                    expected = "없는 인용 ID.*scope_id=scope_0.*unknown_citation"
+                else:
+                    scope["basis_refs"].append(scope["claim_ref"])
+                    expected = "인용 참조 중복.*scope_id=scope_0"
+                with self.assertRaisesRegex(PlanInspectionError, expected):
+                    validate("clean", payload)
+
+    def test_project_citation_added_only_by_scope_is_required_in_every_ac_even_false(self):
+        payload = submission("clean")
+        inspection = payload["inspection"]
+        scope = inspection["validation_scope_rows"][0]
+        _, _, _, project_map = inputs("clean")
+        entry = next(entry for entry in project_map.entries if entry.kind == "reference")
+        inspection["citations"].append({
+            "citation_id": "scope_only_project", "source_ref": f"project:{entry.entry_id}",
+            "selector": "/content", "quote": (ROOT / "plan-inspection-reference.md").read_text(encoding="utf-8")[:120],
+        })
+        scope["basis_refs"].append("scope_only_project")
+        rows = [row for row in inspection["ac_validation_rows"] if row["validation_id"] == scope["validation_id"]]
+        for row in rows:
+            self.assertFalse(row["ac_link_required"])
+            self.assertEqual([], row["scope_ids"])
+            row["basis_refs"].append("scope_only_project")
+        validate("clean", payload)
+        for row in rows:
+            with self.subTest(criterion=row["criterion_id"]):
+                row["basis_refs"].remove("scope_only_project")
+                with self.assertRaises(PlanInspectionError) as failure:
+                    validate("clean", payload)
+                self.assertEqual(
+                    f"대조표 AC 관계 등록 자료 인용 누락: validation_id={row['validation_id']}, "
+                    f"criterion_id={row['criterion_id']}, missing_refs=['scope_only_project']", str(failure.exception),
+                )
+                row["basis_refs"].append("scope_only_project")
+
+    def test_required_ac_repeats_every_selected_scope_claim_and_rejects_foreign_or_false_scope(self):
+        payload = submission("clean")
+        inspection = payload["inspection"]
+        scope = inspection["validation_scope_rows"][0]
+        claim = next(item for item in inspection["citations"] if item["citation_id"] == scope["claim_ref"])
+        inspection["citations"].append(dict(claim, citation_id="partial_claim", quote=claim["quote"][:12]))
+        partial = dict(scope, scope_id="partial_scope", claim_ref="partial_claim",
+                       basis_refs=[*scope["basis_refs"], "partial_claim"])
+        inspection["validation_scope_rows"].append(partial)
+        row = inspection["ac_validation_rows"][0]
+        row.update(ac_link_required=True, scope_ids=[scope["scope_id"], partial["scope_id"]])
+        row["basis_refs"].append("partial_claim")
+        validate("clean", payload)
+        row["basis_refs"].remove("partial_claim")
+        with self.assertRaisesRegex(PlanInspectionError, "AC 연결 scope 근거 누락.*partial_scope.*partial_claim"):
+            validate("clean", payload)
+        row["basis_refs"].append("partial_claim")
+        row["scope_ids"] = [inspection["validation_scope_rows"][1]["scope_id"]]
+        with self.assertRaisesRegex(PlanInspectionError, "AC 검사 scope validation 불일치"):
+            validate("clean", payload)
+        row["scope_ids"] = [scope["scope_id"]]
+        row["ac_link_required"] = False
+        with self.assertRaisesRegex(PlanInspectionError, "비필수 AC 연결의 scope 참조 모순"):
+            validate("clean", payload)
+
+    def test_reviewer_expander_share_binding_instructions_and_stored_schema_order(self):
+        from flowmarshal.canonical import canonical_json, sha256_digest
+        from flowmarshal.engine.planner_roles import PlanExpanderAdapter, PlanReviewerAdapter, RuleBasedTaskAssigner
+        from flowmarshal.engine.roles import RoleCallRequest, strict_json_output_schema
+        from tests.engine_helpers import assignment, skeleton
+
+        class Captured(Exception):
+            pass
+
+        class Capture:
+            def run(self, request, **kwargs):
+                self.request = request
+                raise Captured()
+
+        def assert_order(original, restored):
+            if isinstance(original, dict):
+                if "properties" in original:
+                    self.assertEqual(list(original["properties"]), list(restored["properties"]))
+                    self.assertEqual(list(original["properties"]), restored["required"])
+                for key in original:
+                    assert_order(original[key], restored[key])
+            elif isinstance(original, list):
+                for left, right in zip(original, restored, strict=True):
+                    assert_order(left, right)
+
+        plan, goal, state, project_map = inputs("clean")
+        capture = Capture()
+        options = dict(model="fixture-model", effort="high", inventory_digest="sha256:" + "1" * 64, cwd=ROOT)
+        with self.assertRaises(Captured):
+            PlanReviewerAdapter(capture, **options).review(
+                plan=plan, goal=goal, state=state, project_map=project_map, risk_route="compact_plan_reviewer")
+        requests = [capture.request]
+        models = assignment()
+        with self.assertRaises(Captured):
+            PlanExpanderAdapter(capture, RuleBasedTaskAssigner(models, models, models), **options).expand(
+                candidate=skeleton(goal, state), goal=goal, state=state, project_map=project_map)
+        requests.append(capture.request)
+        with tempfile.TemporaryDirectory() as temp:
+            for request in requests:
+                with self.subTest(role=request.role):
+                    self.assertIn(PLAN_INSPECTION_SHARED_INSTRUCTIONS, request.instructions)
+                    self.assertEqual(1, request.instructions.count(PLAN_INSPECTION_SHARED_INSTRUCTIONS))
+                    self.assertIn(PLAN_VALIDATION_TRACE_INSTRUCTIONS, request.instructions)
+                    self.assertIn("Goal에 명시된 task/goal 독립 검사 의무를 없애지 않는다", request.instructions)
+                    path = Path(temp) / f"{request.role}.json"
+                    path.write_text(canonical_json(request.model_dump(mode="json")), encoding="utf-8")
+                    reloaded = RoleCallRequest.model_validate_json(path.read_text(encoding="utf-8"))
+                    original = strict_json_output_schema(request.output_schema)
+                    restored = strict_json_output_schema(reloaded.output_schema)
+                    self.assertEqual(sha256_digest(original), sha256_digest(restored))
+                    self.assertEqual(request.request_digest, reloaded.request_digest)
+                    assert_order(original, restored)
+
     def test_targets_enumerate_all_pairs_including_disconnected_validations(self):
         plan, goal, _, _ = inputs("missing-link")
         targets = validation_comparison_targets(goal, plan)

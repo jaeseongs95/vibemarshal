@@ -9,6 +9,7 @@
 - [Engine 1.0 qualification](engine-qualification.md): 네 실행 scope, immutable checkpoint, benchmark와 cutover 절차
 - [Engine 실행 구현 현황](engine-implementation-status.md): 실제 실행 결과, NO-GO 근거와 남은 qualification 범위
 - [근거 우선 strict schema 순서 보정](r-s06-evidence-first-schema-order-fix-handoff.md): 선언 property 순서의 canonical 왕복 보존, 근거 우선 Reviewer envelope와 R25 의미 실패 회귀
+- [참조 결속 규격 설명·진단 보정](r-s06-scope-binding-spec-diagnostics-handoff.md): mechanism→scope→AC 추적 규칙, R27 원본 거부·boolean 오류 보존 회귀와 fresh 결정론 Gate 5/5
 
 ## 동결 기준선과 회귀 입력
 

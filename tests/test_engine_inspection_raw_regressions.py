@@ -39,6 +39,56 @@ RAW_S06_17_MANIFEST = json.loads((RAW_S06_17_ROOT / "manifest.json").read_text(e
 FILES = json.loads((ROOT / "plan-inspection-regressions.json").read_text(encoding="utf-8"))["files"]
 V3_EXPECTATIONS = json.loads((ROOT / "plan-inspection-v2-expectations.json").read_text(encoding="utf-8"))
 REFERENCE_ENTRY = "project:entry_ad363844d3392d9ef718d2d6"
+RAW_S06_27_PATH = ROOT / "r-s06-27-clean-scope-binding-failure.json"
+RAW_S06_27 = json.loads(RAW_S06_27_PATH.read_text(encoding="utf-8"))
+
+
+def _r27_context():
+    plan, goal, project_map, evidence_catalog = _context()
+    data = plan.model_dump(mode="json")
+    for selector, value in RAW_S06_27["plan_context_overrides"].items():
+        target = data
+        parts = selector.lstrip("/").split("/")
+        for part in parts[:-1]:
+            target = target[int(part)] if isinstance(target, list) else target[part]
+        target[parts[-1]] = deepcopy(value)
+    data["definition_digest"] = sha256_digest(data["definition"])
+    plan = PlanContractRevision.model_validate(data)
+    evidence_catalog["artifact:plan_contract"] = data
+    return plan, goal, project_map, evidence_catalog
+
+
+def _validate_r27(payload):
+    plan, goal, project_map, evidence_catalog = _r27_context()
+    envelope = PlanReviewEnvelope.model_validate(payload)
+    validate_plan_inspection(envelope.inspection, plan=plan, goal=goal, project_map=project_map,
+                             evidence_catalog=evidence_catalog, findings=envelope.review.findings)
+    return envelope
+
+
+def _r27_complete_refs_in_memory():
+    """원본 판단을 유지한 별도 테스트 사본에 참조만 명시적으로 추가한다."""
+    payload = json.loads(RAW_S06_27["raw_final_response"])
+    inspection = payload["inspection"]
+    scopes = {row["scope_id"]: row for row in inspection["validation_scope_rows"]}
+    scopes["scope_v5_phase"]["basis_refs"].append("p_contract")
+    citations = {row["citation_id"]: row for row in inspection["citations"]}
+    project_refs = {}
+    for row in inspection["validation_rows"]:
+        project_refs[row["validation_id"]] = {
+            ref for mechanism in row["mechanisms"] for ref in mechanism["basis_refs"]
+            if citations[ref]["source_ref"].startswith("project:")
+        }
+    for scope in scopes.values():
+        project_refs[scope["validation_id"]].update(
+            ref for ref in scope["basis_refs"] if citations[ref]["source_ref"].startswith("project:")
+        )
+    for row in inspection["ac_validation_rows"]:
+        required = project_refs[row["validation_id"]].copy()
+        for scope_id in row["scope_ids"]:
+            required.update([scopes[scope_id]["claim_ref"], *scopes[scope_id]["basis_refs"]])
+        row["basis_refs"].extend(sorted(required - set(row["basis_refs"])))
+    return payload
 
 
 def _context(*, goal_data: dict | None = None):
@@ -219,6 +269,86 @@ def _validate(payload: dict, *, goal_data: dict | None = None):
 
 
 class RawPlanInspectionRegressionTests(unittest.TestCase):
+    def test_r27_original_scope_binding_rejection_and_provenance_are_immutable(self):
+        self.assertEqual("sha256:5179b61e2ed1765d21f84e85e4f5954941b1a714c42cb04a4a82a406a41b1c73",
+                         sha256_bytes(RAW_S06_27_PATH.read_bytes()))
+        provenance = RAW_S06_27["provenance"]
+        self.assertEqual(provenance["source_final_response_utf8_digest"],
+                         sha256_bytes(RAW_S06_27["raw_final_response"].encode("utf-8")))
+        self.assertEqual(provenance["base_fixture_bytes_digest"],
+                         sha256_bytes((ROOT / "plan-inspection-regressions.json").read_bytes()))
+        self.assertEqual(provenance["reference_bytes_digest"],
+                         sha256_bytes((ROOT / "plan-inspection-reference.md").read_bytes()))
+        self.assertTrue((ROOT / provenance["handoff"]).is_file())
+        plan, goal, _, _ = _r27_context()
+        self.assertEqual(provenance["source_plan_canonical_digest"], sha256_digest(plan.model_dump(mode="json")))
+        self.assertEqual(provenance["source_goal_definition_canonical_digest"],
+                         sha256_digest(goal.definition.model_dump(mode="json")))
+        self.assertEqual(RAW_S06_27["expected_rows_canonical_digest"],
+                         sha256_digest(RAW_S06_27["expected_ac_validation_rows"]))
+        payload = json.loads(RAW_S06_27["raw_final_response"])
+        before = deepcopy(payload)
+        with self.assertRaises(PlanInspectionError) as failure:
+            _validate_r27(payload)
+        self.assertEqual(
+            "대조표 검사 scope 절차·phase·근거 결속 오류: "
+            "validation_id=val_goal_independent_behavior_contract, scope_id=scope_v5_phase, phase='goal', "
+            "mechanism_candidates=[(0, 'goal', ['p_contract'])] (mechanism_index, phase, missing_refs)",
+            str(failure.exception),
+        )
+        self.assertEqual(before, payload)
+
+    def test_r27_scope_only_fix_preserves_eight_ac_binding_failures(self):
+        payload = json.loads(RAW_S06_27["raw_final_response"])
+        scopes = {row["scope_id"]: row for row in payload["inspection"]["validation_scope_rows"]}
+        missing = {
+            (row["criterion_id"], row["validation_id"]): sorted({
+                ref for scope_id in row["scope_ids"]
+                for ref in [scopes[scope_id]["claim_ref"], *scopes[scope_id]["basis_refs"]]
+            } - set(row["basis_refs"]))
+            for row in payload["inspection"]["ac_validation_rows"]
+        }
+        missing = {key: value for key, value in missing.items() if value}
+        self.assertEqual({(f"ac_00{i}", validation) for i in range(1, 5) for validation in
+                          ("val_task_add_behavior_contract", "val_goal_independent_behavior_contract")}, set(missing))
+        self.assertEqual(["p_task", "v5_checks", "v5_phase"],
+                         missing[("ac_001", "val_goal_independent_behavior_contract")])
+        scopes["scope_v5_phase"]["basis_refs"].append("p_contract")
+        before = deepcopy(payload)
+        with self.assertRaises(PlanInspectionError) as failure:
+            _validate_r27(payload)
+        self.assertEqual(
+            "대조표 AC 연결 scope 근거 누락: validation_id=val_task_add_behavior_contract, "
+            "criterion_id=ac_001, scope_id=scope_v1_phase, missing_refs=['v1_phase']",
+            str(failure.exception),
+        )
+        self.assertEqual(before, payload)
+
+    def test_r27_complete_reference_copy_accepts_structure_but_preserves_one_of_28_boolean_mismatches(self):
+        payload = _r27_complete_refs_in_memory()
+        before = deepcopy(payload)
+        envelope = _validate_r27(payload)
+        self.assertEqual(before, payload)
+        original = json.loads(RAW_S06_27["raw_final_response"])
+        original_bools = [row["ac_link_required"] for row in original["inspection"]["ac_validation_rows"]]
+        self.assertEqual(28, len(original_bools))
+        self.assertEqual(original_bools, [row.ac_link_required for row in envelope.inspection.ac_validation_rows])
+        # 참조 외 필드·인용·판정·선택 scope·finding은 모두 원본과 같다.
+        for key in ("validation_scope_rows", "ac_validation_rows"):
+            for raw_row, row in zip(original["inspection"][key], payload["inspection"][key], strict=True):
+                row["basis_refs"] = raw_row["basis_refs"]
+        self.assertEqual(original, payload)
+        plan, _, _, _ = _r27_context()
+        assessment = assess_fixed_ac_link_requirements(
+            envelope.inspection, RAW_S06_27["expected_ac_validation_rows"], plan.model_dump(mode="json"),
+        )
+        self.assertTrue(assessment["pair_set_matches"])
+        self.assertFalse(assessment["passed"])
+        self.assertEqual([{
+            "criterion_id": "ac_004", "validation_id": "val_goal_independent_unittest",
+            "expected": True, "actual": False,
+        }], assessment["requirement_differences"])
+
     def test_r_s06_17_bad_axis_conflation_raw_reproduces_one_missing_finding_and_three_booleans(self):
         for filename, digest in RAW_S06_17_MANIFEST["files"].items():
             with self.subTest(filename=filename):

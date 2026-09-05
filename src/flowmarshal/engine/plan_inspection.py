@@ -22,7 +22,7 @@ class InspectionCitation(EngineModel):
 class ACValidationInspection(EngineModel):
     criterion_id: str
     validation_id: str
-    basis_refs: tuple[str, ...] = Field(min_length=2, description="해당 AC의 statement·validation_intent 각각, validation statement 전체, 참조한 scope 행의 claim·근거 및 같은 validation이 실제 범위 판단에 사용한 모든 project citation ID. 기존 citation을 재사용하며 새 citation을 만들지 않는다.")
+    basis_refs: tuple[str, ...] = Field(min_length=2, description="해당 AC의 statement·validation_intent 각각과 validation statement 전체를 인용한다. true/false 모두 같은 validation의 mechanism 및 모든 scope에서 실제 범위 판단에 사용한 project citation ID를 포함한다. true이면 선택한 supported scope 각각의 claim_ref와 전체 basis_refs도 포함한다. 근거 반복은 추적 결속이며 다른 부분의 검사 능력·판정을 부여하지 않는다.")
     scope_ids: tuple[str, ...] = Field(description="true 판정의 근거가 되는 동일 validation의 supported validation_scope_rows ID. true이면 하나 이상, false이면 빈 배열이다. 다른 scope 부분의 contradicted·unresolved 판정을 이 행의 false 근거로 자동 전파하지 않는다.")
     ac_link_required: bool = Field(description="앞선 basis_refs와 scope_ids의 근거에 따라 이 validation이 AC 일부를 직접 검증하여 goal_coverage 연결이 필수인지 표시한다. AC statement 또는 validation_intent가 동일 절차의 task/goal phase를 각각 명시하면, 명시된 각 phase를 실제 수행하는 validation은 각각 true다. 별도 실행은 실행·evidence 분리이며 task phase를 선택 사항으로 만들지 않는다. 명시되지 않은 sibling unittest·scope·semantic validation에는 이 규칙을 전염시키지 않는다. false는 선택적 연결을 금지하지 않는다.")
     finding_codes: tuple[str, ...] = Field(description="ac_link_required=true인데 현재 ID 연결이 없는 경우만 missing_validation_link finding. 나머지는 빈 배열.")
@@ -40,7 +40,7 @@ class ConstraintTaskInspection(EngineModel):
 class InspectionMechanism(EngineModel):
     tool: str = Field(min_length=1, max_length=120)
     phase: str | None = Field(description="원문이 식별하는 phase/mode. 없으면 null.")
-    basis_refs: tuple[str, ...] = Field(min_length=1, description="등록 자료·구현의 실제 범위 또는 새로 계약한 검사 책임의 인용 ID. project citation으로 실제 범위를 판단했다면 해당 validation의 모든 AC 관계 행 basis_refs도 같은 ID를 공유한다.")
+    basis_refs: tuple[str, ...] = Field(min_length=1, description="등록 자료·구현의 실제 범위 또는 새로 계약한 검사 책임의 인용 ID. 이 mechanism을 선택한 같은 validation·같은 phase의 scope는 전체 basis_refs를 반복한다. mechanism 및 모든 scope의 범위 판단에 사용한 project citation은 해당 validation의 모든 AC 행에 포함한다.")
 
 
 class ValidationInspection(EngineModel):
@@ -56,7 +56,7 @@ class ValidationScopeInspection(EngineModel):
     claim_ref: str = Field(description="validation statement에서 이 행이 판정하는 부분 주장의 연속 원문 인용 ID.")
     procedure: str = Field(min_length=1, max_length=240, description="이 부분 주장을 실제로 수행한다고 대조한 절차 설명. validation_rows mechanism과 같은 phase·근거 인용으로 결속하며 tool 문자열의 별칭이나 새 검사 능력을 뜻하지 않는다.")
     phase: str | None = Field(description="해당 절차가 실제 실행되는 phase/mode. 원문에 없으면 null.")
-    basis_refs: tuple[str, ...] = Field(min_length=1, description="claim_ref와 실제 절차·phase·범위 판단의 직접 근거 citation ID. claim_ref를 반드시 포함한다.")
+    basis_refs: tuple[str, ...] = Field(min_length=1, description="자신의 claim_ref와 같은 validation·같은 phase에서 선택한 mechanism 하나의 전체 basis_refs를 반드시 포함한다. 여러 mechanism 전체의 합집합은 요구하지 않는다. scope에서 실제 범위 판단에 추가로 사용한 project citation도 포함하고 같은 validation의 모든 AC 행에 재사용한다. 근거 반복은 추적 결속이며 다른 부분의 검사 능력·판정을 이 scope에 부여하지 않는다.")
     assessment: Literal["supported", "contradicted", "unresolved"] = Field(description="해당 부분 주장만 지지됨/직접 모순/근거 부족으로 판정한다. 한 부분의 결과를 같은 validation의 다른 부분이나 AC 연결 판정으로 전파하지 않는다.")
     finding_codes: tuple[str, ...] = Field(description="supported이면 빈 배열. contradicted는 validation_scope, unresolved는 insufficient_evidence finding에 연결한다.")
 
@@ -79,7 +79,20 @@ class PlanInspection(EngineModel):
     finding_links: tuple[InspectionFindingLink, ...]
 
 
-PLAN_INSPECTION_INSTRUCTIONS = (
+PLAN_INSPECTION_SHARED_INSTRUCTIONS = (
+    "참조 결속은 다음 포함관계로 제출 직전에 대조한다. 각 validation_scope_row는 같은 validation·같은 "
+    "phase의 mechanism 하나를 선택할 수 있어야 하며, 자신의 claim_ref와 그 mechanism의 전체 "
+    "basis_refs를 basis_refs에 포함한다. 여러 mechanism 전체의 합집합은 요구하지 않는다. "
+    "모든 ac_validation_row는 true/false와 무관하게 해당 validation의 mechanism 및 모든 scope에서 "
+    "실제 범위 판단에 사용한 project citation을 basis_refs에 포함한다. ac_link_required=true이면 "
+    "선택한 supported scope 각각의 claim_ref와 전체 basis_refs도 모두 포함한다. false이면 "
+    "scope_ids=[]를 유지한다. 참조는 목록 안에서 중복 없이 재사용한다. 근거 반복은 추적 결속일 "
+    "뿐 다른 부분의 검사 능력·판정을 scope에 부여하지 않는다. adapter가 누락 참조·인용·boolean을 "
+    "자동 보정한다고 가정하지 않는다. "
+)
+
+
+PLAN_INSPECTION_INSTRUCTIONS = PLAN_INSPECTION_SHARED_INSTRUCTIONS + (
     "응답은 기존 plan 또는 review와 inspection을 감싼 provider 전용 envelope다. inspection은 "
     "검증 가능한 사실·참조의 간결한 대조표이며 장황한 사고 과정이나 Core 판정을 쓰지 않는다. "
     "review를 제출하는 Reviewer는 findings와 ratings 두 key를 모두 제출한다. findings가 비면 "
@@ -119,7 +132,8 @@ PLAN_INSPECTION_INSTRUCTIONS = (
     "constraint 인용도 붙인다. validation_rows의 mechanism으로 등록 자료·구현을 검사 범위 판단에 "
     "사용했다면 그 정확한 project:<entry_id>/content citation_id를 같은 validation의 모든 AC 관계 행 "
     "basis_refs에도 재사용해 두 판단을 함께 추적한다. 제출 직전 validation별 mechanism의 project citation "
-    "집합이 관련 모든 AC 행에 들어 있는지 직접 대조한다. 같은 "
+    "및 모든 scope의 project citation 집합과 선택한 supported scope의 claim_ref·전체 basis_refs가 "
+    "해당 AC 행에 들어 있는지 직접 대조한다. 같은 "
     "citation_id를 여러 행에서 재사용할 수 있다. 다른 ID가 연결되어도 AC 일부를 직접 검증하는 "
     "검사 ID를 빠뜨리지 않는다. 반대로 검사 문장의 연관 표현·전역 의무만으로 AC 직접 검증을 "
     "추정하지 않는다. 전역 Task 검사 의무는 이 bool에 섞지 않고 constraint_task_rows에서만 판정한다. "
@@ -175,9 +189,9 @@ def _require(condition: bool, message: str) -> None:
         raise PlanInspectionError(message)
 
 
-def _unique(values: Any, label: str) -> set:
+def _unique(values: Any, label: str, context: str = "") -> set:
     items = list(values)
-    _require(len(items) == len(set(items)), f"대조표 {label} 중복")
+    _require(len(items) == len(set(items)), f"대조표 {label} 중복" + (f": {context}" if context else ""))
     return set(items)
 
 
@@ -219,9 +233,12 @@ def validate_plan_inspection(
                  "대조표 인용이 선택한 원문 문자열과 일치하지 않습니다.")
 
     used: set[str] = set()
+    binding_context = ""
 
     def refs(values: tuple[str, ...]) -> tuple[InspectionCitation, ...]:
-        _require(_unique(values, "인용 참조") <= citations.keys(), "대조표에 없는 인용 ID")
+        known_refs = _unique(values, "인용 참조", binding_context)
+        _require(known_refs <= citations.keys(),
+                 f"대조표에 없는 인용 ID: {binding_context}, missing_refs={sorted(known_refs - citations.keys())}")
         used.update(values)
         return tuple(citations[value] for value in values)
 
@@ -272,6 +289,7 @@ def validate_plan_inspection(
     validation_rows_by_id = {row.validation_id: row for row in inspection.validation_rows}
     mechanism_project_refs_by_validation: dict[str, set[str]] = {}
     for validation_row in inspection.validation_rows:
+        binding_context = f"validation_id={validation_row.validation_id}"
         validation = validation_by_id[validation_row.validation_id]
         selector = validation["selector"] + "/statement"
         _require(has((validation_row.claim_ref,), plan_ref, {selector}), "대조표 검사 주장 인용 오류")
@@ -288,20 +306,27 @@ def validate_plan_inspection(
     scope_ids = _unique((row.scope_id for row in inspection.validation_scope_rows), "검사 scope ID")
     scope_by_id = {row.scope_id: row for row in inspection.validation_scope_rows}
     _require({row.validation_id for row in inspection.validation_scope_rows} == validation_by_id.keys(),
-             "대조표 검사 scope 행 집합 불완전")
+             "대조표 검사 scope 행 집합 불완전: "
+             f"missing_validation_ids={sorted(validation_by_id.keys() - {row.validation_id for row in inspection.validation_scope_rows})}, "
+             f"unknown_validation_scopes={sorted((row.validation_id, row.scope_id) for row in inspection.validation_scope_rows if row.validation_id not in validation_by_id)}")
     for row in inspection.validation_scope_rows:
-        _require(row.validation_id in validation_by_id, "대조표 검사 scope validation ID 오류")
+        binding_context = f"validation_id={row.validation_id}, scope_id={row.scope_id}"
+        _require(row.validation_id in validation_by_id, f"대조표 검사 scope validation ID 오류: {binding_context}")
         validation = validation_by_id[row.validation_id]
         selector = validation["selector"] + "/statement"
         claim = citations.get(row.claim_ref)
         _require(claim is not None and claim.source_ref == plan_ref and claim.selector == selector,
-                 "대조표 검사 scope 주장 인용 오류")
-        _require(row.claim_ref in row.basis_refs, "대조표 검사 scope claim 근거 누락")
+                 f"대조표 검사 scope 주장 인용 오류: {binding_context}, claim_ref={row.claim_ref}")
+        _require(row.claim_ref in row.basis_refs,
+                 f"대조표 검사 scope claim 근거 누락: {binding_context}, missing_refs={[row.claim_ref]}")
         scope_basis = refs(row.basis_refs)
+        mechanisms = validation_rows_by_id[row.validation_id].mechanisms
         _require(any(
             row.phase == mechanism.phase and set(mechanism.basis_refs) <= set(row.basis_refs)
-            for mechanism in validation_rows_by_id[row.validation_id].mechanisms
-        ), "대조표 검사 scope 절차·phase·근거 결속 오류")
+            for mechanism in mechanisms
+        ), f"대조표 검사 scope 절차·phase·근거 결속 오류: {binding_context}, phase={row.phase!r}, "
+           f"mechanism_candidates={[(i, mechanism.phase, sorted(set(mechanism.basis_refs) - set(row.basis_refs))) for i, mechanism in enumerate(mechanisms)]} "
+           "(mechanism_index, phase, missing_refs)")
         mechanism_project_refs_by_validation[row.validation_id].update(
             citation.citation_id for citation in scope_basis if citation.source_ref in entries
         )
@@ -310,6 +335,7 @@ def validate_plan_inspection(
     _require(pairs == {(row["criterion_id"], row["validation_id"]) for row in targets["ac_validation_pairs"]},
              "대조표 AC 검사 행 집합 불완전")
     for row in inspection.ac_validation_rows:
+        binding_context = f"validation_id={row.validation_id}, criterion_id={row.criterion_id}"
         criterion = criterion_selectors[row.criterion_id]
         _require(has(row.basis_refs, "source:goal", {criterion["statement"]}), "대조표 해당 AC statement 인용 누락")
         _require(has(row.basis_refs, "source:goal", {criterion["validation_intent"]}), "대조표 해당 AC validation_intent 인용 누락")
@@ -320,22 +346,25 @@ def validate_plan_inspection(
             item.source_ref == plan_ref and item.selector == validation_selector and item.quote == validation_statement
             for item in refs(row.basis_refs)
         ), "대조표 해당 검사 전체 문장 인용 누락")
-        _require(mechanism_project_refs_by_validation.get(row.validation_id, set()) <= set(row.basis_refs),
-                  "대조표 AC 관계 등록 자료 인용 누락")
+        missing_project_refs = mechanism_project_refs_by_validation.get(row.validation_id, set()) - set(row.basis_refs)
+        _require(not missing_project_refs,
+                 f"대조표 AC 관계 등록 자료 인용 누락: {binding_context}, missing_refs={sorted(missing_project_refs)}")
         selected_scope_ids = _unique(row.scope_ids, "AC 검사 scope")
-        _require(selected_scope_ids <= scope_ids, "대조표 AC 검사 scope ID 오류")
+        _require(selected_scope_ids <= scope_ids,
+                 f"대조표 AC 검사 scope ID 오류: {binding_context}, unknown_scope_ids={sorted(selected_scope_ids - scope_ids)}")
         selected_scopes = [scope_by_id[scope_id] for scope_id in row.scope_ids]
         _require(all(scope.validation_id == row.validation_id for scope in selected_scopes),
-                 "대조표 AC 검사 scope validation 불일치")
+                 f"대조표 AC 검사 scope validation 불일치: {binding_context}, scope_ids={row.scope_ids}")
         if row.ac_link_required:
             _require(bool(selected_scopes) and all(scope.assessment == "supported" for scope in selected_scopes),
-                     "대조표 필수 AC 연결의 supported scope 누락")
-            _require(all(
-                {scope.claim_ref, *scope.basis_refs} <= set(row.basis_refs)
-                for scope in selected_scopes
-            ), "대조표 AC 연결 scope 근거 누락")
+                     f"대조표 필수 AC 연결의 supported scope 누락: {binding_context}, scope_ids={row.scope_ids}")
+            for scope in selected_scopes:
+                missing_scope_refs = {scope.claim_ref, *scope.basis_refs} - set(row.basis_refs)
+                _require(not missing_scope_refs,
+                         f"대조표 AC 연결 scope 근거 누락: {binding_context}, scope_id={scope.scope_id}, "
+                         f"missing_refs={sorted(missing_scope_refs)}")
         else:
-            _require(not selected_scopes, "대조표 비필수 AC 연결의 scope 참조 모순")
+            _require(not selected_scopes, f"대조표 비필수 AC 연결의 scope 참조 모순: {binding_context}, scope_ids={row.scope_ids}")
         missing = row.ac_link_required and row.validation_id not in coverage[row.criterion_id].validation_ids
         if missing:
             codes(row.finding_codes, kind="missing_validation_link", criterion=row.criterion_id,
@@ -356,6 +385,7 @@ def validate_plan_inspection(
     _require(pairs == {(row["constraint_id"], row["task_ref"]) for row in targets["constraint_task_pairs"]},
              "대조표 constraint Task 행 집합 불완전")
     for row in inspection.constraint_task_rows:
+        binding_context = f"constraint_id={row.constraint_id}, task_ref={row.task_ref}"
         _require(has(row.basis_refs, "source:goal", {constraint_selectors[row.constraint_id]}), "대조표 해당 constraint 인용 누락")
         task_ids = {item.validation_id for item in task_by_ref[row.task_ref].validations}
         _require(_unique(row.validation_ids, "constraint 검사") <= task_ids, "대조표 constraint 검사 소유 Task 불일치")

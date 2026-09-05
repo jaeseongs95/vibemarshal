@@ -1,0 +1,186 @@
+{
+  "provenance": {
+    "source": "R-S06-27 clean Reviewer의 거부된 원본 final_response. 전체 문자열의 UTF-8 bytes를 보존하며 운영 receipt는 포함하지 않는다.",
+    "handoff": "../../../docs/r-s06-27-sol-high-limited-validation-handoff.md",
+    "source_final_response_utf8_digest": "sha256:fd2f7c9eac0292bdd50548f31a8315b4107a22b6698ccf535a560a02ad55426c",
+    "source_terminal_bytes_digest": "sha256:b92fbed717a62c07bd356ad110929a021a3c9959069145eba89eb62e98708103",
+    "source_request_bytes_digest": "sha256:f8debafb9b66ff9543d747a9fae410208ceb4b4d97d358358aa3d9cf432fea57",
+    "source_plan_canonical_digest": "sha256:a4526fe5603e002530b153a6cdb65e9bdbda24ab0f6256bad0edc482d919225f",
+    "source_goal_definition_canonical_digest": "sha256:e43e73deb801e42b7762d474afcb62917d19d39dbbfbfb54e4f90424eba2bedd",
+    "source_expectation_digest": "sha256:47a415d771546cab537991420abc595d0b15ad2353fa51b619fd2fa267d13c14",
+    "source_expectation_bytes_digest": "sha256:95d40a6a0ecd3b59c2d2d551cf6946f0ee154c4dd663b243c38546bb8ce9bef9",
+    "base_fixture_bytes_digest": "sha256:3da588828a67ebdb777ef297e60952b6e96f40f14983e8d5e36cd34df8abd45f",
+    "reference_bytes_digest": "sha256:c0c58dc3ed0ff48b9f6161d1013d8fb8972549d20378322843f7279033b01ed8",
+    "original_error": "대조표 검사 scope 절차·phase·근거 결속 오류",
+    "context_note": "기존 회귀 입력을 재사용하고 아래 네 배열을 R27 원본 Plan 값으로 투영한다. 응답 수정은 테스트 메모리 사본에만 허용한다."
+  },
+  "plan_context_overrides": {
+    "/definition/goal_coverage/0/validation_ids": [
+      "val_task_add_behavior_contract",
+      "val_task_unittest",
+      "val_goal_independent_behavior_contract",
+      "val_goal_independent_unittest"
+    ],
+    "/definition/goal_coverage/2/validation_ids": [
+      "val_task_unittest",
+      "val_goal_independent_unittest",
+      "val_task_add_behavior_contract",
+      "val_goal_independent_behavior_contract"
+    ],
+    "/definition/integration_validations/0/criterion_refs": [
+      "ac_001",
+      "ac_002",
+      "ac_004",
+      "ac_003"
+    ],
+    "/definition/integration_validations/1/criterion_refs": [
+      "ac_003",
+      "ac_004",
+      "ac_001"
+    ]
+  },
+  "raw_final_response": "{\"inspection\":{\"citations\":[{\"citation_id\":\"g_ac1_s\",\"source_ref\":\"source:goal\",\"selector\":\"/hard_acceptance/0/statement\",\"quote\":\"add(left: int, right: int) -> int가 양수·음수·0을 포함한 두 정수의 합을 반환한다.\"},{\"citation_id\":\"g_ac1_i\",\"source_ref\":\"source:goal\",\"selector\":\"/hard_acceptance/0/validation_intent\",\"quote\":\"등록된 oracle.py의 task 및 goal phase와 기존 unittest를 사용해 동작 결과를 검증한다. goal phase에서는 위치·키워드 인자 호출을 포함한 고정 정수 쌍을 새로 검사한다.\"},{\"citation_id\":\"g_ac2_s\",\"source_ref\":\"source:goal\",\"selector\":\"/hard_acceptance/1/statement\",\"quote\":\"공개 함수명 add, left·right 인자명, int annotation, int 반환 annotation과 위치·키워드 인자 호출 계약을 유지한다.\"},{\"citation_id\":\"g_ac2_i\",\"source_ref\":\"source:goal\",\"selector\":\"/hard_acceptance/1/validation_intent\",\"quote\":\"oracle.py가 실제 함수 annotation·시그니처와 위치·키워드 호출 결과를 검사한다.\"},{\"citation_id\":\"g_ac3_s\",\"source_ref\":\"source:goal\",\"selector\":\"/hard_acceptance/2/statement\",\"quote\":\"기존 unittest가 통과한다.\"},{\"citation_id\":\"g_ac3_i\",\"source_ref\":\"source:goal\",\"selector\":\"/hard_acceptance/2/validation_intent\",\"quote\":\"동일 workspace에서 Python unittest를 새 프로세스로 실행해 통과 여부를 확인한다.\"},{\"citation_id\":\"g_ac4_s\",\"source_ref\":\"source:goal\",\"selector\":\"/hard_acceptance/3/statement\",\"quote\":\"Task 검증과 별도로 동일 workspace에서 Goal Test를 실행하고, 모든 동작·공개 계약·파일 보존 검사가 통과한 독립 evidence로 최종 Goal을 판정한다.\"},{\"citation_id\":\"g_ac4_i\",\"source_ref\":\"source:goal\",\"selector\":\"/hard_acceptance/3/validation_intent\",\"quote\":\"oracle.py를 task phase와 goal phase로 구분해 실행한다. Goal evidence는 새 command·test·file·diff evidence를 사용하고 task_id는 null로 유지하며 Task evidence를 복사하지 않는다.\"},{\"citation_id\":\"g_c1\",\"source_ref\":\"source:goal\",\"selector\":\"/constraints/0/statement\",\"quote\":\"app.py의 add 구현만 수정한다.\"},{\"citation_id\":\"g_c2\",\"source_ref\":\"source:goal\",\"selector\":\"/constraints/1/statement\",\"quote\":\"test_app.py와 AGENTS.md를 그대로 보존하고 프로젝트 파일을 추가하거나 삭제하지 않는다.\"},{\"citation_id\":\"g_c3\",\"source_ref\":\"source:goal\",\"selector\":\"/constraints/2/statement\",\"quote\":\"실제 unittest·파일 변경 범위 확인·분리된 Validator의 직접 evidence 검토를 Task 검증에 포함하고, 모든 Task 검증 후 별도 Goal Test를 수행한다.\"},{\"citation_id\":\"v1\",\"source_ref\":\"artifact:plan_contract\",\"selector\":\"/definition/tasks/0/validations/0/statement\",\"quote\":\"등록된 oracle.py의 task phase를 실제 실행하여 현재 프로젝트 파일 집합, test_app.py·AGENTS.md의 보존 해시, add 본문 밖 AST, 공개 함수명·인자명·int 입력 및 반환 annotation·시그니처와 기존 unittest 통과를 검사한다.\"},{\"citation_id\":\"v1_phase\",\"source_ref\":\"artifact:plan_contract\",\"selector\":\"/definition/tasks/0/validations/0/statement\",\"quote\":\"등록된 oracle.py의 task phase를 실제 실행\"},{\"citation_id\":\"v1_checks\",\"source_ref\":\"artifact:plan_contract\",\"selector\":\"/definition/tasks/0/validations/0/statement\",\"quote\":\"현재 프로젝트 파일 집합, test_app.py·AGENTS.md의 보존 해시, add 본문 밖 AST, 공개 함수명·인자명·int 입력 및 반환 annotation·시그니처와 기존 unittest 통과를 검사한다.\"},{\"citation_id\":\"v2\",\"source_ref\":\"artifact:plan_contract\",\"selector\":\"/definition/tasks/0/validations/1/statement\",\"quote\":\"기존 test_app.py의 unittest를 동일 workspace에서 새 프로세스로 실제 실행하여 기존 unittest가 통과하는지 확인한다.\"},{\"citation_id\":\"v3\",\"source_ref\":\"artifact:plan_contract\",\"selector\":\"/definition/tasks/0/validations/2/statement\",\"quote\":\"Task 변경 결과의 파일 집합과 diff를 직접 검사하여 변경이 app.py의 add 구현에만 한정되고 test_app.py와 AGENTS.md의 원본 내용, 프로젝트 파일 추가·삭제 및 의존성 변경이 없는지 확인한다.\"},{\"citation_id\":\"v4\",\"source_ref\":\"artifact:plan_contract\",\"selector\":\"/definition/tasks/0/validations/3/statement\",\"quote\":\"실행 역할과 분리된 Validator가 Task의 직접 file·diff evidence를 검토하여 app.py의 add 구현 변경이 요구된 동작·공개 호출 계약·최소 수정 범위를 충족하는지 독립적으로 판단하고 검토 결과를 제출한다.\"},{\"citation_id\":\"v5\",\"source_ref\":\"artifact:plan_contract\",\"selector\":\"/definition/integration_validations/0/statement\",\"quote\":\"모든 Task 검증 완료 후 Core가 동일 workspace에서 oracle.py의 goal phase를 새로 실행하여 고정된 양수·음수·0 정수 쌍을 위치 인자와 키워드 인자로 호출하고 합산 결과를 비교하며, 공개 함수명 add, left·right 인자명, int annotation, int 반환 annotation과 위치·키워드 호출 계약을 독립적으로 검사한다.\"},{\"citation_id\":\"v5_phase\",\"source_ref\":\"artifact:plan_contract\",\"selector\":\"/definition/integration_validations/0/statement\",\"quote\":\"모든 Task 검증 완료 후 Core가 동일 workspace에서 oracle.py의 goal phase를 새로 실행\"},{\"citation_id\":\"v5_checks\",\"source_ref\":\"artifact:plan_contract\",\"selector\":\"/definition/integration_validations/0/statement\",\"quote\":\"고정된 양수·음수·0 정수 쌍을 위치 인자와 키워드 인자로 호출하고 합산 결과를 비교하며, 공개 함수명 add, left·right 인자명, int annotation, int 반환 annotation과 위치·키워드 호출 계약을 독립적으로 검사한다.\"},{\"citation_id\":\"v6\",\"source_ref\":\"artifact:plan_contract\",\"selector\":\"/definition/integration_validations/1/statement\",\"quote\":\"모든 Task 검증 완료 후 Core가 동일 workspace에서 기존 unittest를 별도 새 프로세스로 다시 실행하여 기존 unittest 통과 여부를 독립적으로 확인한다.\"},{\"citation_id\":\"v7\",\"source_ref\":\"artifact:plan_contract\",\"selector\":\"/definition/integration_validations/2/statement\",\"quote\":\"모든 Task 검증 완료 후 Core가 동일 workspace의 새 file·diff evidence를 사용하여 app.py의 add 구현 외 변경이 없고 test_app.py와 AGENTS.md가 보존되며 프로젝트 파일 추가·삭제가 없는지 독립적으로 검사한다.\"},{\"citation_id\":\"p_scope\",\"source_ref\":\"project:entry_ad363844d3392d9ef718d2d6\",\"selector\":\"/content\",\"quote\":\"- 초기 보존 파일은 `app.py`, `test_app.py`, `AGENTS.md` 세 개다. Git 메타데이터와 Python bytecode만 파일 집합 비교에서 제외한다. Engine DB·artifact는 workspace 밖에 둔다.\\n- 수정은 작업 복사본의 `app.py` 안 `add` 구현으로 한정한다. 원본 fixture와 검사 도구는 수정 대상이 아니다. 새 프로젝트 파일이나 의존성을 추가할 필요가 없다.\"},{\"citation_id\":\"p_task\",\"source_ref\":\"project:entry_ad363844d3392d9ef718d2d6\",\"selector\":\"/content\",\"quote\":\"기존 도구를 `--phase task --workspace <작업 복사본>`으로 실행하면 현재 프로젝트 파일 집합, 테스트·AGENTS.md 초기 byte 해시, add 본문 밖 AST, 실제 함수 annotation·시그니처와 기존 unittest를 직접 검사한다. Python 실행 시 `-B`를 사용한다. 실제 unittest는 workspace에서 `python -B -m unittest discover -s . -p test_app.py -v`로 새 프로세스에서 수행한다.\"},{\"citation_id\":\"p_review\",\"source_ref\":\"project:entry_ad363844d3392d9ef718d2d6\",\"selector\":\"/content\",\"quote\":\"Task에는 직접 `file`, `diff`, `command`, `test` evidence와 실행 역할과 분리된 Validator의 `model_review`가 필요하다. 최소 변경 의미는 직접 file/diff/test evidence를 받은 독립 Validator가 검토하며, oracle 종료 코드만으로 이 의미 검사를 대체하지 않는다.\"},{\"citation_id\":\"p_goal\",\"source_ref\":\"project:entry_ad363844d3392d9ef718d2d6\",\"selector\":\"/content\",\"quote\":\"같은 기존 도구를 `--phase goal --workspace <동일 작업 복사본>`으로 새로 실행한다. Task 단계 검사를 다시 수행하면서 아래 정수 쌍 각각을 위치 인자와 키워드 인자로 호출하여 결과를 비교한다.\"},{\"citation_id\":\"p_contract\",\"source_ref\":\"project:entry_ad363844d3392d9ef718d2d6\",\"selector\":\"/content\",\"quote\":\"공개 계약은 `add(left: int, right: int) -> int`이며 이름·annotation·위치 및 키워드 인자 호출을 유지한다. 검사 실행 도중 소스가 바뀌어도 실패한다. 정답 diff나 특정 구현 문자열은 강제하지 않는다.\"},{\"citation_id\":\"p_goal_evidence\",\"source_ref\":\"project:entry_ad363844d3392d9ef718d2d6\",\"selector\":\"/content\",\"quote\":\"Goal 검증은 `evidence_mode=independent`와 새 `command`, `test`, `file`, `diff` evidence를 요구한다. Goal evidence의 `task_id`는 null이며 Task evidence를 복사하거나 이름만 바꿔 쓰지 않는다. Core가 최신 State·Goal binding·최종 GoalVerdict를 별도로 결속한다. 고정된 합격 기준은 모든 검사 통과이며 초기 결함 상태에서 oracle 종료 코드 1은 예상되는 실패다.\"}],\"validation_rows\":[{\"validation_id\":\"val_task_add_behavior_contract\",\"claim_ref\":\"v1\",\"mechanisms\":[{\"tool\":\"oracle.py\",\"phase\":\"task\",\"basis_refs\":[\"p_task\"]}],\"separate_check_refs\":[]},{\"validation_id\":\"val_task_unittest\",\"claim_ref\":\"v2\",\"mechanisms\":[{\"tool\":\"Python unittest\",\"phase\":\"task\",\"basis_refs\":[\"p_task\"]}],\"separate_check_refs\":[]},{\"validation_id\":\"val_task_scope_preservation\",\"claim_ref\":\"v3\",\"mechanisms\":[{\"tool\":\"직접 file·diff 검사\",\"phase\":\"task\",\"basis_refs\":[\"v3\",\"p_scope\"]}],\"separate_check_refs\":[]},{\"validation_id\":\"val_task_validator_review\",\"claim_ref\":\"v4\",\"mechanisms\":[{\"tool\":\"독립 Validator model_review\",\"phase\":\"task\",\"basis_refs\":[\"p_review\"]}],\"separate_check_refs\":[]},{\"validation_id\":\"val_goal_independent_behavior_contract\",\"claim_ref\":\"v5\",\"mechanisms\":[{\"tool\":\"oracle.py\",\"phase\":\"goal\",\"basis_refs\":[\"p_goal\",\"p_contract\"]}],\"separate_check_refs\":[]},{\"validation_id\":\"val_goal_independent_unittest\",\"claim_ref\":\"v6\",\"mechanisms\":[{\"tool\":\"Python unittest\",\"phase\":\"goal\",\"basis_refs\":[\"p_goal\",\"p_task\"]}],\"separate_check_refs\":[]},{\"validation_id\":\"val_goal_independent_scope_preservation\",\"claim_ref\":\"v7\",\"mechanisms\":[{\"tool\":\"독립 file·diff 검사\",\"phase\":\"goal\",\"basis_refs\":[\"p_goal\",\"p_task\",\"p_goal_evidence\"]}],\"separate_check_refs\":[]}],\"validation_scope_rows\":[{\"scope_id\":\"scope_v1_phase\",\"validation_id\":\"val_task_add_behavior_contract\",\"claim_ref\":\"v1_phase\",\"procedure\":\"등록된 oracle.py를 task phase로 실제 실행한다.\",\"phase\":\"task\",\"basis_refs\":[\"v1_phase\",\"p_task\"],\"assessment\":\"supported\",\"finding_codes\":[]},{\"scope_id\":\"scope_v1_checks\",\"validation_id\":\"val_task_add_behavior_contract\",\"claim_ref\":\"v1_checks\",\"procedure\":\"oracle.py의 task phase가 파일 집합과 보존 해시, add 밖 AST, 함수 annotation·시그니처 및 기존 unittest를 검사한다.\",\"phase\":\"task\",\"basis_refs\":[\"v1_checks\",\"p_task\"],\"assessment\":\"supported\",\"finding_codes\":[]},{\"scope_id\":\"scope_v2\",\"validation_id\":\"val_task_unittest\",\"claim_ref\":\"v2\",\"procedure\":\"동일 workspace에서 기존 unittest를 새 Python 프로세스로 실행하고 통과 여부를 비교한다.\",\"phase\":\"task\",\"basis_refs\":[\"v2\",\"p_task\"],\"assessment\":\"supported\",\"finding_codes\":[]},{\"scope_id\":\"scope_v3\",\"validation_id\":\"val_task_scope_preservation\",\"claim_ref\":\"v3\",\"procedure\":\"직접 file·diff evidence로 허용된 add 구현 이외의 변경, 보존 파일 변경, 파일 추가·삭제 및 의존성 변경 여부를 검사한다.\",\"phase\":\"task\",\"basis_refs\":[\"v3\",\"p_scope\"],\"assessment\":\"supported\",\"finding_codes\":[]},{\"scope_id\":\"scope_v4\",\"validation_id\":\"val_task_validator_review\",\"claim_ref\":\"v4\",\"procedure\":\"실행 역할과 분리된 Validator가 Task의 직접 변경 evidence를 검토해 동작·공개 계약·최소 수정 의미를 독립 판정한다.\",\"phase\":\"task\",\"basis_refs\":[\"v4\",\"p_review\"],\"assessment\":\"supported\",\"finding_codes\":[]},{\"scope_id\":\"scope_v5_phase\",\"validation_id\":\"val_goal_independent_behavior_contract\",\"claim_ref\":\"v5_phase\",\"procedure\":\"모든 Task 검증 뒤 동일 workspace에서 oracle.py를 goal phase로 새로 실행한다.\",\"phase\":\"goal\",\"basis_refs\":[\"v5_phase\",\"p_goal\"],\"assessment\":\"supported\",\"finding_codes\":[]},{\"scope_id\":\"scope_v5_checks\",\"validation_id\":\"val_goal_independent_behavior_contract\",\"claim_ref\":\"v5_checks\",\"procedure\":\"goal phase가 task 단계 검사를 반복하고 고정 정수 쌍의 위치·키워드 호출 결과 및 공개 계약을 독립 검사한다.\",\"phase\":\"goal\",\"basis_refs\":[\"v5_checks\",\"p_goal\",\"p_contract\",\"p_task\"],\"assessment\":\"supported\",\"finding_codes\":[]},{\"scope_id\":\"scope_v6\",\"validation_id\":\"val_goal_independent_unittest\",\"claim_ref\":\"v6\",\"procedure\":\"모든 Task 검증 뒤 기존 unittest를 동일 workspace의 별도 새 프로세스로 다시 실행한다.\",\"phase\":\"goal\",\"basis_refs\":[\"v6\",\"p_goal\",\"p_task\"],\"assessment\":\"supported\",\"finding_codes\":[]},{\"scope_id\":\"scope_v7\",\"validation_id\":\"val_goal_independent_scope_preservation\",\"claim_ref\":\"v7\",\"procedure\":\"Goal 전용 새 file·diff evidence로 허용 범위 밖 변경과 보존 파일 및 파일 집합을 독립 검사한다.\",\"phase\":\"goal\",\"basis_refs\":[\"v7\",\"p_goal\",\"p_task\",\"p_goal_evidence\"],\"assessment\":\"supported\",\"finding_codes\":[]}],\"ac_validation_rows\":[{\"criterion_id\":\"ac_001\",\"validation_id\":\"val_task_add_behavior_contract\",\"basis_refs\":[\"g_ac1_s\",\"g_ac1_i\",\"v1\",\"p_task\"],\"scope_ids\":[\"scope_v1_phase\",\"scope_v1_checks\"],\"ac_link_required\":true,\"finding_codes\":[]},{\"criterion_id\":\"ac_001\",\"validation_id\":\"val_task_unittest\",\"basis_refs\":[\"g_ac1_s\",\"g_ac1_i\",\"v2\",\"p_task\"],\"scope_ids\":[\"scope_v2\"],\"ac_link_required\":true,\"finding_codes\":[]},{\"criterion_id\":\"ac_001\",\"validation_id\":\"val_task_scope_preservation\",\"basis_refs\":[\"g_ac1_s\",\"g_ac1_i\",\"v3\",\"p_scope\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_001\",\"validation_id\":\"val_task_validator_review\",\"basis_refs\":[\"g_ac1_s\",\"g_ac1_i\",\"v4\",\"p_review\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_001\",\"validation_id\":\"val_goal_independent_behavior_contract\",\"basis_refs\":[\"g_ac1_s\",\"g_ac1_i\",\"v5\",\"p_goal\",\"p_contract\"],\"scope_ids\":[\"scope_v5_phase\",\"scope_v5_checks\"],\"ac_link_required\":true,\"finding_codes\":[]},{\"criterion_id\":\"ac_001\",\"validation_id\":\"val_goal_independent_unittest\",\"basis_refs\":[\"g_ac1_s\",\"g_ac1_i\",\"v6\",\"p_goal\",\"p_task\"],\"scope_ids\":[\"scope_v6\"],\"ac_link_required\":true,\"finding_codes\":[]},{\"criterion_id\":\"ac_001\",\"validation_id\":\"val_goal_independent_scope_preservation\",\"basis_refs\":[\"g_ac1_s\",\"g_ac1_i\",\"v7\",\"p_goal\",\"p_task\",\"p_goal_evidence\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_002\",\"validation_id\":\"val_task_add_behavior_contract\",\"basis_refs\":[\"g_ac2_s\",\"g_ac2_i\",\"v1\",\"p_task\"],\"scope_ids\":[\"scope_v1_checks\"],\"ac_link_required\":true,\"finding_codes\":[]},{\"criterion_id\":\"ac_002\",\"validation_id\":\"val_task_unittest\",\"basis_refs\":[\"g_ac2_s\",\"g_ac2_i\",\"v2\",\"p_task\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_002\",\"validation_id\":\"val_task_scope_preservation\",\"basis_refs\":[\"g_ac2_s\",\"g_ac2_i\",\"v3\",\"p_scope\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_002\",\"validation_id\":\"val_task_validator_review\",\"basis_refs\":[\"g_ac2_s\",\"g_ac2_i\",\"v4\",\"p_review\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_002\",\"validation_id\":\"val_goal_independent_behavior_contract\",\"basis_refs\":[\"g_ac2_s\",\"g_ac2_i\",\"v5\",\"p_goal\",\"p_contract\"],\"scope_ids\":[\"scope_v5_checks\"],\"ac_link_required\":true,\"finding_codes\":[]},{\"criterion_id\":\"ac_002\",\"validation_id\":\"val_goal_independent_unittest\",\"basis_refs\":[\"g_ac2_s\",\"g_ac2_i\",\"v6\",\"p_goal\",\"p_task\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_002\",\"validation_id\":\"val_goal_independent_scope_preservation\",\"basis_refs\":[\"g_ac2_s\",\"g_ac2_i\",\"v7\",\"p_goal\",\"p_task\",\"p_goal_evidence\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_003\",\"validation_id\":\"val_task_add_behavior_contract\",\"basis_refs\":[\"g_ac3_s\",\"g_ac3_i\",\"v1\",\"p_task\"],\"scope_ids\":[\"scope_v1_checks\"],\"ac_link_required\":true,\"finding_codes\":[]},{\"criterion_id\":\"ac_003\",\"validation_id\":\"val_task_unittest\",\"basis_refs\":[\"g_ac3_s\",\"g_ac3_i\",\"v2\",\"p_task\"],\"scope_ids\":[\"scope_v2\"],\"ac_link_required\":true,\"finding_codes\":[]},{\"criterion_id\":\"ac_003\",\"validation_id\":\"val_task_scope_preservation\",\"basis_refs\":[\"g_ac3_s\",\"g_ac3_i\",\"v3\",\"p_scope\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_003\",\"validation_id\":\"val_task_validator_review\",\"basis_refs\":[\"g_ac3_s\",\"g_ac3_i\",\"v4\",\"p_review\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_003\",\"validation_id\":\"val_goal_independent_behavior_contract\",\"basis_refs\":[\"g_ac3_s\",\"g_ac3_i\",\"v5\",\"p_goal\",\"p_contract\"],\"scope_ids\":[\"scope_v5_checks\"],\"ac_link_required\":true,\"finding_codes\":[]},{\"criterion_id\":\"ac_003\",\"validation_id\":\"val_goal_independent_unittest\",\"basis_refs\":[\"g_ac3_s\",\"g_ac3_i\",\"v6\",\"p_goal\",\"p_task\"],\"scope_ids\":[\"scope_v6\"],\"ac_link_required\":true,\"finding_codes\":[]},{\"criterion_id\":\"ac_003\",\"validation_id\":\"val_goal_independent_scope_preservation\",\"basis_refs\":[\"g_ac3_s\",\"g_ac3_i\",\"v7\",\"p_goal\",\"p_task\",\"p_goal_evidence\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_004\",\"validation_id\":\"val_task_add_behavior_contract\",\"basis_refs\":[\"g_ac4_s\",\"g_ac4_i\",\"v1\",\"p_task\"],\"scope_ids\":[\"scope_v1_phase\"],\"ac_link_required\":true,\"finding_codes\":[]},{\"criterion_id\":\"ac_004\",\"validation_id\":\"val_task_unittest\",\"basis_refs\":[\"g_ac4_s\",\"g_ac4_i\",\"v2\",\"p_task\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_004\",\"validation_id\":\"val_task_scope_preservation\",\"basis_refs\":[\"g_ac4_s\",\"g_ac4_i\",\"v3\",\"p_scope\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_004\",\"validation_id\":\"val_task_validator_review\",\"basis_refs\":[\"g_ac4_s\",\"g_ac4_i\",\"v4\",\"p_review\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_004\",\"validation_id\":\"val_goal_independent_behavior_contract\",\"basis_refs\":[\"g_ac4_s\",\"g_ac4_i\",\"v5\",\"p_goal\",\"p_contract\"],\"scope_ids\":[\"scope_v5_phase\",\"scope_v5_checks\"],\"ac_link_required\":true,\"finding_codes\":[]},{\"criterion_id\":\"ac_004\",\"validation_id\":\"val_goal_independent_unittest\",\"basis_refs\":[\"g_ac4_s\",\"g_ac4_i\",\"v6\",\"p_goal\",\"p_task\"],\"scope_ids\":[],\"ac_link_required\":false,\"finding_codes\":[]},{\"criterion_id\":\"ac_004\",\"validation_id\":\"val_goal_independent_scope_preservation\",\"basis_refs\":[\"g_ac4_s\",\"g_ac4_i\",\"v7\",\"p_goal\",\"p_task\",\"p_goal_evidence\"],\"scope_ids\":[\"scope_v7\"],\"ac_link_required\":true,\"finding_codes\":[]}],\"constraint_task_rows\":[{\"constraint_id\":\"constraint_001\",\"task_ref\":\"task_change_add\",\"applicability\":\"not_applicable\",\"validation_ids\":[],\"basis_refs\":[\"g_c1\"],\"finding_codes\":[]},{\"constraint_id\":\"constraint_002\",\"task_ref\":\"task_change_add\",\"applicability\":\"not_applicable\",\"validation_ids\":[],\"basis_refs\":[\"g_c2\"],\"finding_codes\":[]},{\"constraint_id\":\"constraint_003\",\"task_ref\":\"task_change_add\",\"applicability\":\"required\",\"validation_ids\":[\"val_task_add_behavior_contract\",\"val_task_unittest\",\"val_task_scope_preservation\",\"val_task_validator_review\"],\"basis_refs\":[\"g_c3\",\"v1\",\"v2\",\"v3\",\"v4\",\"p_task\",\"p_review\"],\"finding_codes\":[]}],\"finding_links\":[]},\"review\":{\"findings\":[],\"ratings\":{\"goal_fit\":4,\"grounding\":4,\"engineering\":4,\"verification\":4,\"execution_safety\":4}}}",
+  "expected_ac_validation_rows": [
+    {
+      "criterion_id": "ac_001",
+      "validation_id": "val_task_add_behavior_contract",
+      "ac_link_required": true
+    },
+    {
+      "criterion_id": "ac_001",
+      "validation_id": "val_task_unittest",
+      "ac_link_required": true
+    },
+    {
+      "criterion_id": "ac_001",
+      "validation_id": "val_task_scope_preservation",
+      "ac_link_required": false
+    },
+    {
+      "criterion_id": "ac_001",
+      "validation_id": "val_task_validator_review",
+      "ac_link_required": false
+    },
+    {
+      "criterion_id": "ac_001",
+      "validation_id": "val_goal_independent_behavior_contract",
+      "ac_link_required": true
+    },
+    {
+      "criterion_id": "ac_001",
+      "validation_id": "val_goal_independent_unittest",
+      "ac_link_required": true
+    },
+    {
+      "criterion_id": "ac_001",
+      "validation_id": "val_goal_independent_scope_preservation",
+      "ac_link_required": false
+    },
+    {
+      "criterion_id": "ac_002",
+      "validation_id": "val_task_add_behavior_contract",
+      "ac_link_required": true
+    },
+    {
+      "criterion_id": "ac_002",
+      "validation_id": "val_task_unittest",
+      "ac_link_required": false
+    },
+    {
+      "criterion_id": "ac_002",
+      "validation_id": "val_task_scope_preservation",
+      "ac_link_required": false
+    },
+    {
+      "criterion_id": "ac_002",
+      "validation_id": "val_task_validator_review",
+      "ac_link_required": false
+    },
+    {
+      "criterion_id": "ac_002",
+      "validation_id": "val_goal_independent_behavior_contract",
+      "ac_link_required": true
+    },
+    {
+      "criterion_id": "ac_002",
+      "validation_id": "val_goal_independent_unittest",
+      "ac_link_required": false
+    },
+    {
+      "criterion_id": "ac_002",
+      "validation_id": "val_goal_independent_scope_preservation",
+      "ac_link_required": false
+    },
+    {
+      "criterion_id": "ac_003",
+      "validation_id": "val_task_add_behavior_contract",
+      "ac_link_required": true
+    },
+    {
+      "criterion_id": "ac_003",
+      "validation_id": "val_task_unittest",
+      "ac_link_required": true
+    },
+    {
+      "criterion_id": "ac_003",
+      "validation_id": "val_task_scope_preservation",
+      "ac_link_required": false
+    },
+    {
+      "criterion_id": "ac_003",
+      "validation_id": "val_task_validator_review",
+      "ac_link_required": false
+    },
+    {
+      "criterion_id": "ac_003",
+      "validation_id": "val_goal_independent_behavior_contract",
+      "ac_link_required": true
+    },
+    {
+      "criterion_id": "ac_003",
+      "validation_id": "val_goal_independent_unittest",
+      "ac_link_required": true
+    },
+    {
+      "criterion_id": "ac_003",
+      "validation_id": "val_goal_independent_scope_preservation",
+      "ac_link_required": false
+    },
+    {
+      "criterion_id": "ac_004",
+      "validation_id": "val_task_add_behavior_contract",
+      "ac_link_required": true
+    },
+    {
+      "criterion_id": "ac_004",
+      "validation_id": "val_task_unittest",
+      "ac_link_required": false
+    },
+    {
+      "criterion_id": "ac_004",
+      "validation_id": "val_task_scope_preservation",
+      "ac_link_required": false
+    },
+    {
+      "criterion_id": "ac_004",
+      "validation_id": "val_task_validator_review",
+      "ac_link_required": false
+    },
+    {
+      "criterion_id": "ac_004",
+      "validation_id": "val_goal_independent_behavior_contract",
+      "ac_link_required": true
+    },
+    {
+      "criterion_id": "ac_004",
+      "validation_id": "val_goal_independent_unittest",
+      "ac_link_required": true
+    },
+    {
+      "criterion_id": "ac_004",
+      "validation_id": "val_goal_independent_scope_preservation",
+      "ac_link_required": true
+    }
+  ],
+  "expected_rows_canonical_digest": "sha256:0d81f5e2ef1d1697bd0df3331ceda5c0802c88be4d2a4a577358adab6e84d5f5"
+}
