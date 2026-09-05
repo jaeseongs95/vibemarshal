@@ -12,6 +12,7 @@
 - [참조 결속 규격 설명·진단 보정](r-s06-scope-binding-spec-diagnostics-handoff.md): mechanism→scope→AC 추적 규칙, R27 원본 거부·boolean 오류 보존 회귀와 fresh 결정론 Gate 5/5
 - [R-S06-28 Sol/high 제한 실제 검증](r-s06-28-sol-high-limited-validation-handoff.md): 새 결정론 Gate 5/5, 첫 clean 구조 PASS·AC 27/28 의미 FAIL, 이후 12사례 NOT_RUN·1.0 NO-GO
 - [R-S06-29 Sol/xhigh 제한 실제 검증 후보](r-s06-29-sol-xhigh-limited-validation-handoff.md): Sol/high 탈락을 보존하고 general Reviewer effort만 올린 미검증 후보의 절대 입력·v2 결속과 다음 fresh 검증 조건
+- [R-S06-29 Sol/xhigh 제한 실제 검증 결과](r-s06-29-sol-xhigh-actual-validation-handoff.md): 새 Gate 5/5, 사례 PASS 1·FAIL 1·NOT_RUN 11, 1.0 NO-GO
 
 ## 동결 기준선과 회귀 입력
 
