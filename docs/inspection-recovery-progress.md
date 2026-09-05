@@ -8,8 +8,8 @@
 |---|---|---|
 | A. 실행 기반 격리 | 고정 worktree·공통 preflight·독립 fixture package·결정적 Gate | 완료 · `22d68c0` |
 | B. 기존 계약 기준선 | 같은 역할로 static 11사례, 사례별 형식·참조·의미·운영 결과 | 완료 · PASS 7 / FAIL 4 |
-| C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | 6차 복합 finding target catalog·독립 validation 단계 열거 책임 규칙 구현, 전체 671개·개발 Gate 5/5 통과 |
-| D. 새 계약 비교 | 새 실행의 static 11사례와 고정 기대표·실측 usage | 1차 PASS 1 / FAIL 10, 2차 불완결, 3차 PASS 4 / semantic FAIL 7, 4차 3건 완료 뒤 timeout, 5차 PASS 9 / FAIL 2 |
+| C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | 7차 AC별 supported scope 선택·adapter validation join 구현, 전체 671개·개발 Gate 5/5 통과 |
+| D. 새 계약 비교 | 새 실행의 static 11사례와 고정 기대표·실측 usage | 마지막 전수 실행인 5차 PASS 9 / FAIL 2; 최신 7차는 첫 3건 PASS 뒤 프로세스 중단으로 불완결 |
 | E. S06 재진입 검사 | static·expansion·독립 생성 검토·expanded-review 13단계 | NOT_RUN |
 | F. 실제 Goal 경로 | 고정 자연어에서 실제 Goal·Plan 선택·활성화·실행·독립 검증·GoalVerdict | NOT_RUN |
 
@@ -29,7 +29,7 @@ Codex executable은 `D:\codex\fm-inspection-runtime\codex-935a1911.exe`에 복�
 2. 고정 검증 checkout에서 `python -m scripts.diagnostics.r_s06_10 preflight --run-root <새 inspection 실행> --fixture-package <package> --codex-bin <고정 executable> --role-config <절대 설정> --execution-mode development-diagnostic`을 실행한다.
 3. 같은 checkout과 전용 Python으로 `run_deterministic(root=..., run_root=<새 실행>/deterministic)`을 수행한다.
 4. 동일 입력 옵션으로 `prepare`를 실행한다. 모델 turn 없이 ephemeral thread의 실제 지침 경로를 관측하고 정책·inventory·요청·schema·기대표·source를 고정한다.
-5. `python -m scripts.diagnostics.r_s06_10 run --run-root <새 inspection 실행>`으로 11사례를 직렬 관측한다. 실행 옵션은 잠금 뒤 교체할 수 없다.
+5. `python -m scripts.diagnostics.r_s06_10 run --run-root <새 inspection 실행>`으로 11사례를 직렬 관측한다. 새 실행은 저장형 역할 thread를 사용하고, Windows에서는 `Start-Process -WindowStyle Hidden`으로 대화의 포그라운드 세션 밖에서 시작하며 별도 운영 경로에 launch intent·PID·시작 시각·stdout/stderr를 남긴다. 실행 옵션은 잠금 뒤 교체할 수 없다.
 
 완료된 응답의 schema·참조 오류 또는 의미 FAIL은 실패로 보존한 채 다음 독립 사례로 진행한다. provider가 명시적으로 실패 종료한 경우는 `provider_terminal_failed`, 완료·귀속이 불명확한 경우는 `external_unknown`으로 구분하며 둘 다 전체 중단한다. 실패한 사례 재호출과 schema recovery는 없다. 지침 probe를 포함한 미완료 intent는 먼저 관측해야 한다. 11사례 전수 관측은 qualification 통과와 별개의 결과다.
 
@@ -55,4 +55,6 @@ Codex executable은 `D:\codex\fm-inspection-runtime\codex-935a1911.exe`에 복�
 - 6차 고정 static 실행은 clean PASS, bad semantic FAIL, wrong-goal PASS 뒤 combined가 900,187ms timeout으로 `external_unknown`이 되어 나머지 7건을 실행하지 않았다. bad는 의도한 scope overclaim finding을 검출했지만 `ac_004`를 Task unittest·파일 보존 sibling까지 두 건 과잉 연결했다. timeout intent의 저장 상태를 고정 executable로 다시 읽는 시도도 `thread not loaded`여서 재개·재호출하지 않았다. 상세는 [6차 부분 실행 기준선](inspection-v2r6-partial-baseline.md)에 있다.
 - 7차 보정은 `ac_validation_links`의 중복 `validation_id`와 compiler가 사용하지 않던 `requirement_claim`을 제거하고, 모델이 AC별 `supported scope_ids`만 한 행으로 제출하는 `ac_scope_requirements`를 도입했다. adapter는 scope 소유 validation을 join해 전체 AC×validation 행렬을 만든다. 단계의 경계·순서 문구와 특정 단계에 결속된 검사 책임을 구분해 Goal Test의 책임 목록을 Task sibling에 전파하지 않는 일반 규칙도 고정했다. 집중 22개와 전체 671개 테스트가 통과했고, 결정적 Gate는 contract `sha256:65ff56d07589b5c4d9d35d7b3a91a7792f53f9ce4707e3a612452baa287f3d68`, source manifest `sha256:24023076cb7df9abaefc78473d68166bf85b58e4af26e659e7fb5de1d9e4b914`로 5/5를 통과했다. 상세는 [7차 AC scope 선택 계약](inspection-v2r7-ac-scope-contract.md)에 있다.
 
-전체 qualification, Functional Alpha와 1.0 cutover는 아직 NO-GO다. 7차의 결정적 Gate는 통과했지만 새 고정 static 11, qualification 13과 실제 Goal 완료는 아직 증명하지 않았다.
+- 7차 고정 static 실행의 clean·bad·wrong-goal은 모두 PASS였고 AC 관계 차이도 0이었다. 네 번째 combined는 대화 실행 중단 후 프로세스가 사라져 terminal을 확보하지 못했다. 저장 상태 조회도 `thread not loaded`였으므로 `external_unknown`으로 보존했으며 나머지 7건은 NOT_RUN이다. 이는 이전 6차의 900초 timeout과 다른 운영 중단이다. 상세는 [7차 부분 실행 기준선](inspection-v2r7-partial-baseline.md)에 있다.
+
+전체 qualification, Functional Alpha와 1.0 cutover는 아직 NO-GO다. 최신 의미 계약은 7차로 유지하며 운영 복구 보완은 [저장형 진단 실행 준비](inspection-durable-runtime.md)에 분리한다. 새 static 11, qualification 13과 실제 Goal 완료는 아직 증명하지 않았다.

@@ -361,6 +361,7 @@ def portable_preflight(run: Path, *, fixture_package: Path, codex_bin: Path,
         "fixture_package_binding": verify_fixture_package(fixture_package),
         "codex_bin": str(executable), "codex_bin_digest": sha256_bytes(executable.read_bytes()),
         "role_configuration_input": role_configuration.binding,
+        "role_threads_ephemeral": False,
     }
     write_new(run / "workspace-preflight.json", body | {"binding_digest": sha256_digest(body)})
     return body
@@ -444,9 +445,14 @@ class CapturingRuntime(CodexAppServerRuntime):
         return result
 
     def create_thread(self, **kwargs):
+        ephemeral = read(self.run / "preflight.json").get("role_threads_ephemeral", True)
+        if type(ephemeral) is not bool or kwargs.get("ephemeral") is not ephemeral:
+            raise RuntimeError("ROLE_THREAD_PERSISTENCE_BINDING_MISMATCH")
         write_new(self.capture / "thread.intent.json", kwargs)
         result = super().create_thread(**kwargs)
         write_new(self.capture / "thread.receipt.json", result)
+        if result.payload.get("thread", {}).get("ephemeral") is not ephemeral:
+            raise RuntimeError("ACTUAL_ROLE_THREAD_PERSISTENCE_MISMATCH")
         verify_instruction_sources(self.run, result.payload.get("instructionSources", []))
         if result.payload.get("thread", {}).get("turns") != []:
             raise RuntimeError("USAGE_REQUIRES_EMPTY_NEW_THREAD")
@@ -569,6 +575,8 @@ def verify_lock(run):
     elif provider != PLAN_INSPECTION_PROVIDER_V1 or "workspace_binding" in lock:
         raise RuntimeError("INSPECTION_PROVIDER_MANIFEST_MISSING")
     if "workspace_binding" in lock:
+        if lock.get("role_threads_ephemeral") is not False:
+            raise RuntimeError("ROLE_THREAD_PERSISTENCE_BINDING_MISMATCH")
         verify_portable_inputs(lock)
     roles = verify_role_configuration_artifacts(run, lock.get("role_configuration_input", {}))
     planning_binding = read(run / "planning-binding.json")
@@ -645,6 +653,7 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, ex
             raise RuntimeError("WORKSPACE_PREFLIGHT_CHANGED")
         verify_portable_inputs(isolation)
         if (isolation["execution_mode"] != execution_mode or
+                isolation.get("role_threads_ephemeral") is not False or
                 isolation["inspection_provider_contract"] != inspection_provider_contract or
                 isolation.get("inspection_provider_manifest") != provider_manifest or
                 isolation.get("inspection_provider_manifest_digest") != provider_manifest["provider_contract_digest"] or
@@ -778,6 +787,7 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, ex
                 "provider_request_binding_digests": provider_request_binding_digests,
                 "call_order": call_order,
                 "maximum_logical_calls": len(call_order), "maximum_provider_turns": len(call_order), "schema_recovery_attempts": 0,
+                "role_threads_ephemeral": not portable,
                 "prompt_digest": contract.prompt_digest, "output_schema_digest": contract.output_schema_digest,
                 "deterministic_report_digest": report.report_digest, "observed_at": utc_now(),
                 "scope": "제한 진단. 전체 S06·qualification·Plan 활성화·Worker 실행·1.0 cutover는 수행하지 않는다."}
@@ -796,6 +806,7 @@ class RecordedRunner:
     def __init__(self, runtime, run, lock):
         self.runtime, self.run_root, self.lock = runtime, run, lock
         self.runner = CodexStructuredRoleRunner(runtime, max_schema_recovery_attempts=0,
+                    ephemeral_threads=lock.get("role_threads_ephemeral", True),
                     operational_binding=(OperationalBinding.model_validate(lock["operational_binding"])
                                          if "operational_binding" in lock else None))
         self.name = None

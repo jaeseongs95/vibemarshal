@@ -6,11 +6,14 @@ import threading
 import unittest
 from unittest.mock import patch
 
+from flowmarshal.engine.runtime import RuntimeOperationReceipt
+
 from scripts.diagnostics.r_s06_10 import (
     CAPTURE_PHASES,
     CapturingRuntime,
     claim_runtime_phase,
     execute,
+    read,
     write_new,
 )
 
@@ -24,6 +27,34 @@ class InspectionRuntimeCaptureTests(unittest.TestCase):
         runtime.capture = capture
         runtime.indices = {}
         return runtime
+
+    def test_durable_role_thread_intent_and_provider_receipt_match_locked_persistence(self):
+        for requested, observed in ((True, False), (False, True), (False, False)):
+            with self.subTest(requested=requested, observed=observed), tempfile.TemporaryDirectory() as temp:
+                run = Path(temp)
+                capture = run / "calls/01-role"
+                runtime = self._runtime(run, "run", capture)
+                write_new(run / "preflight.json", {"role_threads_ephemeral": False})
+                receipt = RuntimeOperationReceipt(
+                    operation_id="stored-thread",
+                    payload={"thread":{"id":"stored-thread", "ephemeral":observed, "turns":[]}},
+                )
+                with patch("flowmarshal.engine.runtime.CodexAppServerRuntime.create_thread", return_value=receipt) as create, patch(
+                    "scripts.diagnostics.r_s06_10.verify_instruction_sources"
+                ):
+                    if requested:
+                        with self.assertRaisesRegex(RuntimeError, "ROLE_THREAD_PERSISTENCE_BINDING_MISMATCH"):
+                            runtime.create_thread(ephemeral=requested)
+                        create.assert_not_called()
+                        self.assertFalse((capture / "thread.intent.json").exists())
+                    elif observed:
+                        with self.assertRaisesRegex(RuntimeError, "ACTUAL_ROLE_THREAD_PERSISTENCE_MISMATCH"):
+                            runtime.create_thread(ephemeral=requested)
+                        self.assertTrue((capture / "thread.receipt.json").is_file())
+                    else:
+                        self.assertEqual(receipt, runtime.create_thread(ephemeral=requested))
+                        self.assertIs(False, read(capture / "thread.intent.json")["ephemeral"])
+                        create.assert_called_once_with(ephemeral=False)
 
     def test_prepare_and_run_keep_separate_inventory_raw_bytes(self):
         with tempfile.TemporaryDirectory() as temp:

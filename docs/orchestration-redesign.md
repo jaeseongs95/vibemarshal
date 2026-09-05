@@ -398,6 +398,8 @@ report progress|final
 
 공통 preflight는 실험용 detached worktree의 HEAD, source manifest, clean tracked files, 전용 Python identity와 실제 `flowmarshal` import origin을 결속한다. fixture whitelist package와 relocation proof, 명시한 Codex executable, roles와 instruction의 actual source, model lock도 같은 실행 입력으로 고정한다. origin/main과 다른 checkout의 HEAD는 시작 provenance로만 기록하며 실행 중 비교하지 않는다.
 
+새 고정 diagnostics는 실제 역할 thread의 `ephemeral=false`를 preflight에 고정하고 thread 생성 intent와 provider receipt를 대조한다. 모델 turn 없는 지침 probe는 기존 ephemeral 방식이고 일반 역할 runner의 기본값도 유지한다. 프로세스 중단 뒤에는 저장된 thread를 `thread/read`로 먼저 관측하며, 저장 설정 자체를 완료·usage 복구·재실행 권한으로 해석하지 않는다. 장시간 진단은 대화의 포그라운드 실행 세션 밖에서 시작하고 launch intent·PID·시작 시각·출력 경로를 별도 운영 기록에 남긴다. 기존 실행의 summary나 미확인 turn을 새 결과로 덮어쓰지 않는다.
+
 단계 A는 payload 의미나 oracle을 수정하지 않고 과거 FAIL을 보정하지 않는다. 11사례가 모두 관측되어도 이는 development-diagnostic 완료일 뿐 기존 qualification 또는 cutover PASS를 의미하지 않는다.
 
 기능 Gate와 함께 같은 입력의 R3.1 baseline 대비 다음 token/latency Gate를 확인한다.

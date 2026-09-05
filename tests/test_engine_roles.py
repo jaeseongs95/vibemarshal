@@ -8,6 +8,7 @@ from flowmarshal.engine.model_lock import RUNTIME_CAPABILITIES
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from pydantic import ValidationError
 
@@ -178,6 +179,34 @@ class EngineStructuredRoleTests(unittest.TestCase):
         self.assertEqual(1, len(receipt.turn_ids))
         self.assertEqual(100, receipt.input_tokens)
         self.assertEqual(10, receipt.output_tokens)
+
+    def test_role_thread_persistence_is_explicit_without_changing_request_or_resuming(self):
+        for ephemeral in (True, False):
+            with self.subTest(ephemeral=ephemeral), tempfile.TemporaryDirectory() as temp:
+                runtime = ImmediateRoleRuntime(['{"answer":"ok"}'])
+                progress = []
+                runner = CodexStructuredRoleRunner(
+                    runtime, ephemeral_threads=ephemeral, progress_sink=progress.append,
+                    max_schema_recovery_attempts=0,
+                )
+                request = make_role_request(
+                    inventory=runtime.inventory, role="stored-diagnostic", instructions="JSON 응답",
+                    payload={"request":"ok"}, output_schema={"type":"object"},
+                    model="available", effort="low", cwd=temp,
+                    inventory_digest=runtime.inventory.inventory_digest,
+                )
+                before = request.model_dump(mode="json")
+                with patch.object(runtime, "create_thread", wraps=runtime.create_thread) as create:
+                    result = runner.run(request)
+                self.assertIs(ephemeral, create.call_args.kwargs["ephemeral"])
+                self.assertEqual(before, request.model_dump(mode="json"))
+                self.assertEqual("succeeded", result.receipt.status)
+                self.assertEqual(1, len(result.receipt.turn_ids))
+                created = next(item for item in progress if item["event"] == "thread_created")
+                self.assertIs(ephemeral, created["ephemeral"])
+        for invalid in (None, 0, 1, "false"):
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(ValueError, "명시적 bool"):
+                CodexStructuredRoleRunner(ImmediateRoleRuntime([]), ephemeral_threads=invalid)
 
     def test_all_role_schemas_remove_defaults_without_changing_core_schema(self) -> None:
         from flowmarshal.engine.domain import ExecutionSpecProposal

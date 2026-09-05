@@ -210,10 +210,14 @@ class CodexStructuredRoleRunner:
     def __init__(self, runtime: CodexRuntimePort, *, poll_interval_seconds: float = 0.25,
                  progress_sink: Callable[[dict[str, Any]], None] | None = None,
                  max_schema_recovery_attempts: int = 1,
-                 operational_binding: OperationalBinding | None = None) -> None:
+                 operational_binding: OperationalBinding | None = None,
+                 ephemeral_threads: bool = True) -> None:
         if type(max_schema_recovery_attempts) is not int or max_schema_recovery_attempts not in {0, 1}:
             raise ValueError("schema recovery 상한은 0 또는 1이어야 합니다.")
+        if type(ephemeral_threads) is not bool:
+            raise ValueError("ephemeral_threads는 명시적 bool이어야 합니다.")
         self.runtime = runtime
+        self.ephemeral_threads = ephemeral_threads
         self.operational_binding = operational_binding
         self.max_schema_recovery_attempts = max_schema_recovery_attempts
         self.poll_interval_seconds = poll_interval_seconds
@@ -262,14 +266,15 @@ class CodexStructuredRoleRunner:
             title=f"FlowMarshal role: {request.role}",
             model=request.model,
             developer_instructions=request.instructions,
-            ephemeral=True,
+            ephemeral=self.ephemeral_threads,
         )
         if thread.binding is None:
             raise StructuredRoleError(
                 "role thread binding이 없습니다.", receipts=tuple(self.receipts)
             )
         thread_id = thread.binding.thread_id
-        self._progress("thread_created", request, call_id, thread_id=thread_id, ephemeral=True)
+        self._progress("thread_created", request, call_id, thread_id=thread_id,
+                       ephemeral=self.ephemeral_threads)
         turn_ids: list[str] = []
         prompt = canonical_json(request.payload)
         recovery_attempts = 0

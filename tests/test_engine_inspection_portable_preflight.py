@@ -47,6 +47,7 @@ class PortablePreflightTests(unittest.TestCase):
             self.assertEqual(package_binding, binding["fixture_package_binding"])
             self.assertEqual(sha256_bytes(executable.read_bytes()), binding["codex_bin_digest"])
             self.assertEqual(sha256_digest(binding), stored["binding_digest"])
+            self.assertIs(False, binding["role_threads_ephemeral"])
 
             with patch("scripts.diagnostics.inspection_workspace.verify_workspace_binding") as verify_workspace, patch(
                 "scripts.diagnostics.inspection_inputs.verify_fixture_package", return_value=package_binding

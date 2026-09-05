@@ -12,6 +12,8 @@
 - [Plan inspection v2 6차 finding target catalog 계약](inspection-v2r6-target-catalog-contract.md): 복합 target 참조 조립을 adapter catalog로 이전하고 독립 validation 단계의 열거 책임 연결 규칙을 명시한 당시 개발 계약
 - [Plan inspection v2 6차 부분 실행 기준선](inspection-v2r6-partial-baseline.md): clean·wrong-goal PASS, bad 관계 과잉과 combined timeout을 원 intent·usage 경계와 함께 보존한 결과
 - [Plan inspection v2 7차 AC scope 선택 계약](inspection-v2r7-ac-scope-contract.md): AC별 실제 검사 scope만 모델이 선택하고 validation 소유 join·전체 행렬을 adapter로 이전한 현재 개발 계약
+- [Plan inspection v2 7차 부분 실행 기준선](inspection-v2r7-partial-baseline.md): 첫 3사례 PASS 뒤 프로세스 소실로 남은 combined unknown과 7사례 미실행을 보존한 결과
+- [저장형 진단 실행 준비](inspection-durable-runtime.md): 저장형 역할 thread 결속과 포그라운드 세션 밖 실행을 위한 운영 보완
 - [Inspection Provider v2 계약](inspection-provider-v2.md): 모델의 직접 의미 판단과 adapter의 결정적 참조 전개 경계, 호환성·평가·승격 조건
 
 ## 현재 권위 문서
