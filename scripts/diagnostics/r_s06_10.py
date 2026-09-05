@@ -19,7 +19,10 @@ from flowmarshal.engine.plan_inspection_eval import (
 from flowmarshal.engine.planner_roles import PlanExpanderAdapter, PlanReviewerAdapter, PlanReviewEnvelope, RuleBasedTaskAssigner
 from flowmarshal.engine.planning import plan_gate, risk_route
 from flowmarshal.engine.qualification import PlanningScenarioCatalog, ScopeQualificationReport, _model_lock, _planning_contract, source_manifest_digest, source_manifest_files
-from flowmarshal.engine.roles import CodexStructuredRoleRunner, RoleCallRequest, RoleCallResult, strict_json_output_schema, verify_role_receipt
+from flowmarshal.engine.roles import (
+    CodexStructuredRoleRunner, RoleCallReceipt, RoleCallRequest, RoleCallResult,
+    strict_json_output_schema, verify_role_receipt,
+)
 from flowmarshal.engine.runtime import CodexAppServerRuntime
 
 
@@ -434,8 +437,8 @@ class RecordedRunner:
             return result
 
 
-def completed_call_verification(capture: Path, receipt: dict[str, Any] | None) -> dict[str, Any]:
-    """완료 receipt 결속은 다음 사례를 호출하기 전에 확인한다."""
+def common_call_verification(capture: Path, receipt: dict[str, Any] | None) -> dict[str, Any]:
+    """성공 payload와 무관한 request·provider 효과·receipt 결속을 확인한다."""
     request = RoleCallRequest.model_validate(read(capture / "request.json"))
     terminal_record = read(capture / "terminal.json")
     terminal = terminal_record["payload"]
@@ -443,12 +446,8 @@ def completed_call_verification(capture: Path, receipt: dict[str, Any] | None) -
     intent = read(capture / "turn.intent.json")
     turn_receipt = read(capture / "turn.receipt.json")
     strict_artifact = read(capture / "strict-schema.json")
-    result = read(capture / "result.json")
-    receipt_value = receipt if isinstance(receipt, dict) else {}
-    try:
-        terminal_payload = json.loads(terminal_record["final_response"])
-    except (KeyError, TypeError, json.JSONDecodeError):
-        terminal_payload = None
+    receipt_value = (json_value(RoleCallReceipt.model_validate(receipt))
+                     if isinstance(receipt, dict) else {})
     observation_valid = False
     if receipt_value and request.operational_binding is not None:
         try:
@@ -459,12 +458,20 @@ def completed_call_verification(capture: Path, receipt: dict[str, Any] | None) -
             ) == observed
         except (ValueError, RuntimeError, KeyError, TypeError):
             pass
+    usage_total = _terminal_usage(terminal_record)
+    if receipt_value.get("usage_available") is True:
+        receipt_usage_valid = isinstance(usage_total, dict) and all(
+            usage_total.get(raw) == receipt_value.get(field) for field, raw in (
+                ("input_tokens", "inputTokens"), ("cached_input_tokens", "cachedInputTokens"),
+                ("output_tokens", "outputTokens"), ("reasoning_tokens", "reasoningOutputTokens"),
+            )
+        )
+    else:
+        receipt_usage_valid = receipt_value.get("usage_available") is False and usage_total is None
     checks = {
         "request_strict_artifact": strict_artifact == strict_json_output_schema(request.output_schema),
         "strict_artifact_turn_intent": strict_artifact == intent["output_schema"],
         "strict_artifact_receipt_digest": receipt_value.get("output_schema_digest") == sha256_digest(strict_artifact),
-        "terminal_result_output_digest": terminal_payload == result["payload"] and
-                                          receipt_value.get("output_digest") == sha256_digest(result["payload"]),
         "prompt_instruction": json.loads(intent["prompt"]) == request.payload and
                               terminal.get("prompt_digest") == sha256_digest(intent["prompt"]) and
                               read(capture / "thread.intent.json")["developer_instructions"] == request.instructions,
@@ -480,70 +487,390 @@ def completed_call_verification(capture: Path, receipt: dict[str, Any] | None) -
                        terminal.get("turn_id") == turn_receipt["operation_id"] and
                        receipt_value.get("thread_id") == intent["thread_id"] and
                        receipt_value.get("turn_ids") == [terminal.get("turn_id")],
+        "terminal_completed": terminal_record.get("active") is False and
+                              terminal_record.get("terminal_status") in {"completed", "success", "succeeded"},
+        "receipt_terminal_usage": receipt_usage_valid,
         "model_observation": observation_valid,
     }
     return {"passed": all(checks.values()), "checks": checks, "request_digest": request.request_digest,
-            "receipt_digest": sha256_digest(receipt) if receipt else None}
+            "receipt_digest": sha256_digest(receipt_value) if receipt_value else None}
+
+
+def completed_call_verification(capture: Path, receipt: dict[str, Any] | None) -> dict[str, Any]:
+    """정상 성공에만 output 결속을 추가한다. 실패 요약에서는 호출하지 않는다."""
+    common = common_call_verification(capture, receipt)
+    result = RoleCallResult.model_validate(read(capture / "result.json"))
+    receipt_value = receipt if isinstance(receipt, dict) else {}
+    terminal_record = read(capture / "terminal.json")
+    try:
+        terminal_payload = json.loads(terminal_record["final_response"])
+    except (KeyError, TypeError, json.JSONDecodeError):
+        terminal_payload = None
+    result_receipt = json_value(result.receipt)
+    canonical_receipt = json_value(RoleCallReceipt.model_validate(receipt_value)) if receipt_value else None
+    checks = dict(common["checks"])
+    checks["terminal_result_output_digest"] = (
+        receipt_value.get("status") == "succeeded" and
+        terminal_payload == result.payload and
+        receipt_value.get("output_digest") == sha256_digest(result.payload) and
+        result_receipt == canonical_receipt
+    )
+    return {"passed": all(checks.values()), "checks": checks, "request_digest": common["request_digest"],
+            "receipt_digest": common["receipt_digest"]}
+
+
+CALL_ARTIFACT_NAMES = (
+    "request.json", "strict-schema.json", "thread.intent.json", "thread.receipt.json",
+    "turn.intent.json", "turn.receipt.json", "terminal.json", "result.json", "failed.json",
+    "binding-verification.json",
+)
+
+
+def _artifact(path: Path) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    """존재와 JSON object 파싱을 분리해 손상 artifact도 요약 가능한 관측으로 만든다."""
+    if not path.exists():
+        return {"exists": False, "parse_status": "missing", "digest": None, "error": None}, None
+    digest = sha256_bytes(path.read_bytes())
+    try:
+        value = read(path)
+        if not isinstance(value, dict):
+            raise TypeError("JSON object가 아닙니다.")
+    except (OSError, UnicodeError, json.JSONDecodeError, TypeError) as error:
+        return {"exists": True, "parse_status": "malformed", "digest": digest,
+                "error": f"{type(error).__name__}: {error}"}, None
+    return {"exists": True, "parse_status": "parsed", "digest": digest, "error": None}, value
+
+
+def _issue(issues: list[dict[str, Any]], code: str, capture: str, artifact: str, detail: str) -> None:
+    issues.append({"code": code, "capture": capture, "artifact": artifact, "detail": detail})
+
+
+def _receipt_document(raw: Any, *, capture: str, artifact: str,
+                      issues: list[dict[str, Any]]) -> dict[str, Any] | None:
+    if not isinstance(raw, dict):
+        _issue(issues, "PARTIAL_RECEIPT", capture, artifact, "receipt가 JSON object가 아닙니다.")
+        return None
+    # canonical JSON은 값이 None인 nullable 필드를 생략한다. 수치·bool default는
+    # 누락을 0/false로 보정하지 않도록 반드시 원문에 있어야 한다.
+    missing = sorted((set(RoleCallReceipt.model_fields) - {"output_digest", "error_summary"}) - set(raw))
+    if missing:
+        _issue(issues, "PARTIAL_RECEIPT", capture, artifact, "누락 필드: " + ", ".join(missing))
+        return None
+    if raw.get("status") == "succeeded" and not isinstance(raw.get("output_digest"), str):
+        _issue(issues, "PARTIAL_RECEIPT", capture, artifact, "성공 receipt의 output_digest가 없습니다.")
+        return None
+    if raw.get("status") != "succeeded" and not isinstance(raw.get("error_summary"), str):
+        _issue(issues, "PARTIAL_RECEIPT", capture, artifact, "실패 receipt의 error_summary가 없습니다.")
+        return None
+    try:
+        return json_value(RoleCallReceipt.model_validate(raw))
+    except (TypeError, ValueError) as error:
+        _issue(issues, "MALFORMED_RECEIPT", capture, artifact, f"{type(error).__name__}: {error}")
+        return None
+
+
+def _terminal_usage(record: dict[str, Any] | None) -> dict[str, Any] | None:
+    if not isinstance(record, dict) or not isinstance(record.get("payload"), dict):
+        return None
+    usage = record["payload"].get("usage")
+    return usage.get("total") if isinstance(usage, dict) and isinstance(usage.get("total"), dict) else None
+
+
+def collect_call_artifacts(run: Path) -> dict[str, Any]:
+    """저장 artifact만 읽어 호출별 결과·효과·receipt 귀속을 결정적으로 계산한다."""
+    issues: list[dict[str, Any]] = []
+    captures: list[dict[str, Any]] = []
+    occurrences: list[tuple[str, str, dict[str, Any]]] = []
+    call_root = run / "calls"
+    capture_paths = sorted(path for path in call_root.glob("*") if path.is_dir()) if call_root.exists() else []
+    for capture in capture_paths:
+        states: dict[str, Any] = {}
+        documents: dict[str, Any] = {}
+        for name in CALL_ARTIFACT_NAMES:
+            state, document = _artifact(capture / name)
+            states[name] = state
+            documents[name] = document
+            if state["parse_status"] == "malformed":
+                _issue(issues, "MALFORMED_ARTIFACT", capture.name, name, state["error"])
+        result = documents["result.json"]
+        if result is not None:
+            receipt = _receipt_document(result.get("receipt"), capture=capture.name,
+                                        artifact="result.json/receipt", issues=issues)
+            if receipt is not None:
+                occurrences.append((capture.name, "result.json", receipt))
+        failed = documents["failed.json"]
+        if failed is not None:
+            missing_failure = [key for key in ("error_type", "error", "receipts") if key not in failed]
+            if missing_failure:
+                _issue(issues, "PARTIAL_FAILED_ARTIFACT", capture.name, "failed.json",
+                       "누락 필드: " + ", ".join(missing_failure))
+            raw_receipts = failed.get("receipts")
+            if not isinstance(raw_receipts, list):
+                _issue(issues, "PARTIAL_FAILED_ARTIFACT", capture.name, "failed.json/receipts",
+                       "receipts 목록이 없습니다.")
+            else:
+                for index, raw in enumerate(raw_receipts):
+                    receipt = _receipt_document(raw, capture=capture.name,
+                                                artifact=f"failed.json/receipts/{index}", issues=issues)
+                    if receipt is not None:
+                        occurrences.append((capture.name, f"failed.json/receipts/{index}", receipt))
+        terminal = documents["terminal.json"]
+        if terminal is not None:
+            missing_terminal = [key for key in ("active", "terminal_status", "payload") if key not in terminal]
+            payload = terminal.get("payload")
+            if isinstance(payload, dict):
+                missing_terminal.extend(f"payload.{key}" for key in ("thread_id", "turn_id", "prompt_digest")
+                                        if key not in payload)
+            if missing_terminal:
+                _issue(issues, "PARTIAL_TERMINAL", capture.name, "terminal.json",
+                       "누락 필드: " + ", ".join(missing_terminal))
+        captures.append({"name": capture.name, "path": capture, "artifacts": states, "documents": documents})
+
+    receipts_by_id: dict[str, dict[str, Any]] = {}
+    receipt_sources: dict[str, list[dict[str, str]]] = {}
+    for capture_name, source, receipt in occurrences:
+        call_id = receipt["call_id"]
+        existing = receipts_by_id.get(call_id)
+        if existing is not None and existing != receipt:
+            _issue(issues, "DUPLICATE_CALL_ID_CONFLICT", capture_name, source,
+                   f"동일 call_id {call_id}의 내용이 기존 receipt와 다릅니다.")
+            continue
+        receipts_by_id.setdefault(call_id, receipt)
+        receipt_sources.setdefault(call_id, []).append({"capture": capture_name, "artifact": source})
+
+    records: list[dict[str, Any]] = []
+    owners: dict[str, list[str]] = {}
+    turns: list[dict[str, Any]] = []
+    for entry in captures:
+        name, documents, states = entry["name"], entry["documents"], entry["artifacts"]
+        request = documents["request.json"]
+        request_value = None
+        if request is not None:
+            try:
+                request_value = RoleCallRequest.model_validate(request)
+            except (TypeError, ValueError) as error:
+                _issue(issues, "MALFORMED_REQUEST", name, "request.json", f"{type(error).__name__}: {error}")
+        thread_receipt = documents["thread.receipt.json"]
+        thread = thread_receipt.get("payload", {}).get("thread") if isinstance(thread_receipt, dict) else None
+        thread_id = thread.get("id") if isinstance(thread, dict) else None
+        turn_receipt = documents["turn.receipt.json"]
+        turn_id = turn_receipt.get("operation_id") if isinstance(turn_receipt, dict) else None
+        matching = []
+        for call_id, receipt in receipts_by_id.items():
+            if request_value is not None and receipt.get("input_digest") != request_value.request_digest:
+                continue
+            if thread_id is not None and receipt.get("thread_id") != thread_id:
+                continue
+            if turn_id is not None and turn_id not in receipt.get("turn_ids", []):
+                continue
+            if request_value is not None and (receipt.get("role"), receipt.get("model"), receipt.get("effort")) != (
+                    request_value.role, request_value.model, request_value.effort):
+                continue
+            matching.append(receipt)
+        attributed = matching[0] if len(matching) == 1 else None
+        if len(matching) > 1:
+            _issue(issues, "CALL_RECEIPT_ATTRIBUTION_AMBIGUOUS", name, "receipt",
+                   "여러 receipt가 동일 capture에 결속됩니다.")
+        if attributed is not None:
+            owners.setdefault(attributed["call_id"], []).append(name)
+
+        terminal = documents["terminal.json"]
+        terminal_complete = bool(
+            isinstance(terminal, dict) and terminal.get("active") is False and
+            terminal.get("terminal_status") in {"completed", "success", "succeeded"}
+        )
+        failed = documents["failed.json"]
+        result = documents["result.json"]
+        output_binding: dict[str, Any]
+        common_binding: dict[str, Any] | None = None
+        has_malformed = any(state["parse_status"] == "malformed" for state in states.values())
+        if (states["terminal.json"]["parse_status"] == "missing" and
+                (states["thread.intent.json"]["exists"] or states["turn.intent.json"]["exists"])):
+            outcome = "external_unknown"
+            output_binding = {"status": "NOT_EVALUATED", "passed": None,
+                              "reason": "terminal 관측이 없어 provider 효과의 완료 여부를 알 수 없습니다."}
+        elif has_malformed or request_value is None or attributed is None:
+            outcome = "incomplete"
+            output_binding = {"status": "NOT_EVALUATED", "passed": None,
+                              "reason": "artifact가 malformed/partial이거나 receipt 귀속이 불완전합니다."}
+        elif failed is not None and result is None and attributed.get("status") != "succeeded" and terminal_complete:
+            outcome = "failure"
+            output_binding = {"status": "NOT_APPLICABLE", "passed": None,
+                              "reason": "역할 실패에는 성공 전용 output payload 결속을 적용하지 않습니다."}
+            try:
+                common_binding = common_call_verification(entry["path"], attributed)
+                if not common_binding["passed"]:
+                    _issue(issues, "COMMON_BINDING_FAILED", name, "binding",
+                           "실패 artifact의 공통 request/provider/receipt 결속이 일치하지 않습니다.")
+            except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+                _issue(issues, "COMMON_BINDING_ERROR", name, "binding", f"{type(error).__name__}: {error}")
+        elif result is not None and attributed.get("status") == "succeeded" and terminal_complete:
+            outcome = "success"
+            try:
+                verification = completed_call_verification(entry["path"], attributed)
+                common_binding = {"passed": all(value for key, value in verification["checks"].items()
+                                                if key != "terminal_result_output_digest"),
+                                  "checks": {key: value for key, value in verification["checks"].items()
+                                             if key != "terminal_result_output_digest"},
+                                  "request_digest": verification["request_digest"],
+                                  "receipt_digest": verification["receipt_digest"]}
+                output_binding = {"status": "APPLICABLE",
+                                  "passed": verification["checks"]["terminal_result_output_digest"],
+                                  "reason": None}
+                if not verification["passed"]:
+                    _issue(issues, "SUCCESS_BINDING_FAILED", name, "binding",
+                           "성공 artifact의 공통 또는 output 결속이 일치하지 않습니다.")
+                    outcome = "incomplete"
+            except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+                outcome = "incomplete"
+                output_binding = {"status": "NOT_EVALUATED", "passed": None,
+                                  "reason": "성공 artifact의 output 결속을 파싱하지 못했습니다."}
+                _issue(issues, "SUCCESS_BINDING_ERROR", name, "binding", f"{type(error).__name__}: {error}")
+        else:
+            outcome = "incomplete"
+            output_binding = {"status": "NOT_EVALUATED", "passed": None,
+                              "reason": "receipt·terminal·result 상태 조합이 완결된 성공이나 실패가 아닙니다."}
+
+        prior = documents["binding-verification.json"]
+        if prior is not None and outcome == "success":
+            try:
+                current = completed_call_verification(entry["path"], attributed)
+                if prior != current:
+                    _issue(issues, "PRIOR_BINDING_MISMATCH", name, "binding-verification.json",
+                           "저장된 성공 결속 검증과 현재 artifact가 일치하지 않습니다.")
+                    outcome = "incomplete"
+            except (OSError, KeyError, TypeError, ValueError, json.JSONDecodeError) as error:
+                _issue(issues, "PRIOR_BINDING_ERROR", name, "binding-verification.json",
+                       f"{type(error).__name__}: {error}")
+                outcome = "incomplete"
+
+        usage_total = _terminal_usage(terminal)
+        if isinstance(terminal, dict) and isinstance(terminal.get("payload"), dict):
+            payload = terminal["payload"]
+            empty_thread = thread.get("turns") == [] if isinstance(thread, dict) and "turns" in thread else None
+            turns.append({"capture": name, "thread_id": payload.get("thread_id"), "turn_id": payload.get("turn_id"),
+                          "usage_source": payload.get("usage_source"), "usage_scope": payload.get("usage_scope"),
+                          "empty_new_thread": empty_thread, "usage_total": usage_total,
+                          "provider_duration_ms": payload.get("duration_ms"),
+                          "terminal_digest": states["terminal.json"]["digest"]})
+        role_failure = None if failed is None else {
+            "error_type": failed.get("error_type"), "error": failed.get("error"),
+            "receipt_status": None if attributed is None else attributed.get("status"),
+            "receipt_error_summary": None if attributed is None else attributed.get("error_summary"),
+        }
+        records.append({"capture": name, "artifacts": states, "outcome": outcome,
+                        "receipt_call_id": None if attributed is None else attributed["call_id"],
+                        "common_binding": common_binding, "output_binding": output_binding,
+                        "role_failure": role_failure, "artifact_issue_count": 0})
+
+    for call_id, capture_names in owners.items():
+        if len(set(capture_names)) > 1:
+            _issue(issues, "CALL_RECEIPT_ATTRIBUTION_CONFLICT", ",".join(capture_names), "receipt",
+                   f"call_id {call_id}가 여러 capture에 귀속됩니다.")
+    for call_id in receipts_by_id.keys() - owners.keys():
+        _issue(issues, "UNATTRIBUTED_RECEIPT", "run", "receipt",
+               f"call_id {call_id}가 현재 run의 어떤 capture에도 결속되지 않습니다.")
+    turn_keys = [(turn["thread_id"], turn["turn_id"]) for turn in turns
+                 if isinstance(turn["thread_id"], str) and isinstance(turn["turn_id"], str)]
+    if len(set(turn_keys)) != len(turn_keys):
+        _issue(issues, "DUPLICATE_TERMINAL_TURN", "run", "terminal.json",
+               "동일 provider thread/turn의 terminal이 여러 capture에 귀속됩니다.")
+    for record in records:
+        record["artifact_issue_count"] = sum(issue["capture"] == record["capture"] for issue in issues)
+    return {"calls": records, "receipts": [receipt for call_id, receipt in receipts_by_id.items()
+                                             if call_id in owners],
+            "receipt_sources": receipt_sources, "issues": issues, "provider_turn_usage": turns}
+
+
+def _summary_input_digest(run: Path) -> str:
+    excluded = {"summary.json", "generation-pending.json"}
+    observed = {str(path.relative_to(run)): sha256_bytes(path.read_bytes()) for path in sorted(run.rglob("*"))
+                if path.is_file() and path.name not in excluded and "runtime-preflight" not in path.parts}
+    return sha256_digest(observed)
 
 
 def summarize(run, status, error=None):
+    """provider 호출 없이 저장 artifact를 요약하고 결과 파일을 한 번만 배타적으로 게시한다."""
+    summary_path = run / ("generation-pending.json" if status == "GENERATION_REVIEW_REQUIRED" else "summary.json")
+    input_digest = _summary_input_digest(run)
+    if summary_path.exists():
+        existing = read(summary_path)
+        if existing.get("summary_input_digest") != input_digest:
+            raise RuntimeError("SUMMARY_INPUT_CHANGED_AFTER_PUBLICATION")
+        return existing
     lock = read(run / "preflight.json")
-    receipts = {}
-    for path in sorted((run / "calls").glob("*/result.json")):
-        item = read(path)["receipt"]
-        receipts[item["call_id"]] = item
-    for path in sorted((run / "calls").glob("*/failed.json")):
-        for item in read(path)["receipts"]:
-            receipts[item["call_id"]] = item
     binding = read(run / "instruction-binding.json")
+    collected = collect_call_artifacts(run)
     checks = {"source_unchanged": source_manifest_digest(ROOT) == lock["source_manifest_digest"],
               "preserved_originals": preserved_files(run) == lock["original_files"],
               "instructions_unchanged": all(Path(item["path"]).is_file() and
                   sha256_bytes(Path(item["path"]).read_bytes()) == item["content_digest"] for item in binding["sources"]),
               "workspace_unchanged": files(run / "workspace") == files(OLD / "workspace")}
-    values = list(receipts.values())
-    turns = []
-    for path in sorted((run / "calls").glob("*/terminal.json")):
-        terminal = read(path)
-        payload = terminal["payload"]
-        raw_usage = payload.get("usage")
-        usage = raw_usage.get("total") if isinstance(raw_usage, dict) else None
-        thread = read(path.parent / "thread.receipt.json")["payload"]["thread"]
-        turns.append({"thread_id": payload.get("thread_id"), "turn_id": payload.get("turn_id"),
-                      "usage_source": payload.get("usage_source"), "usage_scope": payload.get("usage_scope"),
-                      "empty_new_thread": thread.get("turns") == [], "usage_total": usage,
-                      "provider_duration_ms": payload.get("duration_ms"),
-                      "terminal_digest": sha256_bytes(path.read_bytes())})
-        receipt = next((item for item in values if item["thread_id"] == payload.get("thread_id")), None)
-        verification = completed_call_verification(path.parent, receipt)
-        verification_path = path.parent / "binding-verification.json"
-        if verification_path.exists():
-            checks[f"{path.parent.name}_prior_binding"] = read(verification_path) == verification
-        else:
-            write_new(verification_path, verification)
-        checks[f"{path.parent.name}_binding"] = verification["passed"]
+    for call in collected["calls"]:
+        if call["common_binding"] is not None:
+            checks[f"{call['capture']}_common_binding"] = call["common_binding"]["passed"]
+        if call["output_binding"]["status"] == "APPLICABLE":
+            checks[f"{call['capture']}_output_binding"] = call["output_binding"]["passed"]
+    effect_counts = {
+        "logical_calls": len(collected["calls"]),
+        "requests": sum(call["artifacts"]["request.json"]["exists"] for call in collected["calls"]),
+        "thread_intents": sum(call["artifacts"]["thread.intent.json"]["exists"] for call in collected["calls"]),
+        "thread_start_receipts": sum(call["artifacts"]["thread.receipt.json"]["parse_status"] == "parsed" for call in collected["calls"]),
+        "turn_intents": sum(call["artifacts"]["turn.intent.json"]["exists"] for call in collected["calls"]),
+        "turn_start_receipts": sum(call["artifacts"]["turn.receipt.json"]["parse_status"] == "parsed" for call in collected["calls"]),
+        "terminal_observations": sum(call["artifacts"]["terminal.json"]["parse_status"] == "parsed" for call in collected["calls"]),
+        "accepted_results": sum(call["outcome"] == "success" for call in collected["calls"]),
+    }
     usage_keys = {"input_tokens": "inputTokens", "cached_input_tokens": "cachedInputTokens",
                   "output_tokens": "outputTokens", "reasoning_tokens": "reasoningOutputTokens", "total_tokens": "totalTokens"}
-    available = len(turns) == len(list((run / "calls").glob("*/turn.intent.json"))) and bool(turns) and all(
-        turn["empty_new_thread"] and isinstance(turn["usage_total"], dict) and
-        all(key in turn["usage_total"] for key in usage_keys.values()) for turn in turns)
-    usage = {key: sum(turn["usage_total"][raw] for turn in turns) if available else None for key, raw in usage_keys.items()}
-    usage["latency_ms"] = sum(item["latency_ms"] for item in values)
-    usage["provider_duration_ms"] = sum(turn["provider_duration_ms"] for turn in turns) if all(
-        turn["provider_duration_ms"] is not None for turn in turns) and turns else None
-    usage["reasoning_included_in_output"] = True
-    summary = {"status": status if all(checks.values()) else "FAIL", "error": error, "checks": checks,
-               "preflight_digest": lock["lock_digest"], "receipts": values,
-               "logical_calls": len(list((run / "calls").glob("*"))),
-               "provider_turns": len(list((run / "calls").glob("*/turn.intent.json"))),
-               "usage": usage, "provider_turn_usage": turns,
-               "all_usage_available": available,
+    turns = collected["provider_turn_usage"]
+    unique_turns = {(turn["thread_id"], turn["turn_id"]) for turn in turns
+                    if isinstance(turn["thread_id"], str) and isinstance(turn["turn_id"], str)}
+    usage_available = (effect_counts["turn_start_receipts"] == len(turns) == len(unique_turns) and bool(turns) and all(
+        turn["empty_new_thread"] is True and isinstance(turn["usage_total"], dict) and
+        all(type(turn["usage_total"].get(raw)) is int and turn["usage_total"][raw] >= 0 for raw in usage_keys.values())
+        for turn in turns))
+    usage = {key: sum(turn["usage_total"][raw] for turn in turns) if usage_available else None
+             for key, raw in usage_keys.items()}
+    receipts = collected["receipts"]
+    all_calls_have_receipt = len(receipts) == effect_counts["logical_calls"] and not any(
+        issue["code"].startswith(("PARTIAL_RECEIPT", "MALFORMED_RECEIPT", "DUPLICATE_CALL_ID", "CALL_RECEIPT"))
+        for issue in collected["issues"])
+    usage["latency_ms"] = sum(item["latency_ms"] for item in receipts) if all_calls_have_receipt and receipts else None
+    usage["provider_duration_ms"] = sum(turn["provider_duration_ms"] for turn in turns) if usage_available and all(
+        type(turn["provider_duration_ms"]) is int and turn["provider_duration_ms"] >= 0 for turn in turns) else None
+    usage["reasoning_included_in_output"] = True if usage_available else None
+    usage["unavailable_reason"] = None if usage_available else "모든 시작 turn의 완전한 terminal usage를 유일하게 귀속하지 못했습니다."
+    recovery_count = sum(item["schema_recovery_attempts"] for item in receipts) if all_calls_have_receipt else None
+    outcomes = {name: sum(call["outcome"] == name for call in collected["calls"])
+                for name in ("success", "failure", "external_unknown", "incomplete")}
+    budget = {"maximum_logical_calls": lock.get("maximum_logical_calls"),
+              "maximum_provider_turns": lock.get("maximum_provider_turns"),
+              "remaining_logical_calls": (lock["maximum_logical_calls"] - effect_counts["logical_calls"]
+                                            if type(lock.get("maximum_logical_calls")) is int else None),
+              "remaining_provider_turns": (lock["maximum_provider_turns"] - effect_counts["turn_intents"]
+                                             if type(lock.get("maximum_provider_turns")) is int else None)}
+    clean_artifacts = not collected["issues"] and outcomes["external_unknown"] == 0 and outcomes["incomplete"] == 0
+    final_status = status if all(checks.values()) and clean_artifacts else "FAIL"
+    summary_path = run / ("generation-pending.json" if final_status == "GENERATION_REVIEW_REQUIRED" else "summary.json")
+    summary = {"status": final_status, "error": error, "checks": checks,
+               "diagnostic_errors": collected["issues"], "call_artifacts": collected["calls"],
+               "outcomes": outcomes, "effect_counts": effect_counts,
+               "preflight_digest": lock["lock_digest"], "summary_input_digest": input_digest,
+               "receipts": receipts, "receipt_sources": collected["receipt_sources"],
+               "logical_calls": effect_counts["logical_calls"],
+               "provider_turns": effect_counts["turn_start_receipts"],
+               "schema_recovery_attempts": recovery_count,
+               "budget": budget, "usage": usage, "provider_turn_usage": turns,
+               "all_usage_available": usage_available,
                "billed_cost": None, "billed_cost_reason": "provider receipt가 청구 금액을 제공하지 않는다.",
                "generation_assessment": read(run / "generation-assessment.json") if (run / "generation-assessment.json").exists() else None,
                "plan_activated": False, "worker_executed": False, "new_ledger_writes": 0,
                "full_qualification": "NOT_RUN", "cutover": "NO-GO", "observed_at": utc_now()}
-    write_new(run / ("generation-pending.json" if summary["status"] == "GENERATION_REVIEW_REQUIRED" else "summary.json"), summary)
-    print(json.dumps({key: summary[key] for key in ("status", "logical_calls", "provider_turns", "usage", "error")}, ensure_ascii=False), flush=True)
+    write_new(summary_path, summary)
+    published = read(summary_path)
+    print(json.dumps({key: published[key] for key in ("status", "logical_calls", "provider_turns", "usage", "error")}, ensure_ascii=False), flush=True)
+    return published
 
 
 def verify_generation_pending(run: Path) -> None:

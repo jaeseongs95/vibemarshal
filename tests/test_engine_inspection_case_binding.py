@@ -180,7 +180,8 @@ class InspectionCaseBindingTests(unittest.TestCase):
                    "model": request.model, "effort": request.effort, "role": request.role,
                    "inventory_digest": request.inventory_digest, "permission_profile": ":danger-full-access",
                    "approval_policy": "never", "call_id": "model_call_fixture", "status": "succeeded",
-                   "output_digest": sha256_digest({}), "latency_ms": 0,
+                   "output_digest": sha256_digest({}), "input_tokens": 0, "cached_input_tokens": 0,
+                   "output_tokens": 0, "reasoning_tokens": 0, "usage_available": False, "latency_ms": 0,
                    "recorded_at": "2026-09-05T00:00:00Z", "observed_binding": binding.model_dump(mode="json")}
 
         def write_capture(capture, *, active_request=request, active_schema=schema, active_receipt=receipt,
@@ -190,9 +191,10 @@ class InspectionCaseBindingTests(unittest.TestCase):
             values = {
                 "request.json": active_request, "strict-schema.json": active_schema,
                 "result.json": {"payload": {} if active_result is None else active_result, "receipt": active_receipt},
-                "terminal.json": {"final_response": active_terminal, "payload": {
+                "terminal.json": {"active": False, "terminal_status": "completed",
+                                  "final_response": active_terminal, "payload": {
                     "thread_id": "thread_actual", "turn_id": "turn_actual", "prompt_digest": sha256_digest(prompt)}},
-                "thread.receipt.json": {"payload": {"thread": {"id": "thread_actual"}}},
+                "thread.receipt.json": {"payload": {"thread": {"id": "thread_actual", "turns": []}}},
                 "thread.intent.json": {"developer_instructions": request.instructions},
                 "turn.intent.json": intent,
                 "turn.receipt.json": {"operation_id": "turn_actual"},
@@ -208,7 +210,7 @@ class InspectionCaseBindingTests(unittest.TestCase):
             self.assertEqual({"request_strict_artifact", "strict_artifact_turn_intent",
                               "strict_artifact_receipt_digest", "terminal_result_output_digest",
                               "prompt_instruction", "receipt_request_identity", "model_effort", "thread_turn",
-                              "model_observation"},
+                              "terminal_completed", "receipt_terminal_usage", "model_observation"},
                              set(verification["checks"]))
 
         def verify_failure(**kwargs):

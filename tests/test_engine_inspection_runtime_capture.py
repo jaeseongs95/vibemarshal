@@ -128,6 +128,8 @@ class InspectionRuntimeCaptureTests(unittest.TestCase):
             with self.subTest(artifact=artifact), tempfile.TemporaryDirectory() as temp:
                 run = Path(temp)
                 write_new(run / artifact, {"fixture": artifact})
+                before = {str(path.relative_to(run)): path.read_bytes()
+                          for path in run.rglob("*") if path.is_file()}
                 with patch("scripts.diagnostics.r_s06_10.verify_lock", return_value={"lock_digest": "fixture"}), patch(
                     "scripts.diagnostics.r_s06_10.CapturingRuntime"
                 ) as runtime:
@@ -135,6 +137,9 @@ class InspectionRuntimeCaptureTests(unittest.TestCase):
                     with self.assertRaises(expected):
                         execute(run)
                 runtime.assert_not_called()
+                after = {str(path.relative_to(run)): path.read_bytes()
+                         for path in run.rglob("*") if path.is_file()}
+                self.assertEqual(before, after)
                 self.assertFalse((run / "summary.json").exists())
                 if artifact != "execution-started.json":
                     self.assertFalse((run / "execution-started.json").exists())
