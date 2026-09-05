@@ -1,0 +1,30 @@
+{
+  "normalizer": {
+    "model": "gpt-5.6-luna",
+    "effort": "high"
+  },
+  "skeleton_generator": {
+    "model": "gpt-5.6-luna",
+    "effort": "high"
+  },
+  "plan_expander": {
+    "model": "gpt-5.6-luna",
+    "effort": "high"
+  },
+  "general_reviewer": {
+    "model": "gpt-5.6-sol",
+    "effort": "high"
+  },
+  "critical_reviewer": {
+    "model": "gpt-5.6-sol",
+    "effort": "xhigh"
+  },
+  "executor": {
+    "model": "gpt-5.6-terra",
+    "effort": "high"
+  },
+  "validator": {
+    "model": "gpt-5.6-sol",
+    "effort": "xhigh"
+  }
+}

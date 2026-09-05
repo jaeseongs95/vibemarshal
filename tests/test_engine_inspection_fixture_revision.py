@@ -218,6 +218,31 @@ class InspectionFixtureRevisionTests(unittest.TestCase):
         self.assertFalse(rows["val_task_unittest"])
         self.assertFalse(rows["val_task_scope_preservation"])
 
+    def test_mentions_exclusions_optional_links_and_oracle_links_remain_independent(self):
+        evidence = EXPECTATIONS["evidence_semantics"]
+        self.assertNotIn("명시적으로 제외", evidence["simple_mention_statement"])
+        self.assertIn("명시적으로 제외", evidence["explicit_exclusion_statement"])
+        self.assertEqual([], evidence["simple_mention_expected_defects"])
+        self.assertEqual(["validator-explicitly-excludes-test-evidence"],
+                         evidence["explicit_exclusion_expected_defects"])
+
+        _, destination = self.build()
+        clean = _plan(destination, "input-clean-plan.json")
+        actual_ac004_links = _coverage(clean, "ac_004")
+        rows = {
+            row["validation_id"]: row["ac_link_required"]
+            for row in EXPECTATIONS["case_ac_validation_rows"]["clean"]
+            if row["criterion_id"] == "ac_004"
+        }
+        # 실제 선택 연결의 존재와 의미상 필수성은 서로 독립이다.
+        for validation_id in ("val_task_scope_preservation", "val_task_unittest"):
+            self.assertIn(validation_id, actual_ac004_links)
+            self.assertFalse(rows[validation_id])
+        # AC가 명시한 task/goal oracle 절차는 두 phase 모두 양성 연결이다.
+        for validation_id in ("val_task_add_behavior_contract", "val_goal_independent_behavior_contract"):
+            self.assertIn(validation_id, actual_ac004_links)
+            self.assertTrue(rows[validation_id])
+
     def test_bad_axis_conflation_expectation_keeps_scope_defect_and_three_true_rows(self):
         defects = json.loads((ROOT / "plan-inspection-expectations.json").read_text(encoding="utf-8"))["bad"]
         self.assertEqual(["task-phase-overclaim"], [row["defect_id"] for row in defects])

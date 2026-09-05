@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 from contextlib import contextmanager
+from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
@@ -34,6 +35,15 @@ STATIC_CASES = ("clean", "bad", "wrong-goal", "combined", "boundary-clean", "mis
 CALL_ORDER = (*STATIC_CASES, "expansion", "expanded-review")
 MAXIMUM_CALLS = 13
 CAPTURE_PHASES = ("prepare", "run", "review-generated")
+ROLE_CONFIGURATION_IDS = tuple(EngineRoleConfiguration.model_fields)
+ROLE_CONFIGURATION_INPUT_FORMAT = "flowmarshal-role-configuration-input-v1"
+REQUEST_ROLE_CONFIGURATION = {
+    "plan_expander": "plan_expander",
+    "compact_plan_reviewer": "general_reviewer",
+    "critical_effect_reviewer": "critical_reviewer",
+    "high_risk_reviewer": "critical_reviewer",
+    "external_effect_reviewer": "critical_reviewer",
+}
 
 
 def read(path):
@@ -44,6 +54,14 @@ def write_new(path: Path, value: Any):
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("x", encoding="utf-8", newline="\n") as stream:
         stream.write(json.dumps(json_value(value), ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
+
+
+def write_new_bytes(path: Path, value: bytes) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("xb") as stream:
+        stream.write(value)
         stream.flush()
         os.fsync(stream.fileno())
 
@@ -69,9 +87,149 @@ def preserved_files(run: Path | None = None):
 
 
 def copy_new(source: Path, destination: Path):
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    with destination.open("xb") as stream:
-        stream.write(source.read_bytes())
+    write_new_bytes(destination, source.read_bytes())
+
+
+def _strict_json_document(raw_bytes: bytes) -> Any:
+    def unique_object(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError(f"JSON object key가 중복됐습니다: {key}")
+            result[key] = value
+        return result
+
+    return json.loads(raw_bytes.decode("utf-8"), object_pairs_hook=unique_object)
+
+
+def _decode_role_configuration(raw_bytes: bytes) -> tuple[EngineRoleConfiguration, str]:
+    try:
+        document = _strict_json_document(raw_bytes)
+        if not isinstance(document, dict) or set(document) != set(ROLE_CONFIGURATION_IDS):
+            raise ValueError(
+                "역할 ID 집합이 정확하지 않습니다. expected=" + ",".join(ROLE_CONFIGURATION_IDS)
+            )
+        roles = EngineRoleConfiguration.model_validate(document)
+    except Exception as error:
+        raise RuntimeError(f"ROLE_CONFIGURATION_INVALID: {error}") from error
+    return roles, sha256_digest(document)
+
+
+@dataclass(frozen=True)
+class RoleConfigurationInput:
+    input_path: Path
+    raw_bytes: bytes
+    roles: EngineRoleConfiguration
+    source_canonical_digest: str
+    selection_reason: str
+
+    @property
+    def binding(self) -> dict[str, Any]:
+        return {
+            "format": ROLE_CONFIGURATION_INPUT_FORMAT,
+            "input_path": str(self.input_path),
+            "selection_reason": self.selection_reason,
+            "source_bytes_digest": sha256_bytes(self.raw_bytes),
+            "source_canonical_digest": self.source_canonical_digest,
+            "configuration_digest": self.roles.configuration_digest,
+            "role_ids": list(ROLE_CONFIGURATION_IDS),
+            "copied_artifact": "roles.json",
+        }
+
+
+def load_role_configuration_input(path: Path | None = None) -> RoleConfigurationInput:
+    """prepare mutation 전에 명시적 역할 설정 경로와 원문을 검증한다."""
+    explicit = path is not None
+    selected = S05 / "roles.json" if path is None else Path(path)
+    if explicit and not selected.is_absolute():
+        raise RuntimeError("ROLE_CONFIGURATION_PATH_MUST_BE_ABSOLUTE")
+    try:
+        resolved = selected.resolve(strict=True)
+    except (FileNotFoundError, OSError) as error:
+        raise RuntimeError(f"ROLE_CONFIGURATION_NOT_FOUND: {selected}") from error
+    if not resolved.is_file():
+        raise RuntimeError(f"ROLE_CONFIGURATION_NOT_FILE: {resolved}")
+    raw_bytes = resolved.read_bytes()
+    roles, canonical_digest = _decode_role_configuration(raw_bytes)
+    return RoleConfigurationInput(
+        input_path=resolved,
+        raw_bytes=raw_bytes,
+        roles=roles,
+        source_canonical_digest=canonical_digest,
+        selection_reason=("caller_provided_explicit_role_configuration" if explicit
+                          else "historical_s05_default_role_configuration"),
+    )
+
+
+def validate_role_configuration_inventory(roles: EngineRoleConfiguration, inventory: ModelInventory) -> None:
+    """선택과 fallback의 모든 model/effort 조합을 fresh inventory에 대조한다."""
+    unsupported = []
+    for role_id in ROLE_CONFIGURATION_IDS:
+        binding = roles.binding_for(role_id)
+        choices = (("selected", binding),) + tuple(
+            (f"fallback[{index}]", fallback)
+            for index, fallback in enumerate(binding.allowed_fallbacks)
+        )
+        for envelope_name, choice in choices:
+            if not inventory.supports(choice.model, choice.effort):
+                unsupported.append(f"{role_id}:{envelope_name}:{choice.model}/{choice.effort}")
+    if unsupported:
+        raise RuntimeError("ROLE_CONFIGURATION_MODEL_EFFORT_UNSUPPORTED: " + ", ".join(unsupported))
+
+
+def verify_role_configuration_artifacts(run: Path, binding: dict[str, Any]) -> EngineRoleConfiguration:
+    """preflight에 결속한 외부 원문과 run 복사본이 모두 같은지 확인한다."""
+    if binding.get("format") != ROLE_CONFIGURATION_INPUT_FORMAT:
+        raise RuntimeError("ROLE_CONFIGURATION_INPUT_FORMAT_UNSUPPORTED")
+    if binding.get("role_ids") != list(ROLE_CONFIGURATION_IDS) or binding.get("copied_artifact") != "roles.json":
+        raise RuntimeError("ROLE_CONFIGURATION_INPUT_SCHEMA_MISMATCH")
+    source = Path(binding.get("input_path", ""))
+    if not source.is_absolute() or not source.is_file():
+        raise RuntimeError("ROLE_CONFIGURATION_SOURCE_UNAVAILABLE")
+    source_bytes = source.read_bytes()
+    source_roles, source_canonical_digest = _decode_role_configuration(source_bytes)
+    if (sha256_bytes(source_bytes) != binding.get("source_bytes_digest") or
+            source_canonical_digest != binding.get("source_canonical_digest") or
+            source_roles.configuration_digest != binding.get("configuration_digest")):
+        raise RuntimeError("ROLE_CONFIGURATION_SOURCE_CHANGED")
+    copied = run / binding["copied_artifact"]
+    if not copied.is_file() or copied.read_bytes() != source_bytes:
+        raise RuntimeError("ROLE_CONFIGURATION_COPY_CHANGED")
+    copied_roles, copied_canonical_digest = _decode_role_configuration(copied.read_bytes())
+    if (copied_canonical_digest != binding["source_canonical_digest"] or
+            copied_roles.configuration_digest != binding["configuration_digest"]):
+        raise RuntimeError("ROLE_CONFIGURATION_COPY_BINDING_MISMATCH")
+    return copied_roles
+
+
+def verify_role_request_binding(
+    request: RoleCallRequest,
+    roles: EngineRoleConfiguration,
+    inventory: ModelInventory,
+) -> None:
+    """실제 호출 request를 역할 설정과 그 request의 v2 lock에 동시에 대조한다."""
+    role_id = REQUEST_ROLE_CONFIGURATION.get(request.role)
+    if role_id is None:
+        raise RuntimeError(f"ROLE_CONFIGURATION_REQUEST_ROLE_UNKNOWN: {request.role}")
+    configured = roles.binding_for(role_id)
+    if (request.model, request.effort) != (configured.model, configured.effort):
+        raise RuntimeError("ROLE_CONFIGURATION_REQUEST_MISMATCH")
+    try:
+        request = RoleCallRequest.model_validate(request.model_dump(mode="python"))
+        verify_binding(
+            request.operational_binding,
+            inventory,
+            role=request.role,
+            model=request.model,
+            effort=request.effort,
+        )
+    except ValueError as error:
+        raise RuntimeError(f"ROLE_CONFIGURATION_REQUEST_LOCK_MISMATCH: {error}") from error
+    locked_role = next(item for item in request.operational_binding.lock.roles if item.role == request.role)
+    if tuple((item.model, item.effort) for item in locked_role.allowed_fallbacks) != tuple(
+        (item.model, item.effort) for item in configured.allowed_fallbacks
+    ):
+        raise RuntimeError("ROLE_CONFIGURATION_REQUEST_FALLBACK_MISMATCH")
 
 
 def instruction_binding(run: Path) -> dict[str, Any]:
@@ -255,6 +413,12 @@ def verify_lock(run):
         raise RuntimeError("PREFLIGHT_LOCK_CHANGED")
     if source_manifest_digest(ROOT) != lock["source_manifest_digest"]:
         raise RuntimeError("SOURCE_LOCK_CHANGED")
+    roles = verify_role_configuration_artifacts(run, lock.get("role_configuration_input", {}))
+    planning_binding = read(run / "planning-binding.json")
+    if (planning_binding.get("role_configuration_input") != lock["role_configuration_input"] or
+            planning_binding.get("role_configuration_digest") != roles.configuration_digest or
+            lock.get("role_configuration_digest") != roles.configuration_digest):
+        raise RuntimeError("ROLE_CONFIGURATION_PLANNING_BINDING_MISMATCH")
     if preserved_files(run) != lock["original_files"]:
         raise RuntimeError("PRESERVED_ORIGINALS_CHANGED")
     for name, expected in lock["locked_files"].items():
@@ -283,7 +447,8 @@ def verify_lock(run):
     return lock
 
 
-def prepare(run):
+def prepare(run, role_configuration: RoleConfigurationInput | None = None):
+    role_configuration = role_configuration or load_role_configuration_input()
     if (run / "preflight.json").exists() or (run / "calls").exists():
         raise RuntimeError("이미 잠그거나 실행한 진단은 반복하지 않습니다.")
     report = ScopeQualificationReport.model_validate(read(run / "deterministic/qualification-report.json"))
@@ -298,8 +463,8 @@ def prepare(run):
         raise RuntimeError("INDEPENDENT_FIXTURE_REVIEW_MISSING_OR_STALE")
     for name in files(OLD / "workspace"):
         copy_new(OLD / "workspace" / name, run / "workspace" / name)
-    copy_new(S05 / "roles.json", run / "roles.json")
-    roles = EngineRoleConfiguration.model_validate(read(run / "roles.json"))
+    write_new_bytes(run / "roles.json", role_configuration.raw_bytes)
+    roles = role_configuration.roles
     old_lock = read(S05 / "input-lock.json")
     goal = GoalContractRevision.model_validate(read(run / "input-goal.json"))
     state = StateSnapshot.model_validate(read(run / "input-state.json"))
@@ -316,7 +481,7 @@ def prepare(run):
     with CapturingRuntime(run=run, phase="prepare", codex_bin=Path(old_lock["codex_bin"])) as runtime:
         policy = runtime.verify_execution_policy(run / "workspace")
         inventory = runtime.list_models()
-        roles.validate_inventory(inventory)
+        validate_role_configuration_inventory(roles, inventory)
         if policy.permission_profile != ":danger-full-access" or policy.approval_policy != "never":
             raise RuntimeError("PERMISSION_POLICY_MISMATCH")
         # v1은 historical provenance다. 새 run에서 명시적 v2 운영 계약을 만든다.
@@ -325,6 +490,7 @@ def prepare(run):
         operational = roles.operational_binding(inventory)
         for name in CALL_ORDER[:-1]:
             request = capture_request(name, run, roles, inventory)
+            verify_role_request_binding(request, roles, inventory)
             write_new(run / "requests" / f"{name}.json", request)
             write_new(run / "schemas" / f"{name}.json", strict_json_output_schema(request.output_schema))
             if name in STATIC_CASES:
@@ -338,7 +504,9 @@ def prepare(run):
                 write_new(run / "case-expectations" / f"{name}.json", expectation)
         catalog = PlanningScenarioCatalog.model_validate(read(ROOT / "tests/fixtures/engine/planning-scenarios.json"))
         contract = _planning_contract(ROOT, catalog, inventory, roles)
-        write_new(run / "planning-binding.json", contract)
+        write_new(run / "planning-binding.json", json_value(contract) | {
+            "role_configuration_input": role_configuration.binding,
+        })
         templates = {}
         base = capture_request("clean", run, roles, inventory)
         for role, binding in (("compact_plan_reviewer", roles.general_reviewer),
@@ -362,6 +530,7 @@ def prepare(run):
         for name in source_files:
             copy_new(ROOT / name, run / "executed-source" / name)
         write_new(run / "executed-source-manifest.json", {"files": source_files, "source_manifest_digest": source})
+        verify_role_configuration_artifacts(run, role_configuration.binding)
         locked = locked_input_files(run)
         body = {"session": "R-S06-19", "source_manifest_digest": source, "locked_files": locked,
                 "harness_digest": sha256_bytes(Path(__file__).read_bytes()), "original_files": preserved_files(run),
@@ -370,7 +539,8 @@ def prepare(run):
                 "historical_model_lock_digest": old_lock["model_lock_digest"],
                 "inventory_digest": inventory.inventory_digest, "model_lock_digest": _model_lock(inventory, roles),
                 "codex_bin": old_lock["codex_bin"], "codex_bin_digest": runtime.executable_digest,
-                "role_configuration_digest": roles.configuration_digest, "call_order": CALL_ORDER,
+                "role_configuration_digest": roles.configuration_digest,
+                "role_configuration_input": role_configuration.binding, "call_order": CALL_ORDER,
                 "maximum_logical_calls": MAXIMUM_CALLS, "maximum_provider_turns": MAXIMUM_CALLS, "schema_recovery_attempts": 0,
                 "prompt_digest": contract.prompt_digest, "output_schema_digest": contract.output_schema_digest,
                 "deterministic_report_digest": report.report_digest, "observed_at": utc_now(),
@@ -400,8 +570,10 @@ class RecordedRunner:
         current_inventory = self.runtime.list_models()
         verify_binding(baseline, current_inventory)
         roles = EngineRoleConfiguration.model_validate(read(self.run_root / "roles.json"))
+        validate_role_configuration_inventory(roles, current_inventory)
         if roles.operational_binding(current_inventory).lock_digest != baseline.lock_digest:
             raise RuntimeError("MODEL_OR_EXECUTABLE_LOCK_CHANGED")
+        verify_role_request_binding(request, roles, current_inventory)
         actual_schema = strict_json_output_schema(request.output_schema)
         expected_schema = (read(self.run_root / "schemas" / f"{self.name}.json") if self.name != "expanded-review" else
                            read(self.run_root / "generated-review-template.json")["templates"][request.role]["output_schema"])
@@ -977,17 +1149,26 @@ def execute(run, generated=False):
     summarize(run, status, error)
 
 
-if __name__ == "__main__":
+def parse_arguments(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("mode", choices=("prepare", "run", "review-generated"))
     parser.add_argument("--run-root", type=Path, required=True)
-    arguments = parser.parse_args()
+    parser.add_argument("--role-config", type=Path,
+                        help="prepare에만 사용할 절대 경로의 역할 설정 JSON. 생략하면 기존 S05 설정을 사용합니다.")
+    arguments = parser.parse_args(argv)
+    if arguments.role_config is not None and arguments.mode != "prepare":
+        parser.error("--role-config는 prepare에서만 사용할 수 있습니다.")
+    return arguments
+
+
+if __name__ == "__main__":
+    arguments = parse_arguments()
     destination = arguments.run_root.resolve()
     if not destination.name.startswith(("r-s06-10-", "r-s06-12-", "r-s06-13-", "r-s06-14-", "r-s06-15-", "r-s06-17-", "r-s06-19-")) or destination.parent != OLD.parent:
         raise RuntimeError("새 R-S06 검사 진단 디렉터리만 허용합니다.")
     if arguments.mode == "prepare":
         try:
-            prepare(destination)
+            prepare(destination, load_role_configuration_input(arguments.role_config))
         except Exception as error:
             write_new(destination / "preparation-failed.json", {
                 "status": "FAIL", "error": f"{type(error).__name__}: {error}",

@@ -20,6 +20,8 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고
 
 [R-S06-26 제한 역할 검증](docs/r-s06-26-evidence-order-limited-validation-handoff.md)은 fresh v2 prepare와 clean의 실제 result·receipt·terminal 결속을 통과했다. 고정 평가에서 `ac_004`의 별도 Task scope·unittest 연결을 과잉 필수화했고 예상 밖 `VAL_SCOPE_001`을 제출해 최종 summary는 FAIL이다. logical/provider/recovery는 1/1/0, 총 53,092 token이며 이후 12사례는 NOT_RUN이다. 원본·source를 보존했으며 기존 S06 FAIL·Functional Alpha 미완료·1.0 NO-GO를 유지한다.
 
+[역할 설정 주입 경계와 R26 회귀](docs/r-s06-role-configuration-boundary-handoff.md)는 외부 `--role-config`의 원문·경로·digest·snapshot 및 요청의 v2 결속을 검증한다. general Reviewer `gpt-5.6-sol/high`는 명시적으로 선택할 후보 파일에만 두며 기본 역할은 유지한다. R26 원본의 구조 PASS·동일 의미 FAIL과 semantic Validator의 file/test 전달 경계를 오프라인 회귀로 보존한다. 새 실제 역할 검증은 별도 fresh 실행 조건에 남아 있다.
+
 - 새 Engine은 비권위 `ExecutionSpecProposal`을 최신 Goal·Plan·State·Project Map에 컴파일하고, `run once` 호출마다 materialize·dispatch·observe·validate·complete 중 한 단계만 전진한다.
 - worker 종료 문구는 관측값으로만 보존하고 파일·diff·command·test evidence와 별도 validator 결과로 Task 및 Goal을 판정한다.
 - 완료 Task 뒤 Project Map·State 재관측, 저장 thread의 `thread/read` 우선 복구, receipt 불명확 시 중복 생성 방지가 구현돼 있다.

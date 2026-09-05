@@ -99,6 +99,7 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 ### `flowmarshal-model-lock-v2`
 
 - 실제 모델 이름을 제품 코드에 하드코딩하지 않는다. 실행·검사 역할을 별도로 배정하고 선택 이유·inventory digest·순서 있는 fallback envelope를 Plan에 남긴다. 호출자가 model/effort를 주입하며 실제 호출 직전 App Server `model/list`를 확인한다.
+- 제한 diagnostics의 역할 후보는 prepare의 명시적 외부 설정으로만 주입한다. 절대 입력 경로·선택 이유·원문 bytes와 canonical digest·typed configuration digest·원문 snapshot을 잠그고 실제 호출 전에 재대조한다. 실행 모드에서 설정을 교체하거나 cwd로 다른 입력을 선택하지 않으며, 요청의 역할·선택·fallback 순서와 v2 결속 불일치를 차단한다. 후보 검증을 기본 역할 변경이나 실제 의미 검증 성공으로 승격하지 않는다.
 - 전체 원본 JSON은 typed coercion 전에 검사한다. hidden 행을 포함해 duplicate, 빈/null/잘못된 model·effort와 불완전 pagination을 제거·정규화·생략하지 않고 거부하며 원문 순서와 전체 digest를 감사 evidence로 보존한다.
 - 실행 잠금은 역할별 선택·fallback 조합의 지원 상태, fallback 순서, executable digest와 필요한 runtime capability만 투영한다. 무관한 모델·순서·미사용 effort 변화는 감사 digest만 바꿀 수 있지만 선택·fallback·capability·executable 변화는 새 binding 없이 실행할 수 없다.
 - prepare·역할 호출·materialize·dispatch·내부/공개 resume·독립 Goal Test는 같은 v2 검증기를 사용하고 요청·관측·receipt digest를 대조한다. 미지원 조합을 조용히 바꾸지 않고 fallback도 자동 선택하지 않는다. preflight 실패 뒤 모델 변경·schema recovery로 재호출하지 않는다.

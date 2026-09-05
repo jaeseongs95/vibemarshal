@@ -779,16 +779,31 @@ class ExecutionAutomationTests(unittest.TestCase):
 
     def test_task_semantic_validation_uses_bound_direct_catalog(self):
         prepared, runtime = self.prepared(semantic_task_validation=True)
+        _, task = self.task_contract(prepared)
+        semantic_contract = next(item for item in task.validations if item.method == "semantic")
+        self.assertEqual(("model_review", "file", "test"), semantic_contract.required_evidence_kinds)
         dispatcher = self.validating(prepared, runtime)
         dispatcher.run_once(prepared.project_id)
         dispatched = dispatcher.run_once(prepared.project_id)
         self.assertEqual(RunOnceAction.DISPATCHED, dispatched.action)
         with prepared.service.ledger.read() as connection:
-            row = connection.execute("SELECT binding_json FROM attempts WHERE id = ?", (dispatched.attempt_id,)).fetchone()
+            row = connection.execute("SELECT binding_json, execution_spec_digest FROM attempts WHERE id = ?",
+                                     (dispatched.attempt_id,)).fetchone()
             intent = connection.execute("SELECT request_json FROM runtime_intents WHERE attempt_id = ? AND kind = 'create_thread'",
                                         (dispatched.attempt_id,)).fetchone()
+            evidence_rows = connection.execute(
+                "SELECT id, kind FROM evidence_records WHERE task_id = ?", (prepared.task_id,)
+            ).fetchall()
         provided = json.loads(intent["request_json"])["semantic_evidence_ids"]
         self.assertGreaterEqual(len(provided), 2)
+        provided_kinds = {item["kind"] for item in evidence_rows if item["id"] in provided}
+        self.assertIn("file", provided_kinds)
+        self.assertIn("test", provided_kinds)
+        # 필수 종류를 model_review로 한정해도 앞선 file/test는 직접 catalog에 남는다.
+        minimal_catalog = dispatcher._task_evidence_catalog(
+            prepared.task_id, row["execution_spec_digest"], required_evidence_kinds=("model_review",)
+        )
+        self.assertEqual(set(provided), set(minimal_catalog))
         binding = ThreadBinding.model_validate_json(row["binding_json"])
         runtime.complete(binding.thread_id, response=json.dumps({"passed": True, "rationale": "직접 evidence 확인",
                                                                 "evidence_refs": provided}))

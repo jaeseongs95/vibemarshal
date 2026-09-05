@@ -271,6 +271,8 @@ Reviewer schema에는 `status`, `admissible`, `score`, `weakest_task` 필드가 
 
 runtime capability는 adapter가 사용하는 `thread/start`, `turn/start`, `thread/read`, 필요한 `thread/resume`·구조화 출력·실제 local 권한 계약이다. 이 값은 전체 서버 기능 목록에 대한 추정이 아니며 executable identity와 실제 정책 검증에 결속된 adapter 계약이다. Worker와 구조화 역할은 각각 사용하는 capability만 잠근다.
 
+제한 diagnostics의 역할 설정 후보는 `prepare --role-config <절대 경로>`로만 주입하며 생략 시 기존 기본 설정을 사용한다. 역할 ID 집합·typed schema와 중복 JSON key를 먼저 검사하고, 입력 경로·선택 이유·원문 bytes digest·canonical JSON digest·typed configuration digest를 원문 snapshot과 함께 preflight 및 planning binding에 기록한다. canonical 표현이 같아도 bytes가 바뀌거나 원본·복사본·요청·v2 lock이 다르면 새 실행으로 자동 대체하지 않고 차단한다. 요청에는 해당 역할의 선택과 순서 있는 fallback을 그대로 결속한다. 이 제한 진단은 선택과 fallback 모두 fresh inventory에서 지원되는 조합만 수용하는 더 좁은 진입 조건을 사용하며, 일반 v2의 `supported=false` 표현 능력은 바꾸지 않는다. 후보 설정은 제품 기본 역할과 Goal·Plan·검사 의미를 변경하지 않는다.
+
 `OperationalBinding`은 전체 inventory와 그 digest, v2 projection과 그 digest를 함께 보존하고 역산 검증한다. 역할 요청은 준비 당시 binding을 보유하고, receipt는 호출 직전 실제 observation을 별도로 기록한다. 두 전체 digest가 달라도 projection이 같으면 실행하며, 요청·관측·receipt를 서로 다른 digest로 위조한 경우에는 거부한다. Task intent에는 실제 inventory observation을 기록한다. materialize, 역할 호출, dispatch, 내부·공개 resume, 독립 Goal Test가 같은 검증기를 사용한다. 선택을 바꿔 실패를 감추거나 preflight 실패 후 schema recovery로 재호출하지 않는다.
 
 제한 진단의 새 prepare는 과거 입력·모델 설정·executable 기준을 provenance로 읽고 새로운 v2 preflight를 만든다. 과거 전체 inventory digest와의 정확한 일치를 실행 조건으로 사용하지 않는다. 평가의 검사·threshold·oracle·taxonomy, 역할 모델 설정과 fallback 정책은 이 revision으로 보정하지 않는다. 결정적 구현 검증과 실제 역할 qualification은 계속 별개의 Gate다.
