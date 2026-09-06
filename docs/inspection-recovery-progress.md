@@ -8,8 +8,8 @@
 |---|---|---|
 | A. 실행 기반 격리 | 고정 worktree·공통 preflight·독립 fixture package·결정적 Gate | 완료 · `22d68c0` |
 | B. 기존 계약 기준선 | 같은 역할로 static 11사례, 사례별 형식·참조·의미·운영 결과 | 완료 · PASS 7 / FAIL 4 |
-| C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | AC 원문별 선택·합집합 계약 구현, 집중 26개·전체 677개 포함 개발 Gate 5/5 통과 |
-| D. 새 계약 비교 | 새 실행의 static 11사례와 고정 기대표·실측 usage | 8차 전수 수집 완료: 9 PASS·2 의미 FAIL, schema/참조/복구 불명 0, 전체 token·latency 개선 미입증 |
+| C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | AC 원문별 선택·합집합 계약 구현, 집중 26개·전체 677개 포함 개발/고정 Gate 5/5 통과 |
+| D. 새 계약 비교 | 새 실행의 static 11사례와 고정 기대표·실측 usage | 9차 고정 실행 진행 중. 완료된 기준선은 8차 9 PASS·2 의미 FAIL이며 전체 의미·token·latency 개선 미입증 |
 | E. S06 재진입 검사 | static·expansion·독립 생성 검토·expanded-review 13단계 | NOT_RUN |
 | F. 실제 Goal 경로 | 고정 자연어에서 실제 Goal·Plan 선택·활성화·실행·독립 검증·GoalVerdict | NOT_RUN |
 
@@ -64,3 +64,5 @@ Codex executable은 `D:\codex\fm-inspection-runtime\codex-935a1911.exe`에 복�
 이후 명시된 현재 경계 검증 요청에 따라 준비된 8차를 한 번 실행했다. 최종 결과는 9 PASS·2 의미 FAIL이며 11개 schema·compiler·binding, 사후 재계산과 종료 후 저장 조회는 통과했다. 두 실패는 같은 AC-004의 Task oracle 연결 누락이다. 5차 대비 총 token은 4.09%, receipt latency는 2.54% 증가했으며 PASS 수도 9개로 같다. 기존 자료 1,637개를 보존했다. 추가 보정·재호출 없이 [8차 경계 인계](inspection-v2r8-boundary-handoff.md)에 원인군과 다음 선결 조건을 남긴다. 전체 Goal과 S06·cutover는 미완료다.
 
 8차의 새 실패 근거를 검토해 9차에서는 각 AC의 statement·validation_intent가 명시한 scope 선택을 나누고 adapter가 합집합을 계산하도록 바꿨다. 모든 AC의 두 원문 목록을 요구하며 빈 선택은 보충하지 않는다. 집중 26개와 전체 677개 포함 개발 Gate 5/5가 통과했다. 기존 source와 실제 응답을 통한 진단 가설, 변경 경계와 새 실행 수용 기준은 [AC 원문별 검사 의무 분리](inspection-v2r9-source-requirements.md)에 기록한다. 기존 실제 결과를 새 계약의 PASS로 재해석하지 않는다.
+
+9차 source `92b11e1`의 고정 worktree에서도 677개 포함 Gate 5/5·preflight·prepare가 통과했다. 이전 실행과 같은 11개 기대표·역할·Goal 원문을 확인한 뒤 저장형 thread를 쓰는 숨김 프로세스에서 실제 진단을 시작했다. 실행·관측 경로와 lock은 위 9차 문서에 기록하며, 완료 전에는 부분 관측을 전체 PASS로 올리지 않는다.

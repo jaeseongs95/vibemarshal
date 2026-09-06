@@ -33,3 +33,13 @@ Adapter는 두 목록을 순서를 보존하는 합집합으로 만들고 scope�
 실제 판정은 기존 fixture package `sha256:091bde16cb39ac26ee66df7e4fd30a54388443ef48088fa661fd0138fb6f0866`의 사례 순서·전체 기대 관계·기대 finding을 유지한다. 두 실패뿐 아니라 기존 성공 9건도 모두 통과해야 한다. 실제 receipt의 token·latency를 같은 전체 사례 집합과 비교하며 원문별 목록을 추가한 비용도 포함한다. 각 원문 목록의 의미 적합성은 형식 검증만으로 증명되지 않으며 기존 고정 기대표는 합집합으로 전개한 AC×validation 관계와 finding을 평가한다.
 
 11사례 모두 통과한 새 결과가 있어야 S06 qualification 13과 실제 Goal 경로로 진행할 수 있다. 제품 기본 provider와 cutover 상태는 각각 v1·NO-GO를 유지한다.
+
+## 고정 실행 준비와 시작
+
+구현을 `92b11e1a5948c2721b958e03db28d5c82dbff7b9`로 commit·push했다. 고정 worktree `D:\codex\fm-inspection-v2r9`는 같은 detached HEAD와 전용 Python 3.12.14를 사용하며, source manifest는 `sha256:498937a7dbe24485ab917d714a9222eb975dcb5caf57ef639db43a21f484d33a`다. package와 두 legacy 감사 입력을 byte 보존하고 Python·import origin·설치 버전을 결속했다.
+
+고정본의 Gate도 677개 테스트(85.243초)를 포함해 5/5로 완료됐다. report SHA-256은 `31598b6709ebf851ef730f1ec707a42b65bc7f7f62ffdab7b7543eb42a6e5fa9`이며 개발 Gate와 같은 contract다. 중단 뒤 기존 완료 artifact와 실행 프로세스의 부재를 확인했으며 Gate를 재실행하지 않았다.
+
+실행 root는 `D:\codex\fm-inspection-v2r9\.flowmarshal-engine-eval\runs\inspection-v2r9-static11-20260906`이다. workspace preflight는 `sha256:2427c8f076203448a0c82a06399463b5ee078c1e840cf73264aa528c33e4f86e`, prepare lock은 `sha256:60a5f06880c904b454a9c0b064e01a10dd9e579a2abe361b923edcd32f7a6eaf`로 통과했다. fresh inventory·실제 지침·정책, 동일 Sol/xhigh 역할·호출 순서·11개 기대표·Goal 원문과 저장형 thread를 확인했다. 8차 원본 638개 파일도 모두 보존됐다.
+
+운영 기록은 `D:\codex\fm-inspection-observations\v2r9-launch`에 있다. `pre-launch-verification.json`의 21개 검사를 통과한 뒤, `2026-09-06T01:40:58.9101965Z`에 숨김 프로세스 PID 35088로 진단을 한 번 시작했다. launcher SHA-256은 `b12783033563760152eaf8a136e57bda3fb81de5623805b9b0b2de3de72e382b`다. 이 시점의 상태는 **실제 11사례 검증 진행 중**이며 최종 PASS·의미 개선·S06 완료를 뜻하지 않는다. 중단 뒤에는 PID·시작 시각과 기존 artifact를 먼저 관측하고, PID가 사라져도 기존 provider thread를 재개 없이 확인한 뒤 상태를 분류한다. 같은 launcher나 미완료 사례를 자동 재호출하지 않는다.
