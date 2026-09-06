@@ -105,14 +105,13 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
             ],
             "ac_scope_requirements": [
                 {"criterion_id": criterion.criterion_id,
-                 "scope_ids": [scope_id
+                 "statement_scope_ids": [],
+                 "validation_intent_scope_ids": [scope_id
                                for row in v1["ac_validation_rows"]
                                if row["criterion_id"] == criterion.criterion_id
                                and row["ac_link_required"]
                                for scope_id in row["scope_ids"]]}
                 for criterion in goal.definition.hard_acceptance
-                if any(row["criterion_id"] == criterion.criterion_id and row["ac_link_required"]
-                       for row in v1["ac_validation_rows"])
             ],
             "constraint_task_rows": [
                 {"constraint_id": row["constraint_id"], "task_ref": row["task_ref"],
@@ -148,17 +147,16 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
                 row["scope_id"] for row in raw["validation_scope_rows"]
                 if row["validation_id"] == expected["validation_id"]
             }
-            requirement["scope_ids"] = [
-                scope_id for scope_id in requirement["scope_ids"]
-                if scope_id not in validation_scope_ids
-            ]
-            if not requirement["scope_ids"]:
-                raw["ac_scope_requirements"].remove(requirement)
+            for field in ("statement_scope_ids", "validation_intent_scope_ids"):
+                requirement[field] = [
+                    scope_id for scope_id in requirement[field]
+                    if scope_id not in validation_scope_ids
+                ]
         else:
             scope = next(row for row in raw["validation_scope_rows"]
                          if row["validation_id"] == expected["validation_id"]
                          and row["status"] == "supported")
-            requirement["scope_ids"].append(scope["scope_id"])
+            requirement["validation_intent_scope_ids"].append(scope["scope_id"])
         report = assess_case_inspection_review_v2(
             PlanInspectionV2.model_validate(raw), (), RATINGS, expectation, case_id="clean", payload=payload,
             plan=plan, goal=goal, project_map=project_map, evidence_catalog=catalog,
@@ -263,14 +261,13 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
             } for row in raw["validation_scope_rows"]],
             "ac_scope_requirements": [{
                 "criterion_id": criterion.criterion_id,
-                "scope_ids": [scope_id
+                "statement_scope_ids": [],
+                "validation_intent_scope_ids": [scope_id
                               for row in raw["ac_validation_rows"]
                               if row["criterion_id"] == criterion.criterion_id
                               and row["ac_link_required"]
                               for scope_id in row["scope_ids"]],
-            } for criterion in goal.definition.hard_acceptance
-              if any(row["criterion_id"] == criterion.criterion_id and row["ac_link_required"]
-                     for row in raw["ac_validation_rows"])],
+            } for criterion in goal.definition.hard_acceptance],
             "constraint_task_rows": [{
                 "constraint_id": row["constraint_id"], "task_ref": row["task_ref"],
                 "applicability": row["applicability"], "required_validation_ids": row["validation_ids"],

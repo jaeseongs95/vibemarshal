@@ -76,7 +76,8 @@ def v2_inputs():
         "ac_scope_requirements": [
             {
                 "criterion_id": coverage.criterion_id,
-                "scope_ids": [supported_scopes[validation_id]
+                "statement_scope_ids": [],
+                "validation_intent_scope_ids": [supported_scopes[validation_id]
                               for validation_id in coverage.validation_ids],
             }
             for coverage in plan.definition.goal_coverage
@@ -144,7 +145,8 @@ def v2_table_from_v1(
         "ac_scope_requirements": [
             {
                 "criterion_id": criterion_id,
-                "scope_ids": [supported_scopes[validation_id]
+                "statement_scope_ids": [],
+                "validation_intent_scope_ids": [supported_scopes[validation_id]
                               for validation_id in validation_ids],
             }
             for criterion_id, validation_ids in coverage.items()
@@ -339,7 +341,7 @@ class PlanInspectionV2Tests(unittest.TestCase):
         raw = inspection.model_dump(mode="json")
         requirement = raw["ac_scope_requirements"][0]
         scope = next(item for item in raw["validation_scope_rows"]
-                     if item["scope_id"] == requirement["scope_ids"][0])
+                     if item["scope_id"] == requirement["validation_intent_scope_ids"][0])
         scope["status"] = "unresolved"
         with self.assertRaisesRegex(PlanInspectionError, "supported scope"):
             compile_fixture(PlanInspectionV2.model_validate(raw))
@@ -355,9 +357,59 @@ class PlanInspectionV2Tests(unittest.TestCase):
             compile_fixture(PlanInspectionV2.model_validate(raw))
 
         raw = inspection.model_dump(mode="json")
-        raw["ac_scope_requirements"][0]["scope_ids"] = ["scope_unknown"]
+        raw["ac_scope_requirements"][0]["validation_intent_scope_ids"] = ["scope_unknown"]
         with self.assertRaisesRegex(PlanInspectionError, "scope ID 오류"):
             compile_fixture(PlanInspectionV2.model_validate(raw))
+
+    def test_ac_source_selections_are_unioned_without_losing_or_duplicating_scopes(self):
+        *_, inspection = v2_inputs()
+        baseline = compile_fixture(inspection)
+        raw = inspection.model_dump(mode="json")
+        requirement = raw["ac_scope_requirements"][0]
+        selected = list(requirement["validation_intent_scope_ids"])
+        self.assertGreater(len(selected), 1)
+        requirement["statement_scope_ids"] = selected[:2]
+        requirement["validation_intent_scope_ids"] = selected[1:]
+        updated = PlanInspectionV2.model_validate(raw)
+        compiled = compile_fixture(updated)
+        self.assertEqual(baseline.ac_validation_decisions, compiled.ac_validation_decisions)
+        self.assertEqual(baseline.membership_witnesses, compiled.membership_witnesses)
+        self.assertEqual(raw, updated.model_dump(mode="json"))
+
+    def test_empty_source_selections_do_not_infer_requirements_from_goal_or_coverage(self):
+        *_, inspection = v2_inputs()
+        raw = inspection.model_dump(mode="json")
+        for requirement in raw["ac_scope_requirements"]:
+            requirement["statement_scope_ids"] = []
+            requirement["validation_intent_scope_ids"] = []
+        compiled = compile_fixture(PlanInspectionV2.model_validate(raw))
+        self.assertTrue(compiled.ac_validation_decisions)
+        self.assertTrue(all(not row.ac_link_required and not row.scope_ids
+                            for row in compiled.ac_validation_decisions))
+
+    def test_every_ac_must_be_assessed_even_when_it_has_no_positive_selection(self):
+        *_, inspection = v2_inputs()
+        raw = inspection.model_dump(mode="json")
+        raw["ac_scope_requirements"].pop()
+        with self.assertRaisesRegex(PlanInspectionError, "행 집합 불완전"):
+            compile_fixture(PlanInspectionV2.model_validate(raw))
+
+    def test_both_ac_source_fields_reject_unsupported_or_unknown_scope_choices(self):
+        *_, inspection = v2_inputs()
+        for field in ("statement_scope_ids", "validation_intent_scope_ids"):
+            with self.subTest(field=field):
+                raw = inspection.model_dump(mode="json")
+                requirement = raw["ac_scope_requirements"][0]
+                scope_id = requirement["validation_intent_scope_ids"][0]
+                requirement[field] = [scope_id]
+                next(row for row in raw["validation_scope_rows"]
+                     if row["scope_id"] == scope_id)["status"] = "contradicted"
+                with self.assertRaisesRegex(PlanInspectionError, "supported scope"):
+                    compile_fixture(PlanInspectionV2.model_validate(raw))
+                raw = inspection.model_dump(mode="json")
+                raw["ac_scope_requirements"][0][field] = ["scope_unknown"]
+                with self.assertRaisesRegex(PlanInspectionError, "scope ID 오류"):
+                    compile_fixture(PlanInspectionV2.model_validate(raw))
 
     def test_constraint_partial_is_explicit_and_empty_missing_is_rejected(self):
         plan, goal, _, _, inspection = v2_inputs()
@@ -397,14 +449,11 @@ class PlanInspectionV2Tests(unittest.TestCase):
         raw["validation_scope_rows"][0]["status"] = "contradicted"
         changed_scope_id = raw["validation_scope_rows"][0]["scope_id"]
         for requirement in raw["ac_scope_requirements"]:
-            requirement["scope_ids"] = [
-                scope_id for scope_id in requirement["scope_ids"]
-                if scope_id != changed_scope_id
-            ]
-        raw["ac_scope_requirements"] = [
-            requirement for requirement in raw["ac_scope_requirements"]
-            if requirement["scope_ids"]
-        ]
+            for field in ("statement_scope_ids", "validation_intent_scope_ids"):
+                requirement[field] = [
+                    scope_id for scope_id in requirement[field]
+                    if scope_id != changed_scope_id
+                ]
         with self.assertRaisesRegex(PlanInspectionError, "finding이 누락"):
             compile_fixture(PlanInspectionV2.model_validate(raw))
 
@@ -627,7 +676,7 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
             )
             self.assertIn("ac_scope_requirements", inspection_properties)
             self.assertEqual(
-                {"criterion_id", "scope_ids"},
+                {"criterion_id", "statement_scope_ids", "validation_intent_scope_ids"},
                 set(request.output_schema["$defs"]["ACScopeRequirementInspectionV2"]["properties"]),
             )
             expected_catalog = plan_inspection_citation_catalog_v2(

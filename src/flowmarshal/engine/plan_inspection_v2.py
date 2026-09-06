@@ -73,15 +73,20 @@ class ValidationScopeInspectionV2(EngineModel):
 
 
 class ACScopeRequirementInspectionV2(EngineModel):
-    """모델이 직접 판단한 AC별 필수 supported scope 선택."""
+    """모델이 각 AC 원문 필드에서 직접 판단한 필수 supported scope 선택."""
 
     criterion_id: str
-    scope_ids: tuple[str, ...] = Field(min_length=1)
+    statement_scope_ids: tuple[str, ...] = Field(
+        description="AC statement가 명시적으로 요구하는 실제 검사 절차의 supported scope. 없으면 빈 목록."
+    )
+    validation_intent_scope_ids: tuple[str, ...] = Field(
+        description="AC validation_intent가 명시적으로 요구하는 실제 검사 절차의 supported scope. 없으면 빈 목록."
+    )
 
-    @field_validator("scope_ids")
+    @field_validator("statement_scope_ids", "validation_intent_scope_ids")
     @classmethod
-    def scopes_are_unique(cls, value: tuple[str, ...]) -> tuple[str, ...]:
-        return _unique(value, "AC scope requirement scope_ids")
+    def scopes_are_unique(cls, value: tuple[str, ...], info: Any) -> tuple[str, ...]:
+        return _unique(value, f"AC scope requirement {info.field_name}")
 
 
 class ConstraintTaskInspectionV2(EngineModel):
@@ -241,19 +246,22 @@ PLAN_INSPECTION_V2_INSTRUCTIONS = (
     "실제 절차나 status가 다를 때만 나눈다. AC마다 scope를 다시 만들거나 citation별로 쪼개지 않는다. 같은 validation의 "
     "mechanism_id와 supported·contradicted·unresolved 중 하나를 직접 판단한다. "
     "mechanism의 근거를 direct_extra_refs에 반복하지 말고 해당 scope에만 추가로 필요한 citation만 쓴다. "
-    "scope 판정 뒤 AC statement·validation_intent가 실제 supported 절차를 명시적으로 요구하는 경우만 "
-    "ac_scope_requirements에 criterion_id와 해당 supported scope_ids를 제출한다. 같은 AC의 모든 양의 scope는 "
-    "한 행에 모은다. 결과·주제의 관련성만으로 선택하지 말고 Goal이 "
-    "요구한 실제 검사 절차·도구·phase·Task 또는 integration 범위가 일치해야 한다. 같은 실제 절차를 Task·Goal "
-    "validation이 각각 실행하면 양쪽의 실제 scope를 모두 선택한다. AC가 독립 Task 또는 Goal validation 단계를 하나의 묶음으로 "
-    "명시하고 그 단계에서 수행할 검사 책임을 열거하면, 그 단계에서 열거된 책임을 실제 수행하는 각 scope를 "
-    "선택한다. 이는 같은 단계에 있다는 이유만으로 열거되지 않은 sibling을 선택하는 규칙이 아니다. 별도 unittest "
-    "validation의 존재만으로 oracle validation "
-    "안에서 실제 실행되는 unittest 책임을 생략하지 않는다. 같은 Task·phase·실행 순서라는 이유만으로 sibling "
-    "validation을 선택하지 않는다. Task 검증을 Goal Test와 구분하거나 Goal Test 전에 완료한다고만 한 경계·순서 "
-    "표현은 Task validation 전체를 요구한 것이 아니다. 단계에 결속된 도구·절차·검사 책임만 그 단계의 scope로 "
-    "선택한다. false 관계는 제출하지 않는다. Adapter가 scope의 소유 validation을 join해 sparse 양의 선택을 모든 "
-    "AC×validation의 true/false 행렬과 scope_ids로 확장하고 Goal·validation·mechanism 근거 closure를 파생한다. "
+    "AC의 검사 요구는 Plan의 현재 연결을 근거로 정하지 않는다. 각 AC의 statement와 validation_intent를 "
+    "전체 문맥으로 읽되 각 필드가 명시한 검사 의무를 구분한다. 두 필드는 상호 보완하며 한 필드의 단계·독립성 "
+    "설명이 다른 필드의 명시적 절차를 면제하지 않는다. ac_scope_requirements에는 모든 AC를 정확히 한 행씩 "
+    "쓰고 criterion_id, statement_scope_ids, validation_intent_scope_ids를 제출한다. 각 목록에는 해당 원문 "
+    "필드가 명시적으로 요구하는 실제 절차의 supported scope만 선택한다. 해당 필드에 검사 절차 요구가 없으면 "
+    "빈 목록을 쓴다. 두 필드가 같은 절차를 요구하면 같은 scope를 양쪽 목록에서 선택할 수 있다. 대명사나 "
+    "축약 표현은 AC 전체 문맥으로 해석하며, 결과·주제의 관련성만으로 절차를 추가하지 않는다. "
+    "요구한 절차·도구·phase·Task 또는 integration 범위가 일치해야 한다. 동일 절차의 task/goal phase를 "
+    "각각 명시하면 각 phase의 실제 scope를 선택한다. 단계에 검사 책임을 열거하면 그 단계에서 해당 책임을 "
+    "실제 수행하는 scope를 선택한다. 독립 실행이나 완료 순서만 나타내는 표현은 다른 단계의 모든 검사 "
+    "의무가 아니며, 같은 Task·phase·evidence·주제만으로 열거되지 않은 sibling에 전파하지 않는다. "
+    "한 scope의 모순은 실제 수행되는 다른 절차의 명시적 의무를 없애지 않는다. 같은 요구 절차를 여러 "
+    "validation이 실제 수행하면 각 소유 scope를 선택하며 별도 validation의 존재만으로 복합 validation "
+    "안의 실제 절차를 생략하지 않는다. contradicted·unresolved scope는 선택하지 않는다. Adapter가 두 원문 "
+    "목록의 합집합과 scope의 소유 validation을 join해 전체 AC×validation의 true/false 행렬·scope_ids·근거 "
+    "closure를 파생한다. 원문 목록의 선택을 다시 합쳐 쓰거나 false 조합을 나열하지 않는다. "
     "모든 전역 constraint×Task 조합도 constraint_task_rows에 정확히 한 번씩 제출한다. Task 검사가 직접 "
     "요구되면 applicability=required와 실제 Task validation ID를 쓰고, 그렇지 않으면 not_applicable과 빈 "
     "required_validation_ids를 쓴다. AC 관계와 전역 Task 의무를 서로 추정하지 않는다. "
@@ -741,9 +749,15 @@ def compile_plan_inspection_v2(
         not unknown_criteria,
         f"v2 AC scope requirement criterion 오류: unknown={sorted(unknown_criteria)}",
     )
+    _require(
+        requirements_by_criterion.keys() == criterion_selectors.keys(),
+        "v2 AC scope requirement 행 집합 불완전: 모든 AC의 두 원문 필드를 판정해야 합니다.",
+    )
     scopes_by_pair: dict[tuple[str, str], list[str]] = {}
     for criterion_id, requirement in requirements_by_criterion.items():
-        for scope_id in requirement.scope_ids:
+        for scope_id in _ordered_union(
+            requirement.statement_scope_ids, requirement.validation_intent_scope_ids
+        ):
             _require(scope_id in scope_by_id, f"v2 AC requirement scope ID 오류: {scope_id}")
             scope = scope_by_id[scope_id]
             _require(
