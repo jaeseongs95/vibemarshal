@@ -14,6 +14,7 @@ from flowmarshal.engine.plan_inspection_provider import (
     verify_plan_inspection_result_binding,
 )
 from flowmarshal.engine.plan_inspection_v2 import (
+    TASK_RESULT_FIELD_SEMANTICS_V2,
     PlanInspectionV2,
     ReviewFindingV2,
     compile_plan_inspection_v2,
@@ -649,6 +650,10 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
             )
             request = runner.calls[-1]
             self.assertEqual(draft["tasks"][0]["objective"], plan.definition.tasks[0].objective)
+            self.assertEqual(draft["tasks"][0]["produces"], list(plan.definition.tasks[0].produces))
+            self.assertEqual(
+                dict(TASK_RESULT_FIELD_SEMANTICS_V2), request.payload["task_result_field_semantics"],
+            )
             self.assertIn("plan-inspection-v2", request.instructions)
             self.assertIn(PLAN_VALIDATION_TRACE_V2_INSTRUCTIONS, request.instructions)
             for v1_field in (
@@ -721,6 +726,12 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
         request = runner.calls[-1]
         self.assertEqual((), submission.findings)
         self.assertEqual(4, submission.ratings.verification)
+        self.assertEqual(
+            dict(TASK_RESULT_FIELD_SEMANTICS_V2), request.payload["task_result_field_semantics"],
+        )
+        self.assertEqual(
+            plan.model_dump(mode="json"), request.payload["evidence_catalog"]["artifact:plan_contract"],
+        )
         self.assertNotIn("target_refs", str(request.output_schema))
         self.assertNotIn("InspectionTargetV2", str(request.output_schema))
         finding_properties = request.output_schema["properties"]["review"]["anyOf"][1][
@@ -749,6 +760,13 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "REQUEST_BINDING_MISMATCH"):
             verify_plan_inspection_result_binding(
                 changed, request, RoleCallResult(payload=envelope, receipt=adapter.receipts[-1]),
+            )
+        changed_payload = deepcopy(request.payload)
+        changed_payload["task_result_field_semantics"]["produces"] = "Worker 응답에 포함할 필수 항목."
+        changed_request = request.model_copy(update={"payload": changed_payload})
+        with self.assertRaisesRegex(ValueError, "REQUEST_BINDING_MISMATCH"):
+            verify_plan_inspection_result_binding(
+                binding, changed_request, RoleCallResult(payload=envelope, receipt=adapter.receipts[-1]),
             )
 
 

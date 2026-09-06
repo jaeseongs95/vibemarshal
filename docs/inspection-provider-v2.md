@@ -6,6 +6,8 @@
 
 v1의 raw 입력, strict schema, validator, evaluator와 이미 기록된 artifact는 동결한다. v2 구현이나 평가를 위해 v1 원문·schema·validator·evaluator를 재해석, 덮어쓰기, 보정 또는 migration하지 않는다. 같은 사례를 v2로 호출하려면 v2 형식의 별도 입력·schema·평가 계약과 artifact를 만든다.
 
+v2 Expander·Reviewer 요청의 `task_result_field_semantics`는 `produces`·`acceptance_criteria`·`validations`의 기존 Task 단위 책임을 설명한다. `produces`에는 독립 검증 결과를 포함한 Task의 논리적 산출물을 선언할 수 있으며 Worker 응답의 필수 항목 목록으로 읽지 않는다. 실제 제출 주체·필요 시점·후속 검사 입력은 원문에서 판단한다. 이 설명은 특정 사례의 정답·새 evidence ref가 아니며 citation catalog에도 추가하지 않는다. 원본 Task·산출물 key·완료 조건과 직접 finding을 보존하고 설명을 포함한 전체 request를 receipt에 결속한다. v1 요청과 두 provider의 출력 schema 형식은 바꾸지 않는다.
+
 ## v2의 직접 모델 작성물
 
 모델은 아래의 최소 의미 관측만 직접 작성한다. adapter는 결속된 입력의 의미 원문에서 immutable `inspection_citation_catalog`를 만들고, 고정 복합 관계에서 immutable `inspection_target_catalog`를 만든다. 모델은 원문 citation 객체나 복합 target의 두 참조를 다시 쓰지 않고 실제 판단에 사용한 ID만 선택한다. 모든 직접 참조와 target ID는 현재 요청의 catalog 또는 응답 안에서 모델이 만든 scope 집합에 존재해야 한다.

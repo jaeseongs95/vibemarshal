@@ -8,7 +8,7 @@
 |---|---|---|
 | A. 실행 기반 격리 | 고정 worktree·공통 preflight·독립 fixture package·결정적 Gate | 완료 · `22d68c0` |
 | B. 기존 계약 기준선 | 같은 역할로 static 11사례, 사례별 형식·참조·의미·운영 결과 | 완료 · PASS 7 / FAIL 4 |
-| C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | AC 원문별 선택·합집합 계약 구현, 집중 26개·전체 677개 포함 개발/고정 Gate 5/5 통과 |
+| C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | 9차 AC 원문별 합집합 계약 검증 완료. Task 필드 설명 후보는 집중 28개·Gate 5/5 통과, 실제 모델 호출 없이 방향 재검토 |
 | D. 새 계약 비교 | 새 실행의 static 11사례와 고정 기대표·실측 usage | 9차 11/11 PASS·252개 관계 일치·참조/운영 실패 0. v1 대비 보고 total token −12.47%, latency −40.80%의 단일 관측 |
 | E. S06 재진입 검사 | static·expansion·독립 생성 검토·expanded-review 13단계 | 첫 clean semantic FAIL, 나머지 12 NOT_RUN. AC 관계 28개 일치, Task 산출물을 Worker 제출로 해석한 추가 finding 1개 |
 | F. 실제 Goal 경로 | 고정 자연어에서 실제 Goal·Plan 선택·활성화·실행·독립 검증·GoalVerdict | NOT_RUN |
@@ -70,3 +70,5 @@ Codex executable은 `D:\codex\fm-inspection-runtime\codex-935a1911.exe`에 복�
 9차는 11/11 사례를 모두 PASS로 완료했다. 252개 기대 관계와 finding이 일치했고 재호출·recovery·unknown은 0이었다. 이전에 빠졌던 두 Task oracle 연결 finding을 새 응답이 직접 제출했다. v1 대비 total token 12.47%·receipt latency 40.80% 감소는 같은 전체 사례의 provider 보고값을 비교한 단일 관측이며 정식 성능 Gate는 아니다. 완료 뒤 원본 보존·29개 결과 확인과 저장 응답 재관측도 통과했다.
 
 새 source와 결정적 Gate를 보존한 상태에서 별도의 S06 qualification 13단계를 실행했다. 첫 clean에서 28개 AC 관계는 일치했으나 Task의 논리적 `produces`를 Worker의 미래 Validator 결과 제출 요구로 읽은 추가 finding 하나 때문에 중단됐다. 호출은 1/1/0이며 뒤 12단계는 NOT_RUN이다. 종료 후 같은 저장 thread·turn·응답, 두 실행 lock과 artifact 보존을 확인한 19개 검사가 통과했다. 원인과 전체 Goal의 남은 근거는 [S06 재진입 기록](inspection-s06-reentry.md)에 이어간다. 자연어 Goal에서 실제 GoalVerdict까지의 동일 계보 검증은 아직 NOT_RUN이다.
+
+이후 Task 필드 설명 후보를 작성했지만, 사용자가 검증단 수정의 반복을 지적하고 다른 대화와 길 찾기 알고리즘을 비교하도록 요청했다. 새 모델 호출 없이 [탐색 방향 비교](inspection-search-direction-review.md)를 수행했다. 상세 Plan의 수정 가능한 실패가 검색의 생성·정제 단계로 돌아가지 않아 예산 14회 중 4회 사용 후 선택 없이 종료되는 제어 흐름을 합성 입력으로 확인했다. 입력 설명 후보는 Gate 5/5·집중 28개까지 보존하며, 다음 검토의 중심은 상세 Plan 실패 피드백과 실제 Goal 경로다. 이 알고리즘 보완의 구현·실모델 검증은 아직 수행하지 않았다.

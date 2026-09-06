@@ -68,6 +68,7 @@ from .plan_inspection_provider import (
 )
 from .plan_inspection_v2 import (
     PLAN_INSPECTION_V2_INSTRUCTIONS as _PLAN_INSPECTION_V2_GUIDANCE,
+    TASK_RESULT_FIELD_SEMANTICS_V2,
     PlanInspectionV2,
     ReviewFindingV2,
     compile_plan_inspection_v2,
@@ -999,7 +1000,8 @@ class PlanExpanderAdapter:
                     "source:goal": "payload.goal",
                     "artifact:plan_draft": "output.plan",
                 }),
-                **({"inspection_citation_catalog": [
+                **({"task_result_field_semantics": dict(TASK_RESULT_FIELD_SEMANTICS_V2),
+                    "inspection_citation_catalog": [
                     item.model_dump(mode="json") for item in citation_catalog
                 ]} if use_v2 else {}),
             },
@@ -1266,7 +1268,8 @@ class PlanReviewerAdapter:
                 "inspection_source_catalog": inspection_source_catalog(project_map, {
                     key: f"payload.evidence_catalog.{key}" for key in evidence_catalog
                 }),
-                **({"inspection_citation_catalog": [
+                **({"task_result_field_semantics": dict(TASK_RESULT_FIELD_SEMANTICS_V2),
+                    "inspection_citation_catalog": [
                     item.model_dump(mode="json") for item in citation_catalog
                 ], "inspection_target_catalog": [
                     item.model_dump(mode="json") for item in target_catalog

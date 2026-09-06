@@ -232,11 +232,33 @@ FINDING_TAXONOMY_V2 = MappingProxyType({
 })
 
 
+TASK_RESULT_FIELD_SEMANTICS_V2 = MappingProxyType({
+    "produces": (
+        "검증까지 포함한 Task 전체가 제공하는 논리적 산출물 key다. Worker 응답의 필수 항목 "
+        "목록이나 Worker 단독 작성 책임을 뜻하지 않는다. 독립 Validator의 별도 결과도 Task "
+        "산출물로 선언할 수 있으며, key 이름만으로 작성 주체·제출 시점·검사 입력을 정하지 않는다."
+    ),
+    "acceptance_criteria": (
+        "Worker 작업·응답 제출 이후 Task 검증까지 포함한 완료 조건이다. Worker가 직접 제출할 "
+        "내용과 독립 Validator가 이후 제출할 내용은 조건 원문의 주체·시점으로 구분한다."
+    ),
+    "validations": (
+        "Worker 제출 뒤 Core가 수행하는 Task 검증이다. 독립 Validator는 직접 evidence를 입력으로 "
+        "별도 결과를 제출하고 Core가 Task 완료를 판정한다. 실제 입력 요구는 각 statement에 따른다."
+    ),
+})
+
+
 PLAN_INSPECTION_V2_INSTRUCTIONS = (
     "응답은 기존 plan 또는 review와 inspection을 감싼 plan-inspection-v2 전용 envelope다. "
     "inspection은 의미 판단에 필요한 원자 관측만 제출하고 반복 가능한 참조 closure는 쓰지 않는다. "
     "원문 citation 객체를 다시 쓰지 않는다. 요청의 inspection_citation_catalog는 adapter가 원문에서 "
     "고정한 비권위 후보이며, 모델은 실제 판단에 직접 사용한 citation ID만 direct_refs에서 선택한다. "
+    "task_result_field_semantics는 기존 Task 필드의 책임 범위를 설명하는 입력이며 특정 Task의 "
+    "정상·결함 판정은 아니다. produces의 논리적 산출물 선언과 Worker 응답의 제출 요구를 구분한다. "
+    "result_order finding에는 결과가 필요한 시점·주체를 명시한 계약 원문과 그 결과를 이후 생성하는 "
+    "검사의 입력을 함께 대조해 직접 근거를 선택한다. 필드 설명을 finding evidence로 인용하거나 "
+    "실제 Worker 선제 제출 요구를 정상적인 Task 산출물 선언으로 바꾸지 않는다. "
     "모든 Task·integration validation마다 validation_rows를 정확히 하나 만든다. validation statement와 "
     "Goal AC·constraint의 고정 claim citation은 ID join으로 adapter가 붙인다. mechanisms에는 실제 확인한 "
     "tool·phase와 그 판단에 직접 필요한 catalog citation ID만 "

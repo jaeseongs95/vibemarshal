@@ -1,6 +1,7 @@
 # VibeMarshal 문서 지도
 
 - [검사 계약 구조 개선 진행 기록](inspection-recovery-progress.md): 고정 검증 환경, 독립 11사례 기준선, 참조 계약 개선과 실제 Goal 경로의 공통 완료 조건
+- [길 찾기 알고리즘과 현재 개발 방향의 비교](inspection-search-direction-review.md): 다른 대화의 과거 근거와 최신 결과 구분, 상세 Plan 실패 피드백 부재의 4/14 호출 재현과 우선순위 재검토
 - [Plan inspection v1 독립 11사례 기준선](inspection-v1-static11-baseline.md): 고정 환경에서 전수 관측한 7 PASS·4 FAIL 분포와 실측 usage
 - [Plan inspection v2 독립 11사례 기준선](inspection-v2-static11-baseline.md): 첫 완전 v2 실행의 1 PASS·10 FAIL 분포, 기계 장부 실패와 의미 실패 분리, v1 대비 실측 usage
 - [Plan inspection v2 2차 구조 보정 부분 실행](inspection-v2r2-partial-baseline.md): 7개 schema/compiler 통과 뒤 timeout으로 중단된 실행, 의미 실패군과 prompt/catalog 구조 원인
@@ -17,6 +18,7 @@
 - [Reviewer 참조·scope 축소와 저장형 복구 경계 인계](inspection-v2r8-boundary-handoff.md): 8차 11사례의 9 PASS·2 의미 FAIL, 같은 AC-004 누락 원인군, token·latency와 종료 후 저장 조회 검증
 - [AC 원문별 검사 의무 분리](inspection-v2r9-source-requirements.md): 원문별 직접 선택·adapter 합집합 계약, 677개 Gate와 실제 static 11/11 PASS·사용량 비교
 - [S06 재진입 기록](inspection-s06-reentry.md): 첫 clean의 Task/Worker 산출물 의미 오판·12 NOT_RUN, 저장 응답과 실패 근거 보존, 실제 Goal 완료까지 남은 경계
+- [Task 산출물 책임의 입력 설명](inspection-v2r10-task-result-context.md): Task 필드 의미를 v2 생성·검토 요청에 결속하고 실제 순서 충돌의 직접 판단을 보존하는 다음 검증 계약
 - [Inspection Provider v2 계약](inspection-provider-v2.md): 모델의 직접 의미 판단과 adapter의 결정적 참조 전개 경계, 호환성·평가·승격 조건
 
 ## 현재 권위 문서
