@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from flowmarshal.engine.model_lock import RUNTIME_CAPABILITIES
+from flowmarshal.engine.model_lock import OperationalBinding, RUNTIME_CAPABILITIES
 
 import tempfile
 import unittest
@@ -41,20 +41,25 @@ from flowmarshal.engine.evaluation import (
     BenchmarkCell,
     BenchmarkLifecycleObservation,
     BenchmarkTaskLifecycleObservation,
+    RegressionCatalog,
 )
 from flowmarshal.engine.freeze import LegacyFreezeManifest, verify_legacy_freeze
 from flowmarshal.engine.ledger import ENGINE_SCHEMA_REVISION, EngineLedgerError, SQLiteEngineLedger
 from flowmarshal.engine.models import ModelCapability, ModelInventory
 from flowmarshal.engine.qualification import (
+    GenericFixtureReviewDraft,
     PlanningScenarioCatalog,
     QualificationRunError,
     ORDER_SEEDS,
     _deterministic_contract,
     _planning_cell,
+    _review_result,
+    _write_json,
     default_role_configuration,
     source_manifest_digest,
     source_manifest_files,
 )
+from flowmarshal.engine.roles import strict_json_output_schema
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime
 from flowmarshal.engine.service import EngineService, EngineServiceError
 
@@ -127,6 +132,83 @@ class EngineQualificationTests(unittest.TestCase):
             roles=self.roles,
         )
         return prepared, digest
+
+    def test_inventory_observation_preserves_operational_binding(self) -> None:
+        # model/list 관측은 EngineModel 계층 밖의 strict model도 그대로 보존해야 한다.
+        binding = self.roles.operational_binding(self.inventory)
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "inventory-observation.json"
+            _write_json(path, binding)
+            restored = OperationalBinding.model_validate_json(path.read_text(encoding="utf-8"))
+        self.assertEqual(binding, restored)
+        self.assertEqual(self.inventory.inventory_digest, restored.inventory_digest)
+        self.assertEqual(binding.lock_digest, restored.lock_digest)
+
+    def test_generic_fixture_schema_and_typed_validation_require_empty_task_refs(self) -> None:
+        finding = {
+            "finding_code": "DUPLICATE_STRATEGY",
+            "gate": "plan",
+            "severity": "error",
+            "summary": "두 후보의 전략과 DAG가 같습니다.",
+            "evidence_refs": ["artifact:candidate"],
+            "affected_task_refs": [],
+            "remediable": True,
+        }
+        valid = GenericFixtureReviewDraft.model_validate(
+            {"findings": [finding], "ratings": None}
+        )
+        self.assertEqual((), valid.findings[0].affected_task_refs)
+
+        provider_schema = strict_json_output_schema(
+            GenericFixtureReviewDraft.model_json_schema()
+        )
+        finding_schema = provider_schema["$defs"]["GenericFixtureFindingDraft"]
+        task_refs_schema = finding_schema["properties"]["affected_task_refs"]
+        self.assertEqual(0, task_refs_schema["maxItems"])
+        self.assertIn("affected_task_refs", finding_schema["required"])
+
+        with self.assertRaisesRegex(ValueError, "at most 0 items"):
+            GenericFixtureReviewDraft.model_validate(
+                {
+                    "findings": [finding | {"affected_task_refs": ["candidate-a"]}],
+                    "ratings": None,
+                }
+            )
+
+    def test_generic_fixture_empty_task_refs_preserve_deterministic_decision(self) -> None:
+        catalog = RegressionCatalog.load(
+            ROOT / "tests" / "fixtures" / "engine" / "r31-reviewer-regressions.json"
+        )
+        fixture = next(item for item in catalog.fixtures if item.fixture_id == "P11-adversarial")
+        raw = {
+            "findings": [
+                {
+                    "finding_code": code,
+                    "gate": "plan",
+                    "severity": "error",
+                    "summary": f"{code} 직접 근거가 있습니다.",
+                    "evidence_refs": ["artifact:candidate"],
+                    "affected_task_refs": [],
+                    "remediable": True,
+                }
+                for code in ("DUPLICATE_STRATEGY", "DIVERSITY_FAILURE")
+            ],
+            "ratings": None,
+        }
+
+        result = _review_result(
+            fixture, order_seed=17, raw=raw, reviewer_role="critical_reviewer"
+        )
+
+        self.assertTrue(result.schema_valid)
+        self.assertEqual("needs_revision", result.decision.status.value)
+        self.assertEqual(
+            {"DUPLICATE_STRATEGY", "DIVERSITY_FAILURE"},
+            set(result.decision.finding_codes),
+        )
+        self.assertTrue(
+            all(not item.affected_task_refs for item in result.submission.findings)
+        )
 
     def test_eval_cli_exposes_all_qualification_commands_and_scopes(self) -> None:
         parser = build_parser()

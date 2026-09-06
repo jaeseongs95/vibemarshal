@@ -1,18 +1,20 @@
 # 1.0 전 승인 로드맵
 
 > 상태: **NO-GO**
-> 결정적 Gate: **5/5**, 전체 테스트: **823개 통과**
+> 실제 역할 48건 실행 source(v9)의 결정적 Gate: **5/5·824개 통과**
+> 후속 계약 수정 source(v10)의 최종 결정적 Gate: **5/5·826개 통과**
+> 실제 역할 회귀: **48/48 완료·FAIL**, 후속 평가 계약 보완·재검증 필요
 > 실제 동일 Goal 진단·복구: **두 Task·독립 Goal Test·satisfied GoalVerdict 완료**
 
 이 문서는 승인된 1.0 선행 순서와 각 단계의 재개 조건을 한곳에 표시한다. 제품 계약이나 합격선을 새로 정하지 않는다. Core와 SQLite 원장, 활성 Goal·Plan 계약 및 실제 실행 receipt가 권위이며, 이 문서는 그 결과를 대체하지 않는다.
 
 ## 현재 판정과 해석 원칙
 
-- 현재 1.0 판정은 NO-GO다. 이번 source의 결정적 Gate는 통과했으며 실제 역할·planning·E2E·성능 qualification은 남아 있다. Plan Reviewer의 timeout 및 usage 미확인은 성공이나 0 사용량으로 환산할 수 없다. 종료가 불명확하면 기존 thread를 먼저 관측하고, 종료가 확인됐지만 usage가 없으면 `BUDGET_USAGE_UNKNOWN`으로 추가 호출을 중단한다.
+- 현재 1.0 판정은 NO-GO다. v9 결정적 Gate 뒤 실제 역할 48건을 완료했지만 정상 Goal 오차단 1건·schema 실패 1건으로 FAIL이다. schema 실패의 전달 계약/사후 검사 불일치를 후속 보완하며 원본 결과는 유지한다. 역할 재검증·Planning·E2E·성능 qualification이 남아 있다. timeout·usage 미확인은 성공이나 0 사용량으로 환산하지 않으며 기존 thread를 먼저 관측하고, 종료 후 usage가 없으면 `BUDGET_USAGE_UNKNOWN`으로 추가 호출을 중단한다.
 - 과거 개발 Gate의 **710 tests** 및 **Gate 5/5** 결과는 고정된 과거 source·계약의 provenance다. 현재 source 또는 이번 변경의 PASS가 아니며, 변경된 계약에 재사용하지 않는다.
 - schema 3은 새 Engine 원장 기준이다. 이전 v2 원장·artifact는 변경하거나 제자리 migration하지 않고 보존한다. v2 결과를 schema 3 qualification의 근거로 섞지 않는다.
 - 동일 Goal은 저장 후보 continuation·사용자 exact Plan 활성화·환경 복구·두 Task·독립 Goal Test를 거쳐 완료했다. 여러 개발 source와 명시적 운영 보정을 거친 진단·복구 결과이며, 최종 source의 전체 qualification PASS가 아니다. 실제 ID·실측·실패 보존 근거는 [현재 인계](pre-1.0-handoff.md)에 있다.
-- 현 구현의 `1m / 100k / 25`은 이번 검증에 권장하는 설정값일 뿐, 최적 설정·비교 기준·새 합격선이라는 뜻이 아니다. 실제 적용값과 receipt는 실행 원장에 남긴다. 현재 실제 Goal은 관측된 Worker 사용량에 따라 사용자가 `2m / 200k / 25` override를 별도로 승인했다. 다른 Goal이나 제품 상한의 자동 변경이 아니다.
+- 현 구현의 `1m / 100k / 25`은 사용자가 이번 역할 48건에 승인한 설정이며 최적값·제품 상한·새 합격선이 아니다. 실측 총 1,332,724 token을 48개 호출·원장에 모두 정산했다. 과거 진단 Goal의 `2m / 200k / 25` override는 다른 Goal에 승계하지 않았다. 후속 실제 검증은 이번 48회 승인과 별도다.
 
 ## 근거와 사용 범위
 
@@ -53,8 +55,8 @@
 | S11 Goal 전체 Usage 집계와 Reconciliation | 다중 세션 실행 설계 | 현재 Goal의 실측 소계 788,868과 미확인 1회, 별도 잠정 차감 100,000을 확인했다. 최종 JSON·Markdown이 일치한다. | Goal별 revision 집계, 중복·충돌·누락 표시, token과 nullable latency 독립 집계를 추가했다. | 불완전 실측 총량은 null이다. 여러 Goal·revision·과거 Verdict·중복 receipt 회귀가 최종 Gate에 포함된다. |
 | S12 Goal Budget과 Replan Reserve 실제 집행 | 다중 세션 실행 설계, orchestration redesign | 예산 부족으로 중단한 뒤 사용자 승인으로 현재 Goal만 2m/200k/25로 조정하고 완료했다. 일반 잔여 611,132·reserve 500,000·미정산 예약 0이다. | 정책·예약·정산·명시 조정과 회귀 검증을 연결했다. | 현재 Goal에서 집행을 확인했다. 새 qualification Goal의 예산 범위를 별도로 고정하고 실측 초과·unknown은 계속 차단한다. |
 | S13 제한된 Project Map·Context 정확성 보강 | 다중 세션 실행 설계 | Project Map·Context 구성 요소와 선행 검사 자료가 있다. | 없음 | 고정 source에서 필요한 사실만 Context Pack에 투영하고 digest·freshness 위반을 fail-closed로 기록한다. |
-| S14 Qualification source freeze와 결정적 Gate | 다중 세션 실행 설계, inspection recovery progress | 고정 v7 source에서 결정적 Gate 5/5·823개 테스트·legacy 동결 40개를 통과했다. | 독립 continuation fixture와 역할 실패·집계 회귀를 포함한다. | 현재 source manifest와 계약을 이후 실제 qualification에 결속한다. source 변경 시 새 freeze와 Gate가 필요하다. |
-| S15 역할 회귀와 Planning Qualification | 다중 세션 실행 설계, planning feedback loop | 역할 평가·계획 검사 구현과 과거/부분 결과가 있다. | 없음 | source·prompt/schema·threshold·taxonomy·inventory·receipt가 결속된 실제 role regression과 planning qualification을 완료한다. |
+| S14 Qualification source freeze와 결정적 Gate | 다중 세션 실행 설계, [48건 결과](role-fixture-48-qualification.md) | 실제 역할 호출 전 v9 Gate 5/5·824개 테스트, 후속 수정 v10 Gate 5/5·826개를 통과했다. legacy 40개는 변경·누락 없다. | inventory JSON 저장·테스트 fixture 시각 순서·generic 출력 계약을 수정하고 각각 새 source로 동결했다. | v9 실제 FAIL은 보존한다. v10 source의 실제 qualification을 새 계약·run root에서 수행해야 한다. |
+| S15 역할 회귀와 Planning Qualification | 다중 세션 실행 설계, [48건 결과](role-fixture-48-qualification.md) | 역할 48/48 완료·FAIL. recall 97.06%·precision 90.70%, clean false block 1·schema failure 1이다. 호출·receipt·usage 48/48/48을 감사했다. | generic schema/사후 검사 불일치는 구현 보완, 정상 Goal 오차단·trace finding 누락은 의미 판단 보완으로 구분했다. | 수정 계약의 역할 48 전수 재검증 후 Planning 18을 수행한다. 실패 cell 교체·사후 oracle 조정은 하지 않는다. |
 | S16 실제 E2E Qualification과 상태 보고 정합화 | 다중 세션 실행 설계, A4/A5, inspection recovery progress | 부분 fixture 실행과 상태 보고가 있다. | 없음 | 실제 프로젝트에서 S05~S09 전체를 완료하고 보고 상태가 원장 verdict·evidence와 일치함을 확인한다. |
 | S17 Benchmark 측정 창과 지표 의미 수정 | 다중 세션 실행 설계 | 측정·benchmark 구성 요소가 있다. | 같은 Goal의 모든 materialized Spec·수정 후보 출력 비용을 정확히 결속하고 불변 lifecycle 재관측 명령을 추가했다. 미관측은 null/NOT_OBSERVED다. | 기능 qualification과 분리된 측정 창, 입력·모델 lock·지표 정의를 고정한다. |
 | S18 동일 입력 소규모 Pair 수집 경로 검증 | 다중 세션 실행 설계 | 비교 수집을 위한 기반이 있다. | 없음 | 동일 입력의 소규모 pair를 실행해 receipt·비용·품질 수집 경로가 일관되게 결속됨을 확인한다. |
@@ -66,7 +68,7 @@ S00~S04는 선행 설계·구현의 범위를 보존하기 위한 표기이며, 
 
 | 항목 | 승인된 사용법 | 금지된 해석 |
 |---|---|---|
-| `1m / 100k / 25` | 현 구현에서 검증 실행에 권장하는 설정으로 기록하고 각 호출의 실제 적용값을 receipt에 남긴다. | 최적 설정, 일반 제품 기본값, 새 품질·비용 합격선 |
+| `1m / 100k / 25` | 사용자 승인 역할 48건에 적용했고 전부 실측 정산했다. 후속 검증의 범위·정책도 명시적으로 결속한다. | 최적 설정, 일반 제품 기본값, 새 품질·비용 합격선, 후속 호출의 자동 승인 |
 | timeout 또는 receipt 미확인 | 먼저 provider 상태·기존 intent를 관측하고, 외부 효과 불명과 종료 후 usage 미확인을 구분해 차단한다. | 자동 재시도, 자동 해제, 0 token·0 latency·PASS 처리 |
 | `usage_unknown`, 누락, receipt 충돌 | total을 불완전으로 표시하고 reconciliation의 다음 행동을 제공한다. | adjustment나 추정 reservation을 실제 사용량으로 합산 |
 

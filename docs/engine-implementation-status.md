@@ -4,7 +4,11 @@
 
 ## 현재 판정
 
-**NO-GO**, 개발 package `flowmarshal-engine 0.2.0a1`, 새 원장 schema revision **3**이다. 최종 source의 결정적 Gate **5/5**, 전체 테스트 **823개 / 122.253초**, legacy 동결 **40개 / 변경·누락 없음**으로 통과했다. 원본 경로와 source digest는 [현재 인계](pre-1.0-handoff.md)에 기록했다. 실제 역할 회귀 48-cell·Planning 18-cell·E2E 4-cell·성능 36-cell은 같은 최종 source와 고정 설정으로 새로 검증해야 한다.
+**NO-GO**, 개발 package `flowmarshal-engine 0.2.0a1`, 새 원장 schema revision **3**이다. 실제 역할 회귀는 v9 고정 source에서 **48/48건 완료·FAIL**이다. clean false block 1건과 schema failure 1건이 남았다. recall 97.06%·precision 90.70%, critical false admission·seed 간 critical verdict 불일치는 모두 0건이다. 호출 전 결정적 Gate는 **5/5·824개 테스트**, legacy 동결 **40개 / 변경·누락 없음**으로 통과했다. [48건 결과와 원인](role-fixture-48-qualification.md)에 원본·source·예산·실패 분류를 연결했다.
+
+실제 48회의 provider/receipt/usage와 History를 읽기 전용으로 감사했고 누락·중복·미정산·미확인 사용량은 없었다. 실측 총량은 **1,332,724 token**이다. schema 실패 1건은 provider schema가 허용한 값을 사후 검사에서 금지한 평가 계약 불일치와 연결됐다. 정상 Goal 오차단과 별도 필수 finding 누락은 모델 의미 판단 문제다. 과거 결과를 고치지 않고 후속 계약을 보완하며, Planning 18·E2E 4·성능 36은 이번에 실행하지 않았다.
+
+generic 출력 계약 불일치는 v10에서 수정했고 **최종 결정적 Gate 5/5·826개 테스트 / 113.639초**를 통과했다. 실제 Goal/Plan의 Task 참조 기능과 oracle·합격선은 유지한다. 현재 개발 source는 v10 manifest와 일치하며 수정 후 실제 역할 qualification은 미실행이다. 정확한 source와 Gate digest는 [48건 결과의 후속 수정](role-fixture-48-qualification.md)에 있다.
 
 최신 실제 Goal 계보는 revision 1 conflict에서 독립 피드백 후 revision 2 READY로 진행했고, timeout 뒤 저장 후보를 이어받은 독립 Reviewer가 완료되어 S06의 exact Plan을 선택했다. 사용자가 승인한 Plan을 활성화한 뒤 환경 실패를 복구하고, 두 Task·최신 Task 검증 3개·새 독립 Goal Test를 통과해 Core가 `satisfied` GoalVerdict를 기록했다. 이전 Attempt·FAIL과 schema 실패는 그대로 남는다. 정확한 ID·원본·비용은 [현재 인계](pre-1.0-handoff.md)에 기록한다.
 
@@ -24,8 +28,8 @@
 
 ## 출시 전에 남은 검증
 
-1. 새 qualification Goal들의 예산 범위를 명시하고 최종 source·역할·inventory·fixture·seed·합격선을 고정한다. 현재 Goal의 증액을 다른 Goal로 자동 확대하지 않는다.
-2. 실제 역할 48-cell·Planning 18-cell·E2E 4-cell을 전수 실행해 원시 결과·오분류·순서 안정성·사용량과 복구를 검증한다.
+1. 역할 48 결과에서 확인한 generic 출력 계약 불일치와 Goal 의미 판단 실패를 보완한다. 이번 실패·원시 결과·합격선은 보존한다.
+2. 새 source·계약의 역할 48-cell 재검증 뒤 Planning 18-cell·E2E 4-cell을 전수 검증한다. 이번 48회의 사용자 승인과 과거 Goal 증액을 후속 실제 호출로 자동 확대하지 않는다.
 3. 같은 source의 기능 Gate 통과 뒤 성능 36-cell을 수집한다. 선택된 Engine Plan의 exact 활성화와 실제 실행 lifecycle을 별도로 관측하고 불변 assessment를 추가한다.
 
 S06~S09의 동일 Goal 연결과 실제 예산 집행은 확인했다. 단위 테스트·합성 lifecycle·단일 Goal의 진단·복구 성공으로 위 전체 qualification이나 1.0 완료를 선언하지 않는다.

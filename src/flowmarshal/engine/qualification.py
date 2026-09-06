@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Literal
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from ..canonical import sha256_bytes, sha256_digest
 from .context import ProjectMapper, goal_context_observations
@@ -71,7 +71,13 @@ from .evaluation import (
     evaluate_role_fixtures,
 )
 from .freeze import LegacyFreezeManifest, verify_legacy_freeze
-from .goal import GoalNormalizerAdapter, GoalPreparationPipeline, GoalReviewerAdapter, ReviewDraft
+from .goal import (
+    FindingDraft,
+    GoalNormalizerAdapter,
+    GoalPreparationPipeline,
+    GoalReviewerAdapter,
+    ReviewDraft,
+)
 from .models import AssignmentResolver, EngineRoleConfiguration, ModelInventory
 from .plan_inspection_provider import (
     PLAN_INSPECTION_PROVIDER_V1,
@@ -102,7 +108,9 @@ ROLE_INSTRUCTIONS = (
     "후보를 독립 검토한다. 직접 evidence가 있는 최소 finding만 제출하고, 같은 증상에서 "
     "상관 finding을 늘리지 않는다. finding code는 명확하고 재현 가능해야 한다. "
     "finding이 없을 때만 다섯 축 rating을 제출한다. status, admission, 최종 score는 선언하지 않는다. "
-    "제공된 finding taxonomy 안의 코드만 사용한다."
+    "제공된 finding taxonomy 안의 코드만 사용한다. "
+    "이 generic fixture 입력에는 권위 Task ref catalog가 없으므로 모든 finding의 "
+    "affected_task_refs는 빈 배열이어야 하며 후보 ref를 넣지 않는다. "
     "입력은 source와 후보의 특정 의미를 검사하는 부분 발췌다. 생략된 필드나 문맥을 "
     "존재한다고 발명하지 않으며, 생략 자체를 명시적 결함으로 간주하지도 않는다. "
     "대상·자료가 없다고 명시된 경우는 정보 부족을 지적한다. 발췌에 없는 프로젝트 파일이나 "
@@ -113,6 +121,18 @@ ROLE_INSTRUCTIONS = (
     "취급하지 않는다. source에 없는 가상의 동명 함수·다른 프로젝트가 있을 수 있다는 추측은 "
     "직접 evidence가 아니다. 제공된 ProjectProfile의 호환성·최소 변경 정책도 Goal의 근거다."
 )
+
+
+class GenericFixtureFindingDraft(FindingDraft):
+    """Task catalog가 없는 generic 회귀 fixture 전용 finding 계약이다."""
+
+    affected_task_refs: tuple[str, ...] = Field(default=(), max_length=0)
+
+
+class GenericFixtureReviewDraft(ReviewDraft):
+    """실제 Goal/Plan Reviewer의 Task ref 계약과 분리된 fixture 출력이다."""
+
+    findings: tuple[GenericFixtureFindingDraft, ...] = ()
 
 
 class PlanningScenario(EngineModel):
@@ -281,7 +301,7 @@ def _default_run_root(root: Path, scope_name: str, contract_hint: str) -> Path:
 
 
 def _write_json(path: Path, value: Any) -> None:
-    if isinstance(value, EngineModel):
+    if isinstance(value, BaseModel):
         document = value.model_dump(mode="json")
     else:
         document = value
@@ -498,7 +518,9 @@ def _role_contract(
         ),
         taxonomy_digest=sha256_digest(taxonomy),
         prompt_digest=sha256_digest(ROLE_INSTRUCTIONS),
-        output_schema_digest=sha256_digest(strict_json_output_schema(ReviewDraft.model_json_schema())),
+        output_schema_digest=sha256_digest(
+            strict_json_output_schema(GenericFixtureReviewDraft.model_json_schema())
+        ),
         model_lock_digest=_model_lock(inventory, roles),
     )
 
@@ -510,7 +532,7 @@ def _review_result(
     raw: dict[str, Any],
     reviewer_role: str,
 ) -> FixtureResult:
-    draft = ReviewDraft.model_validate(raw)
+    draft = GenericFixtureReviewDraft.model_validate(raw)
     evidence_catalog = {"artifact:candidate": fixture.artifact}
     findings = tuple(
         ReviewFinding(
@@ -665,15 +687,15 @@ def run_role_fixture(
                                 "evidence_catalog": evidence_catalog,
                                 "finding_taxonomy": taxonomy,
                             },
-                            output_schema=ReviewDraft.model_json_schema(),
+                            output_schema=GenericFixtureReviewDraft.model_json_schema(),
                             model=binding.model,
                             effort=binding.effort, allowed_fallbacks=binding.allowed_fallbacks,
                             inventory_digest=inventory.inventory_digest, inventory=inventory,
                             cwd=str(base),
                         )
 
-                    def validate(raw: dict[str, Any]) -> ReviewDraft:
-                        draft = ReviewDraft.model_validate(raw)
+                    def validate(raw: dict[str, Any]) -> GenericFixtureReviewDraft:
+                        draft = GenericFixtureReviewDraft.model_validate(raw)
                         unknown = {
                             ref
                             for finding in draft.findings
@@ -682,8 +704,6 @@ def run_role_fixture(
                         }
                         if unknown:
                             raise ValueError(f"제공되지 않은 evidence ref: {sorted(unknown)}")
-                        if any(item.affected_task_refs for item in draft.findings):
-                            raise ValueError("generic fixture review에는 affected Task ref를 둘 수 없습니다.")
                         unknown_codes = {
                             item.finding_code for item in draft.findings if item.finding_code not in taxonomy
                         }

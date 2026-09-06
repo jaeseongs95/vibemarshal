@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import timedelta
 from pathlib import Path
 
 from flowmarshal.canonical import canonical_json
@@ -209,28 +210,35 @@ class EngineApplicationTests(unittest.TestCase):
             latency_ms=19,
             available=False,
         )
-        summary = summarize_usage_records(
-            project_id=self.project_id,
-            goal_id=self.goal.goal_id,
-            goal_revision_digests=(self.goal.definition_digest,),
-            records=(selected_duplicate, linked_duplicate),
-            presentation=presentation,
-            provider_call_expectations=(ProviderCallExpectation(
-                provider_call_id="provider_call_duplicate",
-                call_key="same-provider-call",
-                status="usage_unknown",
-                role="executor",
-                stage="execution",
-                usage_id=linked_duplicate.usage_id,
-            ),),
-        )
+        # 빠른 연속 생성 시 같은 시각과 무작위 ID가 선택 순서를 바꾸지 않도록
+        # 이 사례가 검증하려는 선행 기록·후행 provider 사본의 시간 관계를 고정한다.
+        linked_duplicate = linked_duplicate.model_copy(update={
+            "recorded_at": selected_duplicate.recorded_at + timedelta(seconds=1),
+        })
+        for records in ((selected_duplicate, linked_duplicate), (linked_duplicate, selected_duplicate)):
+            with self.subTest(input_order=tuple(item.usage_id for item in records)):
+                summary = summarize_usage_records(
+                    project_id=self.project_id,
+                    goal_id=self.goal.goal_id,
+                    goal_revision_digests=(self.goal.definition_digest,),
+                    records=records,
+                    presentation=presentation,
+                    provider_call_expectations=(ProviderCallExpectation(
+                        provider_call_id="provider_call_duplicate",
+                        call_key="same-provider-call",
+                        status="usage_unknown",
+                        role="executor",
+                        stage="execution",
+                        usage_id=linked_duplicate.usage_id,
+                    ),),
+                )
 
-        self.assertEqual(0, summary.logical_call_count)
-        self.assertEqual(0, summary.input_tokens.known_subtotal)
-        self.assertIsNone(summary.input_tokens.total)
-        self.assertEqual(17, summary.latency_ms.known_subtotal)
-        self.assertEqual(17, summary.latency_ms.total)
-        self.assertEqual(0, summary.latency_ms.incomplete_call_count)
+                self.assertEqual(0, summary.logical_call_count)
+                self.assertEqual(0, summary.input_tokens.known_subtotal)
+                self.assertIsNone(summary.input_tokens.total)
+                self.assertEqual(17, summary.latency_ms.known_subtotal)
+                self.assertEqual(17, summary.latency_ms.total)
+                self.assertEqual(0, summary.latency_ms.incomplete_call_count)
 
     def test_unobserved_provider_call_makes_total_incomplete_without_using_reservation_actual(self) -> None:
         with self.service.ledger.transaction() as tx:

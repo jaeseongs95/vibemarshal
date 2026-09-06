@@ -2,6 +2,18 @@
 
 현재 상태는 [구현 현황](engine-implementation-status.md), 승인된 범위와 이후 기능은 [로드맵](pre-1.0-roadmap.md)을 따른다. 이전 R-S06 인계와 원본 실행은 역사 기록으로 보존한다.
 
+## 최신 역할 48건 실행
+
+사용자가 승인한 역할 48-cell을 v9 고정 source에서 전수 완료했다. **48/48 완료·Gate FAIL·1.0 NO-GO**다. 정상 Goal 오차단 1건과 schema failure 1건이 Gate를 막았다. recall 97.06%·precision 90.70%, critical false admission·seed 간 critical verdict 불일치는 0이다. 상세 근거는 [48건 결과](role-fixture-48-qualification.md)에 기록했다.
+
+provider/checkpoint/usage 48/48/48, History chain 48/48, 중복·unknown·미정산 예약 0을 읽기 전용으로 감사했다. **실측 총 1,332,724 token**은 입력 1,320,603 + 출력 12,121이며 cached input 466,048은 입력에 포함된다. 승인한 Goal별 1m/100k/25를 적용했고 과거 Goal의 잠정 차감·2m override와 합산하지 않았다.
+
+v9 실제 run은 `D:\codex\fm-inspection-runtime\qualification-2952c04-role48-20260906\10-role-fixture`다. 호출 전 JSON serialization 오류(v7)와 불안정한 테스트 시각 순서(v8)는 각각 실제 호출 0회였고 별도 실패 원본으로 보존했다. 이 두 문제를 수정한 v9에서 Gate 5/5·824개 테스트를 통과한 뒤 48회를 실행했다.
+
+P11의 schema failure는 모델에 전달한 schema가 허용한 candidate ref를 generic 사후 validator가 금지한 계약 불일치와 연결됐다. 후속 개발 source에서 generic 전용 draft·`maxItems: 0`·명시 역할 지침으로 수정했다. 실제 Goal/Plan Task ref 계약, fixture·oracle·합격선은 유지한다. G01 정상 요청의 문맥 누락과 G07의 필수 trace finding 누락은 의미 판단 보완 대상으로 남는다. v9 결과를 수정해 PASS로 바꾸지 않았고 수정 후 실제 모델 호출은 0회다.
+
+현재 개발 source의 동결 작업본은 **v10**(`D:\codex\fm-pre10-validation-v10`), HEAD `00f341af30f34f23362fbede65f42081ac0324e0`, manifest `sha256:c543d2d1fa9cdad379cd9d8fd4e58c58faeff62a6beed41bb6d45db8b289cbad`다. **최종 Gate 5/5·826개 테스트 / 113.639초·legacy 40개 변경·누락 0**을 통과했다. 원본 `.flowmarshal-engine-eval\runs\pre10-role48-followup-devgate-20260906`의 contract는 `sha256:d7ad0188a6ac032999723ceb59b39e2ce9c8ad797c5d55d425110548fa7420e4`, report는 `sha256:d091be087c840eb08037d2013029bc07dcd9ef6f98cb826104c587d069fc69fe`다. 실제 48 FAIL은 v9 계약으로 유지하고 v10 후속 실제 실행은 새 run root가 필요하다.
+
 ## 이번 구현
 
 - 최종 Verdict가 참조한 Plan·Goal revision을 조회하고 동일 Goal 계보만 집계한다. 실측 0과 usage/latency 미확인, 동일·충돌 receipt와 호출 누락을 구분한다.
@@ -71,14 +83,14 @@ flowmarshal-engine --db <현재-ledger> --artifacts <현재-artifacts> --role-ti
 
 ## 검증 기록
 
-최종 결정적 Gate는 **5/5**, 전체 테스트는 **823개 / 122.253초**, legacy 동결 검사는 **40개 / 변경·누락 없음**으로 통과했다. 고정 source 작업본은 `D:\codex\fm-pre10-validation-v7`의 `4dcd03dbe69a97bf2907065d95ebae0829948d97`, 원본 Gate는 `.flowmarshal-engine-eval\runs\pre10-terminal-role-failure-devgate-20260906`이다. source manifest `sha256:e91658eba7722651748271108e2231d2ff3b3661f8703119bd8c20bb674ef284`, contract `sha256:df4825ea9cada8ad9c3201794b244044798809a3057d509f1f9a511fa5fc58a7`, report `sha256:f7a5b7323287253f7272c856273b433a0747d599d71426a21d3d525c595981c7`다.
+이전 동일 Goal 완료 당시 v7 결정적 Gate는 **5/5**, 전체 테스트는 **823개 / 122.253초**, legacy 동결 검사는 **40개 / 변경·누락 없음**으로 통과했다. 고정 source 작업본은 `D:\codex\fm-pre10-validation-v7`의 `4dcd03dbe69a97bf2907065d95ebae0829948d97`, 원본 Gate는 `.flowmarshal-engine-eval\runs\pre10-terminal-role-failure-devgate-20260906`이다. source manifest `sha256:e91658eba7722651748271108e2231d2ff3b3661f8703119bd8c20bb674ef284`, contract `sha256:df4825ea9cada8ad9c3201794b244044798809a3057d509f1f9a511fa5fc58a7`, report `sha256:f7a5b7323287253f7272c856273b433a0747d599d71426a21d3d525c595981c7`다.
 
-v3 Gate는 옛 lifecycle helper import를 참조한 테스트 때문에 실패했고 v4에서 5/5·811개를 통과했다. v5 Gate는 실제 실행 디렉터리에 결속된 continuation 테스트가 변경된 실행 산출물에 영향을 받아 4/5·817개 중 2건 오류로 실패했다. 독립적인 임시 9-call fixture로 바꾼 v6에서 5/5·817개를 통과했고, 실제 target 변경 차단은 유지했다. v7은 이후 확인된 역할 실패 종료·집계 수정을 포함한 최종 전체 Gate다. 모든 과거 source·실패 보고서·기존 774-test 결과는 각 원래 작업본에 보존한다.
+v3 Gate는 옛 lifecycle helper import를 참조한 테스트 때문에 실패했고 v4에서 5/5·811개를 통과했다. v5 Gate는 실제 실행 디렉터리에 결속된 continuation 테스트가 변경된 실행 산출물에 영향을 받아 4/5·817개 중 2건 오류로 실패했다. 독립적인 임시 9-call fixture로 바꾼 v6에서 5/5·817개를 통과했고, 실제 target 변경 차단은 유지했다. v7은 당시 확인된 역할 실패 종료·집계 수정을 포함한다. 모든 과거 source·실패 보고서·기존 774-test 결과는 각 원래 작업본에 보존한다.
 
-현재 실제 역할 48-cell·Planning 18-cell·E2E 4-cell·성능 36-cell은 이번 source로 완료하지 않았으며 **NO-GO**다. R3.1 비교 subprocess의 사전 예산 검사와 receipt 대조 구현은 보완했지만 실제 36-cell 통과 근거는 아직 없다. 부분 단위 테스트나 합성 성공으로 이를 대체하지 않는다.
+현재 실제 역할 48-cell은 v9에서 완료했으나 FAIL이며, 후속 수정 계약은 실제 재검증 전이다. Planning 18·E2E 4·성능 36도 미실행으로 **NO-GO**다. R3.1 비교 subprocess의 사전 예산 검사와 receipt 대조 구현은 보완했지만 실제 36-cell 통과 근거는 아직 없다. 부분 단위 테스트나 합성 성공으로 이를 대체하지 않는다.
 
 ## 다음 실행
 
-운영 폴더의 `qualification-launch-proposal.md`, `qualification-launch-plan.json`, `qualification-budget-approval-proposal.json`에 고정 v7 source·역할·실행 파일·정책·명령을 결속한 검토안을 준비했다. 새 model call은 아직 없고 모두 `NOT_RUN`이다. 현재 2,000,000/200,000 override는 완료한 Goal 하나에만 적용되므로 새 qualification Goal의 예산 범위를 따로 명시해야 한다. 현재 구현은 Goal별 예약·정산을 집행하며 campaign 전체 cap을 집행하지 않는다. 여러 Goal 상한의 단순 합계나 예약량을 실제 최대 사용량으로 표시하지 않는다.
+운영 폴더의 `qualification-launch-proposal.md`, `qualification-launch-plan.json`, `qualification-budget-approval-proposal.json`은 원래 v7 검토안의 역사 기록이다. 현재 명령으로 그대로 실행하지 않는다. 사용자 48건 승인·0-call 실패 뒤 재동결·실제 v9 입력은 최종 campaign의 `role48-launch/precall-retry-binding.json`에 연결됐다. 실제 48건은 종료됐으며 재호출하지 않는다. 현 구현은 Goal별 예약·정산만 집행하고 campaign 전체 cap은 집행하지 않는다.
 
-첫 실행 범위는 역할 48-cell로 제한하고 결과와 완전 정산을 검토한 뒤 Planning 18 → E2E 4 → 성능 36 순서로 진행하는 안이다. 성능 수집의 정상 Engine 12-cell은 선택된 정확한 Plan ID·digest의 사용자 활성화와 실제 lifecycle 완료가 별도로 필요하다. 그 전에는 상세화 폐기를 0% 성공으로 처리하지 않는다.
+다음은 generic 출력 계약 수정과 Goal 의미 판단 보완을 결속한 새 역할 48 전수 재검증이다. 그 뒤 Planning 18 → E2E 4 → 성능 36 순서를 유지한다. 후속 실제 호출은 이번 48회의 승인에 포함하지 않으며, 원래 실패 cell이나 완료 run root를 새 source로 재사용하지 않는다. 성능 수집의 정상 Engine 12-cell은 exact Plan 활성화와 실제 lifecycle 완료가 필요하고, 상세화 폐기를 미관측 0% 성공으로 처리하지 않는다.

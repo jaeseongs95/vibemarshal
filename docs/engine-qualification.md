@@ -2,11 +2,13 @@
 
 이 문서는 개발용 `flowmarshal-engine-eval`의 실행 계약을 설명한다. 네 기능 scope와 token/latency Gate를 모두 실제로 통과하기 전까지 판정은 `NO-GO`이며 package와 기본 CLI는 `flowmarshal-engine` pre-1.0 상태를 유지한다.
 
-2026-09-06 최종 v7 source의 결정적 Gate는 5/5·823개 테스트 PASS다. 실제 동일 Goal의 두 Task·독립 Goal Test·satisfied 판정도 확보했지만, 여러 source와 명시적 운영 보정을 거친 진단·복구 결과다. 역할 48·Planning 18·E2E 4·성능 36의 최종 source qualification은 아직 NOT_RUN이며 정확한 경로·digest·예산 범위는 [현재 인계](pre-1.0-handoff.md)에 있다.
+2026-09-06 v9 source의 결정적 Gate 5/5·824개 테스트 뒤 [실제 역할 48건](role-fixture-48-qualification.md)을 완료했다. 역할 Gate는 정상 요청 오차단 1건·schema failure 1건으로 FAIL이다. 후자는 전달 schema와 사후 validator 불일치의 후속 보완 대상으로 분류했다. 원본 판정·fixture·합격선은 보존한다. Planning 18·E2E 4·성능 36은 NOT_RUN이다. 이전 같은 Goal의 `satisfied` 판정은 여러 source와 운영 보정의 진단·복구 결과로 구분한다.
+
+후속 generic 출력 계약은 v10에서 수정하고 최종 Gate 5/5·826개 테스트를 통과했다. provider schema와 typed validator에 같은 빈 Task ref 제약을 두었으며 실제 Goal/Plan의 Task ref는 유지한다. prompt/schema와 source가 달라졌으므로 v9의 실제 checkpoint를 v10에 재사용하지 않는다. 수정 후 실제 qualification은 아직 NOT_RUN이다.
 
 ## 고정 입력
 
-- 역할 설정: 기본 fixture는 `config/qualification-roles.json`이며 실제 실행은 `--role-config`로 명시한 설정과 digest를 계약에 고정한다. 이번 검토안은 `tests/fixtures/engine/plan-inspection-general-reviewer-sol-xhigh-roles.json`을 사용한다. 과거 기본 fixture의 설정을 묵시적으로 이번 실행에 적용하지 않는다.
+- 역할 설정: 기본 fixture는 `config/qualification-roles.json`이며 실제 실행은 `--role-config`로 명시한 설정과 digest를 계약에 고정한다. 실제 48건은 `tests/fixtures/engine/plan-inspection-general-reviewer-sol-xhigh-roles.json`을 사용했다. 과거 기본 fixture의 설정을 묵시적으로 이번 실행에 적용하지 않는다.
 - 공통 finding taxonomy: `config/qualification-finding-taxonomy.json`
 - legacy 동결: `config/legacy-freeze-manifest.json`
 - reviewer 회귀: `tests/fixtures/engine/r31-reviewer-regressions.json`, `goal-reviewer-regressions.json`
@@ -18,7 +20,7 @@
 
 실제 모델 scope에는 `--budget-policy config/pre-1.0-validation-budget.json`과 `--role-timeout-policy config/pre-1.0-role-timeouts.json`을 명시한다. 정책 본문과 digest를 evaluation contract·run metadata에 함께 고정하고, 재개 시 이를 대조한다. 모델 호출은 Goal별 새 원장의 공통 예약·정산을 사용하며 schema recovery는 0회다. Goal 정규화 이전의 호출도 같은 Goal ID로 예약하고 revision 등록 뒤 연결한다. 정책 누락·미확인 사용량·예산 부족은 다음 provider 호출 전에 차단한다.
 
-예산은 Goal별 호출 전 admission과 종료 후 정산을 집행한다. 현재 실행기에는 campaign 전체의 합산 cap이 없고 실제 한 호출의 사용량이 예약을 초과할 수 있다. Goal 상한의 합계나 예약량을 실제 campaign 최대치로 표현하지 않는다. 완료한 진단 Goal의 2m/200k override는 새 qualification Goal의 승인으로 승계하지 않는다. 다음 검토안은 역할 48-cell부터 범위를 고정하고 완전 정산과 Gate 결과를 검토한 뒤 나머지 scope로 진행한다.
+예산은 Goal별 호출 전 admission과 종료 후 정산을 집행한다. 현재 실행기에는 campaign 전체의 합산 cap이 없고 실제 한 호출의 사용량이 예약을 초과할 수 있다. Goal 상한의 합계나 예약량을 실제 campaign 최대치로 표현하지 않는다. 완료한 진단 Goal의 2m/200k override는 새 qualification Goal의 승인으로 승계하지 않는다. 사용자는 이번 역할 48-cell에 Goal별 1m/100k/25를 승인했고 모두 정산됐다. 원래 48회 승인은 후속 재검증·Planning·E2E·성능 호출까지 포함하지 않는다.
 
 ## Scope
 

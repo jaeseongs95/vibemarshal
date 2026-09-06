@@ -10,7 +10,9 @@ VibeMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고
 
 최신 상태의 단일 진입점은 [Engine 구현 현황](docs/engine-implementation-status.md)이다. [1.0 선행 로드맵](docs/pre-1.0-roadmap.md)에 승인된 구현 순서와 후속 기능을 구분했고, [현재 작업 인계](docs/pre-1.0-handoff.md)에 이번 변경과 다음 실행 조건을 기록한다.
 
-현재 판정은 **NO-GO**다. timeout 이후 같은 Goal 계보를 이어받아 사용자가 승인한 Plan 활성화, 두 Task의 완료, 독립 Goal Test와 `satisfied` GoalVerdict까지 실제로 연결했다. 최종 source의 결정적 Gate 5/5와 823개 테스트가 통과했다. 이 실행은 여러 개발 source와 명시적 운영 보정을 거친 진단·복구 근거이며, 같은 최종 source의 실제 역할 회귀·Planning·E2E·성능 qualification은 별도로 남아 있다.
+현재 판정은 **NO-GO**다. [실제 역할 48건](docs/role-fixture-48-qualification.md)을 모두 실행했으며 정상 요청 오차단 1건·평가 계약의 형식 불일치 1건으로 Gate가 실패했다. 실측 1,332,724 token은 48회 모두 정산됐다. v9의 호출 전 결정적 Gate 5/5·824개 테스트는 통과했다. 후속 계약 보완·역할 재검증과 Planning 18·E2E 4·성능 36이 남아 있다. 이전 동일 Goal의 두 Task·독립 Goal Test·`satisfied` 판정은 여러 source를 거친 진단·복구 근거로 별도 보존한다.
+
+평가 계약 불일치는 v10에서 수정했고 최종 결정적 Gate 5/5·826개 테스트를 통과했다. 수정 후 실제 역할 qualification은 재검증 전이며, v9 실패 판정·원시 응답·기존 합격선은 그대로 보존한다.
 
 새 Engine schema revision은 **3**이다. Goal별 최종 보고, 전체 역할 usage 예약·정산, 명시적 모델 재결속과 공통 조회를 보완했다. 기존 revision 2 원장을 자동 변환하지 않으며, 사용량이 미확인이면 추가 모델 호출을 중단한다. 권장 검증 예산은 설정 파일로 주입하며 제품 상한으로 하드코딩하지 않는다.
 
@@ -85,7 +87,7 @@ flowmarshal-engine-eval cutover --scope-report <report> ... --benchmark-report <
 
 실제 모델 평가에는 `--codex-bin <검증할 codex.exe의 절대 경로>`를 명시할 수 있다. 이 작업에서 SDK 동봉 runtime은 응답 API 404를 반환했고 설치된 앱 runtime을 명시한 실행은 정상 동작했다. 검증한 실행 파일과 실패·성공 범위는 [실행 현황 보고서](docs/engine-implementation-status.md)에 기록한다. 실행 파일을 바꾸면 새 evaluation 계약과 run root를 사용한다.
 
-현재 `benchmark`는 외부 36-cell 입력 검증과 frozen R3.1·Engine의 중립 입력 live 수집 경로를 구현한다. 수집기 구현·모의 회귀와 실제 성능 Gate 통과는 별개이며, 이번 CLOSE에서 비용 비교는 실행하지 않았다. 전체 usage·결측·Budget의 F04·F09는 S10~S12, 측정 계약의 F06은 S17 이후에 남긴다.
+현재 `benchmark`는 외부 36-cell 입력 검증과 frozen R3.1·Engine의 중립 입력 live 수집 경로를 구현한다. S10~S12의 usage·결측·예산을 연결했고 실제 48회 정산도 감사했다. 측정되지 않은 lifecycle 폐기 비율은 null/NOT_OBSERVED로 남긴다. 수집기 구현·회귀와 실제 성능 Gate 통과는 별개이며, 36-cell 비용 비교는 아직 실행하지 않았다.
 
 동결 검사는 이 저장소 외에 형제 디렉터리 `../자동화템플릿/prototypes/skills/flowmarshal-work-planner`의 원본 Planner 스킬 7개 파일도 요구한다. 새 clone에서 해당 감사 기준선이 없으면 freeze Gate는 실패하며 자동으로 생략하거나 재생성하지 않는다. 인증정보·로컬 실행 DB·Codex home 복제본·평가 작업 디렉터리는 Git에서 제외하고 기존 로컬 파일은 보존한다.
 
