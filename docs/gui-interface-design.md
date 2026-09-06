@@ -1,8 +1,9 @@
-# FlowMarshal GUI 인터페이스 설계명세
+# VibeMarshal GUI 인터페이스 설계명세
 
-- 문서 상태: 제안(구현 전 설계 기준)
+- 문서 상태: 클릭형 프로토타입 구현됨 / Engine 연동·패키징은 제안
 - 대상: `flowmarshal.engine` / 개발용 `flowmarshal-engine 0.2.0a1`
-- 작성일: 2026-09-05
+- 최초 작성일: 2026-09-05
+- 마지막 갱신: 2026-09-06
 - 관련 권위 문서: [전면 재설계 권위 문서](orchestration-redesign.md), [Engine cutover ADR](engine-cutover-adr.md), [R3.1 동결 기준선](r31-frozen-baseline.md)
 
 ## 1. 목적
@@ -47,6 +48,21 @@ Automation/Trigger ┘            └─> EngineDispatcher ─> CodexRuntimePort
 | 읽기 전용 GUI 단계 | 프로젝트·Goal·Plan·Task·Attempt·evidence·비용·History를 조회하는 로컬 API와 웹 대시보드를 추가한다. |
 | 제어 GUI 단계 | Goal 작성, Plan 비교/활성화, `run once`, interrupt, recovery checkpoint 같은 mutation을 Core command로 연결한다. |
 | 패키징 단계 | Python Engine/API를 sidecar로 묶고 Tauri 데스크톱 셸, 단일 인스턴스, 설치·업데이트·호환성 검사를 추가한다. |
+
+### 2.3 클릭형 프로토타입 결정
+
+UX와 도메인 언어를 실제 Engine 연결보다 먼저 검증하기 위해 `apps/desktop`에 브라우저 우선 React/TypeScript 프로토타입을 둔다.
+
+- 사용자 화면의 제품명은 **VibeMarshal**이다. package, API, schema, DB와 코드 식별자는 기존 `FlowMarshal`/`flowmarshal`을 유지한다.
+- 프런트엔드는 shell-neutral `EngineClient`와 `PlatformAdapter`에만 의존한다. 현재 구현은 메모리 기반 `MockEngineClient`이고, 실제 연동은 같은 계약의 `HttpEngineClient`로 추가한다.
+- mock은 SQLite나 Engine을 읽고 쓰지 않는다. 합성 상태와 History를 사용하며 모든 화면에 `비권위 데모`, `Mock runtime`, `Engine NO-GO`를 표시한다.
+- 구현된 검토 시나리오는 정상 흐름, 활성화 직전 stale 입력, 외부 결과 불명이다. 정상 흐름에서도 Worker 관측, Task validation, 독립 Goal Test를 분리한다.
+- `possible_actions`는 client 계산물이 아니라 Engine 응답 projection으로 간주한다. mock도 이 모양을 재현하고 화면은 반환된 action만 노출한다.
+- 모든 mutation context는 `actor_ref`, `client_instance_id`, `request_id`, `idempotency_key`를 가진다. 이 값은 향후 감사·동시성 확장을 위한 provenance이며 사용자 인증이나 권한 부여가 아니다.
+- React UI와 계약은 Windows/macOS/Linux에서 공유할 수 있게 유지한다. 실제 배포 지원은 Windows Tauri spike와 패키징 E2E를 먼저 통과한 뒤 OS별로 연다.
+- 팀 workspace, 사용자 초대, 역할 관리, 원격 동기화는 MVP 범위 밖이다. 이를 위해 local-only 보안을 다중 사용자 보안으로 오표기하지 않는다.
+
+현재 prototype은 화면 구조와 명령 의도를 검증하는 단계다. `EngineApplication`, loopback API/SSE, Tauri sidecar가 연결되기 전에는 G1/G2/G3 완료나 제품 qualification으로 계산하지 않는다.
 
 ## 3. 비목표
 
@@ -227,14 +243,17 @@ GUI backend는 CLI보다 오래 살아 있으므로 `RuntimeSessionManager`가 �
 ### 6.1 권장 데스크톱 구성
 
 ```text
-flowmarshal-desktop.exe        Tauri shell, window, updater, capability policy
-└─ flowmarshal-engine-api.exe  Python sidecar, EngineApplication, local API
-   └─ codex.exe                Codex App Server/runtime
+vibemarshal-desktop            Tauri shell, window, updater, capability policy
+├─ Windows: .exe
+├─ macOS: .app                 별도 qualification 후 지원
+└─ Linux: AppImage/deb         별도 qualification 후 지원
+   └─ flowmarshal-engine-api   Python sidecar, EngineApplication, local API
+      └─ codex                 Codex App Server/runtime
 ```
 
 Tauri는 Python CLI 또는 API server를 external binary(sidecar)로 묶을 수 있으므로 현재 Python Engine을 재작성하지 않고 데스크톱으로 패키징하기 적합하다. Tauri의 capability 설정으로 프런트엔드가 실행할 sidecar와 인자를 제한한다. 참고: [Tauri external binaries](https://v2.tauri.app/develop/sidecar/), [Tauri capabilities](https://v2.tauri.app/security/capabilities/).
 
-초기 지원 OS는 현재 runtime requirement에 맞춰 Windows로 제한한다. macOS/Linux는 Codex runtime, path semantics, packaging, signing, update와 E2E를 별도 qualification한 뒤 연다.
+프런트엔드 구조는 처음부터 cross-platform-ready로 유지하되 첫 실제 데스크톱 지원과 qualification은 현재 runtime requirement에 맞춰 Windows로 제한한다. macOS/Linux는 Codex runtime, path semantics, packaging, signing, update와 E2E를 각각 별도 qualification한 뒤 연다.
 
 ### 6.2 프로세스 소유권
 
@@ -608,14 +627,31 @@ src/flowmarshal/engine/
    └─ http_api.py                  # 나중에 추가
 
 apps/desktop/
-├─ src/                            # React/TypeScript
-├─ src-tauri/                      # Tauri shell/capabilities
-└─ generated/engine-client/        # OpenAPI 생성 client
+├─ src/                            # 현재 React/TypeScript prototype
+├─ e2e/                            # Chromium/Firefox/WebKit/mobile UX 계약
+├─ src-tauri/                      # UX 승인 뒤 추가할 Tauri shell/capabilities
+└─ generated/engine-client/        # Local API 확정 뒤 추가할 OpenAPI client
 ```
 
 현재 `flowmarshal.application`은 legacy 계열이므로 새 GUI가 import하지 않는다. 새 계층은 반드시 `flowmarshal.engine.application` 아래에 둔다.
 
 ## 13. 구현 단계와 종료 기준
+
+### P0. 클릭형 GUI 프로토타입 — 구현됨
+
+산출물:
+
+- guided overview, Goal Contract, Plan 비교/DAG, run monitor, recovery center
+- `EngineClient`, `PlatformAdapter`, typed message catalog와 provenance command context
+- 정상·stale activation·external unknown 합성 시나리오
+- exact revision/digest 확인창과 Worker/Task validation/Goal Test 3개 lane
+- desktop/mobile responsive shell과 페이지 주 행동용 WebMCP `run_vibemarshal_next_step`
+
+검증 경계:
+
+- unit/component test와 Chromium/Firefox/WebKit/mobile browser E2E를 실행한다.
+- 이 단계의 PASS는 UX와 mock client 계약에만 적용한다. 실제 Engine/SQLite/sidecar E2E를 대신하지 않는다.
+- Tauri spike는 이 prototype의 UX를 검토한 뒤 Windows에서 수행한다.
 
 ### G0. CLI/Application 경계 정리
 
@@ -794,6 +830,6 @@ GUI 인터페이스 기반 구현은 다음을 모두 만족해야 완료로 본
 
 ## 19. 최종 권고
 
-지금 GUI 코드를 시작할 필요는 없지만, **CLI를 제품 로직의 최종 경계로 굳히지 않는 것**이 중요하다. 우선 G0에서 `EngineApplication`, typed query, History cursor, runtime session 경계를 만들고 CLI를 첫 번째 adapter로 전환한다. 그러면 향후 GUI는 Core를 다시 만들지 않고 두 번째 adapter로 추가할 수 있다.
+클릭형 GUI prototype은 시작됐지만, **CLI를 제품 로직의 최종 경계로 굳히지 않는 것**은 그대로 중요하다. 다음 통합 단계에서는 G0의 `EngineApplication`, typed query, History cursor, runtime session 경계를 만들고 CLI를 첫 번째 권위 adapter로 전환한다. 이후 현재 `MockEngineClient`를 `HttpEngineClient`로 교체해도 Core를 프런트엔드에 복제하지 않는다.
 
-GUI 구현 시에는 읽기 전용 대시보드부터 시작해 상태·event·재접속 모델을 검증한 뒤, exact-digest 활성화와 복구처럼 위험한 command를 단계적으로 연다. 데스크톱 기술은 Tauri 2를 우선 검증하되, 화면 프레임워크 선택이 FlowMarshal의 권위 계약을 바꾸지 않게 유지한다.
+실제 연동은 읽기 전용 query와 event·재접속 모델부터 검증한 뒤, prototype에서 검증한 exact-digest 활성화와 복구 command를 단계적으로 연결한다. 데스크톱 기술은 Windows에서 Tauri 2를 우선 검증하되, 화면 프레임워크나 대상 OS가 FlowMarshal의 권위 계약을 바꾸지 않게 유지한다.

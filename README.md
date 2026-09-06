@@ -82,6 +82,30 @@ flowmarshal-engine report progress|final
 
 `goal create --live`와 `plan search --live`는 역할별 model/effort를 호출자가 명시해야 한다. Engine은 이를 최신 App Server model inventory와 대조하고, 지원되지 않는 값을 임의 fallback으로 숨기지 않는다.
 
+## VibeMarshal GUI 클릭형 프로토타입
+
+`apps/desktop`에는 브라우저에서 바로 검토할 수 있는 React/TypeScript GUI 프로토타입이 있다. 사용자 화면의 제품명은 **VibeMarshal**이고, 코드·API·원장의 내부 식별자는 계속 `FlowMarshal`을 사용한다.
+
+```powershell
+cd D:\codex\flowmarshal\apps\desktop
+pnpm install
+pnpm dev
+```
+
+프로토타입에는 Goal 확인, Plan DAG 비교와 exact-digest 활성화, `run once` 실행 관찰, `STALE_EXECUTION_INPUT`, `EXTERNAL_UNKNOWN` 복구 흐름이 포함된다. 상단의 `데모 시나리오`에서 세 흐름을 전환할 수 있다.
+
+이 구현은 `MockEngineClient`의 합성 snapshot을 사용하는 **비권위 UX 검증물**이다. 실제 Engine, SQLite, Codex runtime을 읽거나 변경하지 않으며 현재 `NO-GO` 판정을 바꾸지 않는다. 실제 연결은 transport-neutral `EngineClient` 계약 뒤에 별도 `HttpEngineClient`로 추가한다.
+
+```powershell
+pnpm typecheck
+pnpm test
+pnpm build
+pnpm exec playwright install chromium firefox webkit
+pnpm test:e2e
+```
+
+데스크톱 셸은 UX 검토 후 Windows에서 작은 Tauri sidecar spike를 먼저 수행하고, macOS/Linux는 동일 프런트엔드의 패키징·runtime·서명·복구 E2E를 각각 qualification한 뒤 지원한다. 상세 경계는 [GUI 인터페이스 설계명세](docs/gui-interface-design.md)를 따른다.
+
 개발 qualification은 별도 CLI로 실행한다. 완료 cell만 immutable checkpoint가 되며 사용량 제한은 `PAUSED_RATE_LIMIT`으로 남겨 같은 run root에서 재개한다.
 
 ```powershell
