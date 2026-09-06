@@ -61,3 +61,5 @@ probe의 `request`, 정책·inventory, thread/turn intent·receipt, terminal, �
 준비된 스크립트는 `D:\codex\fm-inspection-observations\v2r8-launch\start-diagnostic.ps1`이며 SHA-256은 `076b84e5a9aaf8c12ec793dcbd212c74f76150de5f767c7342bf020c3866785a`다. PowerShell 구문 검사를 통과했다. 스크립트는 정확한 위 lock·저장 설정·전체 입력을 실행 직전에 검사하고, 기존 실행·launch·로그가 있으면 중단하며, 새 launch intent를 독점 기록한 뒤에만 숨김 프로세스를 시작한다. 실제 11사례 시작은 아직 수행하지 않았다.
 
 프로젝트 `AGENTS.md`의 “완료 관측이 없는 효과는 `external_unknown`으로 보존하고 입력 변경·새 Task·모델 변경으로 우회해 자동 재실행하지 않는다”는 경계 때문에, 이전 unknown을 보존한 별도 새 전수 실행에 대한 사용자 결정을 남긴 뒤 시작한다. 이는 정확한 Plan 활성화와 별개인 운영 재실행 결정이며, 아직 생성하지 않은 실제 Goal Plan을 승인받는 단계가 아니다.
+
+위 내용은 준비 당시의 기록이다. 이후 현재 경계 검증에 대한 명시 요청으로 잠긴 8차 11사례를 한 번 수행했다. 9 PASS·2 의미 FAIL이며 전체 결과와 실제 Reviewer thread의 종료 후 조회·사후 감사는 [8차 경계 인계](inspection-v2r8-boundary-handoff.md)에 기록했다. 과거 unknown은 그대로 보존했고 같은 intent의 재개·재호출은 없다.
