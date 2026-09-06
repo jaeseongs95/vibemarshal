@@ -15,7 +15,8 @@
 - [Plan inspection v2 7차 부분 실행 기준선](inspection-v2r7-partial-baseline.md): 첫 3사례 PASS 뒤 프로세스 소실로 남은 combined unknown과 7사례 미실행을 보존한 결과
 - [저장형 진단 실행 준비](inspection-durable-runtime.md): 저장형 역할 thread 결속과 포그라운드 세션 밖 실행을 위한 운영 보완
 - [Reviewer 참조·scope 축소와 저장형 복구 경계 인계](inspection-v2r8-boundary-handoff.md): 8차 11사례의 9 PASS·2 의미 FAIL, 같은 AC-004 누락 원인군, token·latency와 종료 후 저장 조회 검증
-- [AC 원문별 검사 의무 분리](inspection-v2r9-source-requirements.md): statement·validation_intent의 직접 선택을 나누고 adapter가 합집합을 만드는 새 개발 계약과 검증 기준
+- [AC 원문별 검사 의무 분리](inspection-v2r9-source-requirements.md): 원문별 직접 선택·adapter 합집합 계약, 677개 Gate와 실제 static 11/11 PASS·사용량 비교
+- [S06 재진입 기록](inspection-s06-reentry.md): 첫 clean의 Task/Worker 산출물 의미 오판·12 NOT_RUN, 저장 응답과 실패 근거 보존, 실제 Goal 완료까지 남은 경계
 - [Inspection Provider v2 계약](inspection-provider-v2.md): 모델의 직접 의미 판단과 adapter의 결정적 참조 전개 경계, 호환성·평가·승격 조건
 
 ## 현재 권위 문서

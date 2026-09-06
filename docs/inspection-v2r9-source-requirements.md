@@ -43,3 +43,43 @@ Adapter는 두 목록을 순서를 보존하는 합집합으로 만들고 scope�
 실행 root는 `D:\codex\fm-inspection-v2r9\.flowmarshal-engine-eval\runs\inspection-v2r9-static11-20260906`이다. workspace preflight는 `sha256:2427c8f076203448a0c82a06399463b5ee078c1e840cf73264aa528c33e4f86e`, prepare lock은 `sha256:60a5f06880c904b454a9c0b064e01a10dd9e579a2abe361b923edcd32f7a6eaf`로 통과했다. fresh inventory·실제 지침·정책, 동일 Sol/xhigh 역할·호출 순서·11개 기대표·Goal 원문과 저장형 thread를 확인했다. 8차 원본 638개 파일도 모두 보존됐다.
 
 운영 기록은 `D:\codex\fm-inspection-observations\v2r9-launch`에 있다. `pre-launch-verification.json`의 21개 검사를 통과한 뒤, `2026-09-06T01:40:58.9101965Z`에 숨김 프로세스 PID 35088로 진단을 한 번 시작했다. launcher SHA-256은 `b12783033563760152eaf8a136e57bda3fb81de5623805b9b0b2de3de72e382b`다. 이 시점의 상태는 **실제 11사례 검증 진행 중**이며 최종 PASS·의미 개선·S06 완료를 뜻하지 않는다. 중단 뒤에는 PID·시작 시각과 기존 artifact를 먼저 관측하고, PID가 사라져도 기존 provider thread를 재개 없이 확인한 뒤 상태를 분류한다. 같은 launcher나 미완료 사례를 자동 재호출하지 않는다.
+
+
+## 독립 11사례 완료 결과
+
+실행은 `2026-09-06T02:13:04.655785Z`에 **11 PASS·0 FAIL·0 NOT_RUN**으로 완료됐다. logical/provider 호출은 11/11, schema recovery는 0회다. 252개 AC×validation 기대 관계와 모든 지정 finding이 일치했으며 schema·compiler·요청/응답 결속 검사를 통과했다. `external_unknown`, incomplete와 provider terminal failure도 모두 0이다. summary SHA-256은 `619be20076564fb62f0ef944300eb3f871f24d712e0c6b04f03d1826872955af`다.
+
+| 사례 | 결과 | 일치 관계 | input tokens | output tokens | receipt latency ms |
+|---|---|---:|---:|---:|---:|
+| clean | PASS | 28/28 | 52,810 | 8,562 | 159,297 |
+| bad | PASS | 28/28 | 52,838 | 10,652 | 196,593 |
+| wrong-goal | PASS | 28/28 | 52,815 | 10,704 | 205,844 |
+| combined | PASS | 28/28 | 52,970 | 10,263 | 195,375 |
+| boundary-clean | PASS | 20/20 | 51,433 | 7,658 | 143,453 |
+| missing-link | PASS | 20/20 | 51,428 | 8,363 | 155,703 |
+| future-result | PASS | 20/20 | 51,386 | 6,742 | 127,047 |
+| stored-expanded | PASS | 12/12 | 50,663 | 8,102 | 150,969 |
+| semantic-explicit | PASS | 28/28 | 52,918 | 10,867 | 200,766 |
+| stored-multi-defect | PASS | 12/12 | 50,429 | 9,830 | 182,063 |
+| semantic-missing-link | PASS | 28/28 | 60,788 | 1,811 | 195,000 |
+
+8차에서 실패했던 `stored-expanded`는 AC-004의 `validation_intent_scope_ids`에 `scope_task_oracle_execution`을 선택했고, `AC004_TASK_PHASE_LINK_MISSING` finding을 제출했다. `stored-multi-defect`도 Task oracle phase scope를 intent 목록에 보존하고 같은 연결 누락 finding과 `TASK_ORACLE_OVERSTATES_INPUT_COVERAGE`를 함께 제출했다. 기존 scope 과장 결함을 놓치거나 Task sibling 관계를 과잉 선택하지 않으면서 두 누락을 검출한 새 응답이다. 과거 FAIL을 재해석하지 않았다.
+
+종료 뒤 lock과 summary 입력 digest, 11개 응답 결속·기대표를 다시 대조한 29개 검사가 통과했다. 8차 원본 638개 파일도 모두 보존됐다. 실제 실행 중 main을 `31c45ac`으로 갱신한 뒤에도 고정 worktree의 HEAD·source lock 검사가 통과해 다른 checkout과의 격리를 확인했다. 검증 상세는 운영 경로의 `result-verification.json`에 있다.
+
+새 App Server에서 8·10·11번의 같은 저장 thread·turn·완료 응답을 재개 없이 확인했다. `post-exit-thread-read-v2.json`의 12개 확인이 모두 통과했으며 SHA-256은 `e467623e9a93ff2d3fefd0da7af99ed6227636d0dc8080b90dcda1f603a38f7a`다. 첫 관측 기록은 조회 뒤 datetime 직렬화에서 실패했다. 부분 파일을 보존하고 읽기 전용 확인만 다시 수행했으며, 모델 호출·resume이나 고정 실행 결과의 변경은 없었다.
+
+## 같은 전체 사례 집합의 사용량 비교
+
+| 실행 | 사례 PASS | input | output | total | receipt latency ms |
+|---|---:|---:|---:|---:|---:|
+| v1 기준선 | 7/11 | 594,343 | 175,746 | 770,089 | 3,230,096 |
+| v2 5차 | 9/11 | 550,373 | 104,651 | 655,024 | 2,025,940 |
+| v2 8차 | 9/11 | 578,336 | 103,487 | 681,823 | 2,077,298 |
+| v2 9차 | 11/11 | 580,478 | 93,554 | 674,032 | 1,912,110 |
+
+각 비교에서 동일한 11사례 순서·역할·Goal 원문과 전체 기대 관계·finding을 직접 대조했다. v1 대비 9차의 provider 보고 total token은 12.47%, output은 46.77%, receipt latency는 40.80% 감소했다. 직전 8차 대비 total은 1.14%, latency는 7.95% 감소했다. 5차 대비 total은 2.90% 증가하고 latency는 5.62% 감소했다.
+
+9차 cached input은 143,360, reasoning은 76,428, provider duration은 1,899,123ms다. cached input은 input, reasoning은 output에 포함되므로 별도 합산하지 않는다. 청구 금액은 제공되지 않아 null이다. 이는 계약·prompt·운영 조건 변화와 cache 효과를 포함한 단일 전수 관측이며 인과적 성능 증명·구독 차감량·정식 token/latency Gate의 대체 자료가 아니다.
+
+이 결과로 새 계약의 static 11 선결 조건은 충족했다. 제품 기본 provider는 v1이고 S06·실제 Goal·cutover를 완료로 올리지 않는다. 다음 진행은 [S06 재진입 기록](inspection-s06-reentry.md)에 이어간다.
