@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from flowmarshal.engine.context import ProjectMapper
-from flowmarshal.engine.domain import CandidateStatus, GoalCriterion, RevisionStatus
+from flowmarshal.engine.domain import CandidateStatus, GoalCriterion, RevisionStatus, TaskSkeleton
 from flowmarshal.engine.goal import (
     GoalNormalizerAdapter,
     GoalPreparationPipeline,
@@ -37,6 +37,11 @@ def _ratings():
         "verification": 4,
         "execution_safety": 4,
     }
+
+
+def _unresolved_refinement():
+    return {"action": "unresolved", "rationale": "이 경계 회귀는 원본 결함의 거부를 확인하며 수정 후보는 제공하지 않는다.",
+            "evidence_refs": ["artifact:plan_contract"], "plan": None, "skeleton": None}
 
 
 def _skeleton_response():
@@ -239,6 +244,40 @@ class EngineRoleAdapterTests(unittest.TestCase):
         self.assertIn("integration_validations", runner.calls[2].instructions)
         self.assertIn("미래 activation receipt", runner.calls[3].instructions)
 
+    def test_skeleton_task_schema_rejects_empty_core_links(self) -> None:
+        for field in ("contributes_to", "produces"):
+            with self.subTest(field=field):
+                response = _skeleton_response()
+                response["candidates"][0]["tasks"][0][field] = []
+                runner = ScriptedStructuredRoleRunner({"skeleton_generator": [response]})
+                generator = SkeletonGeneratorAdapter(
+                    runner,
+                    model="worker",
+                    effort="medium",
+                    inventory_digest=self.inventory.inventory_digest,
+                    cwd=self.root,
+                )
+
+                with self.assertRaisesRegex(ValueError, "at least 1 item"):
+                    generator.generate(
+                        goal=self.goal,
+                        state=self.state,
+                        project_map=self.map,
+                        candidate_count=1,
+                    )
+
+                properties = runner.calls[0].output_schema["$defs"]["SkeletonTaskDraft"]["properties"]
+                core_schema = TaskSkeleton.model_json_schema()
+                core_properties = core_schema["properties"]
+                self.assertLessEqual(set(core_schema["required"]), set(
+                    runner.calls[0].output_schema["$defs"]["SkeletonTaskDraft"]["required"]
+                ))
+                self.assertEqual(core_properties["task_ref"]["pattern"], properties["task_ref"]["pattern"])
+                self.assertEqual(core_properties["objective"]["minLength"], properties["objective"]["minLength"])
+                self.assertEqual(core_properties["objective"]["maxLength"], properties["objective"]["maxLength"])
+                self.assertEqual(1, properties["contributes_to"]["minItems"])
+                self.assertEqual(1, properties["produces"]["minItems"])
+
     def test_plan_expander_rejects_task_objective_drift(self) -> None:
         runner = ScriptedStructuredRoleRunner(
             {
@@ -329,6 +368,7 @@ class EngineRoleAdapterTests(unittest.TestCase):
         return skeleton, plan
 
     def _boundary_search(self, runner, *, reviewer_cwd=None):
+        runner.responses.setdefault("plan_refiner", [_unresolved_refinement()])
         options = dict(model="worker", effort="medium", inventory_digest=self.inventory.inventory_digest, cwd=self.root)
         reviewer_options = {**options, "model": "validator", "effort": "high", "cwd": reviewer_cwd or self.root}
         return SkeletonFirstPlanner(
@@ -437,6 +477,7 @@ class EngineRoleAdapterTests(unittest.TestCase):
                 runner = ScriptedStructuredRoleRunner({
                     "skeleton_generator": [skeleton], "skeleton_reviewer": [{"findings": [], "ratings": _ratings()}],
                     "plan_expander": [plan], "compact_plan_reviewer": [review],
+                    "plan_refiner": [_unresolved_refinement()],
                 })
                 outcome = self._boundary_search(runner)
                 self.assertEqual(defect is None, outcome.selected_activation_digest is not None)
@@ -675,6 +716,7 @@ class EngineRoleAdapterTests(unittest.TestCase):
                     "skeleton_generator": [skeleton],
                     "skeleton_reviewer": [{"findings": [], "ratings": _ratings()}],
                     "plan_expander": [plan], "compact_plan_reviewer": [review],
+                    "plan_refiner": [_unresolved_refinement()],
                 })
                 outcome = self._boundary_search(runner)
                 evaluation = outcome.plan_evaluations[0]
@@ -796,6 +838,7 @@ class EngineRoleAdapterTests(unittest.TestCase):
                     "skeleton_reviewer": [{"findings": [], "ratings": _ratings()}],
                     "plan_expander": [plan], "compact_plan_reviewer": [review],
                 })
+                runner.responses["plan_refiner"] = [_unresolved_refinement()]
                 options = dict(model="worker", effort="high", inventory_digest=self.inventory.inventory_digest, cwd=self.root)
                 outcome = SkeletonFirstPlanner(
                     SkeletonGeneratorAdapter(runner, **options), SkeletonReviewerAdapter(runner, **options),
@@ -815,6 +858,13 @@ class EngineRoleAdapterTests(unittest.TestCase):
                 self.assertIn("한 항목에 두 범위를 섞지 않는다", runner.calls[2].instructions)
                 self.assertEqual(["model_review", "external_observation", "file"],
                                  list(result.plan.definition.tasks[0].validations[0].required_evidence_kinds))
+                if contradictory:
+                    refiner_call = next(call for call in runner.calls if call.role == "plan_refiner")
+                    properties = refiner_call.output_schema["$defs"]["SkeletonTaskDraft"]["properties"]
+                    core_properties = TaskSkeleton.model_json_schema()["properties"]
+                    self.assertEqual(core_properties["task_ref"]["pattern"], properties["task_ref"]["pattern"])
+                    self.assertEqual(1, properties["contributes_to"]["minItems"])
+                    self.assertEqual(1, properties["produces"]["minItems"])
 
     def test_review_draft_requires_findings_xor_ratings(self) -> None:
         with self.assertRaisesRegex(ValueError, "fitness rating"):

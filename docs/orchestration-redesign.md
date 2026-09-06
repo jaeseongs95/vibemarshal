@@ -107,6 +107,8 @@ Task 준비 역할과 Goal Test 준비 역할의 입력·지침·출력은 분�
 
 사용자 요청은 한 번만 Goal 후보로 정규화한다. 별도 reviewer는 source trace와 모순·누락을 검토하고 Core가 최종 `GoalContractRevision`을 컴파일한다. Goal revision에는 normalization·review digest, reviewer role과 finding 또는 rating을 preparation binding으로 남긴다. 모델은 Goal revision 번호나 권위 상태를 직접 정하지 않는다.
 
+완료된 준비 결과가 blocking 질문 없이 수정 가능한 `conflict`이면, 원본 요청·Profile·관측과 proposal·독립 finding을 그대로 결속한 별도 `goal_refiner`가 한 번 응답할 수 있다. 정규화와 같은 모델 설정을 사용하되 finding을 정답으로 취급하지 않는다. 변경 proposal은 같은 Goal ID의 직전 revision을 supersede하고 기존 Reviewer와 compiler를 거친다. canonical 동일 후보는 재검토하지 않으며 `disputed`·`unresolved`는 새 Goal을 만들지 않는다. 입력 부족·비수정 가능 finding은 이 경로에 들어오지 않는다. 원본 preparation, 변경 이유·evidence, request/output receipt와 새 preparation을 함께 보존하며, 호출자는 원본별 한 번의 한도와 전체 호출 예산을 적용한다.
+
 Hard AC는 반드시 관측 가능해야 하고 출처를 갖는다. Soft preference는 점수화할 수 있지만 Hard AC를 대신하지 못한다. 비목표는 constraint 목록에 섞지 않고 명시적으로 보존한다.
 
 정규화와 독립 검토는 지침의 출처와 적용 단계를 함께 해석한다. 현재 정규화·계획 역할에만 적용되는 파일 수정·명령 실행 금지는 승인 후 Task의 제약으로 전사하지 않는다. 사용자 원문이나 실행 단계에도 적용되는 정책이 명시한 금지는 보존한다. 파일 무변경과 정적 분석만으로 명령 미실행 증명을 새 요구로 추가하지 않으며, 특정 작업의 실행 금지를 모든 읽기·검증 명령의 금지로 넓히지 않는다. API 변경·보존 전략에는 이름·import·시그니처와 함께 문서·테스트의 정상 동작 계약을 실제 값이나 관계로 명시하고 현재 구현의 결함과 구분한다. 원인 분석의 AC에 필요한 정상 기대값과 현재 불일치가 포함돼 있으면 이를 별도 구현·호환성 보존 의무로 승격하지 않는다. 전체 Goal에 이미 명시된 의미를 특정 항목에 다시 요구하지 않는다.
@@ -180,6 +182,8 @@ Goal Contract 정규화·독립 검토
 → 최대 2개 shortlist
 → shortlisted Skeleton만 Plan Contract 후보로 상세화
 → 5개 Hard Gate와 위험별 review
+→ 수정 가능한 상세 실패를 근거와 함께 최대 한 번 피드백
+→ 상세 revision의 재검토 또는 같은 shortlist 자리의 Skeleton 수정·검토·상세화
 → admissible 후보만 score·비교
 → 사용자 활성화
 ```
@@ -194,6 +198,12 @@ Goal Contract 정규화·독립 검토
 - replan reserve 25%
 
 명확한 단일 변경은 후보 1개만 만든다. 실제 trade-off가 있을 때만 2~3개를 생성한다. 첫 feasible plan을 확보한 뒤 남은 budget에서만 anytime improvement를 수행한다.
+
+상세 Plan의 `needs_revision`은 수정 제안의 시작 조건이며 finding의 진실성을 승인하지 않는다. `plan_refiner`는 원본 Goal·State·Project Map·Skeleton·Plan과 직접 finding을 대조하여 `detail_revision`, `skeleton_revision`, `disputed`, `unresolved` 중 하나와 이유·직접 evidence ref를 제출한다. 상세 수정은 기존 Skeleton 의미를 보존하는 compiler를 거친다. Task 목적·DAG를 바꿔야 하는 수정은 같은 전략 계열의 새 Skeleton로 돌아가 기존 Gate와 독립 검토를 거친다. refiner의 반박이나 미해결 응답은 원래 거절을 유지하며 같은 Plan을 통과할 때까지 재호출하지 않는다. 수정 결과는 이전 평가를 보존하고 새 Gate·독립 Reviewer 검토를 통과해야만 선택된다.
+
+후보별 refinement 1회는 최초 Skeleton 계보 전체에서 공유한다. Skeleton 단계에서 이미 수정했다면 상세 단계에서 다시 수정하지 않는다. `candidate_versions`는 평가한 Skeleton과 추가로 생성한 상세 수정 후보를 세며 최초 상세화는 중복 계산하지 않는다. 변경 없는 수정 제안도 생성 시도·예산으로 보존하되 새 독립 검토는 하지 않는다. 상세 수정에는 최소 2회, Skeleton 수정 경로에는 최소 4회의 잔여 호출을 먼저 확보한다. 원장 ID·검사 ID 이름·배열 순서·비용 추정만 달라진 동일 후보는 무진전으로 중단한다. 후속 Skeleton은 기존 shortlist 자리를 이어받으며 별도의 초기 전략 슬롯을 얻지 않는다. `replan_reserve_percent`는 이 검색의 호출 한도에서 별도 감산하지 않으며 25% 실행 예산 확보를 이 루프가 증명한다고 해석하지 않는다.
+
+같은 Plan 계보의 수정은 동일 `plan_id`, 증가한 `revision_no`, 직전 `supersedes_plan_revision_id`를 가진다. 원장의 전역 Task ID는 새로 생성하며 `task_ref`와 의미 관계로 후보를 비교한다. 검색 입력·모델 inventory 결속을 수정으로 교체하지 않는다. 실제 refiner의 요청·응답·receipt digest와 원본 평가·제안 digest는 프로그램이 계산해 결속하며 모델에게 다시 작성시키지 않는다. `PlanningSearchOutcome`의 원본 실패·수정·중단 이유·선택 결과는 등록된 후보와 Core 판정에 대조한 뒤 `planning.search_recorded` History에 보존한다. 외부 outcome 입력과 합성 회귀는 실제 provider receipt 없는 상태를 그대로 보존한다.
 
 Task의 `contributes_to`와 Skeleton의 `goal_coverage.task_refs`는 AC 충족에 기여하는 산출물·근거의 연결이다. 해당 Task가 연결된 AC의 모든 검사 절차를 직접 실행한다는 뜻은 아니다. 모든 Task 완료 후의 독립 Goal Test AC도 관련 산출물을 제공하는 Task와 연결하고, 상세 Plan의 `goal_coverage.validation_ids`에서 `integration_validations`의 검사 ID로 연결한다. 필요하면 Skeleton의 `detail_requirements`에 이 책임을 명확히 한다. Skeleton 단계에서 Goal Test 전용 Task나 상세 integration validation 필드가 없다는 이유만으로 추가 Task를 요구하지 않는다. Goal과 AC 기여 관계로 이미 전달된 요구는 선택 `detail_requirements`의 반복 부재만으로 차단하지 않는다. 후속 상세화에서 누락될 수 있다는 가정은 현재 결함의 직접 evidence가 아니다. 실제 AC 기여 누락·Task 요구 충돌이나 상세 Plan의 독립 검사·evidence mode·validation ID 연결 결함은 계속 검토한다.
 

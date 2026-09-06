@@ -60,6 +60,7 @@ from .models import AssignmentResolver, ModelInventory
 from .planning import (
     CandidateEvaluation,
     ExpandedPlanEvaluation,
+    PlanningSearchOutcome,
     plan_gate,
     plan_review_evidence_catalog,
     skeleton_gate,
@@ -702,6 +703,65 @@ class EngineService:
                 candidate.candidate_id,
                 {"candidate_digest": candidate_digest, "status": evaluation.decision.status.value},
             )
+
+    def record_planning_search(self, outcome: PlanningSearchOutcome) -> str:
+        """등록된 후보와 대조한 검색·실패 피드백 전체를 변경 불가 History에 보존한다."""
+        outcome = PlanningSearchOutcome.model_validate(outcome.model_dump(mode="json"))
+        digest = sha256_digest(outcome)
+        search_id = "planning_search_" + digest[7:]
+        with self.ledger.transaction() as tx:
+            goal = tx.one(
+                "SELECT id, project_id FROM goal_revisions WHERE definition_digest = ?",
+                (outcome.goal_contract_digest,),
+            )
+            project_id = goal["project_id"]
+            project = tx.one("SELECT active_goal_revision_id FROM projects WHERE id = ?", (project_id,))
+            if project["active_goal_revision_id"] != goal["id"]:
+                raise EngineServiceError("Planning search가 active Goal과 다릅니다.")
+            state = tx.one(
+                "SELECT snapshot_digest FROM state_snapshots WHERE project_id = ? AND is_current = 1",
+                (project_id,),
+            )
+            if state["snapshot_digest"] != outcome.state_snapshot_digest:
+                raise EngineServiceError("Planning search가 current StateSnapshot과 다릅니다.")
+            for kind, evaluations in (("skeleton", outcome.skeleton_evaluations), ("plan", outcome.plan_evaluations)):
+                for evaluation in evaluations:
+                    if kind == "skeleton":
+                        artifact = evaluation.candidate
+                        row = tx.one("SELECT payload_json FROM skeleton_candidates WHERE candidate_digest = ?", (sha256_digest(artifact),))
+                        expected_reviews = (
+                            (evaluation.semantic_submission,)
+                            if evaluation.semantic_submission is not None
+                            else ()
+                        )
+                    else:
+                        artifact = evaluation.plan
+                        row = tx.one("SELECT payload_json FROM plan_revisions WHERE activation_digest = ?", (artifact.activation_digest,))
+                        expected_reviews = evaluation.semantic_submissions
+                    decision = tx.one(
+                        "SELECT payload_json FROM candidate_decisions WHERE artifact_kind = ? AND artifact_digest = ?",
+                        (kind, evaluation.decision.candidate_digest),
+                    )
+                    registered_reviews = tx.connection.execute(
+                        "SELECT payload_json FROM candidate_reviews "
+                        "WHERE project_id = ? AND artifact_kind = ? AND artifact_digest = ?",
+                        (project_id, kind, evaluation.decision.candidate_digest),
+                    ).fetchall()
+                    if (
+                        row["payload_json"] != canonical_json(artifact)
+                        or decision["payload_json"] != canonical_json(evaluation.decision)
+                        or sorted(item["payload_json"] for item in registered_reviews)
+                        != sorted(canonical_json(item) for item in expected_reviews)
+                    ):
+                        raise EngineServiceError("Planning search가 원장 후보·검토·판정과 다릅니다.")
+            existing = tx.maybe_one(
+                "SELECT id FROM history_events WHERE project_id = ? AND event_type = 'planning.search_recorded' AND entity_id = ?",
+                (project_id, search_id),
+            )
+            if existing is None:
+                tx.history(project_id, "planning.search_recorded", "planning_search", search_id,
+                           {"outcome_digest": digest, "outcome": outcome.model_dump(mode="json")})
+        return search_id
 
     def register_plan_evaluation(self, evaluation: ExpandedPlanEvaluation) -> None:
         # typed 입력도 model_copy로 검증을 우회할 수 있으므로 중첩 계약까지 다시 검사한다.

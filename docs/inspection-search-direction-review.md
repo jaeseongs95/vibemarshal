@@ -64,3 +64,5 @@
 사용자 요청 직전에 작성한 [10차 Task 필드 설명](inspection-v2r10-task-result-context.md)은 집중 28개와 결정적 Gate 5/5를 통과한 미검증 후보로 보존한다. 새 static·qualification 모델 호출은 시작하지 않았다. 이 설명 보완의 완료를 실제 탐색 루프 개선으로 계산하지 않는다. 현재 S06은 FAIL, 실제 Goal 경로는 NOT_RUN, 제품 기본 provider는 v1·cutover는 NO-GO다.
 
 이 문서는 방향 판단과 실제 코드 재현 결과다. 상세 Plan 재탐색 알고리즘 자체의 구현·실모델 검증을 완료한 기록은 아니다.
+
+이후 구현과 검증은 [상세 Plan 실패 피드백](planning-feedback-loop.md)에 이어 기록한다. 위 비교와 당시 실행 결과는 변경하지 않는다.

@@ -11,7 +11,7 @@
 | C. provider v2 | 직접 판단·인용 보존, adapter의 참조 전개, v1 회귀 보존 | 9차 AC 원문별 합집합 계약 검증 완료. Task 필드 설명 후보는 집중 28개·Gate 5/5 통과, 실제 모델 호출 없이 방향 재검토 |
 | D. 새 계약 비교 | 새 실행의 static 11사례와 고정 기대표·실측 usage | 9차 11/11 PASS·252개 관계 일치·참조/운영 실패 0. v1 대비 보고 total token −12.47%, latency −40.80%의 단일 관측 |
 | E. S06 재진입 검사 | static·expansion·독립 생성 검토·expanded-review 13단계 | 첫 clean semantic FAIL, 나머지 12 NOT_RUN. AC 관계 28개 일치, Task 산출물을 Worker 제출로 해석한 추가 finding 1개 |
-| F. 실제 Goal 경로 | 고정 자연어에서 실제 Goal·Plan 선택·활성화·실행·독립 검증·GoalVerdict | NOT_RUN |
+| F. 실제 Goal 경로 | 고정 자연어에서 실제 Goal·Plan 선택·활성화·실행·독립 검증·GoalVerdict | 부분 관측. 같은 Goal의 최초 conflict를 한 번 수정·독립 검토해 revision 2 READY. Skeleton 생성·검토·상세화 성공 뒤 Plan Reviewer가 900,078ms timeout으로 중단. Plan 선택·활성화·Task 실행·GoalVerdict는 NOT_RUN |
 
 ## 실행 기반
 
@@ -71,4 +71,6 @@ Codex executable은 `D:\codex\fm-inspection-runtime\codex-935a1911.exe`에 복�
 
 새 source와 결정적 Gate를 보존한 상태에서 별도의 S06 qualification 13단계를 실행했다. 첫 clean에서 28개 AC 관계는 일치했으나 Task의 논리적 `produces`를 Worker의 미래 Validator 결과 제출 요구로 읽은 추가 finding 하나 때문에 중단됐다. 호출은 1/1/0이며 뒤 12단계는 NOT_RUN이다. 종료 후 같은 저장 thread·turn·응답, 두 실행 lock과 artifact 보존을 확인한 19개 검사가 통과했다. 원인과 전체 Goal의 남은 근거는 [S06 재진입 기록](inspection-s06-reentry.md)에 이어간다. 자연어 Goal에서 실제 GoalVerdict까지의 동일 계보 검증은 아직 NOT_RUN이다.
 
-이후 Task 필드 설명 후보를 작성했지만, 사용자가 검증단 수정의 반복을 지적하고 다른 대화와 길 찾기 알고리즘을 비교하도록 요청했다. 새 모델 호출 없이 [탐색 방향 비교](inspection-search-direction-review.md)를 수행했다. 상세 Plan의 수정 가능한 실패가 검색의 생성·정제 단계로 돌아가지 않아 예산 14회 중 4회 사용 후 선택 없이 종료되는 제어 흐름을 합성 입력으로 확인했다. 입력 설명 후보는 Gate 5/5·집중 28개까지 보존하며, 다음 검토의 중심은 상세 Plan 실패 피드백과 실제 Goal 경로다. 이 알고리즘 보완의 구현·실모델 검증은 아직 수행하지 않았다.
+이후 Task 필드 설명 후보를 작성했지만, 사용자가 검증단 수정의 반복을 지적하고 다른 대화와 길 찾기 알고리즘을 비교하도록 요청했다. 새 모델 호출 없이 [탐색 방향 비교](inspection-search-direction-review.md)를 수행했다. 상세 Plan의 수정 가능한 실패가 검색의 생성·정제 단계로 돌아가지 않아 예산 14회 중 4회 사용 후 선택 없이 종료되는 제어 흐름을 합성 입력으로 확인했다. 입력 설명 후보는 Gate 5/5·집중 28개까지 보존하며, 다음 검토의 중심을 상세 Plan 실패 피드백과 실제 Goal 경로로 정했다. 방향 검토 시점에는 이 알고리즘 보완의 구현·실모델 검증을 수행하지 않은 상태였다.
+
+위 결론의 후속으로 상세 Plan 실패를 한 번 수정·재검토하고, Task 의미 변경은 Skeleton으로 되돌리며, 반박·미해결은 원래 거절과 함께 보존하는 검색 경로를 구현했다. 후보·호출·계보 한도와 전체 검색 History 결속, 실제 단일 Goal의 Plan 준비 기록은 [상세 Plan 실패 피드백](planning-feedback-loop.md)에서 관리한다. 이 후속 구현은 과거 S06 FAIL이나 제품 cutover 판정을 바꾸지 않는다.

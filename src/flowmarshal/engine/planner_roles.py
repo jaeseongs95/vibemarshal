@@ -77,6 +77,7 @@ from .plan_inspection_v2 import (
 )
 from .roles import RoleCallReceipt, RoleCallRequest, StructuredRolePort
 from .domain import GoalContractRevision
+from .planning_feedback import PlanRefinementProposal, PlanRefinementProvenance, RefinementAction, validate_plan_revision
 
 
 READ_ONLY_REPORTING_INSTRUCTIONS = (
@@ -350,16 +351,9 @@ class PlanReviewDraftV2(ReviewDraft):
     )
 
 
-class SkeletonTaskDraft(EngineModel):
-    task_ref: str
-    kind: TaskKind
-    objective: str
-    contributes_to: tuple[str, ...] = Field(description="산출물·근거로 기여하는 Goal AC ID. 연결된 모든 검사 절차를 이 Task가 직접 실행한다는 뜻은 아니다.")
-    produces: tuple[str, ...]
+class SkeletonTaskDraft(TaskSkeleton):
+    contributes_to: tuple[str, ...] = Field(min_length=1, description="산출물·근거로 기여하는 Goal AC ID. 연결된 모든 검사 절차를 이 Task가 직접 실행한다는 뜻은 아니다.")
     consumes: tuple[str, ...] = Field(default=(), description="제공된 external_input_catalog의 정확한 key 또는 data dependency producer의 산출물 key. 경로·설명을 임의 key로 만들지 않는다.")
-    risk_tags: tuple[str, ...] = ()
-    required_capabilities: tuple[str, ...] = ()
-    no_op_when: tuple[str, ...] = ()
     unknown_refs: tuple[str, ...] = Field(default=(), description="현재 StateSnapshot.unknowns에 실제 있는 unknown_id만 참조한다. 없으면 빈 배열. 새 질문은 candidate.unknowns에 설명한다.")
     detail_requirements: tuple[str, ...] = Field(default=(), description="상세 Plan에서 보존할 책임. Goal이 해당 Task에 요구한 자체 검증과 모든 Task 완료 후 Core의 integration validation을 구분한다. 이 필드의 생략은 Goal의 Task별 검증 요구를 면제하지 않으며 실행 명령은 넣지 않는다.")
 
@@ -441,6 +435,22 @@ class PlanExpansionDraft(EngineModel):
     integration_validations: tuple[PlanIntegrationValidationDraft, ...] = Field(min_length=1, description="Task 검사와 분리한 plan-level Goal 검사 계약. 참조한 등록 도구·phase가 statement의 검사 범위를 실제 지원하는지 대조한다. 다른 phase의 검사 능력이나 Task evidence로 independent 검사를 대체하지 않는다.")
     expected_effects: tuple[str, ...] = Field(default=(), description="Plan이 실제 발생시키는 효과. 효과가 없다는 부정형 조건은 포함하지 않는다.")
     prohibited_effects: tuple[str, ...] = Field(default=(), description="Goal이 금지한 효과와 범위를 보존하며 현재 계획 역할의 행동 제한을 새로 추가하지 않는다.")
+
+
+class PlanRefinementDraft(EngineModel):
+    action: RefinementAction
+    rationale: str = Field(min_length=1, max_length=4000)
+    evidence_refs: tuple[str, ...] = Field(min_length=1)
+    plan: PlanExpansionDraft | None
+    skeleton: SkeletonCandidateDraft | None
+
+    @model_validator(mode="after")
+    def candidate_matches_action(self) -> "PlanRefinementDraft":
+        if (self.plan is not None) != (self.action == "detail_revision"):
+            raise ValueError("detail_revision에만 plan을 제출해야 합니다.")
+        if (self.skeleton is not None) != (self.action == "skeleton_revision"):
+            raise ValueError("skeleton_revision에만 skeleton을 제출해야 합니다.")
+        return self
 
 
 def _inline_local_schema_refs(schema: dict[str, Any]) -> dict[str, Any]:
@@ -926,6 +936,7 @@ class PlanExpanderAdapter:
         state,
         project_map,
         planning_budget: PlanningBudgetPolicy | None = None,
+        previous_plan: PlanContractRevision | None = None,
     ) -> PlanContractRevision:
         applied_budget = planning_budget or self.planning_budget
         use_v2 = _uses_plan_inspection_v2(self.inspection_provider_contract)
@@ -1024,6 +1035,7 @@ class PlanExpanderAdapter:
                 state=state,
                 project_map=project_map,
                 planning_budget=applied_budget,
+                previous_plan=previous_plan,
             )
             evidence_catalog = inspection_evidence_catalog
             if use_v2:
@@ -1062,7 +1074,96 @@ class PlanExpanderAdapter:
             state=state,
             project_map=project_map,
             planning_budget=applied_budget,
+            previous_plan=previous_plan,
         )
+
+    def refine(
+        self, *, evaluation, candidate, goal, state, project_map,
+        planning_budget: PlanningBudgetPolicy, allow_skeleton_revision: bool,
+    ) -> PlanRefinementProposal:
+        """판정을 통과시키는 재호출이 아니라 직접 실패 근거에 대한 한 번의 응답이다."""
+        evidence_catalog = plan_review_evidence_catalog(
+            evaluation.plan, goal, state, project_map,
+        ) | {"artifact:skeleton": candidate.model_dump(mode="json")}
+        findings = evaluation.deterministic_findings + tuple(
+            finding for submission in evaluation.semantic_submissions
+            for finding in submission.findings
+        )
+        request = make_role_request(
+            inventory=self.inventory, allowed_fallbacks=self.allowed_fallbacks,
+            role="plan_refiner",
+            instructions=(
+                "활성화 전 Plan의 실패 근거에 한 번 응답한다. finding은 비권위 관측이며 "
+                "수정 명령이나 정답이 아니다. 원본 Goal·Skeleton·Plan·등록 자료와 대조한다. "
+                "원문으로 확인한 상세 validation·완료·효과 계약 결함은 detail_revision으로 "
+                "필요한 부분을 수정한 전체 plan을 제출한다. Task 목적·kind·기여·produces/consumes·"
+                "dependency는 보존한다. 그 의미를 바꿔야 해결되는 결함은 skeleton_revision으로 "
+                "전체 Skeleton을 제출하며 기존 strategy_family는 유지한다. 허용 예산이 없는 "
+                "skeleton_revision은 unresolved로 이유를 남긴다. "
+                "finding이 원문과 충돌하면 disputed로 정확한 원문 필드·문장과 반증을 설명하고 "
+                "두 후보 필드는 null로 둔다. 근거가 부족하거나 요구 변경이 필요하면 unresolved다. "
+                "disputed는 기존 거절을 뒤집거나 실행을 허용하지 않는다. "
+                "rationale에는 확인된 원인과 수정 또는 보류 이유를 간결히 쓰고 evidence_refs는 "
+                "제공된 evidence_catalog key만 선택한다. 원본 finding·AC·합격 조건을 지우거나 "
+                "약화하지 않고 새 사실·검사 능력을 발명하지 않는다. ID·순서·비용만 바꾸는 수정은 "
+                "하지 않는다. 새 후보의 평가·선택·활성화는 Core와 독립 Reviewer의 책임이다. "
+                "파일·symbol·명령은 ready-time 상세이며 이 역할은 계획만 제출한다."
+            ) + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PLANNING_VALIDATION_CAPABILITY_INSTRUCTIONS
+              + READ_ONLY_REPORTING_INSTRUCTIONS + PLAN_TASK_RESULT_BOUNDARY_INSTRUCTIONS,
+            payload={
+                "feedback_contract": "bounded-plan-feedback-v1",
+                "source_evaluation_digest": sha256_digest(evaluation),
+                "evidence_catalog": evidence_catalog,
+                "findings": [finding.model_dump(mode="json") for finding in findings],
+                "external_input_catalog": skeleton_input_catalog(state, project_map),
+                "allow_skeleton_revision": allow_skeleton_revision,
+                "planning_budget": planning_budget.model_dump(mode="json"),
+            },
+            output_schema=PlanRefinementDraft.model_json_schema(),
+            model=self.model, effort=self.effort, inventory_digest=self.inventory_digest,
+            cwd=str(Path(self.cwd).resolve()),
+        )
+        accepted: PlanRefinementProposal | None = None
+
+        def validate_refinement(value):
+            nonlocal accepted
+            draft = PlanRefinementDraft.model_validate(value)
+            if not set(draft.evidence_refs).issubset(evidence_catalog):
+                raise PlannerRoleAdapterError("수정 제안이 제공되지 않은 evidence를 참조합니다.")
+            revised_plan = revised_skeleton = None
+            if draft.plan is not None:
+                revised_plan = self._compile(
+                    draft.plan, candidate=candidate, goal=goal, state=state,
+                    project_map=project_map, planning_budget=planning_budget,
+                    previous_plan=evaluation.plan,
+                )
+            if draft.skeleton is not None:
+                if not allow_skeleton_revision:
+                    raise PlannerRoleAdapterError("현재 예산에 Skeleton 수정·재검토 경로가 없습니다.")
+                revised_skeleton = SkeletonGeneratorAdapter._compile(
+                    draft.skeleton, goal=goal, state=state,
+                    parent_candidate_id=candidate.candidate_id,
+                    version=candidate.version + 1, refinement_round=1,
+                )
+                if revised_skeleton.approach.strategy_family != candidate.approach.strategy_family:
+                    raise PlannerRoleAdapterError("Skeleton 수정이 접근 전략을 바꿨습니다.")
+            accepted = PlanRefinementProposal(
+                action=draft.action, rationale=draft.rationale, evidence_refs=draft.evidence_refs,
+                plan=revised_plan, skeleton=revised_skeleton,
+            )
+            return draft
+
+        result = self.runner.run(request, validator=validate_refinement)
+        verify_role_receipt(request, result)
+        self.receipts.append(result.receipt)
+        if accepted is None:
+            raise PlannerRoleAdapterError("Plan 수정 검증 결과가 보존되지 않았습니다.")
+        payload = accepted.model_dump(mode="json", exclude={"provenance"})
+        return PlanRefinementProposal.model_validate(payload | {"provenance": PlanRefinementProvenance(
+            source_evaluation_digest=sha256_digest(evaluation), proposal_digest=sha256_digest(payload),
+            call_id=result.receipt.call_id, request_digest=result.receipt.input_digest,
+            output_digest=result.receipt.output_digest, receipt_digest=sha256_digest(result.receipt),
+        )})
 
     def _compile(
         self,
@@ -1073,6 +1174,7 @@ class PlanExpanderAdapter:
         state,
         project_map,
         planning_budget,
+        previous_plan: PlanContractRevision | None = None,
     ) -> PlanContractRevision:
         skeleton_by_ref = {item.task_ref: item for item in candidate.tasks}
         draft_by_ref = {item.task_ref: item for item in draft.tasks}
@@ -1175,15 +1277,19 @@ class PlanExpanderAdapter:
             expected_effects=draft.expected_effects,
             prohibited_effects=draft.prohibited_effects,
         )
-        return PlanContractRevision(
+        compiled = PlanContractRevision(
             plan_revision_id=new_id("plan_revision"),
-            plan_id=new_id("plan"),
-            revision_no=1,
+            plan_id=previous_plan.plan_id if previous_plan else new_id("plan"),
+            revision_no=previous_plan.revision_no + 1 if previous_plan else 1,
             definition=definition,
             definition_digest=definition.definition_digest,
             status=RevisionStatus.READY,
+            supersedes_plan_revision_id=previous_plan.plan_revision_id if previous_plan else None,
             created_at=utc_now(),
         )
+        if previous_plan is not None:
+            validate_plan_revision(previous_plan, compiled)
+        return compiled
 
 
 @dataclass

@@ -40,6 +40,7 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 
 - 새 권위 schema는 strict·frozen이며 canonical JSON과 digest에 결속한다. 같은 Goal·Plan 계보의 새 revision은 직전 revision을 명시적으로 supersede한다. Mission은 `GoalContractRevision.mission_class` routing label이다.
 - Goal 후보는 정규화 후 독립 검토하고 normalization·review digest, reviewer role과 finding 또는 rating을 preparation binding에 남긴다.
+- Goal 준비의 blocking 질문 없는 수정 가능한 충돌에는 원본 요청·Profile·관측·평가를 결속한 한 번의 별도 피드백을 허용한다. 수정은 같은 Goal의 새 revision과 독립 검토로 남기며, 동일 후보·반박·미해결은 원래 거절을 유지한다. 입력 부족이나 비수정 가능 실패를 자동 정규화 재호출로 우회하지 않는다.
 - SQLite 원장만 revision·활성 계약·Task·Attempt·binding·evidence·validation·budget·History의 권위다. Domain Core만 상태를 전이하고 완료를 판정한다.
 - 대화·모델의 완료 선언만으로 Task·Goal을 완료하지 않는다. Plan·Execution Spec의 evidence 종류는 실제 `EvidenceKind` 지원 집합으로 제한하고 provider schema와 Core에서 함께 검사한다.
 - Planner는 후보, Worker는 배정된 Task 하나의 결과·evidence 후보, Validator는 관측값만 제출한다. Worker는 다음 Task를 선택하지 않는다. Trigger·Scheduled Task도 Core의 `run once`만 호출한다.
@@ -79,6 +80,8 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 - 우선순위는 사용자 명시 제약 → Goal Contract → Project Profile → 모델 추천이다. 명확한 접근은 Skeleton 1개, 실제 trade-off가 있을 때만 최대 3개를 만든다.
 - coverage·grounding·DAG·cycle·scope Gate를 semantic review·score보다 먼저 적용한다. dedupe·dead-end·dominance pruning 뒤 최대 2개만 상세화하며 Hard Gate 통과 후보만 score를 얻는다.
 - 기본 search budget은 역할 호출 14회, candidate version 5개, 후보별 refinement 1회, replan reserve 25%다. 첫 feasible plan 뒤 남은 budget에서만 anytime improvement를 수행한다.
+- 활성화 전 상세 Plan의 수정 가능한 실패는 원본 Goal·Skeleton·Plan·finding·직접 근거와 함께 한 번 피드백한다. 상세 계약 결함은 같은 Plan의 새 revision으로, Task 의미·DAG 변경은 같은 shortlist 자리의 새 Skeleton 검토부터 처리한다. 반증·정보 부족은 `disputed`·`unresolved`로 원본 거절을 유지한다. 제안만으로 finding을 삭제하거나 admission을 바꾸지 않는다.
+- Skeleton·상세 수정 시도는 최초 후보 계보별 refinement 한도를 공유한다. 최초 상세화는 같은 후보의 구체화이며 추가 상세 수정 후보는 version 예산에 포함한다. 수정·재검토에 필요한 전체 호출 예산을 먼저 확보하고 ID·순서·비용만 바뀐 후보는 재검토하지 않는다. 검색 결과와 수정·중단 근거를 원장 후보·판정에 대조해 History에 보존하며 실제 역할 관측이 없으면 provider 성공으로 보고하지 않는다.
 
 ### validation과 Reviewer
 

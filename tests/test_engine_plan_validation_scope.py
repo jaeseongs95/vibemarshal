@@ -14,6 +14,7 @@ from flowmarshal.engine.domain import (
     GoalConstraint,
     GoalContractRevision,
     IntegrationValidationContract,
+    PlanningBudgetPolicy,
     SourceTrace,
     ValidationContract,
 )
@@ -317,7 +318,8 @@ class PlanValidationScopeRegressionTests(unittest.TestCase):
                 **options,
             ),
             PlanReviewerAdapter(runner, **{**options, "model": "validator", "effort": "high"}),
-        ).search(goal=contract, state=snapshot, project_map=project_map, candidate_count=1)
+        ).search(goal=contract, state=snapshot, project_map=project_map, candidate_count=1,
+                 budget=PlanningBudgetPolicy(max_refinement_per_candidate=0))
         self.assertEqual(1, len(outcome.skeleton_evaluations))
         self.assertEqual(1, len(outcome.plan_evaluations))
         service.record_skeleton_evaluation(outcome.skeleton_evaluations[0])

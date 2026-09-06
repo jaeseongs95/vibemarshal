@@ -2,6 +2,7 @@
 
 - [검사 계약 구조 개선 진행 기록](inspection-recovery-progress.md): 고정 검증 환경, 독립 11사례 기준선, 참조 계약 개선과 실제 Goal 경로의 공통 완료 조건
 - [길 찾기 알고리즘과 현재 개발 방향의 비교](inspection-search-direction-review.md): 다른 대화의 과거 근거와 최신 결과 구분, 상세 Plan 실패 피드백 부재의 4/14 호출 재현과 우선순위 재검토
+- [상세 Plan 실패 피드백 구현과 검증](planning-feedback-loop.md): 제한된 수정·재검토, 판단 충돌 보존, 예산·원장 계보와 실제 계획 준비 결과
 - [Plan inspection v1 독립 11사례 기준선](inspection-v1-static11-baseline.md): 고정 환경에서 전수 관측한 7 PASS·4 FAIL 분포와 실측 usage
 - [Plan inspection v2 독립 11사례 기준선](inspection-v2-static11-baseline.md): 첫 완전 v2 실행의 1 PASS·10 FAIL 분포, 기계 장부 실패와 의미 실패 분리, v1 대비 실측 usage
 - [Plan inspection v2 2차 구조 보정 부분 실행](inspection-v2r2-partial-baseline.md): 7개 schema/compiler 통과 뒤 timeout으로 중단된 실행, 의미 실패군과 prompt/catalog 구조 원인

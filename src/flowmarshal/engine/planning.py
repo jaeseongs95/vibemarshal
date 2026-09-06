@@ -27,6 +27,14 @@ from .domain import (
     derive_candidate_decision,
     validate_reviewer_submission_evidence,
 )
+from .planning_feedback import (
+    PlanRefinementAttempt,
+    PlanRefinementProposal,
+    PlanRefinementStop,
+    plan_semantic_digest,
+    skeleton_semantic_digest,
+    validate_plan_revision,
+)
 
 
 class PlanningError(RuntimeError):
@@ -223,7 +231,14 @@ class PlanExpander(Protocol):
         state: StateSnapshot,
         project_map: ProjectMapRevision,
         planning_budget: PlanningBudgetPolicy | None = None,
+        previous_plan: PlanContractRevision | None = None,
     ) -> PlanContractRevision: ...
+
+    def refine(
+        self, *, evaluation: ExpandedPlanEvaluation, candidate: PlanSkeletonCandidate,
+        goal: GoalContractRevision, state: StateSnapshot, project_map: ProjectMapRevision,
+        planning_budget: PlanningBudgetPolicy, allow_skeleton_revision: bool,
+    ) -> PlanRefinementProposal: ...
 
 
 class PlanReviewer(Protocol):
@@ -314,6 +329,8 @@ class PlanningSearchOutcome(EngineModel):
     skeleton_evaluations: tuple[CandidateEvaluation, ...]
     shortlist_digests: tuple[str, ...]
     plan_evaluations: tuple[ExpandedPlanEvaluation, ...]
+    plan_refinements: tuple[PlanRefinementAttempt, ...] = ()
+    plan_refinement_stops: tuple[PlanRefinementStop, ...] = ()
     selected_activation_digest: str | None = None
     logical_role_calls: int = Field(ge=0)
     candidate_versions: int = Field(ge=0)
@@ -327,8 +344,14 @@ class PlanningSearchOutcome(EngineModel):
         )
         if len(skeleton_digests) != len(set(skeleton_digests)):
             raise ValueError("Planning outcome에 같은 Skeleton version이 중복됐습니다.")
-        if self.candidate_versions != len(self.skeleton_evaluations):
-            raise ValueError("candidate_versions가 실제 Skeleton evaluation 수와 다릅니다.")
+        extra_versions = sum(
+            item.proposal.plan is not None or (
+                item.proposal.skeleton is not None
+                and sha256_digest(item.proposal.skeleton) not in skeleton_digests
+            ) for item in self.plan_refinements
+        )
+        if self.candidate_versions != len(self.skeleton_evaluations) + extra_versions:
+            raise ValueError("candidate_versions가 실제 Skeleton·상세 수정 version 수와 다릅니다.")
         if self.candidate_versions > policy.max_candidate_versions:
             raise ValueError("candidate version budget을 초과했습니다.")
 
@@ -343,6 +366,7 @@ class PlanningSearchOutcome(EngineModel):
         if not initial or len(initial) > policy.max_initial_candidates:
             raise ValueError("초기 Skeleton 후보 수가 planning budget과 다릅니다.")
         refinement_counts: dict[str, int] = {}
+        roots: dict[str, str] = {}
         seen_candidate_ids: set[str] = set()
         for item in self.skeleton_evaluations:
             parent_id = item.candidate.parent_candidate_id
@@ -351,8 +375,86 @@ class PlanningSearchOutcome(EngineModel):
                     raise ValueError(
                         "정제 Skeleton의 parent candidate가 자신보다 먼저 기록되지 않았습니다."
                     )
-                refinement_counts[parent_id] = refinement_counts.get(parent_id, 0) + 1
+                root = roots[parent_id]
+                roots[item.candidate.candidate_id] = root
+                refinement_counts[root] = refinement_counts.get(root, 0) + 1
+            else:
+                roots[item.candidate.candidate_id] = item.candidate.candidate_id
             seen_candidate_ids.add(item.candidate.candidate_id)
+        plans_by_digest = {item.plan.activation_digest: item for item in self.plan_evaluations}
+        skeletons_by_digest = {sha256_digest(item.candidate): item for item in self.skeleton_evaluations}
+        refined_plan_digests: set[str] = set()
+        refined_skeleton_ids: set[str] = set()
+        attempted_plans: set[str] = set()
+        for attempt in self.plan_refinements:
+            if attempt.source_plan_digest in attempted_plans:
+                raise ValueError("같은 Plan 실패에 두 번 수정 응답할 수 없습니다.")
+            attempted_plans.add(attempt.source_plan_digest)
+            source = plans_by_digest.get(attempt.source_plan_digest)
+            if source is None or source.decision.status is not CandidateStatus.NEEDS_REVISION:
+                raise ValueError("Plan 수정은 기록된 수정 가능한 실패에 결속해야 합니다.")
+            source_skeleton_evaluation = skeletons_by_digest.get(source.plan.definition.source_skeleton_digest)
+            if source_skeleton_evaluation is None:
+                raise ValueError("수정 원본 Plan의 Skeleton 평가가 없습니다.")
+            source_skeleton = source_skeleton_evaluation.candidate
+            proposal = attempt.proposal
+            if proposal.provenance is not None and proposal.provenance.source_evaluation_digest != sha256_digest(source):
+                raise ValueError("Plan 수정의 생성 관측이 다른 원본 평가에 결속됐습니다.")
+            known_refs = {"artifact:plan_contract", "artifact:skeleton", "source:goal", "source:state", "source:project_map"}
+            if not set(proposal.evidence_refs).issubset(known_refs):
+                raise ValueError("Plan 수정 제안에 알 수 없는 evidence가 있습니다.")
+            root = roots[source_skeleton.candidate_id]
+            skeleton_was_evaluated = (
+                proposal.skeleton is not None and sha256_digest(proposal.skeleton) in skeletons_by_digest
+            )
+            if not skeleton_was_evaluated:
+                refinement_counts[root] = refinement_counts.get(root, 0) + 1
+            if proposal.plan is not None:
+                revised = proposal.plan
+                validate_plan_revision(source.plan, revised)
+                if revised.definition.source_skeleton_digest != source.plan.definition.source_skeleton_digest:
+                    raise ValueError("상세 수정이 원본 Skeleton 결속을 바꿨습니다.")
+                unchanged = plan_semantic_digest(revised) == plan_semantic_digest(source.plan)
+                if attempt.result != ("unchanged_candidate" if unchanged else "evaluated"):
+                    raise ValueError("상세 수정 결과가 실제 의미 변경과 다릅니다.")
+                if unchanged:
+                    if revised.activation_digest in plans_by_digest:
+                        raise ValueError("변경 없는 Plan을 재검토할 수 없습니다.")
+                else:
+                    result = plans_by_digest.get(revised.activation_digest)
+                    if result is None or result.plan != revised:
+                        raise ValueError("수정 Plan의 독립 평가 기록이 없습니다.")
+                    refined_plan_digests.add(revised.activation_digest)
+            elif proposal.skeleton is not None:
+                revised = proposal.skeleton
+                if (
+                    revised.parent_candidate_id != source_skeleton.candidate_id
+                    or revised.version != source_skeleton.version + 1
+                    or revised.refinement_round != 1
+                    or revised.approach.strategy_family != source_skeleton.approach.strategy_family
+                    or revised.goal_contract_digest != source_skeleton.goal_contract_digest
+                    or revised.state_signature != source_skeleton.state_signature
+                ):
+                    raise ValueError("상세 실패에서 수정한 Skeleton의 계보·고정 입력이 다릅니다.")
+                unchanged = skeleton_semantic_digest(revised) == skeleton_semantic_digest(source_skeleton)
+                if attempt.result != ("unchanged_candidate" if unchanged else "evaluated"):
+                    raise ValueError("Skeleton 수정 결과가 실제 의미 변경과 다릅니다.")
+                if unchanged == skeleton_was_evaluated:
+                    raise ValueError("Skeleton 수정의 독립 평가 여부가 실제 변경과 다릅니다.")
+                if skeleton_was_evaluated:
+                    refined_skeleton_ids.add(revised.candidate_id)
+            elif attempt.result != proposal.action:
+                raise ValueError("판단 충돌·미해결 제안을 수정 성공으로 기록할 수 없습니다.")
+        if any(
+            stop.source_plan_digest not in plans_by_digest
+            or plans_by_digest[stop.source_plan_digest].decision.status
+            is not CandidateStatus.NEEDS_REVISION
+            for stop in self.plan_refinement_stops
+        ):
+            raise ValueError("수정 중단 기록은 수정 가능한 원본 Plan에 결속해야 합니다.")
+        stopped_plans = [stop.source_plan_digest for stop in self.plan_refinement_stops]
+        if len(stopped_plans) != len(set(stopped_plans)) or attempted_plans.intersection(stopped_plans):
+            raise ValueError("같은 Plan에 수정 실행·중단 기록이 중복됐습니다.")
         if any(
             count > policy.max_refinement_per_candidate
             for count in refinement_counts.values()
@@ -361,9 +463,12 @@ class PlanningSearchOutcome(EngineModel):
 
         expected_calls = (
             1
-            + sum(1 for item in self.skeleton_evaluations if item.candidate.parent_candidate_id)
+            + sum(1 for item in self.skeleton_evaluations if item.candidate.parent_candidate_id
+                  and item.candidate.candidate_id not in refined_skeleton_ids)
             + sum(1 for item in self.skeleton_evaluations if item.semantic_submission)
             + len(self.plan_evaluations)
+            - len(refined_plan_digests)
+            + len(self.plan_refinements)
             + sum(len(item.semantic_submissions) for item in self.plan_evaluations)
         )
         if self.logical_role_calls != expected_calls:
@@ -377,7 +482,8 @@ class PlanningSearchOutcome(EngineModel):
 
         if len(self.shortlist_digests) != len(set(self.shortlist_digests)):
             raise ValueError("shortlist digest가 중복됐습니다.")
-        if len(self.shortlist_digests) > policy.max_shortlist:
+        if len({roots[skeletons_by_digest[digest].candidate.candidate_id]
+                for digest in self.shortlist_digests if digest in skeletons_by_digest}) > policy.max_shortlist:
             raise ValueError("shortlist budget을 초과했습니다.")
         admissible_skeletons = {
             sha256_digest(item.candidate): item
@@ -387,10 +493,13 @@ class PlanningSearchOutcome(EngineModel):
         if not set(self.shortlist_digests).issubset(admissible_skeletons):
             raise ValueError("shortlist에는 admissible Skeleton만 들어갈 수 있습니다.")
         shortlisted_signatures = [
-            admissible_skeletons[digest].candidate.graph_signature
+            (admissible_skeletons[digest].candidate.graph_signature,
+             roots[admissible_skeletons[digest].candidate.candidate_id])
             for digest in self.shortlist_digests
         ]
-        if len(shortlisted_signatures) != len(set(shortlisted_signatures)):
+        if any(signature == other_signature and root != other_root
+               for signature, root in shortlisted_signatures
+               for other_signature, other_root in shortlisted_signatures):
             raise ValueError("동일 graph signature의 Skeleton을 중복 shortlist할 수 없습니다.")
 
         plan_digests = tuple(item.plan.activation_digest for item in self.plan_evaluations)
@@ -406,6 +515,26 @@ class PlanningSearchOutcome(EngineModel):
             for item in self.plan_evaluations
         ):
             raise ValueError("PlanContract의 planning budget이 실제 검색 budget과 다릅니다.")
+        latest_by_plan_id: dict[str, ExpandedPlanEvaluation] = {}
+        for evaluation in self.plan_evaluations:
+            plan = evaluation.plan
+            previous = latest_by_plan_id.get(plan.plan_id)
+            if previous is None:
+                if plan.revision_no != 1 or plan.supersedes_plan_revision_id is not None:
+                    raise ValueError("최초 Plan revision의 이전 평가가 없습니다.")
+            else:
+                validate_plan_revision(previous.plan, plan)
+                matching = [attempt for attempt in self.plan_refinements
+                            if attempt.source_plan_digest == previous.plan.activation_digest
+                            and attempt.result == "evaluated"]
+                if not any(
+                    attempt.proposal.plan == plan
+                    or (attempt.proposal.skeleton is not None
+                        and sha256_digest(attempt.proposal.skeleton) == plan.definition.source_skeleton_digest)
+                    for attempt in matching
+                ):
+                    raise ValueError("새 Plan revision을 만든 실패 피드백 기록이 없습니다.")
+            latest_by_plan_id[plan.plan_id] = evaluation
         feasible = [
             item
             for item in self.plan_evaluations
@@ -970,6 +1099,34 @@ class SkeletonFirstPlanner:
         )[: policy.max_shortlist]
 
         plan_evaluations: list[ExpandedPlanEvaluation] = []
+        refinements: list[PlanRefinementAttempt] = []
+        refinement_stops: list[PlanRefinementStop] = []
+        shortlist_history = [sha256_digest(item.candidate) for item in shortlist]
+        candidates_by_id = {item.candidate.candidate_id: item.candidate for item in evaluations}
+
+        def root_id(candidate: PlanSkeletonCandidate) -> str:
+            while candidate.parent_candidate_id is not None:
+                candidate = candidates_by_id[candidate.parent_candidate_id]
+            return candidate.candidate_id
+
+        used_refinements: dict[str, int] = {}
+        for evaluation in evaluations:
+            if evaluation.candidate.parent_candidate_id is not None:
+                root = root_id(evaluation.candidate)
+                used_refinements[root] = used_refinements.get(root, 0) + 1
+
+        def evaluate_plan(plan, candidate):
+            nonlocal calls
+            evaluation, review_calls = self._evaluate_plan(
+                plan=plan, candidate=candidate, goal=goal, state=state, project_map=project_map,
+                review_allowed=calls < policy.max_logical_role_calls,
+            )
+            calls += review_calls
+            plan_evaluations.append(evaluation)
+            if evaluation.decision.status is CandidateStatus.ADMISSIBLE and feasible_observer is not None:
+                feasible_observer(evaluation)
+            return evaluation
+
         for item in shortlist:
             if calls >= policy.max_logical_role_calls:
                 break
@@ -981,60 +1138,112 @@ class SkeletonFirstPlanner:
                 planning_budget=policy,
             )
             calls += 1
-            deterministic = plan_gate(
-                plan,
-                source=item.candidate,
-                goal=goal,
-                state=state,
-                project_map=project_map,
+            evaluation = evaluate_plan(plan, item.candidate)
+            if evaluation.decision.status is not CandidateStatus.NEEDS_REVISION:
+                continue
+            root = root_id(item.candidate)
+            stop_reason = None
+            if used_refinements.get(root, 0) >= policy.max_refinement_per_candidate:
+                stop_reason = "refinement_limit"
+            elif versions >= policy.max_candidate_versions:
+                stop_reason = "candidate_version_budget"
+            elif policy.max_logical_role_calls - calls < 2:
+                stop_reason = "insufficient_call_budget"
+            elif not callable(getattr(self.expander, "refine", None)):
+                stop_reason = "refiner_unavailable"
+            if stop_reason is not None:
+                refinement_stops.append(PlanRefinementStop(
+                    source_plan_digest=plan.activation_digest, reason=stop_reason,
+                ))
+                continue
+
+            allow_skeleton = policy.max_logical_role_calls - calls >= 4
+            proposal = self.expander.refine(
+                evaluation=evaluation, candidate=item.candidate, goal=goal, state=state,
+                project_map=project_map, planning_budget=policy, allow_skeleton_revision=allow_skeleton,
             )
-            submissions: tuple[ReviewerSubmission, ...] = ()
-            if not deterministic and calls < policy.max_logical_role_calls:
-                submission = self.plan_reviewer.review(
-                    plan=plan,
-                    goal=goal,
-                    state=state,
-                    project_map=project_map,
-                    risk_route=risk_route(plan),
-                )
-                validate_reviewer_submission_evidence(
-                    submission,
-                    evidence_catalog=plan_review_evidence_catalog(
-                        plan, goal, state, project_map
+            calls += 1
+            used_refinements[root] = used_refinements.get(root, 0) + 1
+            known_refs = set(plan_review_evidence_catalog(plan, goal, state, project_map)) | {"artifact:skeleton"}
+            if not set(proposal.evidence_refs).issubset(known_refs):
+                raise PlanningError("Plan 수정 제안이 제공되지 않은 evidence를 참조합니다.")
+            if proposal.plan is not None:
+                validate_plan_revision(plan, proposal.plan)
+                if proposal.plan.definition.source_skeleton_digest != sha256_digest(item.candidate):
+                    raise PlanningError("상세 Plan 수정이 Skeleton 결속을 바꿨습니다.")
+                versions += 1
+                unchanged = plan_semantic_digest(plan) == plan_semantic_digest(proposal.plan)
+                refinements.append(PlanRefinementAttempt(
+                    source_plan_digest=plan.activation_digest, proposal=proposal,
+                    result="unchanged_candidate" if unchanged else "evaluated",
+                ))
+                if not unchanged:
+                    evaluate_plan(proposal.plan, item.candidate)
+            elif proposal.skeleton is not None:
+                refined = proposal.skeleton
+                if not allow_skeleton:
+                    raise PlanningError("Skeleton 수정·검토·상세화의 전체 호출 예산이 없습니다.")
+                if (
+                    refined.candidate_id in candidates_by_id
+                    or refined.parent_candidate_id != item.candidate.candidate_id
+                    or refined.version != item.candidate.version + 1
+                    or refined.refinement_round != 1
+                    or refined.approach.strategy_family != item.candidate.approach.strategy_family
+                    or refined.goal_contract_digest != goal.definition_digest
+                    or refined.state_signature != state.semantic_digest
+                ):
+                    raise PlanningError("상세 Plan 실패에서 수정한 Skeleton의 계보·입력이 다릅니다.")
+                versions += 1
+                unchanged = skeleton_semantic_digest(refined) == skeleton_semantic_digest(item.candidate)
+                refinements.append(PlanRefinementAttempt(
+                    source_plan_digest=plan.activation_digest, proposal=proposal,
+                    result="unchanged_candidate" if unchanged else "evaluated",
+                ))
+                if unchanged:
+                    continue
+                candidates_by_id[refined.candidate_id] = refined
+                deterministic = skeleton_gate(refined, goal=goal, state=state, project_map=project_map)
+                submission = None
+                if not deterministic:
+                    submission = self.skeleton_reviewer.review(
+                        candidate=refined, goal=goal, state=state, project_map=project_map,
+                    )
+                    calls += 1
+                    validate_reviewer_submission_evidence(
+                        submission,
+                        evidence_catalog=skeleton_review_evidence_catalog(refined, goal, state, project_map),
+                        known_task_refs={task.task_ref for task in refined.tasks},
+                    )
+                revised_evaluation = CandidateEvaluation(
+                    candidate=refined, deterministic_findings=deterministic,
+                    semantic_submission=submission,
+                    decision=_merge_submission(
+                        digest=sha256_digest(refined), deterministic=deterministic, submission=submission,
                     ),
-                    known_task_refs={item.task_ref for item in plan.definition.tasks},
+                )
+                evaluations.append(revised_evaluation)
+                if revised_evaluation.decision.status is not CandidateStatus.ADMISSIBLE:
+                    continue
+                # 기존 shortlist 한 자리의 후속 후보이며 다른 전략과 중복 상세화하지 않는다.
+                if any(
+                    other.candidate.graph_signature == refined.graph_signature
+                    and root_id(other.candidate) != root
+                    and sha256_digest(other.candidate) in shortlist_history
+                    for other in evaluations
+                ):
+                    continue
+                shortlist_history.append(sha256_digest(refined))
+                revised_plan = self.expander.expand(
+                    candidate=refined, goal=goal, state=state, project_map=project_map,
+                    planning_budget=policy, previous_plan=plan,
                 )
                 calls += 1
-                submissions = (submission,)
-            combined_findings = tuple(
-                finding for submission in submissions for finding in submission.findings
-            )
-            ratings = submissions[0].ratings if submissions else None
-            if submissions and submissions[0].candidate_digest != plan.activation_digest:
-                combined_findings += (
-                    _finding(
-                        "REVIEW_BINDING_MISMATCH",
-                        GateName.SCHEMA,
-                        "Plan reviewer 결과가 PlanContract와 결속되지 않았습니다.",
-                        plan.activation_digest,
-                    ),
-                )
-            all_findings = deterministic + combined_findings
-            decision = derive_candidate_decision(
-                candidate_digest=plan.activation_digest,
-                findings=all_findings,
-                ratings=ratings if not all_findings else None,
-            )
-            plan_evaluations.append(
-                ExpandedPlanEvaluation(
-                    plan=plan,
-                    deterministic_findings=deterministic,
-                    semantic_submissions=submissions,
-                    decision=decision,
-                )
-            )
-            if decision.status is CandidateStatus.ADMISSIBLE and feasible_observer is not None:
-                feasible_observer(plan_evaluations[-1])
+                validate_plan_revision(plan, revised_plan)
+                evaluate_plan(revised_plan, refined)
+            else:
+                refinements.append(PlanRefinementAttempt(
+                    source_plan_digest=plan.activation_digest, proposal=proposal, result=proposal.action,
+                ))
 
         feasible = [
             item
@@ -1054,8 +1263,10 @@ class SkeletonFirstPlanner:
             state_snapshot_digest=state.snapshot_digest,
             budget_policy=policy,
             skeleton_evaluations=tuple(evaluations),
-            shortlist_digests=tuple(sha256_digest(item.candidate) for item in shortlist),
+            shortlist_digests=tuple(shortlist_history),
             plan_evaluations=tuple(plan_evaluations),
+            plan_refinements=tuple(refinements),
+            plan_refinement_stops=tuple(refinement_stops),
             selected_activation_digest=(
                 selected.plan.activation_digest if selected is not None else None
             ),
@@ -1063,6 +1274,27 @@ class SkeletonFirstPlanner:
             candidate_versions=versions,
             budget_exhausted=calls >= policy.max_logical_role_calls,
         )
+
+    def _evaluate_plan(self, *, plan, candidate, goal, state, project_map, review_allowed):
+        deterministic = plan_gate(plan, source=candidate, goal=goal, state=state, project_map=project_map)
+        submissions = ()
+        if not deterministic and review_allowed:
+            submission = self.plan_reviewer.review(
+                plan=plan, goal=goal, state=state, project_map=project_map, risk_route=risk_route(plan),
+            )
+            validate_reviewer_submission_evidence(
+                submission, evidence_catalog=plan_review_evidence_catalog(plan, goal, state, project_map),
+                known_task_refs={task.task_ref for task in plan.definition.tasks},
+            )
+            submissions = (submission,)
+        findings = deterministic + tuple(finding for submission in submissions for finding in submission.findings)
+        return ExpandedPlanEvaluation(
+            plan=plan, deterministic_findings=deterministic, semantic_submissions=submissions,
+            decision=derive_candidate_decision(
+                candidate_digest=plan.activation_digest, findings=findings,
+                ratings=submissions[0].ratings if submissions and not findings else None,
+            ),
+        ), len(submissions)
 
     @staticmethod
     def _candidate_count(goal: GoalContractRevision) -> int:

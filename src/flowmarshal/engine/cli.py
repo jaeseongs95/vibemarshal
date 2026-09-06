@@ -562,6 +562,7 @@ def _cmd_plan_search(arguments: argparse.Namespace) -> None:
             service.record_skeleton_evaluation(evaluation)
         for evaluation in outcome.plan_evaluations:
             service.register_plan_evaluation(evaluation)
+        service.record_planning_search(outcome)
         _emit(outcome)
         return
     if arguments.live:
@@ -685,6 +686,7 @@ def _cmd_plan_search(arguments: argparse.Namespace) -> None:
             service.record_skeleton_evaluation(evaluation)
         for evaluation in outcome.plan_evaluations:
             service.register_plan_evaluation(evaluation)
+        service.record_planning_search(outcome)
         for stage, receipts in (
             (BudgetStage.SKELETON_GENERATION, generator.receipts),
             (BudgetStage.SKELETON_REVIEW, skeleton_reviewer.receipts),
