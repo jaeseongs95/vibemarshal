@@ -1,0 +1,12 @@
+{
+  "format": "flowmarshal-role-timeouts-v1",
+  "default_timeout_seconds": 900,
+  "overrides": [
+    {
+      "role": "compact_plan_reviewer",
+      "timeout_seconds": 1800,
+      "replaces_timeout_seconds": 900,
+      "reason": "기존 900초 timeout 호출을 보존하고, 명시적 continuation에서 완료 관측 창을 확대한다."
+    }
+  ]
+}

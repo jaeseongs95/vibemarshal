@@ -18,7 +18,13 @@ from flowmarshal.engine.roles import (
     CodexStructuredRoleRunner,
     RoleCallRequest, make_role_request,
     StructuredRoleError,
+    _usage,
     strict_json_output_schema,
+)
+from flowmarshal.engine.role_execution import (
+    RoleTimeoutOverride,
+    RoleTimeoutPolicy,
+    use_role_timeout_policy,
 )
 from flowmarshal.engine.runtime import (
     ExecutionPolicyEvidence,
@@ -54,17 +60,22 @@ class ImmediateRoleRuntime:
         thread_id = new_id("thread")
         return RuntimeOperationReceipt(
             operation_id=thread_id,
-            payload={"thread_id": thread_id},
+            payload={"thread_id": thread_id, "thread": {"id": thread_id, "turns": []}},
             binding=ThreadBinding(thread_id=thread_id, bound_at=utc_now()),
         )
 
     def start_turn(self, *, thread_id, cwd, prompt, model, effort, output_schema=None):
         del cwd, prompt, model, effort, output_schema
         turn_id = new_id("turn")
+        first_empty_thread = thread_id not in self.latest
         self.latest[thread_id] = (turn_id, self.outputs.pop(0))
         return RuntimeOperationReceipt(
             operation_id=turn_id,
-            payload={"thread_id": thread_id, "turn_id": turn_id},
+            payload={
+                "thread_id": thread_id,
+                "turn_id": turn_id,
+                "first_empty_thread": first_empty_thread,
+            },
             binding=ThreadBinding(thread_id=thread_id, turn_id=turn_id, bound_at=utc_now()),
         )
 
@@ -83,8 +94,10 @@ class ImmediateRoleRuntime:
                         "cachedInputTokens": 40,
                         "outputTokens": 10,
                         "reasoningOutputTokens": 4,
+                        "totalTokens": 110,
                     }
-                }
+                },
+                "usage_scope": "thread",
             },
         )
 
@@ -101,7 +114,200 @@ class ImmediateRoleRuntime:
         return None
 
 
+class InterruptedRoleRuntime(ImmediateRoleRuntime):
+    def __init__(self) -> None:
+        super().__init__([])
+        self.interrupted = False
+
+    def start_turn(self, *, thread_id, cwd, prompt, model, effort, output_schema=None):
+        del cwd, prompt, model, effort, output_schema
+        turn_id = new_id("turn")
+        self.latest[thread_id] = (turn_id, "")
+        return RuntimeOperationReceipt(
+            operation_id=turn_id,
+            payload={
+                "thread_id": thread_id,
+                "turn_id": turn_id,
+                "first_empty_thread": True,
+            },
+            binding=ThreadBinding(thread_id=thread_id, turn_id=turn_id, bound_at=utc_now()),
+        )
+
+    def read(self, *, thread_id):
+        turn_id, _ = self.latest[thread_id]
+        return RuntimeObservation(
+            thread_id=thread_id,
+            turn_id=turn_id,
+            active=not self.interrupted,
+            terminal_status=None if not self.interrupted else "interrupted",
+            final_response=None,
+            payload={},
+        )
+
+    def interrupt(self, *, thread_id, turn_id):
+        self.interrupted = True
+        return super().interrupt(thread_id=thread_id, turn_id=turn_id)
+
+
 class EngineStructuredRoleTests(unittest.TestCase):
+    def test_usage_requires_explicit_scope_single_turn_and_complete_exact_counts(self) -> None:
+        proof = {
+            "thread_id": "thread_1",
+            "turn_ids": ("turn_1",),
+            "observation_thread_id": "thread_1",
+            "observation_turn_id": "turn_1",
+            "turn_binding_proven": True,
+        }
+        valid = {
+            "usage_scope": "turn",
+            "usage": {
+                "inputTokens": 100,
+                "cachedInputTokens": 40,
+                "outputTokens": 10,
+                "reasoningOutputTokens": 4,
+                "totalTokens": 110,
+            },
+        }
+        self.assertEqual((100, 40, 10, 4, True), _usage(valid, **proof))
+
+        invalid = (
+            {"usage": valid["usage"]},
+            {**valid, "usage": {key: value for key, value in valid["usage"].items()
+                                  if key != "reasoningOutputTokens"}},
+            {**valid, "usage": {**valid["usage"], "inputTokens": True}},
+            {**valid, "usage": {**valid["usage"], "inputTokens": -1}},
+            {**valid, "usage": {**valid["usage"], "cachedInputTokens": 101}},
+            {**valid, "usage": {**valid["usage"], "reasoningOutputTokens": 11}},
+            {**valid, "usage": {**valid["usage"], "totalTokens": 109}},
+        )
+        for payload in invalid:
+            with self.subTest(payload=payload):
+                self.assertEqual((None, None, None, None, False), _usage(payload, **proof))
+        self.assertEqual(
+            (None, None, None, None, False),
+            _usage(valid, **{**proof, "turn_ids": ("turn_0", "turn_1")}),
+        )
+
+    def test_thread_aggregate_requires_actual_empty_creation_and_first_turn_receipts(self) -> None:
+        payload = {
+            "usage_scope": "thread",
+            "usage": {"total": {
+                "inputTokens": 100,
+                "cachedInputTokens": 40,
+                "outputTokens": 10,
+                "reasoningOutputTokens": 4,
+                "totalTokens": 110,
+            }},
+        }
+        proof = {
+            "thread_id": "thread_1",
+            "turn_ids": ("turn_1",),
+            "observation_thread_id": "thread_1",
+            "observation_turn_id": "turn_1",
+            "turn_binding_proven": True,
+            "empty_thread_creation_proven": True,
+            "first_empty_turn_proven": True,
+        }
+        self.assertEqual((100, 40, 10, 4, True), _usage(payload, **proof))
+        for missing_proof in ("empty_thread_creation_proven", "first_empty_turn_proven"):
+            with self.subTest(missing_proof=missing_proof):
+                self.assertEqual(
+                    (None, None, None, None, False),
+                    _usage(payload, **{**proof, missing_proof: False}),
+                )
+
+        class MissingCreationProofRuntime(ImmediateRoleRuntime):
+            def create_thread(self, **kwargs):
+                receipt = super().create_thread(**kwargs)
+                return receipt.model_copy(update={"payload": {"thread_id": receipt.operation_id}})
+
+        runtime = MissingCreationProofRuntime(['{"answer":"ok"}'])
+        with tempfile.TemporaryDirectory() as temp:
+            request = make_role_request(
+                inventory=runtime.inventory, role="test-role", instructions="JSON만 반환",
+                payload={"request": "ok"}, output_schema={"type": "object"},
+                model="available", effort="low", inventory_digest=runtime.inventory.inventory_digest,
+                cwd=temp,
+            )
+            receipt = CodexStructuredRoleRunner(runtime).run(request).receipt
+        self.assertFalse(receipt.usage_available)
+        self.assertEqual((None, None, None, None), (
+            receipt.input_tokens, receipt.cached_input_tokens,
+            receipt.output_tokens, receipt.reasoning_tokens,
+        ))
+
+    def test_permission_preflight_failure_explicitly_records_no_effect_started(self) -> None:
+        class MismatchedPolicyRuntime(ImmediateRoleRuntime):
+            def verify_execution_policy(self, cwd):
+                value = super().verify_execution_policy(cwd)
+                return value.model_copy(update={"approval_policy": "on-request"})
+
+        runtime = MismatchedPolicyRuntime([])
+        with tempfile.TemporaryDirectory() as temp:
+            request = make_role_request(
+                inventory=runtime.inventory, role="test-role", instructions="JSON만 반환",
+                payload={"request": "ok"}, output_schema={"type": "object", "properties": {}},
+                model="available", effort="low", inventory_digest=runtime.inventory.inventory_digest,
+                cwd=temp,
+            )
+            with self.assertRaises(StructuredRoleError) as raised:
+                CodexStructuredRoleRunner(runtime).run(request)
+        self.assertFalse(raised.exception.effects_started)
+        self.assertEqual((), raised.exception.receipts)
+
+    def test_role_timeout_policy_is_bound_to_request_and_success_receipt(self) -> None:
+        runtime = ImmediateRoleRuntime(['{"answer":"ok"}'])
+        policy = RoleTimeoutPolicy(overrides=(RoleTimeoutOverride(
+            role="test-role", timeout_seconds=1200, replaces_timeout_seconds=900,
+            reason="실제 장시간 reviewer 관측에 맞춘 명시적 운영 변경",
+        ),))
+        with tempfile.TemporaryDirectory() as temp, use_role_timeout_policy(policy):
+            request = make_role_request(
+                inventory=runtime.inventory, role="test-role", instructions="JSON만 반환",
+                payload={"request": "ok"},
+                output_schema={"type": "object", "properties": {"answer": {"type": "string"}}},
+                model="available", effort="low", inventory_digest=runtime.inventory.inventory_digest,
+                cwd=temp,
+            )
+            result = CodexStructuredRoleRunner(runtime).run(request)
+        self.assertEqual(1200, request.timeout_seconds)
+        self.assertEqual(policy.policy_digest, request.timeout_policy_digest)
+        self.assertEqual(policy.policy_digest, result.receipt.timeout_policy_digest)
+
+    def test_timeout_records_interrupt_receipt_then_terminal_observation(self) -> None:
+        runtime = InterruptedRoleRuntime()
+        policy = RoleTimeoutPolicy(overrides=(RoleTimeoutOverride(
+            role="test-role", timeout_seconds=0.001, replaces_timeout_seconds=900,
+            reason="unit timeout",
+        ),))
+        progress = []
+        with tempfile.TemporaryDirectory() as temp, use_role_timeout_policy(policy):
+            request = make_role_request(
+                inventory=runtime.inventory, role="test-role", instructions="JSON만 반환",
+                payload={"request": "wait"}, output_schema={"type": "object", "properties": {}},
+                model="available", effort="low", inventory_digest=runtime.inventory.inventory_digest,
+                cwd=temp,
+            )
+            with self.assertRaises(StructuredRoleError) as raised:
+                CodexStructuredRoleRunner(
+                    runtime, poll_interval_seconds=0,
+                    interrupt_observation_seconds=0,
+                    progress_sink=progress.append,
+                ).run(request)
+        receipt = raised.exception.receipt
+        self.assertIsNotNone(receipt)
+        assert receipt is not None
+        self.assertEqual("timed_out", receipt.status)
+        self.assertIsNotNone(receipt.interrupt_request_digest)
+        self.assertIsNotNone(receipt.interrupt_receipt_digest)
+        self.assertIsNotNone(receipt.terminal_observation_digest)
+        self.assertEqual("interrupted", receipt.terminal_status_after_interrupt)
+        self.assertEqual(
+            ["interrupt_requested", "interrupt_receipt", "terminal_observed_after_interrupt"],
+            [item["event"] for item in progress if item["event"].startswith("interrupt")
+             or item["event"].startswith("terminal_")],
+        )
+
     def test_plan_reviewer_transport_schema_and_post_validator_share_two_review_branches(self) -> None:
         """전송 strict schema와 Pydantic 사후 검증이 같은 두 review 조합만 허용한다."""
         from flowmarshal.engine.planner_roles import PlanReviewEnvelope
@@ -328,6 +534,8 @@ class EngineStructuredRoleTests(unittest.TestCase):
         self.assertEqual(("succeeded", "schema_failed"), tuple(item.status for item in receipts))
         self.assertEqual(1, receipts[-1].schema_recovery_attempts)
         self.assertEqual(2, len(receipts[-1].turn_ids))
+        self.assertFalse(receipts[-1].usage_available)
+        self.assertIsNone(receipts[-1].input_tokens)
         first_call = [item["event"] for item in progress if item["call_id"] == receipts[0].call_id]
         self.assertEqual(["role_requested", "thread_created", "turn_started", "role_receipt"], first_call)
         second_call = [item["event"] for item in progress if item["call_id"] == receipts[1].call_id]

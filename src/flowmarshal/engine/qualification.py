@@ -21,17 +21,25 @@ from pydantic import Field, model_validator
 from ..canonical import sha256_bytes, sha256_digest
 from .context import ProjectMapper, goal_context_observations
 from .domain import (
+    BehaviorPolicy,
     Criticality,
+    EffectPolicy,
     EngineModel,
     FindingSeverity,
     GateName,
+    GoalContractDefinition,
+    GoalContractRevision,
+    GoalCriterion,
     LifecycleStage,
+    MissionClass,
     ModelAssignmentContract,
+    MutationPolicy,
     PlanningBudgetPolicy,
     ProjectProfileDefinition,
     ProjectProfileRevision,
     RevisionStatus,
     RoleAssignmentPolicy,
+    SourceTrace,
     StateFact,
     StateSnapshot,
     ReviewFinding,
@@ -39,6 +47,16 @@ from .domain import (
     derive_candidate_decision,
     new_id,
     utc_now,
+)
+from .evaluation_budget import (
+    EvaluationPolicies,
+    budgeted_role_runner,
+    initialize_cell_budget,
+    policies_from_metadata,
+    policy_contract_fragment,
+    register_and_attach_goal,
+    verify_metadata_digest,
+    write_immutable_run_metadata,
 )
 from .evaluation import (
     EvaluationCellCheckpoint,
@@ -76,6 +94,7 @@ from .roles import (
     strict_json_output_schema,
 )
 from .runtime import CodexAppServerRuntime
+from .role_execution import use_role_timeout_policy
 
 
 ORDER_SEEDS = (17, 43, 89)
@@ -447,6 +466,7 @@ def _role_contract(
     catalog: RegressionCatalog,
     inventory: ModelInventory,
     roles: EngineRoleConfiguration,
+    policies: EvaluationPolicies,
 ) -> EvaluationContract:
     taxonomy = json.loads(
         (root / "config" / "qualification-finding-taxonomy.json").read_text(
@@ -469,7 +489,10 @@ def _role_contract(
         expected_cell_count=len(catalog.fixtures) * len(ORDER_SEEDS),
         role_configuration_digest=roles.configuration_digest,
         source_manifest_digest=source_manifest_digest(root),
-        rules_digest=sha256_digest({"instructions": ROLE_INSTRUCTIONS, "oracle_hidden": True}),
+        rules_digest=sha256_digest(
+            {"instructions": ROLE_INSTRUCTIONS, "oracle_hidden": True}
+            | policy_contract_fragment(policies)
+        ),
         threshold_digest=sha256_digest(
             {"recall": 0.90, "precision": 0.85, "critical_false_admission": 0, "clean_false_block": 0}
         ),
@@ -538,7 +561,10 @@ def run_role_fixture(
     run_root: Path | None = None,
     role_configuration: EngineRoleConfiguration | None = None,
     codex_bin: Path | str | None = None,
+    evaluation_policies: EvaluationPolicies | None = None,
 ) -> tuple[Path, ScopeQualificationReport]:
+    if evaluation_policies is None:
+        raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
     base = (root or project_root()).resolve(strict=True)
     preflight_failures = _preflight(base)
     if preflight_failures:
@@ -553,7 +579,7 @@ def run_role_fixture(
     with CodexAppServerRuntime(codex_bin=codex_bin) as runtime:
         inventory = runtime.list_models()
         roles.validate_inventory(inventory)
-        contract = _role_contract(base, catalog, inventory, roles)
+        contract = _role_contract(base, catalog, inventory, roles, evaluation_policies)
         destination = (
             run_root or _default_run_root(base, "role-fixture", contract.contract_digest[7:15])
         ).resolve()
@@ -564,17 +590,17 @@ def run_role_fixture(
             _write_json(audit_path, roles.operational_binding(inventory))
         if store.state().status is EvaluationRunStatus.PAUSED_RATE_LIMIT:
             store.set_state(EvaluationRunStatus.RUNNING, updated_at=utc_now())
-        _write_json(
+        write_immutable_run_metadata(
             destination / "run-metadata.json",
             {
                 "scope": "role-fixture",
+                "evaluation_contract_digest": contract.contract_digest,
                 "project_root": str(base),
                 "role_configuration": roles.model_dump(mode="json"),
                 "codex_bin": None if codex_bin is None else str(Path(codex_bin).resolve()),
             },
+            evaluation_policies,
         )
-        runner = CodexStructuredRoleRunner(runtime, progress_sink=_role_progress(destination),
-                                           operational_binding=roles.operational_binding(inventory))
         results: list[FixtureResult] = []
         by_digest = {item.fixture_digest: item for item in catalog.fixtures}
         try:
@@ -586,23 +612,65 @@ def run_role_fixture(
                     if existing is not None:
                         results.append(_checkpoint_fixture_result(existing))
                         continue
+                    cell_ref = {
+                        "contract": contract.contract_digest,
+                        "fixture": fixture.fixture_digest,
+                        "seed": seed,
+                    }
+                    project_id = _qualification_entity("project", cell_ref)
+                    profile = _profile(project_id).model_copy(
+                        update={
+                            "profile_revision_id": _qualification_entity(
+                                "profile_revision", cell_ref
+                            )
+                        }
+                    )
+                    state_root = (
+                        destination / "work" / f"seed-{seed}" / fixture.fixture_digest[7:]
+                        / "budget-state"
+                    )
+                    service, manager = initialize_cell_budget(
+                        state_root=state_root,
+                        workspace=base,
+                        project_id=project_id,
+                        profile=profile,
+                        policies=evaluation_policies,
+                    )
+                    goal_id = _qualification_entity("goal", cell_ref)
+                    fixture_goal = _fixture_goal(
+                        project_id=project_id,
+                        profile=profile,
+                        goal_id=goal_id,
+                        fixture=fixture,
+                    )
+                    register_and_attach_goal(service, manager, fixture_goal)
+                    runner = budgeted_role_runner(
+                        runtime,
+                        service,
+                        project_id=project_id,
+                        goal_id=goal_id,
+                        goal_digest=fixture_goal.definition_digest,
+                        progress_sink=_role_progress(destination),
+                        operational_binding=roles.operational_binding(inventory),
+                    )
                     binding = roles.critical_reviewer if fixture.critical else roles.general_reviewer
                     reviewer_role = "critical_reviewer" if fixture.critical else "general_reviewer"
                     evidence_catalog = {"artifact:candidate": fixture.artifact}
-                    request = make_role_request(
-                        role=reviewer_role,
-                        instructions=ROLE_INSTRUCTIONS,
-                        payload=fixture.model_input()
-                        | {
-                            "evidence_catalog": evidence_catalog,
-                            "finding_taxonomy": taxonomy,
-                        },
-                        output_schema=ReviewDraft.model_json_schema(),
-                        model=binding.model,
-                        effort=binding.effort, allowed_fallbacks=binding.allowed_fallbacks,
-                        inventory_digest=inventory.inventory_digest, inventory=inventory,
-                        cwd=str(base),
-                    )
+                    with use_role_timeout_policy(evaluation_policies.role_timeouts):
+                        request = make_role_request(
+                            role=reviewer_role,
+                            instructions=ROLE_INSTRUCTIONS,
+                            payload=fixture.model_input()
+                            | {
+                                "evidence_catalog": evidence_catalog,
+                                "finding_taxonomy": taxonomy,
+                            },
+                            output_schema=ReviewDraft.model_json_schema(),
+                            model=binding.model,
+                            effort=binding.effort, allowed_fallbacks=binding.allowed_fallbacks,
+                            inventory_digest=inventory.inventory_digest, inventory=inventory,
+                            cwd=str(base),
+                        )
 
                     def validate(raw: dict[str, Any]) -> ReviewDraft:
                         draft = ReviewDraft.model_validate(raw)
@@ -625,7 +693,8 @@ def run_role_fixture(
 
                     start = len(runner.receipts)
                     try:
-                        result = runner.run(request, validator=validate)
+                        with use_role_timeout_policy(evaluation_policies.role_timeouts):
+                            result = runner.run(request, validator=validate)
                         verify_role_receipt(request, result)
                         fixture_result = _review_result(
                             fixture,
@@ -721,6 +790,7 @@ def _planning_contract(
     catalog: PlanningScenarioCatalog,
     inventory: ModelInventory,
     roles: EngineRoleConfiguration,
+    policies: EvaluationPolicies,
     *,
     inspection_provider_contract: PlanInspectionProviderVersion = PLAN_INSPECTION_PROVIDER_V1,
 ) -> EvaluationContract:
@@ -761,6 +831,7 @@ def _planning_contract(
         source_manifest_digest=source_manifest_digest(root),
         rules_digest=sha256_digest(
             {"pipeline": "goal-to-selected-plan", "budget_calls": 14, "versions": 5}
+            | policy_contract_fragment(policies)
             | ({"inspection_provider_contract": inspection_provider_contract}
                if provider_contract_values else {})
         ),
@@ -816,6 +887,52 @@ def _profile(project_id: str) -> ProjectProfileRevision:
     )
 
 
+def _qualification_entity(prefix: str, value: Any) -> str:
+    return prefix + "_" + sha256_digest(value).split(":", 1)[1][:32]
+
+
+def _fixture_goal(
+    *, project_id: str, profile: ProjectProfileRevision, goal_id: str, fixture: RegressionFixture
+) -> GoalContractRevision:
+    source = json.dumps(fixture.model_input(), ensure_ascii=False, sort_keys=True)
+    source_digest = sha256_bytes(source.encode("utf-8"))
+    definition = GoalContractDefinition(
+        project_id=project_id,
+        source_request=source,
+        source_request_digest=source_digest,
+        mission_class=MissionClass.ANALYSIS_AUDIT,
+        observable_outcome="동결 fixture 후보를 직접 evidence와 taxonomy로 독립 평가한다.",
+        hard_acceptance=(GoalCriterion(
+            criterion_id="ac_fixture_review",
+            statement="fixture의 기대 finding 또는 clean 판정을 정확히 제출한다.",
+            validation_intent="원시 역할 receipt와 fixture oracle을 분리해 대조한다.",
+            trace_refs=("trace_fixture",),
+        ),),
+        source_traces=(SourceTrace(
+            trace_id="trace_fixture",
+            source_ref=f"qualification-fixture:{fixture.opaque_case_ref}",
+            statement=source,
+            source_digest=source_digest,
+        ),),
+        effect_policy=EffectPolicy(
+            mutation_policy=MutationPolicy.READ_ONLY,
+            behavior_policy=BehaviorPolicy.NOT_APPLICABLE,
+        ),
+        profile_definition_digest=profile.definition_digest,
+    )
+    return GoalContractRevision(
+        goal_revision_id=_qualification_entity(
+            "goal_revision", {"goal_id": goal_id, "fixture": fixture.fixture_digest}
+        ),
+        goal_id=goal_id,
+        revision_no=1,
+        definition=definition,
+        definition_digest=definition.definition_digest,
+        status=RevisionStatus.READY,
+        created_at=utc_now(),
+    )
+
+
 def _planning_cell(
     *,
     scenario: PlanningScenario,
@@ -827,7 +944,11 @@ def _planning_cell(
     inspection_provider_contract: PlanInspectionProviderVersion = PLAN_INSPECTION_PROVIDER_V1,
     work_root: Path | None = None,
     progress_sink: Callable[[dict[str, Any]], None] | None = None,
+    evaluation_policies: EvaluationPolicies | None = None,
+    retain_execution_checkpoint: bool = False,
 ) -> tuple[dict[str, Any], tuple[RoleCallReceipt, ...]]:
+    if retain_execution_checkpoint and (work_root is None or evaluation_policies is None):
+        raise QualificationRunError("실행 lifecycle 연결에는 영속 cell 경로와 예산 정책이 필요합니다.")
     started = time.monotonic()
     first_feasible: list[int] = []
     workspace_context = (
@@ -854,11 +975,45 @@ def _planning_cell(
                 workspace,
                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
             )
-        project_id = new_id("project")
-        profile = _profile(project_id)
+        cell_ref = {
+            "scenario": scenario.scenario_digest,
+            "seed": seed,
+            "policy": None if evaluation_policies is None else evaluation_policies.policy_digest,
+        }
+        project_id = _qualification_entity("project", cell_ref)
+        profile = _profile(project_id).model_copy(
+            update={
+                "profile_revision_id": _qualification_entity("profile_revision", cell_ref)
+            }
+        )
         project_map = ProjectMapper().build(project_id=project_id, root=workspace, revision_no=1)
-        runner = CodexStructuredRoleRunner(runtime, progress_sink=progress_sink,
-                                           operational_binding=roles.operational_binding(inventory))
+        goal_id = _qualification_entity("goal", cell_ref)
+        service = manager = None
+        if evaluation_policies is None:
+            runner = CodexStructuredRoleRunner(
+                runtime,
+                progress_sink=progress_sink,
+                operational_binding=roles.operational_binding(inventory),
+                max_schema_recovery_attempts=0,
+                ephemeral_threads=False,
+            )
+        else:
+            service, manager = initialize_cell_budget(
+                state_root=(Path(temp) / "budget-state"),
+                workspace=workspace,
+                project_id=project_id,
+                profile=profile,
+                policies=evaluation_policies,
+            )
+            runner = budgeted_role_runner(
+                runtime,
+                service,
+                project_id=project_id,
+                goal_id=goal_id,
+                goal_digest=None,
+                progress_sink=progress_sink,
+                operational_binding=roles.operational_binding(inventory),
+            )
         normalizer = GoalNormalizerAdapter(
             runner,
             model=roles.normalizer.model,
@@ -875,13 +1030,22 @@ def _planning_cell(
             inventory_digest=inventory.inventory_digest, inventory=inventory,
             cwd=workspace,
         )
-        prepared = GoalPreparationPipeline(normalizer, goal_reviewer).prepare(
-            project_id=project_id,
-            profile=profile,
-            source_request=scenario.source_request,
-            observed_facts=goal_context_observations(project_map, scenario.source_request),
+        timeout_context = (
+            nullcontext()
+            if evaluation_policies is None
+            else use_role_timeout_policy(evaluation_policies.role_timeouts)
         )
+        with timeout_context:
+            prepared = GoalPreparationPipeline(normalizer, goal_reviewer).prepare(
+                project_id=project_id,
+                profile=profile,
+                source_request=scenario.source_request,
+                observed_facts=goal_context_observations(project_map, scenario.source_request),
+                goal_id=goal_id,
+            )
         goal = prepared.goal_contract
+        if service is not None and manager is not None:
+            register_and_attach_goal(service, manager, goal)
         blocking_questions = [
             item.model_dump(mode="json") for item in prepared.proposal.unresolved_questions
             if item.blocking
@@ -992,17 +1156,56 @@ def _planning_cell(
             critical_allowed_fallbacks=roles.critical_reviewer.allowed_fallbacks,
             inspection_provider_contract=inspection_provider_contract,
         )
-        outcome = SkeletonFirstPlanner(
-            generator, skeleton_reviewer, expander, plan_reviewer
-        ).search(
-            goal=goal,
-            state=state,
-            project_map=project_map,
-            budget=PlanningBudgetPolicy(max_logical_role_calls=12),
-            candidate_count=scenario.candidate_count,
-            feasible_observer=lambda _evaluation: first_feasible.append(max(1, int((time.monotonic() - started) * 1000))),
+        if retain_execution_checkpoint:
+            from .benchmark_candidate_costs import CandidateOutputRecorder
+            expander = CandidateOutputRecorder(expander)
+        timeout_context = (
+            nullcontext()
+            if evaluation_policies is None
+            else use_role_timeout_policy(evaluation_policies.role_timeouts)
         )
+        with timeout_context:
+            outcome = SkeletonFirstPlanner(
+                generator, skeleton_reviewer, expander, plan_reviewer
+            ).search(
+                goal=goal,
+                state=state,
+                project_map=project_map,
+                budget=PlanningBudgetPolicy(max_logical_role_calls=12),
+                candidate_count=scenario.candidate_count,
+                feasible_observer=lambda _evaluation: first_feasible.append(max(1, int((time.monotonic() - started) * 1000))),
+            )
         selected = outcome.selected_activation_digest is not None
+        if retain_execution_checkpoint:
+            assert service is not None
+            service.record_project_map(project_map)
+            service.record_state_snapshot(state)
+            for evaluation in outcome.skeleton_evaluations:
+                service.record_skeleton_evaluation(evaluation)
+            for evaluation in outcome.plan_evaluations:
+                service.register_plan_evaluation(evaluation)
+            service.record_planning_search(outcome)
+            cell["candidate_output_bindings"] = [
+                item.model_dump(mode="json") for item in expander.bindings
+            ]
+            selected_plan = next((item.plan for item in outcome.plan_evaluations
+                                  if item.plan.activation_digest == outcome.selected_activation_digest), None)
+            if selected_plan is not None:
+                checkpoint = {
+                    "format": "flowmarshal-benchmark-execution-checkpoint-v1",
+                    "project_id": project_id,
+                    "goal_id": goal.goal_id,
+                    "goal_contract_digest": goal.definition_digest,
+                    "plan_revision_id": selected_plan.plan_revision_id,
+                    "activation_digest": selected_plan.activation_digest,
+                    "workspace": str(workspace.resolve()),
+                    "database_path": str(service.ledger.path.resolve()),
+                    "artifact_root": str(service.ledger.artifact_root.resolve()),
+                    "planning_outcome_digest": sha256_digest(outcome),
+                }
+                cell["execution_checkpoint"] = checkpoint
+                _write_json(Path(temp) / "execution-checkpoint.json", checkpoint)
+                _write_json(Path(temp) / "selected-plan.json", selected_plan)
         findings = sorted(
             {
                 item.finding_code
@@ -1058,7 +1261,10 @@ def run_full_planning_pipeline(
     role_configuration: EngineRoleConfiguration | None = None,
     codex_bin: Path | str | None = None,
     inspection_provider_contract: PlanInspectionProviderVersion = PLAN_INSPECTION_PROVIDER_V1,
+    evaluation_policies: EvaluationPolicies | None = None,
 ) -> tuple[Path, ScopeQualificationReport]:
+    if evaluation_policies is None:
+        raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
     base = (root or project_root()).resolve(strict=True)
     preflight_failures = _preflight(base)
     if preflight_failures:
@@ -1072,6 +1278,7 @@ def run_full_planning_pipeline(
         roles.validate_inventory(inventory)
         contract = _planning_contract(
             base, catalog, inventory, roles,
+            evaluation_policies,
             inspection_provider_contract=inspection_provider_contract,
         )
         destination = (
@@ -1085,15 +1292,17 @@ def run_full_planning_pipeline(
             _write_json(audit_path, roles.operational_binding(inventory))
         if store.state().status is EvaluationRunStatus.PAUSED_RATE_LIMIT:
             store.set_state(EvaluationRunStatus.RUNNING, updated_at=utc_now())
-        _write_json(
+        write_immutable_run_metadata(
             destination / "run-metadata.json",
             {
                 "scope": "full-planning-pipeline",
+                "evaluation_contract_digest": contract.contract_digest,
                 "project_root": str(base),
                 "role_configuration": roles.model_dump(mode="json"),
                 "codex_bin": None if codex_bin is None else str(Path(codex_bin).resolve()),
                 "inspection_provider_contract": inspection_provider_contract,
             },
+            evaluation_policies,
         )
         fixture_root = base / "tests" / "fixtures" / "engine" / "live-smoke-project"
         scenarios_by_digest = {item.scenario_digest: item for item in catalog.scenarios}
@@ -1115,6 +1324,7 @@ def run_full_planning_pipeline(
                             inspection_provider_contract=inspection_provider_contract,
                             work_root=destination / "work" / f"seed-{seed}" / scenario.scenario_id,
                             progress_sink=_role_progress(destination, scenario_id=scenario.scenario_id, order_seed=seed),
+                            evaluation_policies=evaluation_policies,
                         )
                     except StructuredRoleError as error:
                         _write_json(
@@ -1214,6 +1424,16 @@ def load_run_metadata(run_root: Path | str) -> dict[str, Any]:
     value = json.loads(path.read_text(encoding="utf-8"))
     if not isinstance(value, dict):
         raise QualificationRunError("run metadata는 JSON object여야 합니다.")
+    if value.get("scope") != "deterministic":
+        verify_metadata_digest(value)
+        contract_path = path.parent / "evaluation-contract.json"
+        if not contract_path.is_file():
+            raise QualificationRunError("resume할 evaluation-contract.json이 없습니다.")
+        contract = EvaluationContract.model_validate_json(
+            contract_path.read_text(encoding="utf-8")
+        )
+        if value.get("evaluation_contract_digest") != contract.contract_digest:
+            raise QualificationRunError("run metadata와 evaluation contract digest가 다릅니다.")
     return value
 
 
@@ -1226,6 +1446,8 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
         )
         if report.status is EvaluationRunStatus.COMPLETED:
             metadata = load_run_metadata(destination)
+            if metadata.get("scope") != "deterministic":
+                policies_from_metadata(metadata)
             contract = EvaluationContract.model_validate_json(
                 (destination / "evaluation-contract.json").read_text(encoding="utf-8")
             )
@@ -1239,6 +1461,7 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
     if scope == "deterministic":
         return run_deterministic(root=base, run_root=destination)
     roles = EngineRoleConfiguration.model_validate(metadata["role_configuration"])
+    policies = policies_from_metadata(metadata)
     codex_bin = metadata.get("codex_bin")
     if scope == "role-fixture":
         return run_role_fixture(
@@ -1246,6 +1469,7 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
             run_root=destination,
             role_configuration=roles,
             codex_bin=codex_bin,
+            evaluation_policies=policies,
         )
     if scope == "full-planning-pipeline":
         return run_full_planning_pipeline(
@@ -1256,6 +1480,7 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
             inspection_provider_contract=metadata.get(
                 "inspection_provider_contract", PLAN_INSPECTION_PROVIDER_V1
             ),
+            evaluation_policies=policies,
         )
     if scope == "project-e2e":
         from .e2e_qualification import run_project_e2e
@@ -1265,5 +1490,6 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
             run_root=destination,
             role_configuration=roles,
             codex_bin=codex_bin,
+            evaluation_policies=policies,
         )
     raise QualificationRunError(f"지원하지 않는 resume scope입니다: {scope}")

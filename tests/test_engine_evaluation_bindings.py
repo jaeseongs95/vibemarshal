@@ -23,9 +23,16 @@ from flowmarshal.engine.qualification import (
     PlanningScenarioCatalog, _planning_contract, _role_progress, default_role_configuration,
 )
 from flowmarshal.engine.roles import strict_json_output_schema
+from flowmarshal.engine.evaluation_budget import EvaluationPolicies
+from flowmarshal.engine.budget import GoalBudgetPolicy
+from flowmarshal.engine.role_execution import RoleTimeoutPolicy
 from tests.test_engine_qualification import qualification_inventory
 
 ROOT = Path(__file__).resolve().parents[1]
+POLICIES = EvaluationPolicies(
+    budget=GoalBudgetPolicy(total_tokens=100_000, call_reservation_tokens=1_000),
+    role_timeouts=RoleTimeoutPolicy(default_timeout_seconds=30),
+)
 
 
 class EvaluationBindingTests(unittest.TestCase):
@@ -33,7 +40,7 @@ class EvaluationBindingTests(unittest.TestCase):
         catalog = PlanningScenarioCatalog.model_validate_json(
             (ROOT / "tests/fixtures/engine/planning-scenarios.json").read_text(encoding="utf-8")
         )
-        args = (ROOT, catalog, qualification_inventory(), default_role_configuration(ROOT))
+        args = (ROOT, catalog, qualification_inventory(), default_role_configuration(ROOT), POLICIES)
         v1 = _planning_contract(*args)
         explicit_v1 = _planning_contract(
             *args, inspection_provider_contract=PLAN_INSPECTION_PROVIDER_V1
@@ -79,7 +86,7 @@ class EvaluationBindingTests(unittest.TestCase):
     def test_pipeline_contract_hashes_real_prompt_builders_and_schemas(self):
         catalog = PlanningScenarioCatalog.model_validate_json(
             (ROOT / "tests/fixtures/engine/planning-scenarios.json").read_text(encoding="utf-8"))
-        contract = _planning_contract(ROOT, catalog, qualification_inventory(), default_role_configuration(ROOT))
+        contract = _planning_contract(ROOT, catalog, qualification_inventory(), default_role_configuration(ROOT), POLICIES)
         prompts = {role.__name__: inspect.getsource(role) for role in (
             GoalNormalizerAdapter, GoalReviewerAdapter, SkeletonGeneratorAdapter,
             SkeletonReviewerAdapter, PlanExpanderAdapter, PlanReviewerAdapter)}
@@ -135,7 +142,7 @@ class EvaluationBindingTests(unittest.TestCase):
             module = "goal" if name == "GOAL_INTERPRETATION_INSTRUCTIONS" else "planner_roles"
             with self.subTest(shared_instruction=name), patch(f"flowmarshal.engine.{module}.{name}", "변경된 지침"):
                 self.assertNotEqual(_planning_contract(ROOT, catalog, qualification_inventory(),
-                                                     default_role_configuration(ROOT)).prompt_digest,
+                                                     default_role_configuration(ROOT), POLICIES).prompt_digest,
                                     contract.prompt_digest)
 
     def test_partial_role_progress_is_not_a_completed_cell(self):

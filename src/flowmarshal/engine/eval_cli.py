@@ -9,11 +9,18 @@ from typing import Any
 from pydantic import ValidationError
 from openai_codex.errors import CodexError
 
+from ..canonical import sha256_digest
+from .benchmark_observation import (
+    BenchmarkObservationError,
+    observe_benchmark_execution_checkpoint,
+)
 from .e2e_qualification import run_project_e2e
 from .evaluation import (
     BenchmarkCell,
     EvaluationContract,
     EvaluationScope,
+    ImmutableCheckpointStore,
+    CheckpointContractError,
     ScopeGateResult,
     TokenLatencyGateReport,
     evaluate_cutover_gate,
@@ -40,6 +47,12 @@ from .qualification import (
 )
 from .roles import StructuredRoleError
 from .runtime import RuntimePolicyError
+from .evaluation_budget import (
+    EvaluationPolicies,
+    load_evaluation_policies,
+    policies_from_metadata,
+    verify_metadata_digest,
+)
 
 
 def _json(path: Path | str) -> Any:
@@ -59,6 +72,17 @@ def _roles(path: str | None, root: Path) -> EngineRoleConfiguration:
     )
 
 
+def _evaluation_policies(arguments: argparse.Namespace) -> EvaluationPolicies:
+    if not arguments.budget_policy or not arguments.role_timeout_policy:
+        raise QualificationRunError(
+            "실제 qualification에는 --budget-policy와 --role-timeout-policy가 필요합니다."
+        )
+    return load_evaluation_policies(
+        budget_policy_path=arguments.budget_policy,
+        role_timeout_policy_path=arguments.role_timeout_policy,
+    )
+
+
 def _run(arguments: argparse.Namespace) -> int:
     root = Path(arguments.project_root).resolve(strict=True)
     destination = None if arguments.run_root is None else Path(arguments.run_root).resolve()
@@ -66,12 +90,14 @@ def _run(arguments: argparse.Namespace) -> int:
         run_root, report = run_deterministic(root=root, run_root=destination)
     else:
         roles = _roles(arguments.role_config, root)
+        policies = _evaluation_policies(arguments)
         if arguments.scope == "role-fixture":
             run_root, report = run_role_fixture(
                 root=root,
                 run_root=destination,
                 role_configuration=roles,
                 codex_bin=arguments.codex_bin,
+                evaluation_policies=policies,
             )
         elif arguments.scope == "full-planning-pipeline":
             run_root, report = run_full_planning_pipeline(
@@ -80,6 +106,7 @@ def _run(arguments: argparse.Namespace) -> int:
                 role_configuration=roles,
                 codex_bin=arguments.codex_bin,
                 inspection_provider_contract=arguments.inspection_contract,
+                evaluation_policies=policies,
             )
         else:
             run_root, report = run_project_e2e(
@@ -87,6 +114,7 @@ def _run(arguments: argparse.Namespace) -> int:
                 run_root=destination,
                 role_configuration=roles,
                 codex_bin=arguments.codex_bin,
+                evaluation_policies=policies,
             )
     _emit(
         {
@@ -102,11 +130,21 @@ def _resume(arguments: argparse.Namespace) -> int:
     metadata = _json(Path(arguments.run_root) / "run-metadata.json")
     if metadata.get("scope") == "benchmark":
         from .benchmark import run_benchmark
+        verify_metadata_digest(metadata)
+        contract = EvaluationContract.model_validate(
+            _json(Path(arguments.run_root) / "evaluation-contract.json")
+        )
+        if metadata.get("evaluation_contract_digest") != contract.contract_digest:
+            raise QualificationRunError(
+                "benchmark metadata와 evaluation contract digest가 다릅니다."
+            )
+        policies = policies_from_metadata(metadata)
         run_root, report = run_benchmark(
             root=Path(metadata["project_root"]), run_root=Path(arguments.run_root),
             role_configuration=EngineRoleConfiguration.model_validate(metadata["role_configuration"]),
             codex_bin=metadata.get("codex_bin"),
             scope_reports=tuple(ScopeQualificationReport.model_validate(item) for item in metadata.get("scope_reports", [])),
+            evaluation_policies=policies,
         )
         _emit({"run_root": str(run_root), "report_digest": report.report_digest, "report": report.model_dump(mode="json")})
         return 0 if report.passed else 1
@@ -155,10 +193,12 @@ def _benchmark(arguments: argparse.Namespace) -> int:
     if arguments.cells_file is None:
         from .benchmark import run_benchmark
         root = Path(arguments.project_root).resolve(strict=True)
+        policies = _evaluation_policies(arguments)
         run_root, report = run_benchmark(
             root=root, run_root=None if arguments.run_root is None else Path(arguments.run_root),
             role_configuration=_roles(arguments.role_config, root), codex_bin=arguments.codex_bin,
             scope_reports=_bound_scope_reports(arguments.scope_report, root),
+            evaluation_policies=policies,
         )
         _emit({"run_root": str(run_root), "report_digest": report.report_digest, "report": report.model_dump(mode="json")})
         return 0 if report.passed else 1
@@ -212,6 +252,100 @@ def validate_benchmark_matrix(
         raise QualificationRunError("benchmark 전체 cell의 model lock이 동일하지 않습니다.")
     if any(item.neutral_input_digest is None for item in cells):
         raise QualificationRunError("qualification benchmark는 중립 입력 파일·정책 digest가 필요합니다.")
+
+
+def _write_immutable_assessment(path: Path, value: Any) -> None:
+    payload = json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2) + "\n"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with path.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(payload)
+    except FileExistsError:
+        if path.read_text(encoding="utf-8") != payload:
+            raise QualificationRunError("기존 lifecycle assessment의 내용이 다릅니다.")
+
+
+def _observe_benchmark_lifecycle(arguments: argparse.Namespace) -> int:
+    """모델 호출 없이 원래 cell 원장을 읽고 별도 불변 평가를 추가한다."""
+    root = Path(arguments.project_root).resolve(strict=True)
+    run_root = Path(arguments.run_root).resolve(strict=True)
+    contract = EvaluationContract.model_validate(_json(run_root / "evaluation-contract.json"))
+    metadata = _json(run_root / "run-metadata.json")
+    verify_metadata_digest(metadata)
+    policies_from_metadata(metadata)
+    if (
+        metadata.get("scope") != "benchmark"
+        or metadata.get("evaluation_contract_digest") != contract.contract_digest
+        or contract.source_manifest_digest != source_manifest_digest(root)
+        or sha256_digest(EngineRoleConfiguration.model_validate(metadata["role_configuration"]))
+        != contract.role_configuration_digest
+    ):
+        raise QualificationRunError("재관측 source·역할·benchmark 계약이 원래 실행과 다릅니다.")
+    neutral = _json(run_root / "neutral-inputs.json")
+    if sha256_digest(neutral) != contract.scenario_set_digest:
+        raise QualificationRunError("재관측 중립 입력이 evaluation 계약과 다릅니다.")
+    catalog = PlanningScenarioCatalog.load(root / "tests/fixtures/engine/planning-scenarios.json")
+    expected = {
+        sha256_digest({"scenario": scenario.scenario_digest, "implementation": implementation,
+                       "neutral": sha256_digest(neutral[scenario.scenario_id])}): (scenario, implementation)
+        for scenario in catalog.scenarios for implementation in ("r31_baseline", "skeleton_engine")
+    }
+    if set(expected) != set(contract.fixture_digests) or tuple(contract.order_seeds) != ORDER_SEEDS:
+        raise QualificationRunError("재관측 fixture·seed가 고정 benchmark matrix와 다릅니다.")
+    reports = _bound_scope_reports(arguments.scope_report, root)
+    store = ImmutableCheckpointStore(run_root, contract)
+    cells, observations, missing = [], [], []
+    for seed in contract.order_seeds:
+        for identity in contract.fixture_digests:
+            checkpoint = store.completed(identity, seed)
+            if checkpoint is None:
+                missing.append({"fixture_digest": identity, "order_seed": seed})
+                continue
+            if not checkpoint.completed or checkpoint.fixture_digest != identity or checkpoint.order_seed != seed:
+                raise QualificationRunError("저장 경로와 checkpoint fixture·seed가 다릅니다.")
+            original = BenchmarkCell.model_validate(checkpoint.raw_structured_assessment["benchmark_cell"])
+            raw = checkpoint.raw_structured_assessment["raw"]
+            scenario, implementation = expected[identity]
+            if (
+                original.scenario_id != scenario.scenario_id or original.scenario_digest != scenario.scenario_digest
+                or original.implementation != implementation or original.order_seed != seed
+                or original.model_lock_digest != contract.model_lock_digest
+                or original.neutral_input_digest != sha256_digest(neutral[scenario.scenario_id])
+                or tuple(raw["receipts"]) != checkpoint.runner_receipts
+                or original.runner_receipt_digest != sha256_digest(raw["receipts"])
+            ):
+                raise QualificationRunError("원래 benchmark cell의 fixture·receipt 결속이 다릅니다.")
+            if original.implementation == "skeleton_engine" and original.disposition == "selected":
+                observation = observe_benchmark_execution_checkpoint(checkpoint, run_root=run_root, contract=contract)
+                cells.append(observation.cell)
+                observations.append(observation.model_dump(mode="json", exclude={"cell"}))
+            else:
+                cells.append(original)
+    token_report = None
+    failures = []
+    try:
+        validate_benchmark_matrix(tuple(cells), catalog)
+    except QualificationRunError as error:
+        failures.append(str(error))
+    else:
+        functional = len(reports) == 4 and {item.scope for item in reports} == set(EvaluationScope) and all(item.passed for item in reports)
+        token_report = evaluate_token_latency_gate(tuple(cells), functional_gate_passed=functional)
+        failures.extend(token_report.failures)
+    assessment = {
+        "format": "flowmarshal-benchmark-lifecycle-assessment-v1", "source_run_root": str(run_root),
+        "contract_digest": contract.contract_digest, "observations": observations, "missing_cells": missing,
+        "scope_report_digests": [item.report_digest for item in reports],
+        "cells_digest": sha256_digest(cells), "failures": failures,
+        "passed": bool(token_report and token_report.passed and not failures),
+    }
+    destination = run_root / "lifecycle-assessments" / sha256_digest(assessment)[7:]
+    _write_immutable_assessment(destination / "evaluation-contract.json", contract.model_dump(mode="json"))
+    _write_immutable_assessment(destination / "benchmark-cells.json", {"cells": [cell.model_dump(mode="json") for cell in cells]})
+    if token_report is not None:
+        _write_immutable_assessment(destination / "token-latency-report.json", token_report.model_dump(mode="json"))
+    _write_immutable_assessment(destination / "assessment.json", assessment)
+    _emit({"assessment_root": str(destination), "assessment": assessment})
+    return 0 if assessment["passed"] else 1
 
 
 def _cutover(arguments: argparse.Namespace) -> int:
@@ -277,6 +411,8 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--run-root")
     run.add_argument("--role-config")
     run.add_argument("--codex-bin")
+    run.add_argument("--budget-policy")
+    run.add_argument("--role-timeout-policy")
     run.add_argument(
         "--inspection-contract",
         choices=(PLAN_INSPECTION_PROVIDER_V1, PLAN_INSPECTION_PROVIDER_V2),
@@ -295,6 +431,8 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.add_argument("--run-root")
     benchmark.add_argument("--role-config")
     benchmark.add_argument("--codex-bin")
+    benchmark.add_argument("--budget-policy")
+    benchmark.add_argument("--role-timeout-policy")
     benchmark.add_argument(
         "--scope-report",
         action="append",
@@ -302,6 +440,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     benchmark.add_argument("--output")
     benchmark.set_defaults(handler=_benchmark)
+
+    observe = commands.add_parser("observe-benchmark-lifecycle")
+    observe.add_argument("--project-root", default=str(project_root()))
+    observe.add_argument("--run-root", required=True)
+    observe.add_argument("--scope-report", action="append")
+    observe.set_defaults(handler=_observe_benchmark_lifecycle)
 
     cutover = commands.add_parser("cutover")
     cutover.add_argument("--project-root", default=str(project_root()))
@@ -319,6 +463,8 @@ def main(argv: list[str] | None = None) -> int:
         return int(arguments.handler(arguments))
     except (
         QualificationRunError,
+        BenchmarkObservationError,
+        CheckpointContractError,
         StructuredRoleError,
         AssignmentResolutionError,
         RuntimePolicyError,

@@ -440,6 +440,16 @@ report progress|final
 
 ## 13. 구현 단계
 
+### 1.0 선행 운영 경계
+
+실제 모델 호출 전에 SQLite에서 해당 Goal 계보의 token 예약을 판정한다. 총량과 호출 예약량은 project/Goal 설정으로 주입하며 일반 호출은 재계획 reserve를 침범하지 않는다. 수정과 그 필수 독립 재검토는 같은 재계획 예산을 사용한다. 종료 관측으로 정산하고, 사용량 미제공 또는 외부 효과 불명은 추가 호출을 차단한다. 효과 전 실패가 증명된 예약만 해제하며 단순히 receipt가 없다는 이유로 해제하지 않는다.
+
+미확인 사용량의 명시 잠정 차감은 실측과 별도로 남긴다. 뒤늦게 유효한 terminal usage를 얻으면 원본 receipt·BudgetUsageRecord를 보존하고 재관측 계보와 새 측정 record를 추가한다. 조회에서는 유효한 계보 끝의 측정값만 합산한다. 최종 보고는 Verdict가 참조한 정확한 Plan·Goal revision과 동일 Goal의 전체 revision 계보를 대상으로 하며, 다른 Goal은 제외한다. 불완전 token/latency 총량은 null이고 확인된 소계·누락/충돌 이유를 함께 반환한다.
+
+모델 미지원은 현재 inventory와 허용 envelope로 차단한다. envelope 안의 명시 model/effort 선택·이유는 새 inventory binding, Execution Spec과 역할에 맞는 Attempt에 결속한다. 범위 밖 선택은 새 Plan이 필요하다. 이미 완료된 Worker를 Validator 변경 때문에 자동 재실행하거나, 불명확한 외부 호출을 모델 변경으로 우회하지 않는다.
+
+역할 timeout은 운영 설정과 요청·receipt에 결속한다. interrupt 요청·응답과 실제 terminal 관측은 별개다. 후속은 원래 호출 계보·미확인 상태·잔여 예산을 보존하는 명시 continuation이며 timeout을 의미 finding으로 변환하지 않는다. `EngineApplication`의 usage/attempt/recovery/model 조회 결과는 revision·digest·오류 코드·다음 행동·History cursor를 제공한다. HTTP 서버·GUI는 이 경계에 포함하지 않는다.
+
 | 단계 | 산출물과 종료 조건 |
 |---|---|
 | M0 | R3.1 최종 수치 정정, legacy 동결, 회귀 fixture, schema/DB/cutover ADR |

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .role_budget import replan_budget
+
 from dataclasses import dataclass
 from typing import Any, Callable, Protocol
 
@@ -1040,49 +1042,50 @@ class SkeletonFirstPlanner:
             findings = evaluation.deterministic_findings
             if evaluation.semantic_submission is not None:
                 findings += evaluation.semantic_submission.findings
-            refined = self.generator.refine(
-                candidate=evaluation.candidate,
-                findings=findings,
-                goal=goal,
-                state=state,
-                project_map=project_map,
-            )
-            calls += 1
-            versions += 1
-            deterministic = skeleton_gate(
-                refined,
-                goal=goal,
-                state=state,
-                project_map=project_map,
-            )
-            submission = None
-            if not deterministic and calls < policy.max_logical_role_calls:
-                submission = self.skeleton_reviewer.review(
-                    candidate=refined,
+            with replan_budget():
+                refined = self.generator.refine(
+                    candidate=evaluation.candidate,
+                    findings=findings,
                     goal=goal,
                     state=state,
                     project_map=project_map,
                 )
-                validate_reviewer_submission_evidence(
-                    submission,
-                    evidence_catalog=skeleton_review_evidence_catalog(
-                        refined, goal, state, project_map
-                    ),
-                    known_task_refs={item.task_ref for item in refined.tasks},
-                )
                 calls += 1
-            evaluations.append(
-                CandidateEvaluation(
-                    candidate=refined,
-                    deterministic_findings=deterministic,
-                    semantic_submission=submission,
-                    decision=_merge_submission(
-                        digest=sha256_digest(refined),
-                        deterministic=deterministic,
-                        submission=submission,
-                    ),
+                versions += 1
+                deterministic = skeleton_gate(
+                    refined,
+                    goal=goal,
+                    state=state,
+                    project_map=project_map,
                 )
-            )
+                submission = None
+                if not deterministic and calls < policy.max_logical_role_calls:
+                    submission = self.skeleton_reviewer.review(
+                        candidate=refined,
+                        goal=goal,
+                        state=state,
+                        project_map=project_map,
+                    )
+                    validate_reviewer_submission_evidence(
+                        submission,
+                        evidence_catalog=skeleton_review_evidence_catalog(
+                            refined, goal, state, project_map
+                        ),
+                        known_task_refs={item.task_ref for item in refined.tasks},
+                    )
+                    calls += 1
+                evaluations.append(
+                    CandidateEvaluation(
+                        candidate=refined,
+                        deterministic_findings=deterministic,
+                        semantic_submission=submission,
+                        decision=_merge_submission(
+                            digest=sha256_digest(refined),
+                            deterministic=deterministic,
+                            submission=submission,
+                        ),
+                    )
+                )
 
         admissible = [
             item for item in evaluations if item.decision.status is CandidateStatus.ADMISSIBLE
@@ -1158,92 +1161,93 @@ class SkeletonFirstPlanner:
                 continue
 
             allow_skeleton = policy.max_logical_role_calls - calls >= 4
-            proposal = self.expander.refine(
-                evaluation=evaluation, candidate=item.candidate, goal=goal, state=state,
-                project_map=project_map, planning_budget=policy, allow_skeleton_revision=allow_skeleton,
-            )
-            calls += 1
-            used_refinements[root] = used_refinements.get(root, 0) + 1
-            known_refs = set(plan_review_evidence_catalog(plan, goal, state, project_map)) | {"artifact:skeleton"}
-            if not set(proposal.evidence_refs).issubset(known_refs):
-                raise PlanningError("Plan 수정 제안이 제공되지 않은 evidence를 참조합니다.")
-            if proposal.plan is not None:
-                validate_plan_revision(plan, proposal.plan)
-                if proposal.plan.definition.source_skeleton_digest != sha256_digest(item.candidate):
-                    raise PlanningError("상세 Plan 수정이 Skeleton 결속을 바꿨습니다.")
-                versions += 1
-                unchanged = plan_semantic_digest(plan) == plan_semantic_digest(proposal.plan)
-                refinements.append(PlanRefinementAttempt(
-                    source_plan_digest=plan.activation_digest, proposal=proposal,
-                    result="unchanged_candidate" if unchanged else "evaluated",
-                ))
-                if not unchanged:
-                    evaluate_plan(proposal.plan, item.candidate)
-            elif proposal.skeleton is not None:
-                refined = proposal.skeleton
-                if not allow_skeleton:
-                    raise PlanningError("Skeleton 수정·검토·상세화의 전체 호출 예산이 없습니다.")
-                if (
-                    refined.candidate_id in candidates_by_id
-                    or refined.parent_candidate_id != item.candidate.candidate_id
-                    or refined.version != item.candidate.version + 1
-                    or refined.refinement_round != 1
-                    or refined.approach.strategy_family != item.candidate.approach.strategy_family
-                    or refined.goal_contract_digest != goal.definition_digest
-                    or refined.state_signature != state.semantic_digest
-                ):
-                    raise PlanningError("상세 Plan 실패에서 수정한 Skeleton의 계보·입력이 다릅니다.")
-                versions += 1
-                unchanged = skeleton_semantic_digest(refined) == skeleton_semantic_digest(item.candidate)
-                refinements.append(PlanRefinementAttempt(
-                    source_plan_digest=plan.activation_digest, proposal=proposal,
-                    result="unchanged_candidate" if unchanged else "evaluated",
-                ))
-                if unchanged:
-                    continue
-                candidates_by_id[refined.candidate_id] = refined
-                deterministic = skeleton_gate(refined, goal=goal, state=state, project_map=project_map)
-                submission = None
-                if not deterministic:
-                    submission = self.skeleton_reviewer.review(
-                        candidate=refined, goal=goal, state=state, project_map=project_map,
-                    )
-                    calls += 1
-                    validate_reviewer_submission_evidence(
-                        submission,
-                        evidence_catalog=skeleton_review_evidence_catalog(refined, goal, state, project_map),
-                        known_task_refs={task.task_ref for task in refined.tasks},
-                    )
-                revised_evaluation = CandidateEvaluation(
-                    candidate=refined, deterministic_findings=deterministic,
-                    semantic_submission=submission,
-                    decision=_merge_submission(
-                        digest=sha256_digest(refined), deterministic=deterministic, submission=submission,
-                    ),
-                )
-                evaluations.append(revised_evaluation)
-                if revised_evaluation.decision.status is not CandidateStatus.ADMISSIBLE:
-                    continue
-                # 기존 shortlist 한 자리의 후속 후보이며 다른 전략과 중복 상세화하지 않는다.
-                if any(
-                    other.candidate.graph_signature == refined.graph_signature
-                    and root_id(other.candidate) != root
-                    and sha256_digest(other.candidate) in shortlist_history
-                    for other in evaluations
-                ):
-                    continue
-                shortlist_history.append(sha256_digest(refined))
-                revised_plan = self.expander.expand(
-                    candidate=refined, goal=goal, state=state, project_map=project_map,
-                    planning_budget=policy, previous_plan=plan,
+            with replan_budget():
+                proposal = self.expander.refine(
+                    evaluation=evaluation, candidate=item.candidate, goal=goal, state=state,
+                    project_map=project_map, planning_budget=policy, allow_skeleton_revision=allow_skeleton,
                 )
                 calls += 1
-                validate_plan_revision(plan, revised_plan)
-                evaluate_plan(revised_plan, refined)
-            else:
-                refinements.append(PlanRefinementAttempt(
-                    source_plan_digest=plan.activation_digest, proposal=proposal, result=proposal.action,
-                ))
+                used_refinements[root] = used_refinements.get(root, 0) + 1
+                known_refs = set(plan_review_evidence_catalog(plan, goal, state, project_map)) | {"artifact:skeleton"}
+                if not set(proposal.evidence_refs).issubset(known_refs):
+                    raise PlanningError("Plan 수정 제안이 제공되지 않은 evidence를 참조합니다.")
+                if proposal.plan is not None:
+                    validate_plan_revision(plan, proposal.plan)
+                    if proposal.plan.definition.source_skeleton_digest != sha256_digest(item.candidate):
+                        raise PlanningError("상세 Plan 수정이 Skeleton 결속을 바꿨습니다.")
+                    versions += 1
+                    unchanged = plan_semantic_digest(plan) == plan_semantic_digest(proposal.plan)
+                    refinements.append(PlanRefinementAttempt(
+                        source_plan_digest=plan.activation_digest, proposal=proposal,
+                        result="unchanged_candidate" if unchanged else "evaluated",
+                    ))
+                    if not unchanged:
+                        evaluate_plan(proposal.plan, item.candidate)
+                elif proposal.skeleton is not None:
+                    refined = proposal.skeleton
+                    if not allow_skeleton:
+                        raise PlanningError("Skeleton 수정·검토·상세화의 전체 호출 예산이 없습니다.")
+                    if (
+                        refined.candidate_id in candidates_by_id
+                        or refined.parent_candidate_id != item.candidate.candidate_id
+                        or refined.version != item.candidate.version + 1
+                        or refined.refinement_round != 1
+                        or refined.approach.strategy_family != item.candidate.approach.strategy_family
+                        or refined.goal_contract_digest != goal.definition_digest
+                        or refined.state_signature != state.semantic_digest
+                    ):
+                        raise PlanningError("상세 Plan 실패에서 수정한 Skeleton의 계보·입력이 다릅니다.")
+                    versions += 1
+                    unchanged = skeleton_semantic_digest(refined) == skeleton_semantic_digest(item.candidate)
+                    refinements.append(PlanRefinementAttempt(
+                        source_plan_digest=plan.activation_digest, proposal=proposal,
+                        result="unchanged_candidate" if unchanged else "evaluated",
+                    ))
+                    if unchanged:
+                        continue
+                    candidates_by_id[refined.candidate_id] = refined
+                    deterministic = skeleton_gate(refined, goal=goal, state=state, project_map=project_map)
+                    submission = None
+                    if not deterministic:
+                        submission = self.skeleton_reviewer.review(
+                            candidate=refined, goal=goal, state=state, project_map=project_map,
+                        )
+                        calls += 1
+                        validate_reviewer_submission_evidence(
+                            submission,
+                            evidence_catalog=skeleton_review_evidence_catalog(refined, goal, state, project_map),
+                            known_task_refs={task.task_ref for task in refined.tasks},
+                        )
+                    revised_evaluation = CandidateEvaluation(
+                        candidate=refined, deterministic_findings=deterministic,
+                        semantic_submission=submission,
+                        decision=_merge_submission(
+                            digest=sha256_digest(refined), deterministic=deterministic, submission=submission,
+                        ),
+                    )
+                    evaluations.append(revised_evaluation)
+                    if revised_evaluation.decision.status is not CandidateStatus.ADMISSIBLE:
+                        continue
+                    # 기존 shortlist 한 자리의 후속 후보이며 다른 전략과 중복 상세화하지 않는다.
+                    if any(
+                        other.candidate.graph_signature == refined.graph_signature
+                        and root_id(other.candidate) != root
+                        and sha256_digest(other.candidate) in shortlist_history
+                        for other in evaluations
+                    ):
+                        continue
+                    shortlist_history.append(sha256_digest(refined))
+                    revised_plan = self.expander.expand(
+                        candidate=refined, goal=goal, state=state, project_map=project_map,
+                        planning_budget=policy, previous_plan=plan,
+                    )
+                    calls += 1
+                    validate_plan_revision(plan, revised_plan)
+                    evaluate_plan(revised_plan, refined)
+                else:
+                    refinements.append(PlanRefinementAttempt(
+                        source_plan_digest=plan.activation_digest, proposal=proposal, result=proposal.action,
+                    ))
 
         feasible = [
             item

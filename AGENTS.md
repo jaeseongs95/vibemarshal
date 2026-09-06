@@ -42,6 +42,7 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 - Goal 후보는 정규화 후 독립 검토하고 normalization·review digest, reviewer role과 finding 또는 rating을 preparation binding에 남긴다.
 - Goal 준비의 blocking 질문 없는 수정 가능한 충돌에는 원본 요청·Profile·관측·평가를 결속한 한 번의 별도 피드백을 허용한다. 수정은 같은 Goal의 새 revision과 독립 검토로 남기며, 동일 후보·반박·미해결은 원래 거절을 유지한다. 입력 부족이나 비수정 가능 실패를 자동 정규화 재호출로 우회하지 않는다.
 - SQLite 원장만 revision·활성 계약·Task·Attempt·binding·evidence·validation·budget·History의 권위다. Domain Core만 상태를 전이하고 완료를 판정한다.
+- 모델 호출 전 Goal 계보의 예산을 예약하고 종료 관측 후 정산한다. 사용량 미확인은 0으로 바꾸지 않고 추가 호출을 차단한다. 명시적인 잠정 차감은 실측과 분리하고, 효과 전 실패가 증명된 예약만 해제한다. 재계획과 그 필수 재검토는 같은 reserve를 사용한다.
 - 대화·모델의 완료 선언만으로 Task·Goal을 완료하지 않는다. Plan·Execution Spec의 evidence 종류는 실제 `EvidenceKind` 지원 집합으로 제한하고 provider schema와 Core에서 함께 검사한다.
 - Planner는 후보, Worker는 배정된 Task 하나의 결과·evidence 후보, Validator는 관측값만 제출한다. Worker는 다음 Task를 선택하지 않는다. Trigger·Scheduled Task도 Core의 `run once`만 호출한다.
 - Reviewer는 직접 evidence ref가 있는 최소 finding code·affected Task·remediable 여부, finding이 없을 때의 rating만 제출한다. ref는 제공된 catalog·Task 집합에 실제 존재해야 하며 상관 결함은 별도 직접 증거가 필요하다.
@@ -140,6 +141,7 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 - 평가 입력이 부분 발췌인지 실행 준비 계약인지 명시한다. fixture·evaluator 결함은 새 revision으로 고치되 과거 입력·원시 결과·판정을 provenance로 보존하고 모델 결과 뒤 oracle alias·합격선을 완화하지 않는다.
 - R1~R3.1 source·artifact는 수정·삭제하지 않고 `legacy/prototype` 감사 기준선으로 보존한다. 기존 campaign을 다시 돌려 GO로 만들지 않으며 실패 사례만 provenance와 함께 새 회귀 fixture로 이전한다.
 - 새 Engine은 별도 SQLite application ID와 artifact root를 사용하고 prototype DB를 자동·제자리 migration하지 않는다. 개발 package·CLI는 `flowmarshal-engine`이며 모든 Gate 통과 뒤에만 `flowmarshal` 1.0으로 승격한다. 하나라도 실패·미실행이면 `NO-GO`다.
+- 원장 schema가 바뀌면 과거 원장을 보존하고 검증된 계약·호출 계보만 명시적으로 새 원장에 등록한다. 원본 receipt·실패 판정·불완전 사용량을 새 성공 결과로 덮어쓰지 않는다. 측정되지 않은 실행 lifecycle 비율은 null이며 0% 성공으로 판정하지 않는다.
 
 ## GitHub commit과 push
 

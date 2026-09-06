@@ -136,6 +136,8 @@ class CodexAppServerRuntime:
     config와 thread receipt가 full-access/never인지 검증한다.
     """
 
+    requires_budget_policy = True
+
     def __init__(self, *, codex_bin: Path | str | None = None) -> None:
         from openai_codex import Codex
         from openai_codex.client import CodexConfig, _resolve_codex_bin
@@ -490,6 +492,7 @@ class CodexAppServerRuntime:
                 "turn_count": len(turns),
                 "turn_status": status,
                 "usage": latest_document.get("usage"),
+                "usage_scope": "turn" if latest_document.get("usage") is not None else "unavailable",
                 "usage_source": "thread/read",
             },
         )
@@ -679,6 +682,20 @@ class EngineDispatcher:
         project_id: str,
         *,
         proposal: ExecutionSpecProposal | None = None,
+        goal_validation_step: Any | None = None,
+        goal_validation_retry: Any | None = None,
+    ) -> RunOnceOutcome:
+        from .budget import BudgetBlocked
+        try:
+            return self._run_once(project_id, proposal=proposal,
+                                  goal_validation_step=goal_validation_step,
+                                  goal_validation_retry=goal_validation_retry)
+        except BudgetBlocked as error:
+            return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=project_id,
+                                  blocker_code=error.code, detail=str(error))
+
+    def _run_once(
+        self, project_id: str, *, proposal: ExecutionSpecProposal | None = None,
         goal_validation_step: Any | None = None,
         goal_validation_retry: Any | None = None,
     ) -> RunOnceOutcome:
@@ -872,7 +889,14 @@ class EngineDispatcher:
             )
         if materialized is not None:
             attempt = self.service.reserve_attempt(task_id=materialized["id"])
-            self._dispatch_reserved(attempt.attempt_id)
+            try:
+                self._dispatch_reserved(attempt.attempt_id)
+            except Exception as error:
+                from .budget import BudgetBlocked
+                if not isinstance(error, BudgetBlocked):
+                    raise
+                return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=project_id,
+                    task_id=materialized["id"], blocker_code=error.code, detail=str(error))
             return RunOnceOutcome(
                 action=RunOnceAction.DISPATCHED,
                 project_id=project_id,
@@ -893,9 +917,10 @@ class EngineDispatcher:
                 "SELECT t.id AS task_id, a.id AS attempt_id, a.failure_class, a.failure_detail "
                 "FROM task_contracts t JOIN attempts a ON a.id = ("
                 "SELECT latest.id FROM attempts latest WHERE latest.task_id = t.id "
-                "AND latest.failure_class IS NOT NULL "
+                "AND latest.kind = 'execution' "
                 "ORDER BY latest.attempt_no DESC, latest.rowid DESC LIMIT 1"
                 ") WHERE t.plan_revision_id = ? AND t.status IN ('failed','blocked') "
+                "AND a.failure_class IS NOT NULL "
                 "ORDER BY t.position LIMIT 1",
                 (project["active_plan_revision_id"],),
             ).fetchone()
@@ -921,6 +946,25 @@ class EngineDispatcher:
                         f"failure_class={failure_class.value}; "
                         f"suggested_repair={repair_action.value}. "
                         "Core는 repair 또는 새 권위 revision을 자동 적용하지 않습니다."
+                    ),
+                )
+            validation_failure = self.service.task_validation_recovery_blocker(
+                project_id, plan_revision_id=project["active_plan_revision_id"]
+            )
+            if validation_failure is not None:
+                return RunOnceOutcome(
+                    action=RunOnceAction.BLOCKED,
+                    project_id=project_id,
+                    task_id=validation_failure["task_id"],
+                    attempt_id=validation_failure["attempt_id"],
+                    validation_result_id=validation_failure["validation_result_id"],
+                    evidence_ids=validation_failure["evidence_ids"],
+                    blocker_code="TASK_VALIDATION_RECOVERY_REQUIRED",
+                    detail=(
+                        "성공 Worker 뒤 현재 validation epoch의 최신 FAIL입니다. "
+                        "해당 FAIL과 현재 Worker Attempt의 직접 evidence를 근거로 "
+                        "원인을 분류한 RecoveryAssessment와 failed validation result ID를 "
+                        "명시해 Task retry를 요청하십시오."
                     ),
                 )
             return RunOnceOutcome(
@@ -970,10 +1014,7 @@ class EngineDispatcher:
             ).fetchone()
             recorded = {
                 row["validation_id"]
-                for row in connection.execute(
-                    "SELECT validation_id FROM validation_results WHERE task_id = ?",
-                    (task_id,),
-                ).fetchall()
+                for row in self.service.effective_task_validation_results(connection, task_id)
             }
         if spec_row is None:
             raise EngineServiceError("validation Attempt의 ExecutionSpec이 없습니다.")
@@ -1074,11 +1115,61 @@ class EngineDispatcher:
         validation_id: str,
     ) -> dict[str, Any]:
         step = self._semantic_validation_step(spec, validation_id)
+        if row["execution_spec_digest"] != spec.definition_digest:
+            return {}
+        worker_spec_digest = self._worker_spec_digest_for_validation(
+            task_id=row["task_id"],
+            validation_attempt_id=row["id"],
+            current_spec_digest=spec.definition_digest,
+        )
+        if worker_spec_digest is None:
+            return {}
         return self._task_evidence_catalog(
             row["task_id"],
-            spec.definition_digest,
+            worker_spec_digest,
             required_evidence_kinds=step.required_evidence_kinds,
         )
+
+    def _worker_spec_digest_for_validation(
+        self,
+        *,
+        task_id: str,
+        validation_attempt_id: str,
+        current_spec_digest: str,
+    ) -> str | None:
+        """현재 validator-only Spec에서 정확한 성공 Worker Spec 계보를 찾는다."""
+
+        with self.service.ledger.read() as connection:
+            digest = current_spec_digest
+            seen: set[str] = set()
+            first_hop = True
+            while digest not in seen:
+                seen.add(digest)
+                worker = connection.execute(
+                    "SELECT id FROM attempts WHERE task_id = ? AND kind = 'execution' "
+                    "AND execution_spec_digest = ? AND status = 'succeeded' "
+                    "ORDER BY attempt_no DESC LIMIT 1",
+                    (task_id, digest),
+                ).fetchone()
+                if worker is not None:
+                    return digest
+                selection = connection.execute(
+                    "SELECT s.previous_execution_spec_digest, s.attempt_id "
+                    "FROM model_rebinding_selections s JOIN attempts a ON a.id = s.attempt_id "
+                    "AND a.task_id = s.task_id AND a.kind = 'validation' "
+                    "AND a.execution_spec_digest = s.new_execution_spec_digest "
+                    "WHERE s.task_id = ? AND s.role = 'validator' "
+                    "AND s.new_execution_spec_digest = ? "
+                    "ORDER BY s.created_at DESC, s.rowid DESC LIMIT 1",
+                    (task_id, digest),
+                ).fetchone()
+                if selection is None or (
+                    first_hop and selection["attempt_id"] != validation_attempt_id
+                ):
+                    return None
+                digest = selection["previous_execution_spec_digest"]
+                first_hop = False
+        return None
 
     def _task_evidence_catalog(
         self,
@@ -1162,6 +1253,13 @@ class EngineDispatcher:
             request["semantic_evidence_ids"] = list(
                 self._semantic_evidence_catalog(row, spec, semantic_validation_id)
             )
+        from .budget import BudgetBlocked, reserve_attempt_call
+        try:
+            reserve_attempt_call(self.service, row, call_key=attempt_key, request=request,
+                                 require_policy=getattr(self.runtime, "requires_budget_policy", False))
+        except BudgetBlocked as error:
+            self.service.release_unstarted_attempt(attempt_id, str(error))
+            raise
         self._hit("before_thread_intent")
         create_intent = self.service.prepare_runtime_intent(
             attempt_id=attempt_id,
@@ -1223,6 +1321,8 @@ class EngineDispatcher:
             "model": role.model,
             "effort": role.effort,
             "validation_id": validation_id,
+            "role_usage_contract": 1,
+            "output_schema_digest": sha256_digest(output_schema),
         }
         if row["kind"] == AttemptKind.EXECUTION.value:
             request.update({
@@ -1256,7 +1356,7 @@ class EngineDispatcher:
             binding=turn_receipt.binding,
         )
         register = getattr(self.runtime, "register_completion_observer", None)
-        if row["kind"] == AttemptKind.EXECUTION.value and register is not None and turn_receipt.binding is not None:
+        if register is not None and turn_receipt.binding is not None:
             register(
                 thread_id=thread_id, turn_id=turn_receipt.binding.turn_id,
                 observer=lambda observation: self._record_worker_usage(row["id"], observation),
@@ -1266,6 +1366,11 @@ class EngineDispatcher:
     def _record_worker_usage(self, attempt_id: str, observation: RuntimeObservation) -> Any:
         if observation.active or observation.turn_id is None or observation.terminal_status is None:
             return None
+        with self.service.ledger.read() as connection:
+            attempt = connection.execute("SELECT kind FROM attempts WHERE id=?", (attempt_id,)).fetchone()
+        if attempt is not None and attempt["kind"] == AttemptKind.VALIDATION.value:
+            from .budget import record_validator_usage
+            return record_validator_usage(self.service, attempt_id, observation)
         return self.service.record_worker_usage(
             attempt_id=attempt_id, thread_id=observation.thread_id, turn_id=observation.turn_id,
             terminal_status=observation.terminal_status, provider_payload=observation.payload,
@@ -1299,6 +1404,10 @@ class EngineDispatcher:
             ).fetchone()[0]
         if resume_count:
             raise EngineServiceError("저장된 Attempt는 이미 한 번 재개됐으며 다시 자동 재개하지 않습니다.")
+        from .budget import reserve_attempt_call
+        reserve_attempt_call(self.service, row, call_key=f"{attempt_key}:resumed",
+                             require_policy=getattr(self.runtime, "requires_budget_policy", False),
+                             request={"thread_id": binding.thread_id, "model_observation": current_binding.model_dump(mode="json")})
         resume_intent = self.service.prepare_runtime_intent(
             attempt_id=row["id"],
             kind=RuntimeIntentKind.RESUME_TURN,
@@ -1355,8 +1464,7 @@ class EngineDispatcher:
                 detail="기존 Attempt가 아직 실행 중입니다.",
             )
         terminal = observation.terminal_status
-        if row["kind"] == AttemptKind.EXECUTION.value:
-            self._record_worker_usage(attempt_id, observation)
+        self._record_worker_usage(attempt_id, observation)
         if terminal in self._SUCCESS:
             if row["kind"] == AttemptKind.VALIDATION.value:
                 evidence_ids, result_id = self._record_semantic_observation(
@@ -1409,6 +1517,10 @@ class EngineDispatcher:
         try:
             self._resume_bound_attempt(row, spec)
         except EngineServiceError as error:
+            from .budget import BudgetBlocked
+            if isinstance(error, BudgetBlocked):
+                # 호출 전 예산 차단은 기존 Attempt의 실패나 resume 소진이 아니다.
+                raise
             self.service.finish_attempt(
                 attempt_id=attempt_id,
                 succeeded=False,
@@ -1584,11 +1696,7 @@ class EngineDispatcher:
                 "WHERE task_id = ? AND is_current = 1",
                 (task["id"],),
             ).fetchone()
-            rows = connection.execute(
-                "SELECT validation_id, status, payload_json FROM validation_results "
-                "WHERE task_id = ? ORDER BY evaluated_at, rowid",
-                (task["id"],),
-            ).fetchall()
+            rows = self.service.effective_task_validation_results(connection, task["id"])
         if spec_row is None:
             raise EngineServiceError("validating Task의 ExecutionSpec이 없습니다.")
         spec = TaskExecutionSpecRevision.model_validate_json(spec_row["payload_json"])

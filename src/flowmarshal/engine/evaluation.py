@@ -5,7 +5,7 @@ import statistics
 from datetime import datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import Field, field_validator, model_validator
 
@@ -427,8 +427,145 @@ def evaluate_role_fixtures(
     )
 
 
+_BENCHMARK_DIGEST = r"^sha256:[0-9a-f]{64}$"
+_BENCHMARK_ENTITY_ID = r"^[a-z][a-z0-9_]*_[0-9a-f]{32}$"
+BenchmarkDigest = Annotated[str, Field(pattern=_BENCHMARK_DIGEST)]
+
+
+class BenchmarkTaskLifecycleObservation(EngineModel):
+    task_id: str = Field(pattern=_BENCHMARK_ENTITY_ID)
+    execution_spec_revision_id: str = Field(pattern=_BENCHMARK_ENTITY_ID)
+    execution_spec_digest: str = Field(pattern=_BENCHMARK_DIGEST)
+    attempt_id: str = Field(pattern=_BENCHMARK_ENTITY_ID)
+    runtime_receipt_digest: str = Field(pattern=_BENCHMARK_DIGEST)
+    validation_result_digests: tuple[BenchmarkDigest, ...] = Field(min_length=1)
+    attempt_status: Literal["succeeded"] = "succeeded"
+
+    @model_validator(mode="after")
+    def validation_results_are_unique(self) -> "BenchmarkTaskLifecycleObservation":
+        if len(self.validation_result_digests) != len(set(self.validation_result_digests)):
+            raise ValueError("lifecycle Task validation result digest가 중복됐습니다.")
+        return self
+
+
+class BenchmarkMaterializedExecutionSpecObservation(EngineModel):
+    """수명주기 v2에서 원장으로 재계산한 모든 materialized Worker 명세."""
+
+    plan_revision_id: str = Field(pattern=_BENCHMARK_ENTITY_ID)
+    task_id: str = Field(pattern=_BENCHMARK_ENTITY_ID)
+    execution_spec_revision_id: str = Field(pattern=_BENCHMARK_ENTITY_ID)
+    execution_spec_digest: str = Field(pattern=_BENCHMARK_DIGEST)
+    materialization_event_digest: str = Field(pattern=_BENCHMARK_DIGEST)
+    execution_state: Literal["executed", "unexecuted", "unknown_effect"]
+    provenance: Literal[
+        "worker_turn_receipt", "validator_rebind_worker_turn", "no_effect", "unknown_effect"
+    ]
+    worker_attempt_ids: tuple[str, ...] = ()
+    runtime_receipt_digests: tuple[BenchmarkDigest, ...] = ()
+    reused_worker_execution_spec_digest: str | None = Field(default=None, pattern=_BENCHMARK_DIGEST)
+
+    @model_validator(mode="after")
+    def execution_provenance_is_complete(self) -> "BenchmarkMaterializedExecutionSpecObservation":
+        if len(self.worker_attempt_ids) != len(set(self.worker_attempt_ids)):
+            raise ValueError("materialized ExecutionSpec Worker Attempt가 중복됐습니다.")
+        if len(self.runtime_receipt_digests) != len(set(self.runtime_receipt_digests)):
+            raise ValueError("materialized ExecutionSpec runtime receipt가 중복됐습니다.")
+        if self.execution_state == "executed":
+            if self.provenance not in {"worker_turn_receipt", "validator_rebind_worker_turn"}:
+                raise ValueError("실행된 ExecutionSpec에는 Worker turn provenance가 필요합니다.")
+            if not self.worker_attempt_ids or not self.runtime_receipt_digests:
+                raise ValueError("실행된 ExecutionSpec에는 Worker Attempt와 runtime receipt가 필요합니다.")
+            if self.provenance == "validator_rebind_worker_turn" and self.reused_worker_execution_spec_digest is None:
+                raise ValueError("validator-only 재결속에는 이전 Worker Spec digest가 필요합니다.")
+        elif self.execution_state == "unexecuted":
+            if self.provenance != "no_effect" or self.worker_attempt_ids or self.runtime_receipt_digests:
+                raise ValueError("미실행 ExecutionSpec은 no-effect 증명만 기록합니다.")
+        elif self.provenance != "unknown_effect":
+            raise ValueError("외부 효과 미확인 ExecutionSpec은 unknown-effect provenance가 필요합니다.")
+        return self
+
+
+class BenchmarkLifecycleObservation(EngineModel):
+    # v1 원시 관측은 checkpoint 재해석 없이 그대로 읽는다. v2만 모든 명세를 집계한다.
+    schema_version: Literal["1.0", "2.0"] = "1.0"
+    collector: Literal[
+        "flowmarshal.engine.lifecycle-ledger-v1", "flowmarshal.engine.lifecycle-ledger-v2"
+    ] = "flowmarshal.engine.lifecycle-ledger-v1"
+    project_id: str = Field(pattern=_BENCHMARK_ENTITY_ID)
+    plan_revision_id: str = Field(pattern=_BENCHMARK_ENTITY_ID)
+    plan_activation_digest: str = Field(pattern=_BENCHMARK_DIGEST)
+    model_lock_digest: str = Field(pattern=_BENCHMARK_DIGEST)
+    neutral_input_digest: str = Field(pattern=_BENCHMARK_DIGEST)
+    tasks: tuple[BenchmarkTaskLifecycleObservation, ...] = Field(min_length=1)
+    materialized_execution_specs: tuple[BenchmarkMaterializedExecutionSpecObservation, ...] = ()
+    integration_validation_result_digests: tuple[BenchmarkDigest, ...] = Field(min_length=1)
+    state_before_digest: str = Field(pattern=_BENCHMARK_DIGEST)
+    state_after_digest: str = Field(pattern=_BENCHMARK_DIGEST)
+    state_reobservation_event_digest: str = Field(pattern=_BENCHMARK_DIGEST)
+    goal_verdict_digest: str = Field(pattern=_BENCHMARK_DIGEST)
+    history_head_digest: str = Field(pattern=_BENCHMARK_DIGEST)
+    run_state: Literal["completed"] = "completed"
+    history_valid: Literal[True] = True
+
+    @model_validator(mode="after")
+    def lifecycle_is_complete_and_unique(self) -> "BenchmarkLifecycleObservation":
+        for label, values in (
+            ("Task", tuple(item.task_id for item in self.tasks)),
+            ("ExecutionSpec", tuple(item.execution_spec_revision_id for item in self.tasks)),
+            ("Attempt", tuple(item.attempt_id for item in self.tasks)),
+            ("integration validation", self.integration_validation_result_digests),
+        ):
+            if len(values) != len(set(values)):
+                raise ValueError(f"lifecycle {label} evidence가 중복됐습니다.")
+        if self.state_before_digest == self.state_after_digest:
+            raise ValueError("lifecycle State 재관측은 실행 전과 다른 snapshot revision이어야 합니다.")
+        if self.schema_version == "1.0":
+            if self.collector != "flowmarshal.engine.lifecycle-ledger-v1" or self.materialized_execution_specs:
+                raise ValueError("lifecycle v1 원시는 v1 collector와 빈 materialized 목록만 허용합니다.")
+        else:
+            if self.collector != "flowmarshal.engine.lifecycle-ledger-v2" or not self.materialized_execution_specs:
+                raise ValueError("lifecycle v2에는 v2 collector와 materialized ExecutionSpec 목록이 필요합니다.")
+            ids = tuple(item.execution_spec_revision_id for item in self.materialized_execution_specs)
+            if len(ids) != len(set(ids)):
+                raise ValueError("lifecycle v2 materialized ExecutionSpec이 중복됐습니다.")
+            by_spec = {item.execution_spec_revision_id: item for item in self.materialized_execution_specs}
+            for task in self.tasks:
+                materialized = by_spec.get(task.execution_spec_revision_id)
+                if (
+                    materialized is None
+                    or materialized.task_id != task.task_id
+                    or materialized.execution_spec_digest != task.execution_spec_digest
+                    or materialized.execution_state != "executed"
+                    or task.attempt_id not in materialized.worker_attempt_ids
+                ):
+                    raise ValueError(
+                        "lifecycle v2 Task 성공 Worker Spec/Attempt는 materialized 목록에 그대로 있어야 합니다."
+                    )
+        return self
+
+    @property
+    def detailed_execution_spec_count(self) -> int:
+        return len(self.materialized_execution_specs) if self.schema_version == "2.0" else len(self.tasks)
+
+    @property
+    def has_unknown_execution_effect(self) -> bool:
+        return any(item.execution_state == "unknown_effect" for item in self.materialized_execution_specs)
+
+    @property
+    def unexecuted_execution_spec_count(self) -> int | None:
+        if self.schema_version == "1.0":
+            return 0
+        if self.has_unknown_execution_effect:
+            return None
+        return sum(item.execution_state == "unexecuted" for item in self.materialized_execution_specs)
+
+    @property
+    def observation_digest(self) -> str:
+        return sha256_digest(self)
+
+
 class BenchmarkCell(EngineModel):
-    schema_version: Literal["2.0"] = "2.0"
+    schema_version: Literal["3.0"] = "3.0"
     scenario_id: str
     scenario_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     neutral_input_digest: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
@@ -444,8 +581,15 @@ class BenchmarkCell(EngineModel):
     output_tokens: int = Field(ge=0)
     latency_ms_to_first_feasible: int | None = Field(gt=0)
     latency_ms_to_disposition: int = Field(gt=0)
-    detailed_task_count: int = Field(ge=0)
-    unexecuted_detailed_task_count: int = Field(ge=0)
+    selected_plan_activation_digest: str | None = Field(
+        default=None, pattern=_BENCHMARK_DIGEST
+    )
+    lifecycle_observation: BenchmarkLifecycleObservation | None = None
+    lifecycle_evidence_digest: str | None = Field(
+        default=None, pattern=_BENCHMARK_DIGEST
+    )
+    detailed_task_count: int | None = Field(default=None, ge=0)
+    unexecuted_detailed_task_count: int | None = Field(default=None, ge=0)
     candidate_output_tokens: int = Field(ge=0)
     discarded_candidate_output_tokens: int = Field(ge=0)
 
@@ -458,7 +602,49 @@ class BenchmarkCell(EngineModel):
                 raise ValueError("최초 feasible plan 시간이 최종 판정 시간보다 늦습니다.")
         elif self.latency_ms_to_first_feasible is not None:
             raise ValueError("Plan이 없는 질문·차단·실패에는 최초 feasible plan 시간이 없습니다.")
-        if self.unexecuted_detailed_task_count > self.detailed_task_count:
+        detail_values = (self.detailed_task_count, self.unexecuted_detailed_task_count)
+        if self.implementation == "skeleton_engine":
+            selected = self.disposition == "selected"
+            if selected != (self.selected_plan_activation_digest is not None):
+                raise ValueError("Engine 선택 결과와 Plan activation digest가 함께 기록돼야 합니다.")
+            observed = self.lifecycle_observation is not None
+            if observed != (self.lifecycle_evidence_digest is not None):
+                raise ValueError("lifecycle evidence 본문과 digest가 함께 기록돼야 합니다.")
+            if observed:
+                lifecycle = self.lifecycle_observation
+                if lifecycle is None:
+                    raise ValueError("lifecycle evidence 본문이 없습니다.")
+                if lifecycle.schema_version == "2.0":
+                    expected_unexecuted = lifecycle.unexecuted_execution_spec_count
+                    if self.detailed_task_count is None or self.detailed_task_count != lifecycle.detailed_execution_spec_count:
+                        raise ValueError("Engine detail 수치는 lifecycle materialized 목록에서 다시 계산돼야 합니다.")
+                    if self.unexecuted_detailed_task_count != expected_unexecuted:
+                        raise ValueError("미실행 detail 수치는 lifecycle effect 관측과 다릅니다.")
+                elif not all(value is not None for value in detail_values):
+                    raise ValueError("Engine detail 수치는 완결된 lifecycle evidence와 함께 기록해야 합니다.")
+            elif any(value is not None for value in detail_values):
+                raise ValueError("Engine detail 수치는 완결된 lifecycle evidence와 함께 기록해야 합니다.")
+            if observed and self.disposition != "selected":
+                raise ValueError("선택되지 않은 Engine cell에는 실행 lifecycle evidence를 둘 수 없습니다.")
+            if observed and self.detailed_task_count == 0:
+                raise ValueError("lifecycle evidence에는 하나 이상의 materialized Task가 필요합니다.")
+            if observed:
+                lifecycle = self.lifecycle_observation
+                if lifecycle is None:
+                    raise ValueError("lifecycle evidence 본문이 없습니다.")
+                if self.lifecycle_evidence_digest != lifecycle.observation_digest:
+                    raise ValueError("lifecycle evidence digest가 본문과 다릅니다.")
+                if (
+                    lifecycle.plan_activation_digest != self.selected_plan_activation_digest
+                    or lifecycle.model_lock_digest != self.model_lock_digest
+                    or lifecycle.neutral_input_digest != self.neutral_input_digest
+                ):
+                    raise ValueError("lifecycle evidence가 Plan/model lock/neutral input과 다릅니다.")
+        if (
+            self.detailed_task_count is not None
+            and self.unexecuted_detailed_task_count is not None
+            and self.unexecuted_detailed_task_count > self.detailed_task_count
+        ):
             raise ValueError("미실행 상세 Task 수가 전체 상세 Task 수보다 큽니다.")
         if self.discarded_candidate_output_tokens > self.candidate_output_tokens:
             raise ValueError("폐기 후보 token이 전체 후보 출력 token보다 큽니다.")
@@ -470,7 +656,7 @@ class BenchmarkCell(EngineModel):
 
 
 class TokenLatencyGateReport(EngineModel):
-    schema_version: Literal["2.0"] = "2.0"
+    schema_version: Literal["3.0"] = "3.0"
     matched_scenario_count: int
     feasible_plan_pair_count: int
     blocked_pair_count: int
@@ -479,8 +665,10 @@ class TokenLatencyGateReport(EngineModel):
     multi_path_median_reduction: float
     overall_mean_reduction: float
     worst_single_path_regression: float
-    unexecuted_detail_ratio: float
-    discarded_candidate_output_ratio: float
+    lifecycle_observed_engine_cell_count: int = Field(ge=0)
+    lifecycle_required_engine_cell_count: int = Field(ge=0)
+    unexecuted_detail_ratio: float | None
+    discarded_candidate_output_ratio: float | None
     time_to_first_feasible_median_improvement: float
     functional_gate_passed: bool
     passed: bool
@@ -609,15 +797,37 @@ def evaluate_token_latency_gate(
         for pair in feasible_pairs
     ]
     engine_cells = [pair["skeleton_engine"] for pair in pairs]
-    detailed = sum(item.detailed_task_count for item in engine_cells)
-    unexecuted = sum(item.unexecuted_detailed_task_count for item in engine_cells)
-    candidate_tokens = sum(item.candidate_output_tokens for item in engine_cells)
-    discarded_tokens = sum(item.discarded_candidate_output_tokens for item in engine_cells)
+    lifecycle_required = [
+        item for item in engine_cells
+        if item.expected_disposition == "selected" and item.disposition == "selected"
+    ]
+    lifecycle_observed = [
+        item for item in lifecycle_required
+        if item.lifecycle_evidence_digest is not None
+        and item.lifecycle_observation is not None
+        and item.lifecycle_observation.schema_version == "2.0"
+    ]
+    lifecycle_complete = (
+        bool(lifecycle_required) and len(lifecycle_observed) == len(lifecycle_required)
+    )
     multi_median = statistics.median(multi) if multi else 0.0
     overall_mean = statistics.mean(token_reductions)
     worst_single = max(single_regressions, default=0.0)
-    unexecuted_ratio = 0.0 if detailed == 0 else unexecuted / detailed
-    discarded_ratio = 0.0 if candidate_tokens == 0 else discarded_tokens / candidate_tokens
+    if lifecycle_complete:
+        detailed = sum(item.detailed_task_count or 0 for item in lifecycle_observed)
+        unknown_effect = any(
+            item.lifecycle_observation is not None
+            and item.lifecycle_observation.has_unknown_execution_effect
+            for item in lifecycle_observed
+        )
+        unexecuted = sum(item.unexecuted_detailed_task_count or 0 for item in lifecycle_observed)
+        candidate_tokens = sum(item.candidate_output_tokens for item in lifecycle_observed)
+        discarded_tokens = sum(item.discarded_candidate_output_tokens for item in lifecycle_observed)
+        unexecuted_ratio = None if detailed == 0 or unknown_effect else unexecuted / detailed
+        discarded_ratio = None if candidate_tokens == 0 else discarded_tokens / candidate_tokens
+    else:
+        unexecuted_ratio = None
+        discarded_ratio = None
     latency_median = statistics.median(latency_improvements) if latency_improvements else 0.0
     failures: list[str] = []
     if any(cell.disposition != cell.expected_disposition for cell in cells):
@@ -632,9 +842,18 @@ def evaluate_token_latency_gate(
         failures.append("전체 benchmark 평균 token 감소가 20% 미만입니다.")
     if worst_single > 0.05:
         failures.append("single-path token 회귀가 5%를 넘습니다.")
-    if unexecuted_ratio > 0.10:
+    if len(lifecycle_observed) != len(lifecycle_required):
+        failures.append(
+            "NOT_OBSERVED: selected Engine cell의 ExecutionSpec→runtime 완료→validation→"
+            "State 재관측 lifecycle evidence가 없습니다."
+        )
+    if unexecuted_ratio is None:
+        failures.append("NOT_OBSERVED: 상세 Task 실행 비율의 관측 가능한 denominator가 없습니다.")
+    elif unexecuted_ratio > 0.10:
         failures.append("상세화 후 실행되지 않은 Task 비율이 10%를 넘습니다.")
-    if discarded_ratio > 0.25:
+    if discarded_ratio is None:
+        failures.append("NOT_OBSERVED: 폐기 후보 출력 비율의 관측 가능한 denominator가 없습니다.")
+    elif discarded_ratio > 0.25:
         failures.append("폐기 후보 상세 출력 비율이 25%를 넘습니다.")
     if latency_median < 0.20:
         failures.append("Time to First Feasible Plan 개선이 20% 미만입니다.")
@@ -655,6 +874,8 @@ def evaluate_token_latency_gate(
         multi_path_median_reduction=multi_median,
         overall_mean_reduction=overall_mean,
         worst_single_path_regression=worst_single,
+        lifecycle_observed_engine_cell_count=len(lifecycle_observed),
+        lifecycle_required_engine_cell_count=len(lifecycle_required),
         unexecuted_detail_ratio=unexecuted_ratio,
         discarded_candidate_output_ratio=discarded_ratio,
         time_to_first_feasible_median_improvement=latency_median,

@@ -59,9 +59,25 @@ def run_command_validation(service: EngineService, task: Any, step: ValidationEx
             "SELECT definition_digest, payload_json FROM execution_spec_revisions WHERE task_id = ? AND is_current = 1",
             (task_id,),
         ).fetchone()
+        worker = (
+            None
+            if task_id is None or spec is None
+            else service.resolve_task_validation_worker(
+                connection,
+                task_id=task_id,
+                current_spec_digest=spec["definition_digest"],
+            )
+        )
+        retry_sequence = 0 if task_id is None else int(connection.execute(
+            "SELECT COALESCE(MAX(sequence), 0) FROM history_events WHERE project_id = ? "
+            "AND event_type = 'task.retry_enabled' AND entity_id = ?",
+            (project_id, task_id),
+        ).fetchone()[0])
         root = Path(connection.execute("SELECT root FROM projects WHERE id = ?", (project_id,)).fetchone()[0]).resolve()
         map_row = connection.execute("SELECT payload_json FROM project_map_revisions WHERE project_id = ? AND is_current = 1",
                                      (project_id,)).fetchone()
+    if task_id is not None and worker is None:
+        raise EngineServiceError("Task deterministic validation에는 현재 성공 Worker Attempt가 필요합니다.")
     artifacts = ()
     if set(step.required_evidence_kinds) & {"file", "diff"}:
         paths = step.artifact_paths
@@ -88,6 +104,14 @@ def run_command_validation(service: EngineService, task: Any, step: ValidationEx
         "step": step.model_dump(mode="json"),
         "artifacts": artifacts,
     }
+    if worker is not None:
+        request.update({
+            "worker_attempt_id": worker["id"],
+            "worker_succeeded_sequence": int(worker["sequence"]),
+            "validation_epoch_sequence": max(int(worker["sequence"]), retry_sequence),
+            "validation_execution_spec_digest": spec["definition_digest"],
+            "source_worker_execution_spec_digest": worker["execution_spec_digest"],
+        })
 
     def execute():
         stdout, stderr, code, timed_out = b"", b"", None, False
@@ -127,12 +151,28 @@ def run_command_validation(service: EngineService, task: Any, step: ValidationEx
     if "launch_error" in response:
         return blocked(project_id, "VALIDATION_ENVIRONMENT_ERROR", response["launch_error"], task_id)
     observation = DeterministicValidationObservation.model_validate(response["observation"])
+    operation_request_digest = sha256_digest({"kind": "validation_command", "request": request})
+    operation_id = "operation_" + sha256_digest(
+        {"project_id": project_id, "request_digest": operation_request_digest}
+    )[7:39]
+    operation_binding = None if worker is None else {
+        "format": "task-validation-operation-v1",
+        "operation_id": operation_id,
+        "request_digest": operation_request_digest,
+        "result_digest": sha256_digest(response),
+        "worker_attempt_id": worker["id"],
+        "worker_succeeded_sequence": int(worker["sequence"]),
+        "validation_epoch_sequence": max(int(worker["sequence"]), retry_sequence),
+        "validation_execution_spec_digest": spec["definition_digest"],
+        "source_worker_execution_spec_digest": worker["execution_spec_digest"],
+    }
     evidence_ids = []
     for kind in step.required_evidence_kinds:
         if kind in {"file", "diff"}:
             for document in response["artifacts"]:
                 evidence = EvidenceRecord(
                     evidence_id=new_id("evidence"), project_id=project_id, task_id=task_id,
+                    attempt_id=None if worker is None else worker["id"],
                     kind=EvidenceKind(kind), source_ref=document["path"],
                     observation=json.dumps(document, ensure_ascii=False, sort_keys=True),
                     content_digest=sha256_digest({"kind": kind, "direct_file_observation": document}),
@@ -143,6 +183,7 @@ def run_command_validation(service: EngineService, task: Any, step: ValidationEx
             continue
         evidence = EvidenceRecord(
             evidence_id=new_id("evidence"), project_id=project_id, task_id=task_id,
+            attempt_id=None if worker is None else worker["id"],
             kind=EvidenceKind(kind), source_ref=f"validation:{step.validation_id}:{step.argv[0]}",
             observation=observation.model_dump_json()[:10_000],
             content_digest=sha256_digest({"kind": kind, "observation": observation}),
@@ -160,7 +201,12 @@ def run_command_validation(service: EngineService, task: Any, step: ValidationEx
         rationale=f"직접 명령 관측: exit={observation.actual_exit_code}, timeout={observation.timed_out}",
         evaluated_at=observation.observed_at,
     )
-    service.record_validation(project_id=project_id, plan_revision_id=plan_id, result=result)
+    service.record_validation(
+        project_id=project_id,
+        plan_revision_id=plan_id,
+        result=result,
+        operation_binding=operation_binding,
+    )
     if fault_hook:
         fault_hook("after_validation_observed")
     return RunOnceOutcome(

@@ -8,30 +8,13 @@ VibeMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고
 
 ## 현재 판정
 
-2026-09-05 [R-S06-19-CLOSE](docs/r-s06-19-close-handoff.md)에서 provider 검사 계약의 기존 보정을 확정했다. 최신 [R-S06-27 Sol/high 제한 검증](docs/r-s06-27-sol-high-limited-validation-handoff.md)은 지정 결정론 Gate 5/5·596 tests의 계약·source·Python 환경 동일성을 확인해 재사용했다. 첫 clean은 scope 근거 결속 오류로 `schema_failed`가 발생해 FAIL로 중단했다. 성공 result·의미 assessment는 없고 이후 12사례는 NOT_RUN이다. 기존 S06 FAIL, Functional Alpha 미완료와 1.0 **NO-GO**를 유지한다.
+최신 상태의 단일 진입점은 [Engine 구현 현황](docs/engine-implementation-status.md)이다. [1.0 선행 로드맵](docs/pre-1.0-roadmap.md)에 승인된 구현 순서와 후속 기능을 구분했고, [현재 작업 인계](docs/pre-1.0-handoff.md)에 이번 변경과 다음 실행 조건을 기록한다.
 
-모델 목록 변화로 제한 검증이 차단된 원인은 [inventory 실행 잠금 v2](docs/model-inventory-lock-v2-handoff.md)에서 수정했다. [R-S06-21 제한 검증](docs/r-s06-21-model-lock-v2-limited-validation-handoff.md)은 fresh v2 prepare 성공 후 inventory 기록 충돌로 역할 호출 0/13에서 FAIL했다. [R-S06-22 제한 검증](docs/r-s06-22-post-capture-fix-limited-validation-handoff.md)은 첫 clean provider 응답 뒤 저장 request의 strict schema 재구성에서 `required` 배열 순서가 달라져 FAIL했다. [strict schema 저장 왕복 보정](docs/r-s06-strict-schema-roundtrip-fix-handoff.md)은 object `properties`와 `required`를 같은 결정적 순서로 생성하고 receipt 관계 검사를 분리했다. [R-S06-23 제한 검증](docs/r-s06-23-post-schema-fix-limited-validation-handoff.md)은 prepare와 실제 schema 왕복 결속을 통과했지만 첫 clean 응답의 scope 근거 누락으로 1/13에서 FAIL했고, 성공 result가 없는 경로의 요약 오류도 확인했다. [실패 안전 diagnostics summary 보정](docs/r-s06-diagnostics-failure-summary-fix-handoff.md)은 원래 역할 실패·usage·효과 수를 보존하는 요약 경로와 결정적 회귀를 추가했다. 새 실제 qualification은 미실행이며 과거 원본 판정과 기존 S06 FAIL·Functional Alpha 미완료·1.0 NO-GO는 유지한다.
+현재 판정은 **NO-GO**다. timeout 이후 같은 Goal 계보를 이어받아 사용자가 승인한 Plan 활성화, 두 Task의 완료, 독립 Goal Test와 `satisfied` GoalVerdict까지 실제로 연결했다. 최종 source의 결정적 Gate 5/5와 823개 테스트가 통과했다. 이 실행은 여러 개발 source와 명시적 운영 보정을 거친 진단·복구 근거이며, 같은 최종 source의 실제 역할 회귀·Planning·E2E·성능 qualification은 별도로 남아 있다.
 
-[R-S06-24 제한 검증 진입](docs/r-s06-24-post-diagnostics-fix-limited-validation-handoff.md)은 clean의 결속 summary 확인 후 다음 사례로 진행하라는 실행 경계와 기존 진단기의 일괄 호출 순서가 충돌해 provider 호출 전 FAIL로 중단했다. 역할 호출은 0/13, 13사례 모두 NOT_RUN이며 새 contract·inventory lock·Gate는 미준비/미실행이다. 기존 S06 FAIL·Functional Alpha 미완료·1.0 NO-GO를 유지한다.
+새 Engine schema revision은 **3**이다. Goal별 최종 보고, 전체 역할 usage 예약·정산, 명시적 모델 재결속과 공통 조회를 보완했다. 기존 revision 2 원장을 자동 변환하지 않으며, 사용량이 미확인이면 추가 모델 호출을 중단한다. 권장 검증 예산은 설정 파일로 주입하며 제품 상한으로 하드코딩하지 않는다.
 
-[R-S06-25 제한 역할 검증](docs/r-s06-25-post-diagnostics-fix-limited-validation-handoff.md)은 사례별 성공 결속·assessment를 다음 호출의 Gate로 사용하는 확정 경계에서 새 결정론 Gate 5/5와 fresh v2 prepare를 통과했다. 첫 clean의 result·receipt·terminal 결속은 성공했지만 고정 AC 연결 3개가 불일치해 assessment와 최종 summary는 FAIL이다. logical/provider/recovery는 1/1/0, 총 52,278 token이며 이후 12사례는 NOT_RUN이다. 기존 S06 FAIL·Functional Alpha 미완료·1.0 NO-GO를 유지한다.
-
-[근거 우선 strict schema 순서 보정](docs/r-s06-evidence-first-schema-order-fix-handoff.md)은 R-S06-25 뒤 transport schema가 선언된 property 순서를 canonical 저장 왕복에서도 보존하고, 검사 envelope와 AC 행에서 근거·scope를 boolean 판정보다 먼저 전송하도록 수정했다. 고정 기대표·evaluator·oracle·threshold와 `gpt-5.6-terra/high` Reviewer 설정은 유지한다. 결정적 회귀는 R25 원본 응답의 구조 PASS와 동일한 세 관계 의미 FAIL도 보존하며, 실제 provider 의미 검증은 별도 fresh 제한 경계에 남긴다.
-
-[R-S06-26 제한 역할 검증](docs/r-s06-26-evidence-order-limited-validation-handoff.md)은 fresh v2 prepare와 clean의 실제 result·receipt·terminal 결속을 통과했다. 고정 평가에서 `ac_004`의 별도 Task scope·unittest 연결을 과잉 필수화했고 예상 밖 `VAL_SCOPE_001`을 제출해 최종 summary는 FAIL이다. logical/provider/recovery는 1/1/0, 총 53,092 token이며 이후 12사례는 NOT_RUN이다. 원본·source를 보존했으며 기존 S06 FAIL·Functional Alpha 미완료·1.0 NO-GO를 유지한다.
-
-[역할 설정 주입 경계와 R26 회귀](docs/r-s06-role-configuration-boundary-handoff.md)는 외부 `--role-config`의 원문·경로·digest·snapshot 및 요청의 v2 결속을 검증한다. general Reviewer `gpt-5.6-sol/high`는 명시적으로 선택할 후보 파일에만 두며 기본 역할은 유지한다. R26 원본의 구조 PASS·동일 의미 FAIL과 semantic Validator의 file/test 전달 경계를 오프라인 회귀로 보존한다. 후속 후보 실제 검증은 아래 R27에 기록했다.
-
-[R-S06-27 Sol/high 제한 역할 검증](docs/r-s06-27-sol-high-limited-validation-handoff.md)은 절대 경로 `--role-config`와 fresh inventory/v2 lock을 결속해 prepare·run을 각각 한 번 실행했다. 첫 clean의 완료 terminal·실패 receipt 공통 결속은 PASS였지만 scope의 mechanism 근거 누락으로 `schema_failed`가 발생했다. logical/provider/recovery는 1/1/0, 총 55,529 tokens이며 최종 summary는 FAIL·diagnostic error 0이다. 원본을 보존하고 이후 12사례는 NOT_RUN으로 남겼다.
-
-- 새 Engine은 비권위 `ExecutionSpecProposal`을 최신 Goal·Plan·State·Project Map에 컴파일하고, `run once` 호출마다 materialize·dispatch·observe·validate·complete 중 한 단계만 전진한다.
-- worker 종료 문구는 관측값으로만 보존하고 파일·diff·command·test evidence와 별도 validator 결과로 Task 및 Goal을 판정한다.
-- 완료 Task 뒤 Project Map·State 재관측, 저장 thread의 `thread/read` 우선 복구, receipt 불명확 시 중복 생성 방지가 구현돼 있다.
-- 실패한 Attempt는 `RunOnceOutcome`에 실패 분류, 권장 repair 수준과 checkpoint 필요 여부를 반환하며 Core가 새 권위 revision을 자동 적용하지 않는다.
-- 실제 역할 fixture, 전체 Skeleton-to-selection pipeline, 실제 프로젝트 E2E, token/latency 비교가 모두 통과하기 전에는 1.0 `GO`가 아니다.
-- 따라서 지금은 `flowmarshal-engine`을 사용하며 `flowmarshal` 기본 CLI로 전환하지 않는다.
-
-R3.1의 최종 상태는 과거 README에 남은 `1/150 진행 중`이 아니다. campaign 10은 150/150 cell과 실제 모델 호출 228회를 완료했지만 총 5,194,766 token을 사용한 뒤 **FAIL**로 끝났다. 캐시 입력 비율은 73.18%다. 원인과 provenance는 [R3.1 최종 동결 기준선](docs/r31-frozen-baseline.md)에 정리했다.
+R3.1은 동결된 prototype 감사 기준선이다. [최종 동결 판정](docs/r31-frozen-baseline.md)을 현재 Engine의 qualification으로 재사용하지 않는다.
 
 ## 새 권위 구조
 
@@ -70,6 +53,8 @@ R3.1의 최종 상태는 과거 README에 남은 `1/150 진행 중`이 아니다
 ```text
 flowmarshal-engine project init|show
 flowmarshal-engine project source add|list
+flowmarshal-engine project budget set|show|observe-role|adjust-unknown
+flowmarshal-engine model status|rebind
 flowmarshal-engine goal create|revise|show
 flowmarshal-engine plan search|compare|activate|status
 flowmarshal-engine task show|materialize
@@ -79,6 +64,8 @@ flowmarshal-engine validate task|goal|observe
 flowmarshal-engine recover inspect|resume|abandon
 flowmarshal-engine report progress|final
 ```
+
+`goal create --live`, `plan search --live`, `run once` 전에 `project budget set --policy-file config/pre-1.0-validation-budget.json`으로 검증 예산을 등록한다. 이 파일은 Goal당 1,000,000 token, 호출당 100,000 token 예약, 재계획 reserve 25%의 시작값이다. 최적값이나 구독 한도 환산값이 아니다. 역할별 timeout은 전역 `--role-timeout-policy config/pre-1.0-role-timeouts.json`으로 결속한다.
 
 `goal create --live`와 `plan search --live`는 역할별 model/effort를 호출자가 명시해야 한다. Engine은 이를 최신 App Server model inventory와 대조하고, 지원되지 않는 값을 임의 fallback으로 숨기지 않는다.
 

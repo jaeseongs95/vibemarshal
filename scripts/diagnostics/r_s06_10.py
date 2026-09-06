@@ -1006,7 +1006,16 @@ def _receipt_document(raw: Any, *, capture: str, artifact: str,
         return None
     # canonical JSON은 값이 None인 nullable 필드를 생략한다. 수치·bool default는
     # 누락을 0/false로 보정하지 않도록 반드시 원문에 있어야 한다.
-    missing = sorted((set(RoleCallReceipt.model_fields) - {"output_digest", "error_summary"}) - set(raw))
+    serializer_optional = {
+        "output_digest",
+        "error_summary",
+        "timeout_policy_digest",
+        "interrupt_request_digest",
+        "interrupt_receipt_digest",
+        "terminal_observation_digest",
+        "terminal_status_after_interrupt",
+    }
+    missing = sorted((set(RoleCallReceipt.model_fields) - serializer_optional) - set(raw))
     if missing:
         _issue(issues, "PARTIAL_RECEIPT", capture, artifact, "누락 필드: " + ", ".join(missing))
         return None

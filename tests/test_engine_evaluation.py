@@ -17,6 +17,9 @@ from flowmarshal.engine.domain import (
 )
 from flowmarshal.engine.evaluation import (
     BenchmarkCell,
+    BenchmarkLifecycleObservation,
+    BenchmarkMaterializedExecutionSpecObservation,
+    BenchmarkTaskLifecycleObservation,
     CheckpointContractError,
     EvaluationCellCheckpoint,
     EvaluationContract,
@@ -38,6 +41,65 @@ def _cell(**values):
     values.setdefault("expected_disposition", "selected")
     values.setdefault("disposition", "selected")
     values.setdefault("latency_ms_to_disposition", values["latency_ms_to_first_feasible"])
+    values.setdefault("neutral_input_digest", "sha256:" + "f" * 64)
+    if values.get("implementation") == "skeleton_engine" and values["disposition"] == "selected":
+        neutral = values["neutral_input_digest"]
+        plan = values.setdefault("selected_plan_activation_digest", "sha256:" + "1" * 64)
+        detailed = values.get("detailed_task_count", 1)
+        unexecuted = values.get("unexecuted_detailed_task_count", 0)
+        task = BenchmarkTaskLifecycleObservation(
+            task_id="task_" + "3" * 32,
+            execution_spec_revision_id="execution_spec_" + "4" * 32,
+            execution_spec_digest="sha256:" + "5" * 64,
+            attempt_id="attempt_" + "6" * 32,
+            runtime_receipt_digest="sha256:" + "7" * 64,
+            validation_result_digests=("sha256:" + "8" * 64,),
+        )
+        materialized = [
+            BenchmarkMaterializedExecutionSpecObservation(
+                plan_revision_id="plan_revision_" + "2" * 32, task_id=task.task_id,
+                execution_spec_revision_id=task.execution_spec_revision_id,
+                execution_spec_digest=task.execution_spec_digest, materialization_event_digest="sha256:" + "0" * 64,
+                execution_state="executed", provenance="worker_turn_receipt",
+                worker_attempt_ids=(task.attempt_id,), runtime_receipt_digests=(task.runtime_receipt_digest,),
+            )
+        ]
+        for index in range(1, detailed):
+            suffix = f"{index:032x}"
+            digest = "sha256:" + f"{index:064x}"
+            if index <= unexecuted:
+                materialized.append(BenchmarkMaterializedExecutionSpecObservation(
+                    plan_revision_id="plan_revision_" + "2" * 32, task_id=task.task_id,
+                    execution_spec_revision_id="execution_spec_" + suffix, execution_spec_digest=digest,
+                    materialization_event_digest="sha256:" + f"{index + 16:064x}",
+                    execution_state="unexecuted", provenance="no_effect",
+                ))
+            else:
+                materialized.append(BenchmarkMaterializedExecutionSpecObservation(
+                    plan_revision_id="plan_revision_" + "2" * 32, task_id=task.task_id,
+                    execution_spec_revision_id="execution_spec_" + suffix, execution_spec_digest=digest,
+                    materialization_event_digest="sha256:" + f"{index + 16:064x}",
+                    execution_state="executed", provenance="worker_turn_receipt",
+                    worker_attempt_ids=("attempt_" + suffix,),
+                    runtime_receipt_digests=("sha256:" + f"{index + 32:064x}",),
+                ))
+        observation = BenchmarkLifecycleObservation(
+            schema_version="2.0", collector="flowmarshal.engine.lifecycle-ledger-v2",
+            project_id="project_" + "1" * 32,
+            plan_revision_id="plan_revision_" + "2" * 32,
+            plan_activation_digest=plan,
+            model_lock_digest="sha256:" + "b" * 64,
+            neutral_input_digest=neutral,
+            tasks=(task,), materialized_execution_specs=tuple(materialized),
+            integration_validation_result_digests=("sha256:" + "9" * 64,),
+            state_before_digest="sha256:" + "a" * 64,
+            state_after_digest="sha256:" + "b" * 64,
+            state_reobservation_event_digest="sha256:" + "c" * 64,
+            goal_verdict_digest="sha256:" + "d" * 64,
+            history_head_digest="sha256:" + "e" * 64,
+        )
+        values.setdefault("lifecycle_observation", observation)
+        values.setdefault("lifecycle_evidence_digest", observation.observation_digest)
     return BenchmarkCell(
         scenario_digest="sha256:" + "a" * 64,
         order_seed=1,

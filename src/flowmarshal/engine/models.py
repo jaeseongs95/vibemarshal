@@ -113,32 +113,58 @@ class AssignmentResolver:
         self,
         policy: RoleAssignmentPolicy,
         inventory: ModelInventory,
+        *,
+        selection: ModelChoice | None = None,
     ) -> ResolvedRoleAssignment:
-        if not inventory.supports(policy.preferred_model, policy.preferred_effort):
+        preferred = ModelChoice(model=policy.preferred_model, effort=policy.preferred_effort)
+        envelope = (preferred, *(ModelChoice(model=item.model, effort=item.effort)
+                                  for item in policy.allowed_fallbacks))
+        selected = selection or preferred
+        selected_key = (selected.model, selected.effort)
+        if selected_key not in {(item.model, item.effort) for item in envelope}:
+            raise AssignmentResolutionError(
+                f"PLAN_MODEL_REVISION_REQUIRED: {policy.role} 선택이 활성 Plan의 model envelope 밖입니다."
+            )
+        if not inventory.supports(selected.model, selected.effort):
             raise AssignmentResolutionError(
                 f"MODEL_BINDING_UNAVAILABLE: {policy.role}의 명시적 새 binding과 Attempt가 필요합니다."
             )
+        alternatives = tuple(item for item in envelope
+                             if (item.model, item.effort) != selected_key)
         try:
             binding = bind_models(
-                inventory, (role_lock(policy.role, policy.preferred_model, policy.preferred_effort,
-                                      policy.allowed_fallbacks),),
+                inventory, (role_lock(policy.role, selected.model, selected.effort,
+                                      alternatives),),
                 required_capabilities=(ROLE_CAPABILITIES if policy.role == "validator" else WORKER_CAPABILITIES),
             )
         except ValueError as error:
             raise AssignmentResolutionError(str(error)) from error
         return ResolvedRoleAssignment(
-            role=policy.role, model=policy.preferred_model, effort=policy.preferred_effort,
-            inventory_digest=inventory.inventory_digest, fallback_used=False, operational_binding=binding,
+            role=policy.role, model=selected.model, effort=selected.effort,
+            inventory_digest=inventory.inventory_digest,
+            fallback_used=selected_key != (preferred.model, preferred.effort),
+            operational_binding=binding,
         )
 
     def resolve_contract(
         self,
         contract: ModelAssignmentContract,
         inventory: ModelInventory,
+        *,
+        executor_selection: ModelChoice | None = None,
+        validator_selection: ModelChoice | None = None,
     ) -> tuple[ResolvedRoleAssignment, ResolvedRoleAssignment | None]:
-        executor = self.resolve_policy(contract.executor, inventory)
+        executor = self.resolve_policy(
+            contract.executor, inventory, selection=executor_selection,
+        )
+        if contract.validator is None and validator_selection is not None:
+            raise AssignmentResolutionError(
+                "PLAN_MODEL_REVISION_REQUIRED: validator가 없는 Task에 validator를 선택할 수 없습니다."
+            )
         validator = (
-            self.resolve_policy(contract.validator, inventory)
+            self.resolve_policy(
+                contract.validator, inventory, selection=validator_selection,
+            )
             if contract.validator is not None
             else None
         )

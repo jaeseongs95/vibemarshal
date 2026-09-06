@@ -37,7 +37,11 @@ from flowmarshal.engine.e2e_qualification import (
     _write_prepared_state,
 )
 from flowmarshal.engine.eval_cli import build_parser, validate_benchmark_matrix
-from flowmarshal.engine.evaluation import BenchmarkCell
+from flowmarshal.engine.evaluation import (
+    BenchmarkCell,
+    BenchmarkLifecycleObservation,
+    BenchmarkTaskLifecycleObservation,
+)
 from flowmarshal.engine.freeze import LegacyFreezeManifest, verify_legacy_freeze
 from flowmarshal.engine.ledger import ENGINE_SCHEMA_REVISION, EngineLedgerError, SQLiteEngineLedger
 from flowmarshal.engine.models import ModelCapability, ModelInventory
@@ -58,6 +62,30 @@ from tests.engine_helpers import goal, profile
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _benchmark_lifecycle(model_lock: str, neutral: str) -> BenchmarkLifecycleObservation:
+    return BenchmarkLifecycleObservation(
+        project_id="project_" + "1" * 32,
+        plan_revision_id="plan_revision_" + "2" * 32,
+        plan_activation_digest="sha256:" + "d" * 64,
+        model_lock_digest=model_lock,
+        neutral_input_digest=neutral,
+        tasks=(BenchmarkTaskLifecycleObservation(
+            task_id="task_" + "3" * 32,
+            execution_spec_revision_id="execution_spec_" + "4" * 32,
+            execution_spec_digest="sha256:" + "5" * 64,
+            attempt_id="attempt_" + "6" * 32,
+            runtime_receipt_digest="sha256:" + "7" * 64,
+            validation_result_digests=("sha256:" + "8" * 64,),
+        ),),
+        integration_validation_result_digests=("sha256:" + "9" * 64,),
+        state_before_digest="sha256:" + "a" * 64,
+        state_after_digest="sha256:" + "b" * 64,
+        state_reobservation_event_digest="sha256:" + "c" * 64,
+        goal_verdict_digest="sha256:" + "e" * 64,
+        history_head_digest="sha256:" + "f" * 64,
+    )
 
 
 def qualification_inventory() -> ModelInventory:
@@ -278,8 +306,39 @@ class EngineQualificationTests(unittest.TestCase):
                 disposition=scenario.expected_disposition,
                 uncached_input_tokens=100, output_tokens=50,
                 latency_ms_to_first_feasible=(1000 if scenario.expected_disposition == "selected" else None),
-                latency_ms_to_disposition=1000, detailed_task_count=1,
-                unexecuted_detailed_task_count=0, candidate_output_tokens=50,
+                latency_ms_to_disposition=1000,
+                selected_plan_activation_digest=(
+                    "sha256:" + "d" * 64
+                    if implementation == "skeleton_engine" and scenario.expected_disposition == "selected"
+                    else None
+                ),
+                lifecycle_observation=(
+                    _benchmark_lifecycle(
+                        "sha256:" + "a" * 64,
+                        sha256_digest({"neutral_fixture": scenario.scenario_id}),
+                    )
+                    if implementation == "skeleton_engine" and scenario.expected_disposition == "selected"
+                    else None
+                ),
+                lifecycle_evidence_digest=(
+                    _benchmark_lifecycle(
+                        "sha256:" + "a" * 64,
+                        sha256_digest({"neutral_fixture": scenario.scenario_id}),
+                    ).observation_digest
+                    if implementation == "skeleton_engine" and scenario.expected_disposition == "selected"
+                    else None
+                ),
+                detailed_task_count=(
+                    None
+                    if implementation == "skeleton_engine" and scenario.expected_disposition == "blocked"
+                    else 1
+                ),
+                unexecuted_detailed_task_count=(
+                    None
+                    if implementation == "skeleton_engine" and scenario.expected_disposition == "blocked"
+                    else 0
+                ),
+                candidate_output_tokens=50,
                 discarded_candidate_output_tokens=0,
             )
             for scenario in catalog.scenarios for seed in ORDER_SEEDS
@@ -681,8 +740,8 @@ class EngineQualificationTests(unittest.TestCase):
             with self.assertRaisesRegex(EngineServiceError, "등록되지 않은"):
                 service.register_profile(invalid)
 
-    def test_new_engine_database_uses_revision_two(self) -> None:
-        self.assertEqual(2, ENGINE_SCHEMA_REVISION)
+    def test_new_engine_database_uses_revision_three_without_automatic_migration(self) -> None:
+        self.assertEqual(3, ENGINE_SCHEMA_REVISION)
         with tempfile.TemporaryDirectory() as temp:
             database = Path(temp) / "old-engine.sqlite3"
             ledger = SQLiteEngineLedger(database)
@@ -690,13 +749,18 @@ class EngineQualificationTests(unittest.TestCase):
             connection = sqlite3.connect(database)
             try:
                 connection.execute(
-                    "UPDATE schema_meta SET value = '1' WHERE key = 'schema_revision'"
+                    "UPDATE schema_meta SET value = '2' WHERE key = 'schema_revision'"
                 )
                 connection.commit()
             finally:
                 connection.close()
             with self.assertRaisesRegex(EngineLedgerError, "revision"):
                 SQLiteEngineLedger(database).initialize()
+            connection = sqlite3.connect(database)
+            try:
+                self.assertEqual("2", connection.execute("SELECT value FROM schema_meta WHERE key='schema_revision'").fetchone()[0])
+            finally:
+                connection.close()
 
 
 if __name__ == "__main__":

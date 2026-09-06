@@ -58,6 +58,14 @@ from .evaluation import (
     EvaluationScope,
     ImmutableCheckpointStore,
 )
+from .evaluation_budget import (
+    EvaluationPolicies,
+    budgeted_role_runner,
+    policy_contract_fragment,
+    verify_service_budget_policy,
+    write_immutable_run_metadata,
+)
+from .budget import BudgetManager
 from .ledger import SQLiteEngineLedger
 from .models import EngineRoleConfiguration, ModelInventory
 from .planning import (
@@ -79,6 +87,7 @@ from .qualification import (
     source_manifest_digest,
 )
 from .runtime import CodexAppServerRuntime, CodexRuntimePort, EngineDispatcher, FakeCodexRuntime
+from .role_execution import use_role_timeout_policy
 from .service import EngineService, EngineServiceError
 
 
@@ -261,6 +270,7 @@ def _prepare(
     roles: EngineRoleConfiguration,
     goal_validation: IntegrationValidationContract | None = None,
     semantic_task_validation: bool = False,
+    evaluation_policies: EvaluationPolicies | None = None,
 ) -> PreparedE2E:
     ledger = SQLiteEngineLedger(
         state_root / "flowmarshal-engine.sqlite3",
@@ -316,6 +326,12 @@ def _prepare(
         created_at=utc_now(),
     )
     service.register_goal(goal)
+    if evaluation_policies is not None:
+        BudgetManager(service).configure(
+            project_id,
+            evaluation_policies.budget,
+            goal_id=goal.goal_id,
+        )
     project_map, state = service.reobserve_project(project_id)
 
     skeleton = PlanSkeletonCandidate(
@@ -607,8 +623,27 @@ def _normal_completion(
     *, roles: EngineRoleConfiguration | None = None,
 ) -> dict[str, Any]:
     from .execution import ExecutionProposalAdapter
-    from .roles import CodexStructuredRoleRunner
-    provider = None if roles is None else ExecutionProposalAdapter(prepared.service, CodexStructuredRoleRunner(runtime), roles)
+    provider = None
+    if roles is not None:
+        with prepared.service.ledger.read() as connection:
+            goal = connection.execute(
+                "SELECT g.goal_id, g.definition_digest FROM projects p "
+                "JOIN goal_revisions g ON g.id = p.active_goal_revision_id WHERE p.id = ?",
+                (prepared.project_id,),
+            ).fetchone()
+        if goal is None:
+            raise QualificationRunError("E2E_GOAL_BUDGET_BINDING_MISSING")
+        provider = ExecutionProposalAdapter(
+            prepared.service,
+            budgeted_role_runner(
+                runtime,
+                prepared.service,
+                project_id=prepared.project_id,
+                goal_id=goal["goal_id"],
+                goal_digest=goal["definition_digest"],
+            ),
+            roles,
+        )
     dispatcher = EngineDispatcher(prepared.service, runtime, proposal_provider=provider)
     deadline = time.monotonic() + 900
     actions: list[str] = []
@@ -823,7 +858,11 @@ def _live_restart_resume(
 
 
 def _contract(
-    root: Path, inventory: ModelInventory, roles: EngineRoleConfiguration, source_digest: str
+    root: Path,
+    inventory: ModelInventory,
+    roles: EngineRoleConfiguration,
+    source_digest: str,
+    policies: EvaluationPolicies | None = None,
 ) -> EvaluationContract:
     import inspect
     from .execution import ProviderExecutionPreparation, GoalTestPreparation, EXECUTION_PREPARATION_INSTRUCTIONS, GOAL_TEST_PREPARATION_INSTRUCTIONS
@@ -846,6 +885,11 @@ def _contract(
         source_manifest_digest=source_manifest_digest(root),
         rules_digest=sha256_digest(
             {"actual_codex": list(E2E_SCENARIOS), "restart": "new-app-server-and-core"}
+            | (
+                policy_contract_fragment(policies)
+                if policies is not None
+                else {"evaluation_policy": "synthetic-unbound"}
+            )
         ),
         threshold_digest=sha256_digest({"all_scenarios_pass": True, "duplicate_effects": 0}),
         taxonomy_digest=sha256_digest(
@@ -873,7 +917,10 @@ def run_project_e2e(
     run_root: Path | None = None,
     role_configuration: EngineRoleConfiguration | None = None,
     codex_bin: Path | str | None = None,
+    evaluation_policies: EvaluationPolicies | None = None,
 ) -> tuple[Path, ScopeQualificationReport]:
+    if evaluation_policies is None:
+        raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
     base = (root or project_root()).resolve(strict=True)
     preflight_failures = _preflight(base)
     if preflight_failures:
@@ -890,7 +937,7 @@ def run_project_e2e(
     with CodexAppServerRuntime(codex_bin=codex_bin) as real_runtime:
         inventory = real_runtime.list_models()
         roles.validate_inventory(inventory)
-        contract = _contract(base, inventory, roles, source_digest)
+        contract = _contract(base, inventory, roles, source_digest, evaluation_policies)
         destination = (
             run_root or _default_run_root(base, "project-e2e", contract.contract_digest[7:15])
         ).resolve()
@@ -899,14 +946,16 @@ def run_project_e2e(
         prior_state = store.state().status
         if prior_state is EvaluationRunStatus.PAUSED_RATE_LIMIT:
             store.set_state(EvaluationRunStatus.RUNNING, updated_at=utc_now())
-        _write_json(
+        write_immutable_run_metadata(
             destination / "run-metadata.json",
             {
                 "scope": "project-e2e",
+                "evaluation_contract_digest": contract.contract_digest,
                 "project_root": str(base),
                 "role_configuration": roles.model_dump(mode="json"),
                 "codex_bin": None if codex_bin is None else str(Path(codex_bin).resolve()),
             },
+            evaluation_policies,
         )
         try:
             for index, scenario in enumerate(E2E_SCENARIOS):
@@ -928,6 +977,9 @@ def run_project_e2e(
                         evaluation_contract_digest=contract.contract_digest,
                         fixture_digest=digest,
                     )
+                    verify_service_budget_policy(
+                        prepared.service, prepared.project_id, evaluation_policies
+                    )
                 else:
                     cell_root.mkdir(parents=True)
                     workspace, copied_digest = _copy_fixture(base, cell_root)
@@ -939,6 +991,7 @@ def run_project_e2e(
                         inventory=inventory,
                         roles=roles,
                         semantic_task_validation=scenario == "normal-completion",
+                        evaluation_policies=evaluation_policies,
                     )
                     _write_prepared_state(
                         cell_root,
@@ -950,21 +1003,23 @@ def run_project_e2e(
                     real_runtime, journal=cell_root / "runtime-receipts.json"
                 )
                 if scenario == "stored-turn-restart-resume":
-                    cell, events = _live_restart_resume(
-                        prepared,
-                        source_digest,
-                        cell_root=cell_root,
-                        contract=contract,
-                        fixture_digest=digest,
-                        codex_bin=codex_bin,
-                    )
+                    with use_role_timeout_policy(evaluation_policies.role_timeouts):
+                        cell, events = _live_restart_resume(
+                            prepared,
+                            source_digest,
+                            cell_root=cell_root,
+                            contract=contract,
+                            fixture_digest=digest,
+                            codex_bin=codex_bin,
+                        )
                 else:
-                    if scenario == "normal-completion":
-                        cell = _normal_completion(prepared, recorded, source_digest, roles=roles)
-                    elif scenario == "stale-after-materialization":
-                        cell = _stale_after_materialization(prepared, recorded, source_digest)
-                    else:
-                        cell = _unknown_receipt(prepared, recorded, source_digest)
+                    with use_role_timeout_policy(evaluation_policies.role_timeouts):
+                        if scenario == "normal-completion":
+                            cell = _normal_completion(prepared, recorded, source_digest, roles=roles)
+                        elif scenario == "stale-after-materialization":
+                            cell = _stale_after_materialization(prepared, recorded, source_digest)
+                        else:
+                            cell = _unknown_receipt(prepared, recorded, source_digest)
                     events = recorded.events
                 receipt = {
                     "runtime": "CodexAppServerRuntime",

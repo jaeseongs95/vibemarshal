@@ -11,7 +11,7 @@ from ..time import SystemClock
 
 
 ENGINE_SCHEMA_ID = "flowmarshal.engine"
-ENGINE_SCHEMA_REVISION = 2
+ENGINE_SCHEMA_REVISION = 3
 SQLITE_APPLICATION_ID = 0x464D4531  # ASCII "FME1"
 DEFAULT_DB_NAME = "flowmarshal-engine.sqlite3"
 DEFAULT_ARTIFACT_DIRECTORY = "artifacts"
@@ -22,6 +22,85 @@ class EngineLedgerError(RuntimeError):
 
 
 SCHEMA_SQL = r"""
+CREATE TABLE budget_policy_revisions (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id),
+    scope_key TEXT NOT NULL,
+    revision_no INTEGER NOT NULL,
+    policy_digest TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(project_id, scope_key, revision_no)
+) STRICT;
+
+CREATE TABLE provider_calls (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id),
+    goal_id TEXT NOT NULL,
+    goal_contract_digest TEXT,
+    call_key TEXT NOT NULL,
+    role TEXT NOT NULL,
+    stage TEXT NOT NULL,
+    request_digest TEXT NOT NULL,
+    request_json TEXT NOT NULL,
+    estimated_tokens INTEGER NOT NULL CHECK (estimated_tokens >= 0),
+    policy_digest TEXT,
+    status TEXT NOT NULL CHECK (status IN ('reserved','settled','usage_unknown','released')),
+    actual_tokens INTEGER,
+    receipt_json TEXT,
+    usage_id TEXT REFERENCES budget_usage(id),
+    attempt_id TEXT REFERENCES attempts(id),
+    created_at TEXT NOT NULL,
+    completed_at TEXT,
+    UNIQUE(project_id, call_key)
+) STRICT;
+
+CREATE TABLE budget_adjustments (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id),
+    goal_id TEXT NOT NULL,
+    call_id TEXT NOT NULL UNIQUE REFERENCES provider_calls(id),
+    charge_tokens INTEGER NOT NULL CHECK (charge_tokens >= 0),
+    reason TEXT NOT NULL,
+    created_at TEXT NOT NULL
+) STRICT;
+
+CREATE TABLE usage_reconciliations (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id),
+    call_id TEXT NOT NULL REFERENCES provider_calls(id),
+    prior_usage_id TEXT NOT NULL UNIQUE REFERENCES budget_usage(id),
+    effective_usage_id TEXT NOT NULL UNIQUE REFERENCES budget_usage(id),
+    original_receipt_json TEXT NOT NULL,
+    original_receipt_digest TEXT NOT NULL,
+    observation_json TEXT NOT NULL,
+    observation_digest TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(call_id, observation_digest)
+) STRICT;
+
+CREATE TABLE model_rebinding_selections (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id),
+    plan_revision_id TEXT NOT NULL REFERENCES plan_revisions(id),
+    task_id TEXT NOT NULL REFERENCES task_contracts(id),
+    role TEXT NOT NULL CHECK (role IN ('executor','validator')),
+    request_digest TEXT NOT NULL UNIQUE,
+    plan_activation_digest TEXT NOT NULL,
+    previous_execution_spec_digest TEXT NOT NULL,
+    selected_model TEXT NOT NULL,
+    selected_effort TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    inventory_digest TEXT NOT NULL,
+    operational_lock_digest TEXT NOT NULL,
+    new_execution_spec_revision_id TEXT NOT NULL UNIQUE REFERENCES execution_spec_revisions(id),
+    new_execution_spec_digest TEXT NOT NULL UNIQUE,
+    attempt_id TEXT NOT NULL UNIQUE REFERENCES attempts(id),
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(task_id, previous_execution_spec_digest, role, selected_model, selected_effort)
+) STRICT;
+
 CREATE TABLE schema_meta (
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -317,8 +396,7 @@ CREATE TABLE budget_usage (
     stage TEXT NOT NULL,
     logical_call_ref TEXT NOT NULL,
     payload_json TEXT NOT NULL,
-    recorded_at TEXT NOT NULL,
-    UNIQUE(project_id, goal_contract_digest, logical_call_ref)
+    recorded_at TEXT NOT NULL
 ) STRICT;
 
 CREATE TABLE recovery_assessments (

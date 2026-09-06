@@ -13,7 +13,20 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from .canonical import sha256_digest
+from .canonical import sha256_bytes, sha256_digest
+from .engine.domain import GoalContractRevision, ProjectProfileRevision
+from .engine.evaluation_budget import (
+    EvaluationPolicies,
+    initialize_cell_budget,
+    register_and_attach_goal,
+)
+from .engine.model_lock import ModelInventory
+from .legacy_budget_proxy import (
+    BudgetedPolicyVerifiedCodex,
+    LegacyBudgetJournal,
+    build_legacy_budget_evidence,
+    install_legacy_role_scopes,
+)
 from .planning import r31_role_adapters as adapters
 from .planning.domain import ContextSourceSpec, RequestSpec, RequirementSpec, ValidationCapability
 from .planning.input import ContextFileRegistration
@@ -83,6 +96,71 @@ def run_cell(document: dict[str, Any]) -> dict[str, Any]:
     state_root.mkdir(parents=True, exist_ok=False)
     neutral = document["neutral_input"]
     project_id = "project_" + document["neutral_input_digest"][7:39]
+    cell_binding = document["budget_cell_binding"]
+    if document.get("budget_cell_binding_digest") != sha256_digest(cell_binding):
+        raise ValueError("LEGACY_BUDGET_CELL_BINDING_DIGEST_MISMATCH")
+    policies = EvaluationPolicies.model_validate(document.get("evaluation_policies"))
+    if document.get("evaluation_policy_digest") != policies.policy_digest:
+        raise ValueError("LEGACY_BUDGET_POLICY_DIGEST_MISMATCH")
+    profile = ProjectProfileRevision.model_validate(document.get("budget_profile"))
+    goal = GoalContractRevision.model_validate(document.get("budget_goal"))
+    roles = document["roles"]
+    expected_role_bindings = {
+        role: {"model": roles[binding]["model"], "effort": roles[binding]["effort"]}
+        for role, binding in ROLE_MAP.items()
+    }
+    expected_engine_role_bindings = {
+        role: {"model": binding["model"], "effort": binding["effort"]}
+        for role, binding in roles.items()
+    }
+    expected_inventory = ModelInventory.model_validate(
+        cell_binding.get("expected_engine_inventory")
+    )
+    codex_path = Path(document["codex_bin"]).resolve(strict=True)
+    executable_digest = sha256_bytes(codex_path.read_bytes())
+    timeout_contract = document.get("parent_hard_timeout_contract")
+    timeout_body = dict(timeout_contract) if isinstance(timeout_contract, dict) else {}
+    timeout_digest = timeout_body.pop("policy_digest", None)
+    if (
+        cell_binding.get("project_id") != project_id
+        or profile.project_id != project_id
+        or goal.definition.project_id != project_id
+        or cell_binding.get("goal_id") != goal.goal_id
+        or cell_binding.get("goal_contract_digest") != goal.definition_digest
+        or cell_binding.get("evaluation_policy_digest") != policies.policy_digest
+        or cell_binding.get("neutral_input_digest") != document["neutral_input_digest"]
+        or cell_binding.get("implementation") != "r31_baseline"
+        or cell_binding.get("ephemeral_threads") is not True
+        or cell_binding.get("max_schema_recovery_attempts") != 0
+        or cell_binding.get("role_configuration_digest") != sha256_digest(roles)
+        or cell_binding.get("expected_role_bindings") != expected_role_bindings
+        or cell_binding.get("expected_engine_role_bindings") != expected_engine_role_bindings
+        or cell_binding.get("engine_inventory_digest") != expected_inventory.inventory_digest
+        or expected_inventory.executable_digest != executable_digest
+        or any(
+            not expected_inventory.supports(binding["model"], binding["effort"])
+            for binding in expected_engine_role_bindings.values()
+        )
+        or cell_binding.get("codex_executable_digest") != executable_digest
+        or cell_binding.get("legacy_inventory_digest") != document.get("legacy_inventory_digest")
+        or cell_binding.get("parent_hard_timeout_seconds") != document.get("parent_hard_timeout_seconds")
+        or cell_binding.get("parent_hard_timeout_policy_digest")
+        != document.get("parent_hard_timeout_policy_digest")
+        or cell_binding.get("parent_hard_timeout_contract") != timeout_contract
+        or timeout_digest != sha256_digest(timeout_body)
+        or timeout_digest != document.get("parent_hard_timeout_policy_digest")
+        or timeout_body.get("timeout_seconds") != document.get("parent_hard_timeout_seconds")
+    ):
+        raise ValueError("LEGACY_BUDGET_CELL_BINDING_MISMATCH")
+    budget_service, budget_manager = initialize_cell_budget(
+        state_root=state_root / "engine-budget",
+        workspace=workspace,
+        project_id=project_id,
+        profile=profile,
+        policies=policies,
+    )
+    register_and_attach_goal(budget_service, budget_manager, goal)
+    journal = LegacyBudgetJournal(cell_binding=cell_binding)
     contexts = tuple(ContextSourceSpec.from_text(
         source_id="project-agents" if item["path"] == "AGENTS.md" else f"source-{index}",
         kind="project_instructions" if item["path"] == "AGENTS.md" else "reference",
@@ -113,7 +191,6 @@ def run_cell(document: dict[str, Any]) -> dict[str, Any]:
     profiles = ProjectProfileStore(state_root)
     profile = profiles.create_revision(project_id, None, definition)
     profile = profiles.activate_revision(profile.profile_revision_id, profile.definition_digest)
-    roles = document["roles"]
     preferences = tuple(ModelRolePreference(role=PlanningRole(role),
                                             preferred_model_ids=(roles[binding]["model"],),
                                             preferred_effort=roles[binding]["effort"])
@@ -122,11 +199,39 @@ def run_cell(document: dict[str, Any]) -> dict[str, Any]:
     repository = CapturingRepository(state_root)
     run_service = PlanningRunService(state_root)
     started = time.monotonic()
+    instructions = load_role_instructions(Path(document["skill_root"]))
+    instruction_by_role = {
+        PlanningRole.PURPOSE_RESOLVER: instructions.purpose_resolver,
+        PlanningRole.INTENT_REVIEWER: instructions.intent_reviewer,
+        PlanningRole.CANDIDATE_GENERATOR: instructions.candidate_generator,
+        PlanningRole.HARD_GATE_REVIEWER: instructions.hard_gate_reviewer,
+        PlanningRole.CRITICAL_REVIEWER: instructions.critical_reviewer,
+        PlanningRole.SCORER_SELECTOR: instructions.scorer_selector,
+    }
+
+    def client_factory():
+        verified = PolicyVerifiedCodex(
+            codex_bin=document["codex_bin"], evidence_sink=policy_evidence.append
+        )
+        return BudgetedPolicyVerifiedCodex(
+            verified,
+            budget_manager,
+            project_id=project_id,
+            goal_id=goal.goal_id,
+            goal_digest=goal.definition_digest,
+            policies=policies,
+            cell_binding=cell_binding,
+            role_instructions=instruction_by_role,
+            journal=journal,
+            expected_inventory_digest=document["legacy_inventory_digest"],
+        )
+
     runtime = build_planning_runtime(
-        client_factory=lambda: PolicyVerifiedCodex(codex_bin=document["codex_bin"], evidence_sink=policy_evidence.append),
+        client_factory=client_factory,
         run_service=run_service, artifact_repository=repository, cwd=workspace,
-        instructions=load_role_instructions(Path(document["skill_root"])), preferences=preferences,
+        instructions=instructions, preferences=preferences,
     )
+    install_legacy_role_scopes(runtime)
     records, feasible_times = [], []
     pipeline = runtime.search_service
     pipeline._expander = CandidateCapture(pipeline._expander, records, "expand")
@@ -197,6 +302,13 @@ def run_cell(document: dict[str, Any]) -> dict[str, Any]:
         latency_ms_to_first_feasible=feasible_times[0] if feasible_times and result["disposition"] == "selected" else None,
         latency_ms_to_disposition=max(1, int((time.monotonic() - started) * 1000)),
         neutral_input_digest=document["neutral_input_digest"],
+    )
+    result["budget_evidence"] = build_legacy_budget_evidence(
+        budget_manager,
+        journal,
+        project_id=project_id,
+        goal_id=goal.goal_id,
+        legacy_receipts=receipts,
     )
     return result
 

@@ -2,9 +2,11 @@
 
 이 문서는 개발용 `flowmarshal-engine-eval`의 실행 계약을 설명한다. 네 기능 scope와 token/latency Gate를 모두 실제로 통과하기 전까지 판정은 `NO-GO`이며 package와 기본 CLI는 `flowmarshal-engine` pre-1.0 상태를 유지한다.
 
+2026-09-06 최종 v7 source의 결정적 Gate는 5/5·823개 테스트 PASS다. 실제 동일 Goal의 두 Task·독립 Goal Test·satisfied 판정도 확보했지만, 여러 source와 명시적 운영 보정을 거친 진단·복구 결과다. 역할 48·Planning 18·E2E 4·성능 36의 최종 source qualification은 아직 NOT_RUN이며 정확한 경로·digest·예산 범위는 [현재 인계](pre-1.0-handoff.md)에 있다.
+
 ## 고정 입력
 
-- 역할 설정: `config/qualification-roles.json`
+- 역할 설정: 기본 fixture는 `config/qualification-roles.json`이며 실제 실행은 `--role-config`로 명시한 설정과 digest를 계약에 고정한다. 이번 검토안은 `tests/fixtures/engine/plan-inspection-general-reviewer-sol-xhigh-roles.json`을 사용한다. 과거 기본 fixture의 설정을 묵시적으로 이번 실행에 적용하지 않는다.
 - 공통 finding taxonomy: `config/qualification-finding-taxonomy.json`
 - legacy 동결: `config/legacy-freeze-manifest.json`
 - reviewer 회귀: `tests/fixtures/engine/r31-reviewer-regressions.json`, `goal-reviewer-regressions.json`
@@ -13,6 +15,10 @@
 - order seed: `17`, `43`, `89`
 
 각 run의 `EvaluationContract`는 scenario·fixture, seed, 역할 설정, source manifest, prompt, schema, taxonomy, threshold와 `model/list` inventory를 digest로 고정한다. 이 중 하나가 달라지면 기존 run root를 재사용할 수 없다.
+
+실제 모델 scope에는 `--budget-policy config/pre-1.0-validation-budget.json`과 `--role-timeout-policy config/pre-1.0-role-timeouts.json`을 명시한다. 정책 본문과 digest를 evaluation contract·run metadata에 함께 고정하고, 재개 시 이를 대조한다. 모델 호출은 Goal별 새 원장의 공통 예약·정산을 사용하며 schema recovery는 0회다. Goal 정규화 이전의 호출도 같은 Goal ID로 예약하고 revision 등록 뒤 연결한다. 정책 누락·미확인 사용량·예산 부족은 다음 provider 호출 전에 차단한다.
+
+예산은 Goal별 호출 전 admission과 종료 후 정산을 집행한다. 현재 실행기에는 campaign 전체의 합산 cap이 없고 실제 한 호출의 사용량이 예약을 초과할 수 있다. Goal 상한의 합계나 예약량을 실제 campaign 최대치로 표현하지 않는다. 완료한 진단 Goal의 2m/200k override는 새 qualification Goal의 승인으로 승계하지 않는다. 다음 검토안은 역할 48-cell부터 범위를 고정하고 완전 정산과 Gate 결과를 검토한 뒤 나머지 scope로 진행한다.
 
 ## Scope
 
@@ -34,6 +40,8 @@ synthetic lifecycle의 프로젝트 입력은 `tests/fixtures/engine/synthetic-l
 
 준비·검증 효과의 intent와 완료 관측은 Core History에 기록한다. 완료 관측 뒤 프로세스 중단은 재사용으로 복구하고, receipt 없는 호출은 재생성하지 않는다. 준비 역할의 세부 thread receipt를 잃은 경우 자동 추정·재개하지 않는 보수적 한계가 있으며, 사용자 확인을 포함한 별도 reconciliation이 필요하다.
 
+정산된 역할의 schema 실패는 원래 request/schema/model/inventory/timeout·provider receipt·usage 계보를 대조해 `operation.failed`로 보존한다. 과거 미종료 operation도 같은 thread/turn의 비활성 completed terminal을 재개 없이 관측한 경우에만 명시 API로 실패 종료할 수 있다. 같은 실패 요청의 자동 재호출은 차단한다. timeout·관측 불명·binding 불일치는 이 경로로 완료 처리하지 않는다.
+
 ## Checkpoint와 재개
 
 완료 cell만 `cells/seed-*/`에 배타적으로 생성되고 다른 결과로 덮어쓸 수 없다. 사용량 제한은 `run-state.json`의 `PAUSED_RATE_LIMIT`으로 기록한다.
@@ -48,10 +56,12 @@ prompt, schema, oracle, threshold, source manifest, 역할 설정 또는 model i
 
 benchmark 입력은 6개 중립 planning scenario × seed 3개 × `r31_baseline`/`skeleton_engine`의 36개 `BenchmarkCell`이다. 각 pair는 같은 scenario digest, 중립 파일·정책 digest, model lock과 functional result digest를 가져야 하며 실제 Runner receipt digest를 포함한다. `benchmark`는 두 구현을 별도 작업 복사본에서 순차 호출한다. R3.1은 Engine 밖의 `flowmarshal.benchmark_legacy` 프로세스에서 호출하며 frozen source·Planner 스킬·campaign artifact와 기존 판정을 변경하지 않는다. `benchmark --cells-file`은 외부 결과의 수입·판정 경로로 유지한다.
 
+R3.1 비교 subprocess는 동결 source 밖의 `legacy_budget_proxy`에서 역할별 호출 전에 같은 예산 원장에 예약하고 종료 뒤 정산한다. 부모는 원장·History·journal·원본 receipt를 일대일로 대조하며 역할·model/effort·inventory·실행 파일·정책과 token component 불일치 또는 중복을 차단한다. 동기 RPC와 부모 프로세스에는 주입 정책에서 계산한 timeout을 적용한다. 프로세스 트리 종료 관측은 별도로 보존하고 미정산 예약을 자동 해제하지 않는다. 기존 legacy의 임시 thread 정책과 Engine의 저장형 thread 정책을 각각 비교 계약에 기록하며 oracle·합격선·R3.1 동결 source는 바꾸지 않는다.
+
 수집 범위는 계획 시작부터 최종 선택 또는 질문·차단까지다. token은 실제 uncached input과 output의 합이며 usage가 없으면 0으로 추정하지 않고 수집을 중단한다. 최초 feasible 시각은 Core의 결정적 admission 직후 관측한다. 상세 Task는 파일·명령을 확정한 운영 실행 명세를 뜻하며 목적·DAG만 있는 semantic TaskContract를 포함하지 않는다. 활성화 전 ExecutionSpec을 만들지 않는 Engine 경로는 운영 상세 생성 수가 0이다. 폐기 후보 출력은 후보별 expander/refiner의 실제 receipt로 계산하고, 여러 Skeleton이 한 응답에 담긴 출력 token을 임의로 후보별 배분하지 않는다.
 
 ```powershell
-flowmarshal-engine-eval benchmark --codex-bin C:\path\to\codex.exe --scope-report <deterministic-report> --scope-report <role-report> --scope-report <planning-report> --scope-report <e2e-report>
+flowmarshal-engine-eval benchmark --codex-bin C:\path\to\codex.exe --budget-policy config/pre-1.0-validation-budget.json --role-timeout-policy config/pre-1.0-role-timeouts.json --scope-report <deterministic-report> --scope-report <role-report> --scope-report <planning-report> --scope-report <e2e-report>
 flowmarshal-engine-eval resume --run-root D:\path\to\benchmark-run
 ```
 
@@ -59,7 +69,17 @@ flowmarshal-engine-eval resume --run-root D:\path\to\benchmark-run
 
 실제 runtime의 실행 파일 SHA-256도 `model/list` inventory의 source identity에 결속한다. `--codex-bin`을 바꾸면 새 model lock·새 run root가 필요하며 모델 ID나 effort는 자동으로 바꾸지 않는다.
 
-`BenchmarkCell` v2는 기대 판정과 실제 판정, 최종 판정 시간을 명시한다. 정상 4개 × seed 3개의 pair만 최초 feasible plan 시간을 비교하고, 정보 부족 2개 × seed 3개는 해당 값을 `null`로 두어 질문·차단 지연을 별도로 집계한다. token은 6개 모두 비교한다. 정상 입력의 Plan 생성 실패는 Gate 실패이며 차단 시간을 계획 생성 시간으로 대입하거나 0으로 채우면 schema에서 거부한다. 기존 합격선은 유지한다. 이전 형식의 보고서나 checkpoint를 v2로 자동 변환하지 않는다.
+`BenchmarkCell` v3는 기대 판정과 실제 판정, 최종 판정 시간과 실행 lifecycle 관측을 명시한다. 정상 4개 × seed 3개의 pair만 최초 feasible plan 시간을 비교하고, 정보 부족 2개 × seed 3개는 해당 값을 `null`로 두어 질문·차단 지연을 별도로 집계한다. token은 6개 모두 비교한다. 정상 입력의 Plan 생성 실패는 Gate 실패이며 차단 시간을 계획 생성 시간으로 대입하거나 0으로 채우면 schema에서 거부한다. 선택된 Engine Plan의 상세화 폐기율은 Execution Spec 생성·Worker 종료·Task 검증·독립 Goal Test·최종 판정에 결속한 lifecycle에서 측정한다. 이 관측이 없으면 `NOT_OBSERVED`와 `null`을 반환하고 Gate를 통과시키지 않는다. 기존 합격선은 유지하며 이전 형식의 보고서나 checkpoint를 v3로 자동 변환하지 않는다.
+
+새 lifecycle v2 관측은 같은 Goal ID 계보에서 실제 materialize된 모든 Execution Spec revision을 포함한다. 실패했어도 Worker 호출이 관측된 Spec은 실행한 것으로 세며, 효과 전 중단이 확인된 Spec만 미실행으로 센다. 결과가 불명확하면 비율은 null이다. 현재 성공 Task만 세거나 과거 revision을 제외해 폐기 비용을 축소하지 않는다. 상세 Plan 출력 비용은 expander·refiner의 정확한 call/receipt/output/Plan digest에 결속하며 응답 배열의 순서로 추정하지 않는다. 반박·Skeleton 수정 응답도 전체 역할 비용에는 남긴다.
+
+Engine benchmark cell은 `selected-plan.json`, `execution-checkpoint.json`, 동일 Goal의 `budget-state` 원장을 보존한다. 사용자가 정확한 Plan을 활성화하고 Core 실행·검증이 완료되면 다음 명령으로 provider 호출 없이 lifecycle을 재관측한다.
+
+```powershell
+flowmarshal-engine-eval observe-benchmark-lifecycle --project-root <고정-source> --run-root <benchmark-run> --scope-report <deterministic-report> --scope-report <role-report> --scope-report <planning-report> --scope-report <e2e-report>
+```
+
+이 명령은 원래 checkpoint·raw·실패 보고서를 유지하고 `lifecycle-observations`와 `lifecycle-assessments` 아래에 digest로 구분한 불변 근거를 추가한다. 미완료 원장, 누락 cell, 다른 source·계약·receipt는 PASS가 아니다. 새 assessment의 `token-latency-report.json`은 같은 source의 네 기능 보고서와 함께 cutover에 전달할 수 있다.
 
 입력·taxonomy를 명확히 한 역할 fixture v2는 기존 기대 판정·필수 코드·허용 코드·합격선을 그대로 둔다. 원본 Engine 축약 fixture는 `tests/fixtures/engine/archive/`에 보존한다. 정규화와 Reviewer는 같은 실제 파일 관측을 받고, 전체 planning cell에는 Goal preparation·질문·Plan 후보와 finding 원문을 함께 저장한다. 정보 부족 입력이 단순한 Plan 생성 오류로 끝난 것은 올바른 질문·차단의 PASS로 집계하지 않는다.
 

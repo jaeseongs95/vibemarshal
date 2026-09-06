@@ -183,6 +183,12 @@ class ExecutionProposalAdapter:
         self.roles = roles
         self.operations = CoreOperations(service, fault_hook)
 
+    def _budgeted_runner(self, project_id: str, context: dict[str, Any]):
+        from .budget import BudgetedRoleRunner
+        return BudgetedRoleRunner(self.runner, self.service, project_id=project_id,
+                                  goal_id=context["goal"]["goal_id"],
+                                  goal_digest=context["goal"]["definition_digest"])
+
     def _predecessor_outputs(self, plan: PlanContractRevision, task: TaskContract) -> list[dict[str, Any]]:
         outputs = []
         with self.service.ledger.read() as connection:
@@ -239,10 +245,11 @@ class ExecutionProposalAdapter:
             inventory_digest=inventory.inventory_digest,
             cwd=context["project_map"]["root"],
         )
+        runner = self._budgeted_runner(project_id, context)
         result = self.operations.invoke(
             project_id=project_id, kind=kind,
             request={"role_request": request.model_dump(mode="json"), "authority_context_digest": sha256_digest(context)},
-            execute=lambda: self.runner.run(request, validator=output_validator).model_dump(mode="json"),
+            execute=lambda: runner.run(request, validator=output_validator).model_dump(mode="json"),
         )
         verify_role_receipt(request, RoleCallResult.model_validate(result))
         self._record_usage(project_id, context, result,
@@ -338,9 +345,10 @@ class ExecutionProposalAdapter:
                 raise ValueError("제공되지 않은 semantic evidence ref입니다.")
             return judgement
 
+        runner = self._budgeted_runner(project_id, context)
         result = self.operations.invoke(
             project_id=project_id, kind="goal_validation", request=request.model_dump(mode="json"),
-            execute=lambda: self.runner.run(request, validator=validate).model_dump(mode="json"),
+            execute=lambda: runner.run(request, validator=validate).model_dump(mode="json"),
         )
         verify_role_receipt(request, RoleCallResult.model_validate(result))
         self._record_usage(project_id, context, result, BudgetStage.VALIDATION)

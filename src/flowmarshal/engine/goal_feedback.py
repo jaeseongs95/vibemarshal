@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .role_budget import replan_budget
+
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -131,6 +133,7 @@ class GoalPreparationRefiner:
     reviewer: GoalReviewerAdapter
     compiler: GoalContractCompiler = GoalContractCompiler()
 
+    @replan_budget()
     def refine(
         self,
         *,

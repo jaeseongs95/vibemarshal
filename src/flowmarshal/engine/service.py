@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Iterable
@@ -19,6 +20,7 @@ from .domain import (
     ContextManifest,
     ContextSourceRegistration,
     ContextSourceRegistrationKind,
+    DeterministicValidationObservation,
     ExecutionSpecProposal,
     EvidenceKind,
     EvidenceRecord,
@@ -115,11 +117,13 @@ class EngineService:
     def initialize(self) -> None:
         self.ledger.initialize()
 
-    def create_project(self, *, name: str, root: Path | str) -> str:
+    def create_project(self, *, name: str, root: Path | str, project_id: str | None = None) -> str:
         resolved_root = Path(root).resolve()
         if not resolved_root.is_dir():
             raise EngineServiceError("프로젝트 root가 존재하는 디렉터리가 아닙니다.")
-        project_id = new_id("project")
+        if project_id is not None and re.fullmatch(r"project_[0-9a-f]{32}", project_id) is None:
+            raise EngineServiceError("CHECKPOINT_PROJECT_ID_INVALID: 보존할 프로젝트 식별자가 유효하지 않습니다.")
+        project_id = project_id or new_id("project")
         artifact_root = (self.ledger.artifact_root / project_id).resolve()
         artifact_root.mkdir(parents=True, exist_ok=True)
         with self.ledger.transaction() as tx:
@@ -1081,18 +1085,56 @@ class EngineService:
             )
             return activation_id
 
-    def retry_task(self, *, task_id: str, new_evidence_ids: tuple[str, ...] = ()) -> None:
+    def retry_task(
+        self,
+        *,
+        task_id: str,
+        new_evidence_ids: tuple[str, ...] = (),
+        recovery_assessment: RecoveryAssessment | None = None,
+        failed_validation_result_id: str | None = None,
+    ) -> None:
         """동일 TaskContract 범위의 재시도만 다시 materialized 상태로 연다."""
 
         with self.ledger.transaction() as tx:
             task = tx.one("SELECT * FROM task_contracts WHERE id = ?", (task_id,))
             if task["status"] not in {"failed", "blocked"}:
                 raise EngineServiceError("failed/blocked Task만 동일 계약으로 재시도할 수 있습니다.")
+            contract = json.loads(task["payload_json"])
+            recovery = contract["recovery"]
+            retry_count = tx.connection.execute(
+                "SELECT COUNT(*) FROM history_events WHERE project_id = ? "
+                "AND event_type = 'task.retry_enabled' AND entity_id = ?",
+                (task["project_id"], task_id),
+            ).fetchone()[0]
+            if retry_count >= int(recovery["max_same_failure_replans"]):
+                raise EngineServiceError(
+                    "동일 Task recovery 한도를 넘었습니다: "
+                    f"{retry_count}/{recovery['max_same_failure_replans']}"
+                )
             attempt = tx.one(
-                "SELECT * FROM attempts WHERE task_id = ? ORDER BY attempt_no DESC, rowid DESC LIMIT 1",
+                "SELECT * FROM attempts WHERE task_id = ? AND kind = 'execution' "
+                "ORDER BY attempt_no DESC, rowid DESC LIMIT 1",
                 (task_id,),
             )
-            failure = FailureClass(attempt["failure_class"])
+            failure = (
+                None
+                if attempt["failure_class"] is None
+                else FailureClass(attempt["failure_class"])
+            )
+            if failure is None:
+                new_evidence_ids = self._validate_task_validation_recovery(
+                    tx,
+                    task=task,
+                    attempt=attempt,
+                    recovery_assessment=recovery_assessment,
+                    failed_validation_result_id=failed_validation_result_id,
+                    supplied_evidence_ids=new_evidence_ids,
+                )
+                failure = recovery_assessment.failure_class  # type: ignore[union-attr]
+            elif recovery_assessment is not None or failed_validation_result_id is not None:
+                raise EngineServiceError(
+                    "Attempt 실패 재시도에는 Task validation recovery 입력을 함께 사용할 수 없습니다."
+                )
             if failure in {
                 FailureClass.TASK_CONTRACT,
                 FailureClass.DEPENDENCY,
@@ -1103,8 +1145,9 @@ class EngineService:
                     f"{failure.value} 실패는 같은 Task 재시도가 아니라 Plan/Goal revision이 필요합니다."
                 )
             unknown = tx.connection.execute(
-                "SELECT COUNT(*) FROM runtime_intents WHERE attempt_id = ? AND status = 'unknown'",
-                (attempt["id"],),
+                "SELECT COUNT(*) FROM runtime_intents i JOIN attempts a ON a.id = i.attempt_id "
+                "WHERE a.project_id = ? AND i.status = 'unknown'",
+                (task["project_id"],),
             ).fetchone()[0]
             if unknown:
                 raise EngineServiceError("unknown 외부 효과를 reconcile하기 전에는 재시도할 수 없습니다.")
@@ -1118,6 +1161,10 @@ class EngineService:
                 ).fetchone()[0]
                 if count != len(new_evidence_ids):
                     raise EngineServiceError("재시도 evidence 일부가 원장에 없습니다.")
+            if failure.value not in set(recovery["retryable_failure_classes"]):
+                raise EngineServiceError(
+                    f"TaskContract가 {failure.value} 실패의 동일 Task 재시도를 허용하지 않습니다."
+                )
             current_spec = tx.one(
                 "SELECT definition_digest FROM execution_spec_revisions WHERE task_id = ? AND is_current = 1",
                 (task_id,),
@@ -1133,8 +1180,435 @@ class EngineService:
                 "task.retry_enabled",
                 "task_contract",
                 task_id,
-                {"previous_attempt_id": attempt["id"], "new_evidence_ids": new_evidence_ids},
+                {
+                    "previous_attempt_id": attempt["id"],
+                    "new_evidence_ids": new_evidence_ids,
+                    "failure_class": failure.value,
+                    "recovery_assessment_id": (
+                        None if recovery_assessment is None else recovery_assessment.assessment_id
+                    ),
+                    "failed_validation_result_id": failed_validation_result_id,
+                },
             )
+
+    @staticmethod
+    def resolve_task_validation_worker(
+        connection: Any, *, task_id: str, current_spec_digest: str
+    ) -> Any | None:
+        """validator-only selection 계보를 거슬러 실제 성공 Worker를 찾는다."""
+
+        digest = current_spec_digest
+        seen: set[str] = set()
+        while digest not in seen:
+            seen.add(digest)
+            worker = connection.execute(
+                "SELECT a.id, a.execution_spec_digest, h.sequence FROM attempts a "
+                "JOIN history_events h ON h.project_id = a.project_id "
+                "AND h.event_type = 'attempt.succeeded' AND h.entity_id = a.id "
+                "WHERE a.task_id = ? AND a.kind = 'execution' AND a.status = 'succeeded' "
+                "AND a.execution_spec_digest = ? "
+                "ORDER BY a.attempt_no DESC, a.rowid DESC LIMIT 1",
+                (task_id, digest),
+            ).fetchone()
+            if worker is not None:
+                return worker
+            selection = connection.execute(
+                "SELECT s.previous_execution_spec_digest FROM model_rebinding_selections s "
+                "JOIN attempts a ON a.id = s.attempt_id AND a.task_id = s.task_id "
+                "AND a.kind = 'validation' "
+                "AND a.execution_spec_digest = s.new_execution_spec_digest "
+                "WHERE s.task_id = ? AND s.role = 'validator' "
+                "AND s.new_execution_spec_digest = ? "
+                "ORDER BY s.created_at DESC, s.rowid DESC LIMIT 1",
+                (task_id, digest),
+            ).fetchone()
+            if selection is None:
+                return None
+            digest = selection["previous_execution_spec_digest"]
+        return None
+
+    @staticmethod
+    def effective_task_validation_results(connection: Any, task_id: str) -> tuple[Any, ...]:
+        """현재 Worker 성공 및 retry epoch 뒤에 기록된 Task validation만 반환한다."""
+
+        task = connection.execute(
+            "SELECT project_id FROM task_contracts WHERE id = ?", (task_id,)
+        ).fetchone()
+        if task is None:
+            raise EngineServiceError("TaskContract를 찾을 수 없습니다.")
+        retry = connection.execute(
+            "SELECT MAX(sequence) FROM history_events WHERE project_id = ? "
+            "AND event_type = 'task.retry_enabled' AND entity_id = ?",
+            (task["project_id"], task_id),
+        ).fetchone()[0]
+        current_spec = connection.execute(
+            "SELECT definition_digest FROM execution_spec_revisions "
+            "WHERE task_id = ? AND is_current = 1",
+            (task_id,),
+        ).fetchone()
+        worker = (
+            None
+            if current_spec is None
+            else EngineService.resolve_task_validation_worker(
+                connection,
+                task_id=task_id,
+                current_spec_digest=current_spec["definition_digest"],
+            )
+        )
+        if worker is None:
+            return ()
+        worker_sequence = int(worker["sequence"])
+        boundary = max(int(retry or 0), worker_sequence)
+        candidates = connection.execute(
+            "SELECT v.*, h.sequence AS history_sequence, "
+            "h.payload_json AS history_payload_json FROM validation_results v "
+            "JOIN history_events h ON h.project_id = v.project_id "
+            "AND h.event_type = 'validation.recorded' AND h.entity_id = v.id "
+            "WHERE v.task_id = ? AND h.sequence > ? ORDER BY h.sequence",
+            (task_id, boundary),
+        ).fetchall()
+        fresh: list[Any] = []
+        for row in candidates:
+            result = ValidationResult.model_validate_json(row["payload_json"])
+            if not result.evidence_ids:
+                fresh.append(row)
+                continue
+            placeholders = ",".join("?" for _ in result.evidence_ids)
+            evidence = connection.execute(
+                "SELECT e.id, e.attempt_id, e.kind, e.observation, e.content_digest, "
+                "h.sequence FROM evidence_records e "
+                "JOIN history_events h ON h.project_id = e.project_id "
+                "AND h.event_type = 'evidence.recorded' AND h.entity_id = e.id "
+                f"WHERE e.id IN ({placeholders})",
+                tuple(result.evidence_ids),
+            ).fetchall()
+            evidence_is_fresh = len(evidence) == len(result.evidence_ids) and all(
+                item["attempt_id"] == worker["id"]
+                or int(item["sequence"]) > worker_sequence
+                for item in evidence
+            )
+            if evidence_is_fresh and EngineService._task_validation_operation_is_current(
+                connection,
+                row=row,
+                result=result,
+                evidence=evidence,
+                worker=worker,
+                retry_sequence=int(retry or 0),
+                current_spec_digest=current_spec["definition_digest"],
+            ):
+                fresh.append(row)
+        return tuple(fresh)
+
+    @staticmethod
+    def _task_validation_operation_is_current(
+        connection: Any,
+        *,
+        row: Any,
+        result: ValidationResult,
+        evidence: Any,
+        worker: Any,
+        retry_sequence: int,
+        current_spec_digest: str,
+    ) -> bool:
+        """명령 검증이면 완료 operation이 현재 Worker epoch에서 준비됐는지 입증한다."""
+
+        history_payload = json.loads(row["history_payload_json"])
+        binding = history_payload.get("operation_binding")
+        worker_sequence = int(worker["sequence"])
+        epoch_sequence = max(worker_sequence, retry_sequence)
+        if binding is not None:
+            if not isinstance(binding, dict) or any(
+                (
+                    binding.get("format") != "task-validation-operation-v1",
+                    binding.get("worker_attempt_id") != worker["id"],
+                    binding.get("worker_succeeded_sequence") != worker_sequence,
+                    binding.get("validation_epoch_sequence") != epoch_sequence,
+                    binding.get("source_worker_execution_spec_digest")
+                    != worker["execution_spec_digest"],
+                    binding.get("validation_execution_spec_digest") != current_spec_digest,
+                )
+            ):
+                return False
+            events = connection.execute(
+                "SELECT sequence, event_type, payload_json FROM history_events "
+                "WHERE project_id = ? AND entity_type = 'core_operation' AND entity_id = ? "
+                "ORDER BY sequence",
+                (row["project_id"], binding.get("operation_id")),
+            ).fetchall()
+            prepared_sequence = None
+            completed_sequence = None
+            for event in events:
+                payload = json.loads(event["payload_json"])
+                if (
+                    event["event_type"] == "operation.prepared"
+                    and payload.get("request_digest") == binding.get("request_digest")
+                    and isinstance(payload.get("request"), dict)
+                    and sha256_digest(
+                        {"kind": "validation_command", "request": payload["request"]}
+                    )
+                    == binding.get("request_digest")
+                    and payload["request"].get("worker_attempt_id") == worker["id"]
+                    and payload["request"].get("worker_succeeded_sequence") == worker_sequence
+                    and payload["request"].get("validation_epoch_sequence") == epoch_sequence
+                    and payload["request"].get("source_worker_execution_spec_digest")
+                    == worker["execution_spec_digest"]
+                    and payload["request"].get("validation_execution_spec_digest")
+                    == current_spec_digest
+                ):
+                    prepared_sequence = int(event["sequence"])
+                if (
+                    event["event_type"] == "operation.completed"
+                    and payload.get("request_digest") == binding.get("request_digest")
+                    and payload.get("result_digest") == binding.get("result_digest")
+                    and sha256_digest(payload.get("result")) == payload.get("result_digest")
+                ):
+                    completed_sequence = int(event["sequence"])
+            return bool(
+                prepared_sequence is not None
+                and completed_sequence is not None
+                and worker_sequence < prepared_sequence < completed_sequence
+                and all(item["attempt_id"] == worker["id"] for item in evidence)
+            )
+
+        # schema 변경 전 명령 검증도 operation의 직접 결과와 evidence digest가
+        # 유일하게 대응하면 보존한다. 다만 operation 준비가 현재 Worker보다
+        # 앞서면 이후에 복제된 validation/evidence여도 stale로 제외한다.
+        operation_matches: list[tuple[int, dict[str, Any]]] = []
+        operations = connection.execute(
+            "SELECT p.sequence AS prepared_sequence, p.payload_json AS prepared_json, "
+            "c.payload_json AS completed_json FROM history_events p "
+            "JOIN history_events c ON c.project_id = p.project_id "
+            "AND c.entity_type = 'core_operation' AND c.entity_id = p.entity_id "
+            "AND c.event_type = 'operation.completed' AND c.sequence > p.sequence "
+            "WHERE p.project_id = ? AND p.entity_type = 'core_operation' "
+            "AND p.event_type = 'operation.prepared' ORDER BY p.sequence",
+            (row["project_id"],),
+        ).fetchall()
+        for operation in operations:
+            prepared = json.loads(operation["prepared_json"])
+            completed = json.loads(operation["completed_json"])
+            request = prepared.get("request")
+            response = completed.get("result")
+            if (
+                prepared.get("kind") != "validation_command"
+                or completed.get("kind") != "validation_command"
+                or prepared.get("request_digest") != completed.get("request_digest")
+                or not isinstance(request, dict)
+                or not isinstance(response, dict)
+                or sha256_digest({"kind": "validation_command", "request": request})
+                != prepared.get("request_digest")
+                or sha256_digest(response) != completed.get("result_digest")
+                or request.get("plan_revision_id") != row["plan_revision_id"]
+                or request.get("task_id") != result.task_id
+                or request.get("execution_spec_digest") != worker["execution_spec_digest"]
+                or not isinstance(request.get("step"), dict)
+                or request["step"].get("validation_id") != result.validation_id
+                or not EngineService._validation_evidence_matches_operation(
+                    result=result, evidence=evidence, response=response
+                )
+            ):
+                continue
+            operation_matches.append((int(operation["prepared_sequence"]), request))
+        if not operation_matches:
+            return True
+        return any(
+            prepared_sequence > worker_sequence
+            and (
+                request.get("worker_attempt_id") is None
+                or (
+                    request.get("worker_attempt_id") == worker["id"]
+                    and request.get("worker_succeeded_sequence") == worker_sequence
+                    and request.get("validation_epoch_sequence") == epoch_sequence
+                )
+            )
+            for prepared_sequence, request in operation_matches
+        )
+
+    @staticmethod
+    def _validation_evidence_matches_operation(
+        *, result: ValidationResult, evidence: Any, response: dict[str, Any]
+    ) -> bool:
+        try:
+            observation = DeterministicValidationObservation.model_validate(
+                response["observation"]
+            )
+            artifacts = response["artifacts"]
+            if (
+                observation.task_id != result.task_id
+                or observation.validation_id != result.validation_id
+                or observation.observed_at != result.evaluated_at
+                or not isinstance(artifacts, list)
+            ):
+                return False
+            for item in evidence:
+                kind = item["kind"]
+                if kind in {"file", "diff"}:
+                    document = json.loads(item["observation"])
+                    if document not in artifacts or item["content_digest"] != sha256_digest(
+                        {"kind": kind, "direct_file_observation": document}
+                    ):
+                        return False
+                elif kind in {"command", "test", "build"}:
+                    if item["content_digest"] != sha256_digest(
+                        {"kind": kind, "observation": observation}
+                    ):
+                        return False
+                else:
+                    return False
+            return True
+        except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+            return False
+
+    def task_validation_recovery_blocker(
+        self, project_id: str, *, plan_revision_id: str | None = None
+    ) -> dict[str, Any] | None:
+        """성공 Worker 뒤 현재 epoch의 최신 validation FAIL을 읽기 전용으로 찾는다."""
+
+        with self.ledger.read() as connection:
+            if plan_revision_id is None:
+                project = connection.execute(
+                    "SELECT active_plan_revision_id FROM projects WHERE id = ?", (project_id,)
+                ).fetchone()
+                if project is None:
+                    raise EngineServiceError("프로젝트를 찾을 수 없습니다.")
+                plan_revision_id = project["active_plan_revision_id"]
+            if plan_revision_id is None:
+                return None
+            tasks = connection.execute(
+                "SELECT id FROM task_contracts WHERE project_id = ? AND plan_revision_id = ? "
+                "AND status = 'blocked' ORDER BY position",
+                (project_id, plan_revision_id),
+            ).fetchall()
+            for task in tasks:
+                attempt = connection.execute(
+                    "SELECT id, status, failure_class FROM attempts WHERE task_id = ? "
+                    "AND kind = 'execution' ORDER BY attempt_no DESC, rowid DESC LIMIT 1",
+                    (task["id"],),
+                ).fetchone()
+                if (
+                    attempt is None
+                    or attempt["status"] != AttemptStatus.SUCCEEDED.value
+                    or attempt["failure_class"] is not None
+                ):
+                    continue
+                latest = {
+                    row["validation_id"]: row
+                    for row in self.effective_task_validation_results(connection, task["id"])
+                }
+                failure = max(
+                    (
+                        row
+                        for row in latest.values()
+                        if row["status"] == ValidationStatus.FAIL.value
+                    ),
+                    key=lambda row: int(row["history_sequence"]),
+                    default=None,
+                )
+                if failure is not None:
+                    result = ValidationResult.model_validate_json(failure["payload_json"])
+                    return {
+                        "task_id": task["id"],
+                        "attempt_id": attempt["id"],
+                        "validation_id": result.validation_id,
+                        "validation_result_id": result.validation_result_id,
+                        "evidence_ids": result.evidence_ids,
+                        "history_sequence": int(failure["history_sequence"]),
+                    }
+        return None
+
+    def _validate_task_validation_recovery(
+        self,
+        tx: Any,
+        *,
+        task: Any,
+        attempt: Any,
+        recovery_assessment: RecoveryAssessment | None,
+        failed_validation_result_id: str | None,
+        supplied_evidence_ids: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        if attempt["status"] != AttemptStatus.SUCCEEDED.value:
+            raise EngineServiceError(
+                "failure_class 없는 Attempt는 성공 Worker와 실패 Task validation 조합이어야 합니다."
+            )
+        if recovery_assessment is None or failed_validation_result_id is None:
+            raise EngineServiceError(
+                "성공 Worker 뒤 validation 실패 재시도에는 실패 결과와 RecoveryAssessment가 필요합니다."
+            )
+        if recovery_assessment.attempt_id != attempt["id"]:
+            raise EngineServiceError("RecoveryAssessment가 현재 성공 Worker Attempt와 다릅니다.")
+        if recovery_assessment.failure_class not in {
+            FailureClass.IMPLEMENTATION,
+            FailureClass.ENVIRONMENT,
+            FailureClass.CONTEXT,
+        }:
+            raise EngineServiceError(
+                "Task validation 실패는 implementation/context/environment로만 동일 Task 재시도할 수 있습니다."
+            )
+        effective = self.effective_task_validation_results(tx.connection, task["id"])
+        target = next((row for row in effective if row["id"] == failed_validation_result_id), None)
+        if target is None:
+            raise EngineServiceError("현재 validation epoch의 실패 결과가 아닙니다.")
+        latest = {row["validation_id"]: row for row in effective}
+        if latest.get(target["validation_id"])["id"] != failed_validation_result_id:
+            raise EngineServiceError("Task 재시도 대상은 해당 검사의 최신 결과여야 합니다.")
+        result = ValidationResult.model_validate_json(target["payload_json"])
+        if result.task_id != task["id"] or result.status is not ValidationStatus.FAIL:
+            raise EngineServiceError("Task 재시도 대상은 현재 Task에 직접 결속된 validation FAIL이어야 합니다.")
+        assessment_evidence = recovery_assessment.new_evidence_ids
+        if not assessment_evidence:
+            raise EngineServiceError("Task validation recovery에는 실패에 직접 결속된 evidence가 필요합니다.")
+        if supplied_evidence_ids and supplied_evidence_ids != assessment_evidence:
+            raise EngineServiceError("retry evidence와 RecoveryAssessment evidence가 다릅니다.")
+        placeholders = ",".join("?" for _ in assessment_evidence)
+        evidence_rows = tx.all(
+            f"SELECT id, project_id, task_id, attempt_id, kind FROM evidence_records "
+            f"WHERE id IN ({placeholders})",
+            tuple(assessment_evidence),
+        )
+        direct_kinds = {"file", "diff", "command", "test", "build", "external_observation"}
+        if len(evidence_rows) != len(assessment_evidence) or any(
+            row["project_id"] != task["project_id"]
+            or row["task_id"] != task["id"]
+            or row["kind"] not in direct_kinds
+            or (
+                row["id"] not in result.evidence_ids
+                and row["attempt_id"] != attempt["id"]
+            )
+            for row in evidence_rows
+        ):
+            raise EngineServiceError(
+                "Task validation recovery에는 FAIL 또는 현재 Worker Attempt에 결속된 직접 evidence만 사용할 수 있습니다."
+            )
+        if not any(row["id"] in result.evidence_ids for row in evidence_rows):
+            raise EngineServiceError("RecoveryAssessment에는 실패 validation에 결속된 직접 evidence가 필요합니다.")
+        if recovery_assessment.failure_class is FailureClass.ENVIRONMENT and not any(
+            row["attempt_id"] == attempt["id"]
+            and row["kind"] in {"command", "test", "build", "external_observation"}
+            for row in evidence_rows
+        ):
+            raise EngineServiceError(
+                "environment recovery에는 현재 Worker Attempt에 결속된 원인 evidence가 필요합니다."
+            )
+        existing = tx.connection.execute(
+            "SELECT project_id, attempt_id, payload_json FROM recovery_assessments WHERE id = ?",
+            (recovery_assessment.assessment_id,),
+        ).fetchone()
+        if existing is None:
+            self._record_recovery_assessment_in_transaction(
+                tx, task["project_id"], recovery_assessment
+            )
+        elif (
+            existing["project_id"] != task["project_id"]
+            or existing["attempt_id"] != attempt["id"]
+            or json.loads(existing["payload_json"]) != recovery_assessment.model_dump(mode="json")
+            or tx.connection.execute(
+                "SELECT 1 FROM history_events WHERE project_id = ? "
+                "AND event_type = 'recovery.assessed' AND entity_id = ?",
+                (task["project_id"], recovery_assessment.assessment_id),
+            ).fetchone() is None
+        ):
+            raise EngineServiceError("기존 RecoveryAssessment ID의 결속 또는 내용이 다릅니다.")
+        return assessment_evidence
 
     @staticmethod
     def _refresh_ready(tx: Any, plan_revision_id: str) -> tuple[str, ...]:
@@ -1826,7 +2300,6 @@ class EngineService:
                 response_digest=response_digest,
                 binding=binding,
                 response_payload=(response if isinstance(response, dict) and
-                                  attempt["kind"] == AttemptKind.EXECUTION.value and
                                   intent["kind"] in {"create_thread", "start_turn"} else None),
                 received_at=utc_now(),
             )
@@ -1959,7 +2432,150 @@ class EngineService:
                 {"task_id": evidence.task_id, "kind": evidence.kind.value, "content_digest": evidence.content_digest},
             )
 
-    def record_validation(self, *, project_id: str, plan_revision_id: str, result: ValidationResult) -> None:
+    @staticmethod
+    def _verify_task_validation_operation_binding(
+        tx: Any,
+        *,
+        project_id: str,
+        plan_revision_id: str,
+        result: ValidationResult,
+        binding: dict[str, Any],
+    ) -> None:
+        expected_keys = {
+            "format",
+            "operation_id",
+            "request_digest",
+            "result_digest",
+            "worker_attempt_id",
+            "worker_succeeded_sequence",
+            "validation_epoch_sequence",
+            "validation_execution_spec_digest",
+            "source_worker_execution_spec_digest",
+        }
+        if set(binding) != expected_keys or binding.get("format") != "task-validation-operation-v1":
+            raise EngineServiceError("Task validation operation binding 형식이 정확하지 않습니다.")
+        if result.task_id is None:
+            raise EngineServiceError("Task validation operation binding은 Task 결과에만 사용할 수 있습니다.")
+        attempt = tx.one(
+            "SELECT id, status, failure_class, execution_spec_digest FROM attempts "
+            "WHERE task_id = ? AND kind = 'execution' "
+            "ORDER BY attempt_no DESC, rowid DESC LIMIT 1",
+            (result.task_id,),
+        )
+        succeeded = tx.one(
+            "SELECT sequence FROM history_events WHERE project_id = ? "
+            "AND event_type = 'attempt.succeeded' AND entity_id = ?",
+            (project_id, attempt["id"]),
+        )
+        retry_sequence = int(tx.connection.execute(
+            "SELECT COALESCE(MAX(sequence), 0) FROM history_events WHERE project_id = ? "
+            "AND event_type = 'task.retry_enabled' AND entity_id = ?",
+            (project_id, result.task_id),
+        ).fetchone()[0])
+        worker_sequence = int(succeeded["sequence"])
+        current_spec = tx.one(
+            "SELECT definition_digest FROM execution_spec_revisions "
+            "WHERE task_id = ? AND is_current = 1",
+            (result.task_id,),
+        )
+        resolved_worker = EngineService.resolve_task_validation_worker(
+            tx.connection,
+            task_id=result.task_id,
+            current_spec_digest=current_spec["definition_digest"],
+        )
+        if (
+            attempt["status"] != AttemptStatus.SUCCEEDED.value
+            or attempt["failure_class"] is not None
+            or resolved_worker is None
+            or resolved_worker["id"] != attempt["id"]
+            or binding.get("worker_attempt_id") != attempt["id"]
+            or binding.get("worker_succeeded_sequence") != worker_sequence
+            or binding.get("validation_epoch_sequence") != max(worker_sequence, retry_sequence)
+            or binding.get("source_worker_execution_spec_digest")
+            != attempt["execution_spec_digest"]
+            or binding.get("validation_execution_spec_digest")
+            != current_spec["definition_digest"]
+        ):
+            raise EngineServiceError("Task validation operation이 현재 성공 Worker epoch와 다릅니다.")
+        operation_id = binding.get("operation_id")
+        request_digest = binding.get("request_digest")
+        expected_operation_id = "operation_" + sha256_digest(
+            {"project_id": project_id, "request_digest": request_digest}
+        )[7:39]
+        if operation_id != expected_operation_id:
+            raise EngineServiceError("Task validation operation ID와 request digest가 다릅니다.")
+        rows = tx.all(
+            "SELECT sequence, event_type, payload_json FROM history_events WHERE project_id = ? "
+            "AND entity_type = 'core_operation' AND entity_id = ? ORDER BY sequence",
+            (project_id, operation_id),
+        )
+        prepared = []
+        completed = []
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            if row["event_type"] == "operation.prepared":
+                prepared.append((int(row["sequence"]), payload))
+            elif row["event_type"] == "operation.completed":
+                completed.append((int(row["sequence"]), payload))
+        valid_prepared = [
+            (sequence, payload)
+            for sequence, payload in prepared
+            if sequence > worker_sequence
+            and payload.get("kind") == "validation_command"
+            and payload.get("request_digest") == request_digest
+            and isinstance(payload.get("request"), dict)
+            and sha256_digest(
+                {"kind": "validation_command", "request": payload["request"]}
+            )
+            == request_digest
+            and payload["request"].get("project_id", project_id) == project_id
+            and payload["request"].get("plan_revision_id") == plan_revision_id
+            and payload["request"].get("task_id") == result.task_id
+            and payload["request"].get("worker_attempt_id") == attempt["id"]
+            and payload["request"].get("worker_succeeded_sequence") == worker_sequence
+            and payload["request"].get("validation_epoch_sequence") == max(
+                worker_sequence, retry_sequence
+            )
+            and payload["request"].get("source_worker_execution_spec_digest")
+            == attempt["execution_spec_digest"]
+            and payload["request"].get("validation_execution_spec_digest")
+            == current_spec["definition_digest"]
+            and payload["request"].get("execution_spec_digest")
+            == current_spec["definition_digest"]
+        ]
+        valid_completed = [
+            (sequence, payload)
+            for sequence, payload in completed
+            if payload.get("kind") == "validation_command"
+            and payload.get("request_digest") == request_digest
+            and payload.get("result_digest") == binding.get("result_digest")
+            and sha256_digest(payload.get("result")) == payload.get("result_digest")
+        ]
+        if not any(
+            prepared_sequence < completed_sequence
+            for prepared_sequence, _ in valid_prepared
+            for completed_sequence, _ in valid_completed
+        ):
+            raise EngineServiceError("Task validation operation의 준비·완료 receipt 결속이 없습니다.")
+        if result.evidence_ids:
+            placeholders = ",".join("?" for _ in result.evidence_ids)
+            evidence = tx.all(
+                f"SELECT attempt_id FROM evidence_records WHERE id IN ({placeholders})",
+                tuple(result.evidence_ids),
+            )
+            if len(evidence) != len(result.evidence_ids) or any(
+                row["attempt_id"] != attempt["id"] for row in evidence
+            ):
+                raise EngineServiceError("Task validation evidence가 현재 Worker Attempt에 결속되지 않았습니다.")
+
+    def record_validation(
+        self,
+        *,
+        project_id: str,
+        plan_revision_id: str,
+        result: ValidationResult,
+        operation_binding: dict[str, Any] | None = None,
+    ) -> None:
         with self.ledger.transaction() as tx:
             plan_row = tx.one(
                 "SELECT payload_json FROM plan_revisions WHERE id = ? AND project_id = ?",
@@ -2014,6 +2630,14 @@ class EngineService:
                             "validation에 필요한 evidence kind가 부족합니다: "
                             + ", ".join(sorted(required_kinds - actual_kinds))
                         )
+            if operation_binding is not None:
+                self._verify_task_validation_operation_binding(
+                    tx,
+                    project_id=project_id,
+                    plan_revision_id=plan_revision_id,
+                    result=result,
+                    binding=operation_binding,
+                )
             tx.connection.execute(
                 "INSERT INTO validation_results "
                 "(id, project_id, plan_revision_id, task_id, validation_id, status, payload_json, evaluated_at) "
@@ -2034,7 +2658,12 @@ class EngineService:
                 "validation.recorded",
                 "validation_result",
                 result.validation_result_id,
-                {"validation_id": result.validation_id, "status": result.status.value, "task_id": result.task_id},
+                {
+                    "validation_id": result.validation_id,
+                    "status": result.status.value,
+                    "task_id": result.task_id,
+                    "operation_binding": operation_binding,
+                },
             )
 
     def record_typed_validation_observation(
@@ -2210,11 +2839,7 @@ class EngineService:
             contract = json.loads(task["payload_json"])
             expected = {item["validation_id"] for item in contract["validations"]}
             latest: dict[str, str] = {}
-            for row in tx.all(
-                "SELECT validation_id, status FROM validation_results WHERE task_id = ? "
-                "ORDER BY evaluated_at, rowid",
-                (task_id,),
-            ):
+            for row in self.effective_task_validation_results(tx.connection, task_id):
                 latest[row["validation_id"]] = row["status"]
             if set(latest) != expected or any(latest[item] != "pass" for item in expected):
                 raise EngineServiceError("모든 Task validation의 최신 결과가 PASS여야 합니다.")
@@ -2463,7 +3088,14 @@ class EngineService:
             return usage
 
     @staticmethod
-    def _insert_budget_usage(tx: Any, usage: BudgetUsageRecord) -> None:
+    def _insert_budget_usage(tx: Any, usage: BudgetUsageRecord) -> str:
+        existing = tx.maybe_one("SELECT payload_json FROM budget_usage WHERE project_id=? AND logical_call_ref=?",
+                                (usage.project_id, usage.logical_call_ref))
+        if existing is not None:
+            prior = BudgetUsageRecord.model_validate_json(existing["payload_json"])
+            if prior.model_dump(exclude={"usage_id", "recorded_at"}) != usage.model_dump(exclude={"usage_id", "recorded_at"}):
+                raise EngineServiceError("BUDGET_RECEIPT_CONFLICT: 같은 호출에 다른 근거가 있습니다.")
+            return prior.usage_id
         payload = usage.model_dump(mode="json") if usage.attempt_id is not None else usage
         tx.connection.execute(
             "INSERT INTO budget_usage (id, project_id, goal_contract_digest, stage, logical_call_ref, payload_json, recorded_at) "
@@ -2473,11 +3105,32 @@ class EngineService:
         )
         tx.history(usage.project_id, "budget.recorded", "budget_usage", usage.usage_id,
                    {"stage": usage.stage.value, "optimization_tokens": usage.optimization_tokens})
+        if usage.attempt_id is not None:
+            from .budget import settle_worker_in_transaction
+            settle_worker_in_transaction(tx, usage)
+        return usage.usage_id
+
+    def rebind_model(self, *, request: Any, inventory: ModelInventory):
+        """사용자의 명시적 envelope 내 선택을 새 Spec·Attempt에 결속한다."""
+        from .model_rebinding import ModelRebindingService
+        return ModelRebindingService(self.ledger, assignment_resolver=self.assignment_resolver).rebind_and_reserve(request, inventory)
 
     def record_budget_usage(self, usage: BudgetUsageRecord) -> None:
         with self.ledger.transaction() as tx:
             tx.one("SELECT id FROM projects WHERE id = ?", (usage.project_id,))
             self._insert_budget_usage(tx, usage)
+
+    def release_unstarted_attempt(self, attempt_id: str, reason: str) -> None:
+        """외부 intent가 아직 없는 예산 거부만 해제하고 시도 이력을 보존한다."""
+        with self.ledger.transaction() as tx:
+            attempt = tx.one("SELECT * FROM attempts WHERE id=?", (attempt_id,))
+            if attempt["status"] != "reserved" or tx.maybe_one("SELECT id FROM runtime_intents WHERE attempt_id=?", (attempt_id,)):
+                raise EngineServiceError("ATTEMPT_EFFECT_NOT_EMPTY: 외부 효과가 없는 예약만 해제할 수 있습니다.")
+            tx.connection.execute("UPDATE attempts SET status='abandoned',ended_at=?,updated_at=? WHERE id=?",
+                                  (tx.now, tx.now, attempt_id))
+            tx.connection.execute("UPDATE task_contracts SET status=?,updated_at=? WHERE id=?",
+                                  ("validating" if attempt["kind"] == "validation" else "materialized", tx.now, attempt["task_id"]))
+            tx.history(attempt["project_id"], "attempt.released_before_effect", "attempt", attempt_id, {"reason": reason})
 
     def recover_inspect(self, project_id: str) -> tuple[str, ...]:
         unknown: list[str] = []
@@ -2554,92 +3207,97 @@ class EngineService:
             )
 
     def record_recovery_assessment(self, project_id: str, assessment: RecoveryAssessment) -> None:
+        with self.ledger.transaction() as tx:
+            self._record_recovery_assessment_in_transaction(tx, project_id, assessment)
+
+    def _record_recovery_assessment_in_transaction(
+        self, tx: Any, project_id: str, assessment: RecoveryAssessment
+    ) -> None:
         expected_action = self.repair_action_for(assessment.failure_class)
         if assessment.action is not expected_action:
             raise EngineServiceError(
                 "failure_class에 대한 repair action이 Core 매핑과 다릅니다: "
                 f"expected={expected_action.value}, actual={assessment.action.value}"
             )
-        with self.ledger.transaction() as tx:
-            attempt = tx.one("SELECT project_id FROM attempts WHERE id = ?", (assessment.attempt_id,))
-            if attempt["project_id"] != project_id:
-                raise EngineServiceError("RecoveryAssessment가 다른 프로젝트 Attempt를 참조합니다.")
-            same_existing = tx.connection.execute(
-                "SELECT COUNT(*) FROM recovery_assessments WHERE project_id = ? "
-                "AND failure_class = ? AND action = 'subgraph_replan'",
-                (project_id, assessment.failure_class.value),
-            ).fetchone()[0]
-            goal_existing = tx.connection.execute(
-                "SELECT COUNT(*) FROM recovery_assessments WHERE project_id = ? "
-                "AND action = 'goal_revision'",
-                (project_id,),
-            ).fetchone()[0]
-            expected_same = int(same_existing) + (
-                1 if assessment.action is RepairAction.SUBGRAPH_REPLAN else 0
+        attempt = tx.one("SELECT project_id FROM attempts WHERE id = ?", (assessment.attempt_id,))
+        if attempt["project_id"] != project_id:
+            raise EngineServiceError("RecoveryAssessment가 다른 프로젝트 Attempt를 참조합니다.")
+        same_existing = tx.connection.execute(
+            "SELECT COUNT(*) FROM recovery_assessments WHERE project_id = ? "
+            "AND failure_class = ? AND action = 'subgraph_replan'",
+            (project_id, assessment.failure_class.value),
+        ).fetchone()[0]
+        goal_existing = tx.connection.execute(
+            "SELECT COUNT(*) FROM recovery_assessments WHERE project_id = ? "
+            "AND action = 'goal_revision'",
+            (project_id,),
+        ).fetchone()[0]
+        expected_same = int(same_existing) + (
+            1 if assessment.action is RepairAction.SUBGRAPH_REPLAN else 0
+        )
+        expected_goal = int(goal_existing) + (
+            1 if assessment.action is RepairAction.GOAL_REVISION else 0
+        )
+        if assessment.same_failure_replan_count != expected_same:
+            raise EngineServiceError(
+                f"same_failure_replan_count는 원장에서 계산한 {expected_same}여야 합니다."
             )
-            expected_goal = int(goal_existing) + (
-                1 if assessment.action is RepairAction.GOAL_REVISION else 0
+        if assessment.goal_replan_count != expected_goal:
+            raise EngineServiceError(
+                f"goal_replan_count는 원장에서 계산한 {expected_goal}여야 합니다."
             )
-            if assessment.same_failure_replan_count != expected_same:
-                raise EngineServiceError(
-                    f"same_failure_replan_count는 원장에서 계산한 {expected_same}여야 합니다."
-                )
-            if assessment.goal_replan_count != expected_goal:
-                raise EngineServiceError(
-                    f"goal_replan_count는 원장에서 계산한 {expected_goal}여야 합니다."
-                )
-            if assessment.same_failure_replan_count > 2:
-                raise EngineServiceError("동일 실패 재계획 한도 2회를 넘었습니다.")
-            if assessment.goal_replan_count > 5:
-                raise EngineServiceError("Goal 전체 재계획 한도 5회를 넘었습니다.")
-            existing_assessments = tx.all(
-                "SELECT payload_json, created_at FROM recovery_assessments WHERE project_id = ? ORDER BY created_at",
-                (project_id,),
-            )
-            prior_ids = {evidence_id for row in existing_assessments
-                         for evidence_id in json.loads(row["payload_json"])["new_evidence_ids"]}
-            for evidence_id in assessment.new_evidence_ids:
-                evidence = tx.connection.execute(
-                    "SELECT project_id, observed_at FROM evidence_records WHERE id = ?", (evidence_id,),
+        if assessment.same_failure_replan_count > 2:
+            raise EngineServiceError("동일 실패 재계획 한도 2회를 넘었습니다.")
+        if assessment.goal_replan_count > 5:
+            raise EngineServiceError("Goal 전체 재계획 한도 5회를 넘었습니다.")
+        existing_assessments = tx.all(
+            "SELECT payload_json, created_at FROM recovery_assessments WHERE project_id = ? ORDER BY created_at",
+            (project_id,),
+        )
+        prior_ids = {evidence_id for row in existing_assessments
+                     for evidence_id in json.loads(row["payload_json"])["new_evidence_ids"]}
+        for evidence_id in assessment.new_evidence_ids:
+            evidence = tx.connection.execute(
+                "SELECT project_id, observed_at FROM evidence_records WHERE id = ?", (evidence_id,),
+            ).fetchone()
+            if evidence is None or evidence["project_id"] != project_id:
+                raise EngineServiceError("새 recovery evidence가 해당 프로젝트 원장에 없습니다.")
+            if evidence_id in prior_ids:
+                raise EngineServiceError("이전 recovery에서 사용한 evidence는 새 evidence가 아닙니다.")
+            if existing_assessments:
+                evidence_event = tx.connection.execute(
+                    "SELECT sequence FROM history_events WHERE project_id = ? AND event_type = 'evidence.recorded' "
+                    "AND entity_id = ?", (project_id, evidence_id),
                 ).fetchone()
-                if evidence is None or evidence["project_id"] != project_id:
-                    raise EngineServiceError("새 recovery evidence가 해당 프로젝트 원장에 없습니다.")
-                if evidence_id in prior_ids:
-                    raise EngineServiceError("이전 recovery에서 사용한 evidence는 새 evidence가 아닙니다.")
-                if existing_assessments:
-                    evidence_event = tx.connection.execute(
-                        "SELECT sequence FROM history_events WHERE project_id = ? AND event_type = 'evidence.recorded' "
-                        "AND entity_id = ?", (project_id, evidence_id),
-                    ).fetchone()
-                    previous_event = tx.connection.execute(
-                        "SELECT MAX(sequence) FROM history_events WHERE project_id = ? AND event_type = 'recovery.assessed'",
-                        (project_id,),
-                    ).fetchone()[0]
-                    if evidence_event is None or evidence_event["sequence"] <= previous_event:
-                        raise EngineServiceError("이전 recovery 이후의 새 evidence 관측이 필요합니다.")
-            tx.connection.execute(
-                "INSERT INTO recovery_assessments "
-                "(id, project_id, attempt_id, failure_class, action, same_failure_replan_count, "
-                "goal_replan_count, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    assessment.assessment_id,
-                    project_id,
-                    assessment.attempt_id,
-                    assessment.failure_class.value,
-                    assessment.action.value,
-                    assessment.same_failure_replan_count,
-                    assessment.goal_replan_count,
-                    canonical_json(assessment),
-                    tx.now,
-                ),
-            )
-            tx.history(
-                project_id,
-                "recovery.assessed",
-                "recovery_assessment",
+                previous_event = tx.connection.execute(
+                    "SELECT MAX(sequence) FROM history_events WHERE project_id = ? AND event_type = 'recovery.assessed'",
+                    (project_id,),
+                ).fetchone()[0]
+                if evidence_event is None or evidence_event["sequence"] <= previous_event:
+                    raise EngineServiceError("이전 recovery 이후의 새 evidence 관측이 필요합니다.")
+        tx.connection.execute(
+            "INSERT INTO recovery_assessments "
+            "(id, project_id, attempt_id, failure_class, action, same_failure_replan_count, "
+            "goal_replan_count, payload_json, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
                 assessment.assessment_id,
-                {"attempt_id": assessment.attempt_id, "action": assessment.action.value},
-            )
+                project_id,
+                assessment.attempt_id,
+                assessment.failure_class.value,
+                assessment.action.value,
+                assessment.same_failure_replan_count,
+                assessment.goal_replan_count,
+                canonical_json(assessment),
+                tx.now,
+            ),
+        )
+        tx.history(
+            project_id,
+            "recovery.assessed",
+            "recovery_assessment",
+            assessment.assessment_id,
+            {"attempt_id": assessment.attempt_id, "action": assessment.action.value},
+        )
 
     @staticmethod
     def repair_action_for(failure_class: FailureClass) -> RepairAction:
