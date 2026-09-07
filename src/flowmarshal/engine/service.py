@@ -1862,7 +1862,8 @@ class EngineService:
             recovery = contract["recovery"]
             retry_count = tx.connection.execute(
                 "SELECT COUNT(*) FROM history_events WHERE project_id = ? "
-                "AND event_type = 'task.retry_enabled' AND entity_id = ?",
+                "AND event_type IN ('task.retry_enabled','task.execution_spec_recovery_enabled') "
+                "AND entity_id = ?",
                 (task["project_id"], task_id),
             ).fetchone()[0]
             if retry_count >= int(recovery["max_same_failure_replans"]):
@@ -1890,15 +1891,25 @@ class EngineService:
                     supplied_evidence_ids=new_evidence_ids,
                 )
                 failure = recovery_assessment.failure_class  # type: ignore[union-attr]
-            elif recovery_assessment is not None or failed_validation_result_id is not None:
+            elif failed_validation_result_id is not None:
                 raise EngineServiceError(
-                    "Attempt 실패 재시도에는 Task validation recovery 입력을 함께 사용할 수 없습니다."
+                    "Attempt 실패 재시도에는 Task validation result를 함께 사용할 수 없습니다."
+                )
+            elif recovery_assessment is not None:
+                new_evidence_ids = self._validate_attempt_recovery(
+                    tx,
+                    task=task,
+                    attempt=attempt,
+                    failure=failure,
+                    recovery_assessment=recovery_assessment,
+                    supplied_evidence_ids=new_evidence_ids,
                 )
             if failure in {
                 FailureClass.TASK_CONTRACT,
                 FailureClass.DEPENDENCY,
                 FailureClass.REQUIREMENT_CHANGE,
                 FailureClass.EXTERNAL_UNKNOWN,
+                FailureClass.UNCLASSIFIED,
             }:
                 raise EngineServiceError(
                     f"{failure.value} 실패는 같은 Task 재시도가 아니라 Plan/Goal revision이 필요합니다."
@@ -1949,6 +1960,126 @@ class EngineService:
                     "failed_validation_result_id": failed_validation_result_id,
                 },
             )
+
+    def enable_execution_spec_recovery(
+        self,
+        *,
+        task_id: str,
+        recovery_assessment: RecoveryAssessment,
+    ) -> None:
+        """context 실패를 같은 Task 의미의 새 ExecutionSpec 준비로 되돌린다."""
+
+        with self.ledger.transaction() as tx:
+            task = tx.one("SELECT * FROM task_contracts WHERE id=?", (task_id,))
+            if task["status"] not in {"failed", "blocked"}:
+                raise EngineServiceError("failed/blocked Task만 ExecutionSpec 복구할 수 있습니다.")
+            attempt = tx.one(
+                "SELECT * FROM attempts WHERE task_id=? AND kind='execution' "
+                "ORDER BY attempt_no DESC,rowid DESC LIMIT 1",
+                (task_id,),
+            )
+            if attempt["failure_class"] != FailureClass.CONTEXT.value:
+                raise EngineServiceError("context 실패만 ExecutionSpec revision으로 복구할 수 있습니다.")
+            contract = json.loads(task["payload_json"])
+            if FailureClass.CONTEXT.value not in set(
+                contract["recovery"]["retryable_failure_classes"]
+            ):
+                raise EngineServiceError("TaskContract가 context 복구를 허용하지 않습니다.")
+            prior = tx.connection.execute(
+                "SELECT COUNT(*) FROM history_events WHERE project_id=? AND entity_id=? "
+                "AND event_type IN ('task.retry_enabled','task.execution_spec_recovery_enabled')",
+                (task["project_id"], task_id),
+            ).fetchone()[0]
+            if prior >= int(contract["recovery"]["max_same_failure_replans"]):
+                raise EngineServiceError("동일 Task recovery 한도를 넘었습니다.")
+            self._validate_attempt_recovery(
+                tx,
+                task=task,
+                attempt=attempt,
+                failure=FailureClass.CONTEXT,
+                recovery_assessment=recovery_assessment,
+                supplied_evidence_ids=(),
+            )
+            current = tx.one(
+                "SELECT definition_digest FROM execution_spec_revisions "
+                "WHERE task_id=? AND is_current=1",
+                (task_id,),
+            )
+            if current["definition_digest"] != attempt["execution_spec_digest"]:
+                raise EngineServiceError("이미 새 ExecutionSpec revision이 존재합니다.")
+            tx.connection.execute(
+                "UPDATE task_contracts SET status='ready',updated_at=? WHERE id=?",
+                (tx.now, task_id),
+            )
+            tx.history(
+                task["project_id"],
+                "task.execution_spec_recovery_enabled",
+                "task_contract",
+                task_id,
+                {
+                    "previous_attempt_id": attempt["id"],
+                    "recovery_assessment_id": recovery_assessment.assessment_id,
+                    "new_evidence_ids": recovery_assessment.new_evidence_ids,
+                },
+            )
+
+    def _validate_attempt_recovery(
+        self,
+        tx: Any,
+        *,
+        task: Any,
+        attempt: Any,
+        failure: FailureClass,
+        recovery_assessment: RecoveryAssessment,
+        supplied_evidence_ids: tuple[str, ...],
+    ) -> tuple[str, ...]:
+        """자동 controller가 만든 assessment를 실패 Attempt에 직접 결속한다."""
+
+        if recovery_assessment.attempt_id != attempt["id"]:
+            raise EngineServiceError("RecoveryAssessment가 현재 실패 Attempt와 다릅니다.")
+        if recovery_assessment.failure_class is not failure:
+            raise EngineServiceError("RecoveryAssessment failure_class가 Attempt와 다릅니다.")
+        expected_action = self.repair_action_for(failure)
+        if recovery_assessment.action is not expected_action:
+            raise EngineServiceError("RecoveryAssessment action이 Core 분류와 다릅니다.")
+        evidence_ids = recovery_assessment.new_evidence_ids
+        if supplied_evidence_ids and supplied_evidence_ids != evidence_ids:
+            raise EngineServiceError("retry evidence와 RecoveryAssessment evidence가 다릅니다.")
+        if not evidence_ids:
+            raise EngineServiceError("Attempt recovery에는 직접 실패 evidence가 필요합니다.")
+        placeholders = ",".join("?" for _ in evidence_ids)
+        rows = tx.all(
+            f"SELECT id,project_id,task_id,attempt_id,kind FROM evidence_records "
+            f"WHERE id IN ({placeholders})",
+            tuple(evidence_ids),
+        )
+        direct_kinds = {"file", "diff", "command", "test", "build", "external_observation"}
+        if len(rows) != len(evidence_ids) or any(
+            row["project_id"] != task["project_id"]
+            or row["task_id"] != task["id"]
+            or row["attempt_id"] != attempt["id"]
+            or row["kind"] not in direct_kinds
+            for row in rows
+        ):
+            raise EngineServiceError(
+                "Attempt recovery에는 해당 실패 Attempt에 결속된 직접 evidence만 사용할 수 있습니다."
+            )
+        existing = tx.connection.execute(
+            "SELECT project_id,attempt_id,payload_json FROM recovery_assessments WHERE id=?",
+            (recovery_assessment.assessment_id,),
+        ).fetchone()
+        if existing is None:
+            self._record_recovery_assessment_in_transaction(
+                tx, task["project_id"], recovery_assessment
+            )
+        elif (
+            existing["project_id"] != task["project_id"]
+            or existing["attempt_id"] != attempt["id"]
+            or json.loads(existing["payload_json"])
+            != recovery_assessment.model_dump(mode="json")
+        ):
+            raise EngineServiceError("기존 RecoveryAssessment ID의 결속 또는 내용이 다릅니다.")
+        return evidence_ids
 
     @staticmethod
     def resolve_task_validation_worker(
@@ -2002,7 +2133,8 @@ class EngineService:
             raise EngineServiceError("TaskContract를 찾을 수 없습니다.")
         retry = connection.execute(
             "SELECT MAX(sequence) FROM history_events WHERE project_id = ? "
-            "AND event_type = 'task.retry_enabled' AND entity_id = ?",
+            "AND event_type IN ('task.retry_enabled','task.execution_spec_recovery_enabled') "
+            "AND entity_id = ?",
             (task["project_id"], task_id),
         ).fetchone()[0]
         current_spec = connection.execute(
@@ -4612,21 +4744,42 @@ class EngineService:
         attempt = tx.one("SELECT project_id FROM attempts WHERE id = ?", (assessment.attempt_id,))
         if attempt["project_id"] != project_id:
             raise EngineServiceError("RecoveryAssessment가 다른 프로젝트 Attempt를 참조합니다.")
-        same_existing = tx.connection.execute(
-            "SELECT COUNT(*) FROM recovery_assessments WHERE project_id = ? "
-            "AND failure_class = ? AND action = 'subgraph_replan'",
-            (project_id, assessment.failure_class.value),
-        ).fetchone()[0]
+        existing_assessments = tx.all(
+            "SELECT payload_json, created_at FROM recovery_assessments WHERE project_id = ? ORDER BY created_at",
+            (project_id,),
+        )
+        existing_payloads = [json.loads(row["payload_json"]) for row in existing_assessments]
+        same_existing = sum(
+            1
+            for payload in existing_payloads
+            if payload["action"] == RepairAction.SUBGRAPH_REPLAN.value
+            and (
+                payload.get("failure_fingerprint") == assessment.failure_fingerprint
+                if assessment.failure_fingerprint is not None
+                else payload["failure_class"] == assessment.failure_class.value
+            )
+        )
+        goal_actions = (
+            "('subgraph_replan','goal_revision')"
+            if assessment.failure_fingerprint is not None
+            else "('goal_revision')"
+        )
         goal_existing = tx.connection.execute(
             "SELECT COUNT(*) FROM recovery_assessments WHERE project_id = ? "
-            "AND action = 'goal_revision'",
+            f"AND action IN {goal_actions}",
             (project_id,),
         ).fetchone()[0]
         expected_same = int(same_existing) + (
             1 if assessment.action is RepairAction.SUBGRAPH_REPLAN else 0
         )
         expected_goal = int(goal_existing) + (
-            1 if assessment.action is RepairAction.GOAL_REVISION else 0
+            1
+            if assessment.action is RepairAction.GOAL_REVISION
+            or (
+                assessment.failure_fingerprint is not None
+                and assessment.action is RepairAction.SUBGRAPH_REPLAN
+            )
+            else 0
         )
         if assessment.same_failure_replan_count != expected_same:
             raise EngineServiceError(
@@ -4636,14 +4789,32 @@ class EngineService:
             raise EngineServiceError(
                 f"goal_replan_count는 원장에서 계산한 {expected_goal}여야 합니다."
             )
-        if assessment.same_failure_replan_count > 2:
-            raise EngineServiceError("동일 실패 재계획 한도 2회를 넘었습니다.")
-        if assessment.goal_replan_count > 5:
-            raise EngineServiceError("Goal 전체 재계획 한도 5회를 넘었습니다.")
-        existing_assessments = tx.all(
-            "SELECT payload_json, created_at FROM recovery_assessments WHERE project_id = ? ORDER BY created_at",
+        authorization = tx.connection.execute(
+            "SELECT payload_json FROM goal_authorizations WHERE project_id=? "
+            "ORDER BY revision_no DESC LIMIT 1",
             (project_id,),
+        ).fetchone()
+        operating = (
+            {"max_same_failure_replans": 2, "max_goal_replans": 5,
+             "requires_new_evidence": True}
+            if authorization is None
+            else json.loads(authorization["payload_json"])["operating_policy"]
         )
+        if assessment.same_failure_replan_count > int(operating["max_same_failure_replans"]):
+            raise EngineServiceError(
+                f"동일 실패 재계획 한도 {operating['max_same_failure_replans']}회를 넘었습니다."
+            )
+        if assessment.goal_replan_count > int(operating["max_goal_replans"]):
+            raise EngineServiceError(
+                f"Goal 전체 재계획 한도 {operating['max_goal_replans']}회를 넘었습니다."
+            )
+        if (
+            operating.get("requires_new_evidence", True)
+            and goal_existing > 0
+            and assessment.action in {RepairAction.SUBGRAPH_REPLAN, RepairAction.GOAL_REVISION}
+            and not assessment.new_evidence_ids
+        ):
+            raise EngineServiceError("첫 재계획 이후에는 새 evidence가 필요합니다.")
         prior_ids = {evidence_id for row in existing_assessments
                      for evidence_id in json.loads(row["payload_json"])["new_evidence_ids"]}
         for evidence_id in assessment.new_evidence_ids:
@@ -4692,6 +4863,7 @@ class EngineService:
     @staticmethod
     def repair_action_for(failure_class: FailureClass) -> RepairAction:
         return {
+            FailureClass.UNCLASSIFIED: RepairAction.ABANDON,
             FailureClass.IMPLEMENTATION: RepairAction.TASK_REPAIR,
             FailureClass.CONTEXT: RepairAction.EXECUTION_SPEC_REVISION,
             FailureClass.TASK_CONTRACT: RepairAction.SUBGRAPH_REPLAN,

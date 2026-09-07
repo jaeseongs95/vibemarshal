@@ -1657,6 +1657,7 @@ class RunOnceAction(StrEnum):
     OBSERVED = "observed"
     VALIDATED = "validated"
     COMPLETED = "completed"
+    RECOVERED = "recovered"
     BLOCKED = "blocked"
     IDLE = "idle"
 
@@ -1763,6 +1764,7 @@ class RuntimeJobObservation(EngineModel):
 
 
 class FailureClass(StrEnum):
+    UNCLASSIFIED = "unclassified"
     IMPLEMENTATION = "implementation"
     CONTEXT = "context"
     TASK_CONTRACT = "task_contract"
@@ -2263,6 +2265,7 @@ class RecoveryAssessment(EngineModel):
     failure_class: FailureClass
     action: RepairAction
     rationale: str = Field(min_length=1, max_length=5000)
+    failure_fingerprint: str | None = Field(default=None, pattern=_DIGEST_PATTERN)
     new_evidence_ids: tuple[str, ...] = ()
     same_failure_replan_count: int = Field(ge=0)
     goal_replan_count: int = Field(ge=0)
@@ -2270,10 +2273,4 @@ class RecoveryAssessment(EngineModel):
     @model_validator(mode="after")
     def recovery_has_new_evidence_when_repeating(self) -> "RecoveryAssessment":
         _unique(self.new_evidence_ids, "recovery evidence")
-        if (
-            (self.same_failure_replan_count > 0 or self.goal_replan_count > 0)
-            and self.action in {RepairAction.SUBGRAPH_REPLAN, RepairAction.GOAL_REVISION}
-            and not self.new_evidence_ids
-        ):
-            raise ValueError("반복 재계획에는 새 evidence가 필요합니다.")
         return self

@@ -10,7 +10,12 @@ from typing import Any, Callable
 from pydantic import Field, model_validator
 
 from ..canonical import sha256_digest
-from .context import AdditionalContextRequest, ProjectMapper, goal_context_observations
+from .context import (
+    AdditionalContextRequest,
+    ProjectMapper,
+    goal_context_observations,
+    resolve_additional_context_request,
+)
 from .domain import (
     BudgetStage, BudgetUsageRecord, EngineModel, ExecutionSpecProposal, GoalContractRevision, PlanContractRevision,
     ProjectMapRevision, ProjectProfileRevision, TaskContract, ValidationExecutionStep,
@@ -281,6 +286,37 @@ class ExecutionProposalAdapter:
             payload=payload,
             validator=validate_task_preparation,
         )
+        if raw.context_request is not None:
+            resolution = resolve_additional_context_request(
+                project_map=ProjectMapRevision.model_validate(context["project_map"]),
+                request=raw.context_request,
+                token_budget=12_000,
+            )
+            if resolution.resolved:
+                payload = payload | {
+                    "additional_context": [
+                        item.model_dump(mode="json") for item in resolution.resolved
+                    ],
+                    "unresolved_context_request": (
+                        None
+                        if resolution.unresolved_request is None
+                        else resolution.unresolved_request.model_dump(mode="json")
+                    ),
+                }
+                raw = self._run(
+                    project_id,
+                    inventory,
+                    context,
+                    ProviderExecutionPreparation,
+                    "execution_preparation",
+                    payload=payload,
+                    instructions=(
+                        EXECUTION_PREPARATION_INSTRUCTIONS
+                        + "\n직전 ContextRequest에 대해 Project Map 전체를 검색한 additional_context가 "
+                        "제공됐다. 그 본문을 사용해 proposal을 완성하되 unresolved 항목은 추측하지 않는다."
+                    ),
+                    validator=validate_task_preparation,
+                )
         result = compile_task_preparation(raw, task)
         # 모델 호출 사이 원장 revision·관찰이 바뀌면 이전 응답을 새 snapshot에 세탁하지 않는다.
         current = execution_context(self.service, project_id)

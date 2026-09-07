@@ -54,6 +54,7 @@ from .operation_trace import (
     use_operation_trace_scope,
 )
 from .service import ContextRequiredError, EngineService, EngineServiceError
+from .recovery import EvidenceFirstFailureClassifier, FailureDiagnosis, FailureSignal
 
 
 REQUIRED_PERMISSION_PROFILE = ":danger-full-access"
@@ -1718,12 +1719,17 @@ class EngineDispatcher:
         fault_hook: Callable[[str], None] | None = None,
         proposal_provider: Any | None = None,
         supervisor: RuntimeJobSupervisor | None = None,
+        recovery_provider: Any | None = None,
+        failure_classifier: EvidenceFirstFailureClassifier | None = None,
     ) -> None:
         self.service = service
         self.runtime = runtime
         self.fault_hook = fault_hook
         self.proposal_provider = proposal_provider
         self.supervisor = supervisor
+        self.recovery_provider = recovery_provider
+        self.failure_classifier = failure_classifier or EvidenceFirstFailureClassifier()
+        self._recovery_supervisor = supervisor or RuntimeJobSupervisor(service, runtime)
         self._operation_traces: dict[str, OperationTrace] = {}
         self._operation_trace_locks: dict[str, threading.RLock] = {}
         self._attempt_provider_call_ids: dict[str, str] = {}
@@ -2297,6 +2303,29 @@ class EngineDispatcher:
         if incomplete:
             if failed is not None:
                 failure_class = FailureClass(failed["failure_class"])
+                evidence_ids, documents = self._failure_evidence(
+                    failed["attempt_id"]
+                )
+                diagnosis = FailureDiagnosis(
+                    failure_class=failure_class,
+                    repair_action=self.service.repair_action_for(failure_class),
+                    evidence_ids=evidence_ids,
+                    rationale=failed["failure_detail"] or "원장에 기록된 Attempt 실패",
+                    source=(
+                        "unclassified"
+                        if failure_class is FailureClass.UNCLASSIFIED
+                        else "direct_evidence"
+                    ),
+                )
+                automatic = self._automatic_recovery(
+                    project_id=project_id,
+                    task_id=failed["task_id"],
+                    attempt_id=failed["attempt_id"],
+                    diagnosis=diagnosis,
+                    evidence_documents=documents,
+                )
+                if automatic is not None:
+                    return automatic
                 repair_action = self.service.repair_action_for(failure_class)
                 checkpoint_required = repair_action in {
                     RepairAction.SUBGRAPH_REPLAN,
@@ -2322,6 +2351,29 @@ class EngineDispatcher:
                 project_id, plan_revision_id=project["active_plan_revision_id"]
             )
             if validation_failure is not None:
+                evidence_ids, documents = self._failure_evidence(
+                    validation_failure["attempt_id"],
+                    evidence_ids=validation_failure["evidence_ids"],
+                )
+                diagnosis = self.failure_classifier.classify(FailureSignal(
+                    terminal_status="validation_failed",
+                    final_response=None,
+                    provider_payload={
+                        "validation_result_id": validation_failure["validation_result_id"]
+                    },
+                    evidence_ids=evidence_ids,
+                    evidence_documents=documents,
+                ))
+                automatic = self._automatic_recovery(
+                    project_id=project_id,
+                    task_id=validation_failure["task_id"],
+                    attempt_id=validation_failure["attempt_id"],
+                    diagnosis=diagnosis,
+                    evidence_documents=documents,
+                    validation_result_id=validation_failure["validation_result_id"],
+                )
+                if automatic is not None:
+                    return automatic
                 return RunOnceOutcome(
                     action=RunOnceAction.BLOCKED,
                     project_id=project_id,
@@ -2346,6 +2398,443 @@ class EngineDispatcher:
         return self._advance_goal_test(
             project_id, plan, goal_validation_step=goal_validation_step,
             goal_validation_retry=goal_validation_retry,
+        )
+
+    def _failure_evidence(
+        self,
+        attempt_id: str,
+        *,
+        evidence_ids: tuple[str, ...] = (),
+    ) -> tuple[tuple[str, ...], tuple[dict[str, Any], ...]]:
+        with self.service.ledger.read() as connection:
+            if evidence_ids:
+                placeholders = ",".join("?" for _ in evidence_ids)
+                rows = connection.execute(
+                    f"SELECT id,payload_json FROM evidence_records WHERE id IN ({placeholders}) "
+                    "ORDER BY observed_at,rowid",
+                    tuple(evidence_ids),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT id,payload_json FROM evidence_records WHERE attempt_id=? "
+                    "ORDER BY observed_at,rowid",
+                    (attempt_id,),
+                ).fetchall()
+        return (
+            tuple(row["id"] for row in rows),
+            tuple(json.loads(row["payload_json"]) for row in rows),
+        )
+
+    @staticmethod
+    def _stable_recovery_id(attempt_id: str, failure_fingerprint: str) -> str:
+        digest = hashlib.sha256(
+            f"{attempt_id}:{failure_fingerprint}".encode("utf-8")
+        ).hexdigest()
+        return f"recovery_assessment_{digest[:32]}"
+
+    def _recovery_assessment(
+        self,
+        *,
+        project_id: str,
+        attempt_id: str,
+        diagnosis: FailureDiagnosis,
+    ) -> tuple[Any, bool]:
+        from .domain import RecoveryAssessment
+
+        if diagnosis.failure_class is None or diagnosis.repair_action is None:
+            raise EngineServiceError("분류되지 않은 실패에는 assessment를 만들 수 없습니다.")
+        assessment_id = self._stable_recovery_id(
+            attempt_id, diagnosis.failure_fingerprint
+        )
+        with self.service.ledger.read() as connection:
+            existing = connection.execute(
+                "SELECT payload_json FROM recovery_assessments WHERE id=?",
+                (assessment_id,),
+            ).fetchone()
+            if existing is not None:
+                return RecoveryAssessment.model_validate_json(existing["payload_json"]), True
+            same = connection.execute(
+                "SELECT COUNT(*) FROM recovery_assessments WHERE project_id=? "
+                "AND action='subgraph_replan' AND json_extract(payload_json,'$.failure_fingerprint')=?",
+                (project_id, diagnosis.failure_fingerprint),
+            ).fetchone()[0]
+            total = connection.execute(
+                "SELECT COUNT(*) FROM recovery_assessments WHERE project_id=? "
+                "AND action IN ('subgraph_replan','goal_revision')",
+                (project_id,),
+            ).fetchone()[0]
+        replan = diagnosis.repair_action in {
+            RepairAction.SUBGRAPH_REPLAN, RepairAction.GOAL_REVISION
+        }
+        assessment = RecoveryAssessment(
+            assessment_id=assessment_id,
+            attempt_id=attempt_id,
+            failure_class=diagnosis.failure_class,
+            action=diagnosis.repair_action,
+            rationale=diagnosis.rationale,
+            failure_fingerprint=diagnosis.failure_fingerprint,
+            new_evidence_ids=diagnosis.evidence_ids,
+            same_failure_replan_count=(
+                int(same) + 1
+                if diagnosis.repair_action is RepairAction.SUBGRAPH_REPLAN
+                else 0
+            ),
+            goal_replan_count=int(total) + 1 if replan else 0,
+        )
+        return assessment, False
+
+    def _automatic_recovery(
+        self,
+        *,
+        project_id: str,
+        task_id: str,
+        attempt_id: str,
+        diagnosis: FailureDiagnosis,
+        evidence_documents: tuple[dict[str, Any], ...],
+        validation_result_id: str | None = None,
+    ) -> RunOnceOutcome | None:
+        failure = diagnosis.failure_class
+        if failure is None or failure is FailureClass.UNCLASSIFIED:
+            if validation_result_id is not None:
+                return None
+            return RunOnceOutcome(
+                action=RunOnceAction.BLOCKED,
+                project_id=project_id,
+                task_id=task_id,
+                attempt_id=attempt_id,
+                validation_result_id=validation_result_id,
+                evidence_ids=diagnosis.evidence_ids,
+                blocker_code="RECOVERY_DIAGNOSIS_REQUIRED",
+                detail=diagnosis.rationale,
+            )
+        if failure is FailureClass.EXTERNAL_UNKNOWN:
+            return None
+        if failure is FailureClass.REQUIREMENT_CHANGE:
+            return RunOnceOutcome(
+                action=RunOnceAction.BLOCKED,
+                project_id=project_id,
+                task_id=task_id,
+                attempt_id=attempt_id,
+                evidence_ids=diagnosis.evidence_ids,
+                blocker_code="AUTHORIZATION_EXPANSION_REQUIRED",
+                failure_class=failure,
+                suggested_repair_action=RepairAction.GOAL_REVISION,
+                checkpoint_required=True,
+                detail="목표·범위·효과·운영 정책 확장은 사용자 승인이 필요합니다.",
+            )
+        if failure is FailureClass.ENVIRONMENT:
+            return RunOnceOutcome(
+                action=RunOnceAction.BLOCKED,
+                project_id=project_id,
+                task_id=task_id,
+                attempt_id=attempt_id,
+                evidence_ids=diagnosis.evidence_ids,
+                blocker_code="ENVIRONMENT_RECOVERY_REQUIRED",
+                failure_class=failure,
+                suggested_repair_action=RepairAction.CONTINUE,
+                checkpoint_required=True,
+                detail="환경 복구를 직접 관측하기 전에는 같은 실행을 반복하지 않습니다.",
+            )
+
+        limit = self._recovery_limit_blocker(
+            project_id=project_id,
+            task_id=task_id,
+            attempt_id=attempt_id,
+            diagnosis=diagnosis,
+            validation_result_id=validation_result_id,
+        )
+        if limit is not None:
+            return limit
+
+        assessment, already_recorded = self._recovery_assessment(
+            project_id=project_id,
+            attempt_id=attempt_id,
+            diagnosis=diagnosis,
+        )
+        if not already_recorded:
+            request = {
+                "assessment": assessment.model_dump(mode="json"),
+                "validation_result_id": validation_result_id,
+                "evidence_documents_digest": sha256_digest(evidence_documents),
+            }
+            checkpoint = f"recovery:{attempt_id}:{diagnosis.failure_fingerprint}"
+            with self.service.ledger.read() as connection:
+                row = connection.execute(
+                    "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
+                    (project_id, checkpoint),
+                ).fetchone()
+            if row is None:
+                job = self._recovery_supervisor.schedule(
+                    project_id=project_id,
+                    kind=RuntimeJobKind.RECOVERY,
+                    checkpoint_key=checkpoint,
+                    request=request,
+                    timeout_seconds=900,
+                    target=lambda: {"assessment": assessment.model_dump(mode="json")},
+                    attempt_id=attempt_id,
+                    task_id=task_id,
+                )
+            else:
+                job = self.service._runtime_job_from_row(row)
+                if job.status in {RuntimeJobStatus.SCHEDULED, RuntimeJobStatus.RUNNING}:
+                    job = self._recovery_supervisor.tick(job.job_id)
+            if job.status not in {
+                RuntimeJobStatus.PROVIDER_TERMINAL, RuntimeJobStatus.CONSUMED
+            }:
+                return RunOnceOutcome(
+                    action=RunOnceAction.DISPATCHED,
+                    project_id=project_id,
+                    task_id=task_id,
+                    attempt_id=attempt_id,
+                    detail="자동 recovery assessment job을 예약·관측했습니다.",
+                )
+            result = self.service.consume_runtime_job(job.job_id)
+            from .domain import RecoveryAssessment
+            assessment = RecoveryAssessment.model_validate(result["assessment"])
+            self.service.record_recovery_assessment(project_id, assessment)
+
+        if assessment.action is RepairAction.TASK_REPAIR:
+            self.service.retry_task(
+                task_id=task_id,
+                recovery_assessment=assessment,
+                failed_validation_result_id=validation_result_id,
+            )
+            return RunOnceOutcome(
+                action=RunOnceAction.RECOVERED,
+                project_id=project_id,
+                task_id=task_id,
+                attempt_id=attempt_id,
+                validation_result_id=validation_result_id,
+                evidence_ids=assessment.new_evidence_ids,
+                detail="원장 생성 assessment로 동일 Task repair를 활성화했습니다. 다음 실행은 새 Attempt입니다.",
+            )
+        if assessment.action is RepairAction.EXECUTION_SPEC_REVISION:
+            self.service.enable_execution_spec_recovery(
+                task_id=task_id, recovery_assessment=assessment
+            )
+            return RunOnceOutcome(
+                action=RunOnceAction.RECOVERED,
+                project_id=project_id,
+                task_id=task_id,
+                attempt_id=attempt_id,
+                evidence_ids=assessment.new_evidence_ids,
+                detail="Context 근거로 새 ExecutionSpec 준비를 활성화했습니다.",
+            )
+        if assessment.action is RepairAction.SUBGRAPH_REPLAN:
+            if not already_recorded:
+                return RunOnceOutcome(
+                    action=RunOnceAction.RECOVERED,
+                    project_id=project_id,
+                    task_id=task_id,
+                    attempt_id=attempt_id,
+                    evidence_ids=assessment.new_evidence_ids,
+                    detail="replanning 전에 자동 assessment checkpoint를 기록했습니다.",
+                )
+            return self._automatic_subgraph_replan(
+                project_id=project_id,
+                task_id=task_id,
+                attempt_id=attempt_id,
+                assessment=assessment,
+                evidence_documents=evidence_documents,
+            )
+        return None
+
+    def _recovery_limit_blocker(
+        self,
+        *,
+        project_id: str,
+        task_id: str,
+        attempt_id: str,
+        diagnosis: FailureDiagnosis,
+        validation_result_id: str | None,
+    ) -> RunOnceOutcome | None:
+        action = diagnosis.repair_action
+        if action is None:
+            return None
+        with self.service.ledger.read() as connection:
+            task = connection.execute(
+                "SELECT payload_json FROM task_contracts WHERE id=?", (task_id,)
+            ).fetchone()
+            authorization = connection.execute(
+                "SELECT payload_json FROM goal_authorizations WHERE project_id=? "
+                "ORDER BY revision_no DESC LIMIT 1",
+                (project_id,),
+            ).fetchone()
+            task_recovery = json.loads(task["payload_json"])["recovery"]
+            existing_assessment = connection.execute(
+                "SELECT 1 FROM recovery_assessments WHERE id=?",
+                (self._stable_recovery_id(attempt_id, diagnosis.failure_fingerprint),),
+            ).fetchone()
+            operating = (
+                {
+                    "max_same_failure_replans": 2,
+                    "max_goal_replans": 5,
+                    "requires_new_evidence": True,
+                }
+                if authorization is None
+                else json.loads(authorization["payload_json"])["operating_policy"]
+            )
+            task_attempts = connection.execute(
+                "SELECT COUNT(*) FROM history_events WHERE project_id=? AND entity_id=? "
+                "AND event_type IN ('task.retry_enabled','task.execution_spec_recovery_enabled')",
+                (project_id, task_id),
+            ).fetchone()[0]
+            same_replans = connection.execute(
+                "SELECT COUNT(*) FROM recovery_assessments WHERE project_id=? "
+                "AND action='subgraph_replan' "
+                "AND json_extract(payload_json,'$.failure_fingerprint')=?",
+                (project_id, diagnosis.failure_fingerprint),
+            ).fetchone()[0]
+            goal_replans = connection.execute(
+                "SELECT COUNT(*) FROM recovery_assessments WHERE project_id=? "
+                "AND action IN ('subgraph_replan','goal_revision')",
+                (project_id,),
+            ).fetchone()[0]
+            last_recovery = connection.execute(
+                "SELECT MAX(sequence) FROM history_events WHERE project_id=? AND ("
+                "event_type='recovery.assessed' OR (entity_id=? AND event_type IN "
+                "('task.retry_enabled','task.execution_spec_recovery_enabled')))",
+                (project_id, task_id),
+            ).fetchone()[0]
+            if diagnosis.evidence_ids:
+                placeholders = ",".join("?" for _ in diagnosis.evidence_ids)
+                newest_evidence = connection.execute(
+                    "SELECT MAX(sequence) FROM history_events WHERE project_id=? "
+                    "AND event_type='evidence.recorded' "
+                    f"AND entity_id IN ({placeholders})",
+                    (project_id, *diagnosis.evidence_ids),
+                ).fetchone()[0]
+            else:
+                newest_evidence = None
+
+        # 같은 assessment의 다음 checkpoint(replan/activation)는 반복 복구가 아니다.
+        if existing_assessment is not None:
+            return None
+
+        limit_code = None
+        detail = None
+        if action in {RepairAction.TASK_REPAIR, RepairAction.EXECUTION_SPEC_REVISION}:
+            maximum = int(task_recovery["max_same_failure_replans"])
+            if diagnosis.failure_class.value not in set(
+                task_recovery["retryable_failure_classes"]
+            ):
+                limit_code = "RECOVERY_NOT_AUTHORIZED"
+                detail = (
+                    f"TaskContract가 {diagnosis.failure_class.value} 자동 복구를 허용하지 않습니다."
+                )
+            elif int(task_attempts) >= maximum:
+                limit_code = "SAME_FAILURE_RECOVERY_LIMIT"
+                detail = f"동일 Task recovery 상한 {maximum}회에 도달했습니다."
+        elif action is RepairAction.SUBGRAPH_REPLAN:
+            maximum = int(operating["max_same_failure_replans"])
+            if int(same_replans) >= maximum:
+                limit_code = "SAME_FAILURE_REPLAN_LIMIT"
+                detail = f"동일 실패 재계획 상한 {maximum}회에 도달했습니다."
+        if (
+            limit_code is None
+            and action in {RepairAction.SUBGRAPH_REPLAN, RepairAction.GOAL_REVISION}
+            and int(goal_replans) >= int(operating["max_goal_replans"])
+        ):
+            limit_code = "GOAL_REPLAN_LIMIT"
+            detail = f"Goal 전체 재계획 상한 {operating['max_goal_replans']}회에 도달했습니다."
+        if (
+            limit_code is None
+            and operating.get("requires_new_evidence", True)
+            and last_recovery is not None
+            and (newest_evidence is None or int(newest_evidence) <= int(last_recovery))
+        ):
+            limit_code = "NEW_RECOVERY_EVIDENCE_REQUIRED"
+            detail = "첫 복구 이후에는 이전 checkpoint 뒤에 기록된 새 evidence가 필요합니다."
+        if limit_code is None:
+            return None
+        return RunOnceOutcome(
+            action=RunOnceAction.BLOCKED,
+            project_id=project_id,
+            task_id=task_id,
+            attempt_id=attempt_id,
+            validation_result_id=validation_result_id,
+            evidence_ids=diagnosis.evidence_ids,
+            blocker_code=limit_code,
+            failure_class=diagnosis.failure_class,
+            suggested_repair_action=action,
+            checkpoint_required=True,
+            detail=detail,
+        )
+
+    def _automatic_subgraph_replan(
+        self,
+        *,
+        project_id: str,
+        task_id: str,
+        attempt_id: str,
+        assessment: Any,
+        evidence_documents: tuple[dict[str, Any], ...],
+    ) -> RunOnceOutcome:
+        if self.recovery_provider is None:
+            return RunOnceOutcome(
+                action=RunOnceAction.BLOCKED,
+                project_id=project_id,
+                task_id=task_id,
+                attempt_id=attempt_id,
+                evidence_ids=assessment.new_evidence_ids,
+                blocker_code="REPLAN_PROVIDER_REQUIRED",
+                failure_class=assessment.failure_class,
+                suggested_repair_action=RepairAction.SUBGRAPH_REPLAN,
+                checkpoint_required=True,
+                detail="승인 범위 안의 Plan subgraph 후보와 독립 review를 생성할 provider가 필요합니다.",
+            )
+        checkpoint = f"replanning:{assessment.assessment_id}"
+        request = {
+            "assessment": assessment.model_dump(mode="json"),
+            "evidence_documents": list(evidence_documents),
+        }
+        with self.service.ledger.read() as connection:
+            row = connection.execute(
+                "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
+                (project_id, checkpoint),
+            ).fetchone()
+        if row is None:
+            job = self._recovery_supervisor.schedule(
+                project_id=project_id,
+                kind=RuntimeJobKind.REPLANNING,
+                checkpoint_key=checkpoint,
+                request=request,
+                timeout_seconds=1800,
+                target=lambda: self.recovery_provider.replan(
+                    project_id=project_id,
+                    task_id=task_id,
+                    assessment=assessment,
+                    evidence_documents=evidence_documents,
+                    inventory=self.runtime.list_models(),
+                ),
+                attempt_id=attempt_id,
+                task_id=task_id,
+            )
+        else:
+            job = self.service._runtime_job_from_row(row)
+            if job.status in {RuntimeJobStatus.SCHEDULED, RuntimeJobStatus.RUNNING}:
+                job = self._recovery_supervisor.tick(job.job_id)
+        if job.status not in {
+            RuntimeJobStatus.PROVIDER_TERMINAL, RuntimeJobStatus.CONSUMED
+        }:
+            return RunOnceOutcome(
+                action=RunOnceAction.DISPATCHED,
+                project_id=project_id,
+                task_id=task_id,
+                attempt_id=attempt_id,
+                detail="Plan subgraph 재계획·독립 review job을 예약·관측했습니다.",
+            )
+        result = self.service.consume_runtime_job(job.job_id)
+        from .planning import ExpandedPlanEvaluation
+        evaluation = ExpandedPlanEvaluation.model_validate(result)
+        self.service.register_authorized_plan_revision(evaluation)
+        return RunOnceOutcome(
+            action=RunOnceAction.RECOVERED,
+            project_id=project_id,
+            task_id=task_id,
+            attempt_id=attempt_id,
+            evidence_ids=assessment.new_evidence_ids,
+            detail="독립 review를 통과한 Plan subgraph revision을 승인 경계 안에서 자동 활성화했습니다.",
         )
 
     def _execution_spec_job(self, *, project_id: str, task_id: str) -> Any | None:
@@ -3225,18 +3714,52 @@ class EngineDispatcher:
                 ),
             )
         if terminal in self._FAILED:
+            document = {
+                "terminal_status": terminal,
+                "final_response": observation.final_response,
+                "provider_payload": observation.payload,
+            }
+            failure_evidence = EvidenceRecord(
+                evidence_id=new_id("evidence"),
+                project_id=row["project_id"],
+                task_id=row["task_id"],
+                attempt_id=attempt_id,
+                kind=EvidenceKind.EXTERNAL_OBSERVATION,
+                source_ref=f"codex-terminal:{observation.thread_id}:{observation.turn_id}",
+                observation=json.dumps(
+                    document, ensure_ascii=False, sort_keys=True
+                )[:10_000],
+                content_digest=sha256_digest(document),
+                observed_at=utc_now(),
+            )
+            self.service.record_evidence(failure_evidence)
+            diagnosis = self.failure_classifier.classify(FailureSignal(
+                terminal_status=terminal,
+                final_response=observation.final_response,
+                provider_payload=observation.payload,
+                evidence_ids=(failure_evidence.evidence_id,),
+                evidence_documents=({
+                    "kind": failure_evidence.kind.value,
+                    "observation": document,
+                },),
+            ))
+            failure_class = diagnosis.failure_class or FailureClass.UNCLASSIFIED
             self.service.finish_attempt(
                 attempt_id=attempt_id,
                 succeeded=False,
-                failure_class=FailureClass.IMPLEMENTATION,
-                detail=observation.final_response or f"terminal_status={terminal}",
+                failure_class=failure_class,
+                detail=diagnosis.rationale,
             )
             return RunOnceOutcome(
                 action=RunOnceAction.OBSERVED,
                 project_id=row["project_id"],
                 task_id=row["task_id"],
                 attempt_id=attempt_id,
-                detail=f"Attempt 실패를 관측했습니다: {terminal}",
+                evidence_ids=(failure_evidence.evidence_id,),
+                detail=(
+                    f"Attempt 실패를 관측했습니다: {terminal}; "
+                    f"classification={failure_class.value}"
+                ),
             )
         try:
             self._resume_bound_attempt(row, spec)

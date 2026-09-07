@@ -829,7 +829,7 @@ class EngineQualificationTests(unittest.TestCase):
                         self.assertEqual(create_before, runtime.create_calls)
                         self.assertEqual(turn_before, runtime.turn_calls)
 
-    def test_run_once_returns_typed_repair_proposal_after_attempt_failure(self) -> None:
+    def test_run_once_automatically_repairs_allowed_implementation_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             prepared, _ = self.prepared(Path(temp) / "repair")
             runtime = FakeCodexRuntime(self.inventory)
@@ -845,12 +845,16 @@ class EngineQualificationTests(unittest.TestCase):
             observed = dispatcher.run_once(prepared.project_id)
             self.assertEqual(RunOnceAction.OBSERVED, observed.action)
 
-            blocked = dispatcher.run_once(prepared.project_id)
-            self.assertEqual(RunOnceAction.BLOCKED, blocked.action)
-            self.assertEqual("TASK_RECOVERY_REQUIRED", blocked.blocker_code)
-            self.assertEqual(FailureClass.IMPLEMENTATION, blocked.failure_class)
-            self.assertEqual(RepairAction.TASK_REPAIR, blocked.suggested_repair_action)
-            self.assertFalse(blocked.checkpoint_required)
+            recovered = dispatcher.run_once(prepared.project_id)
+            self.assertEqual(RunOnceAction.RECOVERED, recovered.action)
+            self.assertIsNone(recovered.blocker_code)
+            with prepared.service.ledger.read() as connection:
+                self.assertEqual(1, connection.execute(
+                    "SELECT COUNT(*) FROM recovery_assessments"
+                ).fetchone()[0])
+                self.assertEqual("materialized", connection.execute(
+                    "SELECT status FROM task_contracts WHERE id=?", (prepared.task_id,)
+                ).fetchone()[0])
 
     def test_validation_and_state_reobservation_faults_resume_without_duplicate_result(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
