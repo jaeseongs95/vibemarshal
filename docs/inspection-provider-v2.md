@@ -103,4 +103,4 @@ v2 승격은 다음을 모두 별도 evidence로 충족한 뒤에만 검토한�
 2. qualification 13사례의 기존 첫 실패와 `expansion → 독립 생성 검토 → expanded-review` 경계를 보존한 v2 evidence
 3. 실제 Goal에서 입력 결속, 직접 근거, 독립 검토와 Core의 기존 판정 경계를 확인한 evidence
 
-위 증거는 v2 provider 형식의 승격 검토 조건일 뿐, 전체 qualification·cutover·`flowmarshal` 1.0 승격을 자동으로 뜻하지 않는다. 기존 qualification 범위와 token/latency Gate, 실제 프로젝트 E2E 요구는 계속 별도로 적용한다.
+위 증거는 v2 provider 형식의 승격 검토 조건이다. 기본 provider는 qualification된 v1을 유지하며 위 조건을 모든 제품 실행의 선행조건으로 적용하지 않는다. 전체 qualification·cutover·`flowmarshal` 1.0 승격은 [승인 계약 V01·V02](redesign-1.0-contract.md)의 기능·안전·실제 역할·Planning·실제 요청 E2E·설치·독립 감사가 필요하다. token/latency 비교는 별도 비차단 보고이며 과거 v1/v2 결과는 보존한다.

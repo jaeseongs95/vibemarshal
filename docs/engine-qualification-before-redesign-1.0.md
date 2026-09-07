@@ -1,0 +1,92 @@
+# FlowMarshal Engine 1.0 qualification
+
+이 문서는 개발용 `flowmarshal-engine-eval`의 실행 계약을 설명한다. 네 기능 scope와 token/latency Gate를 모두 실제로 통과하기 전까지 판정은 `NO-GO`이며 package와 기본 CLI는 `flowmarshal-engine` pre-1.0 상태를 유지한다.
+
+2026-09-06 최초 v9 source의 [실제 역할 48건](role-fixture-48-qualification.md)은 정상 요청 오차단 1건·schema failure 1건으로 FAIL이었다. 전달 schema/사후 validator 불일치와 의미 문맥 검토를 보완한 v12는 실제 48/48 PASS와 전체 정산 감사를 완료했다. E2E 완료 observer까지 보완한 v13은 결정적 Gate 5/5·842개 테스트, 역할 48/48 PASS 뒤 Planning 18/18 완료·FAIL을 기록했다. 출력 안내와 사용량·재시작·선행 Gate 조회 보완은 후속 source에서 다시 검증한다. 현재 source별 판정은 [반복 검증 기록](pre-1.0-iterative-validation.md)을 따른다. 이전 같은 Goal의 `satisfied`는 여러 source와 운영 보정의 진단·복구 결과로 구분한다.
+
+generic 출력 계약은 v10에서 수정했다. provider schema와 typed validator에 같은 빈 Task ref 제약을 두었으며 실제 Goal/Plan의 Task ref는 유지한다. fixture·oracle·합격선은 보존한다. prompt/schema 또는 source가 달라진 실제 checkpoint는 재사용하지 않는다.
+
+## 고정 입력
+
+- 역할 설정: 기본 fixture는 `config/qualification-roles.json`이며 실제 실행은 `--role-config`로 명시한 설정과 digest를 계약에 고정한다. 실제 48건은 `tests/fixtures/engine/plan-inspection-general-reviewer-sol-xhigh-roles.json`을 사용했다. 과거 기본 fixture의 설정을 묵시적으로 이번 실행에 적용하지 않는다.
+- 공통 finding taxonomy: `config/qualification-finding-taxonomy.json`
+- legacy 동결: `config/legacy-freeze-manifest.json`
+- reviewer 회귀: `tests/fixtures/engine/r31-reviewer-regressions.json`, `goal-reviewer-regressions.json`
+- planning 시나리오: `tests/fixtures/engine/planning-scenarios.json`
+- 실제 프로젝트 E2E 원본: `tests/fixtures/engine/project-e2e`
+- order seed: `17`, `43`, `89`
+
+각 run의 `EvaluationContract`는 scenario·fixture, seed, 역할 설정, source manifest, prompt, schema, taxonomy, threshold와 `model/list` inventory를 digest로 고정한다. 이 중 하나가 달라지면 기존 run root를 재사용할 수 없다.
+
+실제 모델 scope에는 `--budget-policy config/pre-1.0-validation-budget.json`과 `--role-timeout-policy config/pre-1.0-role-timeouts.json`을 명시한다. 정책 본문과 digest를 evaluation contract·run metadata에 함께 고정하고, 재개 시 이를 대조한다. 모델 호출은 Goal별 새 원장의 공통 예약·정산을 사용하며 schema recovery는 0회다. Goal 정규화 이전의 호출도 같은 Goal ID로 예약하고 revision 등록 뒤 연결한다. 정책 누락·미확인 사용량·예산 부족은 다음 provider 호출 전에 차단한다.
+
+테스트 작업의 Codex 프로젝트 소속은 `--codex-project-binding <JSON>`으로 고정한다. JSON에는 App Server의 `project_id`, `expected_root`, 선택적 `expected_name`을 둔다. Desktop UI의 프로젝트 ID나 cwd만으로 소속을 추정하지 않는다. runtime은 실제 `project/read`와 생성 응답을 검증하고, 빈 새 thread의 생성 증명은 첫 turn에 한 번만 사용한다. 이후 조회·재개에는 저장 thread의 정확한 프로젝트 ID가 필요하다. 프로젝트 결속을 지원하는 실행 파일과 정책 digest도 새 평가 계약에 포함한다.
+
+예산은 Goal별 호출 전 admission과 종료 후 정산을 집행한다. 현재 실행기에는 campaign 전체의 합산 cap이 없고 실제 한 호출의 사용량이 예약을 초과할 수 있다. Goal 상한의 합계나 예약량을 실제 campaign 최대치로 표현하지 않는다. 완료한 진단 Goal의 2m/200k override는 새 qualification Goal에 승계하지 않는다. 사용자는 2026-09-06에 기존 1m/100k/25 정책 안에서 실패 원인 분석·수정·전수 재검증과 후속 Planning·E2E·성능 검증을 계속하도록 승인했다. token 상한 또는 호출 예약량을 늘릴 때만 추가 승인받는다. 원래 실행의 실패·사용량·receipt는 보존한다.
+
+## Scope
+
+`deterministic`은 `compileall`, 전체 테스트, `pip check`, synthetic lifecycle과 legacy freeze를 검사한다. 하나라도 실패하면 실제 모델 scope는 시작하지 않는다.
+
+synthetic lifecycle의 프로젝트 입력은 `tests/fixtures/engine/synthetic-lifecycle-project`에 고정한다. 이 fixture와 검사 규칙은 평가 계약에 결속하고 원장·artifact는 임시 경로에 둔다. 저장소 전체 문서량에 따라 합성 상태 전이 검사의 Context가 달라지지 않게 하며, 전체 저장소 코드 검증은 전체 테스트·compileall·freeze에서 수행한다. 합성 fixture는 실제 모델 E2E를 대신하지 않는다.
+
+`role-fixture`는 plan 8건과 Goal 8건을 seed 3개로 실행한다. recall 90%, precision 85%, critical false admission 0, clean false block 0, schema failure 0, critical seed 불일치 0을 모두 요구한다.
+
+개별 필수 finding 누락은 `diagnostics`와 raw cell에 항상 보존하고 recall에 반영한다. 누락 한 건을 독립 FAIL로 처리해 사실상 recall 100%를 요구하지 않는다. critical false admission·clean false block 등 0건 조건은 여전히 개별 한 건도 Gate 실패다. 이 구분을 잘못 적용한 과거 보고서는 변경하지 않으며 새 source 계약에서만 수정 판정기를 사용한다.
+
+`full-planning-pipeline`은 bugfix, 읽기 전용 분석, migration 전략 비교, produces/consumes DAG, 필수 context 부족, 비가역 외부 효과를 seed 3개로 실행한다. clean 입력은 Plan 선택, adversarial 입력은 질문 또는 차단이어야 하고 전체 역할 호출 14회 및 candidate version 5개 한도를 지킨다.
+
+`project-e2e`는 원본 fixture를 run root 아래에 복사하고 네 cell 모두 실제 Codex adapter를 사용한다. 정상 완료는 안전한 코드 수정·테스트·Task validation·Goal Test를 검사한다. stale materialization은 dispatch 전 차단을, receipt 불명확 복구는 실제 thread 생성 직후 receipt 저장 전 fault와 중복 생성 방지를 검사한다. 저장 turn 재개는 실제 turn 중단 후 App Server 연결과 Core 인스턴스를 새로 열어 `thread/read` → 필요할 때만 `thread/resume`하는 순서를 확인하고 최종 Goal까지 진행한다. 각 호출의 receipt는 별도 journal과 완료 cell에 결속한다. 단위 테스트에서는 동일 harness에 모의 runtime을 주입하지만 그 결과를 실제 qualification으로 집계하지 않는다. 원본 fixture는 수정하지 않는다.
+
+`run once` CLI가 dispatch한 turn은 해당 CLI가 App Server 연결을 소유하므로 현재 turn 종료 또는 ExecutionSpec timeout까지 연결을 유지한다. 이 대기 중에는 추가 Core 상태 전이를 하지 않으며, 다음 `run once`/`attempt observe`가 저장된 결과를 읽는다. 호출 자체의 강제 종료는 recovery 대상이다.
+
+`run once --role-config <설정 파일>`은 ready Task의 실제 실행 상세화를 설정된 역할에 요청하고 Core가 검사·결속한다. 필수 자료가 없으면 구조화 Context 요청으로 차단한다. 모든 Task가 완료되면 독립 Goal Test의 상세화를 준비하고 다음 호출에서 명령 또는 별도 Validator 검사를 수행한다. 수동 경로는 `--proposal-file`, `--goal-validation-file`로 유지한다. 실제 E2E는 Task unittest와 별도로 Goal unittest를 재실행한 task-less evidence까지 요구한다.
+
+준비·검증 효과의 intent와 완료 관측은 Core History에 기록한다. 완료 관측 뒤 프로세스 중단은 재사용으로 복구하고, receipt 없는 호출은 재생성하지 않는다. 준비 역할의 세부 thread receipt를 잃은 경우 자동 추정·재개하지 않는 보수적 한계가 있으며, 사용자 확인을 포함한 별도 reconciliation이 필요하다.
+
+정산된 역할의 schema 실패는 원래 request/schema/model/inventory/timeout·provider receipt·usage 계보를 대조해 `operation.failed`로 보존한다. 과거 미종료 operation도 같은 thread/turn의 비활성 completed terminal을 재개 없이 관측한 경우에만 명시 API로 실패 종료할 수 있다. 같은 실패 요청의 자동 재호출은 차단한다. timeout·관측 불명·binding 불일치는 이 경로로 완료 처리하지 않는다.
+
+## Checkpoint와 재개
+
+완료 cell만 `cells/seed-*/`에 배타적으로 생성되고 다른 결과로 덮어쓸 수 없다. 재개 가능한 사용량 제한만 `run-state.json`의 `PAUSED_RATE_LIMIT`으로 기록한다. Full Planning은 provider 호출이 시작된 미완료 cell에 중간 역할 checkpoint가 없어 자동 재개하지 않는다. Benchmark도 완료 checkpoint 없는 기존 attempt를 새 attempt·Goal 예산으로 반복하지 않는다. 이 경우 `FAILED`와 관련 원장·호출·다음 조치를 보존하고, 기존 provider 상태와 예산을 먼저 대조한다. E2E는 복구를 구현한 정상 완료 cell만 재개 대상으로 안내한다.
+
+```powershell
+flowmarshal-engine-eval resume --run-root D:\path\to\existing-run
+```
+
+prompt, schema, oracle, threshold, source manifest, 역할 설정 또는 model inventory가 달라지면 기존 호출을 대조한 뒤 새 run root를 사용한다. `project-e2e`의 재개 가능한 `normal-completion` cell은 digest-bound `cell-state.json`, 기존 Engine 원장과 workspace를 같은 run root에서 다시 열어 관측한다. 중단·재시작 자체를 검사하는 다른 cell은 중간 실행을 자동 반복하지 않는다. 완료되지 않은 cell을 결과 checkpoint로 간주하거나 새 프로젝트·thread로 재생성하지 않는다.
+
+## Benchmark와 cutover
+
+benchmark 입력은 6개 중립 planning scenario × seed 3개 × `r31_baseline`/`skeleton_engine`의 36개 `BenchmarkCell`이다. 각 pair는 같은 scenario digest, 중립 파일·정책 digest, model lock과 functional result digest를 가져야 하며 실제 Runner receipt digest를 포함한다. `benchmark`는 두 구현을 별도 작업 복사본에서 순차 호출한다. R3.1은 Engine 밖의 `flowmarshal.benchmark_legacy` 프로세스에서 호출하며 frozen source·Planner 스킬·campaign artifact와 기존 판정을 변경하지 않는다. `benchmark --cells-file`은 외부 결과의 수입·판정 경로로 유지한다.
+
+R3.1 비교 subprocess는 동결 source 밖의 `legacy_budget_proxy`에서 역할별 호출 전에 같은 예산 원장에 예약하고 종료 뒤 정산한다. 부모는 원장·History·journal·원본 receipt를 일대일로 대조하며 역할·model/effort·inventory·실행 파일·정책과 token component 불일치 또는 중복을 차단한다. 동기 RPC와 부모 프로세스에는 주입 정책에서 계산한 timeout을 적용한다. 프로세스 트리 종료 관측은 별도로 보존하고 미정산 예약을 자동 해제하지 않는다. 프로젝트 결속이 없으면 기존 legacy 임시 thread와 Engine 저장형 thread 정책을 유지한다. 프로젝트 결속이 있으면 bridge가 legacy의 원래 임시 thread 요청을 별도 기록하고 실제 요청에는 저장형 thread와 명시 프로젝트를 적용한다. 이 차이는 비교 계약에 결속하며 oracle·합격선·R3.1 동결 source는 바꾸지 않는다.
+
+수집 범위는 계획 시작부터 최종 선택 또는 질문·차단까지다. token은 실제 uncached input과 output의 합이며 usage가 없으면 0으로 추정하지 않고 수집을 중단한다. 최초 feasible 시각은 Core의 결정적 admission 직후 관측한다. 상세 Task는 파일·명령을 확정한 운영 실행 명세를 뜻하며 목적·DAG만 있는 semantic TaskContract를 포함하지 않는다. 활성화 전 ExecutionSpec을 만들지 않는 Engine 경로는 운영 상세 생성 수가 0이다. 폐기 후보 출력은 후보별 expander/refiner의 실제 receipt로 계산하고, 여러 Skeleton이 한 응답에 담긴 출력 token을 임의로 후보별 배분하지 않는다.
+
+```powershell
+flowmarshal-engine-eval benchmark --codex-bin C:\path\to\codex.exe --budget-policy config/pre-1.0-validation-budget.json --role-timeout-policy config/pre-1.0-role-timeouts.json --scope-report <deterministic-report> --scope-report <role-report> --scope-report <planning-report> --scope-report <e2e-report>
+flowmarshal-engine-eval resume --run-root D:\path\to\benchmark-run
+```
+
+완료된 cell은 재개 시 호출하지 않는다. 부분 호출 진단과 실패 원인은 별도 보존하며 미완료 cell을 immutable 완료 checkpoint로 표시하지 않는다. 실제 모델 Gate를 다른 모델 작업과 동시에 실행하면 latency 비교에 영향을 줄 수 있으므로 성능 측정은 다른 qualification 호출을 마친 뒤 수행한다.
+
+실제 runtime의 실행 파일 SHA-256도 `model/list` inventory의 source identity에 결속한다. `--codex-bin`을 바꾸면 새 model lock·새 run root가 필요하며 모델 ID나 effort는 자동으로 바꾸지 않는다.
+
+`BenchmarkCell` v3는 기대 판정과 실제 판정, 최종 판정 시간과 실행 lifecycle 관측을 명시한다. 정상 4개 × seed 3개의 pair만 최초 feasible plan 시간을 비교하고, 정보 부족 2개 × seed 3개는 해당 값을 `null`로 두어 질문·차단 지연을 별도로 집계한다. token은 6개 모두 비교한다. 정상 입력의 Plan 생성 실패는 Gate 실패이며 차단 시간을 계획 생성 시간으로 대입하거나 0으로 채우면 schema에서 거부한다. 선택된 Engine Plan의 상세화 폐기율은 Execution Spec 생성·Worker 종료·Task 검증·독립 Goal Test·최종 판정에 결속한 lifecycle에서 측정한다. 이 관측이 없으면 `NOT_OBSERVED`와 `null`을 반환하고 Gate를 통과시키지 않는다. 기존 합격선은 유지하며 이전 형식의 보고서나 checkpoint를 v3로 자동 변환하지 않는다.
+
+새 lifecycle v2 관측은 같은 Goal ID 계보에서 실제 materialize된 모든 Execution Spec revision을 포함한다. 실패했어도 Worker 호출이 관측된 Spec은 실행한 것으로 세며, 효과 전 중단이 확인된 Spec만 미실행으로 센다. 결과가 불명확하면 비율은 null이다. 현재 성공 Task만 세거나 과거 revision을 제외해 폐기 비용을 축소하지 않는다. 상세 Plan 출력 비용은 expander·refiner의 정확한 call/receipt/output/Plan digest에 결속하며 응답 배열의 순서로 추정하지 않는다. 반박·Skeleton 수정 응답도 전체 역할 비용에는 남긴다.
+
+Engine benchmark cell은 `selected-plan.json`, `execution-checkpoint.json`, 동일 Goal의 `budget-state` 원장을 보존한다. 사용자가 정확한 Plan을 활성화하고 Core 실행·검증이 완료되면 다음 명령으로 provider 호출 없이 lifecycle을 재관측한다.
+
+```powershell
+flowmarshal-engine-eval observe-benchmark-lifecycle --project-root <고정-source> --run-root <benchmark-run> --scope-report <deterministic-report> --scope-report <role-report> --scope-report <planning-report> --scope-report <e2e-report>
+```
+
+이 명령은 원래 checkpoint·raw·실패 보고서를 유지하고 `lifecycle-observations`와 `lifecycle-assessments` 아래에 digest로 구분한 불변 근거를 추가한다. 미완료 원장, 누락 cell, 다른 source·계약·receipt는 PASS가 아니다. 새 assessment의 `token-latency-report.json`은 같은 source의 네 기능 보고서와 함께 cutover에 전달할 수 있다.
+
+입력·taxonomy를 명확히 한 역할 fixture v2는 기존 기대 판정·필수 코드·허용 코드·합격선을 그대로 둔다. 원본 Engine 축약 fixture는 `tests/fixtures/engine/archive/`에 보존한다. 정규화와 Reviewer는 같은 실제 파일 관측을 받고, 전체 planning cell에는 Goal preparation·질문·Plan 후보와 finding 원문을 함께 저장한다. 정보 부족 입력이 단순한 Plan 생성 오류로 끝난 것은 올바른 질문·차단의 PASS로 집계하지 않는다.
+
+`cutover`는 네 개의 `qualification-report.json`과 수집한 token/latency report를 명시적으로 받는다. 원본 계약의 source·역할·model lock을 확인하고 36-cell 성능 결과를 다시 계산한다. 누락·실패·다른 계약의 report가 하나라도 있으면 승격하지 않는다. 보고서가 모두 PASS인 경우에만 package를 `flowmarshal` 1.0.0으로 승격하며 DB migration이나 배포는 수행하지 않는다.
+
+정상 프로젝트 E2E는 실제 상세화 역할이 준비한 ExecutionSpec, Worker, 직접 unittest, 독립 semantic Task validator, 별도 Goal Test 명령을 통과해야 한다. 직접 파일 evidence는 digest와 제한된 실제 내용 발췌를 포함하고 검토 전후 freshness를 확인한다. 수동·외부 Goal 관측도 현재 실행 binding과 selector에 결속하며 다른 evidence 종류로 재표시하지 않는다.

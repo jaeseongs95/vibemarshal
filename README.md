@@ -10,11 +10,9 @@ VibeMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고
 
 최신 상태의 단일 진입점은 [Engine 구현 현황](docs/engine-implementation-status.md)이다. [1.0 선행 로드맵](docs/pre-1.0-roadmap.md)에 승인된 구현 순서와 후속 기능을 구분했고, [현재 작업 인계](docs/pre-1.0-handoff.md)에 이번 변경과 다음 실행 조건을 기록한다.
 
-현재 판정은 **NO-GO**다. v25의 실제 static11은 **10 PASS·1 NOT_RUN·전체 FAIL**이다. 이전 v24의 동일 10사례는 1 PASS였으며, 검사 기여 관계 규칙을 보완한 뒤 의미 오류가 개선됐다. 11번째는 실측 누계 **656,226 token**에 다음 호출 예약 100,000을 더하면 일반 사용 가능분 750,000을 넘어서 호출 전에 차단됐다. 추가 실제 모델 호출은 중단했다. 관측 범위를 과장한 검증 입력을 독립 검토 후 바로잡은 v26은 개발·동결 환경에서 **결정적 Gate 5/5·946개 테스트 PASS**이며 실제 모델 검증은 미실행이다. 최종 source의 S06·역할·Planning·E2E·성능 검증과 main 병합은 미완료다. 제품 기본 provider는 v1을 유지한다. source별 원본 실패·실측·재개 조건은 [반복 검증 기록](docs/pre-1.0-iterative-validation.md)에 보존한다. v19는 실제 역할 **48/48 PASS**, Planning **18/18 완료·15 PASS·3 FAIL**, 정상 Plan 선택 9건과 110회 호출 **4,059,253 token**의 정산·History 감사가 완료된 과거 기준선이다. 이 결과를 새 source의 선행 Gate로 재사용하지 않는다.
+현재 제품 1.0은 **미완료 / NO-GO**다. [승인된 12개 설계 항목과 필수 검증](docs/redesign-1.0-contract.md)을 문서에 반영했으며 새 GoalAuthorization·schema 4·RuntimeJobSupervisor·응용 CLI·패키징은 **planned**다. 실제 구현과 결정적·역할48·Planning18·실제 요청 E2E·설치·독립 감사는 후속 태스크의 책임이다. 과거 테스트와 실제 평가 결과는 [승인 이전 구현 현황](docs/engine-implementation-status-before-redesign-1.0.md)에 보존하며 새 PASS로 집계하지 않는다.
 
-v13은 결정적 Gate 5/5·842개 테스트를 통과한 과거 고정 source다. source별 결과·예산·감사는 [보완 후 반복 검증](docs/pre-1.0-iterative-validation.md)에 연결하며, 과거 판정·원시 응답·기존 합격선은 그대로 보존한다.
-
-새 Engine schema revision은 **3**이다. Goal별 최종 보고, 전체 역할 usage 예약·정산, 명시적 모델 재결속과 공통 조회를 보완했다. 기존 revision 2 원장을 자동 변환하지 않으며, 사용량이 미확인이면 추가 모델 호출을 중단한다. 권장 검증 예산은 설정 파일로 주입하며 제품 상한으로 하드코딩하지 않는다.
+종료·유효 결과가 확인되면 usage 누락만으로 후속 실행을 막지 않고 미측정량은 null/unknown으로 남긴다. 외부 효과 미확정은 기존 intent/binding을 먼저 관측한다. 기본 provider는 qualification된 v1이며 v2 채택 평가와 R3.1 비교 성능은 모든 제품 실행의 선행조건이 아니다. 비교 성능 보고는 비차단 후속이다.
 
 R3.1은 동결된 prototype 감사 기준선이다. [최종 동결 판정](docs/r31-frozen-baseline.md)을 현재 Engine의 qualification으로 재사용하지 않는다.
 
@@ -27,7 +25,8 @@ R3.1은 동결된 prototype 감사 기준선이다. [최종 동결 판정](docs/
 → Skeleton 1~3개 생성
 → 결정적 Gate·compact review·pruning
 → 최대 2개만 Plan Contract 후보로 상세화
-→ 사용자 exact-digest 활성화
+→ 사용자 목표·범위·효과·운영 정책 승인(GoalAuthorization)
+→ Core의 내부 Plan revision 자동 활성화
 → ready Task의 Execution Spec·Context Pack materialize
 → precondition·snapshot·effect checkpoint
 → Codex 실행·receipt·binding
@@ -36,7 +35,7 @@ R3.1은 동결된 prototype 감사 기준선이다. [최종 동결 판정](docs/
 → Continue | Repair | Subgraph Replan | Goal Revision
 ```
 
-사용자가 승인하는 단위는 목표·Task 의미·DAG·완료 조건·위험을 담은 `PlanContractRevision`이다. 실제 파일·symbol·명령·Context Pack은 Task가 ready가 될 때 계약 범위 안에서 결정한다. 운영 상세가 바뀔 때마다 반복 승인을 요구하지 않지만, 목표·Task 의미·dependency·완료 조건·외부 효과가 바뀌면 새 Plan Contract가 필요하다.
+사용자는 목표·대상·허용 효과·운영 정책을 승인한다. Core는 이 경계 안에서 immutable Plan revision을 자동 활성화하고 작업 분할·재계획·복구를 수행한다 (planned). 목표·범위·효과·정책 확장에만 추가 판단을 요청하며 사용자의 exact Plan ID·digest 입력은 필수가 아니다. 실제 파일·symbol·명령·Context는 ready 시점에 결정하고 효과 직전에 다시 검증한다.
 
 ## 핵심 안전성과 사용성 원칙
 
@@ -50,7 +49,9 @@ R3.1은 동결된 prototype 감사 기준선이다. [최종 동결 판정](docs/
 - 모델의 “완료” 선언이 아니라 evidence와 validation으로 Task와 Goal을 완료한다.
 - 같은 프로젝트는 먼저 직렬 실행한다. 병렬화와 VM·WSL·permission hardening은 별도 qualification 뒤에 연다.
 
-## 개발 CLI
+## 기존 개발 CLI（schema 3）
+
+아래는 재설계 전 명령 표면이다. 새 EngineApplication 명령과 패키지 전환은 planned이며 [현재 인계](docs/pre-1.0-handoff.md)의 후속 구현·검증을 거친다. 역사적 adjust-unknown은 새 usage 누락 해소 절차로 사용하지 않는다.
 
 ```text
 flowmarshal-engine project init|show
@@ -71,7 +72,7 @@ flowmarshal-engine report progress|final
 
 `goal create --live`와 `plan search --live`는 역할별 model/effort를 호출자가 명시해야 한다. Engine은 이를 최신 App Server model inventory와 대조하고, 지원되지 않는 값을 임의 fallback으로 숨기지 않는다.
 
-개발 qualification은 별도 CLI로 실행한다. 완료 cell만 immutable checkpoint가 된다. 재개 가능한 사용량 제한만 `PAUSED_RATE_LIMIT`으로 표시하며, 중간 호출의 효과·예산을 복원할 수 없는 pipeline은 `FAILED`와 복구 이유를 남긴다. 기존 thread·원장을 먼저 관측하고 미확인 호출을 새 attempt·예산으로 우회하지 않는다.
+아래는 schema 3 개발 qualification CLI의 역사적 명령이다. 새 harness와 Engine-only 패키지 분리는 planned다. 기존 thread·원장을 먼저 관측하고 미확정 효과를 새 attempt로 우회하지 않는다. usage 누락만으로 새 실행을 차단하거나 아래 benchmark-report 옵션을 현재 1.0 필수 조건으로 사용하지 않는다.
 
 ```powershell
 flowmarshal-engine-eval run --scope deterministic
@@ -85,16 +86,18 @@ flowmarshal-engine-eval cutover --scope-report <report> ... --benchmark-report <
 
 고정 역할 설정과 상세 합격 기준은 [Engine qualification 실행 지침](docs/engine-qualification.md)을 따른다.
 
-실제 모델 평가에는 `--codex-bin <검증할 codex.exe의 절대 경로>`를 명시할 수 있다. 이 작업에서 SDK 동봉 runtime은 응답 API 404를 반환했고 설치된 앱 runtime을 명시한 실행은 정상 동작했다. 검증한 실행 파일과 실패·성공 범위는 [실행 현황 보고서](docs/engine-implementation-status.md)에 기록한다. 실행 파일을 바꾸면 새 evaluation 계약과 run root를 사용한다.
+실제 모델 평가에는 검증할 Codex executable과 명시 source root·재현 입력을 결속한다. 과거 SDK/runtime 실패·성공 관측은 [승인 이전 실행 현황](docs/engine-implementation-status-before-redesign-1.0.md)의 해당 source 근거로만 읽는다. 실행 파일을 바꾸면 새 evaluation 계약과 run root를 사용한다.
 
-현재 `benchmark`는 외부 36-cell 입력 검증과 frozen R3.1·Engine의 중립 입력 live 수집 경로를 구현한다. S10~S12의 usage·결측·예산을 연결했고 실제 48회 정산도 감사했다. 측정되지 않은 lifecycle 폐기 비율은 null/NOT_OBSERVED로 남긴다. 수집기 구현·회귀와 실제 성능 Gate 통과는 별개이며, 36-cell 비용 비교는 아직 실행하지 않았다.
+기존 benchmark 수집기·S10~S12 계측·정산 감사는 과거 구현 근거다. 측정되지 않은 lifecycle 비율은 null/NOT_OBSERVED로 남긴다. R3.1 36-cell 비교는 별도 비차단 보고이며 새 1.0 필수 검증을 대신하지 않는다.
 
 동결 검사는 이 저장소 외에 형제 디렉터리 `../자동화템플릿/prototypes/skills/flowmarshal-work-planner`의 원본 Planner 스킬 7개 파일도 요구한다. 새 clone에서 해당 감사 기준선이 없으면 freeze Gate는 실패하며 자동으로 생략하거나 재생성하지 않는다. 인증정보·로컬 실행 DB·Codex home 복제본·평가 작업 디렉터리는 Git에서 제외하고 기존 로컬 파일은 보존한다.
 
-## 설치와 검증
+## source-tree 개발 설치와 검증
+
+다음 editable 설치는 개발용이다. 승인된 source_root에서 실행하며 로컬 main을 작업 대상으로 묵시 선택하지 않는다. 1.0의 깨끗한 non-editable 설치 검증은 FM-10/12의 별도 필수 책임이다.
 
 ```powershell
-cd D:\codex\flowmarshal
+cd <승인된-source_root>
 .\.venv\Scripts\python.exe -m pip install -e .
 .\.venv\Scripts\python.exe -m compileall -q src tests
 .\.venv\Scripts\python.exe -m unittest discover -s tests -v
@@ -105,11 +108,11 @@ cd D:\codex\flowmarshal
 
 ```powershell
 .\.venv\Scripts\python.exe -m unittest discover -s tests -p 'test_engine*.py' -v
-.\.venv\Scripts\python.exe -m flowmarshal.engine.smoke --project-root D:\codex\flowmarshal
+.\.venv\Scripts\python.exe -m flowmarshal.engine.smoke --project-root <승인된-source_root>
 .\.venv\Scripts\flowmarshal-engine.exe --help
 ```
 
-기본 상태는 프로젝트 루트의 `.flowmarshal-engine/flowmarshal-engine.sqlite3`와 `.flowmarshal-engine/artifacts`에 저장한다. Engine DB schema revision은 2이고 SQLite application ID `0x464D4531`을 사용한다. revision 1, prototype 또는 alpha DB는 자동·제자리 migration하지 않는다.
+기본 상태는 프로젝트 루트의 `.flowmarshal-engine/flowmarshal-engine.sqlite3`와 `.flowmarshal-engine/artifacts`에 저장한다. FM-01 시작 source의 schema revision은 3이며 새 schema 4와 schema 3 read-only reader는 planned다. SQLite application ID `0x464D4531`과 schema revision을 각각 검사하고 prototype/운영 DB의 자동 제자리 migration을 금지한다.
 
 ## 코드 지도
 
