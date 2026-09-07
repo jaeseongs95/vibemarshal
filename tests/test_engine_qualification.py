@@ -818,14 +818,14 @@ class EngineQualificationTests(unittest.TestCase):
                     )
                     self.assertLessEqual(runtime.create_calls, 1)
                     self.assertLessEqual(runtime.turn_calls, 1)
-                    if point in {
-                        "after_thread_intent",
-                        "after_thread_effect",
-                        "after_turn_intent",
-                        "after_turn_effect",
-                    }:
+                    if point in {"after_thread_intent", "after_turn_intent"}:
                         self.assertEqual(RunOnceAction.BLOCKED, recovered.action)
                         self.assertEqual("EXTERNAL_EFFECT_UNKNOWN", recovered.blocker_code)
+                        self.assertEqual(create_before, runtime.create_calls)
+                        self.assertEqual(turn_before, runtime.turn_calls)
+                    elif point in {"after_thread_effect", "after_turn_effect"}:
+                        self.assertEqual(RunOnceAction.OBSERVED, recovered.action)
+                        self.assertIn("정확한 provider receipt/binding", recovered.detail)
                         self.assertEqual(create_before, runtime.create_calls)
                         self.assertEqual(turn_before, runtime.turn_calls)
 

@@ -41,6 +41,7 @@ from .domain import (
     RiskLevel,
     RoleAssignmentPolicy,
     RunOnceAction,
+    RuntimeReceipt,
     SourceTrace,
     TaskContract,
     TaskKind,
@@ -1071,12 +1072,26 @@ def _unknown_receipt(
         failed = True
     recovered = EngineDispatcher(prepared.service, runtime).run_once(prepared.project_id)
     reconciliation: dict[str, Any] | None = None
-    if isinstance(runtime, RecordedRuntime):
+    if (
+        isinstance(runtime, RecordedRuntime)
+        and (
+            recovered.action is RunOnceAction.OBSERVED
+            or (
+                recovered.action is RunOnceAction.BLOCKED
+                and recovered.blocker_code == "EXTERNAL_EFFECT_UNKNOWN"
+            )
+        )
+    ):
         reconciliation = _reconcile_unknown_empty_thread(prepared, runtime)
     return {
         "passed": failed
-        and recovered.action is RunOnceAction.BLOCKED
-        and recovered.blocker_code == "EXTERNAL_EFFECT_UNKNOWN"
+        and (
+            recovered.action is RunOnceAction.OBSERVED
+            or (
+                recovered.action is RunOnceAction.BLOCKED
+                and recovered.blocker_code == "EXTERNAL_EFFECT_UNKNOWN"
+            )
+        )
         and runtime.create_calls == 1
         and runtime.turn_calls == 0
         and (reconciliation is None or reconciliation["passed"]),
@@ -1093,13 +1108,14 @@ def _reconcile_unknown_empty_thread(
     prepared: PreparedE2E,
     runtime: RecordedRuntime,
 ) -> dict[str, Any]:
-    """생성 receipt 유실을 기존 thread의 turn 0 관측으로만 해소한다."""
+    """trace/외부 journal로 결속된 생성 receipt의 turn 0을 관측해 해소한다."""
 
     with prepared.service.ledger.read() as connection:
         rows = connection.execute(
             "SELECT i.*, a.project_id FROM runtime_intents i "
             "JOIN attempts a ON a.id=i.attempt_id "
-            "WHERE a.project_id=? AND i.kind='create_thread' AND i.status='unknown'",
+            "WHERE a.project_id=? AND i.kind='create_thread' "
+            "AND i.status IN ('unknown','received')",
             (prepared.project_id,),
         ).fetchall()
     if len(rows) != 1:
@@ -1130,13 +1146,25 @@ def _reconcile_unknown_empty_thread(
     thread = receipt.payload.get("thread")
     if not isinstance(thread, dict) or thread.get("id") != receipt.binding.thread_id or thread.get("turns") != []:
         raise QualificationRunError("E2E_UNKNOWN_CREATE_RECEIPT_NOT_EMPTY_THREAD")
-    restored_receipt = prepared.service.record_runtime_receipt(
-        intent_id=intent["id"],
-        provider_operation_id=receipt.operation_id,
-        response=receipt.payload,
-        binding=receipt.binding,
-        allow_reconcile_unknown=True,
-    )
+    if intent["status"] == "unknown":
+        restored_receipt = prepared.service.record_runtime_receipt(
+            intent_id=intent["id"],
+            provider_operation_id=receipt.operation_id,
+            response=receipt.payload,
+            binding=receipt.binding,
+            allow_reconcile_unknown=True,
+        )
+    else:
+        with prepared.service.ledger.read() as connection:
+            stored = connection.execute(
+                "SELECT payload_json FROM runtime_receipts WHERE intent_id=?",
+                (intent["id"],),
+            ).fetchone()
+        if stored is None:
+            raise QualificationRunError("E2E_RECEIVED_CREATE_RECEIPT_MISSING")
+        restored_receipt = RuntimeReceipt.model_validate_json(stored["payload_json"])
+        if restored_receipt.binding != receipt.binding:
+            raise QualificationRunError("E2E_RECEIVED_CREATE_RECEIPT_BINDING_MISMATCH")
     observation = runtime.read_stored(thread_id=receipt.binding.thread_id)
     if observation.thread_id != receipt.binding.thread_id or observation.turn_id is not None or observation.active:
         raise QualificationRunError("E2E_UNKNOWN_THREAD_NOT_EMPTY_ON_READ")

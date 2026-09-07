@@ -1762,6 +1762,84 @@ class EngineDispatcher:
     def _runtime_trace_payload(value: Any) -> Any:
         return value.model_dump(mode="json") if hasattr(value, "model_dump") else value
 
+    def _verify_runtime_effect_inputs(
+        self,
+        *,
+        kind: str,
+        attempt_id: str,
+        intent_id: str,
+        request: dict[str, Any],
+    ) -> None:
+        """create/start/resume 직전에 runtime과 Core의 전체 결속을 다시 읽는다."""
+
+        row, spec = self._attempt_context(attempt_id)
+        cwd = Path(row["root"])
+        policy = self.runtime.verify_execution_policy(cwd)
+        if (
+            policy.permission_profile != REQUIRED_PERMISSION_PROFILE
+            or policy.approval_policy != REQUIRED_APPROVAL_POLICY
+            or policy.environment != "local"
+            or not _same_path(policy.cwd, cwd)
+        ):
+            raise RuntimePolicyError(
+                "PERMISSION_POLICY_MISMATCH: 효과 직전 runtime 정책이나 cwd 결속이 다릅니다."
+            )
+        inventory = self.runtime.list_models()
+        validation_id = request.get("validation_id")
+        role, prompt, output_schema = self._role_for_attempt(
+            row,
+            spec,
+            validation_id=validation_id if isinstance(validation_id, str) else None,
+        )
+        for resolved_role in (spec.definition.executor, spec.definition.validator):
+            if resolved_role is not None:
+                self._verify_role_binding(resolved_role, inventory)
+        current_binding = self._verify_role_binding(role, inventory)
+        if request.get("model_observation") != current_binding.model_dump(mode="json"):
+            raise RuntimePolicyError(
+                "MODEL_BINDING_CHANGED: intent 준비 뒤 실제 model observation이 바뀌었습니다."
+            )
+        if request.get("model") != role.model or request.get("effort") != role.effort:
+            raise RuntimePolicyError(
+                "MODEL_BINDING_CHANGED: intent의 model/effort가 current ExecutionSpec과 다릅니다."
+            )
+        if "cwd" in request and not _same_path(request["cwd"], cwd):
+            raise RuntimePolicyError("TARGET_BINDING_CHANGED: intent cwd가 프로젝트 root와 다릅니다.")
+        if request.get("task_id") not in {None, row["task_id"]}:
+            raise RuntimePolicyError("TARGET_BINDING_CHANGED: intent Task가 Attempt와 다릅니다.")
+        if request.get("execution_spec_digest") not in {None, spec.definition_digest}:
+            raise RuntimePolicyError(
+                "STALE_EXECUTION_INPUT: intent ExecutionSpec digest가 current spec과 다릅니다."
+            )
+        if row["kind"] == AttemptKind.EXECUTION.value:
+            binding_digest = spec.definition.context_manifest.prompt_binding.binding_digest
+            if request.get("prompt_binding_digest") not in {None, binding_digest}:
+                raise RuntimePolicyError(
+                    "PROMPT_BINDING_MISMATCH: intent와 current prompt artifact가 다릅니다."
+                )
+        if request.get("resume_notice") is True:
+            prompt = "이전 turn이 중단되었습니다. 같은 TaskContract 범위에서 재개하세요.\n" + prompt
+        expected_prompt_digest = sha256_digest(prompt)
+        if request.get("prompt_digest") not in {None, expected_prompt_digest}:
+            raise RuntimePolicyError(
+                "PROMPT_BINDING_MISMATCH: intent 준비 뒤 실제 전송 prompt가 바뀌었습니다."
+            )
+        expected_schema_digest = sha256_digest(output_schema)
+        if request.get("output_schema_digest") not in {None, expected_schema_digest}:
+            raise RuntimePolicyError(
+                "PROMPT_BINDING_MISMATCH: intent output schema가 current schema와 다릅니다."
+            )
+        self.service.prepare_authorized_runtime_effect(
+            attempt_id,
+            intent_id,
+            request=request,
+            allow_mutable_targets=(
+                kind == "resume"
+                or request.get("resume_notice") is True
+                or row["kind"] == AttemptKind.VALIDATION.value
+            ),
+        )
+
     def _invoke_runtime_operation(
         self,
         trace: OperationTrace,
@@ -1779,7 +1857,44 @@ class EngineDispatcher:
         lock = self._operation_trace_locks.setdefault(attempt_id, threading.RLock())
         with lock:
             if kind in {"create", "start", "resume"}:
-                self.service.prepare_authorized_runtime_effect(attempt_id, intent_id)
+                if intent_id is None:
+                    raise EngineServiceError(
+                        "RUNTIME_INTENT_REQUIRED: create/start/resume에는 durable intent가 필요합니다."
+                    )
+                try:
+                    self._verify_runtime_effect_inputs(
+                        kind=kind,
+                        attempt_id=attempt_id,
+                        intent_id=intent_id,
+                        request=request,
+                    )
+                except Exception as error:
+                    code = getattr(error, "code", None)
+                    if not isinstance(code, str):
+                        message = str(error)
+                        prefix = message.partition(":")[0]
+                        code = (
+                            "MODEL_BINDING_CHANGED"
+                            if prefix.startswith("MODEL_LOCK_")
+                            else prefix
+                        ) if prefix in {
+                            "STALE_EXECUTION_INPUT",
+                            "RUNTIME_INTENT_BINDING_MISMATCH",
+                            "PROMPT_BINDING_MISMATCH",
+                            "PROMPT_ARTIFACT_INVALID",
+                            "MODEL_BINDING_CHANGED",
+                            "PERMISSION_POLICY_MISMATCH",
+                            "TARGET_BINDING_CHANGED",
+                            "EFFECT_CHECKPOINT_STALE",
+                        } or prefix.startswith("MODEL_LOCK_") else "RUNTIME_EFFECT_PREFLIGHT_FAILED"
+                    self.service.record_runtime_effect_not_started(
+                        attempt_id=attempt_id,
+                        intent_id=intent_id,
+                        code=code,
+                        detail=str(error),
+                        changes=tuple(getattr(error, "changes", ())),
+                    )
+                    raise
             parent_scope = current_operation_trace_scope()
             category = (
                 "wait" if kind == "sdk_wait" else
@@ -1933,12 +2048,37 @@ class EngineDispatcher:
         if prepared:
             if len(prepared) == 1:
                 with self.service.ledger.read() as connection:
-                    marker = connection.execute("SELECT event_type FROM history_events WHERE entity_id = ? "
+                    marker = connection.execute("SELECT event_type,payload_json FROM history_events WHERE entity_id = ? "
                         "AND event_type IN ('runtime.effect_not_started','runtime.effect_dispatching') "
                         "ORDER BY sequence DESC LIMIT 1", (prepared[0]["id"],)).fetchone()
                     intent = connection.execute("SELECT * FROM runtime_intents WHERE id = ?", (prepared[0]["id"],)).fetchone()
                 if marker is not None and marker["event_type"] == "runtime.effect_not_started":
-                    return self._retry_authorization_blocked_effect(intent)
+                    marker_payload = json.loads(marker["payload_json"])
+                    if marker_payload.get("code") == "GOAL_AUTHORIZATION_REQUIRED":
+                        return self._retry_authorization_blocked_effect(intent)
+                    return RunOnceOutcome(
+                        action=RunOnceAction.BLOCKED,
+                        project_id=project_id,
+                        task_id=None if active_attempt is None else active_attempt["task_id"],
+                        attempt_id=None if active_attempt is None else active_attempt["id"],
+                        blocker_code=marker_payload.get("code", "RUNTIME_EFFECT_PREFLIGHT_FAILED"),
+                        detail=(
+                            "provider 호출 전 effect checkpoint가 입력 변경을 차단했습니다: "
+                            + marker_payload.get("detail", "preflight rejected")
+                        ),
+                    )
+                recovered = self._reconcile_prepared_intent_from_trace(intent)
+                if recovered is not None:
+                    return RunOnceOutcome(
+                        action=RunOnceAction.OBSERVED,
+                        project_id=project_id,
+                        task_id=None if active_attempt is None else active_attempt["task_id"],
+                        attempt_id=None if active_attempt is None else active_attempt["id"],
+                        detail=(
+                            "append-only operation trace에서 정확한 provider receipt/binding을 "
+                            "복원했습니다. 이 tick에서는 create/start/resume를 재실행하지 않습니다."
+                        ),
+                    )
             unknown = self.service.recover_inspect(project_id)
             return RunOnceOutcome(
                 action=RunOnceAction.BLOCKED,
@@ -2520,12 +2660,97 @@ class EngineDispatcher:
         return RunOnceOutcome(action=RunOnceAction.DISPATCHED, project_id=row["project_id"], task_id=row["task_id"],
                               attempt_id=row["id"], detail="미실행이 기록된 동일 intent를 갱신된 승인 범위에서 실행했습니다.")
 
+    def _reconcile_prepared_intent_from_trace(self, intent: Any) -> RuntimeOperationReceipt | None:
+        """DB receipt 유실 시 trace의 exact response만 복원하고 effect는 재호출하지 않는다."""
+
+        expected_kind = {
+            RuntimeIntentKind.CREATE_THREAD.value: "create",
+            RuntimeIntentKind.START_TURN.value: "start",
+            RuntimeIntentKind.RESUME_TURN.value: "resume",
+        }.get(intent["kind"])
+        if expected_kind is None:
+            return None
+        trace = self._operation_trace(intent["attempt_id"])
+        if trace.path is None or not trace.path.is_file():
+            return None
+        verification = OperationTrace.verify(trace.path)
+        if not verification.valid:
+            return None
+        candidates = [
+            item
+            for item in trace.snapshot()["rows"]
+            if item.get("intent_id") == intent["id"]
+            and item.get("kind") == expected_kind
+            and item.get("status") == "ok"
+            and item.get("request_digest") == intent["request_digest"]
+            and isinstance(item.get("response"), dict)
+        ]
+        if len(candidates) != 1:
+            return None
+        try:
+            recovered = RuntimeOperationReceipt.model_validate(candidates[0]["response"])
+        except ValueError:
+            return None
+        recovered = self._attach_receipt_trace(recovered, trace)
+        request = json.loads(intent["request_json"])
+        binding = recovered.binding
+        if binding is None:
+            return None
+        if request.get("thread_id") not in {None, binding.thread_id}:
+            return None
+        if expected_kind == "start" and (
+            binding.turn_id is None or recovered.payload.get("turn_id") != binding.turn_id
+        ):
+            return None
+        provider_operation_id = (
+            f"resume:{recovered.operation_id}:{intent['attempt_id']}"
+            + (":public" if intent["idempotency_key"].endswith(":public-resume") else "")
+            if expected_kind == "resume"
+            else recovered.operation_id
+        )
+        self.service.record_runtime_receipt(
+            intent_id=intent["id"],
+            provider_operation_id=provider_operation_id,
+            response=recovered.payload,
+            binding=binding,
+        )
+        if expected_kind == "start":
+            row, spec = self._attempt_context(intent["attempt_id"])
+            with self.service.ledger.read() as connection:
+                existing = connection.execute(
+                    "SELECT id FROM runtime_jobs WHERE attempt_id = ? AND turn_id = ? "
+                    "ORDER BY rowid DESC LIMIT 1",
+                    (row["id"], binding.turn_id),
+                ).fetchone()
+            if existing is None:
+                runtime_job_kind = (
+                    RuntimeJobKind.WORKER_TURN
+                    if row["kind"] == AttemptKind.EXECUTION.value
+                    else RuntimeJobKind.TASK_SEMANTIC_VALIDATE
+                )
+                job = self.service.schedule_runtime_job(
+                    project_id=row["project_id"],
+                    kind=runtime_job_kind,
+                    checkpoint_key=f"{runtime_job_kind.value}:{row['id']}:{binding.turn_id}",
+                    request=request,
+                    absolute_deadline_at=utc_now()
+                    + timedelta(seconds=spec.definition.timeout_seconds),
+                    attempt_id=row["id"],
+                    task_id=row["task_id"],
+                )
+                self.service.start_runtime_job(
+                    job.job_id,
+                    thread_id=binding.thread_id,
+                    turn_id=binding.turn_id,
+                )
+        return recovered
+
     def _dispatch_reserved(self, attempt_id: str, *, validation_id: str | None = None,
                            existing_call_id: str | None = None) -> None:
         self.service.assert_attempt_authorized(attempt_id)
         row, spec = self._attempt_context(attempt_id)
         cwd = Path(row["root"])
-        role, _prompt, _output_schema = self._role_for_attempt(
+        role, prompt, output_schema = self._role_for_attempt(
             row, spec, validation_id=validation_id
         )
         self._verify_policy(cwd)
@@ -2539,9 +2764,19 @@ class EngineDispatcher:
             "cwd": str(cwd.resolve()),
             "task_id": row["task_id"],
             "model": role.model,
+            "effort": role.effort,
             "attempt_kind": row["kind"],
             "model_observation": current_binding.model_dump(mode="json"),
             "validation_id": validation_id,
+            "prompt_digest": sha256_digest(prompt),
+            "output_schema_digest": sha256_digest(output_schema),
+            "execution_spec_digest": spec.definition_digest,
+            "prompt_binding_digest": (
+                spec.definition.context_manifest.prompt_binding.binding_digest
+                if row["kind"] == AttemptKind.EXECUTION.value
+                else None
+            ),
+            "resume_notice": False,
         }
         if row["kind"] == AttemptKind.VALIDATION.value:
             semantic_validation_id = validation_id or self._validation_id_from_attempt(attempt_id)
@@ -2633,6 +2868,8 @@ class EngineDispatcher:
             prompt = "이전 turn이 중단되었습니다. 같은 TaskContract 범위에서 재개하세요.\n" + prompt
         request = {
             "thread_id": thread_id,
+            "cwd": str(Path(row["root"]).resolve()),
+            "task_id": row["task_id"],
             "prompt_digest": sha256_digest(prompt),
             "model_observation": current_binding.model_dump(mode="json"),
             "model": role.model,
@@ -2640,6 +2877,7 @@ class EngineDispatcher:
             "validation_id": validation_id,
             "role_usage_contract": 1,
             "output_schema_digest": sha256_digest(output_schema),
+            "resume_notice": resumed,
         }
         if row["kind"] == AttemptKind.EXECUTION.value:
             request.update({
@@ -2798,7 +3036,22 @@ class EngineDispatcher:
                 (row["id"],),
             ).fetchone()[0]
         if resume_count:
-            raise EngineServiceError("저장된 Attempt는 이미 한 번 재개됐으며 다시 자동 재개하지 않습니다.")
+            provider_call_id = self._attempt_provider_call_id(row["id"])
+            if provider_call_id is None:
+                raise EngineServiceError(
+                    "저장된 resume receipt에 결속된 provider call이 없습니다."
+                )
+            self._attempt_provider_call_ids[row["id"]] = provider_call_id
+            self._start_turn(
+                row=row,
+                spec=spec,
+                thread_id=binding.thread_id,
+                attempt_key=f"{attempt_key}:resumed",
+                validation_id=validation_id,
+                resumed=True,
+                provider_call_id=provider_call_id,
+            )
+            return
         # create_thread receipt 뒤 아직 실제 turn을 시작하지 않은 예약은 같은 실행
         # 슬롯이다. 연결을 위한 resume RPC를 새 provider turn/호출로 세지 않는다.
         with self.service.ledger.read() as connection:
@@ -2817,28 +3070,52 @@ class EngineDispatcher:
                          "model_observation": current_binding.model_dump(mode="json")},
             )
         self._attempt_provider_call_ids[row["id"]] = provider_call_id
+        resume_prompt = (
+            "이전 turn이 중단되었습니다. 같은 TaskContract 범위에서 재개하세요.\n"
+            + _prompt
+        )
+        resume_request = {
+            "thread_id": binding.thread_id,
+            "cwd": str(cwd.resolve()),
+            "task_id": row["task_id"],
+            "model": role.model,
+            "effort": role.effort,
+            "model_observation": current_binding.model_dump(mode="json"),
+            "validation_id": validation_id,
+            "prompt_digest": sha256_digest(resume_prompt),
+            "output_schema_digest": sha256_digest(_output_schema),
+            "execution_spec_digest": spec.definition_digest,
+            "prompt_binding_digest": (
+                spec.definition.context_manifest.prompt_binding.binding_digest
+                if row["kind"] == AttemptKind.EXECUTION.value
+                else None
+            ),
+            "resume_notice": True,
+        }
         resume_intent = self.service.prepare_runtime_intent(
             attempt_id=row["id"],
             kind=RuntimeIntentKind.RESUME_TURN,
             idempotency_key=f"{attempt_key}:resume",
-            request={"thread_id": binding.thread_id, "cwd": str(cwd.resolve()),
-                     "model_observation": current_binding.model_dump(mode="json")},
+            request=resume_request,
         )
+        self._hit("after_resume_intent")
         trace = self._operation_trace(row["id"])
         receipt = self._invoke_runtime_operation(
-            trace, "resume", {"thread_id": binding.thread_id, "cwd": str(cwd.resolve())},
+            trace, "resume", resume_request,
             lambda: self.runtime.resume(thread_id=binding.thread_id, cwd=cwd),
             attempt_id=row["id"], intent_id=resume_intent.intent_id,
             call_id=provider_call_id, thread_id=binding.thread_id,
             deadline_seconds=getattr(spec.definition, "timeout_seconds", None),
         )
         receipt = self._attach_receipt_trace(receipt, trace)
+        self._hit("after_resume_effect")
         self.service.record_runtime_receipt(
             intent_id=resume_intent.intent_id,
             provider_operation_id=f"resume:{receipt.operation_id}:{row['id']}",
             response=receipt.payload,
             binding=receipt.binding,
         )
+        self._hit("after_resume_receipt")
         self._start_turn(
             row=row,
             spec=spec,
@@ -2968,6 +3245,27 @@ class EngineDispatcher:
             if isinstance(error, BudgetBlocked):
                 # 호출 전 예산 차단은 기존 Attempt의 실패나 resume 소진이 아니다.
                 raise
+            with self.service.ledger.read() as connection:
+                preflight = connection.execute(
+                    "SELECT h.payload_json FROM history_events h "
+                    "JOIN runtime_intents i ON i.id = h.entity_id "
+                    "WHERE i.attempt_id = ? AND i.status = 'prepared' "
+                    "AND h.event_type = 'runtime.effect_not_started' "
+                    "ORDER BY h.sequence DESC LIMIT 1",
+                    (attempt_id,),
+                ).fetchone()
+            if preflight is not None:
+                payload = json.loads(preflight["payload_json"])
+                return RunOnceOutcome(
+                    action=RunOnceAction.BLOCKED,
+                    project_id=row["project_id"],
+                    task_id=row["task_id"],
+                    attempt_id=attempt_id,
+                    blocker_code=payload.get(
+                        "code", "RUNTIME_EFFECT_PREFLIGHT_FAILED"
+                    ),
+                    detail=str(error),
+                )
             self.service.finish_attempt(
                 attempt_id=attempt_id,
                 succeeded=False,
@@ -3496,13 +3794,8 @@ class EngineDispatcher:
         return observation
 
     def resume_attempt(self, attempt_id: str) -> RuntimeOperationReceipt:
-        with self.service.ledger.read() as connection:
-            row = connection.execute(
-                "SELECT a.binding_json, p.root FROM attempts a JOIN projects p ON p.id = a.project_id "
-                "WHERE a.id = ?",
-                (attempt_id,),
-            ).fetchone()
-        if row is None or row["binding_json"] is None:
+        row, spec = self._attempt_context(attempt_id)
+        if row["binding_json"] is None:
             raise EngineServiceError("resume할 기존 binding이 없습니다.")
         binding = ThreadBinding.model_validate_json(row["binding_json"])
         observation = self._read_attempt_runtime(
@@ -3511,20 +3804,80 @@ class EngineDispatcher:
         )
         if observation.active:
             raise EngineServiceError("thread/read 결과가 active이므로 resume하지 않습니다.")
-        _attempt, spec = self._attempt_context(attempt_id)
         self._verify_policy(Path(row["root"]))
         inventory = self.runtime.list_models()
         for role in (spec.definition.executor, spec.definition.validator):
             if role is not None:
                 self._verify_role_binding(role, inventory)
+        validation_id = (
+            self._validation_id_from_attempt(attempt_id)
+            if row["kind"] == AttemptKind.VALIDATION.value
+            else None
+        )
+        role, prompt, output_schema = self._role_for_attempt(
+            row, spec, validation_id=validation_id
+        )
+        current_binding = self._verify_role_binding(role, inventory)
+        request = {
+            "thread_id": binding.thread_id,
+            "cwd": str(Path(row["root"]).resolve()),
+            "task_id": row["task_id"],
+            "model": role.model,
+            "effort": role.effort,
+            "model_observation": current_binding.model_dump(mode="json"),
+            "validation_id": validation_id,
+            "prompt_digest": sha256_digest(prompt),
+            "output_schema_digest": sha256_digest(output_schema),
+            "execution_spec_digest": spec.definition_digest,
+            "prompt_binding_digest": (
+                spec.definition.context_manifest.prompt_binding.binding_digest
+                if row["kind"] == AttemptKind.EXECUTION.value
+                else None
+            ),
+            "resume_notice": False,
+        }
+        attempt_key = (
+            f"{spec.definition.idempotency_key}:attempt:{row['attempt_no']}:{row['kind']}"
+        )
+        intent = self.service.prepare_runtime_intent(
+            attempt_id=attempt_id,
+            kind=RuntimeIntentKind.RESUME_TURN,
+            idempotency_key=f"{attempt_key}:public-resume",
+            request=request,
+        )
+        if intent.status.value == "received":
+            with self.service.ledger.read() as connection:
+                stored = connection.execute(
+                    "SELECT payload_json FROM runtime_receipts WHERE intent_id = ?",
+                    (intent.intent_id,),
+                ).fetchone()
+            if stored is None:
+                raise EngineServiceError("received resume intent의 receipt가 없습니다.")
+            receipt = json.loads(stored["payload_json"])
+            return RuntimeOperationReceipt(
+                operation_id=receipt["provider_operation_id"],
+                payload=receipt["response_payload"],
+                binding=(
+                    None
+                    if receipt["binding"] is None
+                    else ThreadBinding.model_validate(receipt["binding"])
+                ),
+            )
         trace = self._operation_trace(attempt_id)
         receipt = self._invoke_runtime_operation(
-            trace, "resume", {"thread_id": binding.thread_id, "cwd": str(Path(row["root"]).resolve())},
+            trace, "resume", request,
             lambda: self.runtime.resume(thread_id=binding.thread_id, cwd=Path(row["root"])),
-            attempt_id=attempt_id, call_id=self._attempt_provider_call_id(attempt_id),
+            attempt_id=attempt_id, intent_id=intent.intent_id,
+            call_id=self._attempt_provider_call_id(attempt_id),
             thread_id=binding.thread_id,
         )
         receipt = self._attach_receipt_trace(receipt, trace)
+        self.service.record_runtime_receipt(
+            intent_id=intent.intent_id,
+            provider_operation_id=f"resume:{receipt.operation_id}:{attempt_id}:public",
+            response=receipt.payload,
+            binding=receipt.binding,
+        )
         return receipt.model_copy(
             update={
                 "payload": receipt.payload

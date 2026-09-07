@@ -2925,8 +2925,19 @@ class EngineService:
             )
 
     @staticmethod
-    def _verify_execution_inputs(tx: Any, task: Any, spec_row: Any) -> None:
-        """Attempt 예약 직전에 target/context digest와 current map을 재확인한다."""
+    def _verify_execution_inputs(
+        tx: Any,
+        task: Any,
+        spec_row: Any,
+        *,
+        allow_mutable_targets: bool = False,
+    ) -> None:
+        """현재 immutable execution 입력을 재확인한다.
+
+        최초 create/start에는 모든 target/context를 고정한다. 이미 시작된 Worker의
+        허용된 resume에서는 그 Worker가 쓸 수 있었던 target만 달라질 수 있으며,
+        State·Project Map·policy/reference/read-only context는 계속 고정한다.
+        """
 
         spec = TaskExecutionSpecRevision.model_validate_json(spec_row["payload_json"])
         project = tx.one("SELECT root FROM projects WHERE id = ?", (task["project_id"],))
@@ -2935,19 +2946,53 @@ class EngineService:
             (task["project_id"],),
         )
         if current_map["revision_digest"] != spec.definition.project_map_digest:
-            raise EngineServiceError("ExecutionSpec 이후 Project Map이 변경됐습니다.")
+            raise EngineServiceError(
+                "STALE_EXECUTION_INPUT: ExecutionSpec 이후 Project Map이 변경됐습니다."
+            )
+        snapshot = tx.maybe_one(
+            "SELECT is_current FROM state_snapshots WHERE project_id = ? AND snapshot_digest = ?",
+            (task["project_id"], spec.definition.snapshot_digest),
+        )
+        if snapshot is None or snapshot["is_current"] != 1:
+            raise EngineServiceError(
+                "STALE_EXECUTION_INPUT: ExecutionSpec 이후 StateSnapshot이 변경됐습니다."
+            )
         root = Path(project["root"])
         checks: dict[str, str] = {}
+        absent: set[str] = set()
+        mutable_paths: set[Path] = set()
         for target in spec.definition.resolved_targets:
+            target_path = Path(target.path)
+            resolved_target = (
+                target_path.resolve()
+                if target_path.is_absolute()
+                else (root / target_path).resolve()
+            )
+            if target.access in {"write", "create", "delete"}:
+                mutable_paths.add(resolved_target)
             if target.expected_content_digest is not None:
                 checks[target.path] = target.expected_content_digest
+            elif target.access == "create":
+                absent.add(target.path)
         for fragment in spec.definition.context_manifest.fragments:
             if fragment.source_kind.value in {"code", "test", "reference", "policy", "project"}:
                 checks[fragment.source_ref] = fragment.content_digest
+        for raw_path in absent:
+            path = Path(raw_path)
+            if not path.is_absolute():
+                path = root / path
+            if allow_mutable_targets and path.resolve() in mutable_paths:
+                continue
+            if path.exists():
+                raise EngineServiceError(
+                    f"STALE_EXECUTION_INPUT: create target이 실행 전에 생겼습니다: {raw_path}"
+                )
         for raw_path, expected_digest in checks.items():
             path = Path(raw_path)
             if not path.is_absolute():
                 path = root / path
+            if allow_mutable_targets and path.resolve() in mutable_paths:
+                continue
             try:
                 actual_digest = sha256_bytes(path.read_bytes())
             except OSError as error:
@@ -2980,25 +3025,104 @@ class EngineService:
                                                                   (project["active_plan_revision_id"],))["payload_json"])
             self._plan_authorization(tx, project, plan)
 
-    def prepare_authorized_runtime_effect(self, attempt_id: str, intent_id: str | None) -> None:
-        """효과 호출 직전의 판정을 남겨 승인 거부와 호출 후 응답 유실을 구분한다."""
+    def prepare_authorized_runtime_effect(
+        self,
+        attempt_id: str,
+        intent_id: str | None,
+        *,
+        request: Any | None = None,
+        allow_mutable_targets: bool = False,
+    ) -> None:
+        """효과 호출 직전의 durable intent와 immutable 입력을 원자적으로 대조한다."""
         if intent_id is None:
-            self.assert_attempt_authorized(attempt_id)
-            return
-        try:
-            with self.ledger.transaction() as tx:
-                attempt = tx.one("SELECT * FROM attempts WHERE id = ?", (attempt_id,))
-                tx.one("SELECT id FROM runtime_intents WHERE id = ? AND attempt_id = ? AND status = 'prepared'",
-                       (intent_id, attempt_id))
-                self._assert_attempt_authorized(tx, attempt)
-                tx.history(attempt["project_id"], "runtime.effect_dispatching", "runtime_intent", intent_id,
-                           {"attempt_id": attempt_id})
-        except GoalAuthorizationRequired as error:
-            with self.ledger.transaction() as tx:
-                attempt = tx.one("SELECT project_id FROM attempts WHERE id = ?", (attempt_id,))
-                tx.history(attempt["project_id"], "runtime.effect_not_started", "runtime_intent", intent_id,
-                           {"attempt_id": attempt_id, "code": error.code, "changes": error.changes})
-            raise
+            raise EngineServiceError("runtime 효과에는 먼저 저장된 intent가 필요합니다.")
+        with self.ledger.transaction() as tx:
+            attempt = tx.one("SELECT * FROM attempts WHERE id = ?", (attempt_id,))
+            intent = tx.one(
+                "SELECT * FROM runtime_intents WHERE id = ? AND attempt_id = ? AND status = 'prepared'",
+                (intent_id, attempt_id),
+            )
+            if request is None or intent["request_digest"] != sha256_digest(request):
+                raise EngineServiceError(
+                    "RUNTIME_INTENT_BINDING_MISMATCH: 저장된 intent와 실제 효과 요청이 다릅니다."
+                )
+            self._assert_attempt_authorized(tx, attempt)
+            task = tx.one("SELECT * FROM task_contracts WHERE id = ?", (attempt["task_id"],))
+            spec_row = tx.one(
+                "SELECT * FROM execution_spec_revisions WHERE task_id = ? AND is_current = 1",
+                (attempt["task_id"],),
+            )
+            if attempt["execution_spec_digest"] != spec_row["definition_digest"]:
+                raise EngineServiceError(
+                    "STALE_EXECUTION_INPUT: Attempt와 current ExecutionSpec이 다릅니다."
+                )
+            self._verify_execution_inputs(
+                tx,
+                task,
+                spec_row,
+                allow_mutable_targets=allow_mutable_targets,
+            )
+            contract = json.loads(task["payload_json"])
+            irreversible = {
+                item["effect_id"]
+                for item in contract["expected_effects"]
+                if item["external"] and not item["reversible"]
+            }
+            if irreversible and attempt["kind"] == AttemptKind.EXECUTION.value:
+                approved = {
+                    row["effect_id"]
+                    for row in tx.all(
+                        "SELECT effect_id FROM effect_checkpoints WHERE task_id = ? "
+                        "AND execution_spec_digest = ?",
+                        (task["id"], spec_row["definition_digest"]),
+                    )
+                }
+                if approved != irreversible:
+                    raise EngineServiceError(
+                        "EFFECT_CHECKPOINT_STALE: 비가역 외부 효과 승인이 효과 직전에 다릅니다."
+                    )
+            tx.history(
+                attempt["project_id"],
+                "runtime.effect_dispatching",
+                "runtime_intent",
+                intent_id,
+                {
+                    "attempt_id": attempt_id,
+                    "request_digest": intent["request_digest"],
+                    "execution_spec_digest": attempt["execution_spec_digest"],
+                    "mutable_target_resume": allow_mutable_targets,
+                },
+            )
+
+    def record_runtime_effect_not_started(
+        self,
+        *,
+        attempt_id: str,
+        intent_id: str,
+        code: str,
+        detail: str,
+        changes: tuple[dict[str, Any], ...] = (),
+    ) -> None:
+        """각 preflight 거부가 provider 호출 전이었다는 사실을 기록한다."""
+
+        with self.ledger.transaction() as tx:
+            attempt = tx.one("SELECT project_id FROM attempts WHERE id = ?", (attempt_id,))
+            tx.one(
+                "SELECT id FROM runtime_intents WHERE id = ? AND attempt_id = ? AND status = 'prepared'",
+                (intent_id, attempt_id),
+            )
+            tx.history(
+                attempt["project_id"],
+                "runtime.effect_not_started",
+                "runtime_intent",
+                intent_id,
+                {
+                    "attempt_id": attempt_id,
+                    "code": code,
+                    "detail": detail,
+                    "changes": changes,
+                },
+            )
 
     def prepare_runtime_intent(
         self,
@@ -3107,7 +3231,7 @@ class EngineService:
                 response_digest=response_digest,
                 binding=binding,
                 response_payload=(response if isinstance(response, dict) and
-                                  intent["kind"] in {"create_thread", "start_turn"} else None),
+                                  intent["kind"] in {"create_thread", "start_turn", "resume_turn"} else None),
                 received_at=utc_now(),
             )
             tx.connection.execute(
