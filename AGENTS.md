@@ -80,21 +80,26 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 
 - 우선순위는 사용자 명시 제약 → Goal Contract → Project Profile → 모델 추천이다. 명확한 접근은 Skeleton 1개, 실제 trade-off가 있을 때만 최대 3개를 만든다.
 - coverage·grounding·DAG·cycle·scope Gate를 semantic review·score보다 먼저 적용한다. dedupe·dead-end·dominance pruning 뒤 최대 2개만 상세화하며 Hard Gate 통과 후보만 score를 얻는다.
-- 기본 search budget은 역할 호출 14회, candidate version 5개, 후보별 refinement 1회, replan reserve 25%다. 첫 feasible plan 뒤 남은 budget에서만 anytime improvement를 수행한다.
-- 활성화 전 상세 Plan의 수정 가능한 실패는 원본 Goal·Skeleton·Plan·finding·직접 근거와 함께 한 번 피드백한다. 상세 계약 결함은 같은 Plan의 새 revision으로, Task 의미·DAG 변경은 같은 shortlist 자리의 새 Skeleton 검토부터 처리한다. 반증·정보 부족은 `disputed`·`unresolved`로 원본 거절을 유지한다. 제안만으로 finding을 삭제하거나 admission을 바꾸지 않는다.
-- Skeleton·상세 수정 시도는 최초 후보 계보별 refinement 한도를 공유한다. 최초 상세화는 같은 후보의 구체화이며 추가 상세 수정 후보는 version 예산에 포함한다. 수정·재검토에 필요한 전체 호출 예산을 먼저 확보하고 ID·순서·비용만 바뀐 후보는 재검토하지 않는다. 검색 결과와 수정·중단 근거를 원장 후보·판정에 대조해 History에 보존하며 실제 역할 관측이 없으면 provider 성공으로 보고하지 않는다.
+- 기본 search budget은 역할 호출 14회, candidate version 5개, 단계 내 후보별 refinement 1회, replan reserve 25%다. Goal 준비·피드백도 전체 호출에 포함하며 첫 feasible plan 뒤 남은 budget에서만 anytime improvement를 수행한다.
+- 활성화 전 상세 Plan의 수정 가능한 실패는 원본 Goal·Skeleton·Plan·finding·직접 근거에 대조한다. 상세 계약 결함은 같은 Plan의 새 revision으로, Task 의미·DAG 변경은 같은 shortlist 자리의 새 Skeleton 검토부터 처리한다. 반증·정보 부족은 `disputed`·`unresolved`로 남기며 제안만으로 finding을 삭제하거나 admission을 바꾸지 않는다.
+- 기존 복구 정책 없는 검색은 Skeleton·상세 수정 시도가 최초 후보 계보별 refinement 한도를 공유하는 동작을 보존한다. v2 요청에 명시적으로 결속한 `planning-recovery-v2`는 Skeleton 준비 수정과 상세 Plan 수정에 각각 한 번의 한도를 둔다. 상세 실패로 돌아간 Skeleton 수정은 상세 단계 한도를 소비한다. 두 단계의 전체 호출·candidate version·Goal 토큰 예산은 공유하며 늘리지 않는다. 최초 상세화는 같은 후보의 구체화이며 추가 상세 수정 후보는 version 예산에 포함한다. 수정·재검토에 필요한 전체 호출 예산을 먼저 확보하고 ID·순서·비용만 바뀐 후보는 재검토하지 않는다.
+- `planning-recovery-v2`의 명시적 `disputed`만 같은 immutable Plan·Goal·원검토·직접 반증에 결속한 독립 재심을 최초 후보 계보별 최대 한 번 허용한다. 원 finding을 각각 `upheld`·`withdrawn`으로 판정하고 유지 finding의 원객체·추가 finding·새 관측·원 Core 판정을 보존한다. 불확실하면 원 지적을 유지하며 deterministic finding은 재심하지 않는다. 별도 검토 제출물이 있어야 Core가 판정을 재계산한다. 모델 변경·다수결·묵시적 finding 삭제는 하지 않는다. 재심은 후보 version이나 실제 수정 슬롯을 소비하지 않지만 피드백·재심 호출과 토큰은 같은 전체 예산 및 replan reserve에 포함한다.
+- 새 복구 정책에서 역할의 종료·정책·단일 turn·사용량 정산이 확인된 후보별 schema 실패만 격리해 다른 admissible 후보를 보존한다. 실패 원본과 receipt·비용은 History·qualification에 FAIL로 남기며 선택 가능한 후보의 존재로 schema PASS를 만들지 않는다. 불명 효과·불명 사용량·예산·권한·model lock·입력 결속 실패는 전체를 중단한다. 검색 결과와 수정·재심·중단 근거는 원장 후보·판정·실제 정산 호출에 대조해 History에 보존한다.
+- 초기 Skeleton 검토·초기 수정 후 검토는 `initial_skeleton_review`, 초기 수정은 `skeleton_refine`으로 기록하며 원본 Skeleton만 결속한다. 기존 `skeleton_review`는 상세 Plan 복구의 수정 Skeleton 검토이며 원본 Plan 결속을 유지한다. 실패 검토는 제출 없는 `REJECTED`로 보존해 추가 수정·shortlist·선택을 금지한다. 실패 수정은 원본 판정과 후보를 보존하고 수정 기회·호출·비용을 한 번 소비하되 새 후보 version을 만들지 않는다. 새 검색 기록이나 ID만으로 동일 실패 호출과 소진된 계보별 수정 기회를 복원하지 않는다. 최초 일괄 생성 실패는 후보 격리 대상이 아니다.
 
 ### validation과 Reviewer
 
 - Task의 AC contribution은 산출물·근거의 기여 관계이고 독립 Goal Test 책임과 다르다. Skeleton의 기여 Task 집합과 상세 Plan의 validation ID 연결도 독립적으로 보존한다.
 - Goal·AC 기여가 다른 권위 입력에 보존됐지만 선택 detail requirement에 반복되지 않은 것만으로 차단하지 않는다. 실제 기여 누락·Task 요구 충돌과 상세 Plan의 검사 결함만 직접 증거로 판정한다.
 - Goal이 각/특정 Task 완료 전에 요구한 검사는 해당 Task validation에 둔다. AC 기여·완료 문장·모델 배정으로 실제 검사와 evidence를 대신하거나 후속 Task·Goal Test로만 넘기지 않는다. 모든 Task 완료 후 integration validation을 일반 Task로 재귀 배치하지 않는다.
-- AC가 명시한 절차를 수행하는 validation ID는 해당 AC에 연결한다. 검사 소유 Task가 기여 집합 밖이라는 이유로 빼지 않는다. 전역 constraint만으로 특정 AC 연결을 추정하지 않으며, 검사 자체의 누락과 기존 검사의 AC 연결 누락을 별도 결함으로 판정한다.
+- AC의 statement·validation_intent가 명시한 절차·도구·phase·적용 범위를 실제 수행하는 validation ID는 해당 AC에 연결한다. 결과나 주제의 관련성, 같은 evidence, 전역 constraint, 명시되지 않은 sibling 검사만으로 필수 연결을 추정하지 않는다. 검사 소유 Task가 기여 집합 밖이라는 이유로 빼지 않으며, 검사 자체의 누락과 기존 검사의 AC 연결 누락을 별도 결함으로 판정한다. v2 schema와 writer·reviewer·refiner·재심은 `validation_obligations.py`의 같은 정의를 사용한다. 효과 금지만 있는 보호 제약을 Task별 독립 검사 의무로 확대하지 않으며, 검사를 명시한 경우에는 식별한 자원과 실제 관측 범위가 일치해야 한다.
 - 관계 판단 순서는 validation 전체 문장·method·mode·owner·evidence와 등록 수단의 실제 phase → 전역 Task 검사 의무 → AC statement·validation_intent·적용 범위 → 현재 연결·finding이다. 동일 절차의 task/goal phase를 AC가 각각 명시하면 실제 각 phase의 validation을 모두 연결하되 이 규칙을 명시되지 않은 sibling 검사로 확대하지 않는다.
 - 특정 절차 요구와 도구·phase 실행 요구를 구분한다. 지정 phase가 실제 수행하지 않는 능력을 부여하지 않고, 같은 목적·evidence 종류·선후관계만으로 별도 검사를 필수 연결하지 않는다. validation statement는 검사 대상·종류·목적을 보존하며 실제 명령은 ready-time 명세에 둔다.
 - 같은 validation ID·statement에는 별도 실행과 기대 결과 비교를 명시해 추가 책임을 둘 수 있다. 결과에 목적만 덧붙이는 것은 별도 실행이 아니다. 도구·phase와 검사 의미가 충돌하면 새 Plan으로 수정하고 운영 명령 변경으로 숨기지 않는다.
 - Worker 제출 → Task validation → Core 완료 판정을 구분한다. Worker 응답을 입력으로 수행할 Validator 결과를 같은 Worker가 미리 제출하게 하지 않는다. Compiler는 draft `task_refs`를 권위 `task_ids`로 변환하고 finding의 `affected_task_refs`에는 `Task.task_ref`를 쓴다.
 - 검토용 Goal·validation 색인은 원문 ID·순서·selector·statement·intent·owner·mode·현재 연결만 투영하는 비권위 입력이다. 판단을 미리 넣지 않으며 `required_evidence_kinds`를 semantic Validator catalog의 허용 목록으로 해석하지 않는다.
+- v2의 AC 연결은 이미 계획된 검사의 완전한 기여 관계다. 각 AC×validation에서 명시 절차를 수행하는 supported scope를 모두 보존하며, 같은 절차를 실행하는 다른 검사 ID로 대신하거나 최소 검사 집합만 선택하지 않는다. 등록 도구의 내부 호출·재실행 절차도 실제 본문에 따라 포함한다. 한 validation의 부분 결함은 별도 finding으로 남기고 그 안의 다른 supported scope 연결을 지우지 않는다. AC가 제한하지 않은 phase·범위를 임의로 한정하지 않되 단순 결과 관련성이나 전역 의무를 새 AC 검사 요구로 확대하지 않는다.
+
 #### `plan-inspection-v1` 동결 계약
 
 - v1은 모든 AC×validation의 `ac_link_required`와 반복 citation·scope·finding 장부를 모델이 직접 제출하는 기존 계약이다. strict schema·validator·evaluator·raw·checkpoint와 과거 판정은 동결한다. 상세 필드 규칙과 진단 문구는 `docs/orchestration-redesign.md`의 v1 절을 권위로 사용하며, 실제 선택 provider가 v1일 때만 역할 지침에 넣는다.

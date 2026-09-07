@@ -164,6 +164,9 @@ class BudgetManager:
             if tx.maybe_one("SELECT id FROM provider_calls WHERE project_id = ? AND call_key = ?",
                             (project_id, call_key)):
                 raise BudgetBlocked("PROVIDER_CALL_ALREADY_RESERVED", "기존 호출을 먼저 관측해야 합니다.")
+            self.service.validate_initial_skeleton_call(
+                tx, project_id=project_id, goal_digest=goal_digest, role=role, request=request,
+            )
             policy = self._policy(tx, project_id, goal_id)
             calls = tx.all("SELECT c.*, a.charge_tokens FROM provider_calls c LEFT JOIN budget_adjustments a "
                            "ON a.call_id = c.id WHERE c.project_id = ? AND c.goal_id = ?", (project_id, goal_id))
@@ -321,6 +324,21 @@ class BudgetManager:
             tx.history(call["project_id"], "budget.released_before_effect", "provider_call", call_id,
                        {"request_digest": call["request_digest"], "reason": reason})
 
+    def release_empty_created_thread(
+        self,
+        call_id: str,
+        *,
+        receipt: Any,
+        observation: Any,
+    ) -> None:
+        """복원된 create receipt와 직접 turn 0 관측으로 예약과 Attempt를 닫는다."""
+
+        self.service.release_empty_created_thread_reservation(
+            call_id=call_id,
+            receipt=receipt,
+            observation=observation,
+        )
+
 
 class BudgetedRoleRunner:
     """모든 역할의 provider 호출을 공통 예약·관측 경로로 보낸다."""
@@ -355,6 +373,13 @@ class BudgetedRoleRunner:
                 raise
             receipt = error.receipt if isinstance(error, StructuredRoleError) else None
             manager.settle(call_id, receipt)
+            if isinstance(error, StructuredRoleError):
+                with self.service.ledger.read() as connection:
+                    settled = connection.execute(
+                        "SELECT status FROM provider_calls WHERE id = ?", (call_id,),
+                    ).fetchone()
+                if settled is not None and settled["status"] == "settled":
+                    error.settled_provider_call_id = call_id
             raise
         manager.settle(call_id, result.receipt)
         return result

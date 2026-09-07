@@ -5,8 +5,13 @@ import unittest
 from datetime import timedelta
 from pathlib import Path
 
-from flowmarshal.canonical import canonical_json
-from flowmarshal.engine.application import EngineApplication, summarize_usage_records
+from flowmarshal.canonical import canonical_json, sha256_digest
+from flowmarshal.engine.application import (
+    EngineApplication,
+    EngineApplicationError,
+    summarize_usage_records,
+)
+from flowmarshal.engine.budget import BudgetManager, GoalBudgetPolicy
 from flowmarshal.engine.domain import (
     BudgetStage,
     BudgetUsageRecord,
@@ -27,6 +32,7 @@ from flowmarshal.engine.read_models import (
     ReadPresentation,
 )
 from flowmarshal.engine.service import EngineService
+from flowmarshal.engine.roles import RoleCallReceipt, RoleCallRequest, strict_json_output_schema
 from tests.engine_helpers import (
     clean_review, goal, inventory, plan, profile, project_map, skeleton, state,
 )
@@ -375,6 +381,262 @@ class EngineApplicationTests(unittest.TestCase):
         observed = self.application.model_binding_status(self.project_id, inventory=self.inventory)
         self.assertIsNone(observed.error_code)
         self.assertTrue(all(item.supported for item in observed.bindings))
+
+
+class PreGoalUsageSummaryTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name) / "project"
+        self.root.mkdir()
+        self.ledger = SQLiteEngineLedger(Path(self.temp.name) / "engine.sqlite3")
+        self.service = EngineService(self.ledger)
+        self.service.initialize()
+        self.project_id = self.service.create_project(name="Goal 준비 사용량", root=self.root)
+        self.profile = profile(self.project_id)
+        self.service.register_profile(self.profile)
+        self.manager = BudgetManager(self.service)
+        self.manager.configure(
+            self.project_id,
+            GoalBudgetPolicy(total_tokens=1_000, call_reservation_tokens=100),
+        )
+        self.application = EngineApplication(self.service)
+
+    def tearDown(self) -> None:
+        self.temp.cleanup()
+
+    def request(self, role: str, *, key: str) -> RoleCallRequest:
+        schema = strict_json_output_schema({
+            "type": "object",
+            "properties": {"ok": {"type": "boolean"}},
+            "required": ["ok"],
+            "additionalProperties": False,
+        })
+        return RoleCallRequest(
+            role=role,
+            instructions="고정 schema에 맞는 결과만 반환합니다.",
+            payload={"key": key},
+            output_schema=schema,
+            model="test-model",
+            effort="medium",
+            inventory_digest=DIGEST_A,
+            cwd=str(self.root),
+        )
+
+    def receipt(
+        self,
+        request: RoleCallRequest,
+        *,
+        key: str,
+        input_tokens: int | None = 11,
+        cached_input_tokens: int | None = 3,
+        output_tokens: int | None = 4,
+        reasoning_tokens: int | None = 2,
+        usage_available: bool = True,
+        latency_ms: int = 19,
+    ) -> RoleCallReceipt:
+        return RoleCallReceipt(
+            call_id=key,
+            role=request.role,
+            status="schema_failed",
+            model=request.model,
+            effort=request.effort,
+            inventory_digest=request.inventory_digest,
+            permission_profile=":danger-full-access",
+            approval_policy="never",
+            input_digest=request.request_digest,
+            output_digest=DIGEST_B,
+            output_schema_digest=sha256_digest(
+                strict_json_output_schema(request.output_schema)
+            ),
+            input_tokens=input_tokens,
+            cached_input_tokens=cached_input_tokens,
+            output_tokens=output_tokens,
+            reasoning_tokens=reasoning_tokens,
+            usage_available=usage_available,
+            latency_ms=latency_ms,
+            recorded_at=utc_now(),
+        )
+
+    def settled_pre_goal_call(
+        self,
+        *,
+        goal_id: str,
+        key: str,
+        role: str = "goal_reviewer",
+        usage_available: bool = True,
+        input_tokens: int | None = 11,
+        output_tokens: int | None = 4,
+        logical_call_ref: str | None = None,
+    ) -> str:
+        request = self.request(role, key=key)
+        call_id = self.manager.reserve(
+            project_id=self.project_id,
+            goal_id=goal_id,
+            goal_digest=None,
+            call_key=key,
+            role=role,
+            request=request.model_dump(mode="json"),
+        )
+        receipt = self.receipt(
+            request,
+            key=logical_call_ref or key,
+            input_tokens=input_tokens,
+            cached_input_tokens=(0 if input_tokens is not None else None),
+            output_tokens=output_tokens,
+            reasoning_tokens=(0 if output_tokens is not None else None),
+            usage_available=usage_available,
+        )
+        self.manager.settle(call_id, receipt)
+        return call_id
+
+    def test_pre_goal_receipt_is_typed_then_attach_keeps_the_same_total_once(self) -> None:
+        pending_goal_id = new_id("goal")
+        call_id = self.settled_pre_goal_call(goal_id=pending_goal_id, key="pre-goal")
+        before_history = self.service.status(self.project_id)["history_count"]
+
+        before = self.application.usage_summary(self.project_id, goal_id=pending_goal_id)
+
+        self.assertEqual(15, before.input_tokens.known_subtotal + before.output_tokens.known_subtotal)
+        self.assertEqual(11, before.input_tokens.total)
+        self.assertEqual(4, before.output_tokens.total)
+        self.assertEqual(19, before.latency_ms.total)
+        self.assertEqual(1, before.logical_call_count)
+        self.assertEqual((), before.goal_revision_digests)
+        self.assertEqual("GOAL_REVISION_NOT_CREATED", before.goal_revision_unavailable_reason)
+        self.assertIn("임의로 만들지", before.next_action)
+        self.assertEqual((), before.usage_records)
+        self.assertEqual((call_id,), tuple(item.provider_call_id for item in before.provider_receipt_usage))
+        self.assertIn(call_id, {item.entity_id for item in before.entity_refs})
+        self.assertEqual(before_history, before.history_cursor.sequence)
+        self.assertEqual(before_history, self.service.status(self.project_id)["history_count"])
+        with self.ledger.read() as connection:
+            self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM budget_usage").fetchone()[0])
+
+        pending_goal = goal(self.project_id, self.profile.definition_digest).model_copy(
+            update={"goal_id": pending_goal_id}
+        )
+        self.service.register_goal(pending_goal)
+        self.manager.attach_goal(
+            self.project_id, pending_goal_id, pending_goal.definition_digest
+        )
+
+        after = self.application.usage_summary(self.project_id, goal_id=pending_goal_id)
+        self.assertEqual((11, 4, 19), (
+            after.input_tokens.total, after.output_tokens.total, after.latency_ms.total,
+        ))
+        self.assertEqual(1, after.logical_call_count)
+        self.assertEqual(1, len(after.usage_records))
+        self.assertEqual((), after.provider_receipt_usage)
+        self.assertIsNone(after.goal_revision_unavailable_reason)
+
+    def test_unknown_and_zero_are_distinct_and_goal_scope_is_explicit(self) -> None:
+        first_goal = new_id("goal")
+        second_goal = new_id("goal")
+        self.settled_pre_goal_call(
+            goal_id=first_goal, key="zero", input_tokens=0, output_tokens=0
+        )
+        self.settled_pre_goal_call(
+            goal_id=second_goal,
+            key="unknown",
+            usage_available=False,
+            input_tokens=None,
+            output_tokens=None,
+        )
+
+        with self.assertRaisesRegex(EngineApplicationError, "GOAL_ID_REQUIRED"):
+            self.application.usage_summary(self.project_id)
+        zero = self.application.usage_summary(self.project_id, goal_id=first_goal)
+        unknown = self.application.usage_summary(self.project_id, goal_id=second_goal)
+        self.assertEqual((0, 0, 0), (
+            zero.input_tokens.total, zero.output_tokens.total, zero.input_tokens.known_subtotal,
+        ))
+        self.assertEqual(1, zero.logical_call_count)
+        self.assertEqual(0, unknown.input_tokens.known_subtotal)
+        self.assertIsNone(unknown.input_tokens.total)
+        self.assertEqual(1, unknown.input_tokens.incomplete_call_count)
+        self.assertEqual(19, unknown.latency_ms.total)
+        self.assertEqual("USAGE_INCOMPLETE", unknown.error_code)
+        self.assertEqual("USAGE_UNAVAILABLE", unknown.incomplete_reasons[0].code)
+        self.assertEqual(1, unknown.provider_call_count)
+
+    def test_pre_goal_schema_recovery_keeps_latency_as_unavailable_projection(self) -> None:
+        pending_goal_id = new_id("goal")
+        request = self.request("goal_reviewer", key="schema-recovery")
+        call_id = self.manager.reserve(
+            project_id=self.project_id,
+            goal_id=pending_goal_id,
+            goal_digest=None,
+            call_key="schema-recovery",
+            role=request.role,
+            request=request.model_dump(mode="json"),
+        )
+        self.manager.settle(
+            call_id,
+            self.receipt(request, key="schema-recovery").model_copy(
+                update={"schema_recovery_attempts": 1}
+            ),
+        )
+
+        summary = self.application.usage_summary(self.project_id, goal_id=pending_goal_id)
+
+        self.assertEqual((None, 19), (summary.input_tokens.total, summary.latency_ms.total))
+        self.assertEqual("USAGE_UNAVAILABLE", summary.incomplete_reasons[-1].code)
+        self.assertEqual((call_id,), tuple(item.provider_call_id for item in summary.provider_receipt_usage))
+
+    def test_conflicting_provider_receipt_is_reported_without_inventing_usage(self) -> None:
+        pending_goal_id = new_id("goal")
+        call_id = self.settled_pre_goal_call(goal_id=pending_goal_id, key="conflict")
+        with self.ledger.transaction() as tx:
+            row = tx.one("SELECT receipt_json FROM provider_calls WHERE id=?", (call_id,))
+            receipt = RoleCallReceipt.model_validate_json(row["receipt_json"]).model_copy(
+                update={"input_digest": DIGEST_C}
+            )
+            tx.connection.execute(
+                "UPDATE provider_calls SET receipt_json=? WHERE id=?",
+                (receipt.model_dump_json(), call_id),
+            )
+
+        summary = self.application.usage_summary(self.project_id, goal_id=pending_goal_id)
+
+        self.assertEqual(0, summary.logical_call_count)
+        self.assertEqual((), summary.provider_receipt_usage)
+        self.assertIsNone(summary.input_tokens.total)
+        self.assertEqual(1, summary.input_tokens.incomplete_call_count)
+        self.assertEqual("PROVIDER_RECEIPT_BINDING_INVALID", summary.incomplete_reasons[0].code)
+
+    def test_conflicting_pre_goal_logical_receipts_are_not_summed(self) -> None:
+        pending_goal_id = new_id("goal")
+        first = self.settled_pre_goal_call(
+            goal_id=pending_goal_id, key="first", logical_call_ref="same-logical-call"
+        )
+        second = self.settled_pre_goal_call(
+            goal_id=pending_goal_id, key="second", logical_call_ref="same-logical-call"
+        )
+
+        summary = self.application.usage_summary(self.project_id, goal_id=pending_goal_id)
+
+        self.assertEqual(0, summary.logical_call_count)
+        self.assertEqual(2, len(summary.provider_receipt_usage))
+        self.assertEqual(1, len(summary.conflicts))
+        self.assertEqual({first, second}, set(summary.conflicts[0].provider_call_ids))
+        self.assertIsNone(summary.input_tokens.total)
+        self.assertEqual(1, summary.input_tokens.incomplete_call_count)
+        self.assertEqual("USAGE_RECEIPT_CONFLICT", summary.error_code)
+
+    def test_malformed_provider_request_keeps_a_typed_incomplete_summary(self) -> None:
+        pending_goal_id = new_id("goal")
+        call_id = self.settled_pre_goal_call(goal_id=pending_goal_id, key="malformed")
+        with self.ledger.transaction() as tx:
+            tx.connection.execute(
+                "UPDATE provider_calls SET request_json='{}' WHERE id=?", (call_id,)
+            )
+
+        summary = self.application.usage_summary(self.project_id, goal_id=pending_goal_id)
+
+        self.assertIsNone(summary.input_tokens.total)
+        self.assertEqual("USAGE_INCOMPLETE", summary.error_code)
+        self.assertEqual("PROVIDER_RECEIPT_BINDING_INVALID", summary.incomplete_reasons[0].code)
+        self.assertLessEqual(len(summary.incomplete_reasons[0].detail), 1000)
 
 
 if __name__ == "__main__":

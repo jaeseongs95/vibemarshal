@@ -4,7 +4,7 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any, Iterable
 
 from ..canonical import canonical_json, sha256_bytes, sha256_digest
 from .context import AdditionalContextRequest
@@ -68,6 +68,10 @@ from .planning import (
     skeleton_gate,
     skeleton_review_evidence_catalog,
 )
+from .planning_feedback import skeleton_semantic_digest
+
+if TYPE_CHECKING:
+    from .runtime import RuntimeObservation
 
 
 class EngineServiceError(RuntimeError):
@@ -708,6 +712,108 @@ class EngineService:
                 {"candidate_digest": candidate_digest, "status": evaluation.decision.status.value},
             )
 
+    def validate_initial_skeleton_call(
+        self,
+        tx: Any,
+        *,
+        project_id: str,
+        goal_digest: str,
+        role: str,
+        request: dict[str, Any],
+    ) -> None:
+        """초기 Skeleton 역할 호출을 예약하기 전에 이전 실제 호출과 결속한다.
+
+        이 경계는 새 후보를 아직 ``skeleton_candidates``에 기록하기 전에도 적용된다.
+        따라서 후보 자체와 이전 역할 request를 함께 검증하며, 식별·selector를 재구성할 수
+        없는 기존 동일 Goal의 Skeleton 호출은 재실행 권한으로 해석하지 않는다.
+        """
+
+        if role not in {"skeleton_reviewer", "skeleton_refiner"}:
+            return
+        payload = request.get("payload")
+        if not isinstance(payload, dict):
+            raise EngineServiceError("초기 Skeleton 역할 요청 payload가 객체가 아닙니다.")
+        catalog = payload.get("evidence_catalog", {})
+        if role == "skeleton_reviewer":
+            if not isinstance(catalog, dict):
+                raise EngineServiceError("초기 Skeleton 검토 요청의 evidence catalog가 객체가 아닙니다.")
+            candidate_value = catalog.get("artifact:skeleton")
+        else:
+            candidate_value = payload.get("candidate")
+        if not isinstance(candidate_value, dict):
+            raise EngineServiceError("초기 Skeleton 역할 요청에 결속된 후보가 없습니다.")
+        try:
+            candidate = PlanSkeletonCandidate.model_validate(candidate_value)
+        except ValueError as error:
+            raise EngineServiceError("초기 Skeleton 역할 요청 후보가 유효하지 않습니다.") from error
+        if candidate.goal_contract_digest != goal_digest:
+            raise EngineServiceError("초기 Skeleton 역할 요청 후보가 다른 Goal revision에 결속됐습니다.")
+        if role == "skeleton_refiner" and candidate.parent_candidate_id is not None:
+            raise EngineServiceError("초기 Skeleton 역할에는 root Skeleton 후보만 사용할 수 있습니다.")
+
+        existing_candidate = tx.maybe_one(
+            "SELECT payload_json FROM skeleton_candidates WHERE candidate_digest = ?",
+            (sha256_digest(candidate),),
+        )
+        if existing_candidate is not None and existing_candidate["payload_json"] != canonical_json(candidate):
+            raise EngineServiceError("원장 Skeleton 후보와 초기 역할 요청 후보가 다릅니다.")
+
+        def candidate_from_prior_call(row: Any) -> PlanSkeletonCandidate:
+            try:
+                prior_request = json.loads(row["request_json"])
+                prior_payload = prior_request["payload"]
+                if not isinstance(prior_payload, dict):
+                    raise ValueError("payload")
+                if row["role"] == "skeleton_reviewer":
+                    prior_catalog = prior_payload["evidence_catalog"]
+                    if not isinstance(prior_catalog, dict):
+                        raise ValueError("evidence_catalog")
+                    prior_candidate = prior_catalog["artifact:skeleton"]
+                else:
+                    prior_candidate = prior_payload["candidate"]
+                return PlanSkeletonCandidate.model_validate(prior_candidate)
+            except (KeyError, TypeError, ValueError) as error:
+                raise EngineServiceError(
+                    "기존 초기 Skeleton 역할 호출의 후보 결속을 확인할 수 없습니다."
+                ) from error
+
+        prior_calls = tx.all(
+            "SELECT * FROM provider_calls WHERE project_id = ? AND goal_contract_digest = ? "
+            "AND role IN ('skeleton_reviewer', 'skeleton_refiner') AND status <> 'released' "
+            "ORDER BY rowid",
+            (project_id, goal_digest),
+        )
+        matching_calls: list[Any] = []
+        for prior in prior_calls:
+            prior_candidate = candidate_from_prior_call(prior)
+            if prior_candidate.goal_contract_digest != goal_digest:
+                raise EngineServiceError("기존 초기 Skeleton 역할 호출의 Goal 결속이 다릅니다.")
+            if (
+                prior_candidate.candidate_id == candidate.candidate_id
+                or sha256_digest(prior_candidate) == sha256_digest(candidate)
+                or skeleton_semantic_digest(prior_candidate) == skeleton_semantic_digest(candidate)
+            ):
+                matching_calls.append(prior)
+
+        for prior in matching_calls:
+            if prior["receipt_json"] is None:
+                continue
+            try:
+                receipt = json.loads(prior["receipt_json"])
+            except (TypeError, ValueError) as error:
+                raise EngineServiceError("기존 초기 Skeleton 역할 receipt를 확인할 수 없습니다.") from error
+            if receipt.get("status") == "schema_failed":
+                raise EngineServiceError(
+                    "이 초기 Skeleton 후보의 schema 실패 역할 호출이 이미 정산되어 재검토·수정 호출을 시작할 수 없습니다."
+                )
+
+        if role == "skeleton_refiner" and any(
+            prior["role"] == "skeleton_refiner" for prior in matching_calls
+        ):
+            raise EngineServiceError(
+                "이 초기 Skeleton 후보 계보의 수정 호출은 성공·schema 실패를 합쳐 이미 한 번 사용됐습니다."
+            )
+
     def record_planning_search(self, outcome: PlanningSearchOutcome) -> str:
         """등록된 후보와 대조한 검색·실패 피드백 전체를 변경 불가 History에 보존한다."""
         outcome = PlanningSearchOutcome.model_validate(outcome.model_dump(mode="json"))
@@ -742,6 +848,19 @@ class EngineService:
                         artifact = evaluation.plan
                         row = tx.one("SELECT payload_json FROM plan_revisions WHERE activation_digest = ?", (artifact.activation_digest,))
                         expected_reviews = evaluation.semantic_submissions
+                        if evaluation.adjudication is not None:
+                            expected_reviews += (evaluation.adjudication.submission,)
+                            adjudication_event = tx.one(
+                                "SELECT payload_json FROM history_events WHERE project_id = ? "
+                                "AND event_type = 'plan.review_adjudicated' AND entity_id = ?",
+                                (project_id, artifact.plan_revision_id),
+                            )
+                            if json.loads(adjudication_event["payload_json"]) != {
+                                "original_decision": evaluation.original_evaluation().decision.model_dump(mode="json"),
+                                "adjudication": evaluation.adjudication.model_dump(mode="json"),
+                                "decision": evaluation.decision.model_dump(mode="json"),
+                            }:
+                                raise EngineServiceError("Planning search 재심이 원장 원검토·판정과 다릅니다.")
                     decision = tx.one(
                         "SELECT payload_json FROM candidate_decisions WHERE artifact_kind = ? AND artifact_digest = ?",
                         (kind, evaluation.decision.candidate_digest),
@@ -758,18 +877,210 @@ class EngineService:
                         != sorted(canonical_json(item) for item in expected_reviews)
                     ):
                         raise EngineServiceError("Planning search가 원장 후보·검토·판정과 다릅니다.")
+            skeleton_evaluations_by_digest = {
+                sha256_digest(item.candidate): item
+                for item in outcome.skeleton_evaluations
+            }
+            for failure in outcome.candidate_schema_failures:
+                call = tx.one("SELECT * FROM provider_calls WHERE id = ?", (failure.provider_call_id,))
+                from .roles import RoleCallRequest
+                try:
+                    stored_request = RoleCallRequest.model_validate_json(call["request_json"])
+                except ValueError as error:
+                    raise EngineServiceError(
+                        "격리한 후보 실패의 저장 역할 요청을 검증할 수 없습니다."
+                    ) from error
+                if (
+                    call["project_id"] != project_id
+                    or call["goal_contract_digest"] != outcome.goal_contract_digest
+                    or call["status"] != "settled"
+                    or call["receipt_json"] != canonical_json(failure.receipt)
+                    or stored_request.request_digest != failure.receipt.input_digest
+                ):
+                    raise EngineServiceError("격리한 후보 실패가 실제 정산된 역할 호출과 다릅니다.")
+                request_payload = json.loads(call["request_json"]).get("payload", {})
+                if not isinstance(request_payload, dict):
+                    raise EngineServiceError("격리한 후보 실패의 역할 요청 payload가 객체가 아닙니다.")
+                catalog = request_payload.get("evidence_catalog", {})
+                if not isinstance(catalog, dict):
+                    raise EngineServiceError("격리한 후보 실패의 evidence catalog가 객체가 아닙니다.")
+                if failure.operation in {
+                    "expand", "refine", "skeleton_review", "initial_skeleton_review",
+                    "skeleton_refine",
+                }:
+                    if failure.operation == "expand":
+                        candidate_value = request_payload.get("skeleton")
+                    elif failure.operation == "skeleton_refine":
+                        candidate_value = request_payload.get("candidate")
+                    else:
+                        candidate_value = catalog.get("artifact:skeleton")
+                    try:
+                        request_candidate = PlanSkeletonCandidate.model_validate(candidate_value)
+                    except ValueError as error:
+                        raise EngineServiceError(
+                            "격리한 실패의 역할 요청 Skeleton을 검증할 수 없습니다."
+                        ) from error
+                    if sha256_digest(request_candidate) != failure.source_skeleton_digest:
+                        raise EngineServiceError("격리한 실패가 실제 요청의 Skeleton과 다릅니다.")
+                if failure.operation in {"review", "refine", "adjudicate"}:
+                    plan_value = catalog.get("artifact:plan_contract")
+                    if (plan_value is None
+                            or PlanContractRevision.model_validate(plan_value).activation_digest != failure.source_plan_digest):
+                        raise EngineServiceError("격리한 실패가 실제 요청의 Plan과 다릅니다.")
+                if failure.operation in {"initial_skeleton_review", "skeleton_refine"}:
+                    if failure.source_plan_digest is not None:
+                        raise EngineServiceError("초기 Skeleton 단계 실패에는 Plan 결속이 있으면 안 됩니다.")
+                    source = skeleton_evaluations_by_digest.get(failure.source_skeleton_digest)
+                    if source is None:
+                        raise EngineServiceError("초기 Skeleton 단계 실패의 원본 후보가 검색에 없습니다.")
+                    if failure.operation == "initial_skeleton_review":
+                        if (
+                            source.semantic_submission is not None
+                            or source.decision.status is not CandidateStatus.REJECTED
+                        ):
+                            raise EngineServiceError(
+                                "초기 Skeleton 검토 schema 실패와 성공 검토·admission을 함께 기록할 수 없습니다."
+                            )
+                    elif source.decision.status is not CandidateStatus.NEEDS_REVISION:
+                        raise EngineServiceError(
+                            "초기 Skeleton 수정 schema 실패에는 원본 NEEDS_REVISION 판정이 필요합니다."
+                        )
             existing = tx.maybe_one(
                 "SELECT id FROM history_events WHERE project_id = ? AND event_type = 'planning.search_recorded' AND entity_id = ?",
                 (project_id, search_id),
             )
             if existing is None:
+                def same_skeleton(left: PlanSkeletonCandidate, right: PlanSkeletonCandidate) -> bool:
+                    return (
+                        left.candidate_id == right.candidate_id
+                        or sha256_digest(left) == sha256_digest(right)
+                        or skeleton_semantic_digest(left) == skeleton_semantic_digest(right)
+                    )
+
+                def initial_refinement_roots(
+                    search: PlanningSearchOutcome,
+                ) -> tuple[PlanSkeletonCandidate, ...]:
+                    candidates = {
+                        item.candidate.candidate_id: item.candidate
+                        for item in search.skeleton_evaluations
+                    }
+                    candidates_by_digest = {
+                        sha256_digest(candidate): candidate
+                        for candidate in candidates.values()
+                    }
+                    detailed_children = {
+                        item.proposal.skeleton.candidate_id
+                        for item in search.plan_refinements
+                        if item.proposal.skeleton is not None
+                    }
+                    roots: dict[str, PlanSkeletonCandidate] = {}
+
+                    def add_root(candidate: PlanSkeletonCandidate) -> None:
+                        root = candidate
+                        while root.parent_candidate_id is not None:
+                            parent = candidates.get(root.parent_candidate_id)
+                            if parent is None:
+                                raise EngineServiceError(
+                                    "Planning search의 초기 Skeleton 수정 계보를 확인할 수 없습니다."
+                                )
+                            root = parent
+                        roots.setdefault(sha256_digest(root), root)
+
+                    for candidate_id, candidate in candidates.items():
+                        if candidate.parent_candidate_id is not None and candidate_id not in detailed_children:
+                            add_root(candidate)
+                    for failure in search.candidate_schema_failures:
+                        if failure.operation != "skeleton_refine":
+                            continue
+                        source = candidates_by_digest.get(failure.source_skeleton_digest)
+                        if source is None:
+                            raise EngineServiceError(
+                                "Planning search의 초기 Skeleton 수정 실패 원본을 확인할 수 없습니다."
+                            )
+                        add_root(source)
+                    return tuple(roots.values())
+
+                prior_searches = tx.all(
+                    "SELECT payload_json FROM history_events WHERE project_id = ? "
+                    "AND event_type = 'planning.search_recorded' ORDER BY sequence",
+                    (project_id,),
+                )
+                current_candidates = tuple(
+                    item.candidate for item in outcome.skeleton_evaluations
+                )
+                current_initial_refinement_roots = initial_refinement_roots(outcome)
+                for row in prior_searches:
+                    try:
+                        stored = json.loads(row["payload_json"])
+                        previous = PlanningSearchOutcome.model_validate(stored["outcome"])
+                    except (KeyError, TypeError, ValueError) as error:
+                        raise EngineServiceError(
+                            "이전 planning search의 복구 계보를 검증할 수 없습니다."
+                        ) from error
+                    if previous.goal_contract_digest != outcome.goal_contract_digest:
+                        continue
+                    previous_candidates_by_digest = {
+                        sha256_digest(item.candidate): item.candidate
+                        for item in previous.skeleton_evaluations
+                    }
+                    for failure in previous.candidate_schema_failures:
+                        if failure.operation not in {
+                            "initial_skeleton_review", "skeleton_refine",
+                        }:
+                            continue
+                        source = previous_candidates_by_digest.get(
+                            failure.source_skeleton_digest
+                        )
+                        if source is None:
+                            raise EngineServiceError(
+                                "이전 초기 Skeleton schema 실패의 원본 후보를 확인할 수 없습니다."
+                            )
+                        affected = (
+                            current_candidates
+                            if failure.operation == "initial_skeleton_review"
+                            else tuple(
+                                candidate
+                                for candidate in current_candidates
+                                if candidate.parent_candidate_id is None
+                            )
+                        )
+                        if any(same_skeleton(candidate, source) for candidate in affected):
+                            raise EngineServiceError(
+                                "이전 planning search의 초기 Skeleton schema 실패를 누락·재시도할 수 없습니다."
+                            )
+                    for previous_root in initial_refinement_roots(previous):
+                        if any(
+                            same_skeleton(current_root, previous_root)
+                            for current_root in current_initial_refinement_roots
+                        ):
+                            raise EngineServiceError(
+                                "이전 planning search에서 사용한 초기 Skeleton 수정 슬롯을 새 후보 ID로 복원할 수 없습니다."
+                            )
                 tx.history(project_id, "planning.search_recorded", "planning_search", search_id,
                            {"outcome_digest": digest, "outcome": outcome.model_dump(mode="json")})
+                for failure in outcome.candidate_schema_failures:
+                    tx.history(
+                        project_id,
+                        "planning.candidate_schema_failed",
+                        "provider_call",
+                        failure.provider_call_id,
+                        {
+                            "operation": failure.operation,
+                            "source_skeleton_digest": failure.source_skeleton_digest,
+                            "source_skeleton_semantic_digest": skeleton_semantic_digest(
+                                skeleton_evaluations_by_digest[failure.source_skeleton_digest].candidate
+                            ),
+                            "source_plan_digest": failure.source_plan_digest,
+                            "receipt_digest": sha256_digest(failure.receipt),
+                            "search_id": search_id,
+                        },
+                    )
         return search_id
 
     def register_plan_evaluation(self, evaluation: ExpandedPlanEvaluation) -> None:
         # typed 입력도 model_copy로 검증을 우회할 수 있으므로 중첩 계약까지 다시 검사한다.
         try:
+            evaluation = ExpandedPlanEvaluation.model_validate_json(evaluation.model_dump_json())
             plan = PlanContractRevision.model_validate_json(evaluation.plan.model_dump_json())
         except ValueError as error:
             raise EngineServiceError(f"PlanContract 입력 검증에 실패했습니다: {error}") from error
@@ -814,7 +1125,21 @@ class EngineService:
             raise EngineServiceError(
                 "Plan deterministic findings가 Core 재계산 결과와 다릅니다."
             )
-        for submission in evaluation.semantic_submissions:
+        all_reviews = evaluation.semantic_submissions
+        if evaluation.adjudication is not None:
+            try:
+                evaluation.adjudication.validate_source(
+                    source_evaluation_digest=sha256_digest(evaluation.original_evaluation()),
+                    original_submission=evaluation.semantic_submissions[0],
+                    evidence_catalog=plan_review_evidence_catalog(plan, goal_contract, state_snapshot, project_map),
+                    dispute_evidence_catalog=plan_review_evidence_catalog(plan, goal_contract, state_snapshot, project_map)
+                    | {"artifact:skeleton": source_skeleton.model_dump(mode="json")},
+                    known_task_refs={item.task_ref for item in plan.definition.tasks},
+                )
+            except ValueError as error:
+                raise EngineServiceError(str(error)) from error
+            all_reviews += (evaluation.adjudication.submission,)
+        for submission in all_reviews:
             try:
                 validate_reviewer_submission_evidence(
                     submission,
@@ -827,12 +1152,12 @@ class EngineService:
                 raise EngineServiceError(str(error)) from error
         findings = actual_findings + tuple(
             finding
-            for submission in evaluation.semantic_submissions
+            for submission in evaluation.effective_semantic_submissions
             for finding in submission.findings
         )
         ratings = (
-            evaluation.semantic_submissions[0].ratings
-            if evaluation.semantic_submissions
+            evaluation.effective_semantic_submissions[0].ratings
+            if evaluation.effective_semantic_submissions
             else None
         )
         expected_decision = derive_candidate_decision(
@@ -845,7 +1170,9 @@ class EngineService:
         self._register_plan(
             plan,
             decision=evaluation.decision,
-            reviews=evaluation.semantic_submissions,
+            reviews=all_reviews,
+            adjudication=evaluation.adjudication,
+            original_decision=evaluation.original_evaluation().decision if evaluation.adjudication else None,
         )
 
     def _register_plan(
@@ -854,6 +1181,8 @@ class EngineService:
         *,
         decision: CandidateDecision,
         reviews: Iterable[Any] = (),
+        adjudication: Any = None,
+        original_decision: CandidateDecision | None = None,
     ) -> None:
         definition = plan.definition
         if decision.candidate_digest != plan.activation_digest:
@@ -946,6 +1275,13 @@ class EngineService:
             for review in reviews:
                 self._insert_review(tx, definition.project_id, "plan", review)
             self._insert_decision(tx, definition.project_id, "plan", decision)
+            if adjudication is not None:
+                tx.history(
+                    definition.project_id, "plan.review_adjudicated", "plan_revision", plan.plan_revision_id,
+                    {"original_decision": original_decision.model_dump(mode="json"),
+                     "adjudication": adjudication.model_dump(mode="json"),
+                     "decision": decision.model_dump(mode="json")},
+                )
             tx.history(
                 definition.project_id,
                 "plan.registered",
@@ -3131,6 +3467,460 @@ class EngineService:
             tx.connection.execute("UPDATE task_contracts SET status=?,updated_at=? WHERE id=?",
                                   ("validating" if attempt["kind"] == "validation" else "materialized", tx.now, attempt["task_id"]))
             tx.history(attempt["project_id"], "attempt.released_before_effect", "attempt", attempt_id, {"reason": reason})
+
+    def release_empty_created_thread_reservation(
+        self,
+        *,
+        call_id: str,
+        receipt: RuntimeReceipt,
+        observation: "RuntimeObservation",
+    ) -> None:
+        """turn 0을 직접 관측한 복원 create receipt의 예약과 Attempt를 함께 닫는다."""
+
+        from .model_lock import OperationalBinding, verify_binding
+        from .runtime import RuntimeObservation
+
+        receipt = RuntimeReceipt.model_validate(receipt)
+        observation = RuntimeObservation.model_validate(observation)
+
+        def reject(code: str, detail: str) -> None:
+            raise EngineServiceError(f"{code}: {detail}")
+
+        with self.ledger.transaction() as tx:
+            call = tx.one("SELECT * FROM provider_calls WHERE id = ?", (call_id,))
+            if (
+                call["actual_tokens"] is not None
+                or call["receipt_json"] is not None
+                or call["usage_id"] is not None
+            ):
+                reject(
+                    "EMPTY_THREAD_RESERVATION_HAS_USAGE",
+                    "사용량 또는 역할 receipt가 기록된 provider 예약은 빈 thread로 해제할 수 없습니다.",
+                )
+            if call["attempt_id"] is None:
+                reject(
+                    "EMPTY_THREAD_ATTEMPT_BINDING_REQUIRED",
+                    "Attempt에 결속된 provider 예약이 필요합니다.",
+                )
+            attempt = tx.one("SELECT * FROM attempts WHERE id = ?", (call["attempt_id"],))
+            calls = tx.all(
+                "SELECT id FROM provider_calls WHERE attempt_id = ? ORDER BY rowid",
+                (attempt["id"],),
+            )
+            if len(calls) != 1 or calls[0]["id"] != call_id:
+                reject(
+                    "EMPTY_THREAD_PROVIDER_CALL_CARDINALITY",
+                    "빈 thread Attempt에는 정확히 하나의 provider 예약만 있어야 합니다.",
+                )
+            if call["project_id"] != attempt["project_id"]:
+                reject(
+                    "EMPTY_THREAD_PROJECT_BINDING_MISMATCH",
+                    "provider 예약과 Attempt의 프로젝트가 다릅니다.",
+                )
+
+            intents = tx.all(
+                "SELECT * FROM runtime_intents WHERE attempt_id = ? ORDER BY rowid",
+                (attempt["id"],),
+            )
+            if (
+                len(intents) != 1
+                or intents[0]["kind"] != RuntimeIntentKind.CREATE_THREAD.value
+                or intents[0]["status"] != RuntimeIntentStatus.RECEIVED.value
+            ):
+                reject(
+                    "EMPTY_THREAD_RUNTIME_EFFECT_NOT_EMPTY",
+                    "received create_thread 외의 start/resume/unknown runtime intent가 없어야 합니다.",
+                )
+            intent = intents[0]
+            stored_receipts = tx.all(
+                "SELECT * FROM runtime_receipts WHERE intent_id = ? ORDER BY rowid",
+                (intent["id"],),
+            )
+            if len(stored_receipts) != 1:
+                reject(
+                    "EMPTY_THREAD_CREATE_RECEIPT_REQUIRED",
+                    "복원된 create_thread receipt가 정확히 하나 필요합니다.",
+                )
+            stored_receipt = RuntimeReceipt.model_validate_json(
+                stored_receipts[0]["payload_json"]
+            )
+            if receipt != stored_receipt or receipt.intent_id != intent["id"]:
+                reject(
+                    "EMPTY_THREAD_CREATE_RECEIPT_MISMATCH",
+                    "입력 receipt가 원장에 복원된 create_thread receipt와 다릅니다.",
+                )
+            if receipt.binding is None or receipt.binding.turn_id is not None:
+                reject(
+                    "EMPTY_THREAD_CREATE_BINDING_MISMATCH",
+                    "create_thread receipt에는 turn 없는 thread binding이 필요합니다.",
+                )
+            if (
+                stored_receipts[0]["provider_operation_id"]
+                != receipt.provider_operation_id
+                or stored_receipts[0]["response_digest"] != receipt.response_digest
+                or stored_receipts[0]["binding_json"] != canonical_json(receipt.binding)
+                or attempt["binding_json"] != canonical_json(receipt.binding)
+            ):
+                reject(
+                    "EMPTY_THREAD_CREATE_BINDING_MISMATCH",
+                    "원장 receipt·Attempt binding이 입력 receipt와 다릅니다.",
+                )
+
+            request = json.loads(call["request_json"])
+            intent_request = json.loads(intent["request_json"])
+            if (
+                request != intent_request
+                or sha256_digest(request) != call["request_digest"]
+                or sha256_digest(intent_request) != intent["request_digest"]
+                or call["request_digest"] != intent["request_digest"]
+                or request.get("task_id") != attempt["task_id"]
+                or request.get("attempt_kind") != attempt["kind"]
+            ):
+                reject(
+                    "EMPTY_THREAD_REQUEST_BINDING_MISMATCH",
+                    "provider 예약과 create intent의 Task·Attempt 요청 결속이 다릅니다.",
+                )
+            project = tx.one(
+                "SELECT root FROM projects WHERE id = ?", (attempt["project_id"],)
+            )
+            if Path(str(request.get("cwd", ""))).resolve() != Path(project["root"]).resolve():
+                reject(
+                    "EMPTY_THREAD_REQUEST_BINDING_MISMATCH",
+                    "create 요청의 작업 경로가 프로젝트와 다릅니다.",
+                )
+            spec_row = tx.one(
+                "SELECT payload_json FROM execution_spec_revisions "
+                "WHERE definition_digest = ?",
+                (attempt["execution_spec_digest"],),
+            )
+            spec = TaskExecutionSpecRevision.model_validate_json(spec_row["payload_json"])
+            expected_role = (
+                spec.definition.executor
+                if attempt["kind"] == AttemptKind.EXECUTION.value
+                else spec.definition.validator
+            )
+            expected_call_role = (
+                "worker"
+                if attempt["kind"] == AttemptKind.EXECUTION.value
+                else "semantic_validator"
+            )
+            expected_stage = (
+                BudgetStage.EXECUTION.value
+                if attempt["kind"] == AttemptKind.EXECUTION.value
+                else BudgetStage.VALIDATION.value
+            )
+            if (
+                expected_role is None
+                or expected_role.operational_binding is None
+                or call["role"] != expected_call_role
+                or call["stage"] != expected_stage
+                or request.get("model") != expected_role.model
+            ):
+                reject(
+                    "EMPTY_THREAD_ROLE_BINDING_MISMATCH",
+                    "Attempt 종류·Execution Spec·provider role/stage/model 결속이 다릅니다.",
+                )
+            try:
+                observed_binding = OperationalBinding.model_validate(
+                    request.get("model_observation")
+                )
+                verify_binding(
+                    expected_role.operational_binding,
+                    observed_binding.inventory,
+                    role=expected_role.role,
+                    model=expected_role.model,
+                    effort=expected_role.effort,
+                )
+                if observed_binding.lock_digest != expected_role.operational_binding.lock_digest:
+                    raise ValueError("operational lock digest mismatch")
+            except ValueError as error:
+                reject(
+                    "EMPTY_THREAD_MODEL_BINDING_MISMATCH",
+                    f"create 요청의 model observation이 Execution Spec과 다릅니다: {error}",
+                )
+
+            plan = tx.one(
+                "SELECT payload_json FROM plan_revisions WHERE id = ?",
+                (attempt["plan_revision_id"],),
+            )
+            goal_digest = json.loads(plan["payload_json"])["definition"][
+                "goal_contract_digest"
+            ]
+            goal = tx.one(
+                "SELECT goal_id FROM goal_revisions WHERE project_id = ? "
+                "AND definition_digest = ?",
+                (attempt["project_id"], goal_digest),
+            )
+            if (
+                call["goal_id"] != goal["goal_id"]
+                or call["goal_contract_digest"] != goal_digest
+            ):
+                reject(
+                    "EMPTY_THREAD_GOAL_BINDING_MISMATCH",
+                    "provider 예약이 Attempt의 Plan·Goal revision과 다릅니다.",
+                )
+            if call["policy_digest"] is None:
+                if call["estimated_tokens"] != 0:
+                    reject(
+                        "EMPTY_THREAD_POLICY_BINDING_MISMATCH",
+                        "정책 없는 provider 예약의 token 예약량이 0이 아닙니다.",
+                    )
+            else:
+                policies = tx.all(
+                    "SELECT payload_json FROM budget_policy_revisions "
+                    "WHERE project_id = ? AND scope_key IN ('', ?)",
+                    (attempt["project_id"], goal["goal_id"]),
+                )
+                matching_policy = next(
+                    (
+                        json.loads(item["payload_json"])
+                        for item in policies
+                        if sha256_digest(json.loads(item["payload_json"]))
+                        == call["policy_digest"]
+                    ),
+                    None,
+                )
+                if (
+                    matching_policy is None
+                    or matching_policy.get("call_reservation_tokens")
+                    != call["estimated_tokens"]
+                ):
+                    reject(
+                        "EMPTY_THREAD_POLICY_BINDING_MISMATCH",
+                        "provider 예약량과 명시 예산 정책의 결속이 다릅니다.",
+                    )
+
+            response = receipt.response_payload
+            thread = None if not isinstance(response, dict) else response.get("thread")
+            if (
+                receipt.provider_operation_id != receipt.binding.thread_id
+                or not isinstance(thread, dict)
+                or thread.get("id") != receipt.binding.thread_id
+                or thread.get("turns") != []
+                or (
+                    "thread_id" in response
+                    and response.get("thread_id") != receipt.binding.thread_id
+                )
+            ):
+                reject(
+                    "EMPTY_THREAD_CREATE_RESPONSE_NOT_EMPTY",
+                    "create receipt 원문이 turn 0 thread를 증명하지 않습니다.",
+                )
+            observation_payload = observation.payload
+            evidence_type: str | None = None
+            if (
+                observation.thread_id != receipt.binding.thread_id
+                or observation.turn_id is not None
+                or observation.active
+                or observation.terminal_status is not None
+                or observation.final_response is not None
+                or observation_payload.get("thread_id") != receipt.binding.thread_id
+                or isinstance(observation_payload.get("turn_count"), bool)
+                or not isinstance(observation_payload.get("turn_count"), int)
+                or observation_payload["turn_count"] != 0
+                or observation_payload.get("turn_status") is not None
+                or observation_payload.get("usage") is not None
+            ):
+                reject(
+                    "EMPTY_THREAD_TERMINAL_OBSERVATION_MISMATCH",
+                    "저장 thread의 직접 read 관측이 turn 0·비활성·사용량 없음 상태가 아닙니다.",
+                )
+            if (
+                observation_payload.get("turn_history_available") is True
+                and observation_payload.get("turn_history_source")
+                == "thread/read(includeTurns=true)"
+            ):
+                if (
+                    observation_payload.get("usage_source") != "thread/read"
+                    or observation_payload.get("turn_history_error") is not None
+                ):
+                    reject(
+                        "EMPTY_THREAD_HISTORY_EVIDENCE_MISMATCH",
+                        "typed thread/read turn history 증거가 다릅니다.",
+                    )
+                evidence_type = "typed_thread_read_include_turns"
+            elif (
+                observation_payload.get("turn_history_available") is True
+                and observation_payload.get("turn_history_source") == "thread/turns/list"
+            ):
+                verification = observation_payload.get("project_binding_verification")
+                retry_errors = observation_payload.get("read_retry_errors")
+                expected_params = {
+                    "threadId": receipt.binding.thread_id,
+                    "limit": 1,
+                    "sortDirection": "asc",
+                    "itemsView": "full",
+                }
+                expected_response = {
+                    "data": [],
+                    "nextCursor": None,
+                    "backwardsCursor": None,
+                }
+                expected_materialization_params = {
+                    "threadId": receipt.binding.thread_id,
+                    "includeTurns": True,
+                }
+                materialization = observation_payload.get("materialization_read")
+                receipt_cwd = thread.get("cwd")
+                receipt_path = thread.get("path")
+                if (
+                    observation_payload.get("usage_source") != "thread/turns/list"
+                    or observation_payload.get("turn_history_error") is not None
+                    or observation_payload.get("turn_history_params") != expected_params
+                    or observation_payload.get("turn_history_response") != expected_response
+                    or retry_errors != []
+                    or observation_payload.get("turn_history_connection")
+                    != "independent_app_server"
+                    or observation_payload.get("independent_reader_executable_digest")
+                    != observed_binding.inventory.executable_digest
+                    or not isinstance(materialization, dict)
+                    or materialization.get("method") != "thread/read"
+                    or materialization.get("params") != expected_materialization_params
+                    or (
+                        materialization.get("response") is None
+                        and materialization.get("error")
+                        != {
+                            "type": "MethodNotFoundError",
+                            "code": -32601,
+                            "message": "list_turns is not supported yet",
+                        }
+                    )
+                    or (
+                        materialization.get("response") is not None
+                        and (
+                            materialization.get("error") is not None
+                            or not isinstance(materialization["response"], dict)
+                            or not isinstance(
+                                materialization["response"].get("thread"), dict
+                            )
+                            or materialization["response"].get("thread", {}).get("id")
+                            != receipt.binding.thread_id
+                            or materialization["response"].get("thread", {}).get("turns")
+                            != []
+                        )
+                    )
+                    or not isinstance(verification, dict)
+                    or verification.get("source")
+                    != "same_connection_thread_start_receipt_and_empty_turns_list"
+                    or verification.get("creation_receipt_digest")
+                    != sha256_digest(receipt.response_payload)
+                    or verification.get("creation_project_id") != thread.get("projectId")
+                    or verification.get("raw_metadata_source")
+                    != "thread/read(includeTurns=false)"
+                    or verification.get("raw_metadata_connection")
+                    != "independent_app_server"
+                    or verification.get("raw_metadata_confirmation_count") != 2
+                    or not isinstance(receipt_cwd, str)
+                    or not Path(receipt_cwd).is_absolute()
+                    or Path(receipt_cwd).resolve() != Path(request["cwd"]).resolve()
+                    or not isinstance(receipt_path, str)
+                    or not Path(receipt_path).is_absolute()
+                    or verification.get("rollout_path") != receipt_path
+                    or thread.get("ephemeral") is not False
+                    or not isinstance(thread.get("projectId"), str)
+                    or not thread["projectId"]
+                ):
+                    reject(
+                        "EMPTY_THREAD_TURNS_LIST_EVIDENCE_MISMATCH",
+                        "same-connection 빈 thread turns/list 증거가 원본 create receipt와 다릅니다.",
+                    )
+                evidence_type = "same_connection_thread_turns_list_empty"
+            else:
+                reject(
+                    "EMPTY_THREAD_HISTORY_EVIDENCE_MISMATCH",
+                    "turn history 사용 가능 여부가 명시되어야 합니다.",
+                )
+
+            proof = {
+                "attempt_id": attempt["id"],
+                "intent_id": intent["id"],
+                "request_digest": call["request_digest"],
+                "runtime_receipt_digest": sha256_digest(receipt),
+                "observation_digest": sha256_digest(observation),
+                "observation": observation.model_dump(mode="json"),
+                "thread_id": receipt.binding.thread_id,
+                "observed_turn_count": 0,
+                "actual_tokens": None,
+                "turn_zero_evidence_type": evidence_type,
+            }
+            prior = tx.all(
+                "SELECT payload_json FROM history_events WHERE project_id = ? "
+                "AND event_type = 'budget.empty_thread_reservation_released' "
+                "AND entity_type = 'provider_call' AND entity_id = ? ORDER BY sequence",
+                (attempt["project_id"], call_id),
+            )
+            if call["status"] == "released":
+                attempt_history = tx.all(
+                    "SELECT payload_json FROM history_events WHERE project_id = ? "
+                    "AND event_type = 'attempt.failed' AND entity_type = 'attempt' "
+                    "AND entity_id = ? ORDER BY sequence",
+                    (attempt["project_id"], attempt["id"]),
+                )
+                task = tx.one(
+                    "SELECT status FROM task_contracts WHERE id = ?", (attempt["task_id"],)
+                )
+                if (
+                    len(prior) == 1
+                    and json.loads(prior[0]["payload_json"]) == proof
+                    and attempt["status"] == AttemptStatus.FAILED.value
+                    and attempt["failure_class"] == FailureClass.EXTERNAL_UNKNOWN.value
+                    and task["status"] == TaskRuntimeStatus.FAILED.value
+                    and len(attempt_history) == 1
+                    and json.loads(attempt_history[0]["payload_json"])
+                    == {
+                        "task_id": attempt["task_id"],
+                        "failure_class": FailureClass.EXTERNAL_UNKNOWN.value,
+                    }
+                ):
+                    return
+                reject(
+                    "EMPTY_THREAD_RELEASE_PROOF_MISMATCH",
+                    "기존 해제 이력과 입력 receipt·관측이 다릅니다.",
+                )
+            if call["status"] != "reserved" or prior:
+                reject(
+                    "EMPTY_THREAD_RESERVATION_RELEASE_NOT_ALLOWED",
+                    "현재 reserved 예약만 검증된 빈 thread 증거로 해제할 수 있습니다.",
+                )
+            if attempt["status"] != AttemptStatus.RUNNING.value:
+                reject(
+                    "EMPTY_THREAD_ATTEMPT_NOT_RUNNING",
+                    "복원된 create receipt로 running 상태가 된 Attempt만 해제할 수 있습니다.",
+                )
+            tx.connection.execute(
+                "UPDATE provider_calls SET status = 'released', completed_at = ? WHERE id = ?",
+                (tx.now, call_id),
+            )
+            tx.history(
+                attempt["project_id"],
+                "budget.empty_thread_reservation_released",
+                "provider_call",
+                call_id,
+                proof,
+            )
+            detail = (
+                "생성 receipt를 복구했고 turn 0 evidence를 기록했습니다: "
+                f"{evidence_type}. 모델 turn은 시작되지 않았습니다."
+            )
+            tx.connection.execute(
+                "UPDATE attempts SET status = 'failed', failure_class = 'external_unknown', "
+                "failure_detail = ?, ended_at = ?, updated_at = ? WHERE id = ?",
+                (detail, tx.now, tx.now, attempt["id"]),
+            )
+            tx.connection.execute(
+                "UPDATE task_contracts SET status = 'failed', updated_at = ? WHERE id = ?",
+                (tx.now, attempt["task_id"]),
+            )
+            tx.history(
+                attempt["project_id"],
+                "attempt.failed",
+                "attempt",
+                attempt["id"],
+                {
+                    "task_id": attempt["task_id"],
+                    "failure_class": FailureClass.EXTERNAL_UNKNOWN.value,
+                },
+            )
 
     def recover_inspect(self, project_id: str) -> tuple[str, ...]:
         unknown: list[str] = []

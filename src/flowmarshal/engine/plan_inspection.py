@@ -15,8 +15,8 @@ from .planning import validation_comparison_targets
 class InspectionCitation(EngineModel):
     citation_id: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_]{0,59}$")
     source_ref: str = Field(description="Goal/Plan 원문 ref 또는 정확한 project:<entry_id>. 등록 자료의 검사 범위는 inspection_source_catalog의 정식 project ref로 인용한다.")
-    selector: str = Field(description="source_ref 원문 값에 대한 RFC 6901 JSON pointer. 파일 본문은 /content.")
-    quote: str = Field(min_length=1, max_length=5000, description="선택한 문자열에 그대로 존재하는 연속 인용. AC 행의 validation statement 인용은 해당 문장 전체와 같아야 하며, 요약·생략 기호를 삽입하지 않는다.")
+    selector: str = Field(description="source_ref 원문의 실제 문자열 필드까지 가리키는 RFC 6901 JSON pointer. 객체·배열을 가리키면 안 된다. Goal AC는 /hard_acceptance/<index>/statement 또는 /hard_acceptance/<index>/validation_intent까지 지정하고 파일 본문은 /content를 사용한다.")
+    quote: str = Field(min_length=1, max_length=5000, description="선택한 문자열에 그대로 존재하는 연속 인용. AC 행의 validation statement 인용은 해당 문장 전체와 같아야 하며, 요약·생략 기호를 삽입하지 않는다. 그 밖의 인용은 판단의 직접 근거로 충분한 짧은 연속 구절을 선택한다. JSON 직렬화 escape와 파싱된 문자열 값을 구분하며 파싱 뒤 quote에 원문에 없는 역슬래시·따옴표·개행이 추가되면 안 된다.")
 
 
 class ACValidationInspection(EngineModel):
@@ -45,7 +45,7 @@ class InspectionMechanism(EngineModel):
 
 class ValidationInspection(EngineModel):
     validation_id: str
-    claim_ref: str = Field(description="해당 validation statement의 주장 인용 ID.")
+    claim_ref: str = Field(description="해당 validation statement를 인용하여 inspection.citations에 실제 등록한 citation_id. 별도 claim ID를 만들지 않는다.")
     mechanisms: tuple[InspectionMechanism, ...] = Field(min_length=1)
     separate_check_refs: tuple[str, ...] = Field(description="같은 statement 안 별도 실제 실행·기대값 비교 책임의 인용 ID. 목적만 덧붙인 문장은 포함하지 않는다.")
 
@@ -53,7 +53,7 @@ class ValidationInspection(EngineModel):
 class ValidationScopeInspection(EngineModel):
     scope_id: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_]{0,79}$")
     validation_id: str
-    claim_ref: str = Field(description="validation statement에서 이 행이 판정하는 부분 주장의 연속 원문 인용 ID.")
+    claim_ref: str = Field(description="validation statement에서 이 행이 판정하는 부분 주장의 연속 원문을 inspection.citations에 실제 등록한 citation_id. 이 ID를 같은 scope의 basis_refs에도 포함한다.")
     procedure: str = Field(min_length=1, max_length=240, description="이 부분 주장을 실제로 수행한다고 대조한 절차 설명. validation_rows mechanism과 같은 phase·근거 인용으로 결속하며 tool 문자열의 별칭이나 새 검사 능력을 뜻하지 않는다.")
     phase: str | None = Field(description="해당 절차가 실제 실행되는 phase/mode. 원문에 없으면 null.")
     basis_refs: tuple[str, ...] = Field(min_length=1, description="자신의 claim_ref와 같은 validation·같은 phase에서 선택한 mechanism 하나의 전체 basis_refs를 반드시 포함한다. 여러 mechanism 전체의 합집합은 요구하지 않는다. scope에서 실제 범위 판단에 추가로 사용한 project citation도 포함하고 같은 validation의 모든 AC 행에 재사용한다. 근거 반복은 추적 결속이며 다른 부분의 검사 능력·판정을 이 scope에 부여하지 않는다.")
@@ -71,7 +71,7 @@ class InspectionFindingLink(EngineModel):
 
 
 class PlanInspection(EngineModel):
-    citations: tuple[InspectionCitation, ...] = Field(min_length=1)
+    citations: tuple[InspectionCitation, ...] = Field(min_length=1, description="후속 행의 claim_ref·basis_refs·separate_check_refs에서 실제 사용하는 인용의 유일한 등록 목록. 모든 참조 ID를 포함하고 미사용 인용은 등록하지 않는다. 같은 인용은 하나의 citation_id로 재사용한다.")
     validation_rows: tuple[ValidationInspection, ...]
     validation_scope_rows: tuple[ValidationScopeInspection, ...]
     ac_validation_rows: tuple[ACValidationInspection, ...]
@@ -118,12 +118,18 @@ PLAN_INSPECTION_INSTRUCTIONS = PLAN_INSPECTION_SHARED_INSTRUCTIONS + (
     "같은 원문 인용은 citations에 한 번 등록하고 나머지 행은 citation_id를 참조한다. "
     "source:goal은 Goal definition, Reviewer의 artifact:plan_contract는 revision 전체, 작성자의 "
     "artifact:plan_draft는 응답 plan 전체다. JSON pointer는 이 값의 루트부터 쓰며 배열은 /0 형식이다. "
+    "selector는 quote가 들어 있는 실제 문자열 필드까지 가리킨다. Goal AC의 /hard_acceptance/0은 "
+    "객체이므로 인용 대상이 아니며 /hard_acceptance/0/statement와 /hard_acceptance/0/validation_intent를 "
+    "각각 사용한다. 같은 원칙으로 constraint와 validation도 실제 statement 필드까지 지정한다. "
     "등록 자료의 검사 범위는 inspection_source_catalog가 제공하는 정식 project:<entry_id>와 "
     "selector=/content를 반드시 사용한다. 함께 제공한 content는 content_digest로 검증한 UTF-8 "
     "원문이다. Goal source_traces의 복제 본문이나 배열 번호로 등록 파일의 주소를 재구성하지 않는다. "
     "그 밖의 Project Map 파일도 정확한 entry_id와 /content로 실제 본문을 인용한다. 파일 인용은 "
     "finding의 source:project_map evidence에 대응한다. quote는 연속 원문이며 의역·생략 표시를 "
-    "넣지 않는다. AC × validation 행의 validation statement 인용은 문장 전체를 그대로 쓴다. 등록 문서가 부족하면 관련 구현도 읽되 제공된 원문으로 "
+    "넣지 않는다. AC × validation 행의 validation statement 인용은 문장 전체를 그대로 쓴다. "
+    "그 밖에는 직접 근거로 충분한 짧은 연속 구절을 인용한다. JSON 문법의 escape는 파싱 뒤 "
+    "문자열에 남는 원문 문자가 아니므로, quote를 이중 escape하여 원문에 없는 역슬래시나 "
+    "개행 표기를 삽입하지 않는다. 등록 문서가 부족하면 관련 구현도 읽되 제공된 원문으로 "
     "확인한 범위만 주장한다. "
     "citations 다음에는 모든 validation_rows를 먼저 작성해 validation statement, mechanism, phase와 "
     "별도 실제 검사 책임의 근거를 확정한다. 이어 validation_scope_rows에서 복합 statement의 책임을 "

@@ -34,7 +34,7 @@ from .domain import (
 )
 from .evaluation import (
     BenchmarkCell, BenchmarkLifecycleObservation, BenchmarkTaskLifecycleObservation,
-    EvaluationCellCheckpoint, EvaluationContract, EvaluationRunStatus, ImmutableCheckpointStore,
+    EvaluationCellCheckpoint, EvaluationContract, EvaluationRunStatus, EvaluationScope, ImmutableCheckpointStore,
     TokenLatencyGateReport, evaluate_token_latency_gate,
 )
 from .evaluation_budget import (
@@ -45,6 +45,10 @@ from .evaluation_budget import (
 from .ledger import SQLiteEngineLedger
 from .models import EngineRoleConfiguration
 from .model_lock import ModelInventory
+from .plan_inspection_provider import (
+    PLAN_INSPECTION_PROVIDER_V1,
+    PlanInspectionProviderVersion,
+)
 from .qualification import (
     ORDER_SEEDS, PlanningScenarioCatalog, QualificationRunError, ScopeQualificationReport,
     _default_run_root, _is_rate_limit, _manifest, _planning_cell, _planning_contract, _preflight,
@@ -75,6 +79,13 @@ IMPLEMENTATION_RUNTIME_CONTRACT = {
     "skeleton_engine": {"ephemeral_threads": False, "max_schema_recovery_attempts": 0},
     "r31_baseline": {"ephemeral_threads": True, "max_schema_recovery_attempts": 0},
 }
+
+
+def _implementation_runtime_contract(policies: EvaluationPolicies) -> dict[str, dict[str, Any]]:
+    contract = {name: dict(value) for name, value in IMPLEMENTATION_RUNTIME_CONTRACT.items()}
+    if policies.codex_project is not None:
+        contract["r31_baseline"]["ephemeral_threads"] = False
+    return contract
 
 LEGACY_ROLE_STAGES = {
     "purpose_resolver": {"goal_normalization"},
@@ -387,7 +398,9 @@ def _legacy_budget_cell_binding(
         "parent_hard_timeout_contract": timeout_contract,
         "parent_hard_timeout_seconds": timeout_contract["timeout_seconds"],
         "parent_hard_timeout_policy_digest": timeout_contract["policy_digest"],
-        **IMPLEMENTATION_RUNTIME_CONTRACT["r31_baseline"],
+        **_implementation_runtime_contract(evaluation_policies)["r31_baseline"],
+        **({"codex_project": evaluation_policies.codex_project.model_dump(mode="json", exclude_none=True)}
+           if evaluation_policies.codex_project is not None else {}),
     }
 
 
@@ -725,13 +738,87 @@ def benchmark_cell(scenario, seed: int, implementation: str, model_lock: str, ra
     )
 
 
+def _benchmark_partial_cells(
+    destination: Path, contract: EvaluationContract,
+    catalog: PlanningScenarioCatalog, neutral: dict[str, Any],
+) -> tuple[dict[str, Any], ...]:
+    """완료 checkpoint가 없는 기존 attempt를 새 예산으로 재실행하지 않게 찾는다."""
+    store = ImmutableCheckpointStore(destination, contract)
+    partial = []
+    for scenario in catalog.scenarios:
+        for implementation in ("r31_baseline", "skeleton_engine"):
+            identity = sha256_digest({
+                "scenario": scenario.scenario_digest, "implementation": implementation,
+                "neutral": sha256_digest(neutral[scenario.scenario_id]),
+            })
+            if identity not in contract.fixture_digests:
+                raise QualificationRunError("BENCHMARK_RECOVERY_FIXTURE_BINDING_MISMATCH")
+            for seed in contract.order_seeds:
+                if store.completed(identity, seed) is not None:
+                    continue
+                cell_root = destination / "work" / f"seed-{seed}" / scenario.scenario_id / implementation
+                attempts = tuple(sorted(path for path in cell_root.glob("attempt_*") if path.is_dir()))
+                if attempts:
+                    partial.append({
+                        "scenario_id": scenario.scenario_id, "order_seed": seed,
+                        "implementation": implementation, "fixture_digest": identity,
+                        "attempt_roots": [str(path) for path in attempts],
+                        "next_actions": [
+                            "기존 attempt의 예산 원장·intent·receipt와 provider thread를 재개 없이 관측한다.",
+                            "미확인 효과·사용량을 대조하기 전에는 새 attempt나 새 Goal 예산으로 우회하지 않는다.",
+                            "중간 pipeline checkpoint가 없어 자동 재개하지 않으며 관측 결과에 결속한 명시적 복구가 필요하다.",
+                        ],
+                    })
+    return tuple(partial)
+
+
+def _reject_benchmark_partial_resume(base: Path, destination: Path | None) -> None:
+    """재개 진입 전에 차단하여 기존 실패 상태와 원장을 보존한다."""
+    if destination is None or not destination.exists():
+        return
+    if destination.is_dir() and not any(destination.iterdir()):
+        return
+    try:
+        contract = EvaluationContract.model_validate_json(
+            (destination / "evaluation-contract.json").read_text(encoding="utf-8")
+        )
+        neutral = json.loads((destination / "neutral-inputs.json").read_text(encoding="utf-8"))
+        if sha256_digest(neutral) != contract.scenario_set_digest:
+            raise ValueError("중립 입력 digest 불일치")
+        catalog = PlanningScenarioCatalog.load(base / "tests/fixtures/engine/planning-scenarios.json")
+        partial = _benchmark_partial_cells(destination, contract, catalog, neutral)
+    except (OSError, ValueError, KeyError) as error:
+        raise QualificationRunError(f"BENCHMARK_RECOVERY_BINDING_INVALID: {error}") from error
+    if partial:
+        raise QualificationRunError(
+            "BENCHMARK_PARTIAL_CELL_RECONCILIATION_REQUIRED: "
+            + json.dumps(partial, ensure_ascii=False, sort_keys=True)
+        )
+
+
+def _require_matching_full_planning_scope_report(
+    scope_reports: tuple[ScopeQualificationReport, ...],
+    planning_contract: EvaluationContract,
+) -> None:
+    for report in scope_reports:
+        if (
+            report.scope is EvaluationScope.FULL_PLANNING_PIPELINE
+            and report.contract_digest != planning_contract.contract_digest
+        ):
+            raise QualificationRunError(
+                "BENCHMARK_FULL_PLANNING_INSPECTION_PROVIDER_MISMATCH"
+            )
+
+
 def run_benchmark(*, root: Path | None = None, run_root: Path | None = None,
                   role_configuration: EngineRoleConfiguration | None = None, codex_bin: str | None = None,
                   scope_reports: tuple[ScopeQualificationReport, ...] = (),
+                  inspection_provider_contract: PlanInspectionProviderVersion = PLAN_INSPECTION_PROVIDER_V1,
                   evaluation_policies: EvaluationPolicies | None = None) -> tuple[Path, BenchmarkRunReport]:
     if evaluation_policies is None:
         raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
     base = (root or project_root()).resolve(strict=True)
+    _reject_benchmark_partial_resume(base, run_root)
     failures = _preflight(base)
     if failures:
         raise QualificationRunError("; ".join(failures))
@@ -750,15 +837,19 @@ def run_benchmark(*, root: Path | None = None, run_root: Path | None = None,
             timeout_contract=timeout_contract,
         )
         description = json.loads(description_path.read_text(encoding="utf-8"))
-    with CodexAppServerRuntime(codex_bin=str(resolved_codex)) as runtime:
+    with CodexAppServerRuntime(
+        codex_bin=str(resolved_codex), project_binding=evaluation_policies.codex_project
+    ) as runtime:
         inventory = runtime.list_models()
         if inventory.executable_digest != codex_executable_digest:
             raise QualificationRunError("CODEX_EXECUTABLE_DIGEST_MISMATCH")
         roles.validate_inventory(inventory)
         legacy_inventory_digest = _legacy_inventory_digest(inventory)
         planning_contract = _planning_contract(
-            base, catalog, inventory, roles, evaluation_policies
+            base, catalog, inventory, roles, evaluation_policies,
+            inspection_provider_contract=inspection_provider_contract,
         )
+        _require_matching_full_planning_scope_report(scope_reports, planning_contract)
         model_lock = sha256_digest({"engine_lock": planning_contract.model_lock_digest, "legacy_role_map": description["role_map"]})
         neutral = {scenario.scenario_id: neutral_input(base, scenario) for scenario in catalog.scenarios}
         identities = {(scenario.scenario_id, implementation): sha256_digest({
@@ -771,7 +862,7 @@ def run_benchmark(*, root: Path | None = None, run_root: Path | None = None,
             "threshold_digest": sha256_digest(
                 MEASUREMENT_RULES["thresholds"]
                 | policy_contract_fragment(evaluation_policies)
-                | {"implementation_runtime": IMPLEMENTATION_RUNTIME_CONTRACT}
+                | {"implementation_runtime": _implementation_runtime_contract(evaluation_policies)}
             ),
             "model_lock_digest": model_lock,
             "prompt_digest": sha256_digest({"engine": planning_contract.prompt_digest, "legacy": description["prompt_digest"]}),
@@ -790,8 +881,9 @@ def run_benchmark(*, root: Path | None = None, run_root: Path | None = None,
             "legacy_parent_hard_timeout": timeout_contract,
             "evaluation_contract_digest": contract.contract_digest,
             "role_configuration": roles.model_dump(mode="json"),
+            "inspection_provider_contract": inspection_provider_contract,
             "scope_reports": [item.model_dump(mode="json") for item in scope_reports],
-            "implementation_runtime": IMPLEMENTATION_RUNTIME_CONTRACT,
+            "implementation_runtime": _implementation_runtime_contract(evaluation_policies),
         }, evaluation_policies)
         _write_json(destination / "neutral-inputs.json", neutral)
         status, failures = EvaluationRunStatus.COMPLETED, []
@@ -814,6 +906,7 @@ def run_benchmark(*, root: Path | None = None, run_root: Path | None = None,
                             scenario=scenario, seed=seed, fixture_root=base / "tests/fixtures/engine/live-smoke-project",
                             runtime=runtime, inventory=inventory, roles=roles, work_root=work,
                             progress_sink=_role_progress(destination, scenario_id=scenario_id, order_seed=seed, implementation=implementation),
+                            inspection_provider_contract=inspection_provider_contract,
                             evaluation_policies=evaluation_policies,
                             retain_execution_checkpoint=True,
                         )
@@ -898,8 +991,18 @@ def run_benchmark(*, root: Path | None = None, run_root: Path | None = None,
                         runner_receipts=tuple(raw["receipts"]),
                     ))
         except Exception as error:
-            status = EvaluationRunStatus.PAUSED_RATE_LIMIT if _is_rate_limit(error) else EvaluationRunStatus.FAILED
+            partial = _benchmark_partial_cells(destination, contract, catalog, neutral)
+            status = (EvaluationRunStatus.PAUSED_RATE_LIMIT
+                      if _is_rate_limit(error) and not partial else EvaluationRunStatus.FAILED)
             failures.append(f"{type(error).__name__}: {error}")
+            if partial:
+                failures.append("BENCHMARK_PARTIAL_CELL_RECONCILIATION_REQUIRED")
+                _write_json(destination / "recovery-required.json", {
+                    "code": "BENCHMARK_PARTIAL_CELL_RECONCILIATION_REQUIRED",
+                    "automatic_resume_supported": False,
+                    "contract_digest": contract.contract_digest,
+                    "cells": partial,
+                })
             _write_json(destination / "last-error.json", {"error": type(error).__name__, "message": str(error),
                         "receipts": [item.model_dump(mode="json") for item in getattr(error, "receipts", ())]})
         cells = tuple(BenchmarkCell.model_validate(checkpoint.raw_structured_assessment["benchmark_cell"])

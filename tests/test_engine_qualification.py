@@ -12,6 +12,8 @@ from unittest.mock import patch
 from types import SimpleNamespace
 
 from flowmarshal.canonical import sha256_bytes, sha256_digest
+from flowmarshal.engine.budget import GoalBudgetPolicy
+from flowmarshal.engine.benchmark import _implementation_runtime_contract
 from flowmarshal.engine.domain import (
     ContextSourceRegistration,
     ContextSourceRegistrationKind,
@@ -36,12 +38,19 @@ from flowmarshal.engine.e2e_qualification import (
     _unknown_receipt,
     _write_prepared_state,
 )
-from flowmarshal.engine.eval_cli import build_parser, validate_benchmark_matrix
+from flowmarshal.engine.eval_cli import _bound_scope_reports, build_parser, validate_benchmark_matrix
 from flowmarshal.engine.evaluation import (
     BenchmarkCell,
     BenchmarkLifecycleObservation,
     BenchmarkTaskLifecycleObservation,
+    EvaluationCellCheckpoint,
+    EvaluationRunStatus,
+    ImmutableCheckpointStore,
     RegressionCatalog,
+)
+from flowmarshal.engine.evaluation_budget import (
+    EvaluationPolicies,
+    write_immutable_run_metadata,
 )
 from flowmarshal.engine.freeze import LegacyFreezeManifest, verify_legacy_freeze
 from flowmarshal.engine.ledger import ENGINE_SCHEMA_REVISION, EngineLedgerError, SQLiteEngineLedger
@@ -50,17 +59,23 @@ from flowmarshal.engine.qualification import (
     GenericFixtureReviewDraft,
     PlanningScenarioCatalog,
     QualificationRunError,
+    ScopeQualificationReport,
     ORDER_SEEDS,
     _deterministic_contract,
+    _guard_full_planning_resume,
+    _planning_contract,
     _planning_cell,
+    _record_full_planning_rate_limit,
     _review_result,
     _write_json,
     default_role_configuration,
+    resume_run,
     source_manifest_digest,
     source_manifest_files,
 )
+from flowmarshal.engine.role_execution import RoleTimeoutPolicy
 from flowmarshal.engine.roles import strict_json_output_schema
-from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime
+from flowmarshal.engine.runtime import CodexProjectBinding, EngineDispatcher, FakeCodexRuntime
 from flowmarshal.engine.service import EngineService, EngineServiceError
 
 from tests.engine_helpers import goal, profile
@@ -133,6 +148,37 @@ class EngineQualificationTests(unittest.TestCase):
         )
         return prepared, digest
 
+    def full_planning_paused_run(self, destination: Path):
+        catalog = PlanningScenarioCatalog.load(
+            ROOT / "tests" / "fixtures" / "engine" / "planning-scenarios.json"
+        )
+        policies = EvaluationPolicies(
+            budget=GoalBudgetPolicy(
+                total_tokens=1_000_000,
+                call_reservation_tokens=100_000,
+                replan_reserve_percent=25,
+            ),
+            role_timeouts=RoleTimeoutPolicy(),
+        )
+        contract = _planning_contract(
+            ROOT, catalog, self.inventory, self.roles, policies
+        )
+        store = ImmutableCheckpointStore(destination, contract)
+        store.initialize()
+        write_immutable_run_metadata(
+            destination / "run-metadata.json",
+            {
+                "scope": "full-planning-pipeline",
+                "evaluation_contract_digest": contract.contract_digest,
+                "project_root": str(ROOT),
+                "role_configuration": self.roles.model_dump(mode="json"),
+                "codex_bin": None,
+                "inspection_provider_contract": "plan-inspection-v1",
+            },
+            policies,
+        )
+        return catalog, contract, store, policies
+
     def test_inventory_observation_preserves_operational_binding(self) -> None:
         # model/list 관측은 EngineModel 계층 밖의 strict model도 그대로 보존해야 한다.
         binding = self.roles.operational_binding(self.inventory)
@@ -143,6 +189,135 @@ class EngineQualificationTests(unittest.TestCase):
         self.assertEqual(binding, restored)
         self.assertEqual(self.inventory.inventory_digest, restored.inventory_digest)
         self.assertEqual(binding.lock_digest, restored.lock_digest)
+
+    def test_full_planning_partial_provider_cell_becomes_non_resumable_before_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            destination = Path(raw) / "full-planning"
+            catalog, contract, store, _ = self.full_planning_paused_run(destination)
+            scenario = catalog.scenarios[0]
+            seed = contract.order_seeds[0]
+            state_root = (
+                destination / "work" / f"seed-{seed}" / scenario.scenario_id / "budget-state"
+            )
+            database = state_root / "flowmarshal-engine.sqlite3"
+            database.parent.mkdir(parents=True)
+            connection = sqlite3.connect(database)
+            try:
+                connection.execute("CREATE TABLE provider_calls(id TEXT, status TEXT)")
+                connection.execute(
+                    "INSERT INTO provider_calls(id, status) VALUES (?, ?)",
+                    ("provider_call_partial", "usage_unknown"),
+                )
+                connection.commit()
+            finally:
+                connection.close()
+            store.set_state(
+                EvaluationRunStatus.PAUSED_RATE_LIMIT,
+                updated_at=utc_now(),
+                reason="rate limit exceeded",
+            )
+
+            with patch("flowmarshal.engine.qualification.CodexAppServerRuntime") as runtime:
+                with self.assertRaisesRegex(
+                    QualificationRunError,
+                    "FULL_PLANNING_PARTIAL_CELL_NON_RESUMABLE",
+                ):
+                    resume_run(destination)
+                runtime.assert_not_called()
+
+            failed = store.state()
+            self.assertEqual(EvaluationRunStatus.FAILED, failed.status)
+            self.assertIn("provider_call_partial=usage_unknown", failed.reason or "")
+            self.assertIn(str(database.resolve()), failed.reason or "")
+            self.assertIn("project budget observe-role", failed.reason or "")
+            self.assertIn(str((state_root / "artifacts").resolve()), failed.reason or "")
+
+            with patch("flowmarshal.engine.qualification.CodexAppServerRuntime") as runtime:
+                with self.assertRaisesRegex(
+                    QualificationRunError,
+                    "FULL_PLANNING_PARTIAL_CELL_NON_RESUMABLE",
+                ):
+                    resume_run(destination)
+                runtime.assert_not_called()
+            self.assertEqual(EvaluationRunStatus.FAILED, store.state().status)
+
+    def test_full_planning_pre_provider_rate_limit_remains_resumable(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            destination = Path(raw) / "full-planning"
+            catalog, contract, store, _ = self.full_planning_paused_run(destination)
+            completed_scenario = catalog.scenarios[0]
+            scenario = catalog.scenarios[1]
+            seed = contract.order_seeds[0]
+            completed_state_root = (
+                destination
+                / "work"
+                / f"seed-{seed}"
+                / completed_scenario.scenario_id
+                / "budget-state"
+            )
+            completed_database = completed_state_root / "flowmarshal-engine.sqlite3"
+            completed_database.parent.mkdir(parents=True)
+            connection = sqlite3.connect(completed_database)
+            try:
+                connection.execute("CREATE TABLE provider_calls(id TEXT, status TEXT)")
+                connection.execute(
+                    "INSERT INTO provider_calls(id, status) VALUES (?, ?)",
+                    ("provider_call_completed", "settled"),
+                )
+                connection.commit()
+            finally:
+                connection.close()
+            store.put(
+                EvaluationCellCheckpoint(
+                    model_lock_format="flowmarshal-model-lock-v2",
+                    contract_digest=contract.contract_digest,
+                    fixture_digest=completed_scenario.scenario_digest,
+                    order_seed=seed,
+                    raw_structured_assessment={"passed": True},
+                    runner_receipts=({"status": "success"},),
+                )
+            )
+            state_root = (
+                destination / "work" / f"seed-{seed}" / scenario.scenario_id / "budget-state"
+            )
+            paused = _record_full_planning_rate_limit(
+                store,
+                state_root=state_root,
+                scenario_id=scenario.scenario_id,
+                order_seed=seed,
+                original_reason="rate limit before reservation",
+                codex_bin=None,
+            )
+
+            self.assertEqual(EvaluationRunStatus.PAUSED_RATE_LIMIT, paused.status)
+            self.assertIn("FULL_PLANNING_RATE_LIMIT_BEFORE_PROVIDER_CALL", paused.reason or "")
+            self.assertIn("provider_calls=[]", paused.reason or "")
+            self.assertIn("next_action=resume_same_run_root", paused.reason or "")
+            _guard_full_planning_resume(destination, base=ROOT, codex_bin=None)
+            self.assertEqual(EvaluationRunStatus.PAUSED_RATE_LIMIT, store.state().status)
+
+    def test_full_planning_process_crash_is_blocked_before_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            destination = Path(raw) / "full-planning"
+            catalog, contract, store, _ = self.full_planning_paused_run(destination)
+            state_root = destination / "work" / "seed-17" / catalog.scenarios[0].scenario_id / "budget-state"
+            state_root.mkdir(parents=True)
+            database = state_root / "flowmarshal-engine.sqlite3"
+            connection = sqlite3.connect(database)
+            try:
+                connection.execute("CREATE TABLE provider_calls(id TEXT, status TEXT)")
+                connection.execute("INSERT INTO provider_calls VALUES ('partial_call', 'reserved')")
+                connection.commit()
+            finally:
+                connection.close()
+            self.assertEqual(EvaluationRunStatus.RUNNING, store.state().status)
+            before = database.read_bytes()
+            with patch("flowmarshal.engine.qualification.CodexAppServerRuntime") as runtime:
+                with self.assertRaisesRegex(QualificationRunError, "FULL_PLANNING_PARTIAL_CELL_NON_RESUMABLE"):
+                    resume_run(destination)
+                runtime.assert_not_called()
+            self.assertEqual(before, database.read_bytes())
+            self.assertEqual(EvaluationRunStatus.FAILED, store.state().status)
 
     def test_generic_fixture_schema_and_typed_validation_require_empty_task_refs(self) -> None:
         finding = {
@@ -224,6 +399,42 @@ class EngineQualificationTests(unittest.TestCase):
         ):
             arguments = parser.parse_args(["run", "--scope", scope])
             self.assertEqual(scope, arguments.scope)
+
+    def test_benchmark_project_binding_changes_only_legacy_thread_persistence(self) -> None:
+        policies = EvaluationPolicies(
+            budget=GoalBudgetPolicy(total_tokens=1_000_000, call_reservation_tokens=100_000),
+            role_timeouts=RoleTimeoutPolicy(),
+        )
+        original = _implementation_runtime_contract(policies)
+        bound = policies.model_copy(update={"codex_project": CodexProjectBinding(
+            project_id="server-project-id", expected_root=str(ROOT)
+        )})
+        actual = _implementation_runtime_contract(bound)
+        self.assertTrue(original["r31_baseline"]["ephemeral_threads"])
+        self.assertFalse(actual["r31_baseline"]["ephemeral_threads"])
+        self.assertEqual(original["skeleton_engine"], actual["skeleton_engine"])
+        self.assertEqual(0, actual["r31_baseline"]["max_schema_recovery_attempts"])
+        self.assertEqual(original, _implementation_runtime_contract(policies))
+
+    def test_scope_prerequisites_reject_a_repeated_valid_report(self) -> None:
+        contract = _deterministic_contract(ROOT)
+        report = ScopeQualificationReport(
+            scope=contract.scope,
+            contract_digest=contract.contract_digest,
+            status=EvaluationRunStatus.COMPLETED,
+            passed=True,
+            metrics={"check_count": 5, "failure_count": 0},
+            failures=(),
+            generated_at=utc_now(),
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            report_path = directory / "qualification-report.json"
+            _write_json(directory / "evaluation-contract.json", contract)
+            _write_json(report_path, report)
+            self.assertEqual((report,), _bound_scope_reports([str(report_path)], ROOT))
+            with self.assertRaisesRegex(QualificationRunError, "scope.*중복"):
+                _bound_scope_reports([str(report_path)] * 3, ROOT)
 
     def test_qualification_contracts_fix_expected_cells_and_model_ids_stay_in_config(self) -> None:
         scenarios = PlanningScenarioCatalog.load(

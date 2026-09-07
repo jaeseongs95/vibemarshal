@@ -7,26 +7,140 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import threading
 import time
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Iterator
 
 from .canonical import sha256_digest
 from .engine.budget import BudgetManager
 from .engine.domain import BudgetStage, utc_now
 from .engine.evaluation_budget import EvaluationPolicies
+from .engine.runtime import CodexProjectBinding
 from .engine.roles import RoleCallReceipt, RoleCallRequest
 from .planning.r31_domain import PlanningRole
-from .planning.r31_models import _normalize_model_inventory
+from .planning.r31_models import PolicyVerifiedCodex, _normalize_model_inventory
 
 
 LEGACY_BUDGET_EVIDENCE_FORMAT = "flowmarshal-legacy-budget-evidence-v1"
 LEGACY_SCHEMA_RECOVERY_ERROR = (
     "LEGACY_SCHEMA_RECOVERY_DISABLED: qualification 계약은 schema recovery 0회입니다."
 )
+
+
+def _same_path(left: str | Path, right: str | Path) -> bool:
+    return os.path.normcase(os.path.abspath(str(left))) == os.path.normcase(
+        os.path.abspath(str(right))
+    )
+
+
+class _ProjectBoundPolicyVerifiedCodex:
+    """동결 PolicyVerifiedCodex 검증을 유지하며 raw projectId만 보강한다."""
+
+    def __init__(self, wrapped: Any, binding: CodexProjectBinding) -> None:
+        self._wrapped = wrapped
+        self._binding = binding
+        self._codex = wrapped._codex
+        self._evidence_sink = wrapped._evidence_sink
+        self.creation_thread_id: str | None = None
+
+    def verify_execution_policy(self, cwd: str | Path) -> Any:
+        return self._wrapped.verify_execution_policy(cwd)
+
+    def _raw_object(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+        routed = copy.deepcopy(params)
+        if method == "thread/start":
+            routed["projectId"] = self._binding.project_id
+            routed["ephemeral"] = False
+        response = self._wrapped._raw_object(method, routed)
+        if method == "thread/start":
+            thread = response.get("thread")
+            if (
+                not isinstance(thread, dict)
+                or not isinstance(thread.get("id"), str)
+                or not thread["id"]
+                or thread.get("projectId") != self._binding.project_id
+                or thread.get("ephemeral") is not False
+                or thread.get("turns") != []
+                or routed.get("ephemeral") is not False
+            ):
+                raise ValueError(
+                    "LEGACY_PROJECT_BINDING_MISMATCH: thread/start raw receipt의 "
+                    "id/projectId/ephemeral/빈 turns 또는 저장형 요청 결속이 다릅니다."
+                )
+            self.creation_thread_id = thread["id"]
+        return response
+
+    def thread_start(self, **kwargs: Any) -> Any:
+        routed = dict(kwargs)
+        routed["ephemeral"] = False
+        # 동결 메서드 자체가 permission/cwd/model과 raw receipt를 검증한다.
+        thread = PolicyVerifiedCodex.thread_start(self, **routed)
+        if self.creation_thread_id is None or str(thread.id) != self.creation_thread_id:
+            raise ValueError(
+                "LEGACY_PROJECT_BINDING_MISMATCH: 생성 receipt와 Thread handle ID가 다릅니다."
+            )
+        return thread
+
+
+def _verify_project_binding(wrapped: Any, binding: CodexProjectBinding) -> dict[str, Any]:
+    try:
+        response = wrapped._raw_object("project/read", {"projectId": binding.project_id})
+    except Exception as error:
+        raise ValueError(
+            "LEGACY_PROJECT_BINDING_MISMATCH: project/read에 실패했습니다."
+        ) from error
+    project = response.get("project")
+    roots = project.get("roots") if isinstance(project, dict) else None
+    root_paths = (
+        [item["path"] for item in roots]
+        if isinstance(roots, list)
+        and all(
+            isinstance(item, dict) and isinstance(item.get("path"), str)
+            for item in roots
+        )
+        else None
+    )
+    if (
+        not isinstance(project, dict)
+        or project.get("id") != binding.project_id
+        or not Path(binding.expected_root).is_absolute()
+        or root_paths is None
+        or any(not Path(path).is_absolute() for path in root_paths)
+        or sum(_same_path(path, binding.expected_root) for path in root_paths) != 1
+        or (
+            binding.expected_name is not None
+            and project.get("name") != binding.expected_name
+        )
+    ):
+        raise ValueError(
+            "LEGACY_PROJECT_BINDING_MISMATCH: App Server project가 고정 계약과 다릅니다."
+        )
+    return response
+
+
+def _verify_thread_project(wrapped: Any, thread_id: str, binding: CodexProjectBinding) -> None:
+    try:
+        response = wrapped._raw_object(
+            "thread/read", {"threadId": thread_id, "includeTurns": False}
+        )
+    except Exception as error:
+        raise ValueError(
+            "LEGACY_PROJECT_BINDING_MISMATCH: turn 시작 전 thread/read에 실패했습니다."
+        ) from error
+    thread = response.get("thread")
+    if (
+        not isinstance(thread, dict)
+        or thread.get("id") != thread_id
+        or thread.get("projectId") != binding.project_id
+    ):
+        raise ValueError(
+            "LEGACY_PROJECT_BINDING_MISMATCH: 기존 thread가 고정 프로젝트와 다릅니다."
+        )
 
 
 @dataclass(frozen=True)
@@ -181,6 +295,7 @@ class BudgetedPolicyVerifiedCodex:
         self._journal = journal
         self._expected_inventory_digest = expected_inventory_digest
         self._inventory_digest: str | None = None
+        self._creation_project_proofs: set[str] = set()
         by_digest: dict[str, PlanningRole] = {}
         for role, instructions in role_instructions.items():
             digest = sha256_digest(instructions)
@@ -188,6 +303,24 @@ class BudgetedPolicyVerifiedCodex:
                 raise ValueError("LEGACY_ROLE_INSTRUCTION_DIGEST_COLLISION")
             by_digest[digest] = role
         self._roles_by_instruction_digest = by_digest
+
+    def _start_thread(self, kwargs: dict[str, Any]) -> Any:
+        binding = self._policies.codex_project
+        if binding is None:
+            return self._wrapped.thread_start(**kwargs)
+        routed = _ProjectBoundPolicyVerifiedCodex(self._wrapped, binding)
+        thread = routed.thread_start(**kwargs)
+        self._creation_project_proofs.add(str(thread.id))
+        return thread
+
+    def _verify_thread_project(self, thread_id: str) -> None:
+        binding = self._policies.codex_project
+        if binding is not None:
+            if thread_id in self._creation_project_proofs:
+                # 같은 연결에서 직접 생성한 exact raw receipt proof는 첫 turn에만 쓴다.
+                self._creation_project_proofs.remove(thread_id)
+                return
+            _verify_thread_project(self._wrapped, thread_id, binding)
 
     def models(self, *, include_hidden: bool = False) -> Any:
         response = self._wrapped.models(include_hidden=include_hidden)
@@ -211,6 +344,19 @@ class BudgetedPolicyVerifiedCodex:
             raise ValueError("LEGACY_BUDGET_INVENTORY_BINDING_MISSING")
         if kwargs.get("ephemeral") is not True:
             raise ValueError("LEGACY_EPHEMERAL_BASELINE_CHANGED")
+        project_binding = self._policies.codex_project
+        expected_effective_ephemeral = project_binding is None
+        if self._cell_binding.get("ephemeral_threads") is not expected_effective_ephemeral:
+            raise ValueError("LEGACY_PROJECT_THREAD_PERSISTENCE_BINDING_MISMATCH")
+        expected_project = (
+            None
+            if project_binding is None
+            else project_binding.model_dump(mode="json", exclude_none=True)
+        )
+        if self._cell_binding.get("codex_project") != expected_project:
+            raise ValueError("LEGACY_PROJECT_BINDING_MISMATCH")
+        if project_binding is not None:
+            _verify_project_binding(self._wrapped, project_binding)
         return _LazyBudgetedLegacyThread(
             owner=self,
             thread_kwargs=copy.deepcopy(kwargs),
@@ -272,22 +418,31 @@ class _LazyBudgetedLegacyThread:
         if not isinstance(output_schema, dict):
             raise ValueError("LEGACY_OUTPUT_SCHEMA_BINDING_MISSING")
         timeout = owner._policies.role_timeouts.timeout_for(self._role.value)
+        legacy_payload = {
+            "legacy_turn_input": input,
+            "legacy_cell_binding_digest": owner._journal.cell_binding_digest,
+            "legacy_cell_binding": copy.deepcopy(owner._cell_binding),
+            "legacy_stage": self._stage.value,
+            "legacy_ephemeral": True,
+            "legacy_thread_policy": {
+                "approval_mode": approval_mode,
+                "thread_sandbox": thread_sandbox,
+                "run_sandbox": run_sandbox,
+                "thread_model": thread_model,
+            },
+        }
+        if owner._policies.codex_project is not None:
+            legacy_payload.update(
+                legacy_requested_ephemeral=True,
+                legacy_effective_ephemeral=False,
+                codex_project=owner._policies.codex_project.model_dump(
+                    mode="json", exclude_none=True
+                ),
+            )
         request = RoleCallRequest(
             role=self._role.value,
             instructions=str(self._thread_kwargs.get("base_instructions") or ""),
-            payload={
-                "legacy_turn_input": input,
-                "legacy_cell_binding_digest": owner._journal.cell_binding_digest,
-                "legacy_cell_binding": copy.deepcopy(owner._cell_binding),
-                "legacy_stage": self._stage.value,
-                "legacy_ephemeral": True,
-                "legacy_thread_policy": {
-                    "approval_mode": approval_mode,
-                    "thread_sandbox": thread_sandbox,
-                    "run_sandbox": run_sandbox,
-                    "thread_model": thread_model,
-                },
-            },
+            payload=legacy_payload,
             output_schema=output_schema,
             model=model,
             effort=str(effort or ""),
@@ -318,9 +473,14 @@ class _LazyBudgetedLegacyThread:
         }
         try:
             self._thread = self._bounded_rpc(
-                lambda: owner._wrapped.thread_start(**self._thread_kwargs),
+                lambda: owner._start_thread(self._thread_kwargs),
                 deadline=deadline,
                 operation="thread_start",
+            )
+            self._bounded_rpc(
+                lambda: owner._verify_thread_project(str(self._thread.id)),
+                deadline=deadline,
+                operation="thread_project_read",
             )
             handle = self._bounded_rpc(
                 lambda: self._thread.turn(input, **kwargs),

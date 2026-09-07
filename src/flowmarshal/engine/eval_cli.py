@@ -80,6 +80,7 @@ def _evaluation_policies(arguments: argparse.Namespace) -> EvaluationPolicies:
     return load_evaluation_policies(
         budget_policy_path=arguments.budget_policy,
         role_timeout_policy_path=arguments.role_timeout_policy,
+        codex_project_binding_path=getattr(arguments, "codex_project_binding", None),
     )
 
 
@@ -144,6 +145,9 @@ def _resume(arguments: argparse.Namespace) -> int:
             role_configuration=EngineRoleConfiguration.model_validate(metadata["role_configuration"]),
             codex_bin=metadata.get("codex_bin"),
             scope_reports=tuple(ScopeQualificationReport.model_validate(item) for item in metadata.get("scope_reports", [])),
+            inspection_provider_contract=metadata.get(
+                "inspection_provider_contract", PLAN_INSPECTION_PROVIDER_V1
+            ),
             evaluation_policies=policies,
         )
         _emit({"run_root": str(run_root), "report_digest": report.report_digest, "report": report.model_dump(mode="json")})
@@ -173,8 +177,15 @@ def _scope_reports(paths: list[str] | None) -> tuple[ScopeQualificationReport, .
     )
 
 
-def _bound_scope_reports(paths: list[str] | None, root: Path) -> tuple[ScopeQualificationReport, ...]:
+def _bound_scope_reports(
+    paths: list[str] | None,
+    root: Path,
+    *,
+    inspection_provider_contract: str = PLAN_INSPECTION_PROVIDER_V1,
+) -> tuple[ScopeQualificationReport, ...]:
     reports = _scope_reports(paths)
+    if len({report.scope for report in reports}) != len(reports):
+        raise QualificationRunError("같은 scope의 보고서를 중복해 선행 Gate를 충족할 수 없습니다.")
     locks = []
     for path, report in zip(paths or [], reports, strict=True):
         contract = EvaluationContract.model_validate(_json(Path(path).parent / "evaluation-contract.json"))
@@ -182,6 +193,19 @@ def _bound_scope_reports(paths: list[str] | None, root: Path) -> tuple[ScopeQual
             raise QualificationRunError("scope report와 원본 evaluation 계약이 다릅니다.")
         if contract.source_manifest_digest != source_manifest_digest(root):
             raise QualificationRunError("현재 source와 다른 scope report는 cutover 근거가 아닙니다.")
+        if report.scope is EvaluationScope.FULL_PLANNING_PIPELINE:
+            metadata = _json(Path(path).parent / "run-metadata.json")
+            try:
+                verify_metadata_digest(metadata)
+            except ValueError as error:
+                raise QualificationRunError("full planning run metadata 결속이 다릅니다.") from error
+            observed = metadata.get(
+                "inspection_provider_contract", PLAN_INSPECTION_PROVIDER_V1
+            )
+            if observed != inspection_provider_contract:
+                raise QualificationRunError(
+                    "full planning inspection provider가 benchmark 후보와 다릅니다."
+                )
         if report.scope is not EvaluationScope.DETERMINISTIC:
             locks.append((contract.role_configuration_digest, contract.model_lock_digest))
     if len(set(locks)) > 1:
@@ -197,7 +221,11 @@ def _benchmark(arguments: argparse.Namespace) -> int:
         run_root, report = run_benchmark(
             root=root, run_root=None if arguments.run_root is None else Path(arguments.run_root),
             role_configuration=_roles(arguments.role_config, root), codex_bin=arguments.codex_bin,
-            scope_reports=_bound_scope_reports(arguments.scope_report, root),
+            scope_reports=_bound_scope_reports(
+                arguments.scope_report, root,
+                inspection_provider_contract=arguments.inspection_contract,
+            ),
+            inspection_provider_contract=arguments.inspection_contract,
             evaluation_policies=policies,
         )
         _emit({"run_root": str(run_root), "report_digest": report.report_digest, "report": report.model_dump(mode="json")})
@@ -207,7 +235,10 @@ def _benchmark(arguments: argparse.Namespace) -> int:
         Path(arguments.project_root) / "tests" / "fixtures" / "engine" / "planning-scenarios.json"
     )
     validate_benchmark_matrix(cells, catalog)
-    reports = _bound_scope_reports(arguments.scope_report, Path(arguments.project_root).resolve(strict=True))
+    reports = _bound_scope_reports(
+        arguments.scope_report, Path(arguments.project_root).resolve(strict=True),
+        inspection_provider_contract=arguments.inspection_contract,
+    )
     functional = (
         len(reports) == 4
         and {item.scope for item in reports} == set(EvaluationScope)
@@ -281,6 +312,13 @@ def _observe_benchmark_lifecycle(arguments: argparse.Namespace) -> int:
         != contract.role_configuration_digest
     ):
         raise QualificationRunError("재관측 source·역할·benchmark 계약이 원래 실행과 다릅니다.")
+    inspection_provider_contract = metadata.get(
+        "inspection_provider_contract", PLAN_INSPECTION_PROVIDER_V1
+    )
+    if inspection_provider_contract not in {
+        PLAN_INSPECTION_PROVIDER_V1, PLAN_INSPECTION_PROVIDER_V2,
+    }:
+        raise QualificationRunError("재관측 benchmark inspection provider가 유효하지 않습니다.")
     neutral = _json(run_root / "neutral-inputs.json")
     if sha256_digest(neutral) != contract.scenario_set_digest:
         raise QualificationRunError("재관측 중립 입력이 evaluation 계약과 다릅니다.")
@@ -292,7 +330,11 @@ def _observe_benchmark_lifecycle(arguments: argparse.Namespace) -> int:
     }
     if set(expected) != set(contract.fixture_digests) or tuple(contract.order_seeds) != ORDER_SEEDS:
         raise QualificationRunError("재관측 fixture·seed가 고정 benchmark matrix와 다릅니다.")
-    reports = _bound_scope_reports(arguments.scope_report, root)
+    reports = _bound_scope_reports(
+        arguments.scope_report,
+        root,
+        inspection_provider_contract=inspection_provider_contract,
+    )
     store = ImmutableCheckpointStore(run_root, contract)
     cells, observations, missing = [], [], []
     for seed in contract.order_seeds:
@@ -411,6 +453,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--run-root")
     run.add_argument("--role-config")
     run.add_argument("--codex-bin")
+    run.add_argument("--codex-project-binding", help="App Server 프로젝트 ID·예상 root 결속 JSON")
     run.add_argument("--budget-policy")
     run.add_argument("--role-timeout-policy")
     run.add_argument(
@@ -431,8 +474,15 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.add_argument("--run-root")
     benchmark.add_argument("--role-config")
     benchmark.add_argument("--codex-bin")
+    benchmark.add_argument("--codex-project-binding", help="App Server 프로젝트 ID·예상 root 결속 JSON")
     benchmark.add_argument("--budget-policy")
     benchmark.add_argument("--role-timeout-policy")
+    benchmark.add_argument(
+        "--inspection-contract",
+        choices=(PLAN_INSPECTION_PROVIDER_V1, PLAN_INSPECTION_PROVIDER_V2),
+        default=PLAN_INSPECTION_PROVIDER_V1,
+        help="benchmark skeleton engine의 Plan inspection provider. 기본값은 v1입니다.",
+    )
     benchmark.add_argument(
         "--scope-report",
         action="append",

@@ -150,6 +150,33 @@ class InterruptedRoleRuntime(ImmediateRoleRuntime):
 
 
 class EngineStructuredRoleTests(unittest.TestCase):
+    def test_bound_inspection_input_failure_is_terminal_and_not_schema_recovery(self) -> None:
+        from flowmarshal.engine.plan_inspection_v2 import inspection_file_content
+        from tests.engine_helpers import project_map
+        runtime = ImmediateRoleRuntime(['{}', '{}'])
+        with tempfile.TemporaryDirectory() as temp:
+            source = Path(temp) / "AGENTS.md"
+            source.write_text("원본 지침", encoding="utf-8")
+            project = project_map("project_" + "a" * 32, Path(temp))
+            entry = next(item for item in project.entries if item.path == "AGENTS.md")
+            source.write_text("결속 뒤 바뀐 지침", encoding="utf-8")
+            request = make_role_request(
+                inventory=runtime.inventory, role="compact_plan_reviewer", instructions="고정 원문을 대조한다.",
+                payload={"request": "검토"}, output_schema={"type": "object", "properties": {}},
+                model="available", effort="low", inventory_digest=runtime.inventory.inventory_digest,
+                cwd=temp,
+            )
+            def changed_input(_value):
+                inspection_file_content(entry, project)
+            with self.assertRaises(StructuredRoleError) as raised:
+                CodexStructuredRoleRunner(runtime, max_schema_recovery_attempts=1).run(
+                    request, validator=changed_input,
+                )
+        self.assertEqual("input_contract_failed", raised.exception.receipt.status)
+        self.assertEqual(0, raised.exception.receipt.schema_recovery_attempts)
+        self.assertTrue(raised.exception.receipt.usage_available)
+        self.assertEqual(['{}'], runtime.outputs)
+
     def test_usage_requires_explicit_scope_single_turn_and_complete_exact_counts(self) -> None:
         proof = {
             "thread_id": "thread_1",
@@ -418,7 +445,8 @@ class EngineStructuredRoleTests(unittest.TestCase):
         from flowmarshal.engine.domain import ExecutionSpecProposal
         from flowmarshal.engine.goal import GoalNormalizationProposal, ReviewDraft
         from flowmarshal.engine.planner_roles import (
-            PlanExpansionDraft, PlanExpansionEnvelope, PlanReviewEnvelope, SkeletonBatchDraft, SkeletonCandidateDraft,
+            PlanExpansionDraft, PlanExpansionEnvelope, PlanReviewEnvelope,
+            SkeletonBatchDraft, SkeletonCandidateDraft, SkeletonRefinementDraft,
         )
 
         def verify(node):
@@ -434,7 +462,8 @@ class EngineStructuredRoleTests(unittest.TestCase):
                     verify(child)
 
         for model in (GoalNormalizationProposal, ReviewDraft, PlanExpansionDraft, PlanExpansionEnvelope, PlanReviewEnvelope,
-                      SkeletonBatchDraft, SkeletonCandidateDraft, ExecutionSpecProposal):
+                      SkeletonBatchDraft, SkeletonCandidateDraft, SkeletonRefinementDraft,
+                      ExecutionSpecProposal):
             with self.subTest(model=model.__name__):
                 original = model.model_json_schema()
                 normalized = strict_json_output_schema(original)

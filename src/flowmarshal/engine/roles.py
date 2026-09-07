@@ -24,19 +24,7 @@ from .model_lock import (
 )
 
 
-class StructuredRoleError(RuntimeError):
-    def __init__(
-        self,
-        message: str,
-        *,
-        receipt: "RoleCallReceipt | None" = None,
-        receipts: tuple["RoleCallReceipt", ...] = (),
-        effects_started: bool = True,
-    ) -> None:
-        super().__init__(message)
-        self.receipt = receipt
-        self.receipts = receipts or (() if receipt is None else (receipt,))
-        self.effects_started = effects_started
+from .role_observations import RoleCallReceipt, RoleInputContractError, StructuredRoleError
 
 
 class RoleCallRequest(EngineModel):
@@ -87,57 +75,6 @@ def make_role_request(*, inventory: ModelInventory | None = None, allowed_fallba
     # required 배열에 기록한 선언 순서로 transport schema를 재구성한다.
     kwargs["output_schema"] = strict_json_output_schema(kwargs["output_schema"])
     return RoleCallRequest(**kwargs, operational_binding=binding)
-
-
-class RoleCallReceipt(EngineModel):
-    call_id: str
-    role: str
-    status: str
-    model: str
-    effort: str
-    inventory_digest: str
-    permission_profile: str
-    approval_policy: str
-    thread_id: str | None = None
-    turn_ids: tuple[str, ...] = ()
-    input_digest: str
-    output_digest: str | None = None
-    output_schema_digest: str
-    timeout_policy_digest: str | None = Field(
-        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
-    )
-    interrupt_request_digest: str | None = Field(
-        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
-    )
-    interrupt_receipt_digest: str | None = Field(
-        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
-    )
-    terminal_observation_digest: str | None = Field(
-        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
-    )
-    terminal_status_after_interrupt: str | None = None
-    input_tokens: int | None = Field(default=0, ge=0)
-    cached_input_tokens: int | None = Field(default=0, ge=0)
-    output_tokens: int | None = Field(default=0, ge=0)
-    reasoning_tokens: int | None = Field(default=0, ge=0)
-    usage_available: bool = False
-    latency_ms: int = Field(ge=0)
-    schema_recovery_attempts: int = Field(default=0, ge=0, le=1)
-    error_summary: str | None = None
-    recorded_at: datetime
-    observed_binding: OperationalBinding | None = None
-
-    @model_serializer(mode="wrap")
-    def omit_absent_execution_observations(self, handler):
-        value = handler(self)
-        for field_name in (
-            "timeout_policy_digest", "interrupt_request_digest",
-            "interrupt_receipt_digest", "terminal_observation_digest",
-            "terminal_status_after_interrupt",
-        ):
-            if getattr(self, field_name) is None:
-                value.pop(field_name, None)
-        return value
 
 
 class RoleCallResult(EngineModel):
@@ -556,6 +493,8 @@ class CodexStructuredRoleRunner:
                 return RoleCallResult(payload=decoded, receipt=receipt)
             except Exception as error:
                 last_error = error
+                if isinstance(error, RoleInputContractError):
+                    break
                 if attempt_index < self.max_schema_recovery_attempts:
                     continue
         receipt = self._receipt(
@@ -565,7 +504,7 @@ class CodexStructuredRoleRunner:
             thread_id=thread_id,
             turn_ids=tuple(turn_ids),
             started=started,
-            status="schema_failed",
+            status="input_contract_failed" if isinstance(last_error, RoleInputContractError) else "schema_failed",
             recovery_attempts=recovery_attempts,
             error=str(last_error),
             observation_payload=observation_payload,
@@ -577,7 +516,9 @@ class CodexStructuredRoleRunner:
         )
         self.receipts.append(receipt)
         raise StructuredRoleError(
-            f"structured output이 유효하지 않습니다. schema recovery {recovery_attempts}회",
+            (f"역할 입력 계약을 확인할 수 없습니다: {last_error}"
+             if isinstance(last_error, RoleInputContractError)
+             else f"structured output이 유효하지 않습니다. schema recovery {recovery_attempts}회"),
             receipt=receipt,
             receipts=tuple(self.receipts),
         )

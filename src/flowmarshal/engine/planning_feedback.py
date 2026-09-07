@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, model_serializer, model_validator
 
 from ..canonical import sha256_digest
 from .domain import EngineModel, PlanContractRevision, PlanSkeletonCandidate
@@ -47,13 +47,29 @@ class PlanRefinementProposal(EngineModel):
 
 class PlanRefinementAttempt(EngineModel):
     source_plan_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    source_review_round: Literal[0, 1] = 0
     proposal: PlanRefinementProposal
     result: Literal["evaluated", "unchanged_candidate", "disputed", "unresolved"]
+
+    @model_serializer(mode="wrap")
+    def preserve_initial_review_serialization(self, handler):
+        value = handler(self)
+        if self.source_review_round == 0:
+            value.pop("source_review_round", None)
+        return value
 
 
 class PlanRefinementStop(EngineModel):
     source_plan_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
-    reason: Literal["refinement_limit", "candidate_version_budget", "insufficient_call_budget", "refiner_unavailable"]
+    source_review_round: Literal[0, 1] = 0
+    reason: Literal["refinement_limit", "candidate_version_budget", "insufficient_call_budget", "refiner_unavailable", "schema_failure", "adjudicator_unavailable"]
+
+    @model_serializer(mode="wrap")
+    def preserve_initial_review_serialization(self, handler):
+        value = handler(self)
+        if self.source_review_round == 0:
+            value.pop("source_review_round", None)
+        return value
 
 
 def validate_plan_revision(previous: PlanContractRevision, revised: PlanContractRevision) -> None:

@@ -20,6 +20,9 @@ from flowmarshal.engine.domain import PlanContractRevision
 ROOT = Path(__file__).resolve().parents[2]
 EXPECTATIONS_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v5-expectations.json"
 INDEPENDENT_REVIEW_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v5-independent-fixture-review.json"
+V6_EXPECTATIONS_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v6-expectations.json"
+V6_INDEPENDENT_REVIEW_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v6-independent-fixture-review.json"
+V6_REVIEW_NOTES_PATH = ROOT / "tests/fixtures/engine/plan-inspection-v6-independent-review.md"
 RAW_REJECTED_MANIFEST_PATH = ROOT / "tests/fixtures/engine/r-s06-12-raw-rejected/manifest.json"
 SYNTHETIC_NORMAL_FIXTURE_PATH = ROOT / "tests/fixtures/engine/plan-inspection-r-s06-13-synthetic-normal.json"
 LEGACY_EXPECTATIONS_PATH = ROOT / "tests/fixtures/engine/plan-inspection-expectations.json"
@@ -198,9 +201,10 @@ def _runtime_review_expectations(expectations: dict[str, Any]) -> dict[str, Any]
 
 def _independent_fixture_review(
     expectations: dict[str, Any], runtime_expectations: dict[str, Any],
+    *, review_path: Path = INDEPENDENT_REVIEW_PATH,
 ) -> dict[str, Any]:
     """사전 독립 원문 대조의 고정 입력을 새 run에 그대로 결속한다."""
-    review = _read(INDEPENDENT_REVIEW_PATH)
+    review = _read(review_path)
     expected_cases = expectations["provider_call_order"][:-2]
     runtime_bytes = (
         json.dumps(json_value(expectations | runtime_expectations), ensure_ascii=False, sort_keys=True,
@@ -219,11 +223,29 @@ def _independent_fixture_review(
         raise FixtureRevisionError("R-S06-13 원시 거부 또는 정상 합성 fixture가 없습니다.")
     raw_manifest = _read(RAW_REJECTED_MANIFEST_PATH)
     normal = _read(SYNTHETIC_NORMAL_FIXTURE_PATH)
+    normal_parent_revision = expectations.get("parent_fixture_revision")
+    if expectations.get("fixture_revision") == "plan-inspection-v6-scope-boundary":
+        parent = _read(EXPECTATIONS_PATH)
+        boundary_review = review.get("scope_boundary_review", {})
+        if (
+            normal_parent_revision != parent["fixture_revision"]
+            or expectations.get("parent_expectations_byte_digest") != sha256_bytes(EXPECTATIONS_PATH.read_bytes())
+            or review.get("parent_independent_review_byte_digest") != sha256_bytes(INDEPENDENT_REVIEW_PATH.read_bytes())
+            or review.get("prior_fixture_revision") != parent["fixture_revision"]
+        ):
+            raise FixtureRevisionError("v6의 보존된 v5 부모 fixture 결속이 다릅니다.")
+        if (
+            boundary_review.get("status") != "PASS"
+            or not V6_REVIEW_NOTES_PATH.is_file()
+            or boundary_review.get("review_notes_byte_digest") != sha256_bytes(V6_REVIEW_NOTES_PATH.read_bytes())
+        ):
+            raise FixtureRevisionError("v6의 독립 변경 검토 원문 결속이 다릅니다.")
+        normal_parent_revision = parent["parent_fixture_revision"]
     if (
         raw_manifest.get("expected_status") != "FAIL"
         or raw_manifest.get("files", {}).get("summary.json") != provenance.get("raw_summary_byte_digest")
         or normal.get("provenance", {}).get("relation_rows_selector") != "/expected_ac_validation_rows"
-        or normal.get("provenance", {}).get("expectation_revision") != expectations.get("parent_fixture_revision")
+        or normal.get("provenance", {}).get("expectation_revision") != normal_parent_revision
         or review.get("r_s06_15_provenance", {}).get("parent_expectations") !=
            expectations.get("r_s06_15_provenance", {}).get("parent_expectations")
     ):
@@ -268,7 +290,7 @@ def verify_reviewed_case(
             raise FixtureRevisionError("CASE_REVIEWED_SOURCE_DIGEST_MISMATCH")
 
 
-def build_revision(source_run: Path, destination: Path) -> None:
+def build_revision(source_run: Path, destination: Path, *, fixture_version: str = "v5") -> None:
     """R-S06-09 입력을 읽어 R-S06-10 전용 정상·결함 fixture를 x-쓰기한다.
 
     기존 run과 그 원시 응답은 수정하지 않는다. destination은 새 디렉터리여야 하며,
@@ -277,10 +299,17 @@ def build_revision(source_run: Path, destination: Path) -> None:
     source_run = source_run.resolve()
     destination = destination.resolve()
     _require_source_inputs(source_run)
-    expectations = _read(EXPECTATIONS_PATH)
+    fixture_sources = {
+        "v5": (EXPECTATIONS_PATH, INDEPENDENT_REVIEW_PATH),
+        "v6": (V6_EXPECTATIONS_PATH, V6_INDEPENDENT_REVIEW_PATH),
+    }
+    if fixture_version not in fixture_sources:
+        raise FixtureRevisionError(f"지원하지 않는 고정 fixture version입니다: {fixture_version}")
+    expectations_path, review_path = fixture_sources[fixture_version]
+    expectations = _read(expectations_path)
     _verify_source_input_digests(source_run, expectations)
     runtime_expectations = _runtime_review_expectations(expectations)
-    independent_review = _independent_fixture_review(expectations, runtime_expectations)
+    independent_review = _independent_fixture_review(expectations, runtime_expectations, review_path=review_path)
 
     originals: dict[str, Any] = {}
     working: dict[str, Any] = {}
@@ -336,7 +365,7 @@ def build_revision(source_run: Path, destination: Path) -> None:
         "case_expectations": expectations["cases"],
         "normalized_definition_digests": normalized_digests,
         "derived_definition_digests": derived_digests,
-        "expectations_digest": sha256_bytes(EXPECTATIONS_PATH.read_bytes()),
+        "expectations_digest": sha256_bytes(expectations_path.read_bytes()),
         "runtime_review_expectation_ids": {case_id: [item["defect_id"] for item in defects]
                                            for case_id, defects in runtime_expectations.items()},
         "historical_clean_input": historical_name,

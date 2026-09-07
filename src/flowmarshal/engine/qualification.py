@@ -51,6 +51,7 @@ from .domain import (
 from .evaluation_budget import (
     EvaluationPolicies,
     budgeted_role_runner,
+    evaluation_cell_provider_calls,
     initialize_cell_budget,
     policies_from_metadata,
     policy_contract_fragment,
@@ -61,6 +62,7 @@ from .evaluation_budget import (
 from .evaluation import (
     EvaluationCellCheckpoint,
     EvaluationContract,
+    EvaluationRunState,
     EvaluationRunStatus,
     EvaluationScope,
     FixtureResult,
@@ -91,7 +93,7 @@ from .planner_roles import (
     SkeletonGeneratorAdapter,
     SkeletonReviewerAdapter,
 )
-from .planning import SkeletonFirstPlanner
+from .planning import PlanningSearchOutcome, SkeletonFirstPlanner
 from .roles import (
     CodexStructuredRoleRunner,
     RoleCallRequest,
@@ -120,6 +122,20 @@ ROLE_INSTRUCTIONS = (
     "아직 정하지 않은 설계 대안·새 산출물 배치·테스트 명령을 반드시 외부에서 제공받을 사실로 "
     "취급하지 않는다. source에 없는 가상의 동명 함수·다른 프로젝트가 있을 수 있다는 추측은 "
     "직접 evidence가 아니다. 제공된 ProjectProfile의 호환성·최소 변경 정책도 Goal의 근거다."
+    "finding을 정하기 전에 같은 검토 객체에 관한 artifact 전체의 request, outcome, acceptance, "
+    "constraint, context, profile, 관찰 파일·테스트와 plan 필드를 함께 대조한다. 한 필드가 짧은 "
+    "label이거나 다른 필드의 세부를 반복하지 않아도, 제공된 다른 필드가 같은 대상·기대 결과·검사 "
+    "근거를 구체화하면 그 의미를 누락으로 판정하지 않는다. 서로 다른 필드의 정보는 같은 객체와 "
+    "요구에 속하고 서로 충돌하지 않을 때만 결합하며, 제공되지 않은 내용을 보충하지 않는다. "
+    "key 자체가 없는 부분 발췌와 key가 존재하지만 빈 배열·null·빈 문자열인 명시적 관측을 "
+    "구분한다. 명시적 빈 값도 해당 필드가 제공된 객체에 적용되고 필요하다는 근거가 있을 때만 "
+    "부재 증거로 사용한다. acceptance의 존재·검증 가능성과 그 source binding의 존재·정합성은 "
+    "독립적으로 검사하며 한 축의 finding으로 다른 축의 직접 결함을 대신하지 않는다. "
+    "부분 발췌의 plan에 선언된 선택·방식은 요청과의 의미 정합성을 검토한다. 실행 전 계획에 "
+    "실행 후 실측 증빙이 없다는 이유만으로 그 선언을 미충족으로 바꾸지 않는다. 특정 목적의 "
+    "validation 설명을 전체 검사 목록으로 간주하여 다른 계획 필드마다 별도 검사가 없다고 "
+    "추론하지 않는다. 검사 목록의 완결성이나 별도 증명 의무가 원문에 명시된 경우, 또는 "
+    "제공된 검사 방식이 해당 요구를 검증할 수 없다는 직접 근거가 있는 경우에는 결함을 제출한다."
 )
 
 
@@ -145,6 +161,25 @@ class PlanningScenario(EngineModel):
     @property
     def scenario_digest(self) -> str:
         return sha256_digest(self)
+
+
+class PlanningPartialFeasibleObservation(EngineModel):
+    """schema 실패 전 처음 관측한 admissible Plan만 보존한다."""
+
+    observed: bool
+    latency_ms: int | None = Field(default=None, ge=1)
+    plan_activation_digest: str | None = Field(
+        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
+    )
+
+    @model_validator(mode="after")
+    def observed_values_are_complete(self) -> "PlanningPartialFeasibleObservation":
+        values = (self.latency_ms, self.plan_activation_digest)
+        if self.observed and any(value is None for value in values):
+            raise ValueError("관측된 feasible Plan에는 latency와 activation digest가 필요합니다.")
+        if not self.observed and any(value is not None for value in values):
+            raise ValueError("관측되지 않은 feasible Plan에는 값이 있으면 안 됩니다.")
+        return self
 
 
 class PlanningScenarioCatalog(EngineModel):
@@ -577,6 +612,141 @@ def _is_rate_limit(error: BaseException) -> bool:
     )
 
 
+_FULL_PLANNING_PARTIAL_CELL_NON_RESUMABLE = (
+    "FULL_PLANNING_PARTIAL_CELL_NON_RESUMABLE"
+)
+_FULL_PLANNING_PRE_PROVIDER_RATE_LIMIT = (
+    "FULL_PLANNING_RATE_LIMIT_BEFORE_PROVIDER_CALL"
+)
+
+
+def _full_planning_rate_limit_reason(
+    *,
+    state_root: Path,
+    scenario_id: str,
+    order_seed: int,
+    provider_calls: tuple[tuple[str, str], ...],
+    original_reason: str,
+    codex_bin: Path | str | None,
+) -> tuple[EvaluationRunStatus, str]:
+    database = (state_root / "flowmarshal-engine.sqlite3").resolve()
+    artifacts = (state_root / "artifacts").resolve()
+    if not provider_calls:
+        reason = (
+            f"{_FULL_PLANNING_PRE_PROVIDER_RATE_LIMIT}: scenario_id={scenario_id}; "
+            f"order_seed={order_seed}; provider_calls=[]; provider effect가 시작되지 않아 "
+            "동일 run root를 resume할 수 있습니다; next_action=resume_same_run_root; "
+            f"original_reason={original_reason}"
+        )
+        return EvaluationRunStatus.PAUSED_RATE_LIMIT, reason[:5000]
+
+    calls = ",".join(f"{call_id}={status}" for call_id, status in provider_calls)
+    observe_command = (
+        f'flowmarshal-engine --db "{database}" --artifacts "{artifacts}" '
+        "project budget observe-role --call-id <unresolved-call-id>"
+    )
+    if codex_bin is not None:
+        observe_command += f' --codex-bin "{Path(codex_bin).resolve()}"'
+    reason = (
+        f"{_FULL_PLANNING_PARTIAL_CELL_NON_RESUMABLE}: scenario_id={scenario_id}; "
+        f"order_seed={order_seed}; provider_calls=[{calls}]; ledger={database}; "
+        f"artifacts={artifacts}; 중간 cell 역할 산출물 checkpoint가 없어 이 run은 "
+        "재개할 수 없습니다. 기존 thread의 terminal 관측이 필요한 unresolved 호출은 "
+        f"연결 원장에서 먼저 관측하십시오; next_action={observe_command}; "
+        "원장과 실패 run을 보존하고 미확인 효과와 예산을 대조한 뒤 "
+        "승인된 반복 검증 범위에서 새 run root를 사용하십시오; "
+        f"original_reason={original_reason}"
+    )
+    return EvaluationRunStatus.FAILED, reason[:5000]
+
+
+def _record_full_planning_rate_limit(
+    store: ImmutableCheckpointStore,
+    *,
+    state_root: Path,
+    scenario_id: str,
+    order_seed: int,
+    original_reason: str,
+    codex_bin: Path | str | None,
+) -> EvaluationRunState:
+    status, reason = _full_planning_rate_limit_reason(
+        state_root=state_root,
+        scenario_id=scenario_id,
+        order_seed=order_seed,
+        provider_calls=evaluation_cell_provider_calls(state_root),
+        original_reason=original_reason,
+        codex_bin=codex_bin,
+    )
+    return store.set_state(status, updated_at=utc_now(), reason=reason)
+
+
+def _guard_full_planning_resume(
+    destination: Path,
+    *,
+    base: Path,
+    codex_bin: Path | str | None,
+) -> None:
+    """provider 호출이 시작된 미완료 cell을 런타임 진입 전에 차단한다."""
+
+    contract_path = destination / "evaluation-contract.json"
+    state_path = destination / "run-state.json"
+    if not contract_path.is_file() or not state_path.is_file():
+        return
+    contract = EvaluationContract.model_validate_json(
+        contract_path.read_text(encoding="utf-8")
+    )
+    if contract.scope is not EvaluationScope.FULL_PLANNING_PIPELINE:
+        return
+    if source_manifest_digest(base) != contract.source_manifest_digest:
+        raise QualificationRunError(
+            "resume 대상 source 계약이 변경됐습니다. 기존 run을 보존하고 새 run root를 사용하세요."
+        )
+    store = ImmutableCheckpointStore(destination, contract)
+    state = store.state()
+    if (
+        state.status is EvaluationRunStatus.FAILED
+        and state.reason is not None
+        and state.reason.startswith(_FULL_PLANNING_PARTIAL_CELL_NON_RESUMABLE)
+    ):
+        raise QualificationRunError(state.reason)
+    if state.status is EvaluationRunStatus.COMPLETED:
+        return
+
+    catalog = PlanningScenarioCatalog.load(
+        base / "tests" / "fixtures" / "engine" / "planning-scenarios.json"
+    )
+    if (
+        catalog.catalog_digest != contract.scenario_set_digest
+        or tuple(item.scenario_digest for item in catalog.scenarios)
+        != contract.fixture_digests
+    ):
+        raise QualificationRunError("resume 대상 planning scenario 계약이 다릅니다.")
+    for seed in contract.order_seeds:
+        for scenario in catalog.scenarios:
+            if store.completed(scenario.scenario_digest, seed) is not None:
+                continue
+            state_root = (
+                destination
+                / "work"
+                / f"seed-{seed}"
+                / scenario.scenario_id
+                / "budget-state"
+            )
+            if not evaluation_cell_provider_calls(state_root):
+                continue
+            failed = _record_full_planning_rate_limit(
+                store,
+                state_root=state_root,
+                scenario_id=scenario.scenario_id,
+                order_seed=seed,
+                original_reason=state.reason or "완료 checkpoint가 없는 provider 호출이 발견됐습니다.",
+                codex_bin=codex_bin,
+            )
+            raise QualificationRunError(
+                failed.reason or _FULL_PLANNING_PARTIAL_CELL_NON_RESUMABLE
+            )
+
+
 def run_role_fixture(
     *,
     root: Path | None = None,
@@ -598,7 +768,9 @@ def run_role_fixture(
             encoding="utf-8"
         )
     )
-    with CodexAppServerRuntime(codex_bin=codex_bin) as runtime:
+    with CodexAppServerRuntime(
+        codex_bin=codex_bin, project_binding=evaluation_policies.codex_project
+    ) as runtime:
         inventory = runtime.list_models()
         roles.validate_inventory(inventory)
         contract = _role_contract(base, catalog, inventory, roles, evaluation_policies)
@@ -820,9 +992,12 @@ def _planning_contract(
     from .planner_roles import (
         PlanExpansionEnvelope, PlanExpansionEnvelopeV2,
         PlanReviewEnvelope, PlanReviewEnvelopeV2,
-        SkeletonBatchDraft, SkeletonCandidateDraft,
+        SkeletonBatchDraft, SkeletonCandidateDraft, SkeletonRefinementDraft,
     )
     from .plan_inspection_v2 import FINDING_TAXONOMY_V2, PLAN_INSPECTION_V2_INSTRUCTIONS
+    from .planning_recovery import PlanningRecoveryPolicy
+    from .plan_review_adjudication import PlanReviewAdjudicationDraft, adjudicate_plan_review
+    from .planner_roles import PlanRefinementDraft
 
     if inspection_provider_contract == PLAN_INSPECTION_PROVIDER_V1:
         expansion_envelope, review_envelope = PlanExpansionEnvelope, PlanReviewEnvelope
@@ -832,6 +1007,8 @@ def _planning_contract(
         provider_contract_values = {
             "inspection_provider_contract": inspection_provider_contract,
             "inspection_provider_instructions": PLAN_INSPECTION_V2_INSTRUCTIONS,
+            "planning_recovery_policy": PlanningRecoveryPolicy().model_dump(mode="json"),
+            "adjudication_request_builder": inspect.getsource(adjudicate_plan_review),
             "inspection_provider_taxonomy": {
                 key: (gate.value, severity.value)
                 for key, (gate, severity) in FINDING_TAXONOMY_V2.items()
@@ -854,6 +1031,8 @@ def _planning_contract(
             | policy_contract_fragment(policies)
             | ({"inspection_provider_contract": inspection_provider_contract}
                if provider_contract_values else {})
+            | ({"planning_recovery_policy": PlanningRecoveryPolicy().model_dump(mode="json")}
+               if inspection_provider_contract == PLAN_INSPECTION_PROVIDER_V2 else {})
         ),
         threshold_digest=sha256_digest({"clean_selected": True, "adversarial_blocked": True, "defect_count": 0}),
         taxonomy_digest=sha256_digest({"dispositions": ["selected", "blocked"],
@@ -877,7 +1056,11 @@ def _planning_contract(
             {
                 model.__name__: strict_json_output_schema(model.model_json_schema())
                 for model in (GoalNormalizationProposal, SkeletonBatchDraft, SkeletonCandidateDraft,
-                              expansion_envelope, review_envelope, ReviewDraft)
+                              SkeletonRefinementDraft,
+                              expansion_envelope, review_envelope, ReviewDraft,
+                              PlanningPartialFeasibleObservation, PlanRefinementDraft,
+                              PlanningSearchOutcome)
+                + ((PlanReviewAdjudicationDraft,) if inspection_provider_contract == PLAN_INSPECTION_PROVIDER_V2 else ())
             }
         ),
         model_lock_digest=_model_lock(inventory, roles),
@@ -953,6 +1136,12 @@ def _fixture_goal(
     )
 
 
+def _bind_planning_runner_goal(runner: Any, goal: GoalContractRevision) -> None:
+    """Goal 등록 뒤의 planning 호출만 확정된 Goal revision으로 예약한다."""
+
+    runner.goal_digest = goal.definition_digest
+
+
 def _planning_cell(
     *,
     scenario: PlanningScenario,
@@ -966,11 +1155,26 @@ def _planning_cell(
     progress_sink: Callable[[dict[str, Any]], None] | None = None,
     evaluation_policies: EvaluationPolicies | None = None,
     retain_execution_checkpoint: bool = False,
+    partial_feasible_observer: Callable[[PlanningPartialFeasibleObservation], None] | None = None,
 ) -> tuple[dict[str, Any], tuple[RoleCallReceipt, ...]]:
+    from .planning_recovery import PlanningRecoveryPolicy
     if retain_execution_checkpoint and (work_root is None or evaluation_policies is None):
         raise QualificationRunError("실행 lifecycle 연결에는 영속 cell 경로와 예산 정책이 필요합니다.")
     started = time.monotonic()
-    first_feasible: list[int] = []
+    first_feasible: PlanningPartialFeasibleObservation | None = None
+
+    def observe_first_feasible(evaluation: Any) -> None:
+        nonlocal first_feasible
+        if first_feasible is not None:
+            return
+        observation = PlanningPartialFeasibleObservation(
+            observed=True,
+            latency_ms=max(1, int((time.monotonic() - started) * 1000)),
+            plan_activation_digest=evaluation.plan.activation_digest,
+        )
+        first_feasible = observation
+        if partial_feasible_observer is not None:
+            partial_feasible_observer(observation)
     workspace_context = (
         tempfile.TemporaryDirectory(
             prefix=f"flowmarshal-{scenario.scenario_id}-", ignore_cleanup_errors=True
@@ -1064,8 +1268,10 @@ def _planning_cell(
                 goal_id=goal_id,
             )
         goal = prepared.goal_contract
+        preparation_calls = len(runner.receipts) if inspection_provider_contract == PLAN_INSPECTION_PROVIDER_V2 else 2
         if service is not None and manager is not None:
             register_and_attach_goal(service, manager, goal)
+            _bind_planning_runner_goal(runner, goal)
         blocking_questions = [
             item.model_dump(mode="json") for item in prepared.proposal.unresolved_questions
             if item.blocking
@@ -1078,7 +1284,7 @@ def _planning_cell(
             "expected_disposition": scenario.expected_disposition,
             "goal_status": goal.status.value,
             "selected": False,
-            "logical_role_calls": 2,
+            "logical_role_calls": preparation_calls,
             "candidate_versions": 0,
             "finding_codes": list(goal.preparation_binding.finding_codes),
             "passed": False,
@@ -1191,9 +1397,11 @@ def _planning_cell(
                 goal=goal,
                 state=state,
                 project_map=project_map,
-                budget=PlanningBudgetPolicy(max_logical_role_calls=12),
+                budget=PlanningBudgetPolicy(max_logical_role_calls=14 - preparation_calls),
                 candidate_count=scenario.candidate_count,
-                feasible_observer=lambda _evaluation: first_feasible.append(max(1, int((time.monotonic() - started) * 1000))),
+                feasible_observer=observe_first_feasible,
+                recovery_policy=(PlanningRecoveryPolicy()
+                                 if inspection_provider_contract == PLAN_INSPECTION_PROVIDER_V2 else None),
             )
         selected = outcome.selected_activation_digest is not None
         if retain_execution_checkpoint:
@@ -1241,21 +1449,26 @@ def _planning_cell(
         cell.update(
             {
                 "selected": selected,
-                "logical_role_calls": 2 + outcome.logical_role_calls,
+                "logical_role_calls": preparation_calls + outcome.logical_role_calls,
                 "candidate_versions": outcome.candidate_versions,
                 "finding_codes": sorted(set(cell["finding_codes"]) | set(findings)),
                 "selected_activation_digest": outcome.selected_activation_digest,
                 "planning_outcome": outcome.model_dump(mode="json"),
-                "latency_ms_to_first_feasible": first_feasible[0] if first_feasible else None,
+                "latency_ms_to_first_feasible": (
+                    first_feasible.latency_ms if first_feasible is not None else None
+                ),
                 "latency_ms_to_disposition": max(1, int((time.monotonic() - started) * 1000)),
             }
         )
         failures: list[str] = []
+        if outcome.candidate_schema_failures:
+            cell["schema_valid"] = False
+            failures.append(f"후보 schema 실패 {len(outcome.candidate_schema_failures)}회를 보존함")
         if scenario.expected_disposition == "selected" and not selected:
             failures.append("clean scenario에서 실행 가능한 Plan을 선택하지 못함")
         if scenario.expected_disposition == "blocked":
             failures.append("정보 부족 입력에서 필수 정보 요청 없이 ready planning에 진입함")
-        if 2 + outcome.logical_role_calls > 14:
+        if preparation_calls + outcome.logical_role_calls > 14:
             failures.append("logical 역할 호출이 14회를 초과함")
         if outcome.candidate_versions > 5:
             failures.append("candidate version이 5개를 초과함")
@@ -1286,6 +1499,10 @@ def run_full_planning_pipeline(
     if evaluation_policies is None:
         raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
     base = (root or project_root()).resolve(strict=True)
+    if run_root is not None:
+        _guard_full_planning_resume(
+            Path(run_root).resolve(), base=base, codex_bin=codex_bin
+        )
     preflight_failures = _preflight(base)
     if preflight_failures:
         raise QualificationRunError("; ".join(preflight_failures))
@@ -1293,7 +1510,9 @@ def run_full_planning_pipeline(
     catalog = PlanningScenarioCatalog.load(
         base / "tests" / "fixtures" / "engine" / "planning-scenarios.json"
     )
-    with CodexAppServerRuntime(codex_bin=codex_bin) as runtime:
+    with CodexAppServerRuntime(
+        codex_bin=codex_bin, project_binding=evaluation_policies.codex_project
+    ) as runtime:
         inventory = runtime.list_models()
         roles.validate_inventory(inventory)
         contract = _planning_contract(
@@ -1334,6 +1553,15 @@ def run_full_planning_pipeline(
                     if store.completed(scenario.scenario_digest, seed) is not None:
                         continue
                     try:
+                        partial_feasible = PlanningPartialFeasibleObservation(observed=False)
+
+                        def collect_partial_feasible(
+                            observation: PlanningPartialFeasibleObservation,
+                        ) -> None:
+                            nonlocal partial_feasible
+                            if not partial_feasible.observed:
+                                partial_feasible = observation
+
                         cell, receipts = _planning_cell(
                             scenario=scenario,
                             seed=seed,
@@ -1345,6 +1573,7 @@ def run_full_planning_pipeline(
                             work_root=destination / "work" / f"seed-{seed}" / scenario.scenario_id,
                             progress_sink=_role_progress(destination, scenario_id=scenario.scenario_id, order_seed=seed),
                             evaluation_policies=evaluation_policies,
+                            partial_feasible_observer=collect_partial_feasible,
                         )
                     except StructuredRoleError as error:
                         _write_json(
@@ -1360,10 +1589,19 @@ def run_full_planning_pipeline(
                             },
                         )
                         if _is_rate_limit(error):
-                            store.set_state(
-                                EvaluationRunStatus.PAUSED_RATE_LIMIT,
-                                updated_at=utc_now(),
-                                reason=str(error),
+                            _record_full_planning_rate_limit(
+                                store,
+                                state_root=(
+                                    destination
+                                    / "work"
+                                    / f"seed-{seed}"
+                                    / scenario.scenario_id
+                                    / "budget-state"
+                                ),
+                                scenario_id=scenario.scenario_id,
+                                order_seed=seed,
+                                original_reason=str(error),
+                                codex_bin=codex_bin,
                             )
                             raise
                         receipts = error.receipts
@@ -1376,7 +1614,9 @@ def run_full_planning_pipeline(
                             "expected_disposition": scenario.expected_disposition,
                             "passed": False,
                             "schema_valid": False,
+                            "selected": False,
                             "failure": str(error),
+                            "partial_feasible_observation": partial_feasible.model_dump(mode="json"),
                         }
                     store.put(
                         EvaluationCellCheckpoint(
@@ -1492,6 +1732,9 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
             evaluation_policies=policies,
         )
     if scope == "full-planning-pipeline":
+        _guard_full_planning_resume(
+            destination, base=base, codex_bin=codex_bin
+        )
         return run_full_planning_pipeline(
             root=base,
             run_root=destination,

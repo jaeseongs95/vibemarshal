@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+import copy
+import json
 import tempfile
 import threading
 import time
 import unittest
-import copy
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from flowmarshal.engine.budget import BudgetBlocked, GoalBudgetPolicy
 from flowmarshal.canonical import sha256_digest
@@ -21,6 +23,7 @@ from flowmarshal.engine.evaluation_budget import (
     register_and_attach_goal,
 )
 from flowmarshal.engine.role_execution import RoleTimeoutPolicy
+from flowmarshal.engine.runtime import CodexProjectBinding
 from flowmarshal.engine.model_lock import ModelCapability, ModelInventory
 from flowmarshal.engine.roles import strict_json_output_schema
 from flowmarshal.legacy_budget_proxy import (
@@ -30,10 +33,20 @@ from flowmarshal.legacy_budget_proxy import (
     LegacyRoleScope,
     build_legacy_budget_evidence,
     legacy_role_scope,
+    _verify_project_binding,
 )
 from flowmarshal.planning.r31_domain import PlanningRole
-from flowmarshal.planning.r31_models import _normalize_model_inventory
+from flowmarshal.planning.r31_models import (
+    ExecutionPolicyEvidence as LegacyExecutionPolicyEvidence,
+    PolicyVerifiedCodex,
+    _normalize_model_inventory,
+)
 from tests.engine_helpers import goal, profile
+
+
+# 실제 thread와 SQLite 예약 확인이 선행 RPC를 마칠 시간을 둔다.
+# 고의로 막은 RPC/turn은 아래의 기존 0.5초 종료 검증 안에서 계속 차단돼야 한다.
+WATCHDOG_TEST_TIMEOUT_SECONDS = 0.1
 
 
 class FakeHandle:
@@ -106,6 +119,16 @@ class FakeVerifiedCodex:
         self.turn_effects = 0
         self.interrupts = 0
         self.handles = []
+        self._codex = SimpleNamespace(_client=object())
+        self._evidence_sink = None
+        self.raw_requests = []
+        self.project_id = "project-server-test"
+        self.project_root = None
+        self.project_roots = None
+        self.project_name = "자동화테스트"
+        self.thread_project_id = self.project_id
+        self.thread_ephemeral = False
+        self.thread_read_project_id = self.project_id
 
     def models(self, *, include_hidden=False):
         return {"data": [{
@@ -115,7 +138,46 @@ class FakeVerifiedCodex:
         }]}
 
     def verify_execution_policy(self, _cwd):
-        return {"permission_profile": ":danger-full-access", "approval_policy": "never"}
+        return LegacyExecutionPolicyEvidence(
+            config_digest="sha256:" + "c" * 64,
+            profile_catalog_digest="sha256:" + "d" * 64,
+        )
+
+    def _raw_object(self, method, params):
+        self.raw_requests.append((method, copy.deepcopy(params)))
+        if method == "project/read":
+            return {"project": {
+                "id": self.project_id,
+                "name": self.project_name,
+                "roots": (
+                    [{"path": str(self.project_root)}]
+                    if self.project_roots is None
+                    else [{"path": str(path)} for path in self.project_roots]
+                ),
+            }}
+        if method == "thread/start":
+            self.reservation_probe()
+            self.thread_effects += 1
+            return {
+                "activePermissionProfile": {"id": ":danger-full-access"},
+                "approvalPolicy": "never",
+                "cwd": params["cwd"],
+                "model": params["model"],
+                "runtimeWorkspaceRoots": [params["cwd"]],
+                "instructionSources": [],
+                "thread": {
+                    "id": f"thread-{self.thread_effects}",
+                    "projectId": self.thread_project_id,
+                    "ephemeral": self.thread_ephemeral,
+                    "turns": [],
+                },
+            }
+        if method == "thread/read":
+            return {"thread": {
+                "id": params["threadId"],
+                "projectId": self.thread_read_project_id,
+            }}
+        raise AssertionError(method)
 
     def thread_start(self, **_kwargs):
         self.reservation_probe()
@@ -149,10 +211,12 @@ class LegacyBudgetProxyTests(unittest.TestCase):
     def setup_proxy(
         self, *, timeout=1.0, block=False, missing_usage=False,
         complete_on_interrupt=False, block_thread_start=False, block_interrupt=False,
+        codex_project=None,
     ):
         policies = EvaluationPolicies(
             budget=GoalBudgetPolicy(total_tokens=100, call_reservation_tokens=10),
             role_timeouts=RoleTimeoutPolicy(default_timeout_seconds=timeout),
+            codex_project=codex_project,
         )
         service, manager = initialize_cell_budget(
             state_root=self.state_root / "engine-budget",
@@ -169,9 +233,13 @@ class LegacyBudgetProxyTests(unittest.TestCase):
             "goal_contract_digest": self.goal.definition_digest,
             "evaluation_policy_digest": policies.policy_digest,
             "implementation": "r31_baseline",
-            "ephemeral_threads": True,
+            "ephemeral_threads": codex_project is None,
             "max_schema_recovery_attempts": 0,
         }
+        if codex_project is not None:
+            binding["codex_project"] = codex_project.model_dump(
+                mode="json", exclude_none=True
+            )
         def reservation_probe():
             with service.ledger.read() as connection:
                 row = connection.execute(
@@ -188,6 +256,14 @@ class LegacyBudgetProxyTests(unittest.TestCase):
             block_thread_start=block_thread_start,
             block_interrupt=block_interrupt,
         )
+        wrapped.project_root = self.workspace if codex_project is None else Path(
+            codex_project.expected_root
+        )
+        if codex_project is not None:
+            wrapped.project_id = codex_project.project_id
+            wrapped.project_name = codex_project.expected_name
+            wrapped.thread_project_id = codex_project.project_id
+            wrapped.thread_read_project_id = codex_project.project_id
         self.wrapped_clients = [*getattr(self, "wrapped_clients", []), wrapped]
         legacy_inventory_digest = sha256_digest(_normalize_model_inventory(wrapped.models()))
         inventory = ModelInventory(
@@ -277,6 +353,142 @@ class LegacyBudgetProxyTests(unittest.TestCase):
         self.assertTrue(evidence["turn_coverage_complete"])
         self.assertEqual(5, evidence["calls"][0]["receipt"]["input_tokens"])
         self.assertEqual(3, evidence["calls"][0]["receipt"]["output_tokens"])
+
+    def test_project_binding_routes_stored_thread_and_checks_before_turn(self):
+        project = CodexProjectBinding(
+            project_id="project-server-test",
+            expected_root=str(self.workspace),
+            expected_name="자동화테스트",
+        )
+        proxy, wrapped, service, _manager, _journal, _policies = self.setup_proxy(
+            codex_project=project
+        )
+        original_thread_start = PolicyVerifiedCodex.thread_start
+
+        def verified_start(view, **kwargs):
+            # 동결 PolicyVerifiedCodex의 실제 검증 경로를 실행한 뒤 테스트 thread를 반환한다.
+            original_thread_start(view, **kwargs)
+            return FakeThread(wrapped)
+
+        with patch.object(
+            PolicyVerifiedCodex, "thread_start", autospec=True, side_effect=verified_start
+        ) as frozen_start:
+            thread = self.lazy_thread(proxy)
+            result = self.run_turn(thread)
+
+        self.assertEqual("{}", result.final_response)
+        frozen_start.assert_called_once()
+        self.assertFalse(frozen_start.call_args.kwargs["ephemeral"])
+        methods = [method for method, _params in wrapped.raw_requests]
+        self.assertEqual(["project/read", "thread/start"], methods)
+        start_params = wrapped.raw_requests[1][1]
+        self.assertEqual(project.project_id, start_params["projectId"])
+        self.assertFalse(start_params["ephemeral"])
+        self.assertEqual(1, wrapped.turn_effects)
+        proxy._verify_thread_project(thread.id)
+        self.assertEqual("thread/read", wrapped.raw_requests[-1][0])
+        with service.ledger.read() as connection:
+            request = json.loads(connection.execute(
+                "SELECT request_json FROM provider_calls"
+            ).fetchone()[0])
+        payload = request["payload"]
+        self.assertTrue(payload["legacy_requested_ephemeral"])
+        self.assertFalse(payload["legacy_effective_ephemeral"])
+        self.assertEqual(project.model_dump(mode="json"), payload["codex_project"])
+
+    def test_project_preflight_accepts_other_registered_roots(self):
+        project = CodexProjectBinding(
+            project_id="project-server-test",
+            expected_root=str(self.workspace),
+            expected_name="자동화테스트",
+        )
+        wrapped = FakeVerifiedCodex(lambda: None)
+        wrapped.project_id = project.project_id
+        wrapped.project_name = project.expected_name
+        wrapped.project_roots = [self.workspace, self.workspace.parent / "other-project"]
+
+        response = _verify_project_binding(wrapped, project)
+
+        self.assertEqual(project.project_id, response["project"]["id"])
+
+    def test_project_preflight_rejects_missing_duplicate_or_relative_expected_root(self):
+        project = CodexProjectBinding(
+            project_id="project-server-test",
+            expected_root=str(self.workspace),
+            expected_name="자동화테스트",
+        )
+        cases = (
+            ([self.workspace.parent / "other-project"], project),
+            ([self.workspace, self.workspace], project),
+            ([self.workspace, Path("relative-root")], project),
+            ([self.workspace], project.model_copy(update={"expected_root": "relative-root"})),
+        )
+        for roots, candidate in cases:
+            with self.subTest(roots=roots, expected_root=candidate.expected_root):
+                wrapped = FakeVerifiedCodex(lambda: None)
+                wrapped.project_id = project.project_id
+                wrapped.project_name = project.expected_name
+                wrapped.project_roots = roots
+                with self.assertRaisesRegex(ValueError, "LEGACY_PROJECT_BINDING_MISMATCH"):
+                    _verify_project_binding(wrapped, candidate)
+
+    def test_project_or_thread_mismatch_blocks_before_corresponding_effect(self):
+        project = CodexProjectBinding(
+            project_id="project-server-test",
+            expected_root=str(self.workspace),
+            expected_name="자동화테스트",
+        )
+        proxy, wrapped, service, _manager, _journal, _policies = self.setup_proxy(
+            codex_project=project
+        )
+        wrapped.project_name = "다른 프로젝트"
+        with self.assertRaisesRegex(ValueError, "LEGACY_PROJECT_BINDING_MISMATCH"):
+            self.lazy_thread(proxy)
+        with service.ledger.read() as connection:
+            self.assertEqual(0, connection.execute(
+                "SELECT COUNT(*) FROM provider_calls"
+            ).fetchone()[0])
+        self.assertEqual(0, wrapped.thread_effects)
+
+        self.state_root = Path(self.temp.name) / "legacy-state-thread-project"
+        proxy, wrapped, _service, _manager, _journal, _policies = self.setup_proxy(
+            codex_project=project
+        )
+        wrapped.thread_project_id = "project-foreign"
+        original_thread_start = PolicyVerifiedCodex.thread_start
+
+        def verified_start(view, **kwargs):
+            original_thread_start(view, **kwargs)
+            return FakeThread(wrapped)
+
+        with patch.object(
+            PolicyVerifiedCodex, "thread_start", autospec=True, side_effect=verified_start
+        ), self.assertRaisesRegex(ValueError, "LEGACY_PROJECT_BINDING_MISMATCH"):
+            self.run_turn(self.lazy_thread(proxy))
+        self.assertEqual(1, wrapped.thread_effects)
+        self.assertEqual(0, wrapped.turn_effects)
+
+        self.state_root = Path(self.temp.name) / "legacy-state-later-thread-read"
+        proxy, wrapped, _service, _manager, _journal, _policies = self.setup_proxy(
+            codex_project=project
+        )
+        original_thread_start = PolicyVerifiedCodex.thread_start
+
+        def verified_start_again(view, **kwargs):
+            original_thread_start(view, **kwargs)
+            return FakeThread(wrapped)
+
+        with patch.object(
+            PolicyVerifiedCodex,
+            "thread_start",
+            autospec=True,
+            side_effect=verified_start_again,
+        ):
+            thread = self.lazy_thread(proxy)
+            self.run_turn(thread)
+        wrapped.thread_read_project_id = "project-foreign"
+        with self.assertRaisesRegex(ValueError, "LEGACY_PROJECT_BINDING_MISMATCH"):
+            proxy._verify_thread_project(thread.id)
 
     def test_second_run_is_blocked_before_reservation_or_provider_effect(self):
         proxy, wrapped, service, _manager, _journal, _policies = self.setup_proxy()
@@ -410,7 +622,7 @@ class LegacyBudgetProxyTests(unittest.TestCase):
 
     def test_timeout_requests_interrupt_keeps_unknown_and_blocks_next_call(self):
         proxy, wrapped, service, _manager, _journal, _policies = self.setup_proxy(
-            timeout=0.01, block=True
+            timeout=WATCHDOG_TEST_TIMEOUT_SECONDS, block=True
         )
         thread = self.lazy_thread(proxy)
         with self.assertRaisesRegex(TimeoutError, "LEGACY_ROLE_TIMEOUT"):
@@ -433,7 +645,7 @@ class LegacyBudgetProxyTests(unittest.TestCase):
 
     def test_thread_start_and_interrupt_rpcs_use_policy_watchdogs(self):
         proxy, wrapped, service, _manager, journal, _policies = self.setup_proxy(
-            timeout=0.01, block_thread_start=True
+            timeout=WATCHDOG_TEST_TIMEOUT_SECONDS, block_thread_start=True
         )
         started = time.monotonic()
         with self.assertRaisesRegex(TimeoutError, "LEGACY_THREAD_START_TIMEOUT"):
@@ -447,7 +659,7 @@ class LegacyBudgetProxyTests(unittest.TestCase):
 
         self.state_root = Path(self.temp.name) / "legacy-state-interrupt"
         proxy, wrapped, _service, _manager, journal, _policies = self.setup_proxy(
-            timeout=0.01, block=True, block_interrupt=True
+            timeout=WATCHDOG_TEST_TIMEOUT_SECONDS, block=True, block_interrupt=True
         )
         started = time.monotonic()
         with self.assertRaisesRegex(TimeoutError, "LEGACY_ROLE_TIMEOUT"):
@@ -457,7 +669,7 @@ class LegacyBudgetProxyTests(unittest.TestCase):
 
     def test_timeout_records_terminal_only_when_observed_after_interrupt(self):
         proxy, wrapped, service, _manager, _journal, _policies = self.setup_proxy(
-            timeout=0.01, block=True, complete_on_interrupt=True
+            timeout=WATCHDOG_TEST_TIMEOUT_SECONDS, block=True, complete_on_interrupt=True
         )
         with self.assertRaisesRegex(TimeoutError, "LEGACY_ROLE_TIMEOUT"):
             self.run_turn(self.lazy_thread(proxy))

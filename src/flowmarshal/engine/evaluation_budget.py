@@ -13,6 +13,7 @@ from .domain import EngineModel, GoalContractRevision, ProjectProfileRevision
 from .ledger import SQLiteEngineLedger
 from .role_execution import RoleTimeoutPolicy
 from .roles import CodexStructuredRoleRunner
+from .runtime import CodexProjectBinding
 from .service import EngineService
 
 
@@ -21,6 +22,7 @@ class EvaluationPolicies(EngineModel):
 
     budget: GoalBudgetPolicy
     role_timeouts: RoleTimeoutPolicy
+    codex_project: CodexProjectBinding | None = None
 
     @model_validator(mode="after")
     def schema_recovery_is_never_budgeted(self) -> "EvaluationPolicies":
@@ -33,7 +35,10 @@ class EvaluationPolicies(EngineModel):
 
 
 def load_evaluation_policies(
-    *, budget_policy_path: Path | str, role_timeout_policy_path: Path | str
+    *,
+    budget_policy_path: Path | str,
+    role_timeout_policy_path: Path | str,
+    codex_project_binding_path: Path | str | None = None,
 ) -> EvaluationPolicies:
     return EvaluationPolicies(
         budget=GoalBudgetPolicy.model_validate_json(
@@ -41,6 +46,13 @@ def load_evaluation_policies(
         ),
         role_timeouts=RoleTimeoutPolicy.model_validate_json(
             Path(role_timeout_policy_path).read_text(encoding="utf-8")
+        ),
+        codex_project=(
+            None
+            if codex_project_binding_path is None
+            else CodexProjectBinding.model_validate_json(
+                Path(codex_project_binding_path).read_text(encoding="utf-8")
+            )
         ),
     )
 
@@ -53,19 +65,24 @@ def policies_from_metadata(metadata: dict[str, Any]) -> EvaluationPolicies:
 
 
 def policy_contract_fragment(policies: EvaluationPolicies) -> dict[str, Any]:
-    return {
+    fragment = {
         "evaluation_policy_digest": policies.policy_digest,
         "budget_policy_digest": sha256_digest(policies.budget),
         "role_timeout_policy_digest": policies.role_timeouts.policy_digest,
         "max_schema_recovery_attempts": 0,
         "ephemeral_threads": False,
     }
+    if policies.codex_project is not None:
+        fragment["codex_project"] = policies.codex_project.model_dump(
+            mode="json", exclude_none=True
+        )
+    return fragment
 
 
 def metadata_with_policies(values: dict[str, Any], policies: EvaluationPolicies) -> dict[str, Any]:
     document = dict(values)
     document.update(
-        evaluation_policies=policies.model_dump(mode="json"),
+        evaluation_policies=policies.model_dump(mode="json", exclude_none=True),
         evaluation_policy_digest=policies.policy_digest,
     )
     document["metadata_digest"] = sha256_digest(document)
@@ -150,6 +167,26 @@ def initialize_cell_budget(
                 + ", ".join(f"{row['id']}={row['status']}" for row in prior_calls)
             )
     return service, manager
+
+
+def evaluation_cell_provider_calls(state_root: Path | str) -> tuple[tuple[str, str], ...]:
+    """완료 checkpoint가 없는 evaluation cell의 provider 호출 상태를 읽는다."""
+
+    root = Path(state_root)
+    database = root / "flowmarshal-engine.sqlite3"
+    if not database.is_file():
+        return ()
+    ledger = SQLiteEngineLedger(database, artifact_root=root / "artifacts")
+    with ledger.read() as connection:
+        table = connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='provider_calls'"
+        ).fetchone()
+        if table is None:
+            raise ValueError("EVALUATION_CELL_PROVIDER_CALL_LEDGER_INVALID")
+        rows = connection.execute(
+            "SELECT id, status FROM provider_calls ORDER BY rowid"
+        ).fetchall()
+    return tuple((str(row["id"]), str(row["status"])) for row in rows)
 
 
 def register_and_attach_goal(

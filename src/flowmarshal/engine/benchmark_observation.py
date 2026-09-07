@@ -11,7 +11,9 @@ from ..canonical import sha256_digest
 from .benchmark_lifecycle import collect_lifecycle_observation
 from .domain import EngineModel, PlanContractRevision
 from .evaluation import BenchmarkCell, EvaluationCellCheckpoint, EvaluationContract
+from .evaluation_budget import verify_metadata_digest
 from .ledger import SQLiteEngineLedger
+from .plan_inspection_provider import PLAN_INSPECTION_PROVIDER_V1
 
 
 class BenchmarkObservationError(RuntimeError):
@@ -67,8 +69,16 @@ def _checkpoint_context(
     if EvaluationContract.model_validate(manifest).contract_digest != contract.contract_digest:
         raise BenchmarkObservationError("OBSERVATION_CONTRACT_MANIFEST_MISMATCH")
     metadata = _read_json(run_root / "run-metadata.json", "OBSERVATION_RUN_METADATA_MISSING")
+    if "metadata_digest" in metadata:
+        try:
+            verify_metadata_digest(metadata)
+        except ValueError as error:
+            raise BenchmarkObservationError("OBSERVATION_RUN_METADATA_DIGEST_MISMATCH") from error
     if metadata.get("evaluation_contract_digest") != contract.contract_digest:
         raise BenchmarkObservationError("OBSERVATION_SOURCE_CONTRACT_MISMATCH")
+    provider = metadata.get("inspection_provider_contract", PLAN_INSPECTION_PROVIDER_V1)
+    if provider not in {"plan-inspection-v1", "plan-inspection-v2"}:
+        raise BenchmarkObservationError("OBSERVATION_INSPECTION_PROVIDER_INVALID")
     assessment = checkpoint.raw_structured_assessment
     raw = assessment.get("raw")
     raw_cell = assessment.get("benchmark_cell")

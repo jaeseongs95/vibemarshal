@@ -6,7 +6,13 @@ import unittest
 from pathlib import Path
 
 from flowmarshal.engine.context import ProjectMapper
-from flowmarshal.engine.domain import CandidateStatus, GoalCriterion, RevisionStatus, TaskSkeleton
+from flowmarshal.engine.domain import (
+    CandidateStatus,
+    GoalCriterion,
+    ReviewFinding,
+    RevisionStatus,
+    TaskSkeleton,
+)
 from flowmarshal.engine.goal import (
     GoalNormalizerAdapter,
     GoalPreparationPipeline,
@@ -20,6 +26,8 @@ from flowmarshal.engine.planner_roles import (
     PlanReviewerAdapter,
     PlannerRoleAdapterError,
     RuleBasedTaskAssigner,
+    SkeletonBatchDraft,
+    SkeletonRefinementDraft,
     SkeletonGeneratorAdapter,
     SkeletonReviewerAdapter,
 )
@@ -239,6 +247,9 @@ class EngineRoleAdapterTests(unittest.TestCase):
             self.assertRegex(str(call.payload), r"case-[0-9a-f]{16}")
             self.assertNotIn("adversarial", str(call.payload))
         self.assertIn("input:request", runner.calls[0].payload["external_input_catalog"])
+        self.assertIn("각 candidate는 서로 다른 전체 해결 방법", runner.calls[0].instructions)
+        self.assertIn("A와 B를 candidate별로 나눠", runner.calls[0].instructions)
+        self.assertIn("사용자 산출물 안의 비교 대상 이름이 아니다", runner.calls[0].instructions)
         self.assertIn("아직 없는 활성화 증적", runner.calls[0].instructions)
         self.assertIn("Skeleton schema에 없는", runner.calls[1].instructions)
         self.assertIn("integration_validations", runner.calls[2].instructions)
@@ -331,6 +342,122 @@ class EngineRoleAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(PlanInspectionError, "행 집합 불완전"):
             expander.expand(candidate=candidate, goal=self.goal, state=self.state, project_map=self.map)
 
+    def test_expander_accepts_bound_draft_and_skeleton_citations(self) -> None:
+        from tests.engine_inspection_helpers import inspection_fixture
+
+        skeleton = _skeleton_response()
+        detail = "Goal 결과를 Task validation으로 보존한다."
+        skeleton["candidates"][0]["tasks"][0]["detail_requirements"] = [detail]
+        plan = _plan_response()
+        inspection = inspection_fixture(
+            plan, self.goal.definition.model_dump(mode="json")
+        )
+        citation_id = "c_skeleton_detail"
+        inspection["citations"].append({
+            "citation_id": citation_id,
+            "source_ref": "artifact:skeleton",
+            "selector": "/tasks/0/detail_requirements/0",
+            "quote": detail,
+        })
+        inspection["validation_rows"][0]["mechanisms"][0]["basis_refs"].append(
+            citation_id
+        )
+        inspection["validation_scope_rows"][0]["basis_refs"].append(citation_id)
+        runner = ScriptedStructuredRoleRunner({
+            "skeleton_generator": [skeleton],
+            "plan_expander": [{"plan": plan, "inspection": inspection}],
+        })
+        options = dict(
+            model="worker", effort="medium",
+            inventory_digest=self.inventory.inventory_digest, cwd=self.root,
+        )
+        candidate = SkeletonGeneratorAdapter(runner, **options).generate(
+            goal=self.goal, state=self.state, project_map=self.map, candidate_count=1,
+        )[0]
+
+        result = PlanExpanderAdapter(
+            runner,
+            RuleBasedTaskAssigner(assignment(), assignment(), assignment()),
+            **options,
+        ).expand(
+            candidate=candidate, goal=self.goal, state=self.state, project_map=self.map,
+        )
+
+        request = runner.calls[-1]
+        self.assertEqual("payload.skeleton", request.payload["inspection_source_catalog"]["artifact:skeleton"])
+        self.assertEqual("output.plan", request.payload["inspection_source_catalog"]["artifact:plan_draft"])
+        self.assertEqual("요구를 구현한다.", result.definition.tasks[0].objective)
+
+    def test_expander_still_rejects_wrong_source_selector_and_undefined_claim(self) -> None:
+        from flowmarshal.engine.plan_inspection import PlanInspectionError
+        from tests.engine_inspection_helpers import inspection_fixture
+
+        def attempt(mutate):
+            skeleton = _skeleton_response()
+            detail = "Goal 결과를 Task validation으로 보존한다."
+            skeleton["candidates"][0]["tasks"][0]["detail_requirements"] = [detail]
+            plan = _plan_response()
+            inspection = inspection_fixture(
+                plan, self.goal.definition.model_dump(mode="json")
+            )
+            citation_id = "c_skeleton_detail"
+            inspection["citations"].append({
+                "citation_id": citation_id,
+                "source_ref": "artifact:skeleton",
+                "selector": "/tasks/0/detail_requirements/0",
+                "quote": detail,
+            })
+            inspection["validation_rows"][0]["mechanisms"][0]["basis_refs"].append(
+                citation_id
+            )
+            inspection["validation_scope_rows"][0]["basis_refs"].append(citation_id)
+            mutate(inspection)
+            runner = ScriptedStructuredRoleRunner({
+                "skeleton_generator": [skeleton],
+                "plan_expander": [{"plan": plan, "inspection": inspection}],
+            })
+            options = dict(
+                model="worker", effort="medium",
+                inventory_digest=self.inventory.inventory_digest, cwd=self.root,
+            )
+            candidate = SkeletonGeneratorAdapter(runner, **options).generate(
+                goal=self.goal, state=self.state, project_map=self.map, candidate_count=1,
+            )[0]
+            PlanExpanderAdapter(
+                runner,
+                RuleBasedTaskAssigner(assignment(), assignment(), assignment()),
+                **options,
+            ).expand(
+                candidate=candidate, goal=self.goal, state=self.state,
+                project_map=self.map,
+            )
+
+        cases = (
+            (
+                "source_ref",
+                lambda inspection: inspection["citations"][-1].update(
+                    source_ref="artifact:plan_contract"
+                ),
+            ),
+            (
+                "selector",
+                lambda inspection: inspection["citations"][-1].update(
+                    selector="/skeleton/tasks/0/detail_requirements/0"
+                ),
+            ),
+            (
+                "없는 인용 ID",
+                lambda inspection: inspection["validation_rows"][0].update(
+                    claim_ref="claim://undefined"
+                ),
+            ),
+        )
+        for error, mutate in cases:
+            with self.subTest(error=error), self.assertRaisesRegex(
+                PlanInspectionError, error
+            ):
+                attempt(mutate)
+
     def _validation_boundary_case(self, check_ref="task_check"):
         definition = self.goal.definition.model_copy(update={"hard_acceptance": (
             *self.goal.definition.hard_acceptance,
@@ -417,6 +544,7 @@ class EngineRoleAdapterTests(unittest.TestCase):
         """책임 안내·후보 보정·재검토의 연결을 검증하며 모델의 의미 판단을 모사하지 않는다."""
         skeleton, plan = self._validation_boundary_case()
         refined = deepcopy(skeleton["candidates"][0])
+        refined.pop("approach")
         refined["tasks"][1]["detail_requirements"] = [
             "검토 산출물은 ac_independent에 기여하며 독립 Goal Test 실행은 Plan.integration_validations에 둔다."
         ]
@@ -440,6 +568,23 @@ class EngineRoleAdapterTests(unittest.TestCase):
         self.assertEqual("validation_check", result.tasks[1].validations[0].validation_id)
         calls = {call.role: call for call in runner.calls}
         self.assertEqual(finding, calls["skeleton_refiner"].payload["findings"][0])
+        from flowmarshal.engine.roles import strict_json_output_schema
+        self.assertEqual(
+            strict_json_output_schema(SkeletonRefinementDraft.model_json_schema()),
+            strict_json_output_schema(calls["skeleton_refiner"].output_schema),
+        )
+        self.assertEqual(
+            strict_json_output_schema(SkeletonBatchDraft.model_json_schema()),
+            strict_json_output_schema(calls["skeleton_generator"].output_schema),
+        )
+        self.assertNotIn("approach", calls["skeleton_refiner"].output_schema["properties"])
+        self.assertIn("approach", calls["skeleton_generator"].output_schema["$defs"]["SkeletonCandidateDraft"]["properties"])
+        parent = outcome.skeleton_evaluations[0].candidate
+        repaired = outcome.skeleton_evaluations[1].candidate
+        self.assertEqual(parent.approach, repaired.approach)
+        self.assertEqual(parent.candidate_id, repaired.parent_candidate_id)
+        self.assertEqual(parent.version + 1, repaired.version)
+        self.assertEqual(1, repaired.refinement_round)
         self.assertEqual(refined["tasks"][1]["detail_requirements"],
                          calls["plan_expander"].payload["skeleton"]["tasks"][1]["detail_requirements"])
         self.assertEqual({"skeleton_generator", "skeleton_refiner", "skeleton_reviewer", "plan_expander",
@@ -448,6 +593,96 @@ class EngineRoleAdapterTests(unittest.TestCase):
             self.assertIn(PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS, call.instructions)
         properties = calls["skeleton_refiner"].output_schema["$defs"]["SkeletonTaskDraft"]["properties"]
         self.assertIn("직접 실행", properties["contributes_to"]["description"])
+
+    def test_skeleton_refiner_rejects_repeated_parent_approach(self) -> None:
+        skeleton, _ = self._validation_boundary_case()
+        refined = deepcopy(skeleton["candidates"][0])
+        refined["approach"]["strategy_family"] = "두 대안을 비교하는 새 전략"
+        finding = {
+            "finding_code": "SKEL_STRATEGY_PAIR_UNSPECIFIED",
+            "gate": "goal",
+            "severity": "error",
+            "summary": "비교 대상 두 개를 Task 요구에 명시한다.",
+            "evidence_refs": ["artifact:skeleton", "source:goal"],
+            "affected_task_refs": ["task_check"],
+            "remediable": True,
+        }
+        runner = ScriptedStructuredRoleRunner({
+            "skeleton_generator": [skeleton],
+            "skeleton_refiner": [refined],
+        })
+        options = dict(
+            model="worker", effort="medium",
+            inventory_digest=self.inventory.inventory_digest, cwd=self.root,
+        )
+        candidate = SkeletonGeneratorAdapter(runner, **options).generate(
+            goal=self.goal, state=self.state, project_map=self.map, candidate_count=1,
+        )[0]
+
+        with self.assertRaisesRegex(ValueError, "extra_forbidden"):
+            SkeletonGeneratorAdapter(runner, **options).refine(
+                candidate=candidate,
+                findings=(ReviewFinding.model_validate(finding),),
+                goal=self.goal,
+                state=self.state,
+                project_map=self.map,
+            )
+
+    def test_skeleton_refiner_inherits_parent_approach_and_binds_receipt(self) -> None:
+        from flowmarshal.canonical import sha256_digest
+        from flowmarshal.engine.roles import strict_json_output_schema
+
+        generated = _skeleton_response()
+        mutable = deepcopy(generated["candidates"][0])
+        mutable.pop("approach")
+        mutable["tasks"][0]["detail_requirements"] = [
+            "비교 대상과 결론을 같은 Task에서 모두 다룬다."
+        ]
+        finding = ReviewFinding(
+            finding_code="SKEL_DETAIL_MISSING",
+            gate="goal",
+            severity="error",
+            summary="Task의 비교 책임을 구체화한다.",
+            evidence_refs=("artifact:skeleton", "source:goal"),
+            affected_task_refs=("task_one",),
+            remediable=True,
+        )
+        runner = ScriptedStructuredRoleRunner({
+            "skeleton_generator": [generated],
+            "skeleton_refiner": [mutable],
+        })
+        adapter = SkeletonGeneratorAdapter(
+            runner,
+            model="worker",
+            effort="medium",
+            inventory_digest=self.inventory.inventory_digest,
+            cwd=self.root,
+        )
+        parent = adapter.generate(
+            goal=self.goal, state=self.state, project_map=self.map, candidate_count=1,
+        )[0]
+
+        refined = adapter.refine(
+            candidate=parent,
+            findings=(finding,),
+            goal=self.goal,
+            state=self.state,
+            project_map=self.map,
+        )
+
+        request = runner.calls[-1]
+        receipt = adapter.receipts[-1]
+        self.assertEqual(parent.approach, refined.approach)
+        self.assertEqual(parent.candidate_id, refined.parent_candidate_id)
+        self.assertEqual(parent.version + 1, refined.version)
+        self.assertEqual(1, refined.refinement_round)
+        self.assertEqual(request.request_digest, receipt.input_digest)
+        self.assertEqual(sha256_digest(mutable), receipt.output_digest)
+        self.assertEqual(
+            sha256_digest(strict_json_output_schema(request.output_schema)),
+            receipt.output_schema_digest,
+        )
+        self.assertEqual("succeeded", receipt.status)
 
     def test_recursive_goal_test_finding_is_preserved_without_task_name_rules(self) -> None:
         """일반 검증 Task의 이름은 허용하고 직접 evidence가 있는 의미 충돌 finding은 유지한다."""

@@ -61,6 +61,7 @@ from .evaluation import (
 from .evaluation_budget import (
     EvaluationPolicies,
     budgeted_role_runner,
+    evaluation_cell_provider_calls,
     policy_contract_fragment,
     verify_service_budget_policy,
     write_immutable_run_metadata,
@@ -86,7 +87,14 @@ from .qualification import (
     project_root,
     source_manifest_digest,
 )
-from .runtime import CodexAppServerRuntime, CodexRuntimePort, EngineDispatcher, FakeCodexRuntime
+from .runtime import (
+    CodexAppServerRuntime,
+    CodexProjectBinding,
+    CodexRuntimePort,
+    EngineDispatcher,
+    FakeCodexRuntime,
+    RuntimeOperationReceipt,
+)
 from .role_execution import use_role_timeout_policy
 from .service import EngineService, EngineServiceError
 
@@ -98,26 +106,138 @@ E2E_SCENARIOS = (
     "unknown-receipt-no-duplicate",
 )
 
+_RUNTIME_EVENT_SCHEMA = "flowmarshal.project-e2e.runtime-event.v3"
+
 
 class RecordedRuntime:
     """실제 adapter 호출과 receipt를 보존하는 평가용 위임 wrapper."""
 
     def __init__(self, runtime: CodexRuntimePort, *, journal: Path) -> None:
         self.runtime = runtime
+        self.requires_budget_policy = getattr(runtime, "requires_budget_policy", False)
         self.journal = journal
         self.events: list[dict[str, Any]] = []
+        self.inventory: ModelInventory | None = None
         if journal.is_file():
             self.events = json.loads(journal.read_text(encoding="utf-8"))
+            for event in self.events:
+                if event.get("schema") != _RUNTIME_EVENT_SCHEMA:
+                    raise QualificationRunError("E2E runtime journal schema가 현재 계약과 다릅니다.")
+                digest = event.get("event_digest")
+                body = {key: value for key, value in event.items() if key != "event_digest"}
+                if (
+                    digest != sha256_digest(body)
+                    or event.get("request_binding_digest")
+                    != sha256_digest(event.get("request_binding"))
+                    or event.get("receipt_digest") != sha256_digest(event.get("receipt"))
+                ):
+                    raise QualificationRunError("E2E runtime journal event digest가 일치하지 않습니다.")
+                if event.get("operation") == "list_models":
+                    self.inventory = ModelInventory.model_validate(event.get("receipt"))
         self.create_calls = sum(item["operation"] == "create_thread" for item in self.events)
         self.turn_calls = sum(item["operation"] == "start_turn" for item in self.events)
         self.read_calls = sum(item["operation"] == "read" for item in self.events)
         self.resume_calls = sum(item["operation"] == "resume" for item in self.events)
+        if callable(getattr(runtime, "register_completion_observer", None)):
+            # EngineDispatcher는 getattr로 capability를 탐지하므로 실제 runtime이
+            # 지원할 때만 public attribute를 노출한다.
+            self.register_completion_observer = self._register_completion_observer
+
+    def _request_binding(self, operation: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        binding: dict[str, Any] = {
+            "operation": operation,
+            "cwd": (
+                str(Path(arguments["cwd"]).resolve()) if arguments.get("cwd") is not None else None
+            ),
+            "thread_id": arguments.get("thread_id"),
+            "turn_id": arguments.get("turn_id"),
+            "model": arguments.get("model"),
+            "effort": arguments.get("effort"),
+            "ephemeral": arguments.get("ephemeral"),
+            "inventory_digest": None if self.inventory is None else self.inventory.inventory_digest,
+        }
+        if arguments.get("prompt") is not None:
+            binding["prompt_digest"] = sha256_digest(arguments["prompt"])
+        if arguments.get("developer_instructions") is not None:
+            binding["developer_instructions_digest"] = sha256_digest(
+                arguments["developer_instructions"]
+            )
+        if arguments.get("output_schema") is not None:
+            binding["output_schema_digest"] = sha256_digest(arguments["output_schema"])
+        return binding
+
+    def _append_result_event(
+        self,
+        operation: str,
+        request_binding: dict[str, Any],
+        result: Any,
+        *,
+        deduplicate: bool = False,
+    ) -> None:
+        if isinstance(result, ModelInventory):
+            self.inventory = result
+        receipt = result.model_dump(mode="json")
+        payload = receipt.get("payload") if isinstance(receipt, dict) else None
+        # create_thread의 payload만 adapter가 보존한 thread/start 원시 응답이다.
+        # start_turn의 model/effort는 SDK 요청 인자를 receipt에 다시 쓴 값이므로
+        # provider 관측으로 승격하지 않는다.
+        provider_raw = operation == "create_thread" and isinstance(payload, dict)
+        observed_model = payload.get("model") if provider_raw else None
+        observed_effort = payload.get("effort") if provider_raw else None
+        observation_source = "provider_raw_response" if provider_raw else None
+        if operation == "start_turn":
+            observation_reason = "START_TURN_RECEIPT_MODEL_EFFORT_ARE_REQUEST_ECHO"
+        elif observed_model is None or observed_effort is None:
+            observation_reason = "PROVIDER_RAW_RESPONSE_MODEL_OR_EFFORT_NOT_REPORTED"
+        else:
+            observation_reason = None
+        event: dict[str, Any] = {
+            "schema": _RUNTIME_EVENT_SCHEMA,
+            "operation": operation,
+            "request_binding": request_binding,
+            "request_binding_digest": sha256_digest(request_binding),
+            "receipt": receipt,
+            "receipt_digest": sha256_digest(receipt),
+            "observed_model": observed_model,
+            "observed_effort": observed_effort,
+            "model_observation_source": observation_source,
+            "model_observation_reason": observation_reason,
+        }
+        event["event_digest"] = sha256_digest(event)
+        if deduplicate and any(
+            item.get("event_digest") == event["event_digest"] for item in self.events
+        ):
+            return
+        self.events.append(event)
+        _write_json(self.journal, self.events)
 
     def _call(self, operation: str, **arguments: Any) -> Any:
+        request_binding = self._request_binding(operation, arguments)
         result = getattr(self.runtime, operation)(**arguments)
-        self.events.append({"operation": operation, "receipt": result.model_dump(mode="json")})
-        _write_json(self.journal, self.events)
+        self._append_result_event(operation, request_binding, result)
         return result
+
+    def _register_completion_observer(
+        self, *, thread_id: str, turn_id: str, observer: Any
+    ) -> None:
+        """SDK 완료 usage를 journal에 먼저 보존한 뒤 Core observer에 전달한다."""
+
+        register = getattr(self.runtime, "register_completion_observer")
+
+        def record_and_forward(observation: Any) -> None:
+            request_binding = self._request_binding(
+                "completion_observation",
+                {"thread_id": thread_id, "turn_id": turn_id},
+            )
+            self._append_result_event(
+                "completion_observation",
+                request_binding,
+                observation,
+                deduplicate=True,
+            )
+            observer(observation)
+
+        register(thread_id=thread_id, turn_id=turn_id, observer=record_and_forward)
 
     def verify_execution_policy(self, cwd: Path | str) -> Any:
         return self._call("verify_execution_policy", cwd=cwd)
@@ -153,6 +273,173 @@ class RecordedRuntime:
 
     def close(self) -> None:
         self.runtime.close()
+
+
+def _checkpoint_model_observation(events: list[dict[str, Any]]) -> dict[str, Any]:
+    turns = [item for item in events if item.get("operation") == "start_turn"]
+    observed = [
+        (item.get("observed_model"), item.get("observed_effort")) for item in turns
+        if item.get("model_observation_source") == "provider_raw_response"
+        and isinstance(item.get("observed_model"), str)
+        and bool(item.get("observed_model"))
+        and isinstance(item.get("observed_effort"), str)
+        and bool(item.get("observed_effort"))
+    ]
+    pairs = tuple(sorted(set(observed)))
+    missing = len(turns) - len(observed)
+    if not turns:
+        model = effort = None
+        reason = "NO_MODEL_TURN_OBSERVED"
+    elif missing:
+        model = effort = None
+        reason = "PROVIDER_RAW_MODEL_EFFORT_NOT_OBSERVED"
+    elif len(pairs) == 1:
+        model, effort = pairs[0]
+        reason = None
+    else:
+        model = effort = None
+        reason = "MULTIPLE_OBSERVED_MODEL_EFFORT_PAIRS"
+    return {
+        "actual_model": model,
+        "actual_effort": effort,
+        "observation_reason": reason,
+        "turn_count": len(turns),
+        "observed_pairs": [
+            {"model": model_value, "effort": effort_value}
+            for model_value, effort_value in pairs
+        ],
+        "requested_pairs": [
+            {"model": model_value, "effort": effort_value}
+            for model_value, effort_value in sorted({
+                (
+                    item.get("request_binding", {}).get("model"),
+                    item.get("request_binding", {}).get("effort"),
+                )
+                for item in turns
+                if isinstance(item.get("request_binding", {}).get("model"), str)
+                and isinstance(item.get("request_binding", {}).get("effort"), str)
+            })
+        ],
+        "provider_observation_reasons": sorted({
+            item["model_observation_reason"] for item in turns
+            if isinstance(item.get("model_observation_reason"), str)
+        }),
+        "request_binding_digests": [
+            item.get("request_binding_digest") for item in turns
+        ],
+        "inventory_digests": sorted({
+            item.get("request_binding", {}).get("inventory_digest") for item in turns
+            if item.get("request_binding", {}).get("inventory_digest") is not None
+        }),
+    }
+
+
+def _e2e_failure_disposition(
+    scenario: str | None,
+    error: Exception,
+    *,
+    provider_calls: tuple[tuple[str, str], ...] | None,
+) -> tuple[EvaluationRunStatus, bool, str]:
+    """provider 효과 전 중단이 증명된 normal cell만 PAUSED로 분류한다."""
+
+    rate_limited = any(
+        marker in str(error).casefold()
+        for marker in ("rate limit", "rate_limit", "usage limit", "usage_limit", "quota")
+    )
+    provider_effect_absent = provider_calls is not None and all(
+        status == "released" for _call_id, status in provider_calls
+    )
+    resumable = (
+        rate_limited
+        and scenario == "normal-completion"
+        and provider_effect_absent
+    )
+    if resumable:
+        calls = ",".join(
+            f"{call_id}={status}" for call_id, status in provider_calls or ()
+        )
+        return (
+            EvaluationRunStatus.PAUSED_RATE_LIMIT,
+            True,
+            f"E2E_RATE_LIMIT_BEFORE_PROVIDER_EFFECT: provider_calls=[{calls}]; provider "
+            "효과가 시작되지 않았거나 효과 전 예약이 해제된 것이 원장에서 확인됐습니다. "
+            "같은 run root에서 resume하세요.",
+        )
+    calls = (
+        "unavailable"
+        if provider_calls is None
+        else ",".join(f"{call_id}={status}" for call_id, status in provider_calls)
+    )
+    return (
+        EvaluationRunStatus.FAILED,
+        False,
+        "E2E_PROVIDER_EFFECT_RECONCILIATION_REQUIRED: "
+        f"provider_calls=[{calls}]; 원장과 작업 artifact를 보존하고 기존 runtime intent, "
+        "provider terminal과 예산 예약을 먼저 대조하세요. 미확인 효과가 있으면 새 "
+        "provider 호출이나 새 Goal 예산으로 우회하지 않습니다.",
+    )
+
+
+def _guard_e2e_partial_resume(destination: Path) -> None:
+    """완료 checkpoint 없는 provider 효과를 실제 runtime 진입 전에 차단한다."""
+
+    contract_path = destination / "evaluation-contract.json"
+    state_path = destination / "run-state.json"
+    if not contract_path.is_file() and not state_path.is_file():
+        return
+    if not contract_path.is_file() or not state_path.is_file():
+        raise QualificationRunError("E2E_RESUME_BINDING_INCOMPLETE")
+    contract = EvaluationContract.model_validate_json(
+        contract_path.read_text(encoding="utf-8")
+    )
+    if contract.scope is not EvaluationScope.PROJECT_E2E:
+        return
+    store = ImmutableCheckpointStore(destination, contract)
+    if not contract.fixture_digests:
+        raise QualificationRunError("E2E_RESUME_FIXTURE_BINDING_MISSING")
+    if store.completed(contract.fixture_digests[0], 0) is not None:
+        return
+    cell_root = destination / "work" / "normal-completion"
+    if not cell_root.exists():
+        return
+    try:
+        provider_calls = evaluation_cell_provider_calls(cell_root / "state")
+    except (OSError, ValueError) as error:
+        reason = (
+            "E2E_PROVIDER_EFFECT_RECONCILIATION_REQUIRED: provider_calls=[unavailable]; "
+            f"기존 cell 원장을 읽을 수 없습니다: {error}"
+        )
+        store.set_state(EvaluationRunStatus.FAILED, updated_at=utc_now(), reason=reason)
+        raise QualificationRunError(reason) from error
+    unresolved = tuple(
+        (call_id, status)
+        for call_id, status in provider_calls
+        if status != "released"
+    )
+    if not unresolved:
+        return
+    calls = ",".join(f"{call_id}={status}" for call_id, status in provider_calls)
+    reason = (
+        "E2E_PROVIDER_EFFECT_RECONCILIATION_REQUIRED: "
+        f"provider_calls=[{calls}]; 완료된 E2E cell checkpoint 없이 provider 호출이 "
+        "남았습니다. 기존 runtime intent, provider terminal과 예산 예약을 대조하기 "
+        "전에는 새 provider 호출이나 새 Goal 예산으로 우회하지 않습니다."
+    )
+    store.set_state(EvaluationRunStatus.FAILED, updated_at=utc_now(), reason=reason)
+    raise QualificationRunError(reason)
+
+
+def _preserve_inventory_observation(
+    path: Path, roles: EngineRoleConfiguration, inventory: ModelInventory
+) -> None:
+    """같은 digest 이름의 기존 관측도 전체 원문과 정확히 같아야 재사용한다."""
+
+    expected = roles.operational_binding(inventory).model_dump(mode="json")
+    if path.is_file():
+        if json.loads(path.read_text(encoding="utf-8")) != expected:
+            raise QualificationRunError("E2E inventory observation 내용이 현재 binding과 다릅니다.")
+        return
+    _write_json(path, expected)
 
 
 @dataclass
@@ -202,7 +489,8 @@ def _restore_prepared_state(
     state_path = cell_root / "cell-state.json"
     if not state_path.is_file():
         raise QualificationRunError(
-            f"미완료 E2E cell에 재개 상태가 없습니다. 새 run root가 필요합니다: {cell_root}"
+            "미완료 E2E cell에 재개 상태가 없습니다. 원장과 artifact를 보존하고 기존 "
+            f"runtime intent, provider terminal과 예산 예약을 먼저 대조하세요: {cell_root}"
         )
     document = json.loads(state_path.read_text(encoding="utf-8"))
     if not isinstance(document, dict):
@@ -271,6 +559,8 @@ def _prepare(
     goal_validation: IntegrationValidationContract | None = None,
     semantic_task_validation: bool = False,
     evaluation_policies: EvaluationPolicies | None = None,
+    evaluation_contract_digest: str | None = None,
+    fixture_digest: str | None = None,
 ) -> PreparedE2E:
     ledger = SQLiteEngineLedger(
         state_root / "flowmarshal-engine.sqlite3",
@@ -476,10 +766,34 @@ def _prepare(
             ),
         )
     )
+    _write_json(
+        state_root.parent / "generated-plan.json",
+        {
+            "schema": "flowmarshal.project-e2e.generated-plan.v1",
+            "evaluation_contract_digest": evaluation_contract_digest,
+            "fixture_digest": fixture_digest,
+            "plan": plan.model_dump(mode="json"),
+            "plan_revision_id": plan.plan_revision_id,
+            "activation_digest": plan.activation_digest,
+        },
+    )
     service.activate_plan(
         plan_revision_id=plan.plan_revision_id,
         activation_digest=plan.activation_digest,
         source="qualification",
+    )
+    _write_json(
+        state_root.parent / "plan-activation-receipt.json",
+        {
+            "schema": "flowmarshal.project-e2e.plan-activation-receipt.v1",
+            "evaluation_contract_digest": evaluation_contract_digest,
+            "fixture_digest": fixture_digest,
+            "plan_revision_id": plan.plan_revision_id,
+            "activation_digest": plan.activation_digest,
+            "activation_source": "qualification",
+            "driver": "flowmarshal-engine-eval project-e2e",
+            "workspace": str(workspace.resolve()),
+        },
     )
     app_entry = next(item for item in project_map.entries if item.path == "app.py")
     proposal = ExecutionSpecProposal(
@@ -755,17 +1069,155 @@ def _unknown_receipt(
     except RuntimeError:
         failed = True
     recovered = EngineDispatcher(prepared.service, runtime).run_once(prepared.project_id)
+    reconciliation: dict[str, Any] | None = None
+    if isinstance(runtime, RecordedRuntime):
+        reconciliation = _reconcile_unknown_empty_thread(prepared, runtime)
     return {
         "passed": failed
         and recovered.action is RunOnceAction.BLOCKED
         and recovered.blocker_code == "EXTERNAL_EFFECT_UNKNOWN"
         and runtime.create_calls == 1
-        and runtime.turn_calls == 0,
+        and runtime.turn_calls == 0
+        and (reconciliation is None or reconciliation["passed"]),
         "source_fixture_digest": source_digest,
         "thread_create_count": runtime.create_calls,
         "turn_start_count": runtime.turn_calls,
         "recovery_action": recovered.action.value,
         "blocker_code": recovered.blocker_code,
+        "empty_thread_reconciliation": reconciliation,
+    }
+
+
+def _reconcile_unknown_empty_thread(
+    prepared: PreparedE2E,
+    runtime: RecordedRuntime,
+) -> dict[str, Any]:
+    """생성 receipt 유실을 기존 thread의 turn 0 관측으로만 해소한다."""
+
+    with prepared.service.ledger.read() as connection:
+        rows = connection.execute(
+            "SELECT i.*, a.project_id FROM runtime_intents i "
+            "JOIN attempts a ON a.id=i.attempt_id "
+            "WHERE a.project_id=? AND i.kind='create_thread' AND i.status='unknown'",
+            (prepared.project_id,),
+        ).fetchall()
+    if len(rows) != 1:
+        raise QualificationRunError(
+            f"E2E_UNKNOWN_INTENT_CARDINALITY: expected=1 actual={len(rows)}"
+        )
+    intent = rows[0]
+    request = json.loads(intent["request_json"])
+    expected_inventory_digest = request.get("model_observation", {}).get(
+        "inventory_digest"
+    )
+    matching = [
+        item for item in runtime.events
+        if item.get("operation") == "create_thread"
+        and item.get("request_binding", {}).get("model") == request.get("model")
+        and item.get("request_binding", {}).get("cwd") == request.get("cwd")
+        and item.get("request_binding", {}).get("inventory_digest")
+        == expected_inventory_digest
+    ]
+    if len(matching) != 1:
+        raise QualificationRunError(
+            f"E2E_UNKNOWN_CREATE_RECEIPT_CARDINALITY: expected=1 actual={len(matching)}"
+        )
+    event = matching[0]
+    receipt = RuntimeOperationReceipt.model_validate(event["receipt"])
+    if receipt.binding is None or receipt.binding.turn_id is not None:
+        raise QualificationRunError("E2E_UNKNOWN_CREATE_RECEIPT_BINDING_MISMATCH")
+    thread = receipt.payload.get("thread")
+    if not isinstance(thread, dict) or thread.get("id") != receipt.binding.thread_id or thread.get("turns") != []:
+        raise QualificationRunError("E2E_UNKNOWN_CREATE_RECEIPT_NOT_EMPTY_THREAD")
+    restored_receipt = prepared.service.record_runtime_receipt(
+        intent_id=intent["id"],
+        provider_operation_id=receipt.operation_id,
+        response=receipt.payload,
+        binding=receipt.binding,
+        allow_reconcile_unknown=True,
+    )
+    observation = runtime.read_stored(thread_id=receipt.binding.thread_id)
+    if observation.thread_id != receipt.binding.thread_id or observation.turn_id is not None or observation.active:
+        raise QualificationRunError("E2E_UNKNOWN_THREAD_NOT_EMPTY_ON_READ")
+    if any(item.get("operation") in {"start_turn", "resume"} for item in runtime.events):
+        raise QualificationRunError("E2E_UNKNOWN_THREAD_TURN_EFFECT_DETECTED")
+    with prepared.service.ledger.read() as connection:
+        reserved_calls = connection.execute(
+            "SELECT id FROM provider_calls WHERE project_id=? AND attempt_id=?",
+            (prepared.project_id, intent["attempt_id"]),
+        ).fetchall()
+    if len(reserved_calls) != 1:
+        raise QualificationRunError("E2E_UNKNOWN_PROVIDER_RESERVATION_CARDINALITY")
+    BudgetManager(prepared.service).release_empty_created_thread(
+        reserved_calls[0]["id"],
+        receipt=restored_receipt,
+        observation=observation,
+    )
+    with prepared.service.ledger.read() as connection:
+        provider_calls = connection.execute(
+            "SELECT id, status, actual_tokens, receipt_json, usage_id FROM provider_calls "
+            "WHERE project_id=? AND attempt_id=?",
+            (prepared.project_id, intent["attempt_id"]),
+        ).fetchall()
+        usage_count = connection.execute(
+            "SELECT COUNT(*) FROM budget_usage WHERE project_id=?",
+            (prepared.project_id,),
+        ).fetchone()[0]
+        intent_status = connection.execute(
+            "SELECT status FROM runtime_intents WHERE id=?", (intent["id"],)
+        ).fetchone()[0]
+        attempt_status = connection.execute(
+            "SELECT status FROM attempts WHERE id=?", (intent["attempt_id"],)
+        ).fetchone()[0]
+        release_history_count = connection.execute(
+            "SELECT COUNT(*) FROM history_events WHERE project_id=? "
+            "AND event_type='budget.empty_thread_reservation_released' "
+            "AND entity_type='provider_call' AND entity_id=?",
+            (prepared.project_id, reserved_calls[0]["id"]),
+        ).fetchone()[0]
+    if len(provider_calls) != 1:
+        raise QualificationRunError("E2E_UNKNOWN_PROVIDER_RESERVATION_CARDINALITY")
+    provider_call = provider_calls[0]
+    reservation_released = (
+        provider_call["status"] == "released"
+        and provider_call["actual_tokens"] is None
+        and provider_call["receipt_json"] is None
+        and provider_call["usage_id"] is None
+    )
+    passed = all(
+        (
+            intent_status == "received",
+            attempt_status == "failed",
+            usage_count == 0,
+            reservation_released,
+            release_history_count == 1,
+            runtime.create_calls == 1,
+            runtime.turn_calls == 0,
+        )
+    )
+    return {
+        "passed": passed,
+        "thread_id": receipt.binding.thread_id,
+        "thread_read_without_resume": True,
+        "observed_turn_count": 0,
+        "model_turn_effect": False,
+        "model_usage": None,
+        "model_usage_reason": "NO_MODEL_TURN_OBSERVED",
+        "runtime_intent_status": intent_status,
+        "attempt_status": attempt_status,
+        "provider_reservation_status": provider_call["status"],
+        "provider_reservation_released": reservation_released,
+        "provider_reservation_unresolved": False,
+        "provider_actual_tokens": provider_call["actual_tokens"],
+        "provider_receipt": (
+            None
+            if provider_call["receipt_json"] is None
+            else json.loads(provider_call["receipt_json"])
+        ),
+        "provider_usage_id": provider_call["usage_id"],
+        "reservation_release_history_count": release_history_count,
+        "budget_usage_count": usage_count,
+        "next_action": "복원된 create receipt와 turn 0 관측으로 예약을 해제했습니다.",
     }
 
 
@@ -777,11 +1229,12 @@ def _live_restart_resume(
     contract: EvaluationContract,
     fixture_digest: str,
     codex_bin: Path | str | None,
+    project_binding: CodexProjectBinding | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """실제 App Server 연결과 Core 인스턴스를 닫은 뒤 같은 저장 turn을 재관측한다."""
 
     journal = cell_root / "runtime-receipts.json"
-    with CodexAppServerRuntime(codex_bin=codex_bin) as first_runtime:
+    with CodexAppServerRuntime(codex_bin=codex_bin, project_binding=project_binding) as first_runtime:
         recorded = RecordedRuntime(first_runtime, journal=journal)
         dispatcher = EngineDispatcher(prepared.service, recorded)
         dispatcher.run_once(prepared.project_id, proposal=prepared.proposal)
@@ -826,7 +1279,7 @@ def _live_restart_resume(
         evaluation_contract_digest=contract.contract_digest,
         fixture_digest=fixture_digest,
     )
-    with CodexAppServerRuntime(codex_bin=codex_bin) as second_runtime:
+    with CodexAppServerRuntime(codex_bin=codex_bin, project_binding=project_binding) as second_runtime:
         recorded = RecordedRuntime(second_runtime, journal=journal)
         restart_index = len(recorded.events)
         resumed = EngineDispatcher(restored.service, recorded).run_once(restored.project_id)
@@ -922,6 +1375,8 @@ def run_project_e2e(
     if evaluation_policies is None:
         raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
     base = (root or project_root()).resolve(strict=True)
+    if run_root is not None:
+        _guard_e2e_partial_resume(Path(run_root).resolve())
     preflight_failures = _preflight(base)
     if preflight_failures:
         raise QualificationRunError("; ".join(preflight_failures))
@@ -934,7 +1389,9 @@ def run_project_e2e(
             if path.is_file() and "__pycache__" not in path.parts
         }
     )
-    with CodexAppServerRuntime(codex_bin=codex_bin) as real_runtime:
+    with CodexAppServerRuntime(
+        codex_bin=codex_bin, project_binding=evaluation_policies.codex_project
+    ) as real_runtime:
         inventory = real_runtime.list_models()
         roles.validate_inventory(inventory)
         contract = _contract(base, inventory, roles, source_digest, evaluation_policies)
@@ -943,6 +1400,10 @@ def run_project_e2e(
         ).resolve()
         store = ImmutableCheckpointStore(destination, contract)
         store.initialize()
+        audit_path = destination / (
+            "inventory-observation-" + inventory.inventory_digest[7:] + ".json"
+        )
+        _preserve_inventory_observation(audit_path, roles, inventory)
         prior_state = store.state().status
         if prior_state is EvaluationRunStatus.PAUSED_RATE_LIMIT:
             store.set_state(EvaluationRunStatus.RUNNING, updated_at=utc_now())
@@ -957,8 +1418,10 @@ def run_project_e2e(
             },
             evaluation_policies,
         )
+        active_scenario: str | None = None
         try:
             for index, scenario in enumerate(E2E_SCENARIOS):
+                active_scenario = scenario
                 digest = contract.fixture_digests[index]
                 if store.completed(digest, 0) is not None:
                     continue
@@ -970,7 +1433,8 @@ def run_project_e2e(
                     }:
                         raise QualificationRunError(
                             "재개할 수 없는 미완료 E2E 작업 디렉터리가 남았습니다. "
-                            f"새 run root를 사용하세요: {cell_root}"
+                            "기존 runtime intent, provider terminal과 예산 예약을 먼저 "
+                            f"대조하세요: {cell_root}"
                         )
                     prepared = _restore_prepared_state(
                         cell_root,
@@ -992,6 +1456,8 @@ def run_project_e2e(
                         roles=roles,
                         semantic_task_validation=scenario == "normal-completion",
                         evaluation_policies=evaluation_policies,
+                        evaluation_contract_digest=contract.contract_digest,
+                        fixture_digest=digest,
                     )
                     _write_prepared_state(
                         cell_root,
@@ -1011,6 +1477,7 @@ def run_project_e2e(
                             contract=contract,
                             fixture_digest=digest,
                             codex_bin=codex_bin,
+                            project_binding=evaluation_policies.codex_project,
                         )
                 else:
                     with use_role_timeout_policy(evaluation_policies.role_timeouts):
@@ -1021,14 +1488,27 @@ def run_project_e2e(
                         else:
                             cell = _unknown_receipt(prepared, recorded, source_digest)
                     events = recorded.events
+                model_observation = _checkpoint_model_observation(events)
                 receipt = {
                     "runtime": "CodexAppServerRuntime",
-                    "actual_model": roles.executor.model,
-                    "actual_effort": roles.executor.effort,
+                    "actual_model": model_observation["actual_model"],
+                    "actual_effort": model_observation["actual_effort"],
+                    "model_observation": model_observation,
+                    "configured_executor_model": roles.executor.model,
+                    "configured_executor_effort": roles.executor.effort,
                     "events": events,
                     "events_digest": sha256_digest(events),
                 }
-                cell.update({"scenario": scenario, "order_seed": 0})
+                generated_plan = cell_root / "generated-plan.json"
+                activation_receipt = cell_root / "plan-activation-receipt.json"
+                cell.update({
+                    "scenario": scenario,
+                    "order_seed": 0,
+                    "qualification_plan_activation": {
+                        "generated_plan_digest": sha256_bytes(generated_plan.read_bytes()),
+                        "activation_receipt_digest": sha256_bytes(activation_receipt.read_bytes()),
+                    },
+                })
                 store.put(
                     EvaluationCellCheckpoint(
                         model_lock_format="flowmarshal-model-lock-v2",
@@ -1040,15 +1520,36 @@ def run_project_e2e(
                     )
                 )
         except Exception as error:
-            status = (
-                EvaluationRunStatus.PAUSED_RATE_LIMIT
-                if any(
-                    marker in str(error).casefold()
-                    for marker in ("rate limit", "rate_limit", "usage limit", "usage_limit", "quota")
-                )
-                else EvaluationRunStatus.FAILED
+            provider_calls: tuple[tuple[str, str], ...] | None = None
+            if active_scenario is not None:
+                try:
+                    provider_calls = evaluation_cell_provider_calls(
+                        destination / "work" / active_scenario / "state"
+                    )
+                except (OSError, ValueError):
+                    # 원장을 신뢰성 있게 읽지 못한 경우 효과 전 실패로 추정하지 않는다.
+                    provider_calls = None
+            status, resumable, next_action = _e2e_failure_disposition(
+                active_scenario,
+                error,
+                provider_calls=provider_calls,
             )
-            store.set_state(status, updated_at=utc_now(), reason=str(error))
+            _write_json(
+                destination / "last-error.json",
+                {
+                    "scenario": active_scenario,
+                    "error": type(error).__name__,
+                    "message": str(error),
+                    "run_status": status.value,
+                    "resumable": resumable,
+                    "next_action": next_action,
+                },
+            )
+            store.set_state(
+                status,
+                updated_at=utc_now(),
+                reason=f"{error}; next_action={next_action}",
+            )
             raise
         cells = [
             store.completed(digest, 0).raw_structured_assessment  # type: ignore[union-attr]

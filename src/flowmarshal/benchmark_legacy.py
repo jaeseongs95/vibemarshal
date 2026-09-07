@@ -130,7 +130,12 @@ def run_cell(document: dict[str, Any]) -> dict[str, Any]:
         or cell_binding.get("evaluation_policy_digest") != policies.policy_digest
         or cell_binding.get("neutral_input_digest") != document["neutral_input_digest"]
         or cell_binding.get("implementation") != "r31_baseline"
-        or cell_binding.get("ephemeral_threads") is not True
+        or cell_binding.get("ephemeral_threads") is not (policies.codex_project is None)
+        or cell_binding.get("codex_project") != (
+            None
+            if policies.codex_project is None
+            else policies.codex_project.model_dump(mode="json", exclude_none=True)
+        )
         or cell_binding.get("max_schema_recovery_attempts") != 0
         or cell_binding.get("role_configuration_digest") != sha256_digest(roles)
         or cell_binding.get("expected_role_bindings") != expected_role_bindings

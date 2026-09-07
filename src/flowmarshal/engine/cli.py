@@ -75,7 +75,8 @@ from .plan_inspection_provider import (
 )
 from .planning import PlanningError, PlanningSearchOutcome
 from .planning import SkeletonFirstPlanner
-from .runtime import CodexAppServerRuntime, EngineDispatcher, RuntimePolicyError
+from .planning_recovery import PlanningRecoveryPolicy
+from .runtime import CodexAppServerRuntime, CodexProjectBinding, EngineDispatcher, RuntimePolicyError
 from .validation_execution import GoalValidationRetryRequest
 from .roles import CodexStructuredRoleRunner, RoleCallReceipt, StructuredRoleError
 from .reporting import render_final
@@ -332,7 +333,7 @@ def _cmd_goal_create(arguments: argparse.Namespace) -> None:
                 "--live에는 request와 normalizer/reviewer model·effort가 모두 필요합니다."
             )
         profile_revision = _active_profile(service, arguments.project_id)
-        with CodexAppServerRuntime(codex_bin=arguments.codex_bin) as runtime:
+        with _runtime(arguments) as runtime:
             inventory = runtime.list_models()
             if role_config is not None:
                 role_config.validate_inventory(inventory)
@@ -419,7 +420,7 @@ def _cmd_goal_revise(arguments: argparse.Namespace) -> None:
                 "--live에는 request와 normalizer/reviewer model·effort가 모두 필요합니다."
             )
         profile_revision = _active_profile(service, arguments.project_id)
-        with CodexAppServerRuntime(codex_bin=arguments.codex_bin) as runtime:
+        with _runtime(arguments) as runtime:
             inventory = runtime.list_models()
             if role_config is not None:
                 role_config.validate_inventory(inventory)
@@ -572,7 +573,7 @@ def _cmd_plan_search(arguments: argparse.Namespace) -> None:
                 "--live에는 generator/reviewer/executor/validator model·effort가 모두 필요합니다."
             )
         root = Path(service.status(arguments.project_id)["project"]["root"])
-        with CodexAppServerRuntime(codex_bin=arguments.codex_bin) as runtime:
+        with _runtime(arguments) as runtime:
             inventory = runtime.list_models()
             if role_config is not None:
                 role_config.validate_inventory(inventory)
@@ -641,6 +642,8 @@ def _cmd_plan_search(arguments: argparse.Namespace) -> None:
                 state=state,
                 project_map=project_map,
                 candidate_count=arguments.candidate_count,
+                recovery_policy=(PlanningRecoveryPolicy()
+                                 if arguments.inspection_contract == PLAN_INSPECTION_PROVIDER_V2 else None),
             )
         for evaluation in outcome.skeleton_evaluations:
             service.record_skeleton_evaluation(evaluation)
@@ -742,6 +745,12 @@ def _cmd_task_materialize(arguments: argparse.Namespace) -> None:
 
 
 def _runtime(arguments: argparse.Namespace) -> CodexAppServerRuntime:
+    binding_path = getattr(arguments, "codex_project_binding", None)
+    if binding_path is not None:
+        return CodexAppServerRuntime(
+            codex_bin=arguments.codex_bin,
+            project_binding=CodexProjectBinding.model_validate(_json(binding_path)),
+        )
     return CodexAppServerRuntime(codex_bin=arguments.codex_bin)
 
 
@@ -954,13 +963,18 @@ def _cmd_budget_set(arguments: argparse.Namespace) -> None:
 
 def _cmd_budget_show(arguments: argparse.Namespace) -> None:
     service = _service(arguments)
-    status = BudgetManager(service).status(arguments.project_id, goal_id=arguments.goal_id)
     try:
-        usage = EngineApplication(service).usage_summary(arguments.project_id, goal_id=status.goal_id)
+        usage = EngineApplication(service).usage_summary(
+            arguments.project_id, goal_id=arguments.goal_id
+        )
     except EngineApplicationError as error:
         if str(error) not in {"GOAL_NOT_FOUND", "ACTIVE_GOAL_NOT_FOUND"}:
             raise
         usage = None
+    status = BudgetManager(service).status(
+        arguments.project_id,
+        goal_id=arguments.goal_id if usage is None else usage.goal_id,
+    )
     _emit({"budget": status.model_dump(mode="json"), "usage": None if usage is None else usage.model_dump(mode="json")})
 
 
@@ -1011,6 +1025,7 @@ def _add_goal_arguments(parser: argparse.ArgumentParser, *, revise: bool = False
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="flowmarshal-engine", description="FlowMarshal 새 authority engine")
     parser.add_argument("--role-timeout-policy", help="역할별 timeout 운영 설정 JSON")
+    parser.add_argument("--codex-project-binding", help="새 역할·Worker thread의 App Server 프로젝트 결속 JSON")
     parser.add_argument("--db", default=str(Path.cwd() / ".flowmarshal-engine" / DEFAULT_DB_NAME))
     parser.add_argument("--artifacts", default=str(Path.cwd() / ".flowmarshal-engine" / DEFAULT_ARTIFACT_DIRECTORY))
     commands = parser.add_subparsers(dest="command", required=True)

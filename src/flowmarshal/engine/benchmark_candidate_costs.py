@@ -7,6 +7,7 @@ from pydantic import Field, model_validator
 
 from ..canonical import sha256_digest
 from .domain import EngineModel, PlanContractRevision
+from .planning import PlanningSearchOutcome
 from .roles import RoleCallReceipt
 
 
@@ -85,19 +86,54 @@ class CandidateOutputRecorder:
 
 def candidate_output_costs(raw: dict[str, Any]) -> tuple[int, int]:
     """배분 가능한 expander/refiner 출력만 합산하며 순서로 호출 귀속을 추정하지 않는다."""
+    raw_receipts = raw.get("receipts")
+    if not isinstance(raw_receipts, list):
+        raise ValueError("후보 비용의 역할 receipt 목록이 없습니다.")
+    all_receipts: dict[str, RoleCallReceipt] = {}
     receipts: dict[str, RoleCallReceipt] = {}
-    for value in raw["receipts"]:
-        if value["role"] not in {"plan_expander", "plan_refiner"}:
-            continue
-        if type(value.get("output_tokens")) is not int:
-            raise ValueError("상세 후보 출력 token의 실제 관측이 없습니다.")
+    for value in raw_receipts:
         receipt = RoleCallReceipt.model_validate(value)
-        if receipt.call_id in receipts:
-            raise ValueError("상세 후보 비용에 중복 호출 receipt가 있습니다.")
+        if receipt.call_id in all_receipts:
+            raise ValueError("후보 비용에 중복 호출 receipt가 있습니다.")
+        all_receipts[receipt.call_id] = receipt
+        if receipt.role not in {"plan_expander", "plan_refiner"}:
+            continue
+        if type(receipt.output_tokens) is not int:
+            raise ValueError("상세 후보 출력 token의 실제 관측이 없습니다.")
         receipts[receipt.call_id] = receipt
+
+    outcome_raw = raw.get("planning_outcome", {})
+    failure_values = outcome_raw.get("candidate_schema_failures", ()) \
+        if isinstance(outcome_raw, dict) else ()
+    failed_calls: dict[str, Any] = {}
+    if failure_values:
+        outcome = PlanningSearchOutcome.model_validate(outcome_raw)
+        for failure in outcome.candidate_schema_failures:
+            receipt = all_receipts.get(failure.receipt.call_id)
+            if receipt is None or receipt != failure.receipt:
+                raise ValueError("격리한 후보 schema 실패가 원시 receipt와 다릅니다.")
+            if failure.receipt.call_id in failed_calls:
+                raise ValueError("격리한 후보 schema 실패 호출이 중복됐습니다.")
+            failed_calls[failure.receipt.call_id] = failure
+
     bindings = tuple(CandidateOutputBinding.model_validate(value)
                      for value in raw.get("candidate_output_bindings", ()))
-    if len(bindings) != len(receipts) or {item.call_id for item in bindings} != set(receipts):
+    binding_calls = {item.call_id for item in bindings}
+    if len(binding_calls) != len(bindings):
+        raise ValueError("상세 후보 비용 binding에 중복 호출이 있습니다.")
+    successful_calls: set[str] = set()
+    for call_id, receipt in receipts.items():
+        failure = failed_calls.get(call_id)
+        if receipt.status == "succeeded":
+            if failure is not None:
+                raise ValueError("성공한 상세 후보 호출이 schema 실패로도 기록됐습니다.")
+            successful_calls.add(call_id)
+        elif receipt.status == "schema_failed":
+            if failure is None or failure.operation not in {"expand", "refine"}:
+                raise ValueError("상세 후보 schema 실패가 검색 outcome에 결속되지 않았습니다.")
+        else:
+            raise ValueError("상세 후보 비용에 완료·격리할 수 없는 역할 상태가 있습니다.")
+    if binding_calls != successful_calls:
         raise ValueError("상세 후보·수정 역할과 출력 비용 결속의 범위가 다릅니다.")
     plans = {
         PlanContractRevision.model_validate(item["plan"]).activation_digest

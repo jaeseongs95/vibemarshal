@@ -10,9 +10,9 @@ VibeMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고
 
 최신 상태의 단일 진입점은 [Engine 구현 현황](docs/engine-implementation-status.md)이다. [1.0 선행 로드맵](docs/pre-1.0-roadmap.md)에 승인된 구현 순서와 후속 기능을 구분했고, [현재 작업 인계](docs/pre-1.0-handoff.md)에 이번 변경과 다음 실행 조건을 기록한다.
 
-현재 판정은 **NO-GO**다. [실제 역할 48건](docs/role-fixture-48-qualification.md)을 모두 실행했으며 정상 요청 오차단 1건·평가 계약의 형식 불일치 1건으로 Gate가 실패했다. 실측 1,332,724 token은 48회 모두 정산됐다. v9의 호출 전 결정적 Gate 5/5·824개 테스트는 통과했다. 후속 계약 보완·역할 재검증과 Planning 18·E2E 4·성능 36이 남아 있다. 이전 동일 Goal의 두 Task·독립 Goal Test·`satisfied` 판정은 여러 source를 거친 진단·복구 근거로 별도 보존한다.
+현재 판정은 **NO-GO**다. v25의 실제 static11은 **10 PASS·1 NOT_RUN·전체 FAIL**이다. 이전 v24의 동일 10사례는 1 PASS였으며, 검사 기여 관계 규칙을 보완한 뒤 의미 오류가 개선됐다. 11번째는 실측 누계 **656,226 token**에 다음 호출 예약 100,000을 더하면 일반 사용 가능분 750,000을 넘어서 호출 전에 차단됐다. 추가 실제 모델 호출은 중단했다. 관측 범위를 과장한 검증 입력을 독립 검토 후 바로잡은 v26은 개발·동결 환경에서 **결정적 Gate 5/5·946개 테스트 PASS**이며 실제 모델 검증은 미실행이다. 최종 source의 S06·역할·Planning·E2E·성능 검증과 main 병합은 미완료다. 제품 기본 provider는 v1을 유지한다. source별 원본 실패·실측·재개 조건은 [반복 검증 기록](docs/pre-1.0-iterative-validation.md)에 보존한다. v19는 실제 역할 **48/48 PASS**, Planning **18/18 완료·15 PASS·3 FAIL**, 정상 Plan 선택 9건과 110회 호출 **4,059,253 token**의 정산·History 감사가 완료된 과거 기준선이다. 이 결과를 새 source의 선행 Gate로 재사용하지 않는다.
 
-평가 계약 불일치는 v10에서 수정했고 최종 결정적 Gate 5/5·826개 테스트를 통과했다. 수정 후 실제 역할 qualification은 재검증 전이며, v9 실패 판정·원시 응답·기존 합격선은 그대로 보존한다.
+v13은 결정적 Gate 5/5·842개 테스트를 통과한 과거 고정 source다. source별 결과·예산·감사는 [보완 후 반복 검증](docs/pre-1.0-iterative-validation.md)에 연결하며, 과거 판정·원시 응답·기존 합격선은 그대로 보존한다.
 
 새 Engine schema revision은 **3**이다. Goal별 최종 보고, 전체 역할 usage 예약·정산, 명시적 모델 재결속과 공통 조회를 보완했다. 기존 revision 2 원장을 자동 변환하지 않으며, 사용량이 미확인이면 추가 모델 호출을 중단한다. 권장 검증 예산은 설정 파일로 주입하며 제품 상한으로 하드코딩하지 않는다.
 
@@ -71,7 +71,7 @@ flowmarshal-engine report progress|final
 
 `goal create --live`와 `plan search --live`는 역할별 model/effort를 호출자가 명시해야 한다. Engine은 이를 최신 App Server model inventory와 대조하고, 지원되지 않는 값을 임의 fallback으로 숨기지 않는다.
 
-개발 qualification은 별도 CLI로 실행한다. 완료 cell만 immutable checkpoint가 되며 사용량 제한은 `PAUSED_RATE_LIMIT`으로 남겨 같은 run root에서 재개한다.
+개발 qualification은 별도 CLI로 실행한다. 완료 cell만 immutable checkpoint가 된다. 재개 가능한 사용량 제한만 `PAUSED_RATE_LIMIT`으로 표시하며, 중간 호출의 효과·예산을 복원할 수 없는 pipeline은 `FAILED`와 복구 이유를 남긴다. 기존 thread·원장을 먼저 관측하고 미확인 호출을 새 attempt·예산으로 우회하지 않는다.
 
 ```powershell
 flowmarshal-engine-eval run --scope deterministic

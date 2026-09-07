@@ -1,12 +1,14 @@
 """Engine 원장을 변경하지 않고 표시하는 typed read model."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from .domain import (
     AttemptRecord,
+    BudgetStage,
     BudgetUsageRecord,
     GoalContractRevision,
     GoalVerdict,
@@ -67,6 +69,7 @@ class DuplicateLogicalCall(EngineModel):
     logical_call_ref: str = Field(min_length=1, max_length=300)
     status: Literal["deduplicated", "conflict"]
     usage_ids: tuple[str, ...] = ()
+    provider_call_ids: tuple[str, ...] = ()
     receipt_digests: tuple[str, ...] = ()
     stages: tuple[str, ...] = ()
     roles: tuple[str, ...] = ()
@@ -89,6 +92,64 @@ class ProviderCallExpectation(EngineModel):
     role: str = Field(min_length=1, max_length=100)
     stage: str = Field(min_length=1, max_length=100)
     usage_id: str | None = Field(default=None, max_length=500)
+    incomplete_reason_code: str | None = Field(default=None, max_length=100)
+    incomplete_reason_detail: str | None = Field(default=None, max_length=1000)
+
+
+class ProviderReceiptUsage(EngineModel):
+    """Goal revision 생성 전 provider 원장 receipt의 읽기 전용 usage 투영."""
+
+    projection_source: Literal["provider_receipt"] = "provider_receipt"
+    provider_call_id: str = Field(min_length=1, max_length=500)
+    usage_id: None = None
+    project_id: str = Field(min_length=1, max_length=500)
+    goal_id: str = Field(min_length=1, max_length=500)
+    goal_contract_digest: None = None
+    stage: BudgetStage
+    logical_call_ref: str = Field(min_length=1, max_length=300)
+    role: str = Field(min_length=1, max_length=100)
+    call_status: str = Field(min_length=1, max_length=100)
+    model: str = Field(min_length=1, max_length=200)
+    effort: str = Field(min_length=1, max_length=50)
+    runner_receipt_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    input_tokens: int | None = Field(default=None, ge=0)
+    cached_input_tokens: int | None = Field(default=None, ge=0)
+    output_tokens: int | None = Field(default=None, ge=0)
+    reasoning_tokens: int | None = Field(default=None, ge=0)
+    latency_ms: int | None = Field(default=None, ge=0)
+    usage_available: bool
+    unavailable_reason: str | None = Field(default=None, min_length=1, max_length=500)
+    recorded_at: datetime
+
+    @model_validator(mode="after")
+    def validate_usage(self) -> "ProviderReceiptUsage":
+        counts = (
+            self.input_tokens,
+            self.cached_input_tokens,
+            self.output_tokens,
+            self.reasoning_tokens,
+        )
+        if self.usage_available and any(value is None for value in counts):
+            raise ValueError("실측 provider receipt projection에는 모든 token 필드가 필요합니다.")
+        if not self.usage_available and any(value is not None for value in counts):
+            raise ValueError("미확인 provider receipt projection에는 token 수를 넣지 않습니다.")
+        if self.usage_available and self.unavailable_reason is not None:
+            raise ValueError("실측 usage와 unavailable 이유를 함께 표시할 수 없습니다.")
+        if not self.usage_available and self.unavailable_reason is None:
+            raise ValueError("미확인 usage에는 이유가 필요합니다.")
+        if (
+            self.cached_input_tokens is not None
+            and self.input_tokens is not None
+            and self.cached_input_tokens > self.input_tokens
+        ):
+            raise ValueError("cached input token은 input token보다 클 수 없습니다.")
+        if (
+            self.reasoning_tokens is not None
+            and self.output_tokens is not None
+            and self.reasoning_tokens > self.output_tokens
+        ):
+            raise ValueError("reasoning token은 output token보다 클 수 없습니다.")
+        return self
 
 
 class UsageReconciliationPointer(EngineModel):
@@ -105,6 +166,7 @@ class UsageSummary(ReadPresentation):
     project_id: str = Field(min_length=1, max_length=500)
     goal_id: str = Field(min_length=1, max_length=500)
     goal_revision_digests: tuple[str, ...]
+    goal_revision_unavailable_reason: str | None = Field(default=None, max_length=500)
     logical_call_count: int = Field(ge=0, description="소계 집계 대상으로 남은 usage record의 논리 호출 수")
     provider_call_count: int | None = Field(default=None, ge=0, description="제공된 provider 원장의 호출 수. 원장 입력이 없으면 null")
     expected_logical_call_refs: tuple[str, ...] = ()
@@ -124,6 +186,7 @@ class UsageSummary(ReadPresentation):
     by_stage: tuple[UsageBreakdown, ...] = ()
     by_role: tuple[UsageBreakdown, ...] = ()
     usage_records: tuple[BudgetUsageRecord, ...] = ()
+    provider_receipt_usage: tuple[ProviderReceiptUsage, ...] = ()
 
 
 class FinalReport(ReadPresentation):

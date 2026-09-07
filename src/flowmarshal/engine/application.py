@@ -8,9 +8,12 @@ from __future__ import annotations
 import json
 from collections import defaultdict
 from collections.abc import Iterable
+from typing import Any
 
+from ..canonical import sha256_digest
 from .domain import (
     AttemptRecord,
+    BudgetStage,
     BudgetUsageRecord,
     GoalContractRevision,
     GoalVerdict,
@@ -30,6 +33,7 @@ from .read_models import (
     ModelBindingItem,
     ModelBindingStatus,
     ProviderCallExpectation,
+    ProviderReceiptUsage,
     ReadPresentation,
     RecoveryStatus,
     TaskValidationRecovery,
@@ -39,6 +43,7 @@ from .read_models import (
     UsageReconciliationPointer,
     UsageSummary,
 )
+from .roles import RoleCallReceipt, RoleCallRequest, strict_json_output_schema
 from .service import EngineService
 
 
@@ -46,7 +51,10 @@ class EngineApplicationError(RuntimeError):
     """조회 인자가 원장에 없거나 결속이 깨졌을 때의 읽기 오류."""
 
 
-def _metric(records: Iterable[BudgetUsageRecord], field: str) -> UsageMetric:
+UsageReadRecord = BudgetUsageRecord | ProviderReceiptUsage
+
+
+def _metric(records: Iterable[UsageReadRecord], field: str) -> UsageMetric:
     # provider token usage와 elapsed latency는 독립 관측값이다. token usage가
     # unavailable이어도 terminal receipt의 latency_ms=0 또는 양수는 실측으로 보존한다.
     values = [
@@ -77,17 +85,17 @@ def _add_incomplete(metric: UsageMetric, count: int) -> UsageMetric:
 
 def _breakdown(
     dimension: str,
-    records: tuple[BudgetUsageRecord, ...],
+    records: tuple[UsageReadRecord, ...],
     incomplete: dict[str, int] | None = None,
     *,
-    latency_records: tuple[BudgetUsageRecord, ...] | None = None,
+    latency_records: tuple[UsageReadRecord, ...] | None = None,
     latency_incomplete: dict[str, int] | None = None,
 ) -> tuple[UsageBreakdown, ...]:
-    grouped: dict[str, list[BudgetUsageRecord]] = defaultdict(list)
+    grouped: dict[str, list[UsageReadRecord]] = defaultdict(list)
     for item in records:
         grouped[item.stage.value if dimension == "stage" else item.role].append(item)
     incomplete = incomplete or {}
-    latency_grouped: dict[str, list[BudgetUsageRecord]] = defaultdict(list)
+    latency_grouped: dict[str, list[UsageReadRecord]] = defaultdict(list)
     for item in (records if latency_records is None else latency_records):
         latency_grouped[item.stage.value if dimension == "stage" else item.role].append(item)
     latency_incomplete = latency_incomplete or {}
@@ -141,6 +149,39 @@ def _deduplicate_usage(
     return tuple(selected), tuple(deduplicated), tuple(conflicts)
 
 
+def _deduplicate_provider_receipts(
+    records: Iterable[ProviderReceiptUsage],
+) -> tuple[
+    tuple[ProviderReceiptUsage, ...],
+    tuple[DuplicateLogicalCall, ...],
+    tuple[DuplicateLogicalCall, ...],
+]:
+    grouped: dict[str, list[ProviderReceiptUsage]] = defaultdict(list)
+    for item in records:
+        grouped[item.logical_call_ref].append(item)
+    selected: list[ProviderReceiptUsage] = []
+    deduplicated: list[DuplicateLogicalCall] = []
+    conflicts: list[DuplicateLogicalCall] = []
+    for call_ref, items in sorted(grouped.items()):
+        ordered = sorted(items, key=lambda item: (item.recorded_at, item.provider_call_id))
+        receipts = tuple(sorted({item.runner_receipt_digest for item in ordered}))
+        duplicate = DuplicateLogicalCall(
+            logical_call_ref=call_ref,
+            status="conflict" if len(receipts) > 1 else "deduplicated",
+            provider_call_ids=tuple(item.provider_call_id for item in ordered),
+            receipt_digests=receipts,
+            stages=tuple(sorted({item.stage.value for item in ordered})),
+            roles=tuple(sorted({item.role for item in ordered})),
+        )
+        if len(receipts) > 1:
+            conflicts.append(duplicate)
+            continue
+        selected.append(ordered[0])
+        if len(ordered) > 1:
+            deduplicated.append(duplicate)
+    return tuple(selected), tuple(deduplicated), tuple(conflicts)
+
+
 def summarize_usage_records(
     *,
     project_id: str,
@@ -150,6 +191,8 @@ def summarize_usage_records(
     presentation: ReadPresentation,
     expected_logical_call_refs: Iterable[str] = (),
     provider_call_expectations: Iterable[ProviderCallExpectation] = (),
+    provider_receipt_usage: Iterable[ProviderReceiptUsage] = (),
+    goal_revision_unavailable_reason: str | None = None,
     superseded_usage_ids: Iterable[str] = (),
     reconciliations: Iterable[UsageReconciliationPointer] = (),
 ) -> UsageSummary:
@@ -157,14 +200,28 @@ def summarize_usage_records(
     superseded = tuple(sorted(set(superseded_usage_ids)))
     superseded_set = set(superseded)
     scoped = tuple(item for item in records if item.usage_id not in superseded_set)
-    deduplicated_selected, deduplicated, conflicts = _deduplicate_usage(scoped)
+    deduplicated_selected, usage_deduplicated, usage_conflicts = _deduplicate_usage(scoped)
+    projected = tuple(provider_receipt_usage)
+    projected_selected, projected_deduplicated, projected_conflicts = (
+        _deduplicate_provider_receipts(projected)
+    )
+    deduplicated = (*usage_deduplicated, *projected_deduplicated)
+    conflicts = (*usage_conflicts, *projected_conflicts)
+    projected_provider_ids = {item.provider_call_id for item in projected}
+    if len(projected_provider_ids) != len(projected):
+        raise ValueError("provider receipt projection의 provider call ID가 중복됐습니다.")
+    if {item.logical_call_ref for item in scoped} & {item.logical_call_ref for item in projected}:
+        raise ValueError("Goal-bound usage와 provider receipt projection을 중복 합산할 수 없습니다.")
     expected = tuple(sorted(set(expected_logical_call_refs)))
-    seen = {item.logical_call_ref for item in scoped}
+    seen = {item.logical_call_ref for item in scoped} | {
+        item.logical_call_ref for item in projected
+    }
     provider_calls = tuple(provider_call_expectations)
     usage_ids = {item.usage_id for item in scoped}
     provider_incomplete = tuple(
         item for item in provider_calls
-        if item.status != "settled" or item.usage_id is None or item.usage_id not in usage_ids
+        if item.provider_call_id not in projected_provider_ids
+        and (item.status != "settled" or item.usage_id is None or item.usage_id not in usage_ids)
     )
     # reserved/usage_unknown call에 연결된 usage는 최종 관측 전 값이다. 합산 대상에서
     # 먼저 제외한 뒤 하나의 미확인 호출로 표시해 같은 call을 두 번 세지 않는다.
@@ -177,13 +234,17 @@ def summarize_usage_records(
         for usage_id in incomplete_usage_ids
         if usage_id in usage_by_id
     }
-    selected = tuple(
+    selected_usage = tuple(
         item for item in deduplicated_selected
         if item.logical_call_ref not in incomplete_logical_call_refs
     )
+    selected: tuple[UsageReadRecord, ...] = (*selected_usage, *projected_selected)
     # token settlement은 아직 불완전해도 receipt에서 얻은 latency 관측은 합산할 수
     # 있다. receipt conflict는 deduplicated_selected에서 제외돼 합산하지 않는다.
-    latency_records = deduplicated_selected
+    latency_records: tuple[UsageReadRecord, ...] = (
+        *deduplicated_selected,
+        *projected_selected,
+    )
     missing_expected = tuple(ref for ref in expected if ref not in seen)
     reasons: list[UsageIncompleteReason] = [
         UsageIncompleteReason(
@@ -194,10 +255,12 @@ def summarize_usage_records(
     ]
     reasons.extend(
         UsageIncompleteReason(
-            code=("PROVIDER_CALL_NOT_SETTLED" if item.status != "settled" else "PROVIDER_CALL_USAGE_MISSING"),
+            code=(item.incomplete_reason_code or
+                  ("PROVIDER_CALL_NOT_SETTLED" if item.status != "settled" else "PROVIDER_CALL_USAGE_MISSING")),
             call_ref=item.call_key, stage=item.stage, role=item.role,
-            detail=("provider call이 settled 상태가 아니므로 usage_id가 있어도 완결된 실측으로 취급하지 않습니다."
-                    if item.status != "settled" else "settled provider call에 결속된 usage 레코드가 없습니다."),
+            detail=(item.incomplete_reason_detail or
+                    ("provider call이 settled 상태가 아니므로 usage_id가 있어도 완결된 실측으로 취급하지 않습니다."
+                     if item.status != "settled" else "settled provider call에 결속된 usage 레코드가 없습니다.")),
         )
         for item in provider_incomplete
     )
@@ -274,6 +337,7 @@ def summarize_usage_records(
     return UsageSummary(
         project_id=project_id, goal_id=goal_id,
         goal_revision_digests=tuple(sorted(set(goal_revision_digests))),
+        goal_revision_unavailable_reason=goal_revision_unavailable_reason,
         logical_call_count=len(selected), expected_logical_call_refs=expected,
         provider_call_count=len(provider_calls) if provider_calls else None,
         missing_expected_logical_call_refs=missing_expected,
@@ -300,16 +364,128 @@ def summarize_usage_records(
             latency_records=latency_records,
             latency_incomplete=latency_incomplete_by_role,
         ),
-        usage_records=selected,
+        usage_records=selected_usage,
+        provider_receipt_usage=projected,
         entity_refs=presentation.entity_refs, history_cursor=presentation.history_cursor,
         error_code=("USAGE_RECEIPT_CONFLICT" if conflicts else
                     "USAGE_INCOMPLETE" if reasons else presentation.error_code),
         next_action=(
             "충돌한 논리 호출의 receipt를 원장에서 대조하십시오."
             if conflicts else "예상 호출과 provider receipt를 원장에서 대조하십시오."
-            if reasons else presentation.next_action
+            if reasons else
+            "Goal 준비 실패를 검토하십시오. Goal revision이나 BudgetUsageRecord를 임의로 만들지 마십시오."
+            if goal_revision_unavailable_reason else presentation.next_action
         ),
     )
+
+
+def _provider_receipt_projection(
+    row: Any,
+    history_events: tuple[Any, ...],
+) -> tuple[ProviderReceiptUsage | None, tuple[str, str] | None]:
+    """Goal 생성 전 호출을 원장 mutation 없이 usage read model로 검증·투영한다."""
+    if row["goal_contract_digest"] is not None or row["usage_id"] is not None:
+        return None, (
+            "PROVIDER_GOAL_USAGE_BINDING_INCOMPLETE",
+            "Goal digest와 usage ID가 함께 완성되지 않은 provider call입니다.",
+        )
+    if row["receipt_json"] is None:
+        return None, ("PROVIDER_RECEIPT_MISSING", "provider call의 원문 receipt가 없습니다.")
+    try:
+        request_document = json.loads(row["request_json"])
+        request = RoleCallRequest.model_validate(request_document)
+        receipt = RoleCallReceipt.model_validate_json(row["receipt_json"])
+        if (
+            row["request_digest"] != sha256_digest(request_document)
+            or receipt.input_digest != request.request_digest
+            or (row["role"], receipt.role) != (request.role, request.role)
+            or (receipt.model, receipt.effort) != (request.model, request.effort)
+            or receipt.inventory_digest != request.inventory_digest
+            or receipt.output_schema_digest
+            != sha256_digest(strict_json_output_schema(request.output_schema))
+        ):
+            raise ValueError("request/receipt digest 또는 역할·모델 결속이 다릅니다.")
+        terminal = receipt.status in {"succeeded", "failed", "schema_failed"} or (
+            receipt.terminal_observation_digest is not None
+            and receipt.terminal_status_after_interrupt
+            in {"completed", "success", "succeeded", "failed", "interrupted", "cancelled"}
+        )
+        if not terminal:
+            return None, (
+                "PROVIDER_TERMINAL_RECEIPT_MISSING",
+                "provider receipt에서 terminal 상태를 확인할 수 없습니다.",
+            )
+        available = receipt.usage_available and receipt.schema_recovery_attempts == 0
+        actual = receipt.input_tokens + receipt.output_tokens if available else None
+        expected_status = "settled" if available else "usage_unknown"
+        if row["status"] != expected_status or row["actual_tokens"] != actual:
+            return None, (
+                "PROVIDER_RECEIPT_SETTLEMENT_CONFLICT",
+                "provider call 상태·actual_tokens가 원문 receipt 관측과 다릅니다.",
+            )
+        reserved_events = [
+            event for event in history_events if event["event_type"] == "budget.call_reserved"
+        ]
+        settled_events = [
+            event for event in history_events if event["event_type"] == "budget.call_settled"
+        ]
+        if len(reserved_events) != 1 or len(settled_events) != 1:
+            return None, (
+                "PROVIDER_CALL_HISTORY_INCOMPLETE",
+                "provider call의 예약·정산 History가 정확히 한 건씩 필요합니다.",
+            )
+        reserved = json.loads(reserved_events[0]["payload_json"])
+        settled = json.loads(settled_events[0]["payload_json"])
+        history_receipt = (
+            None if settled.get("receipt") is None
+            else RoleCallReceipt.model_validate(settled["receipt"])
+        )
+        normalized_receipt = receipt.model_copy(update={
+            "input_tokens": None,
+            "cached_input_tokens": None,
+            "output_tokens": None,
+            "reasoning_tokens": None,
+        }) if not available else receipt
+        normalized_history_receipt = history_receipt
+        if history_receipt is not None and not available:
+            normalized_history_receipt = history_receipt.model_copy(update={
+                "input_tokens": None,
+                "cached_input_tokens": None,
+                "output_tokens": None,
+                "reasoning_tokens": None,
+            })
+        if (
+            reserved.get("goal_id") != row["goal_id"]
+            or reserved.get("call_key") != row["call_key"]
+            or reserved.get("role") != row["role"]
+            or settled.get("actual_tokens") != actual
+            or settled.get("usage_available") is not available
+            or normalized_history_receipt != normalized_receipt
+        ):
+            return None, (
+                "PROVIDER_CALL_HISTORY_BINDING_INVALID",
+                "provider call의 예약·정산 History가 현재 request/receipt와 다릅니다.",
+            )
+        return ProviderReceiptUsage(
+            provider_call_id=row["id"], project_id=row["project_id"], goal_id=row["goal_id"],
+            stage=BudgetStage(row["stage"]), logical_call_ref=receipt.call_id, role=receipt.role,
+            call_status=receipt.status, model=receipt.model, effort=receipt.effort,
+            runner_receipt_digest=sha256_digest(json.loads(row["receipt_json"])),
+            input_tokens=receipt.input_tokens if available else None,
+            cached_input_tokens=receipt.cached_input_tokens if available else None,
+            output_tokens=receipt.output_tokens if available else None,
+            reasoning_tokens=receipt.reasoning_tokens if available else None,
+            latency_ms=receipt.latency_ms, usage_available=available,
+            unavailable_reason=(
+                None if available else "PROVIDER_USAGE_UNAVAILABLE_OR_RECOVERY_UNATTRIBUTABLE"
+            ),
+            recorded_at=receipt.recorded_at,
+        ), None
+    except Exception as error:
+        return None, (
+            "PROVIDER_RECEIPT_BINDING_INVALID",
+            f"provider request/receipt를 typed usage로 투영할 수 없습니다: {error}"[:1000],
+        )
 
 
 class EngineApplication:
@@ -364,31 +540,57 @@ class EngineApplication:
         project = self._project_row(project_id)
         if goal_id is None:
             revision_id = project["active_goal_revision_id"]
-            if revision_id is None:
-                raise EngineApplicationError("ACTIVE_GOAL_NOT_FOUND")
             with self.service.ledger.read() as connection:
-                row = connection.execute("SELECT goal_id FROM goal_revisions WHERE id = ?", (revision_id,)).fetchone()
-            if row is None:
-                raise EngineApplicationError("ACTIVE_GOAL_BINDING_BROKEN")
-            goal_id = row["goal_id"]
-        goals = self._goal_rows(project_id, goal_id)
-        digests = tuple(row["definition_digest"] for row in goals)
-        placeholders = ", ".join("?" for _ in digests)
+                if revision_id is not None:
+                    row = connection.execute(
+                        "SELECT goal_id FROM goal_revisions WHERE id = ?", (revision_id,)
+                    ).fetchone()
+                    if row is None:
+                        raise EngineApplicationError("ACTIVE_GOAL_BINDING_BROKEN")
+                    goal_id = row["goal_id"]
+                else:
+                    rows = connection.execute(
+                        "SELECT DISTINCT goal_id FROM provider_calls "
+                        "WHERE project_id=? AND status<>'released' ORDER BY goal_id",
+                        (project_id,),
+                    ).fetchall()
+                    if not rows:
+                        raise EngineApplicationError("ACTIVE_GOAL_NOT_FOUND")
+                    if len(rows) != 1:
+                        raise EngineApplicationError("GOAL_ID_REQUIRED")
+                    goal_id = rows[0]["goal_id"]
+        assert goal_id is not None
         with self.service.ledger.read() as connection:
-            usage_rows = connection.execute(
-                "SELECT payload_json FROM budget_usage WHERE project_id = ? "
-                f"AND goal_contract_digest IN ({placeholders}) ORDER BY recorded_at, rowid",
-                (project_id, *digests),
+            goals = connection.execute(
+                "SELECT * FROM goal_revisions WHERE project_id=? AND goal_id=? "
+                "ORDER BY revision_no, rowid",
+                (project_id, goal_id),
             ).fetchall()
-            has_provider_calls = connection.execute(
-                "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'provider_calls'"
-            ).fetchone() is not None
-            provider_rows = () if not has_provider_calls else connection.execute(
-                "SELECT id, call_key, status, role, stage, usage_id FROM provider_calls "
-                "WHERE project_id = ? AND goal_id = ? AND status <> 'released' "
+            provider_rows = connection.execute(
+                "SELECT * FROM provider_calls WHERE project_id=? AND goal_id=? AND status<>'released' "
                 "ORDER BY created_at, rowid",
                 (project_id, goal_id),
             ).fetchall()
+            provider_history_rows = connection.execute(
+                "SELECT event_type, entity_id, payload_json FROM history_events "
+                "WHERE project_id=? AND entity_type='provider_call' "
+                "AND event_type IN ('budget.call_reserved','budget.call_settled') "
+                "ORDER BY sequence",
+                (project_id,),
+            ).fetchall()
+        if not goals and not provider_rows:
+            raise EngineApplicationError("GOAL_NOT_FOUND")
+        digests = tuple(row["definition_digest"] for row in goals)
+        with self.service.ledger.read() as connection:
+            if digests:
+                placeholders = ", ".join("?" for _ in digests)
+                usage_rows = connection.execute(
+                    "SELECT payload_json FROM budget_usage WHERE project_id = ? "
+                    f"AND goal_contract_digest IN ({placeholders}) ORDER BY recorded_at, rowid",
+                    (project_id, *digests),
+                ).fetchall()
+            else:
+                usage_rows = ()
             has_reconciliations = connection.execute(
                 "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'usage_reconciliations'"
             ).fetchone() is not None
@@ -399,6 +601,20 @@ class EngineApplication:
                 (project_id, goal_id),
             ).fetchall()
         records = tuple(BudgetUsageRecord.model_validate_json(row["payload_json"]) for row in usage_rows)
+        projected: list[ProviderReceiptUsage] = []
+        projection_failures: dict[str, tuple[str, str]] = {}
+        history_by_call: dict[str, list[Any]] = defaultdict(list)
+        for event in provider_history_rows:
+            history_by_call[event["entity_id"]].append(event)
+        if not goals:
+            for row in provider_rows:
+                item, failure = _provider_receipt_projection(
+                    row, tuple(history_by_call[row["id"]])
+                )
+                if item is not None:
+                    projected.append(item)
+                elif failure is not None:
+                    projection_failures[row["id"]] = failure
         reconciliations = tuple(UsageReconciliationPointer(
             reconciliation_id=row["id"], call_id=row["call_id"], prior_usage_id=row["prior_usage_id"],
             effective_usage_id=row["effective_usage_id"], observation_digest=row["observation_digest"],
@@ -408,7 +624,9 @@ class EngineApplication:
             (EntityRef(entity_type="project", entity_id=project_id),
              EntityRef(entity_type="goal", entity_id=goal_id),
              *(EntityRef(entity_type="goal_revision", entity_id=row["id"],
-                         revision_no=row["revision_no"], digest=row["definition_digest"]) for row in goals),
+                          revision_no=row["revision_no"], digest=row["definition_digest"]) for row in goals),
+             *(EntityRef(entity_type="provider_call", entity_id=item.provider_call_id)
+               for item in projected),
              *(EntityRef(entity_type="usage_reconciliation", entity_id=item.reconciliation_id,
                          digest=item.observation_digest)
                for item in reconciliations)),
@@ -420,7 +638,19 @@ class EngineApplication:
             provider_call_expectations=tuple(ProviderCallExpectation(
                 provider_call_id=row["id"], call_key=row["call_key"], status=row["status"], role=row["role"],
                 stage=row["stage"], usage_id=row["usage_id"],
+                incomplete_reason_code=(
+                    None if row["id"] not in projection_failures
+                    else projection_failures[row["id"]][0]
+                ),
+                incomplete_reason_detail=(
+                    None if row["id"] not in projection_failures
+                    else projection_failures[row["id"]][1]
+                ),
             ) for row in provider_rows),
+            provider_receipt_usage=projected,
+            goal_revision_unavailable_reason=(
+                None if goals else "GOAL_REVISION_NOT_CREATED"
+            ),
             superseded_usage_ids=(item.prior_usage_id for item in reconciliations),
             reconciliations=reconciliations,
         )

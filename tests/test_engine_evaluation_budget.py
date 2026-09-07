@@ -11,6 +11,7 @@ from flowmarshal.engine.evaluation_budget import (
     EvaluationPolicies,
     budgeted_role_runner,
     initialize_cell_budget,
+    load_evaluation_policies,
     metadata_with_policies,
     policies_from_metadata,
     policy_contract_fragment,
@@ -18,6 +19,7 @@ from flowmarshal.engine.evaluation_budget import (
     verify_metadata_digest,
     write_immutable_run_metadata,
 )
+from flowmarshal.engine.runtime import CodexProjectBinding
 from flowmarshal.engine.role_execution import (
     RoleTimeoutOverride,
     RoleTimeoutPolicy,
@@ -100,11 +102,55 @@ class EvaluationBudgetTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "EVALUATION_RUN_METADATA_DIGEST_MISMATCH"):
             verify_metadata_digest(tampered)
 
+        legacy_policies = {
+            "budget": self.policies.budget.model_dump(mode="json"),
+            "role_timeouts": self.policies.role_timeouts.model_dump(mode="json"),
+        }
+        self.assertNotIn("codex_project", self.policies.model_dump(mode="json", exclude_none=True))
+        self.assertEqual(sha256_digest(legacy_policies), self.policies.policy_digest)
+        self.assertEqual(legacy_policies, metadata["evaluation_policies"])
+
         destination = Path(self.temp.name) / "run-metadata.json"
         write_immutable_run_metadata(destination, {"scope": "role-fixture"}, self.policies)
         write_immutable_run_metadata(destination, {"scope": "role-fixture"}, self.policies)
         with self.assertRaisesRegex(ValueError, "EVALUATION_RUN_METADATA_BINDING_MISMATCH"):
             write_immutable_run_metadata(destination, {"scope": "project-e2e"}, self.policies)
+
+    def test_codex_project_policy_is_loaded_bound_and_tamper_detected(self) -> None:
+        budget_path = Path(self.temp.name) / "budget.json"
+        timeout_path = Path(self.temp.name) / "timeouts.json"
+        binding_path = Path(self.temp.name) / "codex-project.json"
+        budget_path.write_text(self.policies.budget.model_dump_json(), encoding="utf-8")
+        timeout_path.write_text(self.policies.role_timeouts.model_dump_json(), encoding="utf-8")
+        binding = CodexProjectBinding(
+            project_id="codex-project-1",
+            expected_root=str(self.root),
+            expected_name="Qualification project",
+        )
+        binding_path.write_text(binding.model_dump_json(), encoding="utf-8")
+
+        policies = load_evaluation_policies(
+            budget_policy_path=budget_path,
+            role_timeout_policy_path=timeout_path,
+            codex_project_binding_path=binding_path,
+        )
+        metadata = metadata_with_policies({"scope": "role-fixture"}, policies)
+
+        self.assertEqual(binding, policies.codex_project)
+        self.assertEqual(binding.model_dump(mode="json"), metadata["evaluation_policies"]["codex_project"])
+        self.assertEqual(binding.model_dump(mode="json"), policy_contract_fragment(policies)["codex_project"])
+        self.assertEqual(policies, policies_from_metadata(metadata))
+        tampered = json.loads(json.dumps(metadata))
+        tampered["evaluation_policies"]["codex_project"]["project_id"] = "other-project"
+        with self.assertRaisesRegex(ValueError, "EVALUATION_POLICY_METADATA_DIGEST_MISMATCH"):
+            policies_from_metadata(tampered)
+        destination = Path(self.temp.name) / "bound-run-metadata.json"
+        write_immutable_run_metadata(destination, {"scope": "role-fixture"}, policies)
+        changed_policies = policies.model_copy(update={
+            "codex_project": binding.model_copy(update={"project_id": "other-project"}),
+        })
+        with self.assertRaisesRegex(ValueError, "EVALUATION_RUN_METADATA_BINDING_MISMATCH"):
+            write_immutable_run_metadata(destination, {"scope": "role-fixture"}, changed_policies)
 
     def test_new_cell_attaches_goal_and_settles_role_call_in_its_ledger(self) -> None:
         service, manager = initialize_cell_budget(

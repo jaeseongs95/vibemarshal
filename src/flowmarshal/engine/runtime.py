@@ -63,6 +63,22 @@ class ExecutionPolicyEvidence(EngineModel):
     cwd: str
 
 
+class CodexProjectBinding(EngineModel):
+    """App Server가 소유한 저장 프로젝트와 thread를 결속하는 계약."""
+
+    project_id: str = Field(min_length=1, max_length=500)
+    expected_root: str = Field(min_length=1)
+    expected_name: str | None = Field(default=None, min_length=1, max_length=500)
+
+
+class _NewThreadProjectProof(EngineModel):
+    thread_id: str
+    project_binding: CodexProjectBinding
+    cwd: str
+    rollout_path: str
+    receipt_digest: str
+
+
 class RuntimeOperationReceipt(EngineModel):
     operation_id: str = Field(min_length=1, max_length=500)
     payload: dict[str, Any]
@@ -138,7 +154,16 @@ class CodexAppServerRuntime:
 
     requires_budget_policy = True
 
-    def __init__(self, *, codex_bin: Path | str | None = None) -> None:
+    @property
+    def project_binding(self) -> CodexProjectBinding | None:
+        return getattr(self, "_project_binding", None)
+
+    def __init__(
+        self,
+        *,
+        codex_bin: Path | str | None = None,
+        project_binding: CodexProjectBinding | None = None,
+    ) -> None:
         from openai_codex import Codex
         from openai_codex.client import CodexConfig, _resolve_codex_bin
 
@@ -152,6 +177,8 @@ class CodexAppServerRuntime:
             for block in iter(lambda: stream.read(1024 * 1024), b""):
                 digest.update(block)
         self.executable_digest = "sha256:" + digest.hexdigest()
+        self._codex_bin = resolved
+        self._project_binding = project_binding
         self._codex = Codex(
             CodexConfig(
                 codex_bin=None if codex_bin is None else str(resolved),
@@ -164,8 +191,14 @@ class CodexAppServerRuntime:
         self._turn_futures: dict[str, tuple[Any, Future[Any]]] = {}
         self._ephemeral_thread_ids: set[str] = set()
         self._first_empty_threads: set[str] = set()
+        self._new_thread_project_proofs: dict[str, _NewThreadProjectProof] = {}
         self._turn_usage_context: dict[str, dict[str, Any]] = {}
         self._completion_observers: dict[str, tuple[str, Callable[[RuntimeObservation], None]]] = {}
+        try:
+            self._verify_project_binding()
+        except BaseException:
+            self._codex.close()
+            raise
 
     def close(self) -> None:
         try:
@@ -243,6 +276,126 @@ class CodexAppServerRuntime:
             raise RuntimePolicyError(f"{method} 응답이 JSON object가 아닙니다.")
         return response
 
+    def _verify_project_binding(self) -> None:
+        binding = getattr(self, "project_binding", None)
+        if binding is None:
+            return
+        try:
+            response = self._raw("project/read", {"projectId": binding.project_id})
+        except Exception as error:
+            raise RuntimePolicyError(
+                "PROJECT_BINDING_MISMATCH: App Server project/read에 실패했습니다."
+            ) from error
+        project = response.get("project")
+        roots = project.get("roots") if isinstance(project, dict) else None
+        root_paths = (
+            [item["path"] for item in roots]
+            if isinstance(roots, list)
+            and all(
+                isinstance(item, dict) and isinstance(item.get("path"), str)
+                for item in roots
+            )
+            else None
+        )
+        if (
+            not isinstance(project, dict)
+            or project.get("id") != binding.project_id
+            or not Path(binding.expected_root).is_absolute()
+            or root_paths is None
+            or any(not Path(path).is_absolute() for path in root_paths)
+            or sum(_same_path(path, binding.expected_root) for path in root_paths) != 1
+            or (
+                binding.expected_name is not None
+                and project.get("name") != binding.expected_name
+            )
+        ):
+            raise RuntimePolicyError(
+                "PROJECT_BINDING_MISMATCH: App Server project가 고정 계약과 다릅니다."
+            )
+
+    def _verify_thread_project(
+        self,
+        thread_id: str,
+        *,
+        allow_new_empty_observation: bool = False,
+        raw_reader: Callable[[str, dict[str, Any]], dict[str, Any]] | None = None,
+    ) -> _NewThreadProjectProof | None:
+        binding = getattr(self, "project_binding", None)
+        if binding is None:
+            return None
+        proof = None
+        if allow_new_empty_observation:
+            proof = getattr(self, "_new_thread_project_proofs", {}).get(thread_id)
+            if proof is not None and (
+                proof.thread_id != thread_id or proof.project_binding != binding
+            ):
+                raise RuntimePolicyError(
+                    "PROJECT_BINDING_MISMATCH: 최초 thread 생성 증명이 현재 계약과 다릅니다."
+                )
+        try:
+            response = (raw_reader or self._raw)(
+                "thread/read",
+                {
+                    "threadId": thread_id,
+                    "includeTurns": False,
+                },
+            )
+        except Exception as error:
+            raise RuntimePolicyError(
+                "PROJECT_BINDING_MISMATCH: 저장 thread의 프로젝트를 읽지 못했습니다."
+            ) from error
+        thread = response.get("thread")
+        exact_persisted = (
+            isinstance(thread, dict)
+            and thread.get("id") == thread_id
+            and thread.get("projectId") == binding.project_id
+        )
+        exact_new_empty = (
+            proof is not None
+            and isinstance(thread, dict)
+            and thread.get("id") == thread_id
+            and thread.get("projectId") is None
+            and thread.get("ephemeral") is False
+            and thread.get("turns") == []
+            and isinstance(thread.get("cwd"), str)
+            and Path(thread["cwd"]).is_absolute()
+            and _same_path(thread.get("cwd", ""), proof.cwd)
+            and isinstance(thread.get("path"), str)
+            and Path(thread["path"]).is_absolute()
+            and _same_path(thread["path"], proof.rollout_path)
+            and thread.get("status") in ({"type": "notLoaded"}, {"type": "idle"})
+        )
+        if not exact_persisted and not exact_new_empty:
+            raise RuntimePolicyError(
+                "PROJECT_BINDING_MISMATCH: 저장 thread가 고정 프로젝트에 결속되지 않았습니다."
+            )
+        return proof if exact_new_empty else None
+
+    def _open_project_read_peer(self) -> "CodexAppServerRuntime":
+        """같은 executable과 project 계약으로 독립 읽기 연결을 연다."""
+        return CodexAppServerRuntime(
+            codex_bin=self._codex_bin,
+            project_binding=self.project_binding,
+        )
+
+    def _consume_new_thread_project_proof(
+        self, thread_id: str, *, cwd: Path | str
+    ) -> bool:
+        """같은 연결에서 생성한 빈 thread의 첫 turn 증명을 한 번만 소비한다."""
+        proof = getattr(self, "_new_thread_project_proofs", {}).pop(thread_id, None)
+        if proof is None:
+            return False
+        binding = getattr(self, "project_binding", None)
+        if (
+            proof.thread_id != thread_id
+            or proof.project_binding != binding
+            or not _same_path(Path(cwd).resolve(), proof.cwd)
+        ):
+            raise RuntimePolicyError(
+                "PROJECT_BINDING_MISMATCH: 최초 thread 생성 증명이 현재 계약과 다릅니다."
+            )
+        return True
+
     def verify_execution_policy(self, cwd: Path | str) -> ExecutionPolicyEvidence:
         workspace = Path(cwd).resolve(strict=True)
         if not workspace.is_dir():
@@ -306,17 +459,26 @@ class CodexAppServerRuntime:
         ephemeral: bool = False,
     ) -> RuntimeOperationReceipt:
         del title
+        self._verify_project_binding()
         self.verify_execution_policy(cwd)
+        params: dict[str, Any] = {
+            "approvalPolicy": REQUIRED_APPROVAL_POLICY,
+            "cwd": str(cwd.resolve()),
+            "developerInstructions": developer_instructions,
+            "ephemeral": ephemeral,
+            "model": model,
+            "permissions": REQUIRED_PERMISSION_PROFILE,
+        }
+        project_binding = getattr(self, "project_binding", None)
+        if project_binding is not None:
+            if ephemeral:
+                raise RuntimePolicyError(
+                    "PROJECT_BINDING_MISMATCH: 프로젝트 결속 thread는 저장형이어야 합니다."
+                )
+            params["projectId"] = project_binding.project_id
         response = self._raw(
             "thread/start",
-            {
-                "approvalPolicy": REQUIRED_APPROVAL_POLICY,
-                "cwd": str(cwd.resolve()),
-                "developerInstructions": developer_instructions,
-                "ephemeral": ephemeral,
-                "model": model,
-                "permissions": REQUIRED_PERMISSION_PROFILE,
-            },
+            params,
         )
         profile = response.get("activePermissionProfile")
         active_profile = profile.get("id") if isinstance(profile, dict) else profile
@@ -333,6 +495,34 @@ class CodexAppServerRuntime:
         thread_id = thread.get("id") if isinstance(thread, dict) else None
         if not isinstance(thread_id, str) or not thread_id:
             raise RuntimePolicyError("thread/start receipt에 thread ID가 없습니다.")
+        if (
+            project_binding is not None
+            and thread.get("projectId") != project_binding.project_id
+        ):
+            raise RuntimePolicyError(
+                "PROJECT_BINDING_MISMATCH: thread/start receipt의 프로젝트가 다릅니다."
+            )
+        if project_binding is not None:
+            thread_path = thread.get("path")
+            if (
+                thread.get("ephemeral") is not False
+                or thread.get("turns") != []
+                or not isinstance(thread_path, str)
+                or not Path(thread_path).is_absolute()
+            ):
+                raise RuntimePolicyError(
+                    "PROJECT_BINDING_MISMATCH: 최초 thread 생성 증명이 절대 rollout 경로를 "
+                    "가진 저장형 빈 thread가 아닙니다."
+                )
+            if not hasattr(self, "_new_thread_project_proofs"):
+                self._new_thread_project_proofs = {}
+            self._new_thread_project_proofs[thread_id] = _NewThreadProjectProof(
+                thread_id=thread_id,
+                project_binding=project_binding,
+                cwd=str(cwd.resolve()),
+                rollout_path=thread_path,
+                receipt_digest=sha256_digest(response),
+            )
         binding = ThreadBinding(thread_id=thread_id, bound_at=utc_now())
         if ephemeral:
             self._ephemeral_thread_ids.add(thread_id)
@@ -357,6 +547,8 @@ class CodexAppServerRuntime:
         from openai_codex import ApprovalMode, Sandbox
         from openai_codex.api import Thread
 
+        if not self._consume_new_thread_project_proof(thread_id, cwd=cwd):
+            self._verify_thread_project(thread_id)
         self.verify_execution_policy(cwd)
         # thread/start 직후의 ephemeral 역할 thread는 영속 rollout이 없으므로
         # thread/resume 대상이 아니다. 같은 App Server 연결의 기존 thread ID에
@@ -468,8 +660,109 @@ class CodexAppServerRuntime:
 
     def read_stored(self, *, thread_id: str) -> RuntimeObservation:
         """로컬 active handle과 별개로 thread/read의 저장 상태를 확인한다."""
-        result = self._codex._client.thread_read(thread_id, include_turns=True)  # noqa: SLF001
-        turns = tuple(result.thread.turns)
+        empty_creation_proof = self._verify_thread_project(
+            thread_id,
+            allow_new_empty_observation=True,
+        )
+        turn_history_params: dict[str, Any] | None = None
+        turn_history_response: dict[str, Any] | None = None
+        read_retry_errors: list[dict[str, Any]] = []
+        materialization_read: dict[str, Any] | None = None
+        independent_reader_executable_digest: str | None = None
+        if empty_creation_proof is not None:
+            from openai_codex import MethodNotFoundError
+
+            turn_history_params = {
+                "threadId": thread_id,
+                "limit": 1,
+                "sortDirection": "asc",
+                "itemsView": "full",
+            }
+            materialization_params = {
+                "threadId": thread_id,
+                "includeTurns": True,
+            }
+            try:
+                materialized = self._codex._client.thread_read(  # noqa: SLF001
+                    thread_id, include_turns=True
+                )
+                materialized_turns = tuple(materialized.thread.turns)
+                if str(materialized.thread.id) != thread_id or materialized_turns:
+                    raise RuntimePolicyError(
+                        "PROJECT_BINDING_MISMATCH: owner materialization read가 동일한 "
+                        "빈 thread를 반환하지 않았습니다."
+                    )
+                if not hasattr(materialized, "model_dump"):
+                    raise RuntimePolicyError(
+                        "PROJECT_BINDING_MISMATCH: owner materialization receipt를 "
+                        "직렬화할 수 없습니다."
+                    )
+                materialization_read = {
+                    "method": "thread/read",
+                    "params": materialization_params,
+                    "response": materialized.model_dump(mode="json", by_alias=True),
+                    "error": None,
+                }
+            except Exception as error:
+                if isinstance(error, RuntimePolicyError):
+                    raise
+                if (
+                    type(error) is not MethodNotFoundError
+                    or error.code != -32601
+                    or error.message != "list_turns is not supported yet"
+                ):
+                    raise
+                materialization_read = {
+                    "method": "thread/read",
+                    "params": materialization_params,
+                    "response": None,
+                    "error": {
+                        "type": type(error).__name__,
+                        "code": error.code,
+                        "message": error.message,
+                    },
+                }
+            with self._open_project_read_peer() as peer:
+                if peer.executable_digest != self.executable_digest:
+                    raise RuntimePolicyError(
+                        "PROJECT_BINDING_MISMATCH: 독립 reader executable이 원본과 다릅니다."
+                    )
+                peer_proof = self._verify_thread_project(
+                    thread_id,
+                    allow_new_empty_observation=True,
+                    raw_reader=peer._raw,
+                )
+                if peer_proof != empty_creation_proof:
+                    raise RuntimePolicyError(
+                        "PROJECT_BINDING_MISMATCH: 독립 reader의 최초 metadata 증명이 다릅니다."
+                    )
+                turn_history_response = peer._raw(
+                    "thread/turns/list", turn_history_params
+                )
+                repeated_proof = self._verify_thread_project(
+                    thread_id,
+                    allow_new_empty_observation=True,
+                    raw_reader=peer._raw,
+                )
+                if repeated_proof != empty_creation_proof:
+                    raise RuntimePolicyError(
+                        "PROJECT_BINDING_MISMATCH: 독립 reader의 재확인 증명이 다릅니다."
+                    )
+                independent_reader_executable_digest = peer.executable_digest
+            if turn_history_response != {
+                "data": [],
+                "nextCursor": None,
+                "backwardsCursor": None,
+            }:
+                raise RuntimePolicyError(
+                    "PROJECT_BINDING_MISMATCH: 빈 thread의 paginated turn 목록이 비어 있지 않습니다."
+                )
+            turns: tuple[Any, ...] = ()
+        else:
+            result = self._codex._client.thread_read(  # noqa: SLF001
+                thread_id, include_turns=True
+            )
+            turns = tuple(result.thread.turns)
         latest = None if not turns else turns[-1]
         status = None if latest is None else _enum(latest.status)
         final_response: str | None = None
@@ -493,11 +786,61 @@ class CodexAppServerRuntime:
                 "turn_status": status,
                 "usage": latest_document.get("usage"),
                 "usage_scope": "turn" if latest_document.get("usage") is not None else "unavailable",
-                "usage_source": "thread/read",
+                "usage_source": (
+                    "thread/turns/list"
+                    if empty_creation_proof is not None
+                    else "thread/read"
+                ),
+                "turn_history_available": True,
+                "turn_history_error": None,
+                "turn_history_source": (
+                    "thread/turns/list"
+                    if empty_creation_proof is not None
+                    else "thread/read(includeTurns=true)"
+                ),
+                "turn_history_params": turn_history_params,
+                "turn_history_response": turn_history_response,
+                "read_retry_errors": read_retry_errors,
+                "turn_history_connection": (
+                    "independent_app_server"
+                    if empty_creation_proof is not None
+                    else None
+                ),
+                "independent_reader_executable_digest": (
+                    independent_reader_executable_digest
+                ),
+                "materialization_read": materialization_read,
+                "project_id": (
+                    None
+                    if empty_creation_proof is not None
+                    else (
+                        self.project_binding.project_id
+                        if self.project_binding is not None
+                        else None
+                    )
+                ),
+                "project_binding_verification": (
+                    {
+                        "source": "same_connection_thread_start_receipt_and_empty_turns_list",
+                        "creation_receipt_digest": empty_creation_proof.receipt_digest,
+                        "creation_project_id": empty_creation_proof.project_binding.project_id,
+                        "rollout_path": empty_creation_proof.rollout_path,
+                        "raw_metadata_source": "thread/read(includeTurns=false)",
+                        "raw_metadata_connection": "independent_app_server",
+                        "raw_metadata_confirmation_count": 2,
+                    }
+                    if empty_creation_proof is not None
+                    else (
+                        {"source": "thread/read.projectId"}
+                        if self.project_binding is not None
+                        else {"source": "unbound"}
+                    )
+                ),
             },
         )
 
     def resume(self, *, thread_id: str, cwd: Path) -> RuntimeOperationReceipt:
+        self._verify_thread_project(thread_id)
         self.verify_execution_policy(cwd)
         thread = self._codex.thread_resume(thread_id, cwd=str(cwd.resolve()))
         return RuntimeOperationReceipt(
@@ -628,7 +971,25 @@ class FakeCodexRuntime:
         )
 
     def read_stored(self, *, thread_id: str) -> RuntimeObservation:
-        return self.read(thread_id=thread_id)
+        self.read_calls += 1
+        thread = self.threads[thread_id]
+        return RuntimeObservation(
+            thread_id=thread_id,
+            turn_id=thread.turn_id,
+            active=thread.turn_id is not None and thread.terminal_status is None,
+            terminal_status=thread.terminal_status,
+            final_response=thread.final_response,
+            payload={
+                "thread_id": thread_id,
+                "turn_count": 0 if thread.turn_id is None else 1,
+                "turn_status": thread.terminal_status,
+                "usage": None,
+                "usage_scope": "unavailable",
+                "usage_source": "thread/read",
+                "turn_history_available": True,
+                "turn_history_source": "thread/read(includeTurns=true)",
+            },
+        )
 
     def resume(self, *, thread_id: str, cwd: Path) -> RuntimeOperationReceipt:
         self.resume_calls += 1

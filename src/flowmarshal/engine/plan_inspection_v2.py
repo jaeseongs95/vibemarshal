@@ -15,8 +15,25 @@ from .domain import (
     ProjectMapRevision,
     ReviewFinding,
 )
-from .plan_inspection import InspectionCitation, PlanInspectionError, inspection_file_content
+from .plan_inspection import InspectionCitation, PlanInspectionError, inspection_file_content as _inspection_file_content
+from .role_observations import RoleInputContractError
 from .planning import validation_comparison_targets
+from .validation_obligations import (
+    EXPLICIT_VALIDATION_OBLIGATION_INSTRUCTIONS,
+    explicit_obligation_selection_description,
+    merge_explicit_obligation_scope_ids,
+)
+
+
+class InspectionInputContractError(PlanInspectionError, RoleInputContractError):
+    """파일 입력 무결성을 후보 출력 schema 오류로 격리하지 않는다."""
+
+
+def inspection_file_content(entry, project_map) -> str:
+    try:
+        return _inspection_file_content(entry, project_map)
+    except PlanInspectionError as error:
+        raise InspectionInputContractError(str(error)) from error
 
 
 ScopeStatus = Literal["supported", "contradicted", "unresolved"]
@@ -62,7 +79,13 @@ class ValidationScopeInspectionV2(EngineModel):
     scope_id: str = Field(pattern=r"^[A-Za-z][A-Za-z0-9_]{0,79}$")
     validation_id: str
     mechanism_id: str
-    claim: str = Field(min_length=1, max_length=1000)
+    claim: str = Field(
+        min_length=1, max_length=1000,
+        description=(
+            "등록 도구·phase가 실제 수행하는 검사 절차와 부분 주장. 내부 호출·재실행하는 절차도 "
+            "보존하고, 같은 mechanism·status의 책임은 함께 적되 supported와 contradicted 책임은 분리한다."
+        ),
+    )
     direct_extra_refs: tuple[str, ...]
     status: ScopeStatus
 
@@ -77,10 +100,10 @@ class ACScopeRequirementInspectionV2(EngineModel):
 
     criterion_id: str
     statement_scope_ids: tuple[str, ...] = Field(
-        description="AC statement가 명시적으로 요구하는 실제 검사 절차의 supported scope. 없으면 빈 목록."
+        description=explicit_obligation_selection_description("statement")
     )
     validation_intent_scope_ids: tuple[str, ...] = Field(
-        description="AC validation_intent가 명시적으로 요구하는 실제 검사 절차의 supported scope. 없으면 빈 목록."
+        description=explicit_obligation_selection_description("validation_intent")
     )
 
     @field_validator("statement_scope_ids", "validation_intent_scope_ids")
@@ -268,22 +291,16 @@ PLAN_INSPECTION_V2_INSTRUCTIONS = (
     "실제 절차나 status가 다를 때만 나눈다. AC마다 scope를 다시 만들거나 citation별로 쪼개지 않는다. 같은 validation의 "
     "mechanism_id와 supported·contradicted·unresolved 중 하나를 직접 판단한다. "
     "mechanism의 근거를 direct_extra_refs에 반복하지 말고 해당 scope에만 추가로 필요한 citation만 쓴다. "
-    "AC의 검사 요구는 Plan의 현재 연결을 근거로 정하지 않는다. 각 AC의 statement와 validation_intent를 "
-    "전체 문맥으로 읽되 각 필드가 명시한 검사 의무를 구분한다. 두 필드는 상호 보완하며 한 필드의 단계·독립성 "
-    "설명이 다른 필드의 명시적 절차를 면제하지 않는다. ac_scope_requirements에는 모든 AC를 정확히 한 행씩 "
-    "쓰고 criterion_id, statement_scope_ids, validation_intent_scope_ids를 제출한다. 각 목록에는 해당 원문 "
-    "필드가 명시적으로 요구하는 실제 절차의 supported scope만 선택한다. 해당 필드에 검사 절차 요구가 없으면 "
-    "빈 목록을 쓴다. 두 필드가 같은 절차를 요구하면 같은 scope를 양쪽 목록에서 선택할 수 있다. 대명사나 "
-    "축약 표현은 AC 전체 문맥으로 해석하며, 결과·주제의 관련성만으로 절차를 추가하지 않는다. "
-    "요구한 절차·도구·phase·Task 또는 integration 범위가 일치해야 한다. 동일 절차의 task/goal phase를 "
-    "각각 명시하면 각 phase의 실제 scope를 선택한다. 단계에 검사 책임을 열거하면 그 단계에서 해당 책임을 "
-    "실제 수행하는 scope를 선택한다. 독립 실행이나 완료 순서만 나타내는 표현은 다른 단계의 모든 검사 "
-    "의무가 아니며, 같은 Task·phase·evidence·주제만으로 열거되지 않은 sibling에 전파하지 않는다. "
-    "한 scope의 모순은 실제 수행되는 다른 절차의 명시적 의무를 없애지 않는다. 같은 요구 절차를 여러 "
-    "validation이 실제 수행하면 각 소유 scope를 선택하며 별도 validation의 존재만으로 복합 validation "
-    "안의 실제 절차를 생략하지 않는다. contradicted·unresolved scope는 선택하지 않는다. Adapter가 두 원문 "
-    "목록의 합집합과 scope의 소유 validation을 join해 전체 AC×validation의 true/false 행렬·scope_ids·근거 "
-    "closure를 파생한다. 원문 목록의 선택을 다시 합쳐 쓰거나 false 조합을 나열하지 않는다. "
+    + EXPLICIT_VALIDATION_OBLIGATION_INSTRUCTIONS +
+    " AC의 검사 요구는 Plan의 현재 연결을 근거로 정하지 않는다. statement와 validation_intent는 AC 전체 "
+    "문맥에서 상호 보완적으로 읽되 각 필드의 명시 검사 의무를 구분한다. 한 필드의 단계·독립성 설명은 "
+    "다른 필드의 명시 의무를 면제하지 않는다. ac_scope_requirements에는 모든 AC를 정확히 한 행씩 쓰고 "
+    "criterion_id, statement_scope_ids, validation_intent_scope_ids를 제출한다. 각 목록에는 해당 원문 필드의 "
+    "명시 의무에 해당하는 supported scope만 선택하고 의무가 없으면 비운다. 같은 의무 scope는 두 필드에 "
+    "모두 선택할 수 있고, 단계에 검사 책임을 열거하면 그 단계에서 실제 수행하는 scope를 선택한다. "
+    "contradicted·unresolved scope는 선택하지 않는다. Adapter는 두 목록의 합집합과 "
+    "scope 소유 validation을 join해 전체 AC×validation 결정과 근거 closure를 파생한다. 모델은 합집합·false "
+    "조합·전체 행렬을 다시 제출하지 않는다. "
     "모든 전역 constraint×Task 조합도 constraint_task_rows에 정확히 한 번씩 제출한다. Task 검사가 직접 "
     "요구되면 applicability=required와 실제 Task validation ID를 쓰고, 그렇지 않으면 not_applicable과 빈 "
     "required_validation_ids를 쓴다. AC 관계와 전역 Task 의무를 서로 추정하지 않는다. "
@@ -292,7 +309,13 @@ PLAN_INSPECTION_V2_INSTRUCTIONS = (
     "다섯 표준 defect_kind의 gate·severity는 null이고 adapter가 taxonomy에서 계산한다. 표준 taxonomy로 "
     "표현할 수 없는 직접 결함은 defect_kind=other와 직접 gate·severity를 사용한다. "
     "missing_validation_link와 missing_task_validation의 primary_target_ids는 payload의 inspection_target_catalog에서 "
-    "각각 ac_validation·constraint_task target_id를 선택한다. validation_scope와 insufficient_evidence는 직접 만든 "
+    "각각 ac_validation·constraint_task target_id를 선택한다. Reviewer는 최종 제출 전에 "
+    "ac_scope_requirements의 두 supported scope 목록을 소유 validation_id로 묶고 해당 AC의 "
+    "goal_coverage.validation_ids와 대조한다. 필수로 선택한 validation_id가 현재 coverage에 없으면 "
+    "그 AC×validation의 ac_validation target을 missing_validation_link finding에 빠짐없이 포함한다. "
+    "다른 scope finding은 이 연결 누락 finding을 대신하지 않으며, 실제 연결이 있거나 필수로 "
+    "판단하지 않은 관계에는 missing_validation_link finding을 제출하지 않는다. "
+    "validation_scope와 insufficient_evidence는 직접 만든 "
     "scope_id, result_order는 validation_id, other는 citation ID를 쓴다. target kind·primary·secondary 참조를 다시 "
     "작성하지 않는다. 직접 관련된 추가 citation은 direct_extra_refs, 소유 관계로 계산할 수 없는 영향 Task는 "
     "direct_task_refs에 쓴다. 영향 Task는 주 target 소유 관계와 이 직접 Task 선택에서 adapter가 계산한다. 표준 "
@@ -777,7 +800,7 @@ def compile_plan_inspection_v2(
     )
     scopes_by_pair: dict[tuple[str, str], list[str]] = {}
     for criterion_id, requirement in requirements_by_criterion.items():
-        for scope_id in _ordered_union(
+        for scope_id in merge_explicit_obligation_scope_ids(
             requirement.statement_scope_ids, requirement.validation_intent_scope_ids
         ):
             _require(scope_id in scope_by_id, f"v2 AC requirement scope ID 오류: {scope_id}")
