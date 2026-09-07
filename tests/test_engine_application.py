@@ -375,6 +375,7 @@ class EngineApplicationTests(unittest.TestCase):
     def test_model_binding_needs_observed_inventory_without_calling_provider(self) -> None:
         status = self.application.model_binding_status(self.project_id, inventory=None)
         self.assertEqual("ACTIVE_PLAN_NOT_FOUND", status.error_code)
+        self.service.authorize_goal(project_id=self.project_id, source="합성 사용자 승인")
         self.service.activate_plan(
             plan_revision_id=self.plan.plan_revision_id, activation_digest=self.plan.activation_digest, source="test",
         )

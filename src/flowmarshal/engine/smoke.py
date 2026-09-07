@@ -335,6 +335,7 @@ def run_synthetic_lifecycle(
             decision=plan_decision,
         )
     )
+    service.authorize_goal(project_id=project_id, source="합성 사용자 승인")
     service.activate_plan(
         plan_revision_id=plan.plan_revision_id,
         activation_digest=plan.activation_digest,

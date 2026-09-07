@@ -1525,6 +1525,42 @@ class ResolvedRoleAssignment(EngineModel):
     operational_binding: OperationalBinding | None = None
 
 
+class GoalOperatingPolicy(EngineModel):
+    """승인한 운영 상한. 소요량 예측이나 OS 보안 경계가 아니다."""
+
+    planning_budget: PlanningBudgetPolicy = PlanningBudgetPolicy()
+    commit_horizon: CommitHorizon = CommitHorizon()
+    max_same_failure_replans: int = Field(default=2, ge=0, le=10)
+    max_goal_replans: int = Field(default=5, ge=0, le=20)
+    requires_new_evidence: bool = True
+    resume_strategy: Literal["existing_binding_first", "new_attempt_only"] = "existing_binding_first"
+
+
+class GoalAuthorization(EngineModel):
+    """사용자 목표·대상·효과·정책 승인. Plan 선택은 내부 revision에 결속한다."""
+
+    authorization_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    revision_no: int = Field(ge=1)
+    supersedes_authorization_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
+    project_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    project_root: str = Field(min_length=1, max_length=2000)
+    goal_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    goal_revision_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    goal_contract_digest: str = Field(pattern=_DIGEST_PATTERN)
+    profile_definition_digest: str = Field(pattern=_DIGEST_PATTERN)
+    effect_policy: EffectPolicy
+    operating_policy: GoalOperatingPolicy = GoalOperatingPolicy()
+    budget_policies: tuple[str, ...] = ()
+    source: str = Field(min_length=1, max_length=2000)
+    approved_at: datetime
+
+    _approved_at_is_aware = field_validator("approved_at")(_aware)
+
+    @property
+    def authorization_digest(self) -> str:
+        return sha256_digest(self)
+
+
 class TaskExecutionSpecDefinition(EngineModel):
     plan_activation_digest: str = Field(pattern=_DIGEST_PATTERN)
     task_contract_digest: str = Field(pattern=_DIGEST_PATTERN)

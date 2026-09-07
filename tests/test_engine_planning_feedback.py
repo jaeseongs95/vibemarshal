@@ -659,6 +659,7 @@ class PlanningFeedbackTests(unittest.TestCase):
                 activation_digest=failed.activation_digest,
                 source="test",
             )
+        service.authorize_goal(project_id=project_id, source="합성 사용자 승인")
         service.activate_plan(
             plan_revision_id=repaired.plan_revision_id,
             activation_digest=repaired.activation_digest,

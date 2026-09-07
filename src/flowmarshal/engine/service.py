@@ -26,6 +26,8 @@ from .domain import (
     EvidenceRecord,
     FailureClass,
     GoalContractRevision,
+    GoalAuthorization,
+    GoalOperatingPolicy,
     GoalVerdict,
     GoalVerdictStatus,
     ManualValidationObservation,
@@ -76,6 +78,16 @@ if TYPE_CHECKING:
 
 class EngineServiceError(RuntimeError):
     pass
+
+
+class GoalAuthorizationRequired(EngineServiceError):
+    code = "GOAL_AUTHORIZATION_REQUIRED"
+    effects_started = False
+
+    def __init__(self, changes: tuple[dict[str, Any], ...]) -> None:
+        self.changes = changes
+        super().__init__("GOAL_AUTHORIZATION_REQUIRED: 사용자 목표·대상·효과·정책 판단이 필요합니다: "
+                         + canonical_json(changes))
 
 
 class ContextRequiredError(EngineServiceError):
@@ -1330,6 +1342,150 @@ class EngineService:
             ),
         )
 
+    def authorize_goal(self, *, project_id: str, source: str,
+                       operating_policy: GoalOperatingPolicy | None = None) -> GoalAuthorization:
+        """호출자는 실제 사용자 승인을 받은 명령 경계여야 한다. 후보 제출 권한과 분리한다."""
+        from .authorization import current_budget_policies
+
+        with self.ledger.transaction() as tx:
+            project = tx.one("SELECT * FROM projects WHERE id = ?", (project_id,))
+            goal = GoalContractRevision.model_validate_json(tx.one(
+                "SELECT payload_json FROM goal_revisions WHERE id = ? AND status = 'active'",
+                (project["active_goal_revision_id"],),
+            )["payload_json"])
+            profile = tx.one("SELECT definition_digest FROM profile_revisions WHERE id = ?",
+                             (project["active_profile_revision_id"],))
+            if goal.definition.profile_definition_digest != profile["definition_digest"]:
+                raise EngineServiceError("Goal의 Profile 결속이 최신 운영 정책과 다릅니다.")
+            previous = tx.maybe_one(
+                "SELECT * FROM goal_authorizations WHERE project_id = ? ORDER BY revision_no DESC LIMIT 1",
+                (project_id,),
+            )
+            authorization = GoalAuthorization(
+                authorization_id=new_id("goal_authorization"),
+                revision_no=1 if previous is None else previous["revision_no"] + 1,
+                supersedes_authorization_id=None if previous is None else previous["id"],
+                project_id=project_id, project_root=str(Path(project["root"]).resolve()),
+                goal_id=goal.goal_id, goal_revision_id=goal.goal_revision_id,
+                goal_contract_digest=goal.definition_digest,
+                profile_definition_digest=profile["definition_digest"], effect_policy=goal.definition.effect_policy,
+                operating_policy=operating_policy or GoalOperatingPolicy(),
+                budget_policies=current_budget_policies(tx.connection, project_id),
+                source=source, approved_at=_dt(tx.now),
+            )
+            authorization = GoalAuthorization.model_validate_json(authorization.model_dump_json())
+            tx.connection.execute(
+                "INSERT INTO goal_authorizations (id,project_id,revision_no,authorization_digest,payload_json,created_at) "
+                "VALUES (?,?,?,?,?,?)", (authorization.authorization_id, project_id, authorization.revision_no,
+                authorization.authorization_digest, canonical_json(authorization), tx.now),
+            )
+            tx.history(project_id, "goal.authorized", "goal_authorization", authorization.authorization_id,
+                       {"authorization_digest": authorization.authorization_digest, "source": source})
+            return authorization
+
+    def activate_authorized_plan(self, *, plan_revision_id: str) -> str:
+        """내부 후보 식별자를 사용하며 사용자에게 Plan ID/digest 입력을 요구하지 않는다."""
+        with self.ledger.read() as connection:
+            row = connection.execute("SELECT activation_digest FROM plan_revisions WHERE id = ?",
+                                     (plan_revision_id,)).fetchone()
+        if row is None:
+            raise EngineServiceError("PlanContract를 찾을 수 없습니다.")
+        return self.activate_plan(plan_revision_id=plan_revision_id, activation_digest=row["activation_digest"],
+                                  source="goal_authorization")
+
+    def register_authorized_plan_revision(self, evaluation: ExpandedPlanEvaluation) -> str:
+        """승인 내 분할·repair 후보를 review/Gate 검증 후 자동 활성화한다."""
+        self.register_plan_evaluation(evaluation)
+        return self.activate_authorized_plan(plan_revision_id=evaluation.plan.plan_revision_id)
+
+    def activate_selected_plan(self, *, project_id: str) -> str:
+        """Core가 기록한 선택 후보를 활성화한다. 선택 이력이 없으면 단일 ready 후보만 허용한다."""
+        with self.ledger.read() as connection:
+            selection = connection.execute(
+                "SELECT payload_json FROM history_events WHERE project_id = ? "
+                "AND event_type = 'planning.search_recorded' ORDER BY sequence DESC LIMIT 1", (project_id,),
+            ).fetchone()
+            selected_digest = None if selection is None else json.loads(selection["payload_json"])["outcome"].get("selected_activation_digest")
+            selected_row = None if selected_digest is None else connection.execute(
+                "SELECT id FROM plan_revisions WHERE project_id = ? AND activation_digest = ?",
+                (project_id, selected_digest),
+            ).fetchone()
+            selected = None if selected_row is None else selected_row["id"]
+            if selected is None:
+                candidates = connection.execute("SELECT id FROM plan_revisions WHERE project_id = ? AND status = 'ready'",
+                                                (project_id,)).fetchall()
+                if len(candidates) != 1:
+                    raise EngineServiceError("PLAN_SELECTION_REQUIRED: Core의 단일 선택 후보가 필요합니다.")
+                selected = candidates[0]["id"]
+        return self.activate_authorized_plan(plan_revision_id=selected)
+
+    def _plan_authorization(self, tx: Any, project: Any, payload: PlanContractRevision) -> GoalAuthorization:
+        from .authorization import authorization_changes, current_budget_policies
+
+        row = tx.maybe_one("SELECT * FROM goal_authorizations WHERE project_id = ? ORDER BY revision_no DESC LIMIT 1",
+                           (project["id"],))
+        if row is None:
+            raise GoalAuthorizationRequired(({"boundary": "goal", "field": "authorization", "approved": None,
+                                              "requested": project["active_goal_revision_id"],
+                                              "evidence_ref": payload.activation_digest},))
+        authorization = GoalAuthorization.model_validate_json(row["payload_json"])
+        if authorization.authorization_digest != row["authorization_digest"]:
+            raise EngineServiceError("GoalAuthorization digest 결속이 다릅니다.")
+        goal = GoalContractRevision.model_validate_json(tx.one("SELECT payload_json FROM goal_revisions WHERE id = ?",
+                                                              (project["active_goal_revision_id"],))["payload_json"])
+        profile = tx.one("SELECT definition_digest FROM profile_revisions WHERE id = ?", (project["active_profile_revision_id"],))
+        changes = authorization_changes(authorization, project=project, goal=goal,
+                                        profile_digest=profile["definition_digest"], plan=payload,
+                                        budget_policies=current_budget_policies(tx.connection, project["id"]))
+        project_map = ProjectMapRevision.model_validate_json(tx.one(
+            "SELECT payload_json FROM project_map_revisions WHERE revision_digest = ?",
+            (payload.definition.project_map_digest,),)["payload_json"])
+        if Path(project_map.root).resolve() != Path(authorization.project_root).resolve():
+            changes += ({"boundary": "project", "field": "project_map.root", "approved": authorization.project_root,
+                         "requested": project_map.root, "evidence_ref": project_map.revision_digest},)
+        if changes:
+            raise GoalAuthorizationRequired(changes)
+        if payload.definition.goal_contract_digest != goal.definition_digest:
+            raise EngineServiceError("active GoalContract가 Plan의 승인 기준과 달라졌습니다.")
+        return authorization
+
+    @staticmethod
+    def _assert_plan_replacement_quiescent(tx: Any, project_id: str) -> None:
+        active = tx.all("SELECT id, status FROM attempts WHERE project_id = ? "
+                        "AND (status IN ('reserved','starting','running','unknown') OR failure_class = 'external_unknown')",
+                        (project_id,))
+        intents = tx.all("SELECT i.id FROM runtime_intents i JOIN attempts a ON a.id = i.attempt_id "
+                         "WHERE a.project_id = ? AND i.status IN ('prepared','unknown')", (project_id,))
+        validating = tx.all("SELECT id FROM task_contracts WHERE project_id = ? AND status = 'validating'", (project_id,))
+        calls = tx.all("SELECT id FROM provider_calls WHERE project_id = ? "
+                       "AND (execution_status IN ('reserved','started','unknown') OR effect_status IN ('pending','unknown'))",
+                       (project_id,))
+        operations = tx.all("SELECT h.entity_id FROM history_events h WHERE h.project_id = ? "
+                            "AND h.event_type = 'operation.prepared' AND NOT EXISTS (SELECT 1 FROM history_events c "
+                            "WHERE c.project_id = h.project_id AND c.entity_id = h.entity_id AND c.sequence > h.sequence "
+                            "AND c.event_type IN ('operation.completed','operation.failed','operation.no_effect'))",
+                            (project_id,))
+        if active or intents or validating or calls or operations:
+            raise EngineServiceError("PLAN_REPLACEMENT_IN_FLIGHT: 기존 실행·검사·미확정 효과를 먼저 관측해야 합니다: "
+                                     + canonical_json({"attempts": [dict(row) for row in active],
+                                       "intents": [row["id"] for row in intents],
+                                       "validating_tasks": [row["id"] for row in validating],
+                                       "provider_calls": [row["id"] for row in calls],
+                                       "operations": [row["entity_id"] for row in operations]}))
+
+    def _reuse_completed_tasks(self, tx: Any, plan: PlanContractRevision, previous_id: str) -> tuple[str, ...]:
+        from .plan_reuse import reuse_completed_tasks
+        return reuse_completed_tasks(self, tx, plan, previous_id)
+
+    @staticmethod
+    def task_evidence_rows(connection: Any, task_id: str) -> tuple[Any, ...]:
+        """재사용은 원래 근거 ID/Attempt를 보존하는 읽기 연결이다."""
+        reuse = connection.execute("SELECT evidence_ids_json FROM task_completion_reuse WHERE task_id = ?", (task_id,)).fetchone()
+        if reuse is None:
+            return tuple(connection.execute("SELECT * FROM evidence_records WHERE task_id = ? ORDER BY id", (task_id,)).fetchall())
+        ids = json.loads(reuse["evidence_ids_json"])
+        return tuple(connection.execute("SELECT * FROM evidence_records WHERE id = ?", (item,)).fetchone() for item in ids)
+
     def activate_plan(
         self,
         *,
@@ -1352,18 +1508,25 @@ class EngineService:
                 raise EngineServiceError("Core decision이 admissible인 Plan만 활성화할 수 있습니다.")
             project = tx.one("SELECT * FROM projects WHERE id = ?", (plan["project_id"],))
             payload = PlanContractRevision.model_validate_json(plan["payload_json"])
+            if payload.activation_digest != activation_digest:
+                raise EngineServiceError("저장된 Plan payload의 activation digest가 다릅니다.")
+            authorization = self._plan_authorization(tx, project, payload)
             active_plan_id = project["active_plan_revision_id"]
             if active_plan_id is not None:
+                self._assert_plan_replacement_quiescent(tx, project["id"])
                 active_plan = tx.one(
                     "SELECT id, plan_id, status FROM plan_revisions WHERE id = ?",
                     (active_plan_id,),
                 )
-                if (
-                    payload.supersedes_plan_revision_id != active_plan_id
-                    or payload.plan_id != active_plan["plan_id"]
-                ):
+                ancestor = payload.supersedes_plan_revision_id
+                while ancestor is not None and ancestor != active_plan_id:
+                    prior = tx.one("SELECT plan_id, supersedes_id FROM plan_revisions WHERE id = ?", (ancestor,))
+                    if prior["plan_id"] != payload.plan_id:
+                        break
+                    ancestor = prior["supersedes_id"]
+                if ancestor != active_plan_id or payload.plan_id != active_plan["plan_id"]:
                     raise EngineServiceError(
-                        "active Plan을 교체하려면 같은 plan_id의 새 revision이 현재 revision을 supersede해야 합니다."
+                        "active Plan을 교체하려면 같은 plan_id의 immutable supersedes 계보가 현재 revision으로 이어져야 합니다."
                     )
             goal = tx.one(
                 "SELECT definition_digest FROM goal_revisions WHERE id = ? AND status = 'active'",
@@ -1384,6 +1547,7 @@ class EngineService:
             if project_map["is_current"] != 1:
                 raise EngineServiceError("Plan의 Project Map이 최신 revision이 아닙니다.")
             now = tx.now
+            reused = self._reuse_completed_tasks(tx, payload, active_plan_id) if active_plan_id else ()
             if active_plan_id is not None:
                 tx.connection.execute(
                     "UPDATE plan_revisions SET status = 'superseded' WHERE id = ?",
@@ -1407,9 +1571,10 @@ class EngineService:
             activation_id = new_id("activation")
             tx.connection.execute(
                 "INSERT INTO plan_activations "
-                "(id, project_id, plan_revision_id, activation_digest, source, activated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (activation_id, plan["project_id"], plan_revision_id, activation_digest, source, now),
+                "(id, project_id, plan_revision_id, activation_digest, authorization_id, source, activated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (activation_id, plan["project_id"], plan_revision_id, activation_digest,
+                 authorization.authorization_id, source, now),
             )
             self._refresh_ready(tx, plan_revision_id)
             tx.history(
@@ -1417,7 +1582,8 @@ class EngineService:
                 "plan.activated",
                 "plan_revision",
                 plan_revision_id,
-                {"activation_digest": activation_digest, "source": source},
+                {"activation_digest": activation_digest, "source": source,
+                 "authorization_id": authorization.authorization_id, "reused_task_ids": reused},
             )
             return activation_id
 
@@ -1566,6 +1732,11 @@ class EngineService:
     @staticmethod
     def effective_task_validation_results(connection: Any, task_id: str) -> tuple[Any, ...]:
         """현재 Worker 성공 및 retry epoch 뒤에 기록된 Task validation만 반환한다."""
+
+        reuse = connection.execute("SELECT validation_ids_json FROM task_completion_reuse WHERE task_id = ?", (task_id,)).fetchone()
+        if reuse is not None:
+            return tuple(connection.execute("SELECT * FROM validation_results WHERE id = ?", (item,)).fetchone()
+                         for item in json.loads(reuse["validation_ids_json"]))
 
         task = connection.execute(
             "SELECT project_id FROM task_contracts WHERE id = ?", (task_id,)
@@ -2241,6 +2412,7 @@ class EngineService:
             plan = PlanContractRevision.model_validate_json(plan_row["payload_json"])
             if spec.definition.plan_activation_digest != plan.activation_digest:
                 raise EngineServiceError("ExecutionSpec이 active Plan activation digest와 다릅니다.")
+            self._plan_authorization(tx, tx.one("SELECT * FROM projects WHERE id = ?", (task["project_id"],)), plan)
             if spec.definition.task_contract_digest != task["contract_digest"]:
                 raise EngineServiceError("ExecutionSpec이 TaskContract 의미를 바꾸려 합니다.")
             if spec.definition.task_id != task["id"]:
@@ -2416,12 +2588,11 @@ class EngineService:
                     "execution Attempt는 materialized Task, validation Attempt는 validating Task에서만 "
                     "예약할 수 있습니다."
                 )
-            plan = tx.one(
-                "SELECT status FROM plan_revisions WHERE id = ?", (task["plan_revision_id"],)
-            )
+            plan = tx.one("SELECT * FROM plan_revisions WHERE id = ?", (task["plan_revision_id"],))
             if plan["status"] != "active":
                 raise EngineServiceError("active Plan의 Task만 실행할 수 있습니다.")
-            project = tx.one("SELECT run_state FROM projects WHERE id = ?", (task["project_id"],))
+            project = tx.one("SELECT * FROM projects WHERE id = ?", (task["project_id"],))
+            self._plan_authorization(tx, project, PlanContractRevision.model_validate_json(plan["payload_json"]))
             if project["run_state"] == "recovery_required":
                 raise EngineServiceError("crash recovery가 끝나기 전에는 새 Attempt를 만들 수 없습니다.")
             spec_row = tx.one(
@@ -2531,6 +2702,47 @@ class EngineService:
                     f"STALE_EXECUTION_INPUT: materialization 이후 파일이 바뀌었습니다: {raw_path}"
                 )
 
+    def _assert_attempt_authorized(self, tx: Any, attempt: Any) -> None:
+        project = tx.one("SELECT * FROM projects WHERE id = ?", (attempt["project_id"],))
+        if project["active_plan_revision_id"] != attempt["plan_revision_id"]:
+            raise EngineServiceError("Attempt가 현재 active Plan에 결속되지 않았습니다.")
+        plan = PlanContractRevision.model_validate_json(tx.one("SELECT payload_json FROM plan_revisions WHERE id = ?",
+                                                              (attempt["plan_revision_id"],))["payload_json"])
+        self._plan_authorization(tx, project, plan)
+
+    def assert_attempt_authorized(self, attempt_id: str) -> None:
+        """예약 후 정책 변경도 새 효과 전에 대조한다. 관측·취소는 승인 갱신 없이 허용한다."""
+        with self.ledger.transaction() as tx:
+            self._assert_attempt_authorized(tx, tx.one("SELECT * FROM attempts WHERE id = ?", (attempt_id,)))
+
+    def assert_project_authorized(self, project_id: str) -> None:
+        """Attempt 없는 실행 준비·Task 검사·Goal Test에도 같은 승인 경계를 적용한다."""
+        with self.ledger.transaction() as tx:
+            project = tx.one("SELECT * FROM projects WHERE id = ?", (project_id,))
+            plan = PlanContractRevision.model_validate_json(tx.one("SELECT payload_json FROM plan_revisions WHERE id = ?",
+                                                                  (project["active_plan_revision_id"],))["payload_json"])
+            self._plan_authorization(tx, project, plan)
+
+    def prepare_authorized_runtime_effect(self, attempt_id: str, intent_id: str | None) -> None:
+        """효과 호출 직전의 판정을 남겨 승인 거부와 호출 후 응답 유실을 구분한다."""
+        if intent_id is None:
+            self.assert_attempt_authorized(attempt_id)
+            return
+        try:
+            with self.ledger.transaction() as tx:
+                attempt = tx.one("SELECT * FROM attempts WHERE id = ?", (attempt_id,))
+                tx.one("SELECT id FROM runtime_intents WHERE id = ? AND attempt_id = ? AND status = 'prepared'",
+                       (intent_id, attempt_id))
+                self._assert_attempt_authorized(tx, attempt)
+                tx.history(attempt["project_id"], "runtime.effect_dispatching", "runtime_intent", intent_id,
+                           {"attempt_id": attempt_id})
+        except GoalAuthorizationRequired as error:
+            with self.ledger.transaction() as tx:
+                attempt = tx.one("SELECT project_id FROM attempts WHERE id = ?", (attempt_id,))
+                tx.history(attempt["project_id"], "runtime.effect_not_started", "runtime_intent", intent_id,
+                           {"attempt_id": attempt_id, "code": error.code, "changes": error.changes})
+            raise
+
     def prepare_runtime_intent(
         self,
         *,
@@ -2542,6 +2754,8 @@ class EngineService:
         request_digest = sha256_digest(request)
         with self.ledger.transaction() as tx:
             attempt = tx.one("SELECT * FROM attempts WHERE id = ?", (attempt_id,))
+            if kind is not RuntimeIntentKind.INTERRUPT_TURN:
+                self._assert_attempt_authorized(tx, attempt)
             existing = tx.maybe_one(
                 "SELECT * FROM runtime_intents WHERE idempotency_key = ?", (idempotency_key,)
             )
@@ -2989,6 +3203,8 @@ class EngineService:
                     result.evaluated_at.isoformat(),
                 ),
             )
+            from .plan_reuse import observation_checkpoint
+            reuse_checkpoint = None if result.task_id is None else observation_checkpoint(self, tx.connection, result.task_id)
             tx.history(
                 project_id,
                 "validation.recorded",
@@ -2999,6 +3215,7 @@ class EngineService:
                     "status": result.status.value,
                     "task_id": result.task_id,
                     "operation_binding": operation_binding,
+                    "reuse_checkpoint": reuse_checkpoint,
                 },
             )
 
@@ -3185,12 +3402,13 @@ class EngineService:
                 (now, task_id),
             )
             ready = self._refresh_ready(tx, task["plan_revision_id"])
+            from .plan_reuse import observation_checkpoint
             tx.history(
                 task["project_id"],
                 "task.completed",
                 "task_contract",
                 task_id,
-                {"new_ready_task_ids": ready},
+                {"new_ready_task_ids": ready, "reuse_checkpoint": observation_checkpoint(self, tx.connection, task_id)},
             )
             return ready
 

@@ -275,9 +275,39 @@ CREATE TABLE plan_activations (
     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE RESTRICT,
     plan_revision_id TEXT NOT NULL UNIQUE REFERENCES plan_revisions(id) ON DELETE RESTRICT,
     activation_digest TEXT NOT NULL,
+    authorization_id TEXT NOT NULL REFERENCES goal_authorizations(id) ON DELETE RESTRICT,
     source TEXT NOT NULL,
     activated_at TEXT NOT NULL
 ) STRICT;
+
+CREATE TABLE goal_authorizations (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id),
+    revision_no INTEGER NOT NULL CHECK (revision_no >= 1),
+    authorization_digest TEXT NOT NULL UNIQUE,
+    payload_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(project_id, revision_no)
+) STRICT;
+
+CREATE TABLE task_completion_reuse (
+    task_id TEXT PRIMARY KEY REFERENCES task_contracts(id),
+    source_task_id TEXT NOT NULL REFERENCES task_contracts(id),
+    validation_ids_json TEXT NOT NULL,
+    evidence_ids_json TEXT NOT NULL,
+    checkpoint_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    CHECK(task_id <> source_task_id)
+) STRICT;
+
+CREATE TRIGGER tr_engine_authorization_no_update BEFORE UPDATE ON goal_authorizations
+BEGIN SELECT RAISE(ABORT, 'ENGINE_AUTHORIZATION_APPEND_ONLY'); END;
+CREATE TRIGGER tr_engine_authorization_no_delete BEFORE DELETE ON goal_authorizations
+BEGIN SELECT RAISE(ABORT, 'ENGINE_AUTHORIZATION_APPEND_ONLY'); END;
+CREATE TRIGGER tr_engine_reuse_no_update BEFORE UPDATE ON task_completion_reuse
+BEGIN SELECT RAISE(ABORT, 'ENGINE_REUSE_APPEND_ONLY'); END;
+CREATE TRIGGER tr_engine_reuse_no_delete BEFORE DELETE ON task_completion_reuse
+BEGIN SELECT RAISE(ABORT, 'ENGINE_REUSE_APPEND_ONLY'); END;
 
 CREATE TABLE task_contracts (
     id TEXT PRIMARY KEY,

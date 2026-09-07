@@ -114,6 +114,7 @@ def run_command_validation(service: EngineService, task: Any, step: ValidationEx
         })
 
     def execute():
+        service.assert_project_authorized(project_id)
         stdout, stderr, code, timed_out = b"", b"", None, False
         try:
             result = subprocess.run(step.argv, cwd=step.working_directory, capture_output=True,
@@ -379,6 +380,7 @@ def advance_independent_goal_test(
     retry_request: GoalValidationRetryRequest | None = None,
     fault_hook: Callable[[str], None] | None = None,
 ) -> RunOnceOutcome:
+    service.assert_project_authorized(project_id)
     try:
         context = execution_context(service, project_id)
     except EngineServiceError as error:
@@ -410,6 +412,7 @@ def advance_independent_goal_test(
                 return blocked(project_id, "GOAL_VALIDATION_SPEC_REQUIRED",
                                f"독립 Goal Test의 실행 binding이 필요합니다: {contract.validation_id}")
             try:
+                service.assert_project_authorized(project_id)
                 step = provider.prepare_goal(project_id=project_id, validation_id=contract.validation_id,
                                              inventory=runtime.list_models())
             except ExternalOperationUnknown as error:
@@ -465,11 +468,8 @@ def advance_independent_goal_test(
         except ValueError as error:
             return blocked(project_id, "MODEL_BINDING_CHANGED", str(error))
         with service.ledger.read() as connection:
-            rows = connection.execute(
-                "SELECT e.* FROM evidence_records e JOIN task_contracts t ON t.id = e.task_id "
-                "WHERE e.project_id = ? AND t.plan_revision_id = ? ORDER BY e.observed_at",
-                (project_id, plan.plan_revision_id),
-            ).fetchall()
+            rows = [row for task in plan.definition.tasks
+                    for row in service.task_evidence_rows(connection, task.task_id)]
         catalog = {
             row["id"]: json.loads(row["payload_json"]) for row in rows
             if not (row["kind"] == "external_observation"
@@ -479,6 +479,7 @@ def advance_independent_goal_test(
         if not catalog:
             return blocked(project_id, "GOAL_TEST_INPUT_INCOMPLETE", "독립 검사에 필요한 직접 evidence가 없습니다.")
         try:
+            service.assert_project_authorized(project_id)
             result = provider.validate_goal(project_id=project_id, inventory=inventory,
                                             context=context, evidence_catalog=catalog, step=binding.step)
         except ExternalOperationUnknown as error:

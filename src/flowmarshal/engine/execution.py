@@ -195,10 +195,7 @@ class ExecutionProposalAdapter:
             for dependency in plan.definition.dependencies:
                 if dependency.consumer_task_id != task.task_id:
                     continue
-                rows = connection.execute(
-                    "SELECT payload_json FROM evidence_records WHERE project_id = ? AND task_id = ? ORDER BY id",
-                    (task.project_id, dependency.producer_task_id),
-                ).fetchall()
+                rows = self.service.task_evidence_rows(connection, dependency.producer_task_id)
                 outputs.append({"producer_task_id": dependency.producer_task_id,
                                 "products": list(dependency.products),
                                 "evidence": [json.loads(row["payload_json"]) for row in rows]})
@@ -246,10 +243,13 @@ class ExecutionProposalAdapter:
             cwd=context["project_map"]["root"],
         )
         runner = self._budgeted_runner(project_id, context)
+        def execute_authorized():
+            self.service.assert_project_authorized(project_id)
+            return runner.run(request, validator=output_validator).model_dump(mode="json")
         result = self.operations.invoke(
             project_id=project_id, kind=kind,
             request={"role_request": request.model_dump(mode="json"), "authority_context_digest": sha256_digest(context)},
-            execute=lambda: runner.run(request, validator=output_validator).model_dump(mode="json"),
+            execute=execute_authorized,
         )
         verify_role_receipt(request, RoleCallResult.model_validate(result))
         self._record_usage(project_id, context, result,
@@ -346,9 +346,12 @@ class ExecutionProposalAdapter:
             return judgement
 
         runner = self._budgeted_runner(project_id, context)
+        def execute_authorized():
+            self.service.assert_project_authorized(project_id)
+            return runner.run(request, validator=validate).model_dump(mode="json")
         result = self.operations.invoke(
             project_id=project_id, kind="goal_validation", request=request.model_dump(mode="json"),
-            execute=lambda: runner.run(request, validator=validate).model_dump(mode="json"),
+            execute=execute_authorized,
         )
         verify_role_receipt(request, RoleCallResult.model_validate(result))
         self._record_usage(project_id, context, result, BudgetStage.VALIDATION)

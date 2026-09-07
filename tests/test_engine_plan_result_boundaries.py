@@ -307,6 +307,7 @@ class PlanResultBoundaryRegressionTests(unittest.TestCase):
 
                 if finding_code is None:
                     self.assertIsNotNone(outcome.selected_activation_digest)
+                    service.authorize_goal(project_id=evaluation.plan.definition.project_id, source="합성 사용자 승인")
                     service.activate_plan(
                         plan_revision_id=evaluation.plan.plan_revision_id,
                         activation_digest=evaluation.plan.activation_digest,
@@ -316,6 +317,7 @@ class PlanResultBoundaryRegressionTests(unittest.TestCase):
                 else:
                     self.assertIsNone(outcome.selected_activation_digest)
                     with self.assertRaisesRegex(EngineServiceError, "ready"):
+                        service.authorize_goal(project_id=evaluation.plan.definition.project_id, source="합성 사용자 승인")
                         service.activate_plan(
                             plan_revision_id=evaluation.plan.plan_revision_id,
                             activation_digest=evaluation.plan.activation_digest,

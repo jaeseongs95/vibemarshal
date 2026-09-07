@@ -1587,6 +1587,8 @@ class EngineDispatcher:
     ) -> Any:
         lock = self._operation_trace_locks.setdefault(attempt_id, threading.RLock())
         with lock:
+            if kind in {"create", "start", "resume"}:
+                self.service.prepare_authorized_runtime_effect(attempt_id, intent_id)
             parent_scope = current_operation_trace_scope()
             category = (
                 "wait" if kind == "sdk_wait" else
@@ -1687,11 +1689,12 @@ class EngineDispatcher:
         goal_validation_retry: Any | None = None,
     ) -> RunOnceOutcome:
         from .budget import BudgetBlocked
+        from .service import GoalAuthorizationRequired
         try:
             return self._run_once(project_id, proposal=proposal,
                                   goal_validation_step=goal_validation_step,
                                   goal_validation_retry=goal_validation_retry)
-        except BudgetBlocked as error:
+        except (BudgetBlocked, GoalAuthorizationRequired) as error:
             return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=project_id,
                                   blocker_code=error.code, detail=str(error))
 
@@ -1723,6 +1726,14 @@ class EngineDispatcher:
                 (project_id,),
             ).fetchone()
         if prepared:
+            if len(prepared) == 1:
+                with self.service.ledger.read() as connection:
+                    marker = connection.execute("SELECT event_type FROM history_events WHERE entity_id = ? "
+                        "AND event_type IN ('runtime.effect_not_started','runtime.effect_dispatching') "
+                        "ORDER BY sequence DESC LIMIT 1", (prepared[0]["id"],)).fetchone()
+                    intent = connection.execute("SELECT * FROM runtime_intents WHERE id = ?", (prepared[0]["id"],)).fetchone()
+                if marker is not None and marker["event_type"] == "runtime.effect_not_started":
+                    return self._retry_authorization_blocked_effect(intent)
             unknown = self.service.recover_inspect(project_id)
             return RunOnceOutcome(
                 action=RunOnceAction.BLOCKED,
@@ -1834,6 +1845,7 @@ class EngineDispatcher:
         if validating is not None:
             return self._advance_validation(validating)
         if ready is not None:
+            self.service.assert_project_authorized(project_id)
             if proposal is None and self.proposal_provider is not None:
                 from .operations import ExternalOperationUnknown
                 try:
@@ -2228,7 +2240,34 @@ class EngineDispatcher:
         except ValueError as error:
             raise RuntimePolicyError(str(error)) from error
 
-    def _dispatch_reserved(self, attempt_id: str, *, validation_id: str | None = None) -> None:
+    def _retry_authorization_blocked_effect(self, intent: Any) -> RunOnceOutcome:
+        self.service.assert_attempt_authorized(intent["attempt_id"])
+        row, spec = self._attempt_context(intent["attempt_id"])
+        with self.service.ledger.read() as connection:
+            state = connection.execute("SELECT run_state FROM projects WHERE id = ?", (row["project_id"],)).fetchone()[0]
+        if state != "active":
+            return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=row["project_id"],
+                                  blocker_code="PROJECT_NOT_ACTIVE", detail="프로젝트가 active일 때만 미실행 intent를 다시 실행합니다.")
+        validation_id = self._next_semantic_validation_id(row["task_id"]) if row["kind"] == "validation" else None
+        if intent["kind"] == "create_thread":
+            self._dispatch_reserved(row["id"], validation_id=validation_id,
+                                    existing_call_id=self._attempt_provider_call_id(row["id"]))
+        elif intent["kind"] == "start_turn":
+            binding = ThreadBinding.model_validate_json(row["binding_json"])
+            attempt_key = intent["idempotency_key"].removesuffix(":turn")
+            self._start_turn(row=row, spec=spec, thread_id=binding.thread_id, attempt_key=attempt_key,
+                             validation_id=validation_id, resumed=attempt_key.endswith(":resumed"),
+                             provider_call_id=self._attempt_provider_call_id(row["id"]))
+        elif intent["kind"] == "resume_turn":
+            self._resume_bound_attempt(row, spec)
+        else:
+            raise EngineServiceError("자동 재개할 수 없는 승인 차단 effect입니다.")
+        return RunOnceOutcome(action=RunOnceAction.DISPATCHED, project_id=row["project_id"], task_id=row["task_id"],
+                              attempt_id=row["id"], detail="미실행이 기록된 동일 intent를 갱신된 승인 범위에서 실행했습니다.")
+
+    def _dispatch_reserved(self, attempt_id: str, *, validation_id: str | None = None,
+                           existing_call_id: str | None = None) -> None:
+        self.service.assert_attempt_authorized(attempt_id)
         row, spec = self._attempt_context(attempt_id)
         cwd = Path(row["root"])
         role, _prompt, _output_schema = self._role_for_attempt(
@@ -2256,10 +2295,19 @@ class EngineDispatcher:
             )
         from .budget import BudgetBlocked, reserve_attempt_call
         try:
-            provider_call_id = reserve_attempt_call(
-                self.service, row, call_key=attempt_key, request=request,
-                require_policy=getattr(self.runtime, "requires_budget_policy", False),
-            )
+            if existing_call_id is None:
+                provider_call_id = reserve_attempt_call(
+                    self.service, row, call_key=attempt_key, request=request,
+                    require_policy=getattr(self.runtime, "requires_budget_policy", False),
+                )
+            else:
+                with self.service.ledger.read() as connection:
+                    reserved = connection.execute("SELECT * FROM provider_calls WHERE id = ? AND attempt_id = ?",
+                                                  (existing_call_id, attempt_id)).fetchone()
+                if (reserved is None or reserved["execution_status"] != "reserved"
+                        or reserved["request_digest"] != sha256_digest(request) or reserved["new_turn_count"] != 0):
+                    raise EngineServiceError("승인 차단 이전의 미실행 provider 예약과 입력이 다릅니다.")
+                provider_call_id = existing_call_id
             self._attempt_provider_call_ids[attempt_id] = provider_call_id
         except BudgetBlocked as error:
             self.service.release_unstarted_attempt(attempt_id, str(error))
@@ -2850,6 +2898,9 @@ class EngineDispatcher:
                 "ORDER BY evaluated_at, rowid",
                 (plan.plan_revision_id,),
             ).fetchall()
+            rows += [row for task in plan.definition.tasks
+                     for row in self.service.effective_task_validation_results(connection, task.task_id)
+                     if row["plan_revision_id"] != plan.plan_revision_id]
             existing_verdict = connection.execute(
                 "SELECT payload_json FROM goal_verdicts WHERE plan_revision_id = ? "
                 "ORDER BY evaluated_at DESC, rowid DESC LIMIT 1",

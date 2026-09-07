@@ -522,6 +522,7 @@ def _cmd_plan_search(arguments: argparse.Namespace) -> None:
         for evaluation in outcome.plan_evaluations:
             service.register_plan_evaluation(evaluation)
         service.record_planning_search(outcome)
+        _activate_search_if_authorized(service, arguments.project_id, outcome)
         _emit(outcome)
         return
     if arguments.live:
@@ -650,6 +651,7 @@ def _cmd_plan_search(arguments: argparse.Namespace) -> None:
         for evaluation in outcome.plan_evaluations:
             service.register_plan_evaluation(evaluation)
         service.record_planning_search(outcome)
+        _activate_search_if_authorized(service, arguments.project_id, outcome)
         _emit(outcome)
         return
     _emit(
@@ -686,12 +688,34 @@ def _cmd_plan_compare(arguments: argparse.Namespace) -> None:
 
 
 def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
-    activation_id = _service(arguments).activate_plan(
-        plan_revision_id=arguments.plan_revision_id,
-        activation_digest=arguments.digest,
-        source=arguments.source,
-    )
-    _emit({"activation_id": activation_id, "activation_digest": arguments.digest})
+    service = _service(arguments)
+    if arguments.project_id:
+        activation_id = service.activate_selected_plan(project_id=arguments.project_id)
+    elif arguments.digest:
+        activation_id = service.activate_plan(plan_revision_id=arguments.plan_revision_id,
+                                               activation_digest=arguments.digest, source=arguments.source)
+    else:
+        activation_id = service.activate_authorized_plan(plan_revision_id=arguments.plan_revision_id)
+    _emit({"activation_id": activation_id})
+
+
+def _cmd_goal_authorize(arguments: argparse.Namespace) -> None:
+    from .domain import GoalOperatingPolicy
+    service = _service(arguments)
+    policy = None if arguments.policy_file is None else GoalOperatingPolicy.model_validate(_json(arguments.policy_file))
+    authorization = service.authorize_goal(project_id=arguments.project_id, source=arguments.source, operating_policy=policy)
+    with service.ledger.read() as connection:
+        candidate = connection.execute("SELECT id FROM plan_revisions WHERE project_id = ? AND status = 'ready'",
+                                       (arguments.project_id,)).fetchone()
+    activation_id = None if candidate is None else service.activate_selected_plan(project_id=arguments.project_id)
+    _emit({"authorization": authorization.model_dump(mode="json"), "activation_id": activation_id})
+
+
+def _activate_search_if_authorized(service: EngineService, project_id: str, outcome: PlanningSearchOutcome) -> None:
+    with service.ledger.read() as connection:
+        authorized = connection.execute("SELECT id FROM goal_authorizations WHERE project_id = ?", (project_id,)).fetchone()
+    if authorized is not None and outcome.selected_activation_digest is not None:
+        service.activate_selected_plan(project_id=project_id)
 
 
 def _cmd_plan_status(arguments: argparse.Namespace) -> None:
@@ -1108,6 +1132,11 @@ def build_parser() -> argparse.ArgumentParser:
     goal_show = goal_commands.add_parser("show")
     goal_show.add_argument("--project-id", required=True)
     goal_show.set_defaults(handler=_cmd_goal_show)
+    authorize = goal_commands.add_parser("authorize", help="목표·대상·효과·운영 정책 승인 후 선택 Plan 자동 활성화")
+    authorize.add_argument("--project-id", required=True)
+    authorize.add_argument("--source", default="cli-user")
+    authorize.add_argument("--policy-file")
+    authorize.set_defaults(handler=_cmd_goal_authorize)
 
     plan = commands.add_parser("plan")
     plan_commands = plan.add_subparsers(dest="plan_command", required=True)
@@ -1137,8 +1166,10 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("--project-id", required=True)
     compare.set_defaults(handler=_cmd_plan_compare)
     activate = plan_commands.add_parser("activate")
-    activate.add_argument("--plan-revision-id", required=True)
-    activate.add_argument("--digest", required=True)
+    activation_target = activate.add_mutually_exclusive_group(required=True)
+    activation_target.add_argument("--project-id", help="Core가 선택한 후보를 활성화")
+    activation_target.add_argument("--plan-revision-id", help="내부 진단용 후보 식별자")
+    activate.add_argument("--digest", help="선택적 내부 digest 검증")
     activate.add_argument("--source", default="cli")
     activate.set_defaults(handler=_cmd_plan_activate)
     plan_status = plan_commands.add_parser("status")

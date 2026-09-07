@@ -777,6 +777,7 @@ def _prepare(
             "activation_digest": plan.activation_digest,
         },
     )
+    service.authorize_goal(project_id=project_id, source="합성 qualification 승인")
     service.activate_plan(
         plan_revision_id=plan.plan_revision_id,
         activation_digest=plan.activation_digest,
