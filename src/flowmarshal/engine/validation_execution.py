@@ -13,6 +13,7 @@ from ..canonical import sha256_bytes, sha256_digest
 from .domain import (
     DeterministicValidationObservation, EngineModel, EvidenceKind, EvidenceRecord,
     FailureClass, PlanContractRevision, RepairAction, RunOnceAction, RunOnceOutcome,
+    RuntimeJobKind, RuntimeJobStatus,
     SemanticValidationObservation, ValidationExecutionStep, ValidationResult, ValidationStatus, new_id, utc_now,
     TaskExecutionSpecRevision,
 )
@@ -379,6 +380,7 @@ def advance_independent_goal_test(
     *, supplied_step: ValidationExecutionStep | None = None, provider: Any | None = None,
     retry_request: GoalValidationRetryRequest | None = None,
     fault_hook: Callable[[str], None] | None = None,
+    supervisor: Any | None = None,
 ) -> RunOnceOutcome:
     service.assert_project_authorized(project_id)
     try:
@@ -413,8 +415,45 @@ def advance_independent_goal_test(
                                f"독립 Goal Test의 실행 binding이 필요합니다: {contract.validation_id}")
             try:
                 service.assert_project_authorized(project_id)
-                step = provider.prepare_goal(project_id=project_id, validation_id=contract.validation_id,
-                                             inventory=runtime.list_models())
+                inventory = runtime.list_models()
+                if supervisor is None:
+                    step = provider.prepare_goal(
+                        project_id=project_id, validation_id=contract.validation_id,
+                        inventory=inventory,
+                    )
+                else:
+                    checkpoint = (
+                        f"goal_test_prepare:{plan.plan_revision_id}:{contract.validation_id}:"
+                        f"{0 if retry_request is None else retry_request.failed_validation_result_id}"
+                    )
+                    with service.ledger.read() as connection:
+                        row = connection.execute(
+                            "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
+                            (project_id, checkpoint),
+                        ).fetchone()
+                    if row is None:
+                        job = supervisor.schedule(
+                            project_id=project_id, kind=RuntimeJobKind.GOAL_TEST_PREPARE,
+                            checkpoint_key=checkpoint,
+                            request={"validation_id": contract.validation_id,
+                                     "inventory_digest": inventory.inventory_digest},
+                            timeout_seconds=900,
+                            target=lambda: provider.prepare_goal(
+                                project_id=project_id, validation_id=contract.validation_id,
+                                inventory=inventory),
+                        )
+                    else:
+                        job = service._runtime_job_from_row(row)
+                        if job.status in {RuntimeJobStatus.SCHEDULED, RuntimeJobStatus.RUNNING}:
+                            job = supervisor.tick(job.job_id)
+                    if job.status not in {RuntimeJobStatus.PROVIDER_TERMINAL,
+                                          RuntimeJobStatus.CONSUMED}:
+                        return RunOnceOutcome(
+                            action=RunOnceAction.DISPATCHED, project_id=project_id,
+                            detail=f"Goal Test 준비 job을 예약·관측했습니다: {job.job_id}",
+                        )
+                    result = service.consume_runtime_job(job.job_id)
+                    step = ValidationExecutionStep.model_validate(result)
             except ExternalOperationUnknown as error:
                 return blocked(project_id, "EXTERNAL_EFFECT_UNKNOWN", str(error))
         step = _normalize_goal_step(context, contract, step)
@@ -480,8 +519,45 @@ def advance_independent_goal_test(
             return blocked(project_id, "GOAL_TEST_INPUT_INCOMPLETE", "독립 검사에 필요한 직접 evidence가 없습니다.")
         try:
             service.assert_project_authorized(project_id)
-            result = provider.validate_goal(project_id=project_id, inventory=inventory,
-                                            context=context, evidence_catalog=catalog, step=binding.step)
+            if supervisor is None:
+                result = provider.validate_goal(
+                    project_id=project_id, inventory=inventory, context=context,
+                    evidence_catalog=catalog, step=binding.step,
+                )
+            else:
+                checkpoint = (
+                    f"goal_semantic_validate:{plan.plan_revision_id}:"
+                    f"{contract.validation_id}:{binding.binding_digest}"
+                )
+                with service.ledger.read() as connection:
+                    row = connection.execute(
+                        "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
+                        (project_id, checkpoint),
+                    ).fetchone()
+                if row is None:
+                    job = supervisor.schedule(
+                        project_id=project_id, kind=RuntimeJobKind.GOAL_SEMANTIC_VALIDATE,
+                        checkpoint_key=checkpoint,
+                        request={"validation_id": contract.validation_id,
+                                 "binding_digest": binding.binding_digest,
+                                 "context_digest": sha256_digest(context),
+                                 "evidence_catalog_digest": sha256_digest(catalog)},
+                        timeout_seconds=900,
+                        target=lambda: provider.validate_goal(
+                            project_id=project_id, inventory=inventory, context=context,
+                            evidence_catalog=catalog, step=binding.step),
+                    )
+                else:
+                    job = service._runtime_job_from_row(row)
+                    if job.status in {RuntimeJobStatus.SCHEDULED, RuntimeJobStatus.RUNNING}:
+                        job = supervisor.tick(job.job_id)
+                if job.status not in {RuntimeJobStatus.PROVIDER_TERMINAL,
+                                      RuntimeJobStatus.CONSUMED}:
+                    return RunOnceOutcome(
+                        action=RunOnceAction.DISPATCHED, project_id=project_id,
+                        detail=f"Goal semantic validation job을 예약·관측했습니다: {job.job_id}",
+                    )
+                result = service.consume_runtime_job(job.job_id)
         except ExternalOperationUnknown as error:
             return blocked(project_id, "EXTERNAL_EFFECT_UNKNOWN", str(error))
         if sha256_digest(execution_context(service, project_id)) != binding.context_digest:

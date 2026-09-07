@@ -406,6 +406,46 @@ CREATE TABLE runtime_receipts (
     received_at TEXT NOT NULL
 ) STRICT;
 
+CREATE TABLE runtime_jobs (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE RESTRICT,
+    kind TEXT NOT NULL CHECK (kind IN ('execution_spec_prepare','worker_turn','task_semantic_validate','goal_test_prepare','goal_semantic_validate','recovery','replanning')),
+    status TEXT NOT NULL CHECK (status IN ('scheduled','running','interrupting','provider_terminal','collector_lost','consumed','cancelled')),
+    checkpoint_key TEXT NOT NULL,
+    request_digest TEXT NOT NULL,
+    request_json TEXT NOT NULL,
+    attempt_id TEXT REFERENCES attempts(id) ON DELETE RESTRICT,
+    task_id TEXT REFERENCES task_contracts(id) ON DELETE RESTRICT,
+    thread_id TEXT,
+    turn_id TEXT,
+    absolute_deadline_at TEXT NOT NULL,
+    provider_terminal_status TEXT,
+    result_digest TEXT,
+    result_json TEXT,
+    created_at TEXT NOT NULL,
+    started_at TEXT,
+    ended_at TEXT,
+    updated_at TEXT NOT NULL,
+    UNIQUE(project_id, checkpoint_key)
+) STRICT;
+
+CREATE UNIQUE INDEX uq_engine_one_active_runtime_job_per_project
+ON runtime_jobs(project_id)
+WHERE status IN ('scheduled','running','interrupting','collector_lost');
+
+CREATE TABLE runtime_job_observations (
+    id TEXT PRIMARY KEY,
+    job_id TEXT NOT NULL REFERENCES runtime_jobs(id) ON DELETE RESTRICT,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE RESTRICT,
+    kind TEXT NOT NULL,
+    provider_terminal INTEGER NOT NULL CHECK (provider_terminal IN (0,1)),
+    terminal_status TEXT,
+    payload_digest TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    observed_at TEXT NOT NULL,
+    UNIQUE(job_id, payload_digest)
+) STRICT;
+
 CREATE TABLE evidence_records (
     id TEXT PRIMARY KEY,
     project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE RESTRICT,
@@ -553,6 +593,10 @@ CREATE TRIGGER tr_engine_receipt_no_update BEFORE UPDATE ON runtime_receipts
 BEGIN SELECT RAISE(ABORT, 'ENGINE_RECEIPT_APPEND_ONLY'); END;
 CREATE TRIGGER tr_engine_receipt_no_delete BEFORE DELETE ON runtime_receipts
 BEGIN SELECT RAISE(ABORT, 'ENGINE_RECEIPT_APPEND_ONLY'); END;
+CREATE TRIGGER tr_engine_job_observation_no_update BEFORE UPDATE ON runtime_job_observations
+BEGIN SELECT RAISE(ABORT, 'ENGINE_JOB_OBSERVATION_APPEND_ONLY'); END;
+CREATE TRIGGER tr_engine_job_observation_no_delete BEFORE DELETE ON runtime_job_observations
+BEGIN SELECT RAISE(ABORT, 'ENGINE_JOB_OBSERVATION_APPEND_ONLY'); END;
 """
 
 
@@ -711,6 +755,12 @@ class SQLiteEngineLedger:
                         "SQLiteEngineHistoryReader를 사용하세요."
                     )
                 raise EngineLedgerError("지원하지 않는 Engine schema revision입니다.")
+            required_current_tables = {"runtime_jobs", "runtime_job_observations", "usage_observations"}
+            if not required_current_tables.issubset(tables):
+                raise EngineLedgerError(
+                    "현재 Engine schema 4 계약의 필수 테이블이 없습니다. "
+                    "기존 개발 DB를 제자리 변환하지 말고 새 DB를 만드세요."
+                )
             if connection.execute("PRAGMA application_id").fetchone()[0] != SQLITE_APPLICATION_ID:
                 raise EngineLedgerError("SQLite application_id가 FlowMarshal Engine과 다릅니다.")
         finally:
@@ -789,6 +839,12 @@ class SQLiteEngineLedger:
                 "FROM attempts WHERE project_id = ? ORDER BY created_at, rowid",
                 (project_id,),
             ).fetchall()
+            runtime_jobs = connection.execute(
+                "SELECT id,kind,status,checkpoint_key,attempt_id,task_id,thread_id,turn_id,"
+                "absolute_deadline_at,provider_terminal_status,result_digest,created_at,started_at,ended_at "
+                "FROM runtime_jobs WHERE project_id=? ORDER BY created_at,rowid",
+                (project_id,),
+            ).fetchall()
             context_sources = connection.execute(
                 "SELECT id, kind, path, content_digest, registered_at "
                 "FROM context_source_registrations WHERE project_id = ? ORDER BY registered_at, rowid",
@@ -802,6 +858,7 @@ class SQLiteEngineLedger:
             "plans": [dict(row) for row in plans],
             "tasks": [dict(row) for row in tasks],
             "attempts": [dict(row) for row in attempts],
+            "runtime_jobs": [dict(row) for row in runtime_jobs],
             "context_sources": [dict(row) for row in context_sources],
             "history_count": history_count,
             "history_valid": self.verify_history(project_id),

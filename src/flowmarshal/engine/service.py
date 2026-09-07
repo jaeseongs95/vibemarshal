@@ -43,6 +43,11 @@ from .domain import (
     RuntimeIntentKind,
     RuntimeIntentRecord,
     RuntimeIntentStatus,
+    RuntimeJob,
+    RuntimeJobKind,
+    RuntimeJobObservation,
+    RuntimeJobObservationKind,
+    RuntimeJobStatus,
     RuntimeReceipt,
     StateFact,
     StateSnapshot,
@@ -1301,6 +1306,258 @@ class EngineService:
                 plan.plan_revision_id,
                 {"activation_digest": plan.activation_digest, "decision": decision.status.value},
             )
+
+    def schedule_runtime_job(
+        self,
+        *,
+        project_id: str,
+        kind: RuntimeJobKind,
+        checkpoint_key: str,
+        request: dict[str, Any],
+        absolute_deadline_at: datetime,
+        attempt_id: str | None = None,
+        task_id: str | None = None,
+    ) -> RuntimeJob:
+        """활성 Plan의 역할 작업을 멱등 예약한다. Task/Goal 상태는 바꾸지 않는다."""
+
+        if absolute_deadline_at.tzinfo is None or absolute_deadline_at.utcoffset() is None:
+            raise EngineServiceError("runtime job deadline에는 timezone이 필요합니다.")
+        request_digest = sha256_digest(request)
+        with self.ledger.transaction() as tx:
+            project = tx.maybe_one("SELECT active_plan_revision_id FROM projects WHERE id = ?", (project_id,))
+            if project is None or project["active_plan_revision_id"] is None:
+                raise EngineServiceError("활성 PlanContract 없이 runtime job을 예약할 수 없습니다.")
+            existing = tx.maybe_one(
+                "SELECT * FROM runtime_jobs WHERE project_id = ? AND checkpoint_key = ?",
+                (project_id, checkpoint_key),
+            )
+            if existing is not None:
+                if existing["kind"] != kind.value or existing["request_digest"] != request_digest:
+                    raise EngineServiceError("runtime job checkpoint 입력이 기존 예약과 다릅니다.")
+                return self._runtime_job_from_row(existing)
+            job_id = new_id("runtime_job")
+            tx.connection.execute(
+                "INSERT INTO runtime_jobs "
+                "(id,project_id,kind,status,checkpoint_key,request_digest,request_json,attempt_id,task_id,"
+                "absolute_deadline_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                (
+                    job_id, project_id, kind.value, RuntimeJobStatus.SCHEDULED.value,
+                    checkpoint_key, request_digest, canonical_json(request), attempt_id, task_id,
+                    absolute_deadline_at.isoformat(), tx.now, tx.now,
+                ),
+            )
+            payload = {"kind": kind.value, "checkpoint_key": checkpoint_key, "request_digest": request_digest}
+            self._append_runtime_job_observation(
+                tx, job_id=job_id, project_id=project_id,
+                kind=RuntimeJobObservationKind.SCHEDULED, payload=payload,
+            )
+            tx.history(project_id, "runtime_job.scheduled", "runtime_job", job_id, payload)
+            return self._runtime_job_from_row(
+                tx.one("SELECT * FROM runtime_jobs WHERE id = ?", (job_id,))
+            )
+
+    @staticmethod
+    def _runtime_job_from_row(row: Any) -> RuntimeJob:
+        return RuntimeJob(
+            job_id=row["id"], project_id=row["project_id"], kind=row["kind"], status=row["status"],
+            checkpoint_key=row["checkpoint_key"], request_digest=row["request_digest"],
+            request=json.loads(row["request_json"]), attempt_id=row["attempt_id"], task_id=row["task_id"],
+            thread_id=row["thread_id"], turn_id=row["turn_id"],
+            absolute_deadline_at=_dt(row["absolute_deadline_at"]),
+            provider_terminal_status=row["provider_terminal_status"], result_digest=row["result_digest"],
+            created_at=_dt(row["created_at"]), started_at=_dt(row["started_at"]),
+            ended_at=_dt(row["ended_at"]), updated_at=_dt(row["updated_at"]),
+        )
+
+    def load_runtime_job(self, job_id: str) -> RuntimeJob:
+        with self.ledger.read() as connection:
+            row = connection.execute("SELECT * FROM runtime_jobs WHERE id = ?", (job_id,)).fetchone()
+        if row is None:
+            raise EngineServiceError("runtime job을 찾을 수 없습니다.")
+        return self._runtime_job_from_row(row)
+
+    def active_runtime_job(self, project_id: str) -> RuntimeJob | None:
+        with self.ledger.read() as connection:
+            row = connection.execute(
+                "SELECT * FROM runtime_jobs WHERE project_id=? AND status IN "
+                "('scheduled','running','interrupting','collector_lost') ORDER BY created_at,rowid LIMIT 1",
+                (project_id,),
+            ).fetchone()
+        return None if row is None else self._runtime_job_from_row(row)
+
+    def _append_runtime_job_observation(
+        self,
+        tx: Any,
+        *,
+        job_id: str,
+        project_id: str,
+        kind: RuntimeJobObservationKind,
+        payload: dict[str, Any],
+        provider_terminal: bool = False,
+        terminal_status: str | None = None,
+    ) -> RuntimeJobObservation:
+        digest = sha256_digest(payload)
+        existing = tx.maybe_one(
+            "SELECT * FROM runtime_job_observations WHERE job_id=? AND payload_digest=?",
+            (job_id, digest),
+        )
+        if existing is not None:
+            return RuntimeJobObservation(
+                observation_id=existing["id"], job_id=job_id, project_id=project_id,
+                kind=existing["kind"], provider_terminal=bool(existing["provider_terminal"]),
+                terminal_status=existing["terminal_status"], payload=json.loads(existing["payload_json"]),
+                payload_digest=existing["payload_digest"], observed_at=_dt(existing["observed_at"]),
+            )
+        observation = RuntimeJobObservation(
+            observation_id=new_id("job_observation"), job_id=job_id, project_id=project_id,
+            kind=kind, provider_terminal=provider_terminal, terminal_status=terminal_status,
+            payload=payload, payload_digest=digest, observed_at=_dt(tx.now),
+        )
+        tx.connection.execute(
+            "INSERT INTO runtime_job_observations "
+            "(id,job_id,project_id,kind,provider_terminal,terminal_status,payload_digest,payload_json,observed_at) "
+            "VALUES (?,?,?,?,?,?,?,?,?)",
+            (
+                observation.observation_id, job_id, project_id, kind.value,
+                int(provider_terminal), terminal_status, digest, canonical_json(payload), tx.now,
+            ),
+        )
+        return observation
+
+    def start_runtime_job(
+        self, job_id: str, *, thread_id: str | None = None, turn_id: str | None = None,
+    ) -> RuntimeJob:
+        with self.ledger.transaction() as tx:
+            row = tx.one("SELECT * FROM runtime_jobs WHERE id = ?", (job_id,))
+            if row["status"] not in {RuntimeJobStatus.SCHEDULED.value, RuntimeJobStatus.COLLECTOR_LOST.value}:
+                return self._runtime_job_from_row(row)
+            event = (
+                RuntimeJobObservationKind.COLLECTOR_REATTACHED
+                if row["status"] == RuntimeJobStatus.COLLECTOR_LOST.value
+                else RuntimeJobObservationKind.STARTED
+            )
+            tx.connection.execute(
+                "UPDATE runtime_jobs SET status='running',thread_id=COALESCE(?,thread_id),"
+                "turn_id=COALESCE(?,turn_id),started_at=COALESCE(started_at,?),updated_at=? WHERE id=?",
+                (thread_id, turn_id, tx.now, tx.now, job_id),
+            )
+            payload = {
+                "collector_event": event.value,
+                "thread_id": thread_id,
+                "turn_id": turn_id,
+                "absolute_deadline_at": row["absolute_deadline_at"],
+            }
+            self._append_runtime_job_observation(
+                tx, job_id=job_id, project_id=row["project_id"], kind=event, payload=payload,
+            )
+            tx.history(row["project_id"], f"runtime_job.{event.value}", "runtime_job", job_id, payload)
+            return self._runtime_job_from_row(tx.one("SELECT * FROM runtime_jobs WHERE id=?", (job_id,)))
+
+    def record_runtime_job_observation(
+        self,
+        job_id: str,
+        *,
+        kind: RuntimeJobObservationKind,
+        payload: dict[str, Any],
+        provider_terminal: bool = False,
+        terminal_status: str | None = None,
+    ) -> RuntimeJobObservation:
+        """관측을 저장하되 Attempt·Task·Goal의 완료는 판정하지 않는다."""
+
+        with self.ledger.transaction() as tx:
+            row = tx.one("SELECT * FROM runtime_jobs WHERE id = ?", (job_id,))
+            if provider_terminal and row["status"] in {
+                RuntimeJobStatus.PROVIDER_TERMINAL.value,
+                RuntimeJobStatus.CONSUMED.value,
+            }:
+                existing = tx.one(
+                    "SELECT * FROM runtime_job_observations WHERE job_id=? AND provider_terminal=1 "
+                    "ORDER BY rowid LIMIT 1", (job_id,),
+                )
+                candidate_result = payload.get("result")
+                candidate_digest = None if candidate_result is None else sha256_digest(candidate_result)
+                if (
+                    existing["terminal_status"] != terminal_status
+                    or row["result_digest"] != candidate_digest
+                ):
+                    raise EngineServiceError("runtime job provider terminal 관측이 기존 결과와 다릅니다.")
+                return RuntimeJobObservation(
+                    observation_id=existing["id"], job_id=job_id, project_id=row["project_id"],
+                    kind=existing["kind"], provider_terminal=True,
+                    terminal_status=existing["terminal_status"],
+                    payload=json.loads(existing["payload_json"]),
+                    payload_digest=existing["payload_digest"], observed_at=_dt(existing["observed_at"]),
+                )
+            observation = self._append_runtime_job_observation(
+                tx, job_id=job_id, project_id=row["project_id"], kind=kind, payload=payload,
+                provider_terminal=provider_terminal, terminal_status=terminal_status,
+            )
+            if provider_terminal:
+                result = payload.get("result")
+                result_json = canonical_json(result) if result is not None else None
+                result_digest = None if result is None else sha256_digest(result)
+                tx.connection.execute(
+                    "UPDATE runtime_jobs SET status='provider_terminal',provider_terminal_status=?,"
+                    "result_digest=?,result_json=?,ended_at=COALESCE(ended_at,?),updated_at=? WHERE id=?",
+                    (terminal_status, result_digest, result_json, tx.now, tx.now, job_id),
+                )
+            elif kind is RuntimeJobObservationKind.COLLECTOR_LOST:
+                tx.connection.execute(
+                    "UPDATE runtime_jobs SET status='collector_lost',updated_at=? WHERE id=? "
+                    "AND status NOT IN ('provider_terminal','consumed','cancelled')", (tx.now, job_id),
+                )
+            tx.history(
+                row["project_id"], f"runtime_job.{kind.value}", "runtime_job", job_id,
+                {"observation_id": observation.observation_id, "provider_terminal": provider_terminal,
+                 "terminal_status": terminal_status, "payload_digest": observation.payload_digest},
+            )
+            return observation
+
+    def begin_runtime_job_interrupt(self, job_id: str, *, payload: dict[str, Any]) -> bool:
+        """절대 deadline interrupt를 정확히 한 번 예약한다."""
+        with self.ledger.transaction() as tx:
+            row = tx.one("SELECT * FROM runtime_jobs WHERE id=?", (job_id,))
+            if row["status"] == RuntimeJobStatus.INTERRUPTING.value:
+                return False
+            if row["status"] not in {
+                RuntimeJobStatus.RUNNING.value,
+                RuntimeJobStatus.COLLECTOR_LOST.value,
+            }:
+                return False
+            tx.connection.execute(
+                "UPDATE runtime_jobs SET status='interrupting',updated_at=? WHERE id=?",
+                (tx.now, job_id),
+            )
+            observation = self._append_runtime_job_observation(
+                tx, job_id=job_id, project_id=row["project_id"],
+                kind=RuntimeJobObservationKind.INTERRUPT_REQUESTED, payload=payload,
+            )
+            tx.history(
+                row["project_id"], "runtime_job.interrupt_requested", "runtime_job", job_id,
+                {"observation_id": observation.observation_id,
+                 "payload_digest": observation.payload_digest},
+            )
+            return True
+
+    def consume_runtime_job(self, job_id: str) -> dict[str, Any] | None:
+        """Core 호출자가 terminal 역할 결과 하나를 소비한다. 상태 전이는 별도 Core 로직이 한다."""
+
+        with self.ledger.transaction() as tx:
+            row = tx.one("SELECT * FROM runtime_jobs WHERE id = ?", (job_id,))
+            if row["status"] == RuntimeJobStatus.CONSUMED.value:
+                return None if row["result_json"] is None else json.loads(row["result_json"])
+            if row["status"] != RuntimeJobStatus.PROVIDER_TERMINAL.value:
+                raise EngineServiceError("provider terminal을 관측하지 않은 runtime job은 소비할 수 없습니다.")
+            tx.connection.execute(
+                "UPDATE runtime_jobs SET status='consumed',updated_at=? WHERE id=?", (tx.now, job_id),
+            )
+            payload = {"result_digest": row["result_digest"]}
+            self._append_runtime_job_observation(
+                tx, job_id=job_id, project_id=row["project_id"],
+                kind=RuntimeJobObservationKind.CONSUMED, payload=payload,
+            )
+            tx.history(row["project_id"], "runtime_job.consumed", "runtime_job", job_id, payload)
+            return None if row["result_json"] is None else json.loads(row["result_json"])
 
     @staticmethod
     def _insert_review(tx: Any, project_id: str, artifact_kind: str, review: Any) -> None:

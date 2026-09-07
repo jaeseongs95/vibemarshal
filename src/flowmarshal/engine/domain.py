@@ -1661,6 +1661,107 @@ class RunOnceAction(StrEnum):
     IDLE = "idle"
 
 
+class RuntimeJobKind(StrEnum):
+    """Plan 활성화 뒤 Core가 예약할 수 있는 provider 역할 경계."""
+
+    EXECUTION_SPEC_PREPARE = "execution_spec_prepare"
+    WORKER_TURN = "worker_turn"
+    TASK_SEMANTIC_VALIDATE = "task_semantic_validate"
+    GOAL_TEST_PREPARE = "goal_test_prepare"
+    GOAL_SEMANTIC_VALIDATE = "goal_semantic_validate"
+    RECOVERY = "recovery"
+    REPLANNING = "replanning"
+
+
+class RuntimeJobStatus(StrEnum):
+    SCHEDULED = "scheduled"
+    RUNNING = "running"
+    INTERRUPTING = "interrupting"
+    PROVIDER_TERMINAL = "provider_terminal"
+    COLLECTOR_LOST = "collector_lost"
+    CONSUMED = "consumed"
+    CANCELLED = "cancelled"
+
+
+class RuntimeJobObservationKind(StrEnum):
+    SCHEDULED = "scheduled"
+    STARTED = "started"
+    PROVIDER_PROGRESS = "provider_progress"
+    PROVIDER_TERMINAL = "provider_terminal"
+    INTERRUPT_REQUESTED = "interrupt_requested"
+    INTERRUPT_RECEIPT = "interrupt_receipt"
+    COLLECTOR_LOST = "collector_lost"
+    COLLECTOR_REATTACHED = "collector_reattached"
+    CONSUMED = "consumed"
+
+
+class RuntimeJob(EngineModel):
+    """provider 실행 수명과 Core 상태 판정을 분리한 durable job."""
+
+    job_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    project_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    kind: RuntimeJobKind
+    status: RuntimeJobStatus
+    request_digest: str = Field(pattern=_DIGEST_PATTERN)
+    request: dict[str, Any]
+    checkpoint_key: str = Field(min_length=1, max_length=1000)
+    attempt_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
+    task_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
+    thread_id: str | None = Field(default=None, max_length=300)
+    turn_id: str | None = Field(default=None, max_length=300)
+    absolute_deadline_at: datetime
+    provider_terminal_status: str | None = Field(default=None, max_length=100)
+    result_digest: str | None = Field(default=None, pattern=_DIGEST_PATTERN)
+    created_at: datetime
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    updated_at: datetime
+
+    _absolute_deadline_at_is_aware = field_validator("absolute_deadline_at")(_aware)
+    _created_at_is_aware = field_validator("created_at")(_aware)
+    _started_at_is_aware = field_validator("started_at")(
+        lambda value: None if value is None else _aware(value)
+    )
+    _ended_at_is_aware = field_validator("ended_at")(
+        lambda value: None if value is None else _aware(value)
+    )
+    _updated_at_is_aware = field_validator("updated_at")(_aware)
+
+    @model_validator(mode="after")
+    def terminal_is_provider_observed(self) -> "RuntimeJob":
+        terminal = self.status in {
+            RuntimeJobStatus.PROVIDER_TERMINAL,
+            RuntimeJobStatus.CONSUMED,
+        }
+        if terminal != (self.provider_terminal_status is not None):
+            raise ValueError("provider terminal 상태와 관측값이 일치해야 합니다.")
+        if self.result_digest is not None and not terminal:
+            raise ValueError("provider terminal 전에는 job 결과 digest를 둘 수 없습니다.")
+        return self
+
+
+class RuntimeJobObservation(EngineModel):
+    observation_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    job_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    project_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    kind: RuntimeJobObservationKind
+    provider_terminal: bool = False
+    terminal_status: str | None = Field(default=None, max_length=100)
+    payload: dict[str, Any]
+    payload_digest: str = Field(pattern=_DIGEST_PATTERN)
+    observed_at: datetime
+
+    _observed_at_is_aware = field_validator("observed_at")(_aware)
+
+    @model_validator(mode="after")
+    def observation_is_bound(self) -> "RuntimeJobObservation":
+        if self.payload_digest != sha256_digest(self.payload):
+            raise ValueError("runtime job observation digest가 payload와 다릅니다.")
+        if self.provider_terminal != (self.terminal_status is not None):
+            raise ValueError("provider terminal 관측에만 terminal_status가 필요합니다.")
+        return self
+
+
 class FailureClass(StrEnum):
     IMPLEMENTATION = "implementation"
     CONTEXT = "context"
@@ -1709,6 +1810,26 @@ class RunOnceOutcome(EngineModel):
             raise ValueError("실패 repair 제안은 blocked RunOnceOutcome에만 기록합니다.")
         if self.checkpoint_required and self.suggested_repair_action is None:
             raise ValueError("checkpoint_required에는 repair 제안이 필요합니다.")
+        return self
+
+
+class RunOnceResult(RunOnceOutcome):
+    """한 번의 bounded scheduler tick 결과.
+
+    ``outcome``의 완료 의미는 계속 Core가 판정하며, job 필드는 그 tick이 예약·시작·
+    관측 소비한 provider 작업만 설명한다.
+    """
+
+    runtime_job_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
+    runtime_job_kind: RuntimeJobKind | None = None
+    runtime_job_status: RuntimeJobStatus | None = None
+    tick_elapsed_ms: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def job_fields_are_atomic(self) -> "RunOnceResult":
+        fields = (self.runtime_job_id, self.runtime_job_kind, self.runtime_job_status)
+        if any(value is not None for value in fields) and not all(value is not None for value in fields):
+            raise ValueError("run once job 결속 필드는 함께 기록해야 합니다.")
         return self
 
 
