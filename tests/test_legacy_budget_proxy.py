@@ -705,7 +705,7 @@ class LegacyBudgetProxyTests(unittest.TestCase):
                     state_root=self.state_root, evaluation_policies=policies,
                 )
 
-    def test_missing_usage_is_unknown_and_blocks_following_provider_effect(self):
+    def test_missing_usage_is_unknown_but_allows_following_provider_effect(self):
         proxy, wrapped, service, _manager, _journal, _policies = self.setup_proxy(
             missing_usage=True
         )
@@ -714,12 +714,11 @@ class LegacyBudgetProxyTests(unittest.TestCase):
             row = connection.execute("SELECT status,actual_tokens FROM provider_calls").fetchone()
         self.assertEqual("usage_unknown", row["status"])
         self.assertIsNone(row["actual_tokens"])
-        second_wrapped = FakeVerifiedCodex(lambda: self.fail("provider effect must be blocked"))
+        second_wrapped = FakeVerifiedCodex(lambda: None)
         proxy._wrapped = second_wrapped
         proxy.models()
-        with self.assertRaisesRegex(BudgetBlocked, "BUDGET_USAGE_UNKNOWN"):
-            self.run_turn(self.lazy_thread(proxy))
-        self.assertEqual(0, second_wrapped.thread_effects)
+        self.run_turn(self.lazy_thread(proxy))
+        self.assertEqual(1, second_wrapped.thread_effects)
 
     def test_timeout_requests_interrupt_keeps_unknown_and_blocks_next_call(self):
         proxy, wrapped, service, _manager, _journal, _policies = self.setup_proxy(
@@ -740,7 +739,7 @@ class LegacyBudgetProxyTests(unittest.TestCase):
         proxy._wrapped = second_wrapped
         proxy.models()
         next_thread = self.lazy_thread(proxy)
-        with self.assertRaisesRegex(BudgetBlocked, "BUDGET_USAGE_UNKNOWN"):
+        with self.assertRaisesRegex(BudgetBlocked, "PROVIDER_EFFECT_UNKNOWN"):
             self.run_turn(next_thread)
         self.assertEqual(0, second_wrapped.thread_effects)
 

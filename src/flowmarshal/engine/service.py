@@ -3888,7 +3888,8 @@ class EngineService:
                     "복원된 create receipt로 running 상태가 된 Attempt만 해제할 수 있습니다.",
                 )
             tx.connection.execute(
-                "UPDATE provider_calls SET status = 'released', completed_at = ? WHERE id = ?",
+                "UPDATE provider_calls SET status='released',execution_status='released',"
+                "effect_status='none',result_status='invalid',completed_at=? WHERE id=?",
                 (tx.now, call_id),
             )
             tx.history(

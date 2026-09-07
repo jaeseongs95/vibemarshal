@@ -11,7 +11,8 @@ from ..time import SystemClock
 
 
 ENGINE_SCHEMA_ID = "flowmarshal.engine"
-ENGINE_SCHEMA_REVISION = 3
+ENGINE_SCHEMA_REVISION = 4
+HISTORICAL_ENGINE_SCHEMA_REVISIONS = frozenset({3})
 SQLITE_APPLICATION_ID = 0x464D4531  # ASCII "FME1"
 DEFAULT_DB_NAME = "flowmarshal-engine.sqlite3"
 DEFAULT_ARTIFACT_DIRECTORY = "artifacts"
@@ -45,14 +46,34 @@ CREATE TABLE provider_calls (
     request_json TEXT NOT NULL,
     estimated_tokens INTEGER NOT NULL CHECK (estimated_tokens >= 0),
     policy_digest TEXT,
+    execution_status TEXT NOT NULL DEFAULT 'reserved' CHECK (execution_status IN ('reserved','started','terminal','unknown','released')),
+    effect_status TEXT NOT NULL DEFAULT 'not_started' CHECK (effect_status IN ('not_started','pending','terminal','unknown','none')),
+    result_status TEXT NOT NULL DEFAULT 'pending' CHECK (result_status IN ('pending','valid','invalid','unknown')),
+    new_turn_count INTEGER NOT NULL DEFAULT 0 CHECK (new_turn_count >= 0),
     status TEXT NOT NULL CHECK (status IN ('reserved','settled','usage_unknown','released')),
     actual_tokens INTEGER,
     receipt_json TEXT,
+    raw_receipt_digest TEXT,
     usage_id TEXT REFERENCES budget_usage(id),
     attempt_id TEXT REFERENCES attempts(id),
     created_at TEXT NOT NULL,
     completed_at TEXT,
     UNIQUE(project_id, call_key)
+) STRICT;
+
+CREATE TABLE usage_observations (
+    id TEXT PRIMARY KEY,
+    provider_call_id TEXT NOT NULL REFERENCES provider_calls(id),
+    project_id TEXT NOT NULL REFERENCES projects(id),
+    measurement_status TEXT NOT NULL CHECK (measurement_status IN ('measured','unavailable')),
+    source TEXT NOT NULL,
+    payload_json TEXT NOT NULL,
+    raw_observation_digest TEXT NOT NULL,
+    original_receipt_digest TEXT,
+    previous_observation_id TEXT REFERENCES usage_observations(id),
+    late INTEGER NOT NULL CHECK (late IN (0,1)),
+    observed_at TEXT NOT NULL,
+    UNIQUE(provider_call_id, raw_observation_digest)
 ) STRICT;
 
 CREATE TABLE budget_adjustments (
@@ -653,6 +674,12 @@ class SQLiteEngineLedger:
             if metadata.get("schema_id") != ENGINE_SCHEMA_ID:
                 raise EngineLedgerError("prototype 또는 외부 DB를 Engine 원장으로 열 수 없습니다.")
             if metadata.get("schema_revision") != str(ENGINE_SCHEMA_REVISION):
+                observed = metadata.get("schema_revision")
+                if observed in {str(item) for item in HISTORICAL_ENGINE_SCHEMA_REVISIONS}:
+                    raise EngineLedgerError(
+                        "역사 Engine schema는 writable ledger로 열 수 없습니다. "
+                        "SQLiteEngineHistoryReader를 사용하세요."
+                    )
                 raise EngineLedgerError("지원하지 않는 Engine schema revision입니다.")
             if connection.execute("PRAGMA application_id").fetchone()[0] != SQLITE_APPLICATION_ID:
                 raise EngineLedgerError("SQLite application_id가 FlowMarshal Engine과 다릅니다.")
@@ -709,6 +736,7 @@ class SQLiteEngineLedger:
             previous_hash = row["event_hash"]
         return True
 
+
     def project_snapshot(self, project_id: str) -> dict[str, Any]:
         with self.read() as connection:
             project = connection.execute(
@@ -748,3 +776,89 @@ class SQLiteEngineLedger:
             "history_count": history_count,
             "history_valid": self.verify_history(project_id),
         }
+
+
+class SQLiteEngineHistoryReader:
+    """schema 3/4 원장을 변경하지 않고 원래 의미로 읽는 adapter.
+
+    이 adapter는 ``initialize``나 migration API를 제공하지 않는다. schema 3의
+    ``reserved/settled/usage_unknown``은 실행 상태로 재해석하지 않고 역사 값과
+    usage availability를 그대로 노출한다.
+    """
+
+    def __init__(self, path: Path | str) -> None:
+        self.path = Path(path)
+        self._identity = self._read_identity()
+
+    def _connect(self) -> sqlite3.Connection:
+        connection = sqlite3.connect(
+            self.path.resolve().as_uri() + "?mode=ro", uri=True, timeout=10.0,
+        )
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys = ON")
+        return connection
+
+    def _read_identity(self) -> dict[str, Any]:
+        if not self.path.is_file():
+            raise EngineLedgerError("역사 Engine 원장을 찾을 수 없습니다.")
+        connection = self._connect()
+        try:
+            tables = {
+                row["name"] for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+            if "schema_meta" not in tables:
+                raise EngineLedgerError("기존 DB가 FlowMarshal Engine 원장으로 식별되지 않습니다.")
+            metadata = {
+                row["key"]: row["value"]
+                for row in connection.execute("SELECT key,value FROM schema_meta")
+            }
+            revision = int(metadata.get("schema_revision", "-1"))
+            if metadata.get("schema_id") != ENGINE_SCHEMA_ID:
+                raise EngineLedgerError("prototype 또는 외부 DB를 Engine 역사로 열 수 없습니다.")
+            if revision not in HISTORICAL_ENGINE_SCHEMA_REVISIONS | {ENGINE_SCHEMA_REVISION}:
+                raise EngineLedgerError("지원하지 않는 Engine history schema revision입니다.")
+            if connection.execute("PRAGMA application_id").fetchone()[0] != SQLITE_APPLICATION_ID:
+                raise EngineLedgerError("SQLite application_id가 FlowMarshal Engine과 다릅니다.")
+            return {"schema_id": ENGINE_SCHEMA_ID, "schema_revision": revision}
+        finally:
+            connection.close()
+
+    @property
+    def schema_revision(self) -> int:
+        return int(self._identity["schema_revision"])
+
+    @contextmanager
+    def read(self) -> Iterator[sqlite3.Connection]:
+        connection = self._connect()
+        try:
+            yield connection
+        finally:
+            connection.close()
+
+    def provider_call_history(self, project_id: str) -> tuple[dict[str, Any], ...]:
+        with self.read() as connection:
+            columns = {
+                row["name"] for row in connection.execute("PRAGMA table_info(provider_calls)")
+            }
+            rows = connection.execute(
+                "SELECT * FROM provider_calls WHERE project_id=? ORDER BY rowid", (project_id,),
+            ).fetchall()
+        historical = self.schema_revision == 3
+        result = []
+        for row in rows:
+            item = dict(row)
+            result.append({
+                **item,
+                "source_schema_revision": self.schema_revision,
+                "historical_status": item.get("status") if historical else None,
+                "execution_status": item.get("execution_status") if "execution_status" in columns else None,
+                "effect_status": item.get("effect_status") if "effect_status" in columns else None,
+                "usage_measurement_status": (
+                    "measured" if item.get("status") == "settled" and item.get("actual_tokens") is not None
+                    else "unavailable" if item.get("status") == "usage_unknown"
+                    else "unobserved"
+                ),
+            })
+        return tuple(result)

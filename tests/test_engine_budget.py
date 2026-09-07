@@ -135,7 +135,7 @@ class BudgetFixture(unittest.TestCase):
         self.assertEqual("replan", row["stage"])
         self.assertEqual("reserved", row["status"])
 
-    def test_measured_zero_is_not_unknown_but_unavailable_blocks_next_reservation(self) -> None:
+    def test_measured_zero_and_unavailable_usage_both_allow_next_reservation(self) -> None:
         self.manager.configure(self.project_id, GoalBudgetPolicy(total_tokens=100, call_reservation_tokens=10))
         zero = self.reserve("measured-zero")
         self.manager.settle(zero, self.receipt("measured-zero", input_tokens=0, output_tokens=0, available=True))
@@ -148,8 +148,8 @@ class BudgetFixture(unittest.TestCase):
         unknown_row = self.provider_call(unavailable)
         assert unknown_row is not None
         self.assertEqual(("usage_unknown", None), (unknown_row["status"], unknown_row["actual_tokens"]))
-        with self.assertRaisesRegex(BudgetBlocked, "BUDGET_USAGE_UNKNOWN"):
-            self.reserve("after-unavailable")
+        following = self.reserve("after-unavailable")
+        self.assertEqual("reserved", self.provider_call(following)["execution_status"])
 
     def test_timeout_without_receipt_stays_reserved_across_service_reopen(self) -> None:
         self.manager.configure(self.project_id, GoalBudgetPolicy(total_tokens=100, call_reservation_tokens=10))
@@ -160,7 +160,7 @@ class BudgetFixture(unittest.TestCase):
         self.assertEqual(("reserved", None, None), (row["status"], row["receipt_json"], row["completed_at"]))
 
         reopened = BudgetManager(EngineService(self.ledger))
-        with self.assertRaisesRegex(BudgetBlocked, "BUDGET_USAGE_UNKNOWN"):
+        with self.assertRaisesRegex(BudgetBlocked, "PROVIDER_EFFECT_UNKNOWN"):
             reopened.reserve(
                 project_id=self.project_id,
                 goal_id=self.goal.goal_id,
@@ -203,11 +203,11 @@ class BudgetFixture(unittest.TestCase):
 
         self.manager.settle(call, receipt)
         restarted_receipt = RoleCallReceipt.model_validate_json(self.provider_call(call)["receipt_json"])
-        self.assertEqual((0, 0, 0, 0), (
+        self.assertEqual((None, None, None, None), (
             restarted_receipt.input_tokens, restarted_receipt.cached_input_tokens,
             restarted_receipt.output_tokens, restarted_receipt.reasoning_tokens,
         ))
-        # 재시작 deserialize가 생략 필드를 기본 0으로 복원해도 같은 unknown receipt다.
+        # 재시작 deserialize도 미제공 token을 null로 보존한다.
         BudgetManager(EngineService(self.ledger)).settle(call, restarted_receipt)
         with self.assertRaisesRegex(BudgetBlocked, "BUDGET_RECEIPT_CONFLICT"):
             self.manager.settle(call, receipt.model_copy(update={"output_tokens": 6}))
@@ -254,23 +254,23 @@ class BudgetFixture(unittest.TestCase):
         assert usage is not None
         self.assertEqual(pending_goal.definition_digest, usage["goal_contract_digest"])
 
-    def test_unknown_adjustment_is_a_charge_not_measured_actual_usage(self) -> None:
+    def test_unknown_adjustment_is_prohibited_and_tokens_stay_null(self) -> None:
         call = self.reserve("unknown-adjustment")
         self.manager.settle(call, self.receipt("unknown-adjustment", available=False))
-        self.manager.adjust_unknown(call_id=call, charge_tokens=77, reason="provider가 usage를 제공하지 않음")
+        with self.assertRaisesRegex(BudgetBlocked, "USAGE_ESTIMATION_PROHIBITED"):
+            self.manager.adjust_unknown(call_id=call, charge_tokens=77, reason="provider가 usage를 제공하지 않음")
 
         row = self.provider_call(call)
         assert row is not None
         self.assertEqual(("usage_unknown", None), (row["status"], row["actual_tokens"]))
         with self.ledger.read() as connection:
             adjustment = connection.execute("SELECT charge_tokens FROM budget_adjustments WHERE call_id = ?", (call,)).fetchone()
-        assert adjustment is not None
-        self.assertEqual(77, adjustment["charge_tokens"])
+        self.assertIsNone(adjustment)
 
     def test_unresolved_call_cannot_be_bypassed_by_another_goal_id(self) -> None:
         self.manager.configure(self.project_id, GoalBudgetPolicy(total_tokens=100, call_reservation_tokens=10))
         self.reserve("pending")
-        with self.assertRaisesRegex(BudgetBlocked, "BUDGET_USAGE_UNKNOWN"):
+        with self.assertRaisesRegex(BudgetBlocked, "PROVIDER_EFFECT_UNKNOWN"):
             self.manager.reserve(project_id=self.project_id, goal_id=new_id("goal"), goal_digest=None,
                                  call_key="bypass", role="goal_reviewer", request={})
 
@@ -306,14 +306,15 @@ class BudgetFixture(unittest.TestCase):
             goal_digest=self.goal.definition_digest, entries=({"request": request.model_dump(mode="json"),
             "receipt": receipt.model_dump(mode="json")},), source_ref="immutable-run", source_digest=_digest("source"))
         original = self.provider_call(call)["receipt_json"]
-        with self.assertRaisesRegex(BudgetBlocked, "BUDGET_ADJUSTMENT_NOT_ALLOWED"):
+        with self.assertRaisesRegex(BudgetBlocked, "USAGE_ESTIMATION_PROHIBITED"):
             self.manager.adjust_unknown(call_id=call, charge_tokens=10, reason="종료 관측 전")
         with self.assertRaisesRegex(BudgetBlocked, "BUDGET_OBSERVATION_BINDING_MISMATCH"):
             self.manager.observe_role_terminal(call, RuntimeObservation(thread_id="other", turn_id="original-turn",
                 active=False, terminal_status="interrupted", payload={}))
         self.manager.observe_role_terminal(call, RuntimeObservation(thread_id="original-thread", turn_id="original-turn",
             active=False, terminal_status="interrupted", payload={"usage": None}))
-        self.manager.adjust_unknown(call_id=call, charge_tokens=10, reason="명시 잠정 차감")
+        with self.assertRaisesRegex(BudgetBlocked, "USAGE_ESTIMATION_PROHIBITED"):
+            self.manager.adjust_unknown(call_id=call, charge_tokens=10, reason="명시 잠정 차감")
         row = self.provider_call(call)
         self.assertEqual(("usage_unknown", None, original), (row["status"], row["actual_tokens"], row["receipt_json"]))
         self.manager.configure(self.project_id, GoalBudgetPolicy(total_tokens=100, call_reservation_tokens=10))

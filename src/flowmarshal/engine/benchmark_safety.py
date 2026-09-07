@@ -60,7 +60,7 @@ def read_safety_ledger(database: Path, artifact_root: Path, project_id: str, goa
             "integrity": [row[0] for row in connection.execute("PRAGMA integrity_check")],
             "foreign_key_errors": [list(row) for row in connection.execute("PRAGMA foreign_key_check")],
         }
-        for table in ("projects", "goal_revisions", "budget_policy_revisions", "provider_calls", "budget_usage", "budget_adjustments", "attempts", "recovery_assessments", "history_events"):
+        for table in ("projects", "goal_revisions", "budget_policy_revisions", "provider_calls", "budget_usage", "usage_observations", "budget_adjustments", "attempts", "recovery_assessments", "history_events"):
             field = "id" if table == "projects" else "project_id"
             order = "sequence" if table == "history_events" else "rowid"
             snapshot[table] = [dict(row) for row in connection.execute(
@@ -237,8 +237,10 @@ def _project_calls(snapshot: dict[str, Any], calls: list[dict[str, Any]], *, pol
             continue
         if call["policy_digest"] != sha256_digest(policies.budget) or call["estimated_tokens"] != policies.budget.call_reservation_tokens:
             _increment(counts, "budget_policy_violation_count")
-        if call["status"] != "settled" or type(call["actual_tokens"]) is not int:
-            _increment(counts, "unresolved_or_usage_unknown_count")
+        if call.get("execution_status") != "terminal" or call.get("effect_status") != "terminal":
+            _increment(counts, "unknown_effect_count")
+            failures.append("PERFORMANCE_PROVIDER_EFFECT_UNRESOLVED")
+        if type(call["actual_tokens"]) is not int:
             missing.append("PERFORMANCE_USAGE_UNSETTLED")
         receipt = _json(call["receipt_json"])
         usage_row = usage_by_id.get(call["usage_id"])
@@ -256,7 +258,6 @@ def _project_calls(snapshot: dict[str, Any], calls: list[dict[str, Any]], *, pol
                 or usage.logical_call_ref != usage_row["logical_call_ref"]):
             failures.append("PERFORMANCE_USAGE_COLUMN_BINDING_MISMATCH")
         if (not usage.usage_available or usage.input_tokens is None or usage.output_tokens is None):
-            _increment(counts, "unresolved_or_usage_unknown_count")
             missing.append("PERFORMANCE_USAGE_UNAVAILABLE")
         elif call["actual_tokens"] != usage.input_tokens + usage.output_tokens:
             failures.append("PERFORMANCE_ACTUAL_USAGE_CONFLICT")
@@ -350,15 +351,8 @@ def _budget_audit(snapshot: dict[str, Any], policies: EvaluationPolicies) -> lis
     if not policy_rows or any(row["policy_digest"] != sha256_digest(policies.budget)
                               or sha256_digest(_json(row["payload_json"])) != row["policy_digest"] for row in policy_rows):
         failures.append("PERFORMANCE_BUDGET_POLICY_MISMATCH")
-    cumulative = 0
-    for row in snapshot["provider_calls"]:
-        cap = policies.budget.total_tokens if row["stage"] == "replan" else policies.budget.total_tokens*(100-policies.budget.replan_reserve_percent)//100
-        if cumulative + row["estimated_tokens"] > cap:
-            failures.append("PERFORMANCE_RESERVATION_BUDGET_EXCEEDED")
-        if type(row["actual_tokens"]) is int:
-            cumulative += row["actual_tokens"]
-    if cumulative > policies.budget.total_tokens:
-        failures.append("PERFORMANCE_TOTAL_BUDGET_EXCEEDED")
+    if len(snapshot["provider_calls"]) > policies.max_provider_calls:
+        failures.append("PERFORMANCE_PROVIDER_CALL_LIMIT_EXCEEDED")
     if snapshot["budget_status"].get("error_code"):
         failures.append("PERFORMANCE_BUDGET_BLOCKED")
     return failures
@@ -466,12 +460,13 @@ def observe_benchmark_safety(*, checkpoint: EvaluationCellCheckpoint, cell: Benc
     if not functional:
         failures.append("PERFORMANCE_FUNCTIONAL_RESULT_FAILED")
     complete = not failures and not missing and planning_counts.complete and planning_usage.complete and (assessment_stage == "planning" or lifecycle_counts.complete and lifecycle_usage.complete)
+    non_usage_missing = [item for item in missing if not item.startswith("PERFORMANCE_USAGE_")]
     evidence.update(failures=sorted(set(failures)), not_observed=sorted(set(missing)))
     result = PerformanceSafetyObservation(
         scenario_id=cell.scenario_id, scenario_digest=cell.scenario_digest, order_seed=cell.order_seed,
         implementation=cell.implementation, cell_digest=sha256_digest(cell), source_evidence_digest=sha256_digest(evidence),
         assessment_stage=assessment_stage, complete=complete, functional_passed=functional,
-        safety_passed=not failures and not missing, failures=tuple(sorted(set(failures))), not_observed=tuple(sorted(set(missing))),
+        safety_passed=not failures and not non_usage_missing, failures=tuple(sorted(set(failures))), not_observed=tuple(sorted(set(missing))),
         planning_counters=planning_counts, lifecycle_counters=lifecycle_counts, planning_usage=planning_usage, lifecycle_usage=lifecycle_usage,
     )
     return result, evidence

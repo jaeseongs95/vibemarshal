@@ -233,11 +233,34 @@ def reconcile_role_usage_terminal(service: Any, call_id: str, observation: Any) 
             "terminal_observed": terminal, "usage_available": known, "actual_tokens": actual,
         }
         tx.history(call["project_id"], "budget.call_observed", "provider_call", call_id, event_payload)
+        from .budget import _insert_usage_observation
+        _insert_usage_observation(
+            tx, call=call, source="runtime_observation", raw_document=document,
+            known=known, values=values,
+            usage_scope=(document.get("payload") or {}).get("usage_scope", "unavailable"),
+            attribution_basis=(
+                "first_empty_thread" if known and (document.get("payload") or {}).get("usage_scope") == "thread"
+                else "provider_turn" if known else "unavailable"
+            ),
+            unavailable_reason=None if known else (
+                "PROVIDER_USAGE_UNAVAILABLE_OR_UNATTRIBUTABLE" if terminal
+                else "PROVIDER_TERMINAL_UNOBSERVED"
+            ),
+            late=True,
+        )
         status = "settled" if known else "usage_unknown" if terminal else "reserved"
-        completed_at = tx.now if terminal else None
+        completed_at = call["completed_at"] or (tx.now if terminal else None)
+        execution_status = "terminal" if terminal else call["execution_status"]
+        effect_status = "terminal" if terminal else call["effect_status"]
+        result_status = call["result_status"]
+        if terminal and result_status in {"pending", "unknown"}:
+            result_status = "unknown"
         if call["goal_contract_digest"] is None:
-            tx.connection.execute("UPDATE provider_calls SET status=?,actual_tokens=?,completed_at=? WHERE id=?",
-                                  (status, actual, completed_at, call_id))
+            tx.connection.execute(
+                "UPDATE provider_calls SET execution_status=?,effect_status=?,result_status=?,"
+                "status=?,actual_tokens=?,completed_at=? WHERE id=?",
+                (execution_status, effect_status, result_status, status, actual, completed_at, call_id),
+            )
             if known:
                 tx.history(call["project_id"], "budget.call_settled", "provider_call", call_id,
                            {"observation_digest": observation_digest, "actual_tokens": actual,
@@ -268,8 +291,12 @@ def reconcile_role_usage_terminal(service: Any, call_id: str, observation: Any) 
              canonical_json(original_receipt), sha256_digest(original_receipt), canonical_json(document),
              observation_digest, tx.now),
         )
-        tx.connection.execute("UPDATE provider_calls SET status=?,actual_tokens=?,usage_id=?,completed_at=? WHERE id=?",
-                              (status, actual, usage.usage_id, completed_at, call_id))
+        tx.connection.execute(
+            "UPDATE provider_calls SET execution_status=?,effect_status=?,result_status=?,"
+            "status=?,actual_tokens=?,usage_id=?,completed_at=? WHERE id=?",
+            (execution_status, effect_status, result_status, status, actual,
+             usage.usage_id, completed_at, call_id),
+        )
         tx.history(call["project_id"], "budget.role_usage_reconciled", "provider_call", call_id,
                    {"reconciliation_id": reconciliation_id, "prior_usage_id": prior_usage.usage_id,
                     "effective_usage_id": usage.usage_id, "observation_digest": observation_digest,

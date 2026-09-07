@@ -78,12 +78,6 @@ class PlanReviewAdjudication(EngineModel):
             raise ValueError("재심 receipt가 출력 digest와 다릅니다.")
         if self.receipt.role != self.submission.reviewer_role:
             raise ValueError("재심 receipt role과 최종 submission role이 다릅니다.")
-        usage = (
-            self.receipt.input_tokens,
-            self.receipt.cached_input_tokens,
-            self.receipt.output_tokens,
-            self.receipt.reasoning_tokens,
-        )
         if (
             self.receipt.status != "succeeded"
             or self.receipt.permission_profile != ":danger-full-access"
@@ -92,12 +86,8 @@ class PlanReviewAdjudication(EngineModel):
             or len(self.receipt.turn_ids) != 1
             or not self.receipt.turn_ids[0]
             or self.receipt.schema_recovery_attempts != 0
-            or not self.receipt.usage_available
-            or any(type(value) is not int or value < 0 for value in usage)
-            or self.receipt.cached_input_tokens > self.receipt.input_tokens
-            or self.receipt.reasoning_tokens > self.receipt.output_tokens
         ):
-            raise ValueError("재심 receipt에 성공한 독립 turn·정책·실측 usage가 없습니다.")
+            raise ValueError("재심 receipt에 성공한 독립 turn·정책 결속이 없습니다.")
         self._validate_original_lineage(self.original_submission)
         return self
 

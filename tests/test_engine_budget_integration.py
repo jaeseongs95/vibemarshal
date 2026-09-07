@@ -371,7 +371,9 @@ class EngineBudgetIntegrationTests(unittest.TestCase):
         self.assertFalse(recorded.usage_available)
         self.assertIsNone(recorded.input_tokens)
         status = BudgetManager(prepared.service).status(prepared.project_id, goal_id=self._goal_id(prepared))
-        self.assertEqual("BUDGET_USAGE_UNKNOWN", status.error_code)
+        self.assertIsNone(status.error_code)
+        self.assertIsNone(status.remaining_total_tokens)
+        self.assertIn("실행을 차단하지 않습니다", status.next_action or "")
 
     def test_budget_rejects_unregistered_goal_lineage_before_reserving(self) -> None:
         prepared = self.prepared("wrong-goal-lineage")

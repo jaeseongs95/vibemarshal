@@ -105,6 +105,8 @@ class EvaluationBudgetTests(unittest.TestCase):
         legacy_policies = {
             "budget": self.policies.budget.model_dump(mode="json"),
             "role_timeouts": self.policies.role_timeouts.model_dump(mode="json"),
+            "max_provider_calls": 14,
+            "wall_timeout_seconds": 28_800,
         }
         self.assertNotIn("codex_project", self.policies.model_dump(mode="json", exclude_none=True))
         self.assertEqual(sha256_digest(legacy_policies), self.policies.policy_digest)

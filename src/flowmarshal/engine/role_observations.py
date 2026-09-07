@@ -61,10 +61,10 @@ class RoleCallReceipt(EngineModel):
         default=None, pattern=r"^sha256:[0-9a-f]{64}$"
     )
     terminal_status_after_interrupt: str | None = None
-    input_tokens: int | None = Field(default=0, ge=0)
-    cached_input_tokens: int | None = Field(default=0, ge=0)
-    output_tokens: int | None = Field(default=0, ge=0)
-    reasoning_tokens: int | None = Field(default=0, ge=0)
+    input_tokens: int | None = Field(default=None, ge=0)
+    cached_input_tokens: int | None = Field(default=None, ge=0)
+    output_tokens: int | None = Field(default=None, ge=0)
+    reasoning_tokens: int | None = Field(default=None, ge=0)
     usage_available: bool = False
     latency_ms: int = Field(ge=0)
     schema_recovery_attempts: int = Field(default=0, ge=0, le=1)

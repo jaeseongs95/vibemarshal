@@ -125,20 +125,17 @@ def neutral_input(root: Path, scenario) -> dict[str, Any]:
 
 
 def _legacy_hard_timeout_contract(policies: EvaluationPolicies) -> dict[str, Any]:
-    maximum_calls = policies.budget.total_tokens // policies.budget.call_reservation_tokens
-    if maximum_calls < 1:
-        raise QualificationRunError("LEGACY_BUDGET_CANNOT_RESERVE_FIRST_CALL")
-    role_timeouts = (
-        policies.role_timeouts.default_timeout_seconds,
-        *(item.timeout_seconds for item in policies.role_timeouts.overrides),
-    )
+    """legacy process 경계도 명시적 호출/시간 정책만 사용한다.
+
+    함수명은 과거 evidence reader 호환을 위해 유지하지만 token 예약량에서 호출
+    횟수나 hard timeout을 환산하지 않는다.
+    """
     body = {
-        "derivation": "floor(total_tokens/call_reservation_tokens)*max(role_timeout_seconds)",
-        "budget_policy_digest": sha256_digest(policies.budget),
+        "derivation": "explicit_evaluation_policy",
+        "evaluation_policy_digest": policies.policy_digest,
         "role_timeout_policy_digest": policies.role_timeouts.policy_digest,
-        "maximum_reserved_calls": maximum_calls,
-        "maximum_role_timeout_seconds": max(role_timeouts),
-        "timeout_seconds": maximum_calls * max(role_timeouts),
+        "maximum_provider_calls": policies.max_provider_calls,
+        "timeout_seconds": policies.wall_timeout_seconds,
     }
     return body | {"policy_digest": sha256_digest(body)}
 
@@ -431,9 +428,9 @@ def _verify_legacy_budget_evidence(
             or timeout_digest != sha256_digest(timeout_body)
             or timeout_digest != expected_binding["parent_hard_timeout_policy_digest"]
             or timeout_body["timeout_seconds"] != expected_binding["parent_hard_timeout_seconds"]
-            or timeout_body["role_timeout_policy_digest"]
-            != evaluation_policies.role_timeouts.policy_digest
-            or timeout_body["budget_policy_digest"] != sha256_digest(evaluation_policies.budget)
+            or timeout_body["maximum_provider_calls"] != evaluation_policies.max_provider_calls
+            or timeout_body["timeout_seconds"] != evaluation_policies.wall_timeout_seconds
+            or timeout_body["evaluation_policy_digest"] != evaluation_policies.policy_digest
         ):
             raise ValueError("binding mismatch")
     except (KeyError, TypeError, ValueError) as error:

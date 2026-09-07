@@ -371,7 +371,10 @@ class CoreOperations:
         except Exception as error:
             from .budget import BudgetBlocked
             from .roles import StructuredRoleError
-            if (isinstance(error, BudgetBlocked) and error.code in {"BUDGET_BLOCKED", "BUDGET_USAGE_UNKNOWN", "BUDGET_POLICY_REQUIRED"}) or getattr(error, "effects_started", True) is False:
+            if (isinstance(error, BudgetBlocked) and error.code in {
+                "BUDGET_BLOCKED", "BUDGET_USAGE_UNKNOWN", "PROVIDER_EFFECT_UNKNOWN",
+                "BUDGET_POLICY_REQUIRED",
+            }) or getattr(error, "effects_started", True) is False:
                 with self.service.ledger.transaction() as tx:
                     tx.history(project_id, "operation.no_effect", "core_operation", operation_id,
                                {"request_digest": request_digest, "blocker_code": getattr(error, "code", str(error)), "detail": str(error)})

@@ -183,7 +183,8 @@ def _ledger_snapshot(database: Path) -> dict[str, Any]:
                 history_valid = False
             previous[row["project_id"]] = row["event_hash"]
         calls = [dict(row) for row in connection.execute(
-            "SELECT id,project_id,goal_id,goal_contract_digest,request_digest,status,actual_tokens,receipt_json,usage_id "
+            "SELECT id,project_id,goal_id,goal_contract_digest,request_digest,status,"
+            "execution_status,effect_status,result_status,new_turn_count,actual_tokens,receipt_json,usage_id "
             "FROM provider_calls ORDER BY rowid"
         )]
         policies = [dict(row) for row in connection.execute(
@@ -229,7 +230,11 @@ def _ledger_snapshot(database: Path) -> dict[str, Any]:
             "source": "runtime_observation" if latest is not None else "role_receipt",
             "observation_digest": None if latest is None else latest["observation_digest"],
         })
-    unresolved = [call["id"] for call in calls if call["status"] != "settled" or call["actual_tokens"] is None]
+    unresolved = [call["id"] for call in calls if (
+        call["execution_status"] in {"reserved", "started", "unknown"}
+        or call["effect_status"] == "unknown"
+    )]
+    usage_incomplete = [call["id"] for call in calls if call["actual_tokens"] is None]
     body = {
         "history": history, "policies": policies, "provider_calls": calls,
         "usage": usages, "receipts": receipts, "observations": observations,
@@ -239,6 +244,7 @@ def _ledger_snapshot(database: Path) -> dict[str, Any]:
         "history_event_count": len(history), "history_chain_valid": history_valid,
         "policy_count": len(policies), "provider_call_count": len(calls),
         "usage_observation_count": len(usages), "unresolved_provider_call_ids": unresolved,
+        "usage_incomplete_provider_call_ids": usage_incomplete,
         "malformed_receipt": malformed_receipt, "malformed_observation": malformed_observation,
         "provider_receipts": receipts,
         "provider_observations": observations, "effective_provider_usage": effective_usage,
@@ -262,9 +268,14 @@ def diagnostic_budget_ledger_observation(run_root: Path | str) -> dict[str, Any]
         call_id for item in entries.values()
         for call_id in item["unresolved_provider_call_ids"]
     ]
+    usage_incomplete = [
+        call_id for item in entries.values()
+        for call_id in item["usage_incomplete_provider_call_ids"]
+    ]
     return {
         "ledger_count": len(entries), "entries": entries, "missing_ledger_state_roots": missing,
         "unresolved_provider_call_ids": unresolved,
+        "usage_incomplete_provider_call_ids": usage_incomplete,
         "all_history_chains_valid": all(item["history_chain_valid"] for item in entries.values()),
         "all_receipts_well_formed": all(not item["malformed_receipt"] for item in entries.values()),
         "all_observations_well_formed": all(not item["malformed_observation"] for item in entries.values()),

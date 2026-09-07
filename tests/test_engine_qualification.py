@@ -1035,8 +1035,8 @@ class EngineQualificationTests(unittest.TestCase):
             with self.assertRaisesRegex(EngineServiceError, "등록되지 않은"):
                 service.register_profile(invalid)
 
-    def test_new_engine_database_uses_revision_three_without_automatic_migration(self) -> None:
-        self.assertEqual(3, ENGINE_SCHEMA_REVISION)
+    def test_new_engine_database_uses_revision_four_without_automatic_migration(self) -> None:
+        self.assertEqual(4, ENGINE_SCHEMA_REVISION)
         with tempfile.TemporaryDirectory() as temp:
             database = Path(temp) / "old-engine.sqlite3"
             ledger = SQLiteEngineLedger(database)

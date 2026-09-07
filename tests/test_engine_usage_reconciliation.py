@@ -135,7 +135,6 @@ class RoleUsageReconciliationTests(unittest.TestCase):
                                                      effective.output_tokens, effective.reasoning_tokens))
         summary = EngineApplication(self.service).usage_summary(self.project_id, goal_id=self.goal.goal_id)
         self.assertIsNone(summary.input_tokens.total)
-        self.assertTrue(any(item.code == "PROVIDER_CALL_NOT_SETTLED" for item in summary.incomplete_reasons))
         self.assertTrue(any(item.code == "USAGE_UNAVAILABLE" for item in summary.incomplete_reasons))
 
     def test_thread_scope_requires_bound_empty_thread_first_turn_receipts(self) -> None:
@@ -254,10 +253,11 @@ class RoleUsageReconciliationTests(unittest.TestCase):
         self.assertEqual({original_usage_id, first_unavailable.usage_id}, set(summary.superseded_usage_ids))
         self.assertEqual(2, len(summary.superseded_usage_ids))
 
-    def test_later_actual_usage_overrides_adjustment_for_budget_math_without_erasing_history(self) -> None:
+    def test_later_actual_usage_is_observed_without_estimated_adjustment(self) -> None:
         call_id, receipt = self._reserve_timeout("adjusted-then-observed", status="failed")
         self.assertEqual("usage_unknown", self._call_row(call_id)["status"])
-        self.manager.adjust_unknown(call_id=call_id, charge_tokens=77, reason="초기 관측에 usage가 없음")
+        with self.assertRaisesRegex(BudgetBlocked, "USAGE_ESTIMATION_PROHIBITED"):
+            self.manager.adjust_unknown(call_id=call_id, charge_tokens=77, reason="초기 관측에 usage가 없음")
         effective = self.manager.observe_role_terminal(call_id, self._terminal(receipt))
 
         status = self.manager.status(self.project_id, goal_id=self.goal.goal_id)
@@ -265,8 +265,7 @@ class RoleUsageReconciliationTests(unittest.TestCase):
         self.assertEqual((0, 0), (status.measured_token_subtotal, status.explicit_adjustment_tokens))
         with self.ledger.read() as connection:
             adjustment = connection.execute("SELECT charge_tokens FROM budget_adjustments WHERE call_id=?", (call_id,)).fetchone()
-        assert adjustment is not None
-        self.assertEqual(77, adjustment["charge_tokens"])
+        self.assertIsNone(adjustment)
 
     def test_pre_goal_timeout_observation_survives_restart_and_attaches_latest_known_once(self) -> None:
         pending_goal_id = new_id("goal")
@@ -325,11 +324,11 @@ class RoleUsageReconciliationTests(unittest.TestCase):
             self._call_row(call_id)["status"], self._call_row(call_id)["actual_tokens"],
             self._call_row(call_id)["usage_id"],
         ))
-        with self.assertRaisesRegex(BudgetBlocked, "BUDGET_USAGE_UNKNOWN"):
-            reopened.reserve(
-                project_id=self.project_id, goal_id=pending_goal_id, goal_digest=None,
-                call_key="blocked-after-unknown", role="goal_reviewer", request={},
-            )
+        following = reopened.reserve(
+            project_id=self.project_id, goal_id=pending_goal_id, goal_digest=None,
+            call_key="allowed-after-unknown-usage", role="goal_reviewer", request={},
+        )
+        reopened.release_before_effect(following, reason="테스트의 후속 예약 정리")
         unknown_summary = EngineApplication(self.service).usage_summary(
             self.project_id, goal_id=pending_goal_id
         )

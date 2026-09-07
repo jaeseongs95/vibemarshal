@@ -302,7 +302,7 @@ class PlanningFeedbackLiveTests(unittest.TestCase):
             self.assertFalse(summary["claim_created"])
             database = sqlite3.connect(run_root / "ledger" / "flowmarshal-engine.sqlite3")
             try:
-                self.assertEqual(3, database.execute("PRAGMA user_version").fetchone()[0])
+                self.assertEqual(4, database.execute("PRAGMA user_version").fetchone()[0])
                 self.assertEqual(2, database.execute("SELECT COUNT(*) FROM goal_revisions").fetchone()[0])
                 self.assertEqual(9, database.execute("SELECT COUNT(*) FROM provider_calls").fetchone()[0])
                 self.assertEqual(

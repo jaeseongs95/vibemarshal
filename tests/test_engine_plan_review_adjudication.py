@@ -425,7 +425,7 @@ class PlanReviewAdjudicationTests(unittest.TestCase):
                 candidate=wrong_candidate,
             )
 
-    def test_receipt_must_be_a_successful_measured_policy_bound_turn(self):
+    def test_receipt_must_be_a_successful_policy_bound_turn(self):
         plan, goal, state, project_map, finding, _catalog, _original, evaluation, proposal = (
             adjudication_fixture()
         )
@@ -447,7 +447,6 @@ class PlanReviewAdjudicationTests(unittest.TestCase):
             ("status", "failed"),
             ("permission_profile", "read-only"),
             ("approval_policy", "on-request"),
-            ("usage_available", False),
             ("thread_id", None),
             ("turn_ids", ()),
             ("turn_ids", ("",)),

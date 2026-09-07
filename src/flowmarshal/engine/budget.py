@@ -6,7 +6,7 @@ from typing import Any, Literal
 from pydantic import Field
 
 from ..canonical import canonical_json, sha256_digest
-from .domain import BudgetStage, BudgetUsageRecord, EngineModel, new_id, utc_now
+from .domain import BudgetStage, BudgetUsageRecord, EngineModel, UsageObservation, new_id, utc_now
 from .service import EngineService, EngineServiceError
 
 
@@ -85,13 +85,81 @@ def receipt_usage(receipt: Any, *, project_id: str, goal_digest: str,
 
 
 def _terminal_receipt(receipt: Any | None) -> bool:
-    return receipt is not None and (receipt.status in {"succeeded", "failed", "schema_failed"} or
+    return receipt is not None and (receipt.status in {
+        "succeeded", "failed", "schema_failed", "input_contract_failed"
+    } or
         (getattr(receipt, "terminal_observation_digest", None) is not None and
          getattr(receipt, "terminal_status_after_interrupt", None) in {"completed", "success", "succeeded", "failed", "interrupted", "cancelled"}))
 
 
+def _provider_states(receipt: Any | None) -> tuple[str, str, str]:
+    """실행/효과/결과 상태를 usage availability와 무관하게 계산한다."""
+    if receipt is None:
+        return "reserved", "not_started", "pending"
+    if _terminal_receipt(receipt):
+        result = ("valid" if receipt.status == "succeeded" else "invalid" if receipt.status in {
+            "failed", "schema_failed", "input_contract_failed"
+        } else "unknown")
+        return "terminal", "terminal", result
+    return "unknown", "unknown", "unknown"
+
+
+def _insert_usage_observation(
+    tx: Any,
+    *,
+    call: Any,
+    source: str,
+    raw_document: Any,
+    known: bool,
+    values: tuple[int | None, int | None, int | None, int | None],
+    usage_scope: str = "unavailable",
+    attribution_basis: str = "unavailable",
+    unavailable_reason: str | None = None,
+    late: bool = False,
+) -> UsageObservation:
+    raw_digest = sha256_digest(raw_document)
+    existing = tx.maybe_one(
+        "SELECT payload_json FROM usage_observations WHERE provider_call_id=? "
+        "AND raw_observation_digest=?", (call["id"], raw_digest),
+    )
+    if existing is not None:
+        return UsageObservation.model_validate_json(existing["payload_json"])
+    previous = tx.maybe_one(
+        "SELECT id FROM usage_observations WHERE provider_call_id=? ORDER BY rowid DESC LIMIT 1",
+        (call["id"],),
+    )
+    observation = UsageObservation(
+        observation_id=new_id("usage_observation"), provider_call_id=call["id"],
+        project_id=call["project_id"], source=source,
+        measurement_status="measured" if known else "unavailable",
+        input_tokens=values[0] if known else None,
+        cached_input_tokens=values[1] if known else None,
+        output_tokens=values[2] if known else None,
+        reasoning_tokens=values[3] if known else None,
+        usage_scope=usage_scope if known else "unavailable",
+        attribution_basis=attribution_basis if known else "unavailable",
+        unavailable_reason=None if known else (unavailable_reason or "PROVIDER_USAGE_UNAVAILABLE"),
+        raw_observation_digest=raw_digest,
+        original_receipt_digest=call["raw_receipt_digest"],
+        previous_observation_id=None if previous is None else previous["id"],
+        late=late,
+        observed_at=utc_now(),
+    )
+    tx.connection.execute(
+        "INSERT INTO usage_observations "
+        "(id,provider_call_id,project_id,measurement_status,source,payload_json,"
+        "raw_observation_digest,original_receipt_digest,previous_observation_id,late,observed_at) "
+        "VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+        (observation.observation_id, observation.provider_call_id, observation.project_id,
+         observation.measurement_status, observation.source, canonical_json(observation),
+         observation.raw_observation_digest, observation.original_receipt_digest,
+         observation.previous_observation_id, int(observation.late), observation.observed_at.isoformat()),
+    )
+    return observation
+
+
 def _normalized_unknown_receipt_json(value: str | Any | None) -> str | None:
-    """미제공 token의 구 null과 신규 생략→기본 0만 같은 receipt로 비교한다."""
+    """역사 receipt의 명시적 0과 신규 null을 미측정 값으로만 정규화한다."""
     if value is None:
         return None
     from .roles import RoleCallReceipt
@@ -108,7 +176,7 @@ def _normalized_unknown_receipt_json(value: str | Any | None) -> str | None:
 
 
 class BudgetManager:
-    """Core 원장의 호출 전 예약·종료 정산. 불명확한 예약은 자동 해제하지 않는다."""
+    """호출 효과 admission과 append-only usage 관측을 분리한다."""
 
     def __init__(self, service: EngineService):
         self.service = service
@@ -155,20 +223,26 @@ class BudgetManager:
             policy = None if policy_row is None else GoalBudgetPolicy.model_validate_json(policy_row["payload_json"])
             rows = connection.execute("SELECT c.*,a.charge_tokens FROM provider_calls c LEFT JOIN budget_adjustments a ON a.call_id=c.id "
                 "WHERE c.project_id=? AND c.goal_id=? AND c.status<>'released'", (project_id, goal_id)).fetchall()
-            unresolved = tuple(row["id"] for row in connection.execute("SELECT c.id FROM provider_calls c LEFT JOIN budget_adjustments a ON a.call_id=c.id "
-                "WHERE c.project_id=? AND c.status IN ('reserved','usage_unknown') AND a.call_id IS NULL ORDER BY c.rowid", (project_id,)))
-        measured = sum(row["actual_tokens"] or 0 for row in rows)
+            unresolved = tuple(row["id"] for row in connection.execute(
+                "SELECT id FROM provider_calls WHERE project_id=? AND "
+                "(execution_status IN ('reserved','started','unknown') OR effect_status='unknown') "
+                "ORDER BY rowid", (project_id,)))
+            usage_incomplete = tuple(row["id"] for row in connection.execute(
+                "SELECT id FROM provider_calls WHERE project_id=? AND goal_id=? AND status='usage_unknown' "
+                "ORDER BY rowid", (project_id, goal_id)))
+        measured = sum(row["actual_tokens"] for row in rows if row["actual_tokens"] is not None)
         adjusted = sum(row["charge_tokens"] or 0 for row in rows if row["actual_tokens"] is None)
         reserved = sum(row["estimated_tokens"] for row in rows if row["status"] == "reserved")
         blocked = policy is None or bool(unresolved)
         return BudgetStatus(project_id=project_id, goal_id=goal_id, policy=policy,
             measured_token_subtotal=measured, explicit_adjustment_tokens=adjusted, reserved_tokens=reserved,
             unresolved_call_ids=unresolved,
-            remaining_normal_tokens=None if blocked else max(0, policy.total_tokens * (100-policy.replan_reserve_percent)//100 - measured-adjusted),
-            remaining_total_tokens=None if blocked else max(0, policy.total_tokens-measured-adjusted),
-            error_code="BUDGET_POLICY_REQUIRED" if policy is None else "BUDGET_USAGE_UNKNOWN" if unresolved else None,
+            remaining_normal_tokens=None if blocked or usage_incomplete else max(0, policy.total_tokens * (100-policy.replan_reserve_percent)//100 - measured-adjusted),
+            remaining_total_tokens=None if blocked or usage_incomplete else max(0, policy.total_tokens-measured-adjusted),
+            error_code="BUDGET_POLICY_REQUIRED" if policy is None else "PROVIDER_EFFECT_UNKNOWN" if unresolved else None,
             next_action="project budget set으로 정책을 등록하십시오." if policy is None else
-                "원래 thread/turn의 종료·사용량을 재관측하십시오. 귀속 가능한 사용량을 확보하기 전 추가 호출은 차단됩니다." if unresolved else None)
+                "원래 thread/turn의 효과를 먼저 관측하십시오. 새 호출은 만들지 않습니다." if unresolved else
+                "사용량은 미확인이며 실행을 차단하지 않습니다." if usage_incomplete else None)
 
     def reserve(self, *, project_id: str, goal_id: str, goal_digest: str | None,
                 call_key: str, role: str, request: dict[str, Any],
@@ -189,16 +263,20 @@ class BudgetManager:
             policy = self._policy(tx, project_id, goal_id)
             calls = tx.all("SELECT c.*, a.charge_tokens FROM provider_calls c LEFT JOIN budget_adjustments a "
                            "ON a.call_id = c.id WHERE c.project_id = ? AND c.goal_id = ?", (project_id, goal_id))
+            unresolved = [c["id"] for c in tx.all(
+                "SELECT id FROM provider_calls WHERE project_id=? AND "
+                "(execution_status IN ('reserved','started','unknown') OR effect_status='unknown')",
+                (project_id,),
+            )]
+            if unresolved:
+                raise BudgetBlocked(
+                    "PROVIDER_EFFECT_UNKNOWN",
+                    "원래 호출의 실행·효과를 먼저 관측해야 합니다: " + ", ".join(unresolved),
+                )
             if policy:
-                unresolved = [c["id"] for c in tx.all(
-                    "SELECT c.id FROM provider_calls c LEFT JOIN budget_adjustments a ON a.call_id=c.id "
-                    "WHERE c.project_id=? AND c.status IN ('reserved','usage_unknown') AND a.call_id IS NULL",
-                    (project_id,))]
-                if unresolved:
-                    raise BudgetBlocked("BUDGET_USAGE_UNKNOWN", "사용량 재관측 또는 명시적 정산이 필요합니다: " + ", ".join(unresolved))
                 charged = sum(c["actual_tokens"] if c["actual_tokens"] is not None else
                               c["charge_tokens"] if c["charge_tokens"] is not None else
-                              c["estimated_tokens"] if c["status"] == "reserved" else 0 for c in calls)
+                              0 for c in calls)
                 reserve = policy.call_reservation_tokens
                 cap = (policy.total_tokens if stage is BudgetStage.REPLAN else
                        policy.total_tokens * (100 - policy.replan_reserve_percent) // 100)
@@ -245,14 +323,33 @@ class BudgetManager:
             terminal = _terminal_receipt(receipt)
             known = terminal and receipt.usage_available and receipt.schema_recovery_attempts == 0
             actual = receipt.input_tokens + receipt.output_tokens if known else None
+            execution_status, effect_status, result_status = _provider_states(receipt)
             usage_id = None
             if receipt is not None and call["goal_contract_digest"] is not None:
                 usage = receipt_usage(receipt, project_id=call["project_id"],
                                       goal_digest=call["goal_contract_digest"], stage=BudgetStage(call["stage"]))
                 usage_id = self.service._insert_budget_usage(tx, usage)
-            tx.connection.execute("UPDATE provider_calls SET status=?, actual_tokens=?, receipt_json=?, usage_id=?, completed_at=? "
-                                  "WHERE id=?", ("settled" if known else "usage_unknown" if terminal else "reserved",
-                                                actual, value, usage_id, tx.now if terminal else None, call_id))
+            raw_receipt_digest = None if receipt is None else sha256_digest(receipt)
+            tx.connection.execute(
+                "UPDATE provider_calls SET execution_status=?,effect_status=?,result_status=?,"
+                "new_turn_count=?,status=?,actual_tokens=?,receipt_json=?,raw_receipt_digest=?,usage_id=?,completed_at=? WHERE id=?",
+                (execution_status, effect_status, result_status,
+                 len(receipt.turn_ids) if receipt is not None else 0,
+                 "settled" if known else "usage_unknown" if terminal else "reserved",
+                 actual, value, raw_receipt_digest, usage_id, tx.now if terminal else None, call_id),
+            )
+            if receipt is not None:
+                refreshed = tx.one("SELECT * FROM provider_calls WHERE id=?", (call_id,))
+                _insert_usage_observation(
+                    tx, call=refreshed, source="role_receipt", raw_document=receipt,
+                    known=known,
+                    values=(receipt.input_tokens, receipt.cached_input_tokens,
+                            receipt.output_tokens, receipt.reasoning_tokens),
+                    usage_scope="turn", attribution_basis="provider_turn",
+                    unavailable_reason=(None if known else
+                        "PROVIDER_TERMINAL_UNOBSERVED" if not terminal else
+                        "PROVIDER_USAGE_UNAVAILABLE_OR_RECOVERY_UNATTRIBUTABLE"),
+                )
             if receipt is not None:
                 tx.history(call["project_id"], "budget.call_observed", "provider_call", call_id,
                            {"observation_kind": "role_receipt", "receipt": json.loads(value),
@@ -293,17 +390,10 @@ class BudgetManager:
                 tx.history(project_id, "budget.goal_bound", "provider_call", call["id"], {"goal_contract_digest": goal_digest})
 
     def adjust_unknown(self, *, call_id: str, charge_tokens: int, reason: str) -> None:
-        if isinstance(charge_tokens, bool) or not isinstance(charge_tokens, int) or charge_tokens < 0 or not reason.strip():
-            raise ValueError("명시적 비음수 잠정 차감량과 이유가 필요합니다.")
-        with self.service.ledger.transaction() as tx:
-            call = tx.one("SELECT * FROM provider_calls WHERE id=?", (call_id,))
-            if call["status"] != "usage_unknown":
-                raise BudgetBlocked("BUDGET_ADJUSTMENT_NOT_ALLOWED", "종료 처리된 미확인 사용량만 명시적으로 정산할 수 있습니다.")
-            identifier = new_id("budget_adjustment")
-            tx.connection.execute("INSERT INTO budget_adjustments VALUES (?,?,?,?,?,?,?)",
-                (identifier, call["project_id"], call["goal_id"], call_id, charge_tokens, reason, tx.now))
-            tx.history(call["project_id"], "budget.unknown_adjusted", "budget_adjustment", identifier,
-                       {"call_id": call_id, "charge_tokens": charge_tokens, "reason": reason, "actual_usage_known": False})
+        raise BudgetBlocked(
+            "USAGE_ESTIMATION_PROHIBITED",
+            "누락 사용량은 0·예약량·추정 차감으로 보충하지 않고 null로 보존합니다.",
+        )
 
     def import_role_checkpoint(self, *, project_id: str, goal_id: str, goal_digest: str,
                                entries: tuple[dict[str, Any], ...], source_ref: str,
@@ -339,15 +429,27 @@ class BudgetManager:
                 usage_id = self.service._insert_budget_usage(tx, usage)
                 terminal = _terminal_receipt(receipt)
                 known = terminal and usage.usage_available
+                execution_status, effect_status, result_status = _provider_states(receipt)
                 identifier = new_id("provider_call")
                 tx.connection.execute("INSERT INTO provider_calls (id,project_id,goal_id,goal_contract_digest,call_key,role,stage,"
-                    "request_digest,request_json,estimated_tokens,status,actual_tokens,receipt_json,usage_id,created_at,completed_at) "
-                    "VALUES (?,?,?,?,?,?,?,?,?,0,?,?,?,?,?,?)", (identifier, project_id, goal_id, digest, receipt.call_id,
+                    "request_digest,request_json,estimated_tokens,execution_status,effect_status,result_status,new_turn_count,status,"
+                    "actual_tokens,receipt_json,raw_receipt_digest,usage_id,created_at,completed_at) "
+                    "VALUES (?,?,?,?,?,?,?,?,?,0,?,?,?,?,?,?,?,?,?,?,?)", (identifier, project_id, goal_id, digest, receipt.call_id,
                     receipt.role, usage.stage.value, sha256_digest(item["request"]), canonical_json(item["request"]),
+                    execution_status, effect_status, result_status, len(receipt.turn_ids),
                     "settled" if known else "usage_unknown" if terminal else "reserved",
                     usage.input_tokens + usage.output_tokens if known else None,
-                    canonical_json(item["receipt"]), usage_id, receipt.recorded_at.isoformat(),
+                    canonical_json(item["receipt"]), sha256_digest(item["receipt"]), usage_id, receipt.recorded_at.isoformat(),
                     receipt.recorded_at.isoformat() if terminal else None))
+                call = tx.one("SELECT * FROM provider_calls WHERE id=?", (identifier,))
+                _insert_usage_observation(
+                    tx, call=call, source="role_receipt", raw_document=item["receipt"], known=known,
+                    values=(usage.input_tokens, usage.cached_input_tokens,
+                            usage.output_tokens, usage.reasoning_tokens),
+                    usage_scope=(usage.usage_scope if usage.usage_scope in {"turn", "thread"} else "turn"),
+                    attribution_basis=(usage.attribution_basis or "provider_turn") if known else "unavailable",
+                    unavailable_reason=usage.unavailable_reason,
+                )
                 identifiers.append(identifier)
                 tx.history(project_id, "budget.checkpoint_call_imported", "provider_call", identifier,
                            {"source_ref": source_ref, "source_digest": source_digest,
@@ -367,6 +469,10 @@ class BudgetManager:
             if call["status"] != "reserved" or call["receipt_json"] is not None or call["attempt_id"] is not None:
                 raise BudgetBlocked("BUDGET_RELEASE_NOT_ALLOWED", "역할 효과가 시작되지 않은 예약만 해제할 수 있습니다.")
             tx.connection.execute("UPDATE provider_calls SET status='released',completed_at=? WHERE id=?", (tx.now, call_id))
+            tx.connection.execute(
+                "UPDATE provider_calls SET execution_status='released',effect_status='none',result_status='invalid' "
+                "WHERE id=?", (call_id,),
+            )
             tx.history(call["project_id"], "budget.released_before_effect", "provider_call", call_id,
                        {"request_digest": call["request_digest"], "reason": reason})
 
@@ -549,9 +655,19 @@ def record_validator_usage(service: EngineService, attempt_id: str, observation:
             runtime_intent_id=intent["id"], runtime_receipt_id=receipt.receipt_id,
             execution_spec_digest=spec.definition_digest, provider_observation=payload, recorded_at=utc_now())
         service._insert_budget_usage(tx, usage)
-        tx.connection.execute("UPDATE provider_calls SET status=?,actual_tokens=?,receipt_json=?,usage_id=?,completed_at=? WHERE id=?",
-            ("settled" if known else "usage_unknown", values[0] + values[2] if known else None,
-             canonical_json(payload), usage.usage_id, tx.now, call["id"]))
+        raw_digest = sha256_digest(payload)
+        tx.connection.execute("UPDATE provider_calls SET execution_status='terminal',effect_status='terminal',"
+            "result_status=?,new_turn_count=1,status=?,actual_tokens=?,receipt_json=?,raw_receipt_digest=?,usage_id=?,completed_at=? WHERE id=?",
+            ("valid" if observation.terminal_status in {"completed", "success", "succeeded"} else "invalid",
+             "settled" if known else "usage_unknown", values[0] + values[2] if known else None,
+             canonical_json(payload), raw_digest, usage.usage_id, tx.now, call["id"]))
+        refreshed = tx.one("SELECT * FROM provider_calls WHERE id=?", (call["id"],))
+        _insert_usage_observation(
+            tx, call=refreshed, source="validator_terminal", raw_document=payload, known=known,
+            values=values, usage_scope=scope if scope in {"turn", "thread"} else "unavailable",
+            attribution_basis=("provider_turn" if scope == "turn" else "first_empty_thread") if known else "unavailable",
+            unavailable_reason=None if known else "PROVIDER_USAGE_UNAVAILABLE_OR_UNATTRIBUTABLE",
+        )
         tx.history(attempt["project_id"], "budget.call_settled", "provider_call", call["id"],
                    {"actual_tokens": values[0] + values[2] if known else None, "usage_available": known})
         return usage
@@ -565,8 +681,22 @@ def settle_worker_in_transaction(tx: Any, usage: BudgetUsageRecord) -> None:
     if call is None:
         return
     actual = usage.input_tokens + usage.output_tokens if usage.usage_available else None
-    tx.connection.execute("UPDATE provider_calls SET status=?,actual_tokens=?,receipt_json=?,usage_id=?,completed_at=? WHERE id=?",
-        ("settled" if usage.usage_available else "usage_unknown", actual, canonical_json(usage.provider_observation),
-         usage.usage_id, tx.now, call["id"]))
+    raw_document = usage.provider_observation
+    raw_digest = sha256_digest(raw_document)
+    tx.connection.execute("UPDATE provider_calls SET execution_status='terminal',effect_status='terminal',"
+        "result_status=?,new_turn_count=1,status=?,actual_tokens=?,receipt_json=?,raw_receipt_digest=?,usage_id=?,completed_at=? WHERE id=?",
+        ("valid" if usage.call_status in {"completed", "success", "succeeded"} else "invalid",
+         "settled" if usage.usage_available else "usage_unknown", actual, canonical_json(raw_document),
+         raw_digest, usage.usage_id, tx.now, call["id"]))
+    refreshed = tx.one("SELECT * FROM provider_calls WHERE id=?", (call["id"],))
+    _insert_usage_observation(
+        tx, call=refreshed, source="worker_terminal", raw_document=raw_document,
+        known=usage.usage_available,
+        values=(usage.input_tokens, usage.cached_input_tokens,
+                usage.output_tokens, usage.reasoning_tokens),
+        usage_scope=usage.usage_scope,
+        attribution_basis=usage.attribution_basis or "unavailable",
+        unavailable_reason=usage.unavailable_reason,
+    )
     tx.history(usage.project_id, "budget.call_settled", "provider_call", call["id"],
                {"actual_tokens": actual, "usage_available": usage.usage_available})

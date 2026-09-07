@@ -204,7 +204,7 @@ class InspectionDiagnosticBudgetTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "DIAGNOSTIC_GOAL_BINDING_CHANGED"):
             registry.service_for(current_goal)
 
-    def test_unknown_usage_blocks_later_call_in_same_goal_ledger(self):
+    def test_unknown_usage_is_reported_but_allows_later_call_in_same_goal_ledger(self):
         _binding, policies = self.bind()
         project_id = "project_" + "5" * 32
         current_goal = goal(project_id, sha256_digest("fixture-profile"))
@@ -218,10 +218,10 @@ class InspectionDiagnosticBudgetTests(unittest.TestCase):
         runner = _UnknownUsageRunner()
         registry.runner_for(runner, current_goal).run(request)
         observation = diagnostic_budget_ledger_observation(self.root / "run")
-        self.assertTrue(observation["unresolved_provider_call_ids"])
+        self.assertFalse(observation["unresolved_provider_call_ids"])
+        self.assertTrue(observation["usage_incomplete_provider_call_ids"])
         self.assertTrue(observation["all_history_chains_valid"])
-        with self.assertRaisesRegex(BudgetBlocked, "BUDGET_USAGE_UNKNOWN"):
-            registry.runner_for(runner, current_goal).run(request)
+        registry.runner_for(runner, current_goal).run(request)
 
     def test_diagnostic_snapshot_distinguishes_original_receipt_from_late_observation(self):
         _binding, policies = self.bind()
@@ -307,7 +307,7 @@ class InspectionDiagnosticBudgetTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "PENDING_LEDGER_CHANGED"):
             module.verify_generation_pending(run)
 
-    def test_summary_cannot_publish_pass_when_last_budget_receipt_usage_is_unknown(self):
+    def test_summary_reports_unknown_usage_without_marking_effect_unresolved(self):
         module = _s06_module()
         _binding, policies = self.bind()
         run = self.root / "summary-run"
@@ -345,7 +345,7 @@ class InspectionDiagnosticBudgetTests(unittest.TestCase):
             (module.source_manifest_digest, module.preserved_files, module.files,
              module.collect_call_artifacts) = original
         self.assertEqual(summary["status"], "FAIL")
-        self.assertFalse(summary["checks"]["budget_ledger_usage_complete"])
+        self.assertTrue(summary["checks"]["budget_ledger_usage_complete"])
         self.assertFalse(summary["checks"]["provider_receipt_usage_available"])
         self.assertFalse(summary["checks"]["provider_terminal_usage_complete"])
         self.assertGreater(summary["new_ledger_writes"], 0)

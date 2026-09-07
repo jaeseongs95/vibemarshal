@@ -1948,6 +1948,66 @@ class BudgetStage(StrEnum):
     REPLAN = "replan"
 
 
+class UsageObservation(EngineModel):
+    """provider 실행 상태와 분리된 append-only 사용량 관측.
+
+    ``unavailable``은 측정값 0이 아니다. 늦게 도착한 실측은 새 관측으로
+    연결하며 원래 receipt나 실행 완료 시각을 수정하지 않는다.
+    """
+
+    schema_version: Literal["1.0"] = "1.0"
+    observation_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    provider_call_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    project_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    source: Literal["role_receipt", "runtime_observation", "worker_terminal", "validator_terminal"]
+    measurement_status: Literal["measured", "unavailable"]
+    input_tokens: int | None = Field(default=None, ge=0)
+    cached_input_tokens: int | None = Field(default=None, ge=0)
+    output_tokens: int | None = Field(default=None, ge=0)
+    reasoning_tokens: int | None = Field(default=None, ge=0)
+    usage_scope: Literal["unspecified", "turn", "thread", "unavailable"] = "unavailable"
+    attribution_basis: Literal["provider_turn", "first_empty_thread", "unavailable"] = "unavailable"
+    unavailable_reason: str | None = Field(default=None, min_length=1, max_length=500)
+    raw_observation_digest: str = Field(pattern=_DIGEST_PATTERN)
+    original_receipt_digest: str | None = Field(default=None, pattern=_DIGEST_PATTERN)
+    previous_observation_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
+    late: bool = False
+    observed_at: datetime
+
+    _observed_at_is_aware = field_validator("observed_at")(_aware)
+
+    @model_validator(mode="after")
+    def measurement_is_not_estimated(self) -> "UsageObservation":
+        counts = (
+            self.input_tokens,
+            self.cached_input_tokens,
+            self.output_tokens,
+            self.reasoning_tokens,
+        )
+        if self.measurement_status == "measured":
+            if any(value is None for value in counts):
+                raise ValueError("실측 UsageObservation에는 모든 token 필드가 필요합니다.")
+            if self.unavailable_reason is not None or self.attribution_basis == "unavailable":
+                raise ValueError("실측 usage와 unavailable provenance를 혼합할 수 없습니다.")
+        elif any(value is not None for value in counts) or self.unavailable_reason is None:
+            raise ValueError("미확인 UsageObservation은 null token과 이유를 보존해야 합니다.")
+        if (
+            self.cached_input_tokens is not None
+            and self.input_tokens is not None
+            and self.cached_input_tokens > self.input_tokens
+        ):
+            raise ValueError("cached input token은 input token보다 클 수 없습니다.")
+        if (
+            self.reasoning_tokens is not None
+            and self.output_tokens is not None
+            and self.reasoning_tokens > self.output_tokens
+        ):
+            raise ValueError("reasoning token은 output token보다 클 수 없습니다.")
+        if self.late and self.previous_observation_id is None:
+            raise ValueError("late UsageObservation에는 직전 관측 연결이 필요합니다.")
+        return self
+
+
 class BudgetUsageRecord(EngineModel):
     usage_id: str = Field(pattern=_ENTITY_ID_PATTERN)
     project_id: str = Field(pattern=_ENTITY_ID_PATTERN)

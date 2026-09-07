@@ -2447,13 +2447,23 @@ class EngineDispatcher:
             ).fetchone()[0]
         if resume_count:
             raise EngineServiceError("저장된 Attempt는 이미 한 번 재개됐으며 다시 자동 재개하지 않습니다.")
-        from .budget import reserve_attempt_call
-        provider_call_id = reserve_attempt_call(
-            self.service, row, call_key=f"{attempt_key}:resumed",
-            require_policy=getattr(self.runtime, "requires_budget_policy", False),
-            request={"thread_id": binding.thread_id,
-                     "model_observation": current_binding.model_dump(mode="json")},
-        )
+        # create_thread receipt 뒤 아직 실제 turn을 시작하지 않은 예약은 같은 실행
+        # 슬롯이다. 연결을 위한 resume RPC를 새 provider turn/호출로 세지 않는다.
+        with self.service.ledger.read() as connection:
+            unused_call = connection.execute(
+                "SELECT id FROM provider_calls WHERE attempt_id=? AND execution_status='reserved' "
+                "AND new_turn_count=0 ORDER BY rowid DESC LIMIT 1", (row["id"],),
+            ).fetchone()
+        if unused_call is not None:
+            provider_call_id = unused_call["id"]
+        else:
+            from .budget import reserve_attempt_call
+            provider_call_id = reserve_attempt_call(
+                self.service, row, call_key=f"{attempt_key}:resumed",
+                require_policy=getattr(self.runtime, "requires_budget_policy", False),
+                request={"thread_id": binding.thread_id,
+                         "model_observation": current_binding.model_dump(mode="json")},
+            )
         self._attempt_provider_call_ids[row["id"]] = provider_call_id
         resume_intent = self.service.prepare_runtime_intent(
             attempt_id=row["id"],

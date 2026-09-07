@@ -221,7 +221,11 @@ def summarize_usage_records(
     provider_incomplete = tuple(
         item for item in provider_calls
         if item.provider_call_id not in projected_provider_ids
-        and (item.status != "settled" or item.usage_id is None or item.usage_id not in usage_ids)
+        and (
+            item.execution_status != "terminal"
+            or item.usage_id is None
+            or item.usage_id not in usage_ids
+        )
     )
     # reserved/usage_unknown call에 연결된 usage는 최종 관측 전 값이다. 합산 대상에서
     # 먼저 제외한 뒤 하나의 미확인 호출로 표시해 같은 call을 두 번 세지 않는다.
@@ -255,12 +259,17 @@ def summarize_usage_records(
     ]
     reasons.extend(
         UsageIncompleteReason(
-            code=(item.incomplete_reason_code or
-                  ("PROVIDER_CALL_NOT_SETTLED" if item.status != "settled" else "PROVIDER_CALL_USAGE_MISSING")),
+            code=(item.incomplete_reason_code or (
+                "PROVIDER_CALL_NOT_SETTLED"
+                if item.execution_status != "terminal"
+                else "PROVIDER_CALL_USAGE_MISSING"
+            )),
             call_ref=item.call_key, stage=item.stage, role=item.role,
-            detail=(item.incomplete_reason_detail or
-                    ("provider call이 settled 상태가 아니므로 usage_id가 있어도 완결된 실측으로 취급하지 않습니다."
-                     if item.status != "settled" else "settled provider call에 결속된 usage 레코드가 없습니다.")),
+            detail=(item.incomplete_reason_detail or (
+                "provider 실행·효과가 terminal이 아니므로 usage와 별개로 먼저 관측해야 합니다."
+                if item.execution_status != "terminal"
+                else "provider 실행 상태와 별개로 결속된 UsageObservation/usage 레코드가 없습니다."
+            )),
         )
         for item in provider_incomplete
     )
@@ -505,7 +514,7 @@ def _provider_receipt_projection(
             attribution_basis = ("first_empty_thread" if available and usage_scope == "thread"
                                  else "provider_turn" if available else "unavailable")
         else:
-            terminal = receipt.status in {"succeeded", "failed", "schema_failed"} or (
+            terminal = receipt.status in {"succeeded", "failed", "schema_failed", "input_contract_failed"} or (
                 receipt.terminal_observation_digest is not None
                 and receipt.terminal_status_after_interrupt in TERMINAL_STATUSES
             )
@@ -687,6 +696,8 @@ class EngineApplication:
             expected_logical_call_refs=expected_logical_call_refs,
             provider_call_expectations=tuple(ProviderCallExpectation(
                 provider_call_id=row["id"], call_key=row["call_key"], status=row["status"], role=row["role"],
+                execution_status=row["execution_status"], effect_status=row["effect_status"],
+                result_status=row["result_status"],
                 stage=row["stage"], usage_id=row["usage_id"],
                 incomplete_reason_code=(
                     None if row["id"] not in projection_failures

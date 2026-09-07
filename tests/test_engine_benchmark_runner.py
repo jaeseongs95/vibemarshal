@@ -379,7 +379,8 @@ class BenchmarkRunnerTests(unittest.TestCase):
                 call_id="fixture", role="goal_normalizer", status="succeeded", model="fixture", effort="medium",
                 inventory_digest="sha256:" + "1" * 64, permission_profile=":danger-full-access", approval_policy="never",
                 input_digest="sha256:" + "2" * 64, output_schema_digest="sha256:" + "3" * 64,
-                input_tokens=50, output_tokens=10, usage_available=True, latency_ms=50, recorded_at=utc_now(),
+                input_tokens=50, cached_input_tokens=0, output_tokens=10, reasoning_tokens=0,
+                usage_available=True, latency_ms=50, recorded_at=utc_now(),
             )
             return {"selected": False, "passed": scenario.expected_disposition == "blocked",
                     "blocking_questions": ["추가 자료 필요"] if scenario.expected_disposition == "blocked" else [],

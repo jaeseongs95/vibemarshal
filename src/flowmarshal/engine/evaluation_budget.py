@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from pydantic import model_validator
+from pydantic import Field, model_validator
 
 from ..canonical import sha256_digest
 from .budget import BudgetManager, BudgetedRoleRunner, GoalBudgetPolicy
@@ -23,6 +23,8 @@ class EvaluationPolicies(EngineModel):
     budget: GoalBudgetPolicy
     role_timeouts: RoleTimeoutPolicy
     codex_project: CodexProjectBinding | None = None
+    max_provider_calls: int = Field(default=14, ge=1, strict=True)
+    wall_timeout_seconds: int = Field(default=28_800, ge=1, strict=True)
 
     @model_validator(mode="after")
     def schema_recovery_is_never_budgeted(self) -> "EvaluationPolicies":
