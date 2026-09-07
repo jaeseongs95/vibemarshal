@@ -182,6 +182,7 @@ def _bound_scope_reports(
     root: Path,
     *,
     inspection_provider_contract: str = PLAN_INSPECTION_PROVIDER_V1,
+    require_checkpoint_evidence: bool = False,
 ) -> tuple[ScopeQualificationReport, ...]:
     reports = _scope_reports(paths)
     if len({report.scope for report in reports}) != len(reports):
@@ -193,6 +194,11 @@ def _bound_scope_reports(
             raise QualificationRunError("scope report와 원본 evaluation 계약이 다릅니다.")
         if contract.source_manifest_digest != source_manifest_digest(root):
             raise QualificationRunError("현재 source와 다른 scope report는 cutover 근거가 아닙니다.")
+        if require_checkpoint_evidence:
+            from .scope_report_verification import verify_scope_report
+            verified = verify_scope_report(root=root, run_root=Path(path).parent, report=report)
+            if not verified.valid:
+                raise QualificationRunError("SCOPE_REPORT_RECALCULATION_FAILED: " + "; ".join(verified.errors))
         if report.scope is EvaluationScope.FULL_PLANNING_PIPELINE:
             metadata = _json(Path(path).parent / "run-metadata.json")
             try:
@@ -224,6 +230,7 @@ def _benchmark(arguments: argparse.Namespace) -> int:
             scope_reports=_bound_scope_reports(
                 arguments.scope_report, root,
                 inspection_provider_contract=arguments.inspection_contract,
+                require_checkpoint_evidence=True,
             ),
             inspection_provider_contract=arguments.inspection_contract,
             evaluation_policies=policies,
@@ -296,7 +303,7 @@ def _write_immutable_assessment(path: Path, value: Any) -> None:
             raise QualificationRunError("기존 lifecycle assessment의 내용이 다릅니다.")
 
 
-def _observe_benchmark_lifecycle(arguments: argparse.Namespace) -> int:
+def _observe_benchmark_lifecycle_v3(arguments: argparse.Namespace) -> int:
     """모델 호출 없이 원래 cell 원장을 읽고 별도 불변 평가를 추가한다."""
     root = Path(arguments.project_root).resolve(strict=True)
     run_root = Path(arguments.run_root).resolve(strict=True)
@@ -386,49 +393,65 @@ def _observe_benchmark_lifecycle(arguments: argparse.Namespace) -> int:
     if token_report is not None:
         _write_immutable_assessment(destination / "token-latency-report.json", token_report.model_dump(mode="json"))
     _write_immutable_assessment(destination / "assessment.json", assessment)
-    _emit({"assessment_root": str(destination), "assessment": assessment})
+    _emit({"assessment_root": str(destination), "assessment": assessment,
+           "release_floor_status": "NOT_OBSERVED", "cutover_eligible": False})
     return 0 if assessment["passed"] else 1
 
 
-def _cutover(arguments: argparse.Namespace) -> int:
+def _observe_benchmark_lifecycle(arguments: argparse.Namespace) -> int:
+    """v4 run은 최종 최소선을 판정하고 v3는 역사 관측 형식으로만 읽는다."""
+    from .performance_assessment import build_performance_assessment, write_performance_assessment
     root = Path(arguments.project_root).resolve(strict=True)
-    reports = _bound_scope_reports(arguments.scope_report, root)
-    token_report = TokenLatencyGateReport.model_validate(_json(arguments.benchmark_report))
-    benchmark_root = Path(arguments.benchmark_report).parent
-    benchmark_contract = EvaluationContract.model_validate(_json(benchmark_root / "evaluation-contract.json"))
-    if benchmark_contract.source_manifest_digest != source_manifest_digest(root):
-        raise QualificationRunError("현재 source와 다른 benchmark는 cutover 근거가 아닙니다.")
-    cells = _load_cells(benchmark_root / "benchmark-cells.json")
-    catalog = PlanningScenarioCatalog.load(root / "tests/fixtures/engine/planning-scenarios.json")
-    validate_benchmark_matrix(cells, catalog)
-    if any(item.model_lock_digest != benchmark_contract.model_lock_digest for item in cells):
-        raise QualificationRunError("benchmark model lock과 cell이 다릅니다.")
-    recalculated = evaluate_token_latency_gate(cells, functional_gate_passed=(len(reports) == 4 and all(item.passed for item in reports)))
-    if recalculated != token_report:
-        raise QualificationRunError("benchmark report가 원본 cell의 재계산 결과와 다릅니다.")
-    scope_results = tuple(
-        ScopeGateResult(
-            scope=report.scope,
-            contract_digest=report.contract_digest,
-            artifact_digest=report.report_digest,
-            passed=report.passed,
-            failures=report.failures,
-        )
-        for report in reports
-    )
-    result = evaluate_cutover_gate(
-        scope_results=scope_results,
-        token_latency_gate=token_report,
-    )
+    run_root = Path(arguments.run_root).resolve(strict=True)
+    metadata = _json(run_root / "run-metadata.json")
+    if "performance_threshold_policy" not in metadata:
+        return _observe_benchmark_lifecycle_v3(arguments)
+    reports = _bound_scope_reports(arguments.scope_report, root,
+        inspection_provider_contract=metadata.get("inspection_provider_contract", PLAN_INSPECTION_PROVIDER_V1),
+        require_checkpoint_evidence=True)
+    report, bundle = build_performance_assessment(root=root, run_root=run_root, scope_reports=reports, assessment_stage="final")
+    destination = write_performance_assessment(run_root, report, bundle)
+    _emit({"assessment_root": str(destination), "report": report.model_dump(mode="json"),
+           "report_digest": sha256_digest(report), "release_floor_passed": report.release_floor_passed,
+           "optimization_targets_passed": report.optimization_targets_passed,
+           "optimization_followups_required": report.optimization_followups_required,
+           "cutover_eligible": report.cutover_eligible})
+    return 0 if report.release_floor_passed else 1
+
+
+def _cutover(arguments: argparse.Namespace) -> int:
+    """원본 근거에서 재계산한 final v4 보고서만 새 cutover에 사용한다."""
+    from .performance import PerformanceQualificationReport, evaluate_release_cutover_gate
+    from .performance_assessment import build_performance_assessment
+    root = Path(arguments.project_root).resolve(strict=True)
+    path = Path(arguments.benchmark_report).resolve(strict=True)
+    document = _json(path)
+    if document.get("schema_version") != "4.0":
+        raise QualificationRunError("PERFORMANCE_V4_REPORT_REQUIRED: v3.0은 표시용이며 새 cutover 근거가 아닙니다.")
+    report = PerformanceQualificationReport.model_validate_json(json.dumps(document))
+    if report.assessment_stage != "final":
+        raise QualificationRunError("PERFORMANCE_FINAL_ASSESSMENT_REQUIRED")
+    bundle = _json(path.parent / "assessment.json")
+    if (bundle.get("format") != "flowmarshal-performance-assessment-v1"
+            or bundle.get("report_digest") != sha256_digest(report)
+            or path.parent.name != sha256_digest(bundle)[7:]):
+        raise QualificationRunError("PERFORMANCE_ASSESSMENT_DIGEST_MISMATCH")
+    run_root = Path(bundle["source_run_root"]).resolve(strict=True)
+    metadata = _json(run_root / "run-metadata.json")
+    reports = _bound_scope_reports(arguments.scope_report, root,
+        inspection_provider_contract=metadata.get("inspection_provider_contract", PLAN_INSPECTION_PROVIDER_V1),
+        require_checkpoint_evidence=True)
+    recalculated, original_bundle = build_performance_assessment(root=root, run_root=run_root,
+        scope_reports=reports, assessment_stage="final")
+    if recalculated != report or original_bundle != bundle:
+        raise QualificationRunError("PERFORMANCE_REPORT_RECALCULATION_MISMATCH")
+    result = evaluate_release_cutover_gate(performance_report=recalculated)
     if arguments.output:
-        destination = Path(arguments.output)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        destination.write_text(
-            json.dumps(result.model_dump(mode="json"), ensure_ascii=False, sort_keys=True, indent=2)
-            + "\n",
-            encoding="utf-8",
-        )
-    _emit(result)
+        _write_immutable_assessment(Path(arguments.output), result.model_dump(mode="json"))
+    _emit({"report": result.model_dump(mode="json"), "release_floor_passed": report.release_floor_passed,
+           "optimization_targets_passed": report.optimization_targets_passed,
+           "optimization_followups_required": report.optimization_followups_required,
+           "cutover_eligible": result.passed})
     return 0 if result.passed else 1
 
 

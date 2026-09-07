@@ -139,12 +139,14 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 
 ## Qualification·legacy·cutover
 
-- 다음 범위는 각각 독립 artifact와 immutable evaluation contract가 필요하다: ① strict schema·DAG·ledger 결정적 Gate, ② 실제 Goal/Reviewer 회귀, ③ Skeleton-to-selection 전체 실제 모델 pipeline, ④ activation-to-recovery 실제 프로젝트 E2E. 같은 입력의 token/latency Gate도 별도로 통과해야 한다.
+- 다음 범위는 각각 독립 artifact와 immutable evaluation contract가 필요하다: ① strict schema·DAG·ledger 결정적 Gate, ② 실제 Goal/Reviewer 회귀, ③ Skeleton-to-selection 전체 실제 모델 pipeline, ④ activation-to-recovery 실제 프로젝트 E2E. 네 범위와 별도의 final `ReleasePerformanceFloor`가 모두 통과해야 1.0 cutover가 가능하다.
 - evaluation cell은 fixture digest·order seed·prompt·schema·threshold·taxonomy·model lock·receipt에 결속한다. 계약이 달라진 checkpoint와 미완료 cell을 재사용하지 않는다. 결정적 테스트·synthetic smoke·일부 fixture·aggregate 점수는 실제 역할과 전체 qualification을 대체하지 못한다.
 - development-diagnostic 단계는 사전 고정한 독립 static 11사례와 명시적으로 선택한 provider version을 모델 호출 최대 11회, schema recovery 0회로 관측한다. v1의 행 내부 검사·첫 실패 중단과 qualification 13의 기존 첫 실패, `expansion → 독립 생성 검토 → expanded-review` 경계는 바꾸지 않는다. 정상 완료 또는 receipt·terminal·lock 귀속이 완료된 model/schema/semantic FAIL만 다음 독립 사례로 진행한다. 환경·계약·입력 stale·외부 효과 불명은 즉시 전체를 중단하며, 관측된 실패는 FAIL로 보존하고 호출하지 않은 사례는 NOT_RUN으로 남긴다.
 - 단계 A 공통 preflight는 detached worktree의 HEAD·source_manifest·clean tracked files, 전용 Python·`flowmarshal` import origin, fixture whitelist package와 relocation proof, 명시적 Codex executable, roles·instruction actual sources와 model lock을 결속한다. origin/main과 다른 checkout HEAD는 시작 provenance일 뿐 실행 중 비교하지 않는다. payload 의미·oracle·과거 FAIL은 보정하지 않으며, 11사례 완료는 qualification PASS가 아니다.
 - 새 고정 diagnostics의 실제 역할 thread는 저장형(`ephemeral=false`)으로 생성하고 preflight·생성 intent·provider receipt에서 일치를 검사한다. 모델 turn 없는 지침 probe와 일반 역할 runner의 기본 정책은 별도다. 저장형 thread도 완료를 보장하지 않으며 프로세스 중단 뒤에는 기존 thread를 재개 없이 먼저 관측한다.
-- 계획 생성 성공과 정보 부족에 따른 질문·차단을 구분하고 Plan이 없는 결과의 최초 feasible 시간을 0으로 만들지 않는다. 성능은 같은 중립 입력·정책·model lock으로 비교하며 실제 receipt 없는 token·시간·비용을 추정해 채우지 않는다.
+- 계획 생성 성공과 정보 부족에 따른 질문·차단을 구분하고 Plan이 없는 결과의 최초 feasible 시간을 0으로 만들지 않는다. 성능은 기대 manifest에 고정한 6 scenario×3 seed×2 implementation의 36 cell과 18 whole pair를 같은 중립 입력·정책·model lock으로 비교한다. planning의 미캐시 입력+출력 token을 pair별 상대 비율로 먼저 계산하며 실제 receipt 없는 token·시간·비용, baseline 0, 누락 pair와 필수 분모를 0으로 채우지 않는다.
+- final 성능 판정 전에 planning 중간 평가를 별도로 남기고, 선택된 Engine 12 cell의 exact Plan 활성화·실행·validation·State 재관측 lifecycle을 완결한다. operation trace나 usage·효과가 없거나 불완전하면 counter와 지표는 `null / NOT_OBSERVED`이며 합격이 아니다. baseline·질문/차단 cell도 lifecycle 비적용을 원장에서 확인한 경우만 0으로 기록한다.
+- 1.0 필수 성능 최소선과 기존 여섯 최적화 목표를 구분한다. 모든 최적화 지표의 관측은 final 최소선에 필요하지만, 완전히 관측된 목표치 미달은 scorecard와 후속 개선으로 공개하고 cutover를 차단하지 않는다. 과거 `TokenLatencyGateReport` v3.0과 계산 함수는 역사 읽기 호환으로 유지하며 새 cutover에는 final `PerformanceQualificationReport` v4.0만 사용한다.
 - 평가 입력이 부분 발췌인지 실행 준비 계약인지 명시한다. fixture·evaluator 결함은 새 revision으로 고치되 과거 입력·원시 결과·판정을 provenance로 보존하고 모델 결과 뒤 oracle alias·합격선을 완화하지 않는다.
 - R1~R3.1 source·artifact는 수정·삭제하지 않고 `legacy/prototype` 감사 기준선으로 보존한다. 기존 campaign을 다시 돌려 GO로 만들지 않으며 실패 사례만 provenance와 함께 새 회귀 fixture로 이전한다.
 - 새 Engine은 별도 SQLite application ID와 artifact root를 사용하고 prototype DB를 자동·제자리 migration하지 않는다. 개발 package·CLI는 `flowmarshal-engine`이며 모든 Gate 통과 뒤에만 `flowmarshal` 1.0으로 승격한다. 하나라도 실패·미실행이면 `NO-GO`다.

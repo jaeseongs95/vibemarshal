@@ -337,6 +337,8 @@ class BenchmarkRunnerTests(unittest.TestCase):
 
     def test_completed_matrix_is_immutable_and_resume_does_not_call_models(self):
         calls = []
+        safety_captures = []
+        performance_assessments = []
         catalog = PlanningScenarioCatalog.load(ROOT / "tests/fixtures/engine/planning-scenarios.json")
         scenarios = {item.source_request: item for item in catalog.scenarios}
 
@@ -383,6 +385,70 @@ class BenchmarkRunnerTests(unittest.TestCase):
                     "blocking_questions": ["추가 자료 필요"] if scenario.expected_disposition == "blocked" else [],
                     "latency_ms_to_first_feasible": None, "latency_ms_to_disposition": 50}, (receipt,)
 
+        def capture_safety(*, work_root, implementation, raw, policies):
+            # 이 테스트는 실제 provider/SQLite 관측이 없는 runner matrix mock이다.
+            # collector 자체의 원장·trace 검증은 test_engine_benchmark_safety가 담당한다.
+            self.assertIn(implementation, {"r31_baseline", "skeleton_engine"})
+            self.assertIs(policies, POLICIES)
+            self.assertIn("receipts", raw)
+            safety_captures.append((work_root, implementation))
+            return {"format": "mock-safety-checkpoint-v1", "implementation": implementation}
+
+        def build_assessment(**arguments):
+            from flowmarshal.engine.performance import (
+                PerformanceQualificationReport,
+                PerformanceThresholdPolicy,
+            )
+
+            self.assertEqual("planning", arguments["assessment_stage"])
+            performance_assessments.append(arguments["run_root"])
+            # matrix resume 불변성만 검증하는 mock이므로 안전성 통과를 위조하지 않는다.
+            # 실제 collector의 6개 원장/trace 회귀는 별도 테스트에서 실행한다.
+            policy = PerformanceThresholdPolicy.load(
+                ROOT / "config" / "pre-1.0-performance-thresholds.json"
+            )
+            return PerformanceQualificationReport(
+                schema_version="4.0",
+                assessment_stage="planning",
+                contract_digest="sha256:" + "0" * 64,
+                source_manifest_digest="sha256:" + "1" * 64,
+                scenario_set_digest="sha256:" + "2" * 64,
+                expected_manifest_digest="sha256:" + "3" * 64,
+                threshold_policy=policy,
+                performance_threshold_policy_digest=policy.policy_digest,
+                observed_cell_count=0,
+                observed_pair_count=0,
+                observed_selected_pair_count=0,
+                observed_blocked_pair_count=0,
+                cell_digests=(),
+                safety_observation_digests=(),
+                source_evidence_digests=(),
+                scope_results=(),
+                pair_results=(),
+                overall_mean_reduction=None,
+                multi_path_median_reduction=None,
+                worst_single_path_regression=None,
+                worst_cell_token_regression=None,
+                time_to_first_feasible_median_improvement=None,
+                all_pair_disposition_median_improvement=None,
+                unexecuted_detail_ratio=None,
+                discarded_candidate_output_ratio=None,
+                manifest_complete=False,
+                functional_safety_passed=False,
+                minimum_performance_floor_passed=False,
+                release_floor_passed=False,
+                cutover_eligible=False,
+                optimization_targets_passed=False,
+                optimization_followups_required=False,
+                optimization_misses=(),
+                planning_assessment_passed=False,
+                failures=(),
+                not_observed=("PERFORMANCE_MOCK_NOT_OBSERVED",),
+            ), {"format": "mock-performance-assessment-v1"}
+
+        def write_assessment(run_root, _report, _bundle):
+            return run_root / "performance-assessments" / "mock"
+
         with tempfile.TemporaryDirectory() as temporary, patch(
             "flowmarshal.engine.benchmark._preflight", return_value=()
         ), patch("flowmarshal.engine.benchmark.CodexAppServerRuntime", side_effect=lambda **_: ContextRuntime(runtime_inventory())), patch(
@@ -391,6 +457,15 @@ class BenchmarkRunnerTests(unittest.TestCase):
             "flowmarshal.engine.benchmark._legacy_process", side_effect=legacy
         ), patch("flowmarshal.engine.benchmark._planning_cell", side_effect=engine), patch(
             "flowmarshal.engine.benchmark._verify_legacy_budget_evidence"
+        ), patch(
+            "flowmarshal.engine.benchmark_safety.capture_planning_safety_checkpoint",
+            side_effect=capture_safety,
+        ), patch(
+            "flowmarshal.engine.performance_assessment.build_performance_assessment",
+            side_effect=build_assessment,
+        ), patch(
+            "flowmarshal.engine.performance_assessment.write_performance_assessment",
+            side_effect=write_assessment,
         ):
             run_root, report = run_benchmark(
                 root=ROOT,
@@ -401,6 +476,10 @@ class BenchmarkRunnerTests(unittest.TestCase):
             self.assertEqual(36, report.completed_cell_count)
             self.assertFalse(report.passed)
             self.assertEqual(36, len(calls))
+            self.assertEqual(36, len(safety_captures))
+            self.assertIsNotNone(report.performance_qualification)
+            self.assertFalse(report.performance_qualification.planning_assessment_passed)
+            self.assertEqual(1, len(performance_assessments))
             checkpoints = {str(path): path.read_bytes() for path in run_root.glob("cells/**/*.json")}
             _, resumed = run_benchmark(
                 root=ROOT,
@@ -409,6 +488,8 @@ class BenchmarkRunnerTests(unittest.TestCase):
             )
             self.assertEqual(36, resumed.completed_cell_count)
             self.assertEqual(36, len(calls))
+            self.assertEqual(36, len(safety_captures))
+            self.assertEqual(2, len(performance_assessments))
             self.assertEqual(checkpoints, {str(path): path.read_bytes() for path in run_root.glob("cells/**/*.json")})
 
 

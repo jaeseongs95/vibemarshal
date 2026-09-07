@@ -8,10 +8,11 @@ import threading
 import time
 from concurrent.futures import Future
 from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
-from pydantic import Field
+from pydantic import Field, model_serializer, model_validator
 
 from ..canonical import sha256_bytes, sha256_digest
 from .domain import (
@@ -41,6 +42,12 @@ from .domain import (
 )
 from .models import ModelCapability, ModelInventory
 from .runtime_observation import bounded_observation_call
+from .operation_trace import (
+    OperationTrace,
+    OperationTraceScope,
+    current_operation_trace_scope,
+    use_operation_trace_scope,
+)
 from .service import ContextRequiredError, EngineService, EngineServiceError
 
 
@@ -84,6 +91,28 @@ class RuntimeOperationReceipt(EngineModel):
     operation_id: str = Field(min_length=1, max_length=500)
     payload: dict[str, Any]
     binding: ThreadBinding | None = None
+    operation_trace: dict[str, Any] | None = None
+    operation_trace_ref: str | None = None
+    operation_trace_digest: str | None = Field(
+        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
+    )
+
+    @model_validator(mode="after")
+    def operation_trace_is_bound(self):
+        if self.operation_trace is None:
+            if self.operation_trace_digest is not None:
+                raise ValueError("operation trace body 없이 digest를 결속할 수 없습니다.")
+        elif self.operation_trace_digest != sha256_digest(self.operation_trace):
+            raise ValueError("operation trace digest가 body와 다릅니다.")
+        return self
+
+    @model_serializer(mode="wrap")
+    def omit_absent_operation_trace(self, handler):
+        value = handler(self)
+        for field_name in ("operation_trace", "operation_trace_ref", "operation_trace_digest"):
+            if getattr(self, field_name) is None:
+                value.pop(field_name, None)
+        return value
 
 
 class RuntimeObservation(EngineModel):
@@ -160,6 +189,7 @@ class CodexAppServerRuntime:
     """
 
     requires_budget_policy = True
+    emits_rpc_operation_trace = True
 
     @property
     def project_binding(self) -> CodexProjectBinding | None:
@@ -203,6 +233,7 @@ class CodexAppServerRuntime:
         self._completion_observers: dict[str, tuple[str, Callable[[RuntimeObservation], None]]] = {}
         self._completion_observer_lock = threading.Lock()
         self._interrupted_turn_ids: set[str] = set()
+        self._thread_trace_scopes: dict[str, OperationTraceScope] = {}
         try:
             self._verify_project_binding()
         except BaseException:
@@ -224,9 +255,24 @@ class CodexAppServerRuntime:
                     # close나 복구 경로가 같은 interrupt를 중복 전송하면 안 된다.
                     interrupted_turn_ids.add(handle.id)
                     try:
+                        remaining = min(
+                            timeout_seconds, max(0.0, deadline - time.monotonic())
+                        )
+                        trace_scope = getattr(self, "_thread_trace_scopes", {}).get(thread_id)
                         bounded_observation_call(
-                            handle.interrupt,
-                            timeout_seconds=max(0.0, deadline - time.monotonic()),
+                            lambda: self._actual_rpc(
+                                "sdk.turn/interrupt",
+                                {"threadId": thread_id, "turnId": handle.id},
+                                handle.interrupt,
+                                thread_id=thread_id, turn_id=handle.id,
+                                response_projection=lambda value: (
+                                    value.model_dump(mode="json", by_alias=True)
+                                    if hasattr(value, "model_dump") else {"completed": True}
+                                ),
+                                scope=trace_scope, detached=True,
+                                deadline_seconds=remaining,
+                            ),
+                            timeout_seconds=remaining,
                             operation_name=f"turn/interrupt:{handle.id}",
                         )
                     except BaseException:
@@ -316,8 +362,93 @@ class CodexAppServerRuntime:
     def __exit__(self, *_: object) -> None:
         self.close()
 
+    @staticmethod
+    def _rpc_kind(method: str) -> str:
+        if method in {"thread/start", "sdk.thread/start"}:
+            return "create"
+        if method in {"turn/start", "sdk.turn/start"}:
+            return "start"
+        if method in {"thread/resume", "sdk.thread/resume"}:
+            return "resume"
+        if method in {"turn/interrupt", "sdk.turn/interrupt"}:
+            return "interrupt"
+        return "read"
+
+    def _actual_rpc(
+        self,
+        method: str,
+        params: dict[str, Any],
+        invoke: Callable[[], Any],
+        *,
+        thread_id: str | None = None,
+        turn_id: str | None = None,
+        response_projection: Callable[[Any], Any] | None = None,
+        scope: OperationTraceScope | None = None,
+        detached: bool = False,
+        deadline_seconds: float | None = None,
+    ) -> Any:
+        active = scope or current_operation_trace_scope()
+        if active is None:
+            return invoke()
+        remaining = deadline_seconds
+        if remaining is None and active.deadline_monotonic_ns is not None:
+            remaining = max(0.0, (active.deadline_monotonic_ns - time.monotonic_ns()) / 1_000_000_000)
+        child_deadline_at = None
+        if remaining is not None:
+            child_deadline_at = utc_now() + timedelta(seconds=remaining)
+            if not detached and active.deadline_at is not None:
+                child_deadline_at = min(child_deadline_at, active.deadline_at)
+        token = active.trace.begin(
+            self._rpc_kind(method), {"method": method, "params": params},
+            call_id=active.call_id, attempt_id=active.attempt_id,
+            intent_id=active.intent_id,
+            thread_id=thread_id or active.thread_id,
+            turn_id=turn_id or active.turn_id,
+            deadline_seconds=remaining, deadline_at=child_deadline_at, category="rpc",
+            parent_operation_id=None if detached else active.parent.operation_id,
+            rpc_method=method,
+            detached=detached,
+        )
+        try:
+            result = invoke()
+            response = response_projection(result) if response_projection is not None else result
+        except BaseException as error:
+            active.trace.finish(
+                token, error=error, attempt_id=active.attempt_id,
+                intent_id=active.intent_id, thread_id=thread_id or active.thread_id,
+                turn_id=turn_id or active.turn_id,
+            )
+            raise
+        active.trace.finish(
+            token, response=response, attempt_id=active.attempt_id,
+            intent_id=active.intent_id, thread_id=thread_id or active.thread_id,
+            turn_id=turn_id or active.turn_id,
+        )
+        return result
+
     def _raw(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
-        response = self._codex._client._request_raw(method, params)  # noqa: SLF001
+        active = current_operation_trace_scope()
+        # 5초 상한은 조회·중단에 적용한다. 생성·시작의 기존 실행 기한은 유지한다.
+        rpc_timeout = 5.0 if self._rpc_kind(method) in {"read", "interrupt"} else None
+        if active is not None and active.deadline_monotonic_ns is not None:
+            remaining = max(0.0, (active.deadline_monotonic_ns - time.monotonic_ns()) / 1_000_000_000)
+            rpc_timeout = remaining if rpc_timeout is None else min(rpc_timeout, remaining)
+        if rpc_timeout is not None and rpc_timeout <= 0:
+            raise TimeoutError(f"{method}: 상위 operation 기한이 만료됐습니다.")
+
+        def request_raw():
+            operation = lambda: self._codex._client._request_raw(method, params)  # noqa: SLF001
+            if rpc_timeout is None:
+                return operation()
+            return bounded_observation_call(
+                operation, timeout_seconds=rpc_timeout, operation_name=method,
+            )
+
+        response = self._actual_rpc(
+            method, params, request_raw,
+            thread_id=params.get("threadId"), turn_id=params.get("turnId"),
+            deadline_seconds=rpc_timeout,
+        )
         if not isinstance(response, dict):
             raise RuntimePolicyError(f"{method} 응답이 JSON object가 아닙니다.")
         return response
@@ -541,6 +672,9 @@ class CodexAppServerRuntime:
         thread_id = thread.get("id") if isinstance(thread, dict) else None
         if not isinstance(thread_id, str) or not thread_id:
             raise RuntimePolicyError("thread/start receipt에 thread ID가 없습니다.")
+        active_scope = current_operation_trace_scope()
+        if active_scope is not None:
+            self._thread_trace_scopes[thread_id] = active_scope
         if (
             project_binding is not None
             and thread.get("projectId") != project_binding.project_id
@@ -683,7 +817,19 @@ class CodexAppServerRuntime:
         # SDK에 넘기는 바로 이 문자열의 digest를 provider start receipt와 함께 보존한다.
         prompt_digest = sha256_digest(prompt)
         first_empty_thread = thread_id in getattr(self, "_first_empty_threads", set())
-        handle = thread.turn(prompt, **turn_arguments)
+        handle = self._actual_rpc(
+            "sdk.turn/start",
+            {"threadId": thread_id, "promptDigest": prompt_digest, **{
+                key: (value.value if hasattr(value, "value") else value)
+                for key, value in turn_arguments.items()
+            }},
+            lambda: thread.turn(prompt, **turn_arguments),
+            thread_id=thread_id,
+            response_projection=lambda value: {"turnId": value.id},
+        )
+        active_scope = current_operation_trace_scope()
+        if active_scope is not None:
+            self._thread_trace_scopes[thread_id] = active_scope
         getattr(self, "_first_empty_threads", set()).discard(thread_id)
         if not hasattr(self, "_turn_usage_context"):
             self._turn_usage_context = {}
@@ -811,6 +957,9 @@ class CodexAppServerRuntime:
             raise RuntimePolicyError("ephemeral thread의 active turn handle이 없습니다.")
         return self.read_stored(thread_id=thread_id)
 
+    def operation_kind_for_read(self, thread_id: str) -> str:
+        return "sdk_wait" if thread_id in self._turn_futures else "read"
+
     def read_stored(
         self,
         *,
@@ -819,8 +968,16 @@ class CodexAppServerRuntime:
         timeout_seconds: float = 5.0,
     ) -> RuntimeObservation:
         """저장 상태를 유한 시간에 읽고, 지정한 경우 정확한 과거 turn만 반환한다."""
+        active_scope = current_operation_trace_scope()
+
+        def read_with_scope():
+            if active_scope is None:
+                return self._read_stored_impl(thread_id=thread_id, turn_id=turn_id)
+            with use_operation_trace_scope(active_scope):
+                return self._read_stored_impl(thread_id=thread_id, turn_id=turn_id)
+
         return bounded_observation_call(
-            lambda: self._read_stored_impl(thread_id=thread_id, turn_id=turn_id),
+            read_with_scope,
             timeout_seconds=timeout_seconds,
             operation_name=f"read_stored:{thread_id}:{turn_id or 'latest'}",
         )
@@ -926,8 +1083,12 @@ class CodexAppServerRuntime:
                 "includeTurns": True,
             }
             try:
-                materialized = self._codex._client.thread_read(  # noqa: SLF001
-                    thread_id, include_turns=True
+                materialized = self._actual_rpc(
+                    "sdk.thread/read", materialization_params,
+                    lambda: self._codex._client.thread_read(  # noqa: SLF001
+                        thread_id, include_turns=True
+                    ),
+                    thread_id=thread_id,
                 )
                 materialized_turns = tuple(materialized.thread.turns)
                 if str(materialized.thread.id) != thread_id or materialized_turns:
@@ -1010,8 +1171,12 @@ class CodexAppServerRuntime:
                 "itemsView": "full",
             }
         else:
-            result = self._codex._client.thread_read(  # noqa: SLF001
-                thread_id, include_turns=True
+            result = self._actual_rpc(
+                "sdk.thread/read", {"threadId": thread_id, "includeTurns": True},
+                lambda: self._codex._client.thread_read(  # noqa: SLF001
+                    thread_id, include_turns=True
+                ),
+                thread_id=thread_id,
             )
             turn_documents: list[dict[str, Any]] = []
             for item in result.thread.turns:
@@ -1130,7 +1295,12 @@ class CodexAppServerRuntime:
     def resume(self, *, thread_id: str, cwd: Path) -> RuntimeOperationReceipt:
         self._verify_thread_project(thread_id)
         self.verify_execution_policy(cwd)
-        thread = self._codex.thread_resume(thread_id, cwd=str(cwd.resolve()))
+        thread = self._actual_rpc(
+            "sdk.thread/resume", {"threadId": thread_id, "cwd": str(cwd.resolve())},
+            lambda: self._codex.thread_resume(thread_id, cwd=str(cwd.resolve())),
+            thread_id=thread_id,
+            response_projection=lambda value: {"threadId": value.id},
+        )
         return RuntimeOperationReceipt(
             operation_id=thread.id,
             payload={"thread_id": thread.id, "cwd": str(cwd.resolve()), "resumed": True},
@@ -1149,10 +1319,20 @@ class CodexAppServerRuntime:
                 "RUNTIME_INTERRUPT_ALREADY_REQUESTED: 같은 turn에 interrupt를 다시 보내지 않습니다."
             )
         interrupted_turn_ids.add(turn_id)
+        active_scope = current_operation_trace_scope()
+
+        def interrupt_with_scope():
+            if active_scope is None:
+                return self._raw(
+                    "turn/interrupt", {"threadId": thread_id, "turnId": turn_id},
+                )
+            with use_operation_trace_scope(active_scope):
+                return self._raw(
+                    "turn/interrupt", {"threadId": thread_id, "turnId": turn_id},
+                )
+
         response = bounded_observation_call(
-            lambda: self._raw(
-                "turn/interrupt", {"threadId": thread_id, "turnId": turn_id},
-            ),
+            interrupt_with_scope,
             timeout_seconds=timeout_seconds,
             operation_name=f"turn/interrupt:{turn_id}",
         )
@@ -1275,6 +1455,10 @@ class FakeCodexRuntime:
             payload={"thread_id": thread_id, "turn_id": thread.turn_id},
         )
 
+    def operation_kind_for_read(self, thread_id: str) -> str:
+        del thread_id
+        return "read"
+
     def read_stored(
         self, *, thread_id: str, turn_id: str | None = None, timeout_seconds: float = 5.0,
     ) -> RuntimeObservation:
@@ -1349,6 +1533,146 @@ class EngineDispatcher:
         self.runtime = runtime
         self.fault_hook = fault_hook
         self.proposal_provider = proposal_provider
+        self._operation_traces: dict[str, OperationTrace] = {}
+        self._operation_trace_locks: dict[str, threading.RLock] = {}
+        self._attempt_provider_call_ids: dict[str, str] = {}
+
+    def _attempt_provider_call_id(self, attempt_id: str) -> str | None:
+        current = self._attempt_provider_call_ids.get(attempt_id)
+        if current is not None:
+            return current
+        with self.service.ledger.read() as connection:
+            row = connection.execute(
+                "SELECT id FROM provider_calls WHERE attempt_id = ? ORDER BY rowid DESC LIMIT 1",
+                (attempt_id,),
+            ).fetchone()
+        if row is not None:
+            current = row["id"]
+            self._attempt_provider_call_ids[attempt_id] = current
+        return current
+
+    def _operation_trace(self, attempt_id: str) -> OperationTrace:
+        current = self._operation_traces.get(attempt_id)
+        if current is not None:
+            return current
+        path = self.service.ledger.artifact_root / "operation-traces" / f"{attempt_id}.operation-trace.jsonl"
+        if path.exists():
+            current = OperationTrace.from_path(path)
+        else:
+            current = OperationTrace(
+                context={"scope": "engine_attempt", "attempt_id": attempt_id},
+                path=path,
+                expected_operations=("create", "start"),
+            )
+        self._operation_traces[attempt_id] = current
+        return current
+
+    @staticmethod
+    def _runtime_trace_payload(value: Any) -> Any:
+        return value.model_dump(mode="json") if hasattr(value, "model_dump") else value
+
+    def _invoke_runtime_operation(
+        self,
+        trace: OperationTrace,
+        kind: str,
+        request: dict[str, Any],
+        invoke: Callable[[], Any],
+        *,
+        attempt_id: str,
+        intent_id: str | None = None,
+        call_id: str | None = None,
+        deadline_seconds: float | None = None,
+        thread_id: str | None = None,
+        turn_id: str | None = None,
+    ) -> Any:
+        lock = self._operation_trace_locks.setdefault(attempt_id, threading.RLock())
+        with lock:
+            parent_scope = current_operation_trace_scope()
+            category = (
+                "wait" if kind == "sdk_wait" else
+                "logical" if getattr(self.runtime, "emits_rpc_operation_trace", False) else
+                "rpc"
+            )
+            token = trace.begin(
+                kind, request, call_id=call_id, attempt_id=attempt_id, intent_id=intent_id,
+                thread_id=thread_id, turn_id=turn_id, deadline_seconds=deadline_seconds,
+                category=category,
+                parent_operation_id=(
+                    None if parent_scope is None else parent_scope.parent.operation_id
+                ),
+                rpc_method=(f"port.{kind}" if category == "rpc" else None),
+            )
+            try:
+                with trace.operation_scope(token):
+                    result = invoke()
+            except Exception as error:
+                trace.finish(
+                    token, error=error, attempt_id=attempt_id, intent_id=intent_id,
+                    thread_id=thread_id, turn_id=turn_id,
+                )
+                raise
+            binding = getattr(result, "binding", None)
+            trace.finish(
+                token, response=self._runtime_trace_payload(result),
+                provider_call_id=getattr(result, "operation_id", None),
+                attempt_id=attempt_id, intent_id=intent_id,
+                thread_id=getattr(binding, "thread_id", None) or thread_id,
+                turn_id=getattr(binding, "turn_id", None) or turn_id,
+            )
+            return result
+
+    @staticmethod
+    def _attach_receipt_trace(
+        receipt: RuntimeOperationReceipt, trace: OperationTrace, *, seal: bool = False,
+    ) -> RuntimeOperationReceipt:
+        body = trace.seal() if seal and not trace.snapshot()["manifest"]["pending_operation_ids"] else trace.snapshot()
+        ref = None if trace.path is None else str(trace.path.resolve())
+        digest = sha256_digest(body)
+        payload = receipt.payload | {
+            "operation_trace": body, "operation_trace_digest": digest,
+            **({} if ref is None else {"operation_trace_ref": ref}),
+        }
+        return receipt.model_copy(update={
+            "payload": payload, "operation_trace": body,
+            "operation_trace_ref": ref, "operation_trace_digest": digest,
+        })
+
+    @staticmethod
+    def _attach_observation_trace(
+        observation: RuntimeObservation, trace: OperationTrace, *, seal: bool = False,
+    ) -> RuntimeObservation:
+        body = trace.seal() if seal and not trace.snapshot()["manifest"]["pending_operation_ids"] else trace.snapshot()
+        ref = None if trace.path is None else str(trace.path.resolve())
+        digest = sha256_digest(body)
+        return observation.model_copy(update={"payload": observation.payload | {
+            "operation_trace": body, "operation_trace_digest": digest,
+            **({} if ref is None else {"operation_trace_ref": ref}),
+        }})
+
+    def _read_attempt_runtime(
+        self,
+        attempt_id: str,
+        *,
+        thread_id: str,
+        turn_id: str | None,
+        seal_terminal: bool,
+    ) -> RuntimeObservation:
+        trace = self._operation_trace(attempt_id)
+        lock = self._operation_trace_locks.setdefault(attempt_id, threading.RLock())
+        with lock:
+            resolver = getattr(self.runtime, "operation_kind_for_read", None)
+            kind = resolver(thread_id) if callable(resolver) else "read"
+            observation = self._invoke_runtime_operation(
+                trace, kind, {"thread_id": thread_id, "turn_id": turn_id},
+                lambda: self.runtime.read(thread_id=thread_id),
+                attempt_id=attempt_id, thread_id=thread_id, turn_id=turn_id,
+                call_id=self._attempt_provider_call_id(attempt_id),
+                deadline_seconds=5.0 if kind == "read" else None,
+            )
+            terminal = (
+                seal_terminal and not observation.active and observation.terminal_status is not None
+            )
+            return self._attach_observation_trace(observation, trace, seal=terminal)
 
     def _hit(self, point: str) -> None:
         if self.fault_hook is not None:
@@ -1932,8 +2256,11 @@ class EngineDispatcher:
             )
         from .budget import BudgetBlocked, reserve_attempt_call
         try:
-            reserve_attempt_call(self.service, row, call_key=attempt_key, request=request,
-                                 require_policy=getattr(self.runtime, "requires_budget_policy", False))
+            provider_call_id = reserve_attempt_call(
+                self.service, row, call_key=attempt_key, request=request,
+                require_policy=getattr(self.runtime, "requires_budget_policy", False),
+            )
+            self._attempt_provider_call_ids[attempt_id] = provider_call_id
         except BudgetBlocked as error:
             self.service.release_unstarted_attempt(attempt_id, str(error))
             raise
@@ -1945,15 +2272,23 @@ class EngineDispatcher:
             request=request,
         )
         self._hit("after_thread_intent")
-        thread_receipt = self.runtime.create_thread(
-            cwd=cwd,
-            title=f"FlowMarshal {row['task_ref']} {row['kind']}",
-            model=role.model,
-            developer_instructions=(
-                "활성 PlanContract가 지정한 역할 하나만 수행한다. 다음 Task를 선택하거나 "
-                "FlowMarshal 원장의 권위 상태를 직접 바꾸지 않는다."
+        trace = self._operation_trace(attempt_id)
+        thread_receipt = self._invoke_runtime_operation(
+            trace, "create", request,
+            lambda: self.runtime.create_thread(
+                cwd=cwd,
+                title=f"FlowMarshal {row['task_ref']} {row['kind']}",
+                model=role.model,
+                developer_instructions=(
+                    "활성 PlanContract가 지정한 역할 하나만 수행한다. 다음 Task를 선택하거나 "
+                    "FlowMarshal 원장의 권위 상태를 직접 바꾸지 않는다."
+                ),
             ),
+            attempt_id=attempt_id, intent_id=create_intent.intent_id,
+            call_id=provider_call_id,
+            deadline_seconds=getattr(spec.definition, "timeout_seconds", None),
         )
+        thread_receipt = self._attach_receipt_trace(thread_receipt, trace)
         self._hit("after_thread_effect")
         self.service.record_runtime_receipt(
             intent_id=create_intent.intent_id,
@@ -1970,6 +2305,7 @@ class EngineDispatcher:
             thread_id=thread_receipt.binding.thread_id,
             attempt_key=attempt_key,
             validation_id=validation_id,
+            provider_call_id=provider_call_id,
         )
 
     def _start_turn(
@@ -1981,6 +2317,7 @@ class EngineDispatcher:
         attempt_key: str,
         validation_id: str | None,
         resumed: bool = False,
+        provider_call_id: str | None = None,
     ) -> None:
         # 전송 직전에 다시 읽는다. 호출자가 임의 본문으로 대체할 인자는 두지 않는다.
         role, prompt, output_schema = self._role_for_attempt(row, spec, validation_id=validation_id)
@@ -2017,14 +2354,23 @@ class EngineDispatcher:
             request=request,
         )
         self._hit("after_turn_intent")
-        turn_receipt = self.runtime.start_turn(
+        trace = self._operation_trace(row["id"])
+        turn_receipt = self._invoke_runtime_operation(
+            trace, "start", request,
+            lambda: self.runtime.start_turn(
+                thread_id=thread_id,
+                cwd=Path(row["root"]),
+                prompt=prompt,
+                model=role.model,
+                effort=role.effort,
+                output_schema=output_schema,
+            ),
+            attempt_id=row["id"], intent_id=turn_intent.intent_id,
+            call_id=provider_call_id,
             thread_id=thread_id,
-            cwd=Path(row["root"]),
-            prompt=prompt,
-            model=role.model,
-            effort=role.effort,
-            output_schema=output_schema,
+            deadline_seconds=getattr(spec.definition, "timeout_seconds", None),
         )
+        turn_receipt = self._attach_receipt_trace(turn_receipt, trace)
         self._hit("after_turn_effect")
         self.service.record_runtime_receipt(
             intent_id=turn_intent.intent_id,
@@ -2034,9 +2380,29 @@ class EngineDispatcher:
         )
         register = getattr(self.runtime, "register_completion_observer", None)
         if register is not None and turn_receipt.binding is not None:
+            def record_completion(observation, *, attempt_id=row["id"], active_trace=trace):
+                lock = self._operation_trace_locks.setdefault(attempt_id, threading.RLock())
+                with lock:
+                    if active_trace.snapshot()["manifest"]["sealed"]:
+                        observed = self._attach_observation_trace(observation, active_trace)
+                    else:
+                        observed = self._invoke_runtime_operation(
+                            active_trace, "sdk_wait",
+                            {"operation": "completion_observer", "thread_id": observation.thread_id,
+                             "turn_id": observation.turn_id},
+                        lambda: observation,
+                        attempt_id=attempt_id, thread_id=observation.thread_id,
+                        turn_id=observation.turn_id,
+                        call_id=self._attempt_provider_call_id(attempt_id),
+                        )
+                        observed = self._attach_observation_trace(
+                            observed, active_trace,
+                            seal=observation.terminal_status in self._SUCCESS | self._FAILED,
+                        )
+                return self._record_worker_usage(attempt_id, observed)
             register(
                 thread_id=thread_id, turn_id=turn_receipt.binding.turn_id,
-                observer=lambda observation: self._record_worker_usage(row["id"], observation),
+                observer=record_completion,
             )
         self._hit("after_turn_receipt")
 
@@ -2082,9 +2448,13 @@ class EngineDispatcher:
         if resume_count:
             raise EngineServiceError("저장된 Attempt는 이미 한 번 재개됐으며 다시 자동 재개하지 않습니다.")
         from .budget import reserve_attempt_call
-        reserve_attempt_call(self.service, row, call_key=f"{attempt_key}:resumed",
-                             require_policy=getattr(self.runtime, "requires_budget_policy", False),
-                             request={"thread_id": binding.thread_id, "model_observation": current_binding.model_dump(mode="json")})
+        provider_call_id = reserve_attempt_call(
+            self.service, row, call_key=f"{attempt_key}:resumed",
+            require_policy=getattr(self.runtime, "requires_budget_policy", False),
+            request={"thread_id": binding.thread_id,
+                     "model_observation": current_binding.model_dump(mode="json")},
+        )
+        self._attempt_provider_call_ids[row["id"]] = provider_call_id
         resume_intent = self.service.prepare_runtime_intent(
             attempt_id=row["id"],
             kind=RuntimeIntentKind.RESUME_TURN,
@@ -2092,7 +2462,15 @@ class EngineDispatcher:
             request={"thread_id": binding.thread_id, "cwd": str(cwd.resolve()),
                      "model_observation": current_binding.model_dump(mode="json")},
         )
-        receipt = self.runtime.resume(thread_id=binding.thread_id, cwd=cwd)
+        trace = self._operation_trace(row["id"])
+        receipt = self._invoke_runtime_operation(
+            trace, "resume", {"thread_id": binding.thread_id, "cwd": str(cwd.resolve())},
+            lambda: self.runtime.resume(thread_id=binding.thread_id, cwd=cwd),
+            attempt_id=row["id"], intent_id=resume_intent.intent_id,
+            call_id=provider_call_id, thread_id=binding.thread_id,
+            deadline_seconds=getattr(spec.definition, "timeout_seconds", None),
+        )
+        receipt = self._attach_receipt_trace(receipt, trace)
         self.service.record_runtime_receipt(
             intent_id=resume_intent.intent_id,
             provider_operation_id=f"resume:{receipt.operation_id}:{row['id']}",
@@ -2106,6 +2484,7 @@ class EngineDispatcher:
             attempt_key=f"{attempt_key}:resumed",
             validation_id=validation_id,
             resumed=True,
+            provider_call_id=provider_call_id,
         )
 
     def _observe_as_outcome(self, attempt_id: str) -> RunOnceOutcome:
@@ -2114,7 +2493,9 @@ class EngineDispatcher:
             raise EngineServiceError("Attempt runtime binding이 없습니다.")
         binding = ThreadBinding.model_validate_json(row["binding_json"])
         if binding.turn_id is None:
-            observation = self.runtime.read(thread_id=binding.thread_id)
+            observation = self._read_attempt_runtime(
+                attempt_id, thread_id=binding.thread_id, turn_id=None, seal_terminal=False,
+            )
             if observation.active:
                 return RunOnceOutcome(
                     action=RunOnceAction.OBSERVED,
@@ -2131,7 +2512,10 @@ class EngineDispatcher:
                 attempt_id=attempt_id,
                 detail="thread/read 후 기존 thread를 resume하고 같은 Attempt의 turn을 시작했습니다.",
             )
-        observation = self.runtime.read(thread_id=binding.thread_id)
+        observation = self._read_attempt_runtime(
+            attempt_id, thread_id=binding.thread_id, turn_id=binding.turn_id,
+            seal_terminal=False,
+        )
         if observation.active:
             return RunOnceOutcome(
                 action=RunOnceAction.OBSERVED,
@@ -2141,6 +2525,10 @@ class EngineDispatcher:
                 detail="기존 Attempt가 아직 실행 중입니다.",
             )
         terminal = observation.terminal_status
+        if terminal in self._SUCCESS | self._FAILED:
+            observation = self._attach_observation_trace(
+                observation, self._operation_trace(attempt_id), seal=True,
+            )
         self._record_worker_usage(attempt_id, observation)
         if terminal in self._SUCCESS:
             if row["kind"] == AttemptKind.VALIDATION.value:
@@ -2705,10 +3093,16 @@ class EngineDispatcher:
         if row["binding_json"] is None:
             raise EngineServiceError("Attempt runtime binding이 없습니다.")
         binding = ThreadBinding.model_validate_json(row["binding_json"])
-        observation = self.runtime.read(thread_id=binding.thread_id)
-        usage = self._record_worker_usage(attempt_id, observation)
+        observation = self._read_attempt_runtime(
+            attempt_id, thread_id=binding.thread_id, turn_id=binding.turn_id,
+            seal_terminal=False,
+        )
         if row["status"] in {"reserved", "starting", "running"}:
             self._observe_as_outcome(attempt_id)
+            observation = self._attach_observation_trace(
+                observation, self._operation_trace(attempt_id)
+            )
+        usage = self._record_worker_usage(attempt_id, observation)
         if usage is not None:
             observation = observation.model_copy(update={"payload": observation.payload | {
                 "worker_usage_id": usage.usage_id, "usage_available": usage.usage_available,
@@ -2725,7 +3119,10 @@ class EngineDispatcher:
         if row is None or row["binding_json"] is None:
             raise EngineServiceError("resume할 기존 binding이 없습니다.")
         binding = ThreadBinding.model_validate_json(row["binding_json"])
-        observation = self.runtime.read(thread_id=binding.thread_id)
+        observation = self._read_attempt_runtime(
+            attempt_id, thread_id=binding.thread_id, turn_id=binding.turn_id,
+            seal_terminal=False,
+        )
         if observation.active:
             raise EngineServiceError("thread/read 결과가 active이므로 resume하지 않습니다.")
         _attempt, spec = self._attempt_context(attempt_id)
@@ -2734,7 +3131,14 @@ class EngineDispatcher:
         for role in (spec.definition.executor, spec.definition.validator):
             if role is not None:
                 self._verify_role_binding(role, inventory)
-        receipt = self.runtime.resume(thread_id=binding.thread_id, cwd=Path(row["root"]))
+        trace = self._operation_trace(attempt_id)
+        receipt = self._invoke_runtime_operation(
+            trace, "resume", {"thread_id": binding.thread_id, "cwd": str(Path(row["root"]).resolve())},
+            lambda: self.runtime.resume(thread_id=binding.thread_id, cwd=Path(row["root"])),
+            attempt_id=attempt_id, call_id=self._attempt_provider_call_id(attempt_id),
+            thread_id=binding.thread_id,
+        )
+        receipt = self._attach_receipt_trace(receipt, trace)
         return receipt.model_copy(
             update={
                 "payload": receipt.payload
@@ -2752,4 +3156,14 @@ class EngineDispatcher:
         binding = ThreadBinding.model_validate_json(row["binding_json"])
         if binding.turn_id is None:
             raise EngineServiceError("interrupt할 turn binding이 없습니다.")
-        return self.runtime.interrupt(thread_id=binding.thread_id, turn_id=binding.turn_id)
+        trace = self._operation_trace(attempt_id)
+        receipt = self._invoke_runtime_operation(
+            trace, "interrupt", {"thread_id": binding.thread_id, "turn_id": binding.turn_id},
+            lambda: self.runtime.interrupt(
+                thread_id=binding.thread_id, turn_id=binding.turn_id
+            ),
+            attempt_id=attempt_id, call_id=self._attempt_provider_call_id(attempt_id),
+            thread_id=binding.thread_id, turn_id=binding.turn_id,
+            deadline_seconds=5.0,
+        )
+        return self._attach_receipt_trace(receipt, trace)

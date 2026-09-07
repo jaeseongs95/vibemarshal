@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import Field, model_serializer
+from pydantic import Field, model_serializer, model_validator
+
+from ..canonical import sha256_digest
 
 from .domain import EngineModel
 from .model_lock import OperationalBinding
@@ -69,6 +71,20 @@ class RoleCallReceipt(EngineModel):
     error_summary: str | None = None
     recorded_at: datetime
     observed_binding: OperationalBinding | None = None
+    operation_trace: dict | None = None
+    operation_trace_ref: str | None = None
+    operation_trace_digest: str | None = Field(
+        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
+    )
+
+    @model_validator(mode="after")
+    def operation_trace_is_bound(self):
+        if self.operation_trace is None:
+            if self.operation_trace_digest is not None:
+                raise ValueError("operation trace body 없이 digest를 결속할 수 없습니다.")
+        elif self.operation_trace_digest != sha256_digest(self.operation_trace):
+            raise ValueError("operation trace digest가 body와 다릅니다.")
+        return self
 
     @model_serializer(mode="wrap")
     def omit_absent_execution_observations(self, handler):
@@ -77,6 +93,7 @@ class RoleCallReceipt(EngineModel):
             "timeout_policy_digest", "observation_policy_digest", "interrupt_request_digest",
             "interrupt_receipt_digest", "terminal_observation_digest",
             "terminal_status_after_interrupt",
+            "operation_trace", "operation_trace_ref", "operation_trace_digest",
         ):
             if getattr(self, field_name) is None:
                 value.pop(field_name, None)

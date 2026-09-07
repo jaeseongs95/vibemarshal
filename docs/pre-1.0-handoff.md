@@ -4,6 +4,12 @@
 
 ## 현재 반복 검증
 
+ReleasePerformanceFloor 구현 기준선은 v29 `df06a7c`·991 tests다. 분리한 `D:/codex/fm-performance-floor`의 `codex/performance-release-floor`는 정책·v4 assessment·RPC/원장 안전성·lifecycle·cutover 재계산 연결과 최종 **Gate 5/5·1,056 tests·diff check PASS**를 완료했다. 새 동결 commit·source manifest·정책 원문·검증 artifact는 [구현 결과](D:/codex/fm-inspection-runtime/performance-release-floor-20260907/구현-검증-결과.md)를 기준으로 이어받는다. 991개 기준선의 결과와 새 1,056개 결과를 구분한다.
+
+현재 전체 상태는 **BLOCKED_USAGE_UNKNOWN**이다. `provider_call_4f3dc65762fd492e97d68087b2ec3ea3`의 원래 thread `01a079f1-f41d-7a93-adaa-22c30a746a52`, turn `01a079f1-f876-7ca2-9f0c-3510ecfcb634`만 다시 읽었고 `interrupted`·실제 usage 미제공을 확인했다. 원본 원장에는 Goal이 없고 actual tokens는 null이다. 추가 평가 모델 호출·임의 정산·새 원장 비용 초기화 없이 멈춘다. 확정된 static11의 724,352 token과 미확정 qualification 호출을 따로 보존하며 hypothesis round 3·연속 무진전 0/5를 승계한다. 진단 Goal 1,500,000·예약 100,000·reserve 25%, 다른 Goal 기본 1,000,000을 유지한다.
+
+사용량 확보와 Core 정산·무결성 확인 후에만 새 동결본 `static11 → qualification13(독립 생성 검토 포함) → 실제 Goal Plan 선택 → 역할48 → Planning18 → E2E4 → performance36 중간 판정 → exact Plan 12개 활성화·실행 → 동일 Goal 예산의 lifecycle12 최종 판정 → cutover 감사 → main 병합 → 1.0 승격 판정`으로 진행한다. 변경된 계약에 과거 checkpoint를 PASS 근거로 재사용하지 않는다. 실제 성능은 계속 `NOT_OBSERVED / NO-GO`다.
+
 v25의 실제 static11은 **10 PASS·1 NOT_RUN·전체 FAIL**이다. 이전 v24의 동일 10사례는 1 PASS였으며, 검사 기여 관계 규칙을 보완한 뒤 의미 오류가 개선됐다. 11번째는 실측 누계 **656,226 token**에 다음 호출 예약 100,000을 더하면 일반 사용 가능분 750,000을 넘어서 호출 전에 차단됐다. 추가 실제 모델 호출은 중단했다. 관측 범위를 과장한 검증 입력을 독립 검토 후 바로잡은 v26은 개발·동결 환경에서 **결정적 Gate 5/5·946개 테스트 PASS**이며 실제 모델 검증은 미실행이다. 최종 source의 S06·역할·Planning·E2E·성능 검증과 main 병합은 미완료다. 제품 기본 provider는 v1을 유지한다. 기존 1m/100k/25 안의 새 source 재검증과 완료 후 main 병합은 승인됐으며, 예산 증액은 사용자의 별도 승인이 필요하다. 진전 없는 약 5회 반복 시 중단 지시도 유지한다. [반복 검증 기록](pre-1.0-iterative-validation.md)에 원본·현재 source·재개 조건이 있다.
 
 v19는 실제 역할 **48/48 PASS**, Planning **18/18 완료·15 PASS·3 FAIL**, 정상 Plan 선택 9건과 110회 호출 **4,059,253 token**의 정산·History 감사가 완료된 과거 기준선이다. 이 결과를 새 source의 선행 Gate로 재사용하지 않는다. 아래 v9/v10은 최초 실행과 후속 보완의 역사 기록이다.
@@ -85,7 +91,7 @@ flowmarshal-engine --db <현재-ledger> --artifacts <현재-artifacts> attempt r
 flowmarshal-engine --db <현재-ledger> --artifacts <현재-artifacts> --role-timeout-policy <timeout-JSON> run once --project-id <같은-project> --codex-bin <고정-executable> --role-config <원래-roles>
 ```
 
-새 benchmark는 같은 Goal의 모든 materialized Spec revision과 실제 실행·검증·State·Verdict를 재관측한다. 상세 Plan 수정 출력도 receipt와 exact Plan digest에 결속해 비용에 포함한다. R3.1 비교는 동결 source 밖의 예산 proxy와 parent timeout·receipt 대조로 연결했다. 실제 완료 뒤 별도 불변 평가를 추가하는 명령은 [qualification 실행 계약](engine-qualification.md)을 따른다.
+새 benchmark는 같은 Goal의 모든 materialized Spec revision과 실제 실행·검증·State·Verdict를 재관측한다. 상세 Plan 수정 출력도 receipt와 exact Plan digest에 결속해 비용에 포함한다. R3.1 비교는 동결 source 밖의 예산 proxy와 parent timeout·receipt 대조로 연결했다. 36개 planning cell 뒤 중간 v4 평가를 만들고, 선택된 Engine 12 cell의 exact activation·lifecycle 완료 뒤 `observe-benchmark-lifecycle`로 final 평가를 추가한다. `cutover`는 같은 원본에서 재계산한 final v4 보고서만 받는다. 상세 계약은 [Release Performance Floor](performance-release-floor.md), 실행 명령은 [qualification 실행 계약](engine-qualification.md)을 따른다.
 
 ## 검증 기록
 
@@ -93,10 +99,10 @@ flowmarshal-engine --db <현재-ledger> --artifacts <현재-artifacts> --role-ti
 
 v3 Gate는 옛 lifecycle helper import를 참조한 테스트 때문에 실패했고 v4에서 5/5·811개를 통과했다. v5 Gate는 실제 실행 디렉터리에 결속된 continuation 테스트가 변경된 실행 산출물에 영향을 받아 4/5·817개 중 2건 오류로 실패했다. 독립적인 임시 9-call fixture로 바꾼 v6에서 5/5·817개를 통과했고, 실제 target 변경 차단은 유지했다. v7은 당시 확인된 역할 실패 종료·집계 수정을 포함한다. 모든 과거 source·실패 보고서·기존 774-test 결과는 각 원래 작업본에 보존한다.
 
-v9 당시 실제 역할 48-cell은 FAIL이었다. v13의 역할 48-cell은 PASS, Planning 18-cell은 완료·FAIL이며 E2E 4·성능 36은 미실행으로 **NO-GO**다. R3.1 비교 subprocess의 사전 예산 검사와 receipt 대조 구현은 보완했지만 실제 36-cell 통과 근거는 아직 없다. 부분 단위 테스트나 합성 성공으로 이를 대체하지 않는다.
+v9 당시 실제 역할 48-cell은 FAIL이었다. v13의 역할 48-cell은 PASS, Planning 18-cell은 완료·FAIL이며 E2E 4·성능 36은 미실행으로 **NO-GO**다. R3.1 비교 subprocess의 사전 예산 검사와 receipt 대조 구현은 보완했지만 실제 36-cell 통과 근거는 아직 없다. v29 `df06a7c`·991 tests와 이번 구현 검증도 실제 성능 결과가 아니며, 부분 단위 테스트나 합성 성공으로 이를 대체하지 않는다.
 
 ## 다음 실행
 
 운영 폴더의 `qualification-launch-proposal.md`, `qualification-launch-plan.json`, `qualification-budget-approval-proposal.json`은 원래 v7 검토안의 역사 기록이다. 현재 명령으로 그대로 실행하지 않는다. 사용자 48건 승인·0-call 실패 뒤 재동결·실제 v9 입력은 최종 campaign의 `role48-launch/precall-retry-binding.json`에 연결됐다. 실제 48건은 종료됐으며 재호출하지 않는다. 현 구현은 Goal별 예약·정산만 집행하고 campaign 전체 cap은 집행하지 않는다.
 
-최종 보완 source의 역할 48 PASS와 감사 뒤 Planning 18 → E2E 4 → 성능 36 순서로 진행한다. 사용자는 2026-09-06에 기존 1m/100k/25 정책 안에서 실패 분석·수정·재검증을 계속하도록 승인했고 token 상한·호출 예약량 증가에만 추가 승인을 요구했다. 결정 원문은 운영 폴더의 `iterative-validation-user-decision-20260906.json`에 보존했다. 원래 실패 cell이나 완료 run root를 새 source로 재사용하지 않는다. 성능 수집의 정상 Engine 12-cell은 exact Plan 활성화와 실제 lifecycle 완료가 필요하고, 상세화 폐기를 미관측 0% 성공으로 처리하지 않는다.
+최종 보완 source의 역할 48 PASS와 감사 뒤 Planning 18 → E2E 4 → 성능 36 planning 평가 → 선택 Engine 12 lifecycle final 평가 순서로 진행한다. 사용자는 2026-09-06에 기존 1m/100k/25 정책 안에서 실패 분석·수정·재검증을 계속하도록 승인했고 token 상한·호출 예약량 증가에만 추가 승인을 요구했다. 결정 원문은 운영 폴더의 `iterative-validation-user-decision-20260906.json`에 보존했다. 원래 실패 cell이나 완료 run root를 새 source로 재사용하지 않는다. trace·usage·whole pair·baseline denominator·미실행/폐기 분모가 없으면 null/NOT_OBSERVED로 차단한다. 여섯 최적화 목표는 완전 관측 후 미달을 공개 후속으로 남기며, final 필수 최소선과 네 qualification이 모두 통과한 때만 cutover를 실행한다. usage unknown 차단은 그대로 유지한다.

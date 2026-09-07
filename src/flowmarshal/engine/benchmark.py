@@ -56,10 +56,11 @@ from .qualification import (
 )
 from .roles import RoleCallReceipt, RoleCallRequest, StructuredRoleError
 from .runtime import CodexAppServerRuntime
+from .performance import PerformanceQualificationReport, PerformanceThresholdPolicy
 
 
 MEASUREMENT_RULES = {
-    "version": "neutral-lifecycle-qualified-window-v3",
+    "version": "neutral-release-floor-and-optimization-window-v4",
     "token": "uncached_input_plus_output; six scenarios including expected blocks",
     "latency": "monotonic wall time to Core-admitted feasible Plan; blocks recorded separately",
     "detail": (
@@ -71,6 +72,8 @@ MEASUREMENT_RULES = {
         "and disputed responses from candidate output; require lifecycle-observed selected cells"
     ),
     "order": "seed-shuffled scenario/implementation cells executed serially",
+    "performance_floor": "pairwise relative ratios; full 36-cell manifest; planning then final lifecycle assessment",
+    "safety_evidence": "provider-ledger-receipt-bound sealed operation traces; missing evidence is NOT_OBSERVED",
     "thresholds": {"multi": .30, "overall": .20, "single_regression": .05,
                    "unexecuted_detail": .10, "discarded_output": .25, "first_feasible": .20},
 }
@@ -105,6 +108,7 @@ class BenchmarkRunReport(EngineModel):
     passed: bool
     failures: tuple[str, ...] = ()
     token_latency: TokenLatencyGateReport | None = None
+    performance_qualification: PerformanceQualificationReport | None = None
 
     @property
     def report_digest(self):
@@ -407,6 +411,7 @@ def _legacy_budget_cell_binding(
 def _verify_legacy_budget_evidence(
     *, raw: dict[str, Any], expected_binding: dict[str, Any], state_root: Path,
     evaluation_policies: EvaluationPolicies,
+    require_operation_trace: bool = False,
 ) -> None:
     try:
         expected_inventory = ModelInventory.model_validate(
@@ -645,6 +650,25 @@ def _verify_legacy_budget_evidence(
     if budget_turns != legacy_turns or body.get("budget_turn_ids") != sorted(budget_turns) \
             or body.get("legacy_turn_ids") != sorted(legacy_turns):
         raise QualificationRunError("LEGACY_BUDGET_TURN_COVERAGE_MISMATCH")
+    if require_operation_trace:
+        from .operation_trace import verify_operation_trace
+        traces = body.get("operation_traces")
+        if not isinstance(traces, list) or len(traces) != len(calls) or body.get("operation_traces_digest") != sha256_digest(traces):
+            raise QualificationRunError("LEGACY_OPERATION_TRACE_COVERAGE_MISMATCH")
+        by_provider = {item.get("provider_call_id"): item for item in traces if isinstance(item, dict)}
+        if set(by_provider) != provider_ids or len(by_provider) != len(traces):
+            raise QualificationRunError("LEGACY_OPERATION_TRACE_PROVIDER_MISMATCH")
+        expected_operations = ("create", "start", "sdk_wait") + (("read",) if evaluation_policies.codex_project is not None else ())
+        for call in calls:
+            entry = by_provider[call["provider_call_id"]]
+            trace = entry.get("trace")
+            receipt = call["receipt"]
+            if not isinstance(trace, dict) or entry.get("trace_digest") != sha256_digest(trace) or receipt.get("operation_trace") != trace or receipt.get("operation_trace_digest") != sha256_digest(trace):
+                raise QualificationRunError("LEGACY_OPERATION_TRACE_RECEIPT_MISMATCH")
+            verified = verify_operation_trace(trace, expected_operations=expected_operations, expected_call_ids=(call["call_key"],))
+            counts = verified.manifest.get("actual_started_counts", {})
+            if not verified.valid or not verified.complete or any(counts.get(kind, 0) != expected_operations.count(kind) for kind in ("create", "start", "sdk_wait", "read", "resume", "interrupt")):
+                raise QualificationRunError("LEGACY_OPERATION_TRACE_NOT_COMPLETE")
     status = body.get("budget_status")
     if not isinstance(status, dict) or status.get("error_code") is not None \
             or status.get("unresolved_call_ids") not in ([], ()):
@@ -818,6 +842,11 @@ def run_benchmark(*, root: Path | None = None, run_root: Path | None = None,
     if evaluation_policies is None:
         raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
     base = (root or project_root()).resolve(strict=True)
+    performance_policy = PerformanceThresholdPolicy.load(base / "config" / "pre-1.0-performance-thresholds.json")
+    from .benchmark_safety import capture_planning_safety_checkpoint
+    from .performance_assessment import (
+        build_performance_assessment, performance_threshold_digest, write_performance_assessment,
+    )
     _reject_benchmark_partial_resume(base, run_root)
     failures = _preflight(base)
     if failures:
@@ -859,11 +888,7 @@ def run_benchmark(*, root: Path | None = None, run_root: Path | None = None,
         contract = EvaluationContract.model_validate(planning_contract.model_dump() | {
             "fixture_digests": tuple(identities.values()), "expected_cell_count": 36,
             "scenario_set_digest": sha256_digest(neutral), "rules_digest": sha256_digest(MEASUREMENT_RULES),
-            "threshold_digest": sha256_digest(
-                MEASUREMENT_RULES["thresholds"]
-                | policy_contract_fragment(evaluation_policies)
-                | {"implementation_runtime": _implementation_runtime_contract(evaluation_policies)}
-            ),
+            "threshold_digest": performance_threshold_digest(evaluation_policies, performance_policy),
             "model_lock_digest": model_lock,
             "prompt_digest": sha256_digest({"engine": planning_contract.prompt_digest, "legacy": description["prompt_digest"]}),
             "output_schema_digest": sha256_digest({"engine": planning_contract.output_schema_digest,
@@ -884,6 +909,8 @@ def run_benchmark(*, root: Path | None = None, run_root: Path | None = None,
             "inspection_provider_contract": inspection_provider_contract,
             "scope_reports": [item.model_dump(mode="json") for item in scope_reports],
             "implementation_runtime": _implementation_runtime_contract(evaluation_policies),
+            "performance_threshold_policy": performance_policy.model_dump(mode="json"),
+            "performance_threshold_policy_digest": performance_policy.policy_digest,
         }, evaluation_policies)
         _write_json(destination / "neutral-inputs.json", neutral)
         status, failures = EvaluationRunStatus.COMPLETED, []
@@ -977,11 +1004,15 @@ def run_benchmark(*, root: Path | None = None, run_root: Path | None = None,
                             expected_binding=budget_binding,
                             state_root=work / "legacy-state",
                             evaluation_policies=evaluation_policies,
+                            require_operation_trace=True,
                         )
                     if raw.get("message") and _is_rate_limit(QualificationRunError(raw["message"])):
                         raise QualificationRunError(raw["message"])
                     # 부모 프로세스 준비 시간은 진단으로 보존하고 각 pipeline의 monotonic 지표를 사용한다.
                     raw["collector_latency_ms"] = max(1, int((time.monotonic() - started) * 1000))
+                    raw["safety_checkpoint"] = capture_planning_safety_checkpoint(
+                        work_root=work, implementation=implementation, raw=raw, policies=evaluation_policies,
+                    )
                     _write_json(work / "raw-result.json", raw)
                     cell = benchmark_cell(scenario, seed, implementation, model_lock, raw)
                     store.put(EvaluationCellCheckpoint(
@@ -1009,20 +1040,35 @@ def run_benchmark(*, root: Path | None = None, run_root: Path | None = None,
                       for seed in ORDER_SEEDS for identity in identities.values()
                       if (checkpoint := store.completed(identity, seed)) is not None)
         token_report = None
+        performance_report = None
         if len(cells) == 36:
             from .eval_cli import validate_benchmark_matrix
             try:
                 validate_benchmark_matrix(cells, catalog)
                 functional = len(scope_reports) == 4 and len({item.scope for item in scope_reports}) == 4 and all(item.passed for item in scope_reports)
                 token_report = evaluate_token_latency_gate(cells, functional_gate_passed=functional)
-                failures.extend(token_report.failures)
                 _write_json(destination / "token-latency-report.json", token_report)
             except ValueError as error:
                 failures.append(str(error))
+        try:
+            performance_report, assessment = build_performance_assessment(
+                root=base, run_root=destination, scope_reports=scope_reports, assessment_stage="planning",
+            )
+            assessment_root = write_performance_assessment(destination, performance_report, assessment)
+            _write_json(destination / "performance-assessment-ref.json", {
+                "assessment_root": str(assessment_root), "assessment_stage": "planning",
+                "performance_report_digest": sha256_digest(performance_report),
+            })
+            if not performance_report.planning_assessment_passed:
+                failures.extend(performance_report.failures)
+                failures.extend(performance_report.not_observed)
+        except (ValueError, RuntimeError, OSError) as error:
+            failures.append(f"PERFORMANCE_ASSESSMENT_FAILED: {error}")
         store.set_state(status, updated_at=utc_now(), reason="; ".join(failures)[:5000] or None)
         report = BenchmarkRunReport(contract_digest=contract.contract_digest, status=status,
-                                    completed_cell_count=len(cells), passed=bool(token_report and token_report.passed and not failures),
-                                    failures=tuple(failures), token_latency=token_report)
+                                    completed_cell_count=len(cells), passed=bool(performance_report and performance_report.planning_assessment_passed and not failures),
+                                    failures=tuple(failures), token_latency=token_report,
+                                    performance_qualification=performance_report)
         _write_json(destination / "benchmark-cells.json", {"cells": [item.model_dump(mode="json") for item in cells]})
         _write_json(destination / "benchmark-run-report.json", report)
         return destination, report

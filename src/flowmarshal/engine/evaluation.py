@@ -892,3 +892,30 @@ def write_qualification_report(report: QualificationReport, path: Path | str) ->
         json.dumps(report.model_dump(mode="json"), ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
+
+
+# v4 performance qualification은 별도 모듈에 있으며 이 module에서 공개 API를 지연 재노출한다.
+# 지연 import는 performance.py를 직접 import할 때의 순환을 피한다. 기존 v3 API는 그대로 둔다.
+_PERFORMANCE_EXPORTS = frozenset(
+    {
+        "PerformanceExpectedManifestIdentity",
+        "PerformancePairResult",
+        "PerformanceQualificationReport",
+        "PerformanceSafetyCounters",
+        "PerformanceSafetyObservation",
+        "PerformanceScenarioIdentity",
+        "PerformanceThresholdPolicy",
+        "PerformanceUsageCounters",
+        "ReleaseCutoverReport",
+        "evaluate_performance_qualification",
+        "evaluate_release_cutover_gate",
+    }
+)
+
+
+def __getattr__(name: str) -> Any:
+    if name in _PERFORMANCE_EXPORTS:
+        from . import performance
+
+        return getattr(performance, name)
+    raise AttributeError(name)

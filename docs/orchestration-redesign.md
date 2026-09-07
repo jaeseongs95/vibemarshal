@@ -426,7 +426,20 @@ report progress|final
 
 단계 A는 payload 의미나 oracle을 수정하지 않고 과거 FAIL을 보정하지 않는다. 11사례가 모두 관측되어도 이는 development-diagnostic 완료일 뿐 기존 qualification 또는 cutover PASS를 의미하지 않는다.
 
-기능 Gate와 함께 같은 입력의 R3.1 baseline 대비 다음 token/latency Gate를 확인한다.
+기능 Gate와 별도로 같은 입력의 R3.1 baseline 대비 [Release Performance Floor](performance-release-floor.md)를 확인한다. 새 cutover에는 네 qualification 범위와 final `PerformanceQualificationReport` v4.0이 모두 필요하다. 과거 `TokenLatencyGateReport` v3.0은 역사 읽기·재계산 호환으로만 유지한다.
+
+성능 계약은 수집된 cell에서 기대값을 유추하지 않는다. 기대 manifest에 6 scenario×seed `(17, 43, 89)`×baseline/Engine의 36 cell, 18 whole pair, 정상 Plan 12 pair와 질문·차단 6 pair를 고정한다. planning의 미캐시 입력+출력 token을 각 pair의 상대 비율로 먼저 계산한 뒤 평균·중앙값을 구하며 최종 출력만 float로 변환한다. baseline token 0, 누락 whole pair, 필수 분모·usage·trace 미관측은 `null / NOT_OBSERVED`이고 합격이 아니다.
+
+1.0 필수 최소선은 다음과 같다.
+
+- 전체 pair token 상대 감소율 평균 `>= -0.20`
+- multi-path token 상대 감소율 중앙값 `>= -0.25`
+- single-path token 최악 회귀 `<= 0.50`
+- 전체 cell pair token 최악 회귀 `<= 1.00`
+- 정상 Plan Time to First Feasible 상대 개선 중앙값 `>= -0.25`
+- 전체 18 pair final disposition 상대 개선 중앙값 `>= -0.25`
+
+다음 여섯 수치는 기존 최적화 scorecard로 유지한다.
 
 - multi-path planning token 중앙값 30% 이상 감소
 - 전체 평균 token 20% 이상 감소
@@ -435,11 +448,15 @@ report progress|final
 - 폐기 후보 상세 출력 비율 최대 25%
 - Time to First Feasible Plan 중앙값 20% 이상 개선
 
-정상 결과가 질문·차단인 시나리오는 최초 feasible plan 시간이 없으므로 이 지표에서는 제외한다. 해당 값은 `null`이고 질문·차단 판정 지연을 별도로 기록하며, 기존 token 비교에는 포함한다. 정상 Plan을 요구한 입력이 실패하면 시간 표본에서 조용히 제외하지 않고 기능 Gate 실패로 남긴다. 차단 지연에는 별도 합격선을 임의로 추가하지 않는다.
+정상 결과가 질문·차단인 시나리오는 최초 feasible plan 시간이 없으므로 Time to First Feasible 지표에서는 제외한다. 해당 값은 `null`이고 정상 Plan을 요구한 입력이 실패하면 시간 표본에서 조용히 제외하지 않고 기능 Gate 실패로 남긴다. 질문·차단 6 pair는 전체 18 pair의 final disposition 지연 최소선에 포함하며, 이 고정 최소선 외의 별도 차단 지연 목표를 임의로 추가하지 않는다.
 
 성능 비교의 중립 입력은 요청과 실제 fixture 파일·프로젝트 정책을 함께 digest에 결속한다. 상세 Task는 파일·명령을 확정한 운영 실행 명세이며 semantic TaskContract를 세지 않는다. 최초 feasible 시각은 Core admission 직후, 후보별 상세 출력은 expander/refiner receipt에서 측정한다. batched Skeleton token을 임의로 후보별 배분하거나 사용량이 없는 호출을 0으로 채우지 않는다. R3.1 호출은 Engine 밖의 별도 benchmark harness에서 수행하며 원본 source와 동결 판정을 변경하지 않는다.
 
-결정적 테스트나 합성 smoke는 구현 검증이지 1.0 qualification을 대신하지 않는다. 네 범위와 token/latency Gate가 모두 통과하기 전에는 package와 기본 CLI를 `flowmarshal`로 승격하지 않는다.
+36개 planning cell이 완결되면 먼저 중간 평가를 만든다. 이 단계는 planning 기능·안전·usage와 수치 최소선을 평가할 수 있지만 `release_floor_passed`와 `cutover_eligible`는 false다. 이후 선택된 Engine 12 cell의 exact Plan 활성화, 모든 materialized Execution Spec, runtime 완료, validation, State 재관측과 GoalVerdict를 원래 checkpoint에 읽기 전용으로 결속해 final 평가를 만든다. baseline과 질문·차단 cell은 실제 원장에서 lifecycle 호출·Attempt가 없음을 확인한 경우에만 0을 기록한다. sealed operation trace가 없거나 불완전하면 timeout·중복·unknown effect·usage·retry/resume·예산·deadline counter를 0으로 추정하지 않는다.
+
+기존 여섯 최적화 지표의 분모와 값은 final에서 모두 관측되어야 한다. 완전히 관측됐지만 목표치에 미달한 값은 `optimization_followups_required`와 원시 cell·pair 근거를 공개하고 1.0.x 후속으로 추적할 수 있으며 최소선 통과를 뒤집지 않는다.
+
+결정적 테스트나 합성 smoke는 구현 검증이지 1.0 qualification을 대신하지 않는다. 네 범위와 final `ReleasePerformanceFloor`가 모두 통과하기 전에는 package와 기본 CLI를 `flowmarshal`로 승격하지 않는다.
 
 ## 12. Legacy 동결과 migration 정책
 
@@ -476,4 +493,4 @@ Goal 등록 전 진단 역할 호출도 같은 프로젝트·Goal 계보·요청
 | M3 | Skeleton-first bounded search, Core-derived 판정, shortlist-only expansion, 5 Hard Gate |
 | M4 | `model/list` 배정, exact digest activation, lazy Execution Spec, Runtime Port와 dispatcher |
 | M5 | Task/Goal validation 분리, 실패 분류, 제한 재계획, crash recovery와 최종 보고 |
-| Cutover | 네 실제 qualification 범위와 token/latency Gate 통과 후 package·CLI 1.0 승격 |
+| Cutover | 네 실제 qualification 범위와 final `ReleasePerformanceFloor` 통과 후 package·CLI 1.0 승격 |

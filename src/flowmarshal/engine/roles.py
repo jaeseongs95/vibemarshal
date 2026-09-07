@@ -26,6 +26,7 @@ from .model_lock import (
 
 
 from .role_observations import RoleCallReceipt, RoleInputContractError, StructuredRoleError
+from .operation_trace import OperationTrace, current_operation_trace_scope
 
 
 class RoleCallRequest(EngineModel):
@@ -218,7 +219,10 @@ class CodexStructuredRoleRunner:
                  max_schema_recovery_attempts: int = 1,
                  operational_binding: OperationalBinding | None = None,
                  ephemeral_threads: bool = True,
-                 interrupt_observation_seconds: float | None = None) -> None:
+                 interrupt_observation_seconds: float | None = None,
+                 operation_trace_path: (
+                     Path | str | Callable[[str], Path | str] | None
+                 ) = None) -> None:
         if type(max_schema_recovery_attempts) is not int or max_schema_recovery_attempts not in {0, 1}:
             raise ValueError("schema recovery 상한은 0 또는 1이어야 합니다.")
         if type(ephemeral_threads) is not bool:
@@ -232,8 +236,67 @@ class CodexStructuredRoleRunner:
         self.poll_interval_seconds = poll_interval_seconds
         self.progress_sink = progress_sink
         self.interrupt_observation_seconds = interrupt_observation_seconds
+        self.operation_trace_path = operation_trace_path
         self.receipts: list[RoleCallReceipt] = []
         self.pending_terminal_observations: dict[str, Any] = {}
+        self.operation_traces: dict[str, OperationTrace] = {}
+
+    def _trace_path(self, call_id: str) -> Path | None:
+        configured = self.operation_trace_path
+        if configured is None:
+            return None
+        value = configured(call_id) if callable(configured) else configured
+        path = Path(value)
+        if path.suffix.casefold() != ".jsonl":
+            path = path / f"{call_id}.operation-trace.jsonl"
+        return path
+
+    @staticmethod
+    def _trace_response(value: Any) -> Any:
+        return value.model_dump(mode="json") if hasattr(value, "model_dump") else value
+
+    def _invoke_traced(
+        self,
+        trace: OperationTrace,
+        kind: str,
+        request: dict[str, Any],
+        invoke: Callable[[], Any],
+        *,
+        call_id: str,
+        deadline_seconds: float | None = None,
+        thread_id: str | None = None,
+        turn_id: str | None = None,
+    ) -> Any:
+        parent_scope = current_operation_trace_scope()
+        category = (
+            "wait" if kind == "sdk_wait" else
+            "logical" if getattr(self.runtime, "emits_rpc_operation_trace", False) else
+            "rpc"
+        )
+        token = trace.begin(
+            kind, request, call_id=call_id, thread_id=thread_id, turn_id=turn_id,
+            deadline_seconds=deadline_seconds,
+            category=category,
+            parent_operation_id=(
+                None if parent_scope is None else parent_scope.parent.operation_id
+            ),
+            rpc_method=(f"port.{kind}" if category == "rpc" else None),
+        )
+        try:
+            with trace.operation_scope(token):
+                result = invoke()
+        except Exception as error:
+            trace.finish(token, error=error, thread_id=thread_id, turn_id=turn_id)
+            raise
+        binding = getattr(result, "binding", None)
+        trace.finish(
+            token,
+            response=self._trace_response(result),
+            provider_call_id=getattr(result, "operation_id", None),
+            thread_id=(getattr(binding, "thread_id", None) or thread_id),
+            turn_id=(getattr(binding, "turn_id", None) or turn_id),
+        )
+        return result
 
     def _verify_inventory(self, request: RoleCallRequest, inventory: ModelInventory) -> OperationalBinding:
         if self.operational_binding is not None:
@@ -255,6 +318,11 @@ class CodexStructuredRoleRunner:
     ) -> RoleCallResult:
         started = time.monotonic()
         call_id = new_id("model_call")
+        trace = OperationTrace(
+            context={"call_id": call_id, "role": request.role, "request_digest": request.request_digest},
+            path=self._trace_path(call_id), expected_operations=("create", "start"),
+        )
+        self.operation_traces[call_id] = trace
         try:
             schema = strict_json_output_schema(request.output_schema)
             schema_digest = sha256_digest(schema)
@@ -290,12 +358,21 @@ class CodexStructuredRoleRunner:
             raise StructuredRoleError(
                 str(error), receipts=tuple(self.receipts), effects_started=False,
             ) from error
-        thread = self.runtime.create_thread(
-            cwd=cwd,
-            title=f"FlowMarshal role: {request.role}",
-            model=request.model,
-            developer_instructions=request.instructions,
-            ephemeral=self.ephemeral_threads,
+        create_request = {
+            "cwd": str(cwd), "title": f"FlowMarshal role: {request.role}",
+            "model": request.model, "developer_instructions_digest": sha256_digest(request.instructions),
+            "ephemeral": self.ephemeral_threads,
+        }
+        thread = self._invoke_traced(
+            trace, "create", create_request,
+            lambda: self.runtime.create_thread(
+                cwd=cwd,
+                title=f"FlowMarshal role: {request.role}",
+                model=request.model,
+                developer_instructions=request.instructions,
+                ephemeral=self.ephemeral_threads,
+            ),
+            call_id=call_id, deadline_seconds=request.timeout_seconds,
         )
         if thread.binding is None:
             raise StructuredRoleError(
@@ -338,13 +415,22 @@ class CodexStructuredRoleRunner:
                 observed_binding = self._verify_inventory(request, self.runtime.list_models())
             except ValueError as error:
                 raise StructuredRoleError(str(error), receipts=tuple(self.receipts)) from error
-            turn = self.runtime.start_turn(
-                thread_id=thread_id,
-                cwd=cwd,
-                prompt=prompt,
-                model=request.model,
-                effort=request.effort,
-                output_schema=schema,
+            turn_request = {
+                "thread_id": thread_id, "cwd": str(cwd), "prompt_digest": sha256_digest(prompt),
+                "model": request.model, "effort": request.effort,
+                "output_schema_digest": schema_digest,
+            }
+            turn = self._invoke_traced(
+                trace, "start", turn_request,
+                lambda: self.runtime.start_turn(
+                    thread_id=thread_id,
+                    cwd=cwd,
+                    prompt=prompt,
+                    model=request.model,
+                    effort=request.effort,
+                    output_schema=schema,
+                ),
+                call_id=call_id, deadline_seconds=request.timeout_seconds, thread_id=thread_id,
             )
             turn_ids.append(turn.operation_id)
             turn_binding_proofs.append(
@@ -382,7 +468,12 @@ class CodexStructuredRoleRunner:
                 register(thread_id=thread_id, turn_id=turn.operation_id, observer=record_terminal)
             deadline = started + request.timeout_seconds
             while True:
-                observation = self.runtime.read(thread_id=thread_id)
+                observation = self._invoke_traced(
+                    trace, "sdk_wait", {"thread_id": thread_id, "turn_id": turn.operation_id},
+                    lambda: self.runtime.read(thread_id=thread_id),
+                    call_id=call_id, deadline_seconds=max(0, deadline - time.monotonic()),
+                    thread_id=thread_id, turn_id=turn.operation_id,
+                )
                 observation_payload = observation.payload
                 observation_thread_id = observation.thread_id
                 observation_turn_id = observation.turn_id
@@ -412,9 +503,24 @@ class CodexStructuredRoleRunner:
                             if observation_policy.interrupt_observation_seconds == 0 else
                             min(observation_policy.rpc_timeout_seconds, observation_deadline - time.monotonic())
                         )
-                        interrupt_receipt = bounded_observation_call(
-                            lambda: self.runtime.interrupt(thread_id=thread_id, turn_id=turn.operation_id),
-                            timeout_seconds=interrupt_wait, operation_name="role_interrupt",
+                        interrupt_receipt = self._invoke_traced(
+                            trace, "sdk_wait",
+                            {"operation": "role_interrupt_wait", "thread_id": thread_id,
+                             "turn_id": turn.operation_id},
+                            lambda: bounded_observation_call(
+                                lambda: self._invoke_traced(
+                                    trace, "interrupt",
+                                    {"thread_id": thread_id, "turn_id": turn.operation_id},
+                                    lambda: self.runtime.interrupt(
+                                        thread_id=thread_id, turn_id=turn.operation_id
+                                    ),
+                                    call_id=call_id, deadline_seconds=interrupt_wait,
+                                    thread_id=thread_id, turn_id=turn.operation_id,
+                                ),
+                                timeout_seconds=interrupt_wait, operation_name="role_interrupt",
+                            ),
+                            call_id=call_id, deadline_seconds=interrupt_wait,
+                            thread_id=thread_id, turn_id=turn.operation_id,
                         )
                         interrupt_receipt_digest = sha256_digest(interrupt_receipt)
                         self._progress(
@@ -443,9 +549,16 @@ class CodexStructuredRoleRunner:
                             read_wait = (observation_policy.rpc_timeout_seconds
                                          if observation_policy.interrupt_observation_seconds == 0 else
                                          min(observation_policy.rpc_timeout_seconds, remaining))
-                            observation = bounded_observation_call(
-                                lambda: self.runtime.read(thread_id=thread_id),
-                                timeout_seconds=read_wait, operation_name="role_terminal_read",
+                            observation = self._invoke_traced(
+                                trace, "sdk_wait",
+                                {"operation": "role_terminal_read", "thread_id": thread_id,
+                                 "turn_id": turn.operation_id},
+                                lambda: bounded_observation_call(
+                                    lambda: self.runtime.read(thread_id=thread_id),
+                                    timeout_seconds=read_wait, operation_name="role_terminal_read",
+                                ),
+                                call_id=call_id, deadline_seconds=read_wait,
+                                thread_id=thread_id, turn_id=turn.operation_id,
                             )
                             if observation.thread_id != thread_id or observation.turn_id != turn.operation_id:
                                 raise ValueError("ROLE_TERMINAL_OBSERVATION_BINDING_MISMATCH")
@@ -643,6 +756,11 @@ class CodexStructuredRoleRunner:
             # 수집기 종료나 interrupt ACK는 provider 종료를 증명하지 않는다.
             input_tokens = cached_tokens = output_tokens = reasoning_tokens = None
             usage_available = False
+        trace = self.operation_traces.get(call_id)
+        trace_body = None
+        if trace is not None:
+            pending = trace.snapshot()["manifest"]["pending_operation_ids"]
+            trace_body = trace.snapshot() if pending else trace.seal()
         receipt = RoleCallReceipt(
             call_id=call_id,
             role=request.role,
@@ -673,6 +791,9 @@ class CodexStructuredRoleRunner:
             error_summary=error,
             recorded_at=utc_now(),
             observed_binding=observed_binding,
+            operation_trace=trace_body,
+            operation_trace_ref=None if trace is None or trace.path is None else str(trace.path.resolve()),
+            operation_trace_digest=None if trace_body is None else sha256_digest(trace_body),
         )
         self._progress("role_receipt", request, call_id, receipt=receipt.model_dump(mode="json"))
         return receipt
@@ -730,6 +851,18 @@ def verify_role_receipt(request: RoleCallRequest, result: RoleCallResult) -> Non
             or (receipt.role, receipt.model, receipt.effort, receipt.inventory_digest)
             != (request.role, request.model, request.effort, request.inventory_digest)):
         raise StructuredRoleError("ROLE_RECEIPT_BINDING_MISMATCH")
+    if receipt.operation_trace is not None:
+        verification = OperationTrace.verify(
+            receipt.operation_trace, expected_call_ids=(receipt.call_id,)
+        )
+        if not verification.valid:
+            raise StructuredRoleError(
+                "ROLE_OPERATION_TRACE_INVALID: " + ", ".join(verification.errors)
+            )
+        if receipt.operation_trace.get("context", {}).get("call_id") != receipt.call_id:
+            raise StructuredRoleError("ROLE_OPERATION_TRACE_CALL_BINDING_MISMATCH")
+        if receipt.status == "succeeded" and not verification.complete:
+            raise StructuredRoleError("ROLE_OPERATION_TRACE_INCOMPLETE")
     if request.operational_binding is not None:
         if receipt.observed_binding is None:
             raise StructuredRoleError("MODEL_LOCK_RECEIPT_OBSERVATION_MISSING")

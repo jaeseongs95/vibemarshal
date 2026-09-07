@@ -242,6 +242,7 @@ def budgeted_role_runner(
         operational_binding=operational_binding,
         max_schema_recovery_attempts=0,
         ephemeral_threads=False,
+        operation_trace_path=service.ledger.artifact_root / "operation-traces",
     )
     return BudgetedRoleRunner(
         runner,

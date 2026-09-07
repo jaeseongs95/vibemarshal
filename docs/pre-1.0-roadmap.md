@@ -4,7 +4,8 @@
 > 실제 역할 48건 실행 source(v9)의 결정적 Gate: **5/5·824개 통과**
 > 과거 고정 source(v13)의 결정적 Gate: **5/5·842개 통과**
 > 최근 실제 v25: **10 PASS·1 NOT_RUN**, 11번째 호출 전 예산 차단으로 전체 FAIL. 동일 10사례의 v24 PASS는 1건.
-> 최신 검증본 v26: **결정적 Gate 5/5·946개 PASS**, 새 입력의 실제 모델 호출 0회. 예산 증액 승인 전 추가 실제 호출 중단.
+> 과거 검증본 v26: **결정적 Gate 5/5·946개 PASS**, 당시 새 입력의 실제 모델 호출 0회.
+> 성능 구현 기준선 v29: **`df06a7c`·991 tests**. 새 `codex/performance-release-floor` 구현은 **Gate 5/5·1,056 tests PASS**. 동결·검증 원문은 [구현 결과](D:/codex/fm-inspection-runtime/performance-release-floor-20260907/구현-검증-결과.md)를 따른다. 실제 평가·main 병합·1.0 승격은 `BLOCKED_USAGE_UNKNOWN`.
 > 과거 v19: 역할 **48/48 PASS**, Planning **15 PASS·3 FAIL**, 실제 110회 정산·History 감사 PASS. 새 source의 Gate로 재사용하지 않음.
 > 실제 역할 회귀: v9 **FAIL**·v12 **PASS** 보존, v13 **48/48 PASS**·Planning **18/18 완료·FAIL**
 > 실제 동일 Goal 진단·복구: **두 Task·독립 Goal Test·satisfied GoalVerdict 완료**
@@ -14,6 +15,7 @@
 ## 현재 판정과 해석 원칙
 
 - 현재 1.0 판정은 NO-GO다. v26 결정적 검사와 v25의 실제 의미 개선을 구분하고, 승인 예산에서 막힌 추가 실제 호출을 중단했다. 최종 source의 S06·역할·Planning·E2E·성능 qualification과 이후 main 병합은 미완료다. [source별 결과](pre-1.0-iterative-validation.md)를 구분해 보존한다. timeout·usage 미확인은 성공이나 0 사용량으로 환산하지 않으며 기존 thread를 먼저 관측하고, 종료 후 usage가 없으면 `BUDGET_USAGE_UNKNOWN`으로 추가 호출을 중단한다.
+- v29 `df06a7c`·991 tests는 이번 변경의 시작 기준선이다. 새 수집기·v4 evaluator·CLI의 오프라인 통합 검증은 1,056 tests로 완료했으며, 실제 모델/App Server 성능 결과는 조회하지 않았다. 종료 재관측에서도 원래 호출의 usage가 미확정이므로 성능 36-cell은 `NOT_OBSERVED`, 1.0은 `NO-GO`다. 최신 재개 순서는 [현재 인계](pre-1.0-handoff.md)에 고정한다.
 - 과거 개발 Gate의 **710 tests** 및 **Gate 5/5** 결과는 고정된 과거 source·계약의 provenance다. 현재 source 또는 이번 변경의 PASS가 아니며, 변경된 계약에 재사용하지 않는다.
 - schema 3은 새 Engine 원장 기준이다. 이전 v2 원장·artifact는 변경하거나 제자리 migration하지 않고 보존한다. v2 결과를 schema 3 qualification의 근거로 섞지 않는다.
 - 동일 Goal은 저장 후보 continuation·사용자 exact Plan 활성화·환경 복구·두 Task·독립 Goal Test를 거쳐 완료했다. 여러 개발 source와 명시적 운영 보정을 거친 진단·복구 결과이며, 최종 source의 전체 qualification PASS가 아니다. 실제 ID·실측·실패 보존 근거는 [현재 인계](pre-1.0-handoff.md)에 있다.
@@ -40,7 +42,7 @@
 | S10~S12 계측·예산 | 같은 실행 설계의 F04/F09 및 기존 25% reserve | 모든 역할 호출 전 예약/후 정산, 미확인 시 차단, 명시 잠정 차감과 실측 분리, 재계획과 필수 재검토 비용의 reserve 적용. |
 | 최소 모델 복구 | [모델 서비스 종료 설계](../../자동화템플릿/참고자료/설계아이디어/FlowMarshal-모델-서비스종료-감지-및-설정갱신-프로세스-설계.md), 현 model/list preflight | 미지원 이유·영향 Task·다음 행동 표시. envelope 안의 명시 선택·사유·새 inventory binding을 새 Spec/Attempt에 기록하고, 범위 밖은 새 Plan 요구. 불명확한 호출은 재실행하지 않는다. |
 | 공통 typed 조회 | [역할별 운영 계획](../../자동화템플릿/참고자료/설계아이디어/FlowMarshal-역할별-모델-추론수준-검증-및-다중모델-운영계획.md), 기존 Core/CLI | EngineApplication의 usage_summary, attempt_detail, recovery_status, model_binding_status. revision/digest·오류 코드·다음 행동·History cursor를 CLI가 표시. HTTP/GUI 제외. |
-| 측정과 출시 Gate | 기존 qualification와 성능 측정 창 | 동일 source·고정 설정의 결정적 Gate, 역할48, Planning18, 실제 E2E4, 성능36 전수 통과. 상세화 폐기는 실제 lifecycle에서 관측하며 미관측은 0%가 아니다. |
+| 측정과 출시 Gate | 기존 qualification와 [Release Performance Floor](performance-release-floor.md) | 동일 source·고정 설정의 결정적 Gate, 역할48, Planning18, 실제 E2E4와 성능36 완전 관측·final 최소선 통과. 기존 여섯 최적화 목표 미달은 공개 scorecard로 추적하되 완전히 관측된 경우 cutover를 차단하지 않는다. |
 
 | 단계 | 출처 | 기존 구현·근거 | 이번 변경 | 남은 수용기준 |
 |---|---|---|---|---|
@@ -61,9 +63,9 @@
 | S14 Qualification source freeze와 결정적 Gate | 다중 세션 실행 설계, [반복 검증](pre-1.0-iterative-validation.md) | v16 Gate 5/5·880개 테스트를 통과했다. legacy 40개는 변경·누락 없다. | 출력 계약·문맥 검토·재시작 차단·프로젝트 결속·직접 빈 세션 관측 보완을 새 source로 동결했다. | 최종 source의 나머지 모든 qualification을 같은 계약 계보의 새 run root에서 수행한다. |
 | S15 역할 회귀와 Planning Qualification | 다중 세션 실행 설계, [반복 검증](pre-1.0-iterative-validation.md) | v19 역할 48/48 PASS·recall 100%·precision 97.67%. Planning 18/18 완료·15 PASS·3 FAIL이며 실제 110회 호출·usage·공개 합계와 History 감사는 통과했다. | 검사 의무 정의·v2 기계적 참조 전개·단계별 수정·독립 재심·후보별 오류 격리를 보완한 새 source를 검증한다. 원본 실패와 비용은 보존한다. | 새 source에서 결정적 Gate부터 역할·Planning을 전수 검증한다. 실패 cell 교체·사후 oracle 조정은 하지 않는다. |
 | S16 실제 E2E Qualification과 상태 보고 정합화 | 다중 세션 실행 설계, A4/A5, [반복 검증](pre-1.0-iterative-validation.md) | 부분 fixture 실행과 상태 보고가 있다. | runtime 완료 observer 전달, 요청/실제 모델 관측 구분, exact Plan 활성화 근거와 빈 thread 예약 해제를 보완했다. | 실제 프로젝트에서 S05~S09 전체를 완료하고 보고 상태가 원장 verdict·evidence와 일치함을 확인한다. |
-| S17 Benchmark 측정 창과 지표 의미 수정 | 다중 세션 실행 설계 | 측정·benchmark 구성 요소가 있다. | 같은 Goal의 모든 materialized Spec·수정 후보 출력 비용을 정확히 결속하고 불변 lifecycle 재관측 명령을 추가했다. 미관측은 null/NOT_OBSERVED다. | 기능 qualification과 분리된 측정 창, 입력·모델 lock·지표 정의를 고정한다. |
-| S18 동일 입력 소규모 Pair 수집 경로 검증 | 다중 세션 실행 설계 | 비교 수집을 위한 기반이 있다. | 없음 | 동일 입력의 소규모 pair를 실행해 receipt·비용·품질 수집 경로가 일관되게 결속됨을 확인한다. |
-| S19 36-cell 비용·품질 비교와 1.0 승격 결정 | 다중 세션 실행 설계 | 비교 구조와 과거 자료가 있다. | 없음 | S14~S18의 새 source evidence를 바탕으로 36-cell 결과와 모든 선행 Gate를 검토한다. 이때만 1.0 승격 여부를 판정한다. |
+| S17 Benchmark 측정 창과 지표 의미 수정 | 다중 세션 실행 설계, [Release Performance Floor](performance-release-floor.md) | 측정·benchmark 구성 요소가 있다. | 고정 threshold policy, 36-cell expected manifest, planning/final v4 assessment와 원본 재계산 경로를 구현 중이다. planning 미캐시 입력+출력의 pair별 상대 비율을 사용하고 미관측은 null/NOT_OBSERVED다. | 현재 구현을 통합 검증·동결하고 실제 실행 전 policy·rules·source·model lock digest를 고정한다. |
+| S18 동일 입력 소규모 Pair 수집 경로 검증 | 다중 세션 실행 설계 | 비교 수집을 위한 기반이 있다. | operation trace와 planning/lifecycle 안전·usage 수집기를 구현 중이다. | 실제 호출 없이 구현 검증을 끝낸 뒤, 승인된 실행에서 receipt·trace·원장·비용 결속을 확인한다. trace 없음이나 usage unknown은 0/PASS가 아니다. |
+| S19 36-cell 비용·품질 비교와 1.0 승격 결정 | 다중 세션 실행 설계, [Release Performance Floor](performance-release-floor.md) | v29 `df06a7c`·991 tests는 변경 전 구현 기준선이며 실제 성능 결과가 아니다. | 1.0 하한 여섯 수치와 기존 최적화 scorecard를 분리했다. | 네 qualification PASS 뒤 성능36 planning 평가 → 선택 Engine12 lifecycle final 평가 → final v4 원본 재계산 순서로 진행한다. final 최소선과 모든 필수 관측이 통과한 때만 1.0 승격을 판정한다. |
 
 S00~S04는 선행 설계·구현의 범위를 보존하기 위한 표기이며, 현재 qualification의 PASS 선언이 아니다. 이번 변경은 보고·운영 복구·계측 경계를 보완하며 실제 완료·출시 검증을 건너뛰게 하지 않는다.
 

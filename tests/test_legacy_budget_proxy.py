@@ -25,6 +25,7 @@ from flowmarshal.engine.evaluation_budget import (
 from flowmarshal.engine.role_execution import RoleTimeoutPolicy
 from flowmarshal.engine.runtime import CodexProjectBinding
 from flowmarshal.engine.model_lock import ModelCapability, ModelInventory
+from flowmarshal.engine.operation_trace import verify_operation_trace
 from flowmarshal.engine.roles import strict_json_output_schema
 from flowmarshal.legacy_budget_proxy import (
     BudgetedPolicyVerifiedCodex,
@@ -353,6 +354,106 @@ class LegacyBudgetProxyTests(unittest.TestCase):
         self.assertTrue(evidence["turn_coverage_complete"])
         self.assertEqual(5, evidence["calls"][0]["receipt"]["input_tokens"])
         self.assertEqual(3, evidence["calls"][0]["receipt"]["output_tokens"])
+
+    def test_success_trace_is_sealed_and_bound_to_budget_call(self):
+        proxy, _wrapped, _service, manager, journal, _policies = self.setup_proxy()
+        result = self.run_turn(self.lazy_thread(proxy))
+        evidence = build_legacy_budget_evidence(
+            manager, journal, project_id=self.project_id, goal_id=self.goal.goal_id,
+            legacy_receipts=[SimpleNamespace(turn_ids=(result.id,))],
+        )
+        self.assertEqual(sha256_digest(evidence["operation_traces"]), evidence["operation_traces_digest"])
+        trace_item = evidence["operation_traces"][0]
+        trace = trace_item["trace"]
+        receipt = evidence["calls"][0]["receipt"]
+        self.assertEqual(trace, receipt["operation_trace"])
+        self.assertEqual(sha256_digest(trace), receipt["operation_trace_digest"])
+        verified = verify_operation_trace(
+            trace,
+            expected_operations=("create", "start", "sdk_wait"),
+            expected_call_ids=(evidence["calls"][0]["call_key"],),
+        )
+        self.assertTrue(verified.valid, verified.errors)
+        self.assertTrue(verified.manifest["sealed"])
+        self.assertEqual({}, verified.manifest["missing_operation_counts"])
+        self.assertTrue(Path(trace_item["trace_path"]).is_file())
+        rows = {row["kind"]: row for row in trace["rows"]}
+        self.assertEqual(receipt["thread_id"], rows["create"]["thread_id"])
+        self.assertEqual(receipt["thread_id"], rows["start"]["thread_id"])
+        self.assertEqual(receipt["turn_ids"][0], rows["start"]["turn_id"])
+        self.assertEqual(receipt["turn_ids"][0], rows["sdk_wait"]["turn_id"])
+
+    def test_provider_exception_is_recorded_as_trace_error(self):
+        proxy, wrapped, _service, manager, journal, _policies = self.setup_proxy()
+
+        class FailingThread:
+            id = "thread-provider-error"
+
+            @staticmethod
+            def turn(_input, **_kwargs):
+                raise RuntimeError("provider turn start failed")
+
+        wrapped.thread_start = lambda **_kwargs: FailingThread()
+        with self.assertRaisesRegex(RuntimeError, "provider turn start failed"):
+            self.run_turn(self.lazy_thread(proxy))
+        evidence = build_legacy_budget_evidence(
+            manager, journal, project_id=self.project_id, goal_id=self.goal.goal_id,
+            legacy_receipts=[],
+        )
+        trace = evidence["operation_traces"][0]["trace"]
+        verified = verify_operation_trace(trace)
+        self.assertTrue(verified.valid, verified.errors)
+        self.assertFalse(verified.manifest["sealed"])
+        self.assertEqual(1, len(verified.manifest["error_operation_ids"]))
+        self.assertEqual({"sdk_wait": 1}, verified.manifest["missing_operation_counts"])
+
+    def test_timeout_trace_marks_deadline_and_interrupt_without_sealing(self):
+        proxy, _wrapped, _service, manager, journal, _policies = self.setup_proxy(
+            timeout=WATCHDOG_TEST_TIMEOUT_SECONDS, block=True
+        )
+        with self.assertRaisesRegex(TimeoutError, "LEGACY_ROLE_TIMEOUT"):
+            self.run_turn(self.lazy_thread(proxy))
+        evidence = build_legacy_budget_evidence(
+            manager, journal, project_id=self.project_id, goal_id=self.goal.goal_id,
+            legacy_receipts=[],
+        )
+        trace = evidence["operation_traces"][0]["trace"]
+        verified = verify_operation_trace(
+            trace,
+            expected_operations=("create", "start", "sdk_wait", "interrupt"),
+        )
+        self.assertTrue(verified.valid, verified.errors)
+        self.assertFalse(verified.manifest["sealed"])
+        self.assertTrue(verified.manifest["deadline_exceeded_operation_ids"])
+        self.assertEqual({}, verified.manifest["missing_operation_counts"])
+
+    def test_unfinished_trace_and_tamper_remain_detectable(self):
+        proxy, _wrapped, _service, _manager, journal, _policies = self.setup_proxy()
+        request = SimpleNamespace(
+            request_digest="sha256:" + "a" * 64,
+            role="purpose_resolver",
+        )
+        trace = journal.create_operation_trace(
+            provider_call_id="provider_incomplete",
+            call_key="legacy-incomplete",
+            request=request,
+            stage=BudgetStage.GOAL_NORMALIZATION,
+            expected_operations=("sdk_wait",),
+        )
+        trace.begin("sdk_wait", {"operation": "parent-hard-kill"}, call_id="legacy-incomplete")
+        item = next(
+            value for value in journal.operation_trace_evidence()
+            if value["provider_call_id"] == "provider_incomplete"
+        )
+        verified = verify_operation_trace(item["trace"])
+        self.assertTrue(verified.valid, verified.errors)
+        self.assertFalse(verified.manifest["sealed"])
+        self.assertEqual(1, len(verified.manifest["pending_operation_ids"]))
+        self.assertTrue(Path(item["trace_path"]).is_file())
+
+        tampered = copy.deepcopy(item["trace"])
+        tampered["rows"][0]["request"]["operation"] = "rewritten"
+        self.assertFalse(verify_operation_trace(tampered).valid)
 
     def test_project_binding_routes_stored_thread_and_checks_before_turn(self):
         project = CodexProjectBinding(

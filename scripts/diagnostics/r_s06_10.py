@@ -1215,6 +1215,9 @@ def _receipt_document(raw: Any, *, capture: str, artifact: str,
         "interrupt_receipt_digest",
         "terminal_observation_digest",
         "terminal_status_after_interrupt",
+        "operation_trace",
+        "operation_trace_ref",
+        "operation_trace_digest",
     }
     missing = sorted((set(RoleCallReceipt.model_fields) - serializer_optional) - set(raw))
     if missing:

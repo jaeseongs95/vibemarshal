@@ -20,6 +20,7 @@ from .canonical import sha256_digest
 from .engine.budget import BudgetManager
 from .engine.domain import BudgetStage, utc_now
 from .engine.evaluation_budget import EvaluationPolicies
+from .engine.operation_trace import OperationTrace
 from .engine.runtime import CodexProjectBinding
 from .engine.roles import RoleCallReceipt, RoleCallRequest
 from .planning.r31_domain import PlanningRole
@@ -36,6 +37,35 @@ def _same_path(left: str | Path, right: str | Path) -> bool:
     return os.path.normcase(os.path.abspath(str(left))) == os.path.normcase(
         os.path.abspath(str(right))
     )
+
+
+def _trace_response(value: Any) -> dict[str, Any]:
+    """SDK 객체를 trace에 안전하고 결정적으로 투영한다.
+
+    원본 응답 본문이나 Python 객체 표현을 trace에 넣지 않는다. provider 효과와
+    receipt 결속에 필요한 식별자·상태·본문 digest만 남긴다.
+    """
+    if value is None:
+        return {"value": None}
+    if isinstance(value, dict):
+        return {"mapping_digest": sha256_digest(value)}
+    dumped = value.model_dump(mode="json", by_alias=True) if hasattr(value, "model_dump") else None
+    if dumped is not None:
+        return {"model_digest": sha256_digest(dumped)}
+    status = getattr(getattr(value, "status", None), "value", getattr(value, "status", None))
+    response: dict[str, Any] = {
+        "type": type(value).__name__,
+        "id": None if getattr(value, "id", None) is None else str(value.id),
+        "status": None if status is None else str(status),
+    }
+    final_response = getattr(value, "final_response", None)
+    if final_response is not None:
+        response["final_response_digest"] = sha256_digest(final_response)
+    return response
+
+
+def _trace_error(error: BaseException) -> dict[str, str]:
+    return {"type": type(error).__name__, "message": str(error)}
 
 
 class _ProjectBoundPolicyVerifiedCodex:
@@ -249,6 +279,11 @@ class LegacyBudgetJournal:
     records: list[dict[str, Any]] = field(default_factory=list)
     _counter: int = 0
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+    _trace_root: Path | None = field(default=None, init=False, repr=False)
+    _traces: dict[str, OperationTrace] = field(default_factory=dict, init=False, repr=False)
+    _trace_expected_operations: dict[str, tuple[str, ...]] = field(
+        default_factory=dict, init=False, repr=False
+    )
 
     def __post_init__(self) -> None:
         self.cell_binding = copy.deepcopy(self.cell_binding)
@@ -266,6 +301,75 @@ class LegacyBudgetJournal:
     def add(self, value: dict[str, Any]) -> None:
         with self._lock:
             self.records.append(copy.deepcopy(value))
+
+    def configure_trace_root(self, root: Path) -> None:
+        """호출별 append-only trace의 영속 위치를 한 번만 고정한다."""
+        resolved = root.resolve()
+        with self._lock:
+            if self._trace_root is not None and self._trace_root != resolved:
+                raise ValueError("LEGACY_OPERATION_TRACE_ROOT_MISMATCH")
+            self._trace_root = resolved
+
+    def create_operation_trace(
+        self,
+        *,
+        provider_call_id: str,
+        call_key: str,
+        request: RoleCallRequest,
+        stage: BudgetStage,
+        expected_operations: tuple[str, ...],
+    ) -> OperationTrace:
+        with self._lock:
+            if provider_call_id in self._traces:
+                raise ValueError("LEGACY_OPERATION_TRACE_DUPLICATE_CALL")
+            if self._trace_root is None:
+                raise ValueError("LEGACY_OPERATION_TRACE_ROOT_MISSING")
+            trace = OperationTrace(
+                context={
+                    "legacy_budget_evidence_format": LEGACY_BUDGET_EVIDENCE_FORMAT,
+                    "cell_binding_digest": self.cell_binding_digest,
+                    "provider_call_id": provider_call_id,
+                    "call_key": call_key,
+                    "request_digest": request.request_digest,
+                    "role": request.role,
+                    "stage": stage.value,
+                },
+                path=self._trace_root / f"{provider_call_id}.operation-trace.jsonl",
+                expected_operations=expected_operations,
+            )
+            self._traces[provider_call_id] = trace
+            self._trace_expected_operations[provider_call_id] = expected_operations
+            return trace
+
+    def set_trace_expected_operations(
+        self, provider_call_id: str, expected_operations: tuple[str, ...]
+    ) -> None:
+        with self._lock:
+            if provider_call_id not in self._traces:
+                raise ValueError("LEGACY_OPERATION_TRACE_MISSING_CALL")
+            self._trace_expected_operations[provider_call_id] = expected_operations
+
+    def operation_trace_evidence(self) -> list[dict[str, Any]]:
+        """현재까지 파일에 기록된 trace를 원장 evidence에 투영한다.
+
+        timeout 또는 parent hard-kill 직전에는 seal하지 않는다. 따라서 provider
+        효과가 미확정이면 ``pending``과 ``sealed=false``가 그대로 남는다.
+        """
+        with self._lock:
+            entries = [
+                (provider_call_id, trace, self._trace_expected_operations[provider_call_id])
+                for provider_call_id, trace in self._traces.items()
+            ]
+        result = []
+        for provider_call_id, trace, expected_operations in entries:
+            body = trace.snapshot(expected_operations=expected_operations)
+            result.append({
+                "provider_call_id": provider_call_id,
+                "trace_path": None if trace.path is None else str(trace.path),
+                "trace": body,
+                "trace_digest": sha256_digest(body),
+            })
+        return result
 
 
 class BudgetedPolicyVerifiedCodex:
@@ -293,6 +397,9 @@ class BudgetedPolicyVerifiedCodex:
         self._policies = policies
         self._cell_binding = copy.deepcopy(cell_binding)
         self._journal = journal
+        self._journal.configure_trace_root(
+            self._manager.service.ledger.artifact_root / "legacy-operation-traces"
+        )
         self._expected_inventory_digest = expected_inventory_digest
         self._inventory_digest: str | None = None
         self._creation_project_proofs: set[str] = set()
@@ -464,6 +571,16 @@ class _LazyBudgetedLegacyThread:
         self._provider_call_id = provider_call_id
         started = time.monotonic()
         deadline = started + timeout
+        expected_operations = ("create", "start", "sdk_wait") + (
+            ("read",) if owner._policies.codex_project is not None else ()
+        )
+        trace = owner._journal.create_operation_trace(
+            provider_call_id=provider_call_id,
+            call_key=call_key,
+            request=request,
+            stage=self._stage,
+            expected_operations=expected_operations,
+        )
         base_record = {
             "provider_call_id": provider_call_id,
             "call_key": call_key,
@@ -476,16 +593,55 @@ class _LazyBudgetedLegacyThread:
                 lambda: owner._start_thread(self._thread_kwargs),
                 deadline=deadline,
                 operation="thread_start",
+                trace=trace,
+                kind="create",
+                request={
+                    "request_digest": request.request_digest,
+                    "model": model,
+                    "approval_mode": approval_mode,
+                    "sandbox": thread_sandbox,
+                    "requested_ephemeral": True,
+                },
+                call_key=call_key,
+                provider_call_id=provider_call_id,
             )
-            self._bounded_rpc(
-                lambda: owner._verify_thread_project(str(self._thread.id)),
-                deadline=deadline,
-                operation="thread_project_read",
-            )
+            if owner._policies.codex_project is not None:
+                observation_policy = owner._policies.role_timeouts.observation_policy
+                rpc_timeout = (
+                    5.0
+                    if observation_policy is None
+                    else observation_policy.rpc_timeout_seconds
+                )
+                self._bounded_rpc(
+                    lambda: owner._verify_thread_project(str(self._thread.id)),
+                    deadline=min(deadline, time.monotonic() + rpc_timeout),
+                    operation="thread_project_read",
+                    trace=trace,
+                    kind="read",
+                    request={
+                        "thread_id": str(self._thread.id),
+                        "project_id": owner._policies.codex_project.project_id,
+                    },
+                    call_key=call_key,
+                    provider_call_id=provider_call_id,
+                    thread_id=str(self._thread.id),
+                )
             handle = self._bounded_rpc(
                 lambda: self._thread.turn(input, **kwargs),
                 deadline=deadline,
                 operation="turn_start",
+                trace=trace,
+                kind="start",
+                request={
+                    "request_digest": request.request_digest,
+                    "input_digest": sha256_digest(input),
+                    "output_schema_digest": sha256_digest(output_schema),
+                    "model": model,
+                    "effort": str(effort),
+                },
+                call_key=call_key,
+                provider_call_id=provider_call_id,
+                thread_id=str(self._thread.id),
             )
         except BaseException as error:
             owner._journal.add(base_record | {
@@ -496,12 +652,35 @@ class _LazyBudgetedLegacyThread:
 
         box: dict[str, Any] = {}
         completed = threading.Event()
+        run_token = trace.begin(
+            "sdk_wait",
+            {
+                "request_digest": request.request_digest,
+                "handle_id": str(handle.id),
+                "operation": "handle.run",
+            },
+            call_id=call_key,
+            provider_call_id=provider_call_id,
+            thread_id=str(self._thread.id),
+            turn_id=str(handle.id),
+            deadline_seconds=max(0.0, deadline - time.monotonic()),
+            category="wait",
+        )
 
         def collect() -> None:
             try:
                 box["result"] = handle.run()
+                try:
+                    trace.finish(run_token, response=_trace_response(box["result"]))
+                except (RuntimeError, ValueError):
+                    # 호출자 watchdog이 먼저 deadline 관측을 확정한 경우다.
+                    pass
             except BaseException as error:
                 box["error"] = error
+                try:
+                    trace.finish(run_token, error=_trace_error(error))
+                except (RuntimeError, ValueError):
+                    pass
             finally:
                 completed.set()
 
@@ -509,6 +688,11 @@ class _LazyBudgetedLegacyThread:
         worker.start()
         remaining = max(0.0, timeout - (time.monotonic() - started))
         if not completed.wait(remaining):
+            try:
+                trace.finish(run_token, error=TimeoutError("LEGACY_ROLE_TIMEOUT"))
+            except (RuntimeError, ValueError):
+                # worker가 deadline을 초과해 먼저 종료를 관측한 경우도 허용한다.
+                pass
             interrupt_request = {
                 "thread_id": str(self._thread.id),
                 "turn_id": str(handle.id),
@@ -524,6 +708,13 @@ class _LazyBudgetedLegacyThread:
                     handle.interrupt,
                     deadline=time.monotonic() + timeout,
                     operation="interrupt",
+                    trace=trace,
+                    kind="interrupt",
+                    request=interrupt_request,
+                    call_key=call_key,
+                    provider_call_id=provider_call_id,
+                    thread_id=str(self._thread.id),
+                    turn_id=str(handle.id),
                 )
                 interrupt_receipt_digest = sha256_digest(
                     interrupt_receipt.model_dump(mode="json", by_alias=True)
@@ -536,6 +727,10 @@ class _LazyBudgetedLegacyThread:
                 getattr(getattr(observed_after_interrupt, "status", None), "value", None)
                 if observed_after_interrupt is not None else None
             )
+            trace_expected_operations = expected_operations + ("interrupt",)
+            owner._journal.set_trace_expected_operations(
+                provider_call_id, trace_expected_operations
+            )
             receipt = self._receipt(
                 request=request,
                 call_key=call_key,
@@ -547,6 +742,11 @@ class _LazyBudgetedLegacyThread:
                 interrupt_request_digest=interrupt_request_digest,
                 interrupt_receipt_digest=interrupt_receipt_digest,
                 terminal_status=terminal_status,
+                operation_trace=(
+                    trace.seal(expected_operations=trace_expected_operations)
+                    if terminal_status in {"completed", "interrupted", "failed"}
+                    else trace.snapshot(expected_operations=trace_expected_operations)
+                ),
             )
             owner._manager.settle(provider_call_id, receipt)
             owner._journal.add(base_record | {
@@ -581,6 +781,7 @@ class _LazyBudgetedLegacyThread:
             started=started,
             status=status,
             error=None if status == "succeeded" else f"terminal status={status_value}",
+            operation_trace=trace.seal(),
         )
         owner._manager.settle(provider_call_id, receipt)
         owner._journal.add(base_record | {
@@ -591,7 +792,19 @@ class _LazyBudgetedLegacyThread:
         return result
 
     @staticmethod
-    def _bounded_rpc(operation_call: Any, *, deadline: float, operation: str) -> Any:
+    def _bounded_rpc(
+        operation_call: Any,
+        *,
+        deadline: float,
+        operation: str,
+        trace: OperationTrace,
+        kind: str,
+        request: dict[str, Any],
+        call_key: str,
+        provider_call_id: str,
+        thread_id: str | None = None,
+        turn_id: str | None = None,
+    ) -> Any:
         """SDK의 동기 RPC를 정책 timeout 안에서만 기다린다.
 
         daemon worker가 늦게 반환해도 호출자는 provider 효과를 미확인 상태로
@@ -599,12 +812,40 @@ class _LazyBudgetedLegacyThread:
         """
         box: dict[str, Any] = {}
         completed = threading.Event()
+        token = trace.begin(
+            kind,
+            request,
+            call_id=call_key,
+            provider_call_id=provider_call_id,
+            thread_id=thread_id,
+            turn_id=turn_id,
+            deadline_seconds=max(0.0, deadline - time.monotonic()),
+        )
 
         def invoke() -> None:
             try:
                 box["result"] = operation_call()
+                resolved_thread_id = thread_id
+                resolved_turn_id = turn_id
+                if kind == "create" and getattr(box["result"], "id", None) is not None:
+                    resolved_thread_id = str(box["result"].id)
+                elif kind == "start" and getattr(box["result"], "id", None) is not None:
+                    resolved_turn_id = str(box["result"].id)
+                try:
+                    trace.finish(
+                        token,
+                        response=_trace_response(box["result"]),
+                        thread_id=resolved_thread_id,
+                        turn_id=resolved_turn_id,
+                    )
+                except (RuntimeError, ValueError):
+                    pass
             except BaseException as error:
                 box["error"] = error
+                try:
+                    trace.finish(token, error=_trace_error(error))
+                except (RuntimeError, ValueError):
+                    pass
             finally:
                 completed.set()
 
@@ -615,7 +856,12 @@ class _LazyBudgetedLegacyThread:
         ).start()
         remaining = max(0.0, deadline - time.monotonic())
         if not completed.wait(remaining):
-            raise TimeoutError(f"LEGACY_{operation.upper()}_TIMEOUT")
+            error = TimeoutError(f"LEGACY_{operation.upper()}_TIMEOUT")
+            try:
+                trace.finish(token, error=error)
+            except (RuntimeError, ValueError):
+                pass
+            raise error
         if "error" in box:
             raise box["error"]
         return box["result"]
@@ -633,6 +879,7 @@ class _LazyBudgetedLegacyThread:
         interrupt_request_digest: str | None = None,
         interrupt_receipt_digest: str | None = None,
         terminal_status: str | None = None,
+        operation_trace: dict[str, Any] | None = None,
     ) -> RoleCallReceipt:
         usage = None if result is None else getattr(getattr(result, "usage", None), "last", None)
         fields = (
@@ -677,6 +924,10 @@ class _LazyBudgetedLegacyThread:
             interrupt_receipt_digest=interrupt_receipt_digest,
             terminal_observation_digest=terminal_digest,
             terminal_status_after_interrupt=terminal_status,
+            operation_trace=operation_trace,
+            operation_trace_digest=(
+                None if operation_trace is None else sha256_digest(operation_trace)
+            ),
             input_tokens=fields[0] if usage_available else None,
             cached_input_tokens=fields[1] if usage_available else None,
             output_tokens=fields[2] if usage_available else None,
@@ -727,6 +978,7 @@ def build_legacy_budget_evidence(
         for turn_id in getattr(receipt, "turn_ids", ())
     }
     status = manager.status(project_id, goal_id=goal_id)
+    operation_traces = journal.operation_trace_evidence()
     body = {
         "format": LEGACY_BUDGET_EVIDENCE_FORMAT,
         "cell_binding": copy.deepcopy(journal.cell_binding),
@@ -738,5 +990,7 @@ def build_legacy_budget_evidence(
         "turn_coverage_complete": legacy_turn_ids == budget_turn_ids,
         "budget_status": status.model_dump(mode="json"),
         "history_valid": manager.service.ledger.verify_history(project_id),
+        "operation_traces": operation_traces,
+        "operation_traces_digest": sha256_digest(operation_traces),
     }
     return body | {"evidence_digest": sha256_digest(body)}

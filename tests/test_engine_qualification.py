@@ -466,6 +466,8 @@ class EngineQualificationTests(unittest.TestCase):
         self.assertLessEqual(expected_source, manifest.keys())
         self.assertLessEqual(expected_tests, manifest.keys())
         required = (
+            "config/pre-1.0-performance-thresholds.json",
+            "docs/performance-release-floor.md",
             "src/flowmarshal/gate0c/ledger.py",
             "src/flowmarshal/gate0c/e2e.py",
             "src/flowmarshal/canonical.py",
