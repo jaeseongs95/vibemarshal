@@ -195,7 +195,10 @@ def _ledger_snapshot(database: Path) -> dict[str, Any]:
     finally:
         connection.close()
     receipts = []
+    observations = []
+    effective_usage = []
     malformed_receipt = False
+    malformed_observation = False
     for call in calls:
         value = call["receipt_json"]
         try:
@@ -203,17 +206,42 @@ def _ledger_snapshot(database: Path) -> dict[str, Any]:
         except json.JSONDecodeError:
             receipt, malformed_receipt = None, True
         receipts.append({"provider_call_id": call["id"], "receipt": receipt})
+        call_observations = []
+        for event in history:
+            if event["entity_type"] != "provider_call" or event["entity_id"] != call["id"] \
+                    or event["event_type"] != "budget.call_observed":
+                continue
+            payload = json.loads(event["payload_json"])
+            if payload.get("observation_kind") != "runtime_observation":
+                continue
+            document = payload.get("observation")
+            valid = isinstance(document, dict) and payload.get("observation_digest") == sha256_digest(document)
+            malformed_observation = malformed_observation or not valid
+            call_observations.append({
+                "observation": document, "observation_digest": payload.get("observation_digest"),
+                "valid": valid, "history_sequence": event["sequence"],
+            })
+        observations.append({"provider_call_id": call["id"], "observations": call_observations})
+        latest = call_observations[-1] if call_observations else None
+        effective_usage.append({
+            "provider_call_id": call["id"], "status": call["status"],
+            "actual_tokens": call["actual_tokens"], "usage_id": call["usage_id"],
+            "source": "runtime_observation" if latest is not None else "role_receipt",
+            "observation_digest": None if latest is None else latest["observation_digest"],
+        })
     unresolved = [call["id"] for call in calls if call["status"] != "settled" or call["actual_tokens"] is None]
     body = {
         "history": history, "policies": policies, "provider_calls": calls,
-        "usage": usages, "receipts": receipts,
+        "usage": usages, "receipts": receipts, "observations": observations,
+        "effective_usage": effective_usage,
     }
     return {
         "history_event_count": len(history), "history_chain_valid": history_valid,
         "policy_count": len(policies), "provider_call_count": len(calls),
         "usage_observation_count": len(usages), "unresolved_provider_call_ids": unresolved,
-        "malformed_receipt": malformed_receipt,
+        "malformed_receipt": malformed_receipt, "malformed_observation": malformed_observation,
         "provider_receipts": receipts,
+        "provider_observations": observations, "effective_provider_usage": effective_usage,
         "logical_snapshot_digest": sha256_digest(body),
     }
 
@@ -239,6 +267,7 @@ def diagnostic_budget_ledger_observation(run_root: Path | str) -> dict[str, Any]
         "unresolved_provider_call_ids": unresolved,
         "all_history_chains_valid": all(item["history_chain_valid"] for item in entries.values()),
         "all_receipts_well_formed": all(not item["malformed_receipt"] for item in entries.values()),
+        "all_observations_well_formed": all(not item["malformed_observation"] for item in entries.values()),
         "logical_snapshot_digest": sha256_digest(entries),
     }
 

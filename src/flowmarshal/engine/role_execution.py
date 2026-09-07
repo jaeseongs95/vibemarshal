@@ -4,10 +4,11 @@ from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from typing import Any, Iterator, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, field_validator, model_serializer, model_validator
 
 from ..canonical import sha256_digest
 from .domain import EngineModel
+from .runtime_observation import RoleObservationPolicy
 
 
 class RoleTimeoutOverride(EngineModel):
@@ -31,6 +32,14 @@ class RoleTimeoutPolicy(EngineModel):
     format: Literal["flowmarshal-role-timeouts-v1"] = "flowmarshal-role-timeouts-v1"
     default_timeout_seconds: float = Field(default=900, gt=0, le=3600)
     overrides: tuple[RoleTimeoutOverride, ...] = ()
+    observation_policy: RoleObservationPolicy | None = None
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_serialization(self, handler):
+        value = handler(self)
+        if self.observation_policy is None:
+            value.pop("observation_policy", None)
+        return value
 
     @field_validator("overrides")
     @classmethod
@@ -88,15 +97,26 @@ def bind_active_role_timeout(role: str, values: dict[str, Any]) -> dict[str, Any
         raise ValueError("ROLE_TIMEOUT_POLICY_REQUEST_MISMATCH")
     values["timeout_seconds"] = timeout
     values["timeout_policy_digest"] = policy.policy_digest
+    if policy.observation_policy is not None:
+        supplied = values.get("observation_policy")
+        if supplied is not None and RoleObservationPolicy.model_validate(supplied) != policy.observation_policy:
+            raise ValueError("ROLE_OBSERVATION_POLICY_REQUEST_MISMATCH")
+        values["observation_policy"] = policy.observation_policy
     return values
 
 
 def verify_role_timeout_binding(
     *, role: str, timeout_seconds: float, timeout_policy_digest: str | None,
     policy: RoleTimeoutPolicy,
+    observation_policy: RoleObservationPolicy | None = None,
+    observation_policy_digest: str | None = None,
 ) -> None:
     if (
         timeout_policy_digest != policy.policy_digest
         or timeout_seconds != policy.timeout_for(role)
     ):
         raise ValueError("ROLE_TIMEOUT_POLICY_BINDING_MISMATCH")
+    if (observation_policy != policy.observation_policy
+            or observation_policy_digest != (None if policy.observation_policy is None
+                                             else policy.observation_policy.policy_digest)):
+        raise ValueError("ROLE_OBSERVATION_POLICY_BINDING_MISMATCH")

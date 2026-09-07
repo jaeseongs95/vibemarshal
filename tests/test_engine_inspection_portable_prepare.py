@@ -57,7 +57,10 @@ class PortablePrepareIntegrationTests(unittest.TestCase):
                                       "call_reservation_tokens": 100_000,
                                       "replan_reserve_percent": 25}), encoding="utf-8")
         timeout.write_text(json.dumps({"format": "flowmarshal-role-timeouts-v1",
-                                       "default_timeout_seconds": 900}), encoding="utf-8")
+                                       "default_timeout_seconds": 900,
+                                       "observation_policy": {"format": "flowmarshal-role-observation-v1",
+                                                              "interrupt_observation_seconds": 30.0,
+                                                              "rpc_timeout_seconds": 5.0}}), encoding="utf-8")
         project.write_text(json.dumps({"project_id": "project-portable",
                                        "expected_root": str((run / "workspace").resolve()),
                                        "expected_name": "자동화테스트"}), encoding="utf-8")
@@ -139,6 +142,15 @@ class PortablePrepareIntegrationTests(unittest.TestCase):
                     self.assertEqual("project-portable", lock["diagnostic_policy_input"]
                                      ["codex_project_binding"]["project_id"])
                     self.assertIsNotNone(contract.call_args.kwargs["policies"])
+                    from flowmarshal.engine.roles import RoleCallRequest
+                    from flowmarshal.engine.runtime_observation import RoleObservationPolicy
+                    from flowmarshal.canonical import sha256_digest
+                    expected_observation_policy = RoleObservationPolicy()
+                    request = RoleCallRequest.model_validate(r_s06_10.read(run / "requests/clean.json"))
+                    self.assertEqual(expected_observation_policy, request.observation_policy)
+                    self.assertEqual(expected_observation_policy.policy_digest, request.observation_policy_digest)
+                    self.assertEqual(expected_observation_policy.policy_digest, sha256_digest(
+                        lock["diagnostic_policy_input"]["role_timeout_policy"]["observation_policy"]))
                     self.assertEqual(r_s06_10.PLAN_INSPECTION_PROVIDER_V2,
                                      contract.call_args.kwargs["inspection_provider_contract"])
 

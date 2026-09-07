@@ -10,7 +10,7 @@ from collections import defaultdict
 from collections.abc import Iterable
 from typing import Any
 
-from ..canonical import sha256_digest
+from ..canonical import canonical_json, sha256_digest
 from .domain import (
     AttemptRecord,
     BudgetStage,
@@ -383,7 +383,7 @@ def _provider_receipt_projection(
     row: Any,
     history_events: tuple[Any, ...],
 ) -> tuple[ProviderReceiptUsage | None, tuple[str, str] | None]:
-    """Goal 생성 전 호출을 원장 mutation 없이 usage read model로 검증·투영한다."""
+    """Goal 생성 전 호출의 원 receipt와 최신 runtime 관측을 읽기 전용으로 투영한다."""
     if row["goal_contract_digest"] is not None or row["usage_id"] is not None:
         return None, (
             "PROVIDER_GOAL_USAGE_BINDING_INCOMPLETE",
@@ -394,7 +394,8 @@ def _provider_receipt_projection(
     try:
         request_document = json.loads(row["request_json"])
         request = RoleCallRequest.model_validate(request_document)
-        receipt = RoleCallReceipt.model_validate_json(row["receipt_json"])
+        receipt_document = json.loads(row["receipt_json"])
+        receipt = RoleCallReceipt.model_validate(receipt_document)
         if (
             row["request_digest"] != sha256_digest(request_document)
             or receipt.input_digest != request.request_digest
@@ -403,83 +404,132 @@ def _provider_receipt_projection(
             or receipt.inventory_digest != request.inventory_digest
             or receipt.output_schema_digest
             != sha256_digest(strict_json_output_schema(request.output_schema))
+            or getattr(receipt, "timeout_policy_digest", None)
+            != getattr(request, "timeout_policy_digest", None)
+            or getattr(receipt, "observation_policy_digest", None)
+            != getattr(request, "observation_policy_digest", None)
         ):
             raise ValueError("request/receipt digest 또는 역할·모델 결속이 다릅니다.")
-        terminal = receipt.status in {"succeeded", "failed", "schema_failed"} or (
-            receipt.terminal_observation_digest is not None
-            and receipt.terminal_status_after_interrupt
-            in {"completed", "success", "succeeded", "failed", "interrupted", "cancelled"}
-        )
-        if not terminal:
-            return None, (
-                "PROVIDER_TERMINAL_RECEIPT_MISSING",
-                "provider receipt에서 terminal 상태를 확인할 수 없습니다.",
-            )
-        available = receipt.usage_available and receipt.schema_recovery_attempts == 0
-        actual = receipt.input_tokens + receipt.output_tokens if available else None
-        expected_status = "settled" if available else "usage_unknown"
-        if row["status"] != expected_status or row["actual_tokens"] != actual:
-            return None, (
-                "PROVIDER_RECEIPT_SETTLEMENT_CONFLICT",
-                "provider call 상태·actual_tokens가 원문 receipt 관측과 다릅니다.",
-            )
         reserved_events = [
             event for event in history_events if event["event_type"] == "budget.call_reserved"
         ]
-        settled_events = [
-            event for event in history_events if event["event_type"] == "budget.call_settled"
-        ]
-        if len(reserved_events) != 1 or len(settled_events) != 1:
+        if len(reserved_events) != 1:
             return None, (
                 "PROVIDER_CALL_HISTORY_INCOMPLETE",
-                "provider call의 예약·정산 History가 정확히 한 건씩 필요합니다.",
+                "provider call의 예약 History가 정확히 한 건 필요합니다.",
             )
         reserved = json.loads(reserved_events[0]["payload_json"])
-        settled = json.loads(settled_events[0]["payload_json"])
-        history_receipt = (
-            None if settled.get("receipt") is None
-            else RoleCallReceipt.model_validate(settled["receipt"])
-        )
-        normalized_receipt = receipt.model_copy(update={
-            "input_tokens": None,
-            "cached_input_tokens": None,
-            "output_tokens": None,
-            "reasoning_tokens": None,
-        }) if not available else receipt
-        normalized_history_receipt = history_receipt
-        if history_receipt is not None and not available:
-            normalized_history_receipt = history_receipt.model_copy(update={
-                "input_tokens": None,
-                "cached_input_tokens": None,
-                "output_tokens": None,
-                "reasoning_tokens": None,
-            })
         if (
             reserved.get("goal_id") != row["goal_id"]
             or reserved.get("call_key") != row["call_key"]
             or reserved.get("role") != row["role"]
-            or settled.get("actual_tokens") != actual
-            or settled.get("usage_available") is not available
-            or normalized_history_receipt != normalized_receipt
         ):
             return None, (
                 "PROVIDER_CALL_HISTORY_BINDING_INVALID",
-                "provider call의 예약·정산 History가 현재 request/receipt와 다릅니다.",
+                "provider call의 예약 History가 현재 요청과 다릅니다.",
             )
+        receipt_history_documents = []
+        for event in history_events:
+            payload = json.loads(event["payload_json"])
+            if (event["event_type"] == "budget.call_observed"
+                    and payload.get("observation_kind") == "role_receipt"
+                    and payload.get("receipt") is not None):
+                receipt_history_documents.append(payload["receipt"])
+            elif event["event_type"] == "budget.call_settled" and payload.get("receipt") is not None:
+                # schema revision 3의 기존 History는 unknown 관측도 call_settled로 기록했다.
+                receipt_history_documents.append(payload["receipt"])
+        if not receipt_history_documents:
+            return None, ("PROVIDER_CALL_HISTORY_INCOMPLETE",
+                          "원본 role receipt 관측 History가 없습니다.")
+        def normalized_unavailable_receipt(value: Any) -> RoleCallReceipt:
+            item = RoleCallReceipt.model_validate(value)
+            counts = (item.input_tokens, item.cached_input_tokens,
+                      item.output_tokens, item.reasoning_tokens)
+            if not item.usage_available and all(count in (None, 0) for count in counts):
+                item = item.model_copy(update={
+                    "input_tokens": None, "cached_input_tokens": None,
+                    "output_tokens": None, "reasoning_tokens": None,
+                })
+            return item
+
+        normalized_receipt = normalized_unavailable_receipt(receipt)
+        if any(canonical_json(normalized_unavailable_receipt(item))
+               != canonical_json(normalized_receipt) for item in receipt_history_documents):
+            return None, ("PROVIDER_CALL_HISTORY_BINDING_INVALID",
+                          "원본 role receipt History가 현재 receipt와 다릅니다.")
+        from .role_usage_reconciliation import TERMINAL_STATUSES, observation_usage_values
+        runtime_events = []
+        for event in history_events:
+            if event["event_type"] != "budget.call_observed":
+                continue
+            payload = json.loads(event["payload_json"])
+            if payload.get("observation_kind") != "runtime_observation":
+                continue
+            document = payload.get("observation")
+            if (not isinstance(document, dict)
+                    or payload.get("observation_digest") != sha256_digest(document)
+                    or payload.get("original_receipt_digest") != sha256_digest(json.loads(row["receipt_json"]))
+                    or document.get("thread_id") != receipt.thread_id
+                    or not receipt.turn_ids or document.get("turn_id") != receipt.turn_ids[-1]):
+                raise ValueError("runtime 관측의 원문/digest/thread/turn 결속이 다릅니다.")
+            runtime_events.append((event, payload, document))
+
+        projection_source = "provider_receipt"
+        runtime_digest = None
+        usage_scope = "unspecified"
+        attribution_basis = None
+        call_status = receipt.status
+        runner_digest = sha256_digest(json.loads(row["receipt_json"]))
+        recorded_at = receipt.recorded_at
+        latency = receipt.latency_ms
+        if runtime_events:
+            event, payload, document = runtime_events[-1]
+            terminal = not document.get("active", True) and document.get("terminal_status") in TERMINAL_STATUSES
+            available, values = observation_usage_values(document.get("payload") or {}, receipt)
+            available = terminal and available
+            if not available:
+                values = (None, None, None, None)
+            actual = values[0] + values[2] if available else None
+            expected_status = "settled" if available else "usage_unknown" if terminal else "reserved"
+            duration = (document.get("payload") or {}).get("duration_ms")
+            latency = duration if type(duration) is int and duration >= 0 and terminal else None
+            projection_source = "runtime_observation"
+            runtime_digest = payload["observation_digest"]
+            runner_digest = runtime_digest
+            recorded_at = event["created_at"]
+            call_status = document.get("terminal_status") if terminal else "active"
+            unavailable_reason = (None if available else
+                "PROVIDER_USAGE_UNAVAILABLE_OR_UNATTRIBUTABLE" if terminal else
+                "PROVIDER_TERMINAL_UNOBSERVED")
+            usage_scope = document.get("payload", {}).get("usage_scope") if available else "unavailable"
+            attribution_basis = ("first_empty_thread" if available and usage_scope == "thread"
+                                 else "provider_turn" if available else "unavailable")
+        else:
+            terminal = receipt.status in {"succeeded", "failed", "schema_failed"} or (
+                receipt.terminal_observation_digest is not None
+                and receipt.terminal_status_after_interrupt in TERMINAL_STATUSES
+            )
+            if not terminal:
+                return None, ("PROVIDER_TERMINAL_RECEIPT_MISSING",
+                              "provider receipt에서 terminal 상태를 확인할 수 없습니다.")
+            available = receipt.usage_available and receipt.schema_recovery_attempts == 0
+            values = (receipt.input_tokens, receipt.cached_input_tokens,
+                      receipt.output_tokens, receipt.reasoning_tokens) if available else (None, None, None, None)
+            actual = values[0] + values[2] if available else None
+            expected_status = "settled" if available else "usage_unknown"
+            unavailable_reason = None if available else "PROVIDER_USAGE_UNAVAILABLE_OR_RECOVERY_UNATTRIBUTABLE"
+        if row["status"] != expected_status or row["actual_tokens"] != actual:
+            return None, ("PROVIDER_RECEIPT_SETTLEMENT_CONFLICT",
+                          "provider call 상태·actual_tokens가 최신 유효 관측과 다릅니다.")
         return ProviderReceiptUsage(
+            projection_source=projection_source, runtime_observation_digest=runtime_digest,
+            usage_scope=usage_scope, attribution_basis=attribution_basis,
             provider_call_id=row["id"], project_id=row["project_id"], goal_id=row["goal_id"],
             stage=BudgetStage(row["stage"]), logical_call_ref=receipt.call_id, role=receipt.role,
-            call_status=receipt.status, model=receipt.model, effort=receipt.effort,
-            runner_receipt_digest=sha256_digest(json.loads(row["receipt_json"])),
-            input_tokens=receipt.input_tokens if available else None,
-            cached_input_tokens=receipt.cached_input_tokens if available else None,
-            output_tokens=receipt.output_tokens if available else None,
-            reasoning_tokens=receipt.reasoning_tokens if available else None,
-            latency_ms=receipt.latency_ms, usage_available=available,
-            unavailable_reason=(
-                None if available else "PROVIDER_USAGE_UNAVAILABLE_OR_RECOVERY_UNATTRIBUTABLE"
-            ),
-            recorded_at=receipt.recorded_at,
+            call_status=call_status, model=receipt.model, effort=receipt.effort,
+            runner_receipt_digest=runner_digest, input_tokens=values[0], cached_input_tokens=values[1],
+            output_tokens=values[2], reasoning_tokens=values[3], latency_ms=latency,
+            usage_available=available, unavailable_reason=unavailable_reason, recorded_at=recorded_at,
         ), None
     except Exception as error:
         return None, (
@@ -572,9 +622,9 @@ class EngineApplication:
                 (project_id, goal_id),
             ).fetchall()
             provider_history_rows = connection.execute(
-                "SELECT event_type, entity_id, payload_json FROM history_events "
+                "SELECT event_type, entity_id, payload_json, created_at FROM history_events "
                 "WHERE project_id=? AND entity_type='provider_call' "
-                "AND event_type IN ('budget.call_reserved','budget.call_settled') "
+                "AND event_type IN ('budget.call_reserved','budget.call_observed','budget.call_settled') "
                 "ORDER BY sequence",
                 (project_id,),
             ).fetchall()

@@ -99,7 +99,12 @@ class ProviderCallExpectation(EngineModel):
 class ProviderReceiptUsage(EngineModel):
     """Goal revision 생성 전 provider 원장 receipt의 읽기 전용 usage 투영."""
 
-    projection_source: Literal["provider_receipt"] = "provider_receipt"
+    projection_source: Literal["provider_receipt", "runtime_observation"] = "provider_receipt"
+    runtime_observation_digest: str | None = Field(
+        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
+    )
+    usage_scope: Literal["unspecified", "turn", "thread", "unavailable"] = "unspecified"
+    attribution_basis: Literal["provider_turn", "first_empty_thread", "unavailable"] | None = None
     provider_call_id: str = Field(min_length=1, max_length=500)
     usage_id: None = None
     project_id: str = Field(min_length=1, max_length=500)

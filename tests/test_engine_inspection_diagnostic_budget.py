@@ -10,7 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from flowmarshal.canonical import sha256_digest
-from flowmarshal.engine.budget import BudgetBlocked, GoalBudgetPolicy
+from flowmarshal.engine.budget import BudgetBlocked, BudgetManager, GoalBudgetPolicy
 from flowmarshal.engine.domain import new_id
 from flowmarshal.engine.inspection_diagnostic_budget import (
     DiagnosticBudgetRegistry,
@@ -23,6 +23,7 @@ from flowmarshal.engine.role_execution import (
     RoleTimeoutPolicy, use_role_timeout_policy, verify_role_timeout_binding,
 )
 from flowmarshal.engine.roles import RoleCallReceipt, RoleCallResult, make_role_request, strict_json_output_schema
+from flowmarshal.engine.runtime import RuntimeObservation
 from tests.engine_helpers import goal
 
 
@@ -48,6 +49,8 @@ class _UnknownUsageRunner:
             thread_id="thread-one", turn_ids=("turn-one",), input_digest=request.request_digest,
             output_digest=sha256_digest({"ok": True}),
             output_schema_digest=sha256_digest(strict_json_output_schema(request.output_schema)),
+            timeout_policy_digest=request.timeout_policy_digest,
+            observation_policy_digest=request.observation_policy_digest,
             input_tokens=None, cached_input_tokens=None, output_tokens=None, reasoning_tokens=None,
             usage_available=False, latency_ms=1, recorded_at=datetime.now(timezone.utc),
         )
@@ -69,6 +72,8 @@ class _KnownUsageRecordedRunner(_UnknownUsageRunner):
             thread_id="thread-one", turn_ids=("turn-one",), input_digest=request.request_digest,
             output_digest=sha256_digest({"ok": True}),
             output_schema_digest=sha256_digest(strict_json_output_schema(request.output_schema)),
+            timeout_policy_digest=request.timeout_policy_digest,
+            observation_policy_digest=request.observation_policy_digest,
             input_tokens=3, cached_input_tokens=0, output_tokens=2, reasoning_tokens=0,
             usage_available=True, latency_ms=1, recorded_at=datetime.now(timezone.utc),
         )
@@ -217,6 +222,41 @@ class InspectionDiagnosticBudgetTests(unittest.TestCase):
         self.assertTrue(observation["all_history_chains_valid"])
         with self.assertRaisesRegex(BudgetBlocked, "BUDGET_USAGE_UNKNOWN"):
             registry.runner_for(runner, current_goal).run(request)
+
+    def test_diagnostic_snapshot_distinguishes_original_receipt_from_late_observation(self):
+        _binding, policies = self.bind()
+        run = self.root / "observed-run"
+        project_id = "project_" + "3" * 32
+        current_goal = goal(project_id, sha256_digest("fixture-profile"))
+        registry = DiagnosticBudgetRegistry(run_root=run, workspace=self.workspace, policies=policies)
+        with use_role_timeout_policy(policies.role_timeouts):
+            request = make_role_request(
+                role="compact_plan_reviewer", instructions="test", payload={"case": "late"},
+                output_schema={"type": "object", "properties": {}}, model="test-model",
+                effort="medium", inventory_digest=sha256_digest("inventory"), cwd=str(self.workspace),
+            )
+        runner = _UnknownUsageRunner()
+        registry.runner_for(runner, current_goal).run(request)
+        service = registry.service_for(current_goal)
+        with service.ledger.read() as connection:
+            call_id = connection.execute("SELECT id FROM provider_calls").fetchone()["id"]
+        BudgetManager(service).observe_role_terminal(call_id, RuntimeObservation(
+            thread_id="thread-one", turn_id="turn-one", active=False,
+            terminal_status="completed", final_response="완료",
+            payload={"usage_scope": "turn", "usage": {
+                "inputTokens": 3, "cachedInputTokens": 0, "outputTokens": 2,
+                "reasoningOutputTokens": 0, "totalTokens": 5,
+            }},
+        ))
+
+        snapshot = diagnostic_budget_ledger_observation(run)
+        entry = next(iter(snapshot["entries"].values()))
+        self.assertEqual([], snapshot["unresolved_provider_call_ids"])
+        self.assertTrue(snapshot["all_observations_well_formed"])
+        self.assertFalse(entry["provider_receipts"][0]["receipt"]["usage_available"])
+        self.assertEqual("runtime_observation", entry["effective_provider_usage"][0]["source"])
+        self.assertEqual(5, entry["effective_provider_usage"][0]["actual_tokens"])
+        self.assertEqual(1, len(entry["provider_observations"][0]["observations"]))
 
     def test_generation_pending_rejects_late_input_and_ledger_rollback(self):
         module = _s06_module()

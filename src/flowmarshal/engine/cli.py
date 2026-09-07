@@ -994,7 +994,9 @@ def _cmd_budget_observe(arguments: argparse.Namespace) -> None:
     if receipt.thread_id is None:
         raise EngineServiceError("BUDGET_ROLE_RECEIPT_REQUIRED: 원본 역할 thread 결속이 없습니다.")
     with _runtime(arguments) as runtime:
-        observation = runtime.read_stored(thread_id=receipt.thread_id)
+        if len(receipt.turn_ids) != 1:
+            raise EngineServiceError("BUDGET_ROLE_TURN_BINDING_REQUIRED: 단일 원본 turn이 필요합니다.")
+        observation = runtime.read_stored(thread_id=receipt.thread_id, turn_id=receipt.turn_ids[0])
     BudgetManager(service).observe_role_terminal(arguments.call_id, observation)
     _emit({"call_id": arguments.call_id, "observation": observation})
 

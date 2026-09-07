@@ -529,6 +529,71 @@ class PreGoalUsageSummaryTests(unittest.TestCase):
         self.assertEqual((), after.provider_receipt_usage)
         self.assertIsNone(after.goal_revision_unavailable_reason)
 
+    def test_pre_goal_projection_reads_legacy_call_settled_history(self) -> None:
+        pending_goal_id = new_id("goal")
+        request = self.request("goal_reviewer", key="legacy-history")
+        call_id = self.manager.reserve(
+            project_id=self.project_id, goal_id=pending_goal_id, goal_digest=None,
+            call_key="legacy-history", role=request.role,
+            request=request.model_dump(mode="json"),
+        )
+        receipt = self.receipt(request, key="legacy-history")
+        with self.ledger.transaction() as tx:
+            tx.connection.execute(
+                "UPDATE provider_calls SET status='settled',actual_tokens=?,receipt_json=?,completed_at=? "
+                "WHERE id=?",
+                (receipt.input_tokens + receipt.output_tokens, canonical_json(receipt), tx.now, call_id),
+            )
+            # schema revision 3의 기존 writer는 관측과 정산을 이 이벤트 하나로 기록했다.
+            tx.history(self.project_id, "budget.call_settled", "provider_call", call_id, {
+                "actual_tokens": receipt.input_tokens + receipt.output_tokens,
+                "usage_available": True, "receipt": receipt.model_dump(mode="json"),
+            })
+
+        summary = self.application.usage_summary(self.project_id, goal_id=pending_goal_id)
+        self.assertEqual((11, 4, 19, "provider_receipt"), (
+            summary.input_tokens.total, summary.output_tokens.total,
+            summary.latency_ms.total, summary.provider_receipt_usage[0].projection_source,
+        ))
+
+    def test_legacy_unavailable_receipt_omitted_and_null_tokens_compare_equal(self) -> None:
+        pending_goal_id = new_id("goal")
+        request = self.request("goal_reviewer", key="legacy-unavailable")
+        call_id = self.manager.reserve(
+            project_id=self.project_id, goal_id=pending_goal_id, goal_digest=None,
+            call_key="legacy-unavailable", role=request.role,
+            request=request.model_dump(mode="json"),
+        )
+        receipt = self.receipt(
+            request, key="legacy-unavailable", input_tokens=None,
+            cached_input_tokens=None, output_tokens=None, reasoning_tokens=None,
+            usage_available=False,
+        )
+        # canonical 원본은 null token을 생략하지만 구 History writer는 model_dump의
+        # 명시적 null을 기록했던 실제 운영 원장 형태를 재현한다.
+        with self.ledger.transaction() as tx:
+            tx.connection.execute(
+                "UPDATE provider_calls SET status='usage_unknown',actual_tokens=NULL,receipt_json=?,completed_at=? "
+                "WHERE id=?", (canonical_json(receipt), tx.now, call_id),
+            )
+            tx.history(self.project_id, "budget.call_settled", "provider_call", call_id, {
+                "actual_tokens": None, "usage_available": False,
+                "receipt": receipt.model_dump(mode="json"),
+            })
+
+        summary = self.application.usage_summary(self.project_id, goal_id=pending_goal_id)
+        self.assertEqual(1, summary.logical_call_count)
+        self.assertEqual((None, 0, 19), (
+            summary.input_tokens.total, summary.input_tokens.known_subtotal,
+            summary.latency_ms.total,
+        ))
+        self.assertEqual("provider_receipt", summary.provider_receipt_usage[0].projection_source)
+        self.assertFalse(summary.provider_receipt_usage[0].usage_available)
+        self.assertFalse(any(
+            item.code == "PROVIDER_CALL_HISTORY_BINDING_INVALID"
+            for item in summary.incomplete_reasons
+        ))
+
     def test_unknown_and_zero_are_distinct_and_goal_scope_is_explicit(self) -> None:
         first_goal = new_id("goal")
         second_goal = new_id("goal")

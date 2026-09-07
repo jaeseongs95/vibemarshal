@@ -462,6 +462,12 @@ report progress|final
 
 역할 timeout은 운영 설정과 요청·receipt에 결속한다. interrupt 요청·응답과 실제 terminal 관측은 별개다. 후속은 원래 호출 계보·미확인 상태·잔여 예산을 보존하는 명시 continuation이며 timeout을 의미 finding으로 변환하지 않는다. `EngineApplication`의 usage/attempt/recovery/model 조회 결과는 revision·digest·오류 코드·다음 행동·History cursor를 제공한다. HTTP 서버·GUI는 이 경계에 포함하지 않는다.
 
+역할 종료 관측 정책은 실행 timeout과 독립적이다. 운영 설정의 timeout 후 관측 창과 개별 RPC 대기 상한을 요청·receipt·진단 preflight에 digest로 결속한다. RPC 대기는 전체 관측 창에 포함한다. 구버전의 정책 필드가 없는 직렬화와 digest는 유지한다. `turn/interrupt` ACK나 SDK 수집기 예외를 terminal로 승격하지 않고 시작·마지막 이벤트·중단·종료 시각, 오류와 이미 받은 사용량 원문을 보존한다. callback은 호출별 고정 artifact에 관측을 남기며 Core 반영은 원본 receipt 등록 이후에 한다. timeout 처리와 연결 종료가 같은 interrupt를 중복 전송하지 않는다.
+
+재관측은 `read_stored(thread_id=..., turn_id=...)`로 원래 turn을 정확히 읽는다. 최신 turn으로 대체하거나 thread 생성·resume·새 turn을 실행하지 않는다. 종료 미확인은 `reserved / actual_tokens=null`, 종료 확인과 사용량 미확정은 `usage_unknown / null`, 종료 및 귀속 가능한 사용량 확인은 `settled / 관측값`이다. 사용량 미확정은 0이나 예약량으로 대체하지 않으며 추가 모델 호출을 계속 차단한다.
+
+Goal 등록 전 진단 역할 호출도 같은 프로젝트·Goal 계보·요청·원본 receipt·thread/turn 결속을 검증한 뒤 관측을 추가할 수 있다. Goal·Profile은 임의로 만들지 않는다. 원본 receipt는 보존하고 관측 원문과 digest는 기존 History에 추가하므로 DB schema를 바꾸지 않는다. 동일 관측은 멱등 처리하며 확정된 사용량과 충돌하는 관측은 거부한다. 실제 Goal이 나중에 등록되면 최신 유효 관측을 사용량 레코드에 한 번만 연결한다. 예산 조회·공개 사용량 요약·진단 감사는 원본 timeout 결과와 현재 정산 상태를 함께 읽는다. 신규 `budget.call_observed`는 관측, `budget.call_settled`는 실측 정산을 뜻하며 과거 `budget.call_settled`의 관측 기록은 읽기 호환성을 유지한다.
+
 | 단계 | 산출물과 종료 조건 |
 |---|---|
 | M0 | R3.1 최종 수치 정정, legacy 동결, 회귀 fixture, schema/DB/cutover ADR |

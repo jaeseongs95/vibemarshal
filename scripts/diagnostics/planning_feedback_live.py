@@ -349,6 +349,8 @@ class RecordedRunner:
             verify_role_timeout_binding(
                 role=request.role, timeout_seconds=request.timeout_seconds,
                 timeout_policy_digest=request.timeout_policy_digest, policy=timeout_policy,
+                observation_policy=request.observation_policy,
+                observation_policy_digest=request.observation_policy_digest,
             )
         request_binding = verify_binding(request.operational_binding, current,
             role=request.role, model=request.model, effort=request.effort)

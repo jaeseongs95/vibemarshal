@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -182,6 +183,39 @@ class BudgetFixture(unittest.TestCase):
         with self.ledger.read() as connection:
             count = connection.execute("SELECT COUNT(*) FROM budget_usage WHERE project_id = ?", (self.project_id,)).fetchone()[0]
         self.assertEqual(1, count)
+
+    def test_reserved_original_receipt_is_idempotent_and_cannot_be_overwritten(self) -> None:
+        call = self.reserve("pending-original")
+        receipt = self.receipt("pending-original", status="timed_out", available=False).model_copy(
+            update={"input_tokens": None, "cached_input_tokens": None,
+                    "output_tokens": None, "reasoning_tokens": None}
+        )
+        self.manager.settle(call, receipt)
+        row = self.provider_call(call)
+        assert row is not None
+        self.assertEqual(("reserved", None), (row["status"], row["actual_tokens"]))
+        with self.ledger.read() as connection:
+            usage = connection.execute(
+                "SELECT payload_json FROM budget_usage WHERE id=?", (row["usage_id"],)
+            ).fetchone()
+        assert usage is not None
+        self.assertFalse(json.loads(usage["payload_json"])["usage_available"])
+
+        self.manager.settle(call, receipt)
+        restarted_receipt = RoleCallReceipt.model_validate_json(self.provider_call(call)["receipt_json"])
+        self.assertEqual((0, 0, 0, 0), (
+            restarted_receipt.input_tokens, restarted_receipt.cached_input_tokens,
+            restarted_receipt.output_tokens, restarted_receipt.reasoning_tokens,
+        ))
+        # 재시작 deserialize가 생략 필드를 기본 0으로 복원해도 같은 unknown receipt다.
+        BudgetManager(EngineService(self.ledger)).settle(call, restarted_receipt)
+        with self.assertRaisesRegex(BudgetBlocked, "BUDGET_RECEIPT_CONFLICT"):
+            self.manager.settle(call, receipt.model_copy(update={"output_tokens": 6}))
+        with self.ledger.read() as connection:
+            self.assertEqual(1, connection.execute(
+                "SELECT COUNT(*) FROM history_events WHERE entity_id=? "
+                "AND event_type='budget.call_observed'", (call,)
+            ).fetchone()[0])
 
     def test_attach_goal_binds_a_pending_receipt_to_exact_goal_revision(self) -> None:
         pending_goal_id = new_id("goal")

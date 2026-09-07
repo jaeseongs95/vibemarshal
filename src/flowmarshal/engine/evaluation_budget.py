@@ -76,6 +76,9 @@ def policy_contract_fragment(policies: EvaluationPolicies) -> dict[str, Any]:
         fragment["codex_project"] = policies.codex_project.model_dump(
             mode="json", exclude_none=True
         )
+    if policies.role_timeouts.observation_policy is not None:
+        fragment["role_observation_policy"] = policies.role_timeouts.observation_policy.model_dump(mode="json")
+        fragment["role_observation_policy_digest"] = policies.role_timeouts.observation_policy.policy_digest
     return fragment
 
 

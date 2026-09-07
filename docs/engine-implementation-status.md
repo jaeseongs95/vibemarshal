@@ -4,6 +4,10 @@
 
 ## 현재 판정
 
+종료 관측·정산 보완은 v28 동결본 `6a17e2d`에서 분리했다. v28의 결정적 테스트 969개·static11 PASS와 qualification13의 첫 호출 timeout·나머지 12건 미실행은 과거 결과로 보존한다. 원래 실패 turn을 새 turn·resume 없이 조회해 `interrupted` 종료를 확인했으나 실제 사용량은 여전히 미확정이다. 기존 pre-Goal 원장은 원본 receipt를 보존한 채 `reserved`에서 `usage_unknown`으로 바뀌었고, History 관측 한 건만 추가됐다. Goal·Profile·사용량 레코드·DB schema를 새로 만들지 않았다.
+
+이 보완의 원본 대조·결정적 Gate·소스 동결 결과는 [종료 관측 보완 실행 보고서](D:/codex/fm-inspection-runtime/planning-continuation-20260906/timeout-observation-recovery-20260907/구현-검증-결과.md)에 연결한다. 실제 사용량이 확보되기 전에는 새 static11·qualification13과 이후 전체 평가, 선택 Plan 실행, lifecycle, main 병합을 차단한다. 잠정 차감·재호출·새 원장으로 비용을 초기화하지 않는다. 최초 30분 지연의 내부 원인이 해결됐거나 qualification이 통과했다고 판정하지 않는다.
+
 **NO-GO**, 개발 package `flowmarshal-engine 0.2.0a1`, 새 원장 schema revision **3**이다. 최종 source의 전체 qualification이 아직 완료되지 않았다. 최초 v9 역할 회귀는 **48/48건 완료·FAIL**로 보존한다. 당시 clean false block 1건과 schema failure 1건, recall 97.06%·precision 90.70%였고 critical false admission·seed 간 critical verdict 불일치는 0건이었다. v9 결정적 Gate는 **5/5·824개 테스트**, legacy 동결 **40개 / 변경·누락 없음**으로 통과했다. [최초 결과와 원인](role-fixture-48-qualification.md)에 원본·source·예산·실패 분류를 연결했다.
 
 최초 v9 48회의 provider/receipt/usage와 History를 읽기 전용으로 감사했고 누락·중복·미정산·미확인 사용량은 없었다. 실측 총량은 **1,332,724 token**이었다. schema 실패 1건은 provider schema가 허용한 값을 사후 검사에서 금지한 평가 계약 불일치와 연결됐다. 정상 Goal 오차단과 별도 필수 finding 누락은 모델 의미 판단 문제로 분류해 후속 source에서 보완했다. 과거 결과는 그대로 보존한다.

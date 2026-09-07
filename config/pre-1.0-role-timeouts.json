@@ -1,6 +1,11 @@
 {
   "format": "flowmarshal-role-timeouts-v1",
   "default_timeout_seconds": 900,
+  "observation_policy": {
+    "format": "flowmarshal-role-observation-v1",
+    "interrupt_observation_seconds": 30.0,
+    "rpc_timeout_seconds": 5.0
+  },
   "overrides": [
     {
       "role": "compact_plan_reviewer",

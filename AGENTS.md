@@ -43,6 +43,8 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 - Goal 준비의 blocking 질문 없는 수정 가능한 충돌에는 원본 요청·Profile·관측·평가를 결속한 한 번의 별도 피드백을 허용한다. 수정은 같은 Goal의 새 revision과 독립 검토로 남기며, 동일 후보·반박·미해결은 원래 거절을 유지한다. 입력 부족이나 비수정 가능 실패를 자동 정규화 재호출로 우회하지 않는다.
 - SQLite 원장만 revision·활성 계약·Task·Attempt·binding·evidence·validation·budget·History의 권위다. Domain Core만 상태를 전이하고 완료를 판정한다.
 - 모델 호출 전 Goal 계보의 예산을 예약하고 종료 관측 후 정산한다. 사용량 미확인은 0으로 바꾸지 않고 추가 호출을 차단한다. 명시적인 잠정 차감은 실측과 분리하고, 효과 전 실패가 증명된 예약만 해제한다. 재계획과 그 필수 재검토는 같은 reserve를 사용한다.
+- interrupt 응답·수집기 종료와 provider terminal 관측을 구분한다. 종료 미확인은 `reserved`, 종료 확인·사용량 미확정은 `usage_unknown`, 종료와 귀속 가능한 실측 사용량이 확인된 경우만 `settled`다. 관측·RPC 대기 정책은 요청·receipt·진단 preflight digest에 결속한다. 복구는 원래 turn을 새 turn·resume 없이 조회하고 원본 receipt를 덮어쓰지 않는다.
+- Goal 등록 전 역할 호출도 원래 프로젝트·Goal 계보·요청·receipt·thread/turn에 결속해 재관측할 수 있다. Goal·Profile을 임의 생성하지 않고 History에 관측 원문·digest를 추가한다. 실제 Goal 등록 시 최신 유효 관측을 한 번만 연결하며, 종료만 확인한 관측은 추가 호출의 예산 차단을 해제하지 않는다.
 - 대화·모델의 완료 선언만으로 Task·Goal을 완료하지 않는다. Plan·Execution Spec의 evidence 종류는 실제 `EvidenceKind` 지원 집합으로 제한하고 provider schema와 Core에서 함께 검사한다.
 - Planner는 후보, Worker는 배정된 Task 하나의 결과·evidence 후보, Validator는 관측값만 제출한다. Worker는 다음 Task를 선택하지 않는다. Trigger·Scheduled Task도 Core의 `run once`만 호출한다.
 - Reviewer는 직접 evidence ref가 있는 최소 finding code·affected Task·remediable 여부, finding이 없을 때의 rating만 제출한다. ref는 제공된 catalog·Task 집합에 실제 존재해야 하며 상관 결함은 별도 직접 증거가 필요하다.

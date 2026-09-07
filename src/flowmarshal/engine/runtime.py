@@ -40,6 +40,7 @@ from .domain import (
     utc_now,
 )
 from .models import ModelCapability, ModelInventory
+from .runtime_observation import bounded_observation_call
 from .service import ContextRequiredError, EngineService, EngineServiceError
 
 
@@ -124,9 +125,15 @@ class CodexRuntimePort(Protocol):
 
     def resume(self, *, thread_id: str, cwd: Path) -> RuntimeOperationReceipt: ...
 
-    def interrupt(self, *, thread_id: str, turn_id: str) -> RuntimeOperationReceipt: ...
+    def interrupt(
+        self, *, thread_id: str, turn_id: str, timeout_seconds: float = 5.0,
+    ) -> RuntimeOperationReceipt: ...
 
-    def close(self) -> None: ...
+    def read_stored(
+        self, *, thread_id: str, turn_id: str | None = None, timeout_seconds: float = 5.0,
+    ) -> RuntimeObservation: ...
+
+    def close(self, *, timeout_seconds: float = 5.0) -> None: ...
 
 
 def _get(value: Any, name: str, default: Any = None) -> Any:
@@ -194,32 +201,63 @@ class CodexAppServerRuntime:
         self._new_thread_project_proofs: dict[str, _NewThreadProjectProof] = {}
         self._turn_usage_context: dict[str, dict[str, Any]] = {}
         self._completion_observers: dict[str, tuple[str, Callable[[RuntimeObservation], None]]] = {}
+        self._completion_observer_lock = threading.Lock()
+        self._interrupted_turn_ids: set[str] = set()
         try:
             self._verify_project_binding()
         except BaseException:
             self._codex.close()
             raise
 
-    def close(self) -> None:
+    def close(self, *, timeout_seconds: float = 5.0) -> None:
+        deadline = time.monotonic() + timeout_seconds
         try:
             for thread_id, (handle, future) in tuple(self._turn_futures.items()):
                 if future.done():
                     self._flush_completion_observer(thread_id)
                     continue
-                try:
-                    handle.interrupt()
-                except Exception:
-                    pass
+                interrupted_turn_ids = getattr(self, "_interrupted_turn_ids", set())
+                if not hasattr(self, "_interrupted_turn_ids"):
+                    self._interrupted_turn_ids = interrupted_turn_ids
+                if handle.id not in interrupted_turn_ids:
+                    # 요청을 보내기 전에 표시한다. timeout은 원격 미실행 증명이 아니므로
+                    # close나 복구 경로가 같은 interrupt를 중복 전송하면 안 된다.
+                    interrupted_turn_ids.add(handle.id)
+                    try:
+                        bounded_observation_call(
+                            handle.interrupt,
+                            timeout_seconds=max(0.0, deadline - time.monotonic()),
+                            operation_name=f"turn/interrupt:{handle.id}",
+                        )
+                    except BaseException:
+                        pass
                 if thread_id in getattr(self, "_completion_observers", {}):
                     # 종료와 완료 이벤트의 경합에서도 도착한 usage를 버리지 않는다.
                     # 응답이 없는 연결을 무기한 기다리는 복구 보장은 하지 않는다.
                     try:
-                        future.result(timeout=5.0)
+                        future.result(timeout=max(0.0, deadline - time.monotonic()))
                     except BaseException:
                         pass
                     self._flush_completion_observer(thread_id)
         finally:
-            self._codex.close()
+            remaining = deadline - time.monotonic()
+            if remaining > 0:
+                try:
+                    bounded_observation_call(
+                        self._codex.close,
+                        timeout_seconds=remaining,
+                        operation_name="app-server/close",
+                    )
+                except BaseException:
+                    pass
+            else:
+                # 전체 반환 기한은 넘기지 않되, 앞선 interrupt 대기로 기한을
+                # 소진한 경우에도 transport cleanup 자체는 정확히 한 번 시작한다.
+                threading.Thread(
+                    target=self._codex.close,
+                    name="flowmarshal-observe-app-server-close",
+                    daemon=True,
+                ).start()
 
     def register_completion_observer(
         self, *, thread_id: str, turn_id: str, observer: Callable[[RuntimeObservation], None],
@@ -230,19 +268,27 @@ class CodexAppServerRuntime:
             raise RuntimePolicyError("WORKER_USAGE_BINDING_MISMATCH: 완료 handle이 다릅니다.")
         if not hasattr(self, "_completion_observers"):
             self._completion_observers = {}
-        self._completion_observers[thread_id] = (turn_id, observer)
-        self._flush_completion_observer(thread_id)
+        if not hasattr(self, "_completion_observer_lock"):
+            self._completion_observer_lock = threading.Lock()
+        with self._completion_observer_lock:
+            self._completion_observers[thread_id] = (turn_id, observer)
+        _future.add_done_callback(lambda _completed: self._flush_completion_observer(thread_id))
 
     def _flush_completion_observer(self, thread_id: str) -> None:
-        entry = getattr(self, "_completion_observers", {}).get(thread_id)
         tracked = self._turn_futures.get(thread_id)
-        if entry is None or tracked is None or not tracked[1].done():
+        if tracked is None or not tracked[1].done():
             return
-        observation = self.read(thread_id=thread_id)
-        if observation.turn_id != entry[0] or observation.active:
-            raise RuntimePolicyError("WORKER_USAGE_BINDING_MISMATCH: 완료 관측 turn이 다릅니다.")
+        if not hasattr(self, "_completion_observer_lock"):
+            self._completion_observer_lock = threading.Lock()
+        with self._completion_observer_lock:
+            entry = getattr(self, "_completion_observers", {}).get(thread_id)
+            if entry is None:
+                return
+            observation = self.read(thread_id=thread_id)
+            if observation.turn_id != entry[0] or observation.active:
+                raise RuntimePolicyError("WORKER_USAGE_BINDING_MISMATCH: 완료 관측 turn이 다릅니다.")
+            del self._completion_observers[thread_id]
         entry[1](observation)
-        del self._completion_observers[thread_id]
 
     def wait_for_active_turns(self, *, timeout_seconds: float) -> bool:
         """CLI가 소유한 연결을 dispatch 직후 닫아 실행을 끊지 않도록 유지한다.
@@ -534,6 +580,77 @@ class CodexAppServerRuntime:
             binding=binding,
         )
 
+    @staticmethod
+    def _notification_document(event: Any) -> dict[str, Any]:
+        payload = getattr(event, "payload", None)
+        if hasattr(payload, "model_dump"):
+            document = payload.model_dump(mode="json", by_alias=True)
+        elif isinstance(payload, dict):
+            document = dict(payload)
+        else:
+            document = {"value": str(payload)}
+        return document if isinstance(document, dict) else {"value": document}
+
+    def _record_turn_event(self, *, thread_id: str, turn_id: str, event: Any) -> None:
+        """SDK collector가 failed turn에서 버리는 terminal·usage 근거를 보존한다."""
+        context = self._turn_usage_context[thread_id]
+        method = str(getattr(event, "method", "unknown"))
+        document = self._notification_document(event)
+        nested_turn = document.get("turn")
+        observed_thread_id = document.get("threadId", document.get("thread_id"))
+        observed_turn_id = document.get("turnId", document.get("turn_id"))
+        if isinstance(nested_turn, dict):
+            observed_turn_id = nested_turn.get("id", observed_turn_id)
+        if observed_thread_id is not None and observed_thread_id != thread_id:
+            raise RuntimePolicyError(
+                "RUNTIME_OBSERVATION_BINDING_MISMATCH: provider event의 thread가 다릅니다."
+            )
+        if observed_turn_id is not None and observed_turn_id != turn_id:
+            raise RuntimePolicyError(
+                "RUNTIME_OBSERVATION_BINDING_MISMATCH: provider event의 turn이 다릅니다."
+            )
+
+        observed_at = utc_now().isoformat()
+        lifecycle = context["lifecycle"]
+        if lifecycle["first_event_at"] is None:
+            lifecycle["first_event_at"] = observed_at
+        lifecycle["last_event_at"] = observed_at
+        lifecycle["event_count"] += 1
+        last_event = {
+            "method": method,
+            "observed_at": observed_at,
+            "thread_id": observed_thread_id,
+            "turn_id": observed_turn_id,
+        }
+        lifecycle["last_event"] = last_event
+
+        provider_document: dict[str, Any] | None = None
+        if method == "thread/tokenUsage/updated":
+            provider_document = document
+            context["usage"] = document.get("tokenUsage", document.get("token_usage"))
+            context["usage_scope"] = "thread"
+            context["usage_source"] = "thread/tokenUsage/updated"
+        elif method == "turn/completed":
+            provider_turn = dict(nested_turn) if isinstance(nested_turn, dict) else {}
+            provider_document = document
+            lifecycle["provider_started_at"] = provider_turn.get("startedAt")
+            lifecycle["provider_completed_at"] = provider_turn.get("completedAt")
+            lifecycle["provider_duration_ms"] = provider_turn.get("durationMs")
+            lifecycle["terminal_status"] = provider_turn.get("status")
+            lifecycle["terminal_error"] = provider_turn.get("error")
+        elif method == "error":
+            provider_document = document
+            lifecycle["terminal_error"] = document
+
+        if provider_document is not None:
+            context["provider_events"].append(
+                {
+                    "method": method,
+                    "observed_at": observed_at,
+                    "payload": provider_document,
+                }
+            )
+
     def start_turn(
         self,
         *,
@@ -570,12 +687,36 @@ class CodexAppServerRuntime:
         getattr(self, "_first_empty_threads", set()).discard(thread_id)
         if not hasattr(self, "_turn_usage_context"):
             self._turn_usage_context = {}
-        self._turn_usage_context[thread_id] = {"prompt_digest": prompt_digest}
+        self._turn_usage_context[thread_id] = {
+            "prompt_digest": prompt_digest,
+            "provider_events": [],
+            "lifecycle": {
+                "observation_started_at": utc_now().isoformat(),
+                "first_event_at": None,
+                "last_event_at": None,
+                "event_count": 0,
+                "last_event": None,
+                "provider_started_at": None,
+                "provider_completed_at": None,
+                "provider_duration_ms": None,
+                "terminal_status": None,
+                "terminal_error": None,
+            },
+        }
         future: Future[Any] = Future()
 
         def consume_turn() -> None:
+            from openai_codex._run import _collect_turn_result
+
+            def observed_stream():
+                for event in handle.stream():
+                    self._record_turn_event(
+                        thread_id=thread_id, turn_id=handle.id, event=event,
+                    )
+                    yield event
+
             try:
-                future.set_result(handle.run())
+                future.set_result(_collect_turn_result(observed_stream(), turn_id=handle.id))
             except BaseException as error:
                 future.set_exception(error)
 
@@ -606,20 +747,28 @@ class CodexAppServerRuntime:
         if tracked is not None:
             handle, future = tracked
             if not future.done():
+                usage_context = getattr(self, "_turn_usage_context", {}).get(thread_id, {})
                 return RuntimeObservation(
                     thread_id=thread_id,
                     turn_id=handle.id,
                     active=True,
-                    payload={"thread_id": thread_id, "turn_id": handle.id, "usage": None},
+                    payload={
+                        "thread_id": thread_id,
+                        "turn_id": handle.id,
+                        "usage": None,
+                        **usage_context,
+                    },
                 )
             try:
                 turn_result = future.result()
             except BaseException as error:
+                usage_context = getattr(self, "_turn_usage_context", {}).get(thread_id, {})
+                lifecycle = usage_context.get("lifecycle", {})
                 return RuntimeObservation(
                     thread_id=thread_id,
                     turn_id=handle.id,
                     active=False,
-                    terminal_status="failed",
+                    terminal_status=lifecycle.get("terminal_status"),
                     final_response=str(error),
                     payload={
                         "thread_id": thread_id,
@@ -627,8 +776,12 @@ class CodexAppServerRuntime:
                         "error": f"{type(error).__name__}: {error}",
                         "usage": None,
                         "usage_source": "sdk.turn_result.error",
-                        **getattr(self, "_turn_usage_context", {}).get(thread_id, {}),
+                        **usage_context,
                     },
+                )
+            if turn_result.id != handle.id:
+                raise RuntimePolicyError(
+                    "RUNTIME_OBSERVATION_BINDING_MISMATCH: SDK 결과 turn이 다릅니다."
                 )
             usage = turn_result.usage
             usage_document = (
@@ -658,8 +811,97 @@ class CodexAppServerRuntime:
             raise RuntimePolicyError("ephemeral thread의 active turn handle이 없습니다.")
         return self.read_stored(thread_id=thread_id)
 
-    def read_stored(self, *, thread_id: str) -> RuntimeObservation:
-        """로컬 active handle과 별개로 thread/read의 저장 상태를 확인한다."""
+    def read_stored(
+        self,
+        *,
+        thread_id: str,
+        turn_id: str | None = None,
+        timeout_seconds: float = 5.0,
+    ) -> RuntimeObservation:
+        """저장 상태를 유한 시간에 읽고, 지정한 경우 정확한 과거 turn만 반환한다."""
+        return bounded_observation_call(
+            lambda: self._read_stored_impl(thread_id=thread_id, turn_id=turn_id),
+            timeout_seconds=timeout_seconds,
+            operation_name=f"read_stored:{thread_id}:{turn_id or 'latest'}",
+        )
+
+    def _read_exact_turn_history(
+        self, *, thread_id: str,
+    ) -> tuple[tuple[dict[str, Any], ...], list[dict[str, Any]]]:
+        """모든 순방향 페이지를 검증해 turn ID 중복·누락을 숨기지 않는다."""
+        cursor: str | None = None
+        seen_cursors: set[str] = set()
+        seen_turn_ids: set[str] = set()
+        turns: list[dict[str, Any]] = []
+        pages: list[dict[str, Any]] = []
+        while True:
+            params: dict[str, Any] = {
+                "threadId": thread_id,
+                "limit": 100,
+                "sortDirection": "asc",
+                "itemsView": "full",
+            }
+            if cursor is not None:
+                params["cursor"] = cursor
+            response = self._raw("thread/turns/list", params)
+            data = response.get("data")
+            next_cursor = response.get("nextCursor")
+            backwards_cursor = response.get("backwardsCursor")
+            if (
+                not isinstance(data, list)
+                or (next_cursor is not None and (not isinstance(next_cursor, str) or not next_cursor))
+                or (
+                    backwards_cursor is not None
+                    and (not isinstance(backwards_cursor, str) or not backwards_cursor)
+                )
+            ):
+                raise RuntimePolicyError(
+                    "RUNTIME_OBSERVATION_PAGINATION_INCOMPLETE: turn 목록 page가 유효하지 않습니다."
+                )
+            page_turn_ids: list[str] = []
+            for turn in data:
+                if not isinstance(turn, dict):
+                    raise RuntimePolicyError(
+                        "RUNTIME_OBSERVATION_PAGINATION_INCOMPLETE: turn 항목이 object가 아닙니다."
+                    )
+                listed_turn_id = turn.get("id")
+                if not isinstance(listed_turn_id, str) or not listed_turn_id:
+                    raise RuntimePolicyError(
+                        "RUNTIME_OBSERVATION_BINDING_MISMATCH: 저장 turn ID가 없습니다."
+                    )
+                if listed_turn_id in seen_turn_ids:
+                    raise RuntimePolicyError(
+                        "RUNTIME_OBSERVATION_BINDING_MISMATCH: turn ID가 pagination에서 중복됐습니다."
+                    )
+                if turn.get("itemsView") in {"summary", "notLoaded"}:
+                    raise RuntimePolicyError(
+                        "RUNTIME_OBSERVATION_PAGINATION_INCOMPLETE: full turn 항목을 받지 못했습니다."
+                    )
+                seen_turn_ids.add(listed_turn_id)
+                page_turn_ids.append(listed_turn_id)
+                turns.append(turn)
+            pages.append(
+                {
+                    "params": params,
+                    "turn_ids": page_turn_ids,
+                    "next_cursor": next_cursor,
+                    "backwards_cursor": backwards_cursor,
+                }
+            )
+            if next_cursor is None:
+                break
+            if not data or next_cursor == cursor or next_cursor in seen_cursors:
+                raise RuntimePolicyError(
+                    "RUNTIME_OBSERVATION_PAGINATION_INCOMPLETE: turn 목록 cursor가 진행하지 않습니다."
+                )
+            seen_cursors.add(next_cursor)
+            cursor = next_cursor
+        return tuple(turns), pages
+
+    def _read_stored_impl(
+        self, *, thread_id: str, turn_id: str | None,
+    ) -> RuntimeObservation:
+        """daemon watchdog 안에서 실행되는 저장 상태 조회 본체."""
         empty_creation_proof = self._verify_thread_project(
             thread_id,
             allow_new_empty_observation=True,
@@ -669,6 +911,7 @@ class CodexAppServerRuntime:
         read_retry_errors: list[dict[str, Any]] = []
         materialization_read: dict[str, Any] | None = None
         independent_reader_executable_digest: str | None = None
+        turn_history_pages: list[dict[str, Any]] | None = None
         if empty_creation_proof is not None:
             from openai_codex import MethodNotFoundError
 
@@ -757,55 +1000,100 @@ class CodexAppServerRuntime:
                 raise RuntimePolicyError(
                     "PROJECT_BINDING_MISMATCH: 빈 thread의 paginated turn 목록이 비어 있지 않습니다."
                 )
-            turns: tuple[Any, ...] = ()
+            turns: tuple[dict[str, Any], ...] = ()
+        elif turn_id is not None:
+            turns, turn_history_pages = self._read_exact_turn_history(thread_id=thread_id)
+            turn_history_params = {
+                "threadId": thread_id,
+                "limit": 100,
+                "sortDirection": "asc",
+                "itemsView": "full",
+            }
         else:
             result = self._codex._client.thread_read(  # noqa: SLF001
                 thread_id, include_turns=True
             )
-            turns = tuple(result.thread.turns)
-        latest = None if not turns else turns[-1]
-        status = None if latest is None else _enum(latest.status)
-        final_response: str | None = None
-        if latest is not None:
-            latest_document = latest.model_dump(mode="json", by_alias=True)
-            for item in latest.items:
+            turn_documents: list[dict[str, Any]] = []
+            for item in result.thread.turns:
                 document = item.model_dump(mode="json", by_alias=True)
+                document.setdefault("id", item.id)
+                document.setdefault("status", _enum(item.status))
+                document.setdefault(
+                    "items",
+                    [
+                        value.model_dump(mode="json", by_alias=True)
+                        if hasattr(value, "model_dump")
+                        else value
+                        for value in item.items
+                    ],
+                )
+                turn_documents.append(document)
+            turns = tuple(turn_documents)
+        if turn_id is None:
+            selected = None if not turns else turns[-1]
+        else:
+            matches = tuple(item for item in turns if item.get("id") == turn_id)
+            if len(matches) != 1:
+                raise RuntimePolicyError(
+                    "RUNTIME_OBSERVATION_BINDING_MISMATCH: 요청한 exact turn을 정확히 찾지 못했습니다."
+                )
+            selected = matches[0]
+        status = None if selected is None else _enum(selected.get("status"))
+        final_response: str | None = None
+        if selected is not None:
+            selected_document = dict(selected)
+            for item in selected.get("items", []):
+                document = (
+                    item.model_dump(mode="json", by_alias=True)
+                    if hasattr(item, "model_dump")
+                    else item
+                )
                 if document.get("type") == "agentMessage" and isinstance(document.get("text"), str):
                     final_response = document["text"]
         else:
-            latest_document = {}
+            selected_document = {}
         return RuntimeObservation(
             thread_id=thread_id,
-            turn_id=None if latest is None else latest.id,
+            turn_id=None if selected is None else selected.get("id"),
             active=status in {"inProgress", "in_progress"},
-            terminal_status=None if latest is None or status in {"inProgress", "in_progress"} else status,
+            terminal_status=None if selected is None or status in {"inProgress", "in_progress"} else status,
             final_response=final_response,
             payload={
                 "thread_id": thread_id,
+                "requested_turn_id": turn_id,
                 "turn_count": len(turns),
                 "turn_status": status,
-                "usage": latest_document.get("usage"),
-                "usage_scope": "turn" if latest_document.get("usage") is not None else "unavailable",
+                "provider_turn": selected_document,
+                "usage": selected_document.get("usage"),
+                "usage_scope": "turn" if selected_document.get("usage") is not None else "unavailable",
                 "usage_source": (
                     "thread/turns/list"
-                    if empty_creation_proof is not None
+                    if empty_creation_proof is not None or turn_id is not None
                     else "thread/read"
                 ),
                 "turn_history_available": True,
                 "turn_history_error": None,
                 "turn_history_source": (
                     "thread/turns/list"
-                    if empty_creation_proof is not None
+                    if empty_creation_proof is not None or turn_id is not None
                     else "thread/read(includeTurns=true)"
                 ),
                 "turn_history_params": turn_history_params,
                 "turn_history_response": turn_history_response,
+                "turn_history_pages": turn_history_pages,
                 "read_retry_errors": read_retry_errors,
                 "turn_history_connection": (
                     "independent_app_server"
                     if empty_creation_proof is not None
-                    else None
+                    else ("owner_app_server" if turn_id is not None else None)
                 ),
+                "lifecycle": {
+                    "provider_started_at": selected_document.get("startedAt"),
+                    "provider_completed_at": selected_document.get("completedAt"),
+                    "provider_duration_ms": selected_document.get("durationMs"),
+                    "terminal_status": status,
+                    "terminal_error": selected_document.get("error"),
+                },
                 "independent_reader_executable_digest": (
                     independent_reader_executable_digest
                 ),
@@ -849,9 +1137,25 @@ class CodexAppServerRuntime:
             binding=ThreadBinding(thread_id=thread.id, bound_at=utc_now()),
         )
 
-    def interrupt(self, *, thread_id: str, turn_id: str) -> RuntimeOperationReceipt:
+    def interrupt(
+        self, *, thread_id: str, turn_id: str, timeout_seconds: float = 5.0,
+    ) -> RuntimeOperationReceipt:
         # 실행 중인 turn을 중단하기 위해 저장 thread를 다시 resume하지 않는다.
-        response = self._raw("turn/interrupt", {"threadId": thread_id, "turnId": turn_id})
+        interrupted_turn_ids = getattr(self, "_interrupted_turn_ids", set())
+        if not hasattr(self, "_interrupted_turn_ids"):
+            self._interrupted_turn_ids = interrupted_turn_ids
+        if turn_id in interrupted_turn_ids:
+            raise RuntimePolicyError(
+                "RUNTIME_INTERRUPT_ALREADY_REQUESTED: 같은 turn에 interrupt를 다시 보내지 않습니다."
+            )
+        interrupted_turn_ids.add(turn_id)
+        response = bounded_observation_call(
+            lambda: self._raw(
+                "turn/interrupt", {"threadId": thread_id, "turnId": turn_id},
+            ),
+            timeout_seconds=timeout_seconds,
+            operation_name=f"turn/interrupt:{turn_id}",
+        )
         return RuntimeOperationReceipt(
             operation_id=turn_id,
             payload={
@@ -885,7 +1189,8 @@ class FakeCodexRuntime:
         self.resume_calls = 0
         self.interrupt_calls = 0
 
-    def close(self) -> None:
+    def close(self, *, timeout_seconds: float = 5.0) -> None:
+        del timeout_seconds
         return None
 
     def verify_execution_policy(self, cwd: Path | str) -> ExecutionPolicyEvidence:
@@ -970,9 +1275,16 @@ class FakeCodexRuntime:
             payload={"thread_id": thread_id, "turn_id": thread.turn_id},
         )
 
-    def read_stored(self, *, thread_id: str) -> RuntimeObservation:
+    def read_stored(
+        self, *, thread_id: str, turn_id: str | None = None, timeout_seconds: float = 5.0,
+    ) -> RuntimeObservation:
+        del timeout_seconds
         self.read_calls += 1
         thread = self.threads[thread_id]
+        if turn_id is not None and thread.turn_id != turn_id:
+            raise RuntimePolicyError(
+                "RUNTIME_OBSERVATION_BINDING_MISMATCH: 요청한 exact turn을 찾지 못했습니다."
+            )
         return RuntimeObservation(
             thread_id=thread_id,
             turn_id=thread.turn_id,
@@ -981,6 +1293,7 @@ class FakeCodexRuntime:
             final_response=thread.final_response,
             payload={
                 "thread_id": thread_id,
+                "requested_turn_id": turn_id,
                 "turn_count": 0 if thread.turn_id is None else 1,
                 "turn_status": thread.terminal_status,
                 "usage": None,
@@ -1002,7 +1315,10 @@ class FakeCodexRuntime:
             binding=ThreadBinding(thread_id=thread_id, turn_id=thread.turn_id, bound_at=utc_now()),
         )
 
-    def interrupt(self, *, thread_id: str, turn_id: str) -> RuntimeOperationReceipt:
+    def interrupt(
+        self, *, thread_id: str, turn_id: str, timeout_seconds: float = 5.0,
+    ) -> RuntimeOperationReceipt:
+        del timeout_seconds
         thread = self.threads[thread_id]
         if thread.turn_id != turn_id:
             raise KeyError(turn_id)

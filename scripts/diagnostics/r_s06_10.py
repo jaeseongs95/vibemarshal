@@ -8,10 +8,11 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import threading
 from typing import Any
 
 from flowmarshal.canonical import canonical_json, json_value, sha256_bytes, sha256_digest
-from flowmarshal.engine.domain import GoalContractRevision, PlanContractRevision, PlanSkeletonCandidate, ProjectMapRevision, StateSnapshot, utc_now
+from flowmarshal.engine.domain import GoalContractRevision, PlanContractRevision, PlanSkeletonCandidate, ProjectMapRevision, StateSnapshot, new_id, utc_now
 from flowmarshal.engine.inspection_diagnostic_budget import (
     DiagnosticBudgetRegistry,
     bind_diagnostic_policy_input,
@@ -446,6 +447,8 @@ class CapturingRuntime(CodexAppServerRuntime):
         self.phase = phase
         self.capture = claim_runtime_phase(run, phase)
         self.indices = {}
+        self.turn_captures = {}
+        self.terminal_capture_lock = threading.Lock()
         super().__init__(**kwargs)
 
     def record(self, kind, value):
@@ -511,12 +514,19 @@ class CapturingRuntime(CodexAppServerRuntime):
         claim_turn(self.run, self.capture, kwargs)
         result = super().start_turn(**kwargs)
         write_new(self.capture / "turn.receipt.json", result)
+        if not hasattr(self, "turn_captures"):
+            self.turn_captures = {}
+        self.turn_captures[(kwargs["thread_id"], result.operation_id)] = self.capture
         return result
 
     def read(self, **kwargs):
         result = super().read(**kwargs)
-        if not result.active and not (self.capture / "terminal.json").exists():
-            write_new(self.capture / "terminal.json", result)
+        capture = getattr(self, "turn_captures", {}).get((result.thread_id, result.turn_id), self.capture)
+        if not hasattr(self, "terminal_capture_lock"):
+            self.terminal_capture_lock = threading.Lock()
+        with self.terminal_capture_lock:
+            if not result.active and not (capture / "terminal.json").exists():
+                write_new(capture / "terminal.json", result)
         return result
 
 
@@ -674,6 +684,8 @@ def verify_lock(run):
                     role=request.role, timeout_seconds=request.timeout_seconds,
                     timeout_policy_digest=request.timeout_policy_digest,
                     policy=policies.role_timeouts,
+                    observation_policy=request.observation_policy,
+                    observation_policy_digest=request.observation_policy_digest,
                 )
             except ValueError as error:
                 raise RuntimeError("ROLE_TIMEOUT_POLICY_BINDING_MISMATCH") from error
@@ -940,6 +952,10 @@ class RecordedRunner:
     def receipts(self):
         return self.runner.receipts
 
+    @property
+    def pending_terminal_observations(self):
+        return self.runner.pending_terminal_observations
+
     def run(self, request, *, validator=None):
         verify_lock(self.run_root)
         if self.lock.get("diagnostic_policy_input") is not None:
@@ -952,6 +968,8 @@ class RecordedRunner:
                     role=request.role, timeout_seconds=request.timeout_seconds,
                     timeout_policy_digest=request.timeout_policy_digest,
                     policy=policies.role_timeouts,
+                    observation_policy=request.observation_policy,
+                    observation_policy_digest=request.observation_policy_digest,
                 )
             except ValueError as error:
                 raise RuntimeError("ROLE_TIMEOUT_POLICY_BINDING_MISMATCH") from error
@@ -982,6 +1000,10 @@ class RecordedRunner:
         number = execution_order(self.lock).index(self.name) + 1
         capture = self.run_root / "calls" / f"{number:02d}-{request.role}"
         capture.mkdir(parents=True, exist_ok=False)
+        # 완료 callback은 call_capture가 해제된 뒤에도 이 호출의 고정 경로에 남는다.
+        self.runner.progress_sink = lambda event, root=capture: write_new(
+            root / "role-progress" / f"{new_id('observation')}.json", event,
+        )
         with self.runtime.call_capture(capture):
             write_new(capture / "request.json", request)
             write_new(capture / "strict-schema.json", actual_schema)
@@ -1025,6 +1047,10 @@ class BudgetedRecordedRunner:
     @property
     def receipts(self):
         return self.runner.receipts
+
+    @property
+    def pending_terminal_observations(self):
+        return self.runner.pending_terminal_observations
 
     @property
     def last_result(self):
@@ -1101,6 +1127,8 @@ def common_call_verification(
         "terminal_completed": terminal_record.get("active") is False and
                               terminal_record.get("terminal_status") in accepted_terminal_statuses,
         "receipt_terminal_usage": receipt_usage_valid,
+        "receipt_timeout_policy": receipt_value.get("timeout_policy_digest") == request.timeout_policy_digest,
+        "receipt_observation_policy": receipt_value.get("observation_policy_digest") == request.observation_policy_digest,
         "model_observation": observation_valid,
     }
     provider_binding_path = capture / "provider-binding.json"
@@ -1182,6 +1210,7 @@ def _receipt_document(raw: Any, *, capture: str, artifact: str,
         "output_digest",
         "error_summary",
         "timeout_policy_digest",
+        "observation_policy_digest",
         "interrupt_request_digest",
         "interrupt_receipt_digest",
         "terminal_observation_digest",
@@ -1489,6 +1518,84 @@ def ledger_receipt_binding(ledger: dict[str, Any], receipts: list[dict[str, Any]
     return bool(expected) and observed == expected
 
 
+def effective_runtime_usage(ledger, receipts):
+    """원본 receipt를 보존하며 History 원문에서 귀속 가능한 현재 사용량만 읽는다."""
+    from flowmarshal.engine.role_usage_reconciliation import TERMINAL_STATUSES, observation_usage_values
+    if ledger is None or not ledger.get("all_history_chains_valid"):
+        return {}
+    originals = {item["call_id"]: item for item in receipts}
+    result = {}
+    for entry in ledger["entries"].values():
+        stored_receipts = {item["provider_call_id"]: item["receipt"] for item in entry["provider_receipts"]}
+        observations = {item["provider_call_id"]: item["observations"] for item in entry.get("provider_observations", [])}
+        for state in entry.get("effective_provider_usage", []):
+            provider_id = state["provider_call_id"]
+            raw = stored_receipts.get(provider_id)
+            events = observations.get(provider_id, [])
+            if (state["source"] != "runtime_observation" or state["status"] != "settled"
+                    or not isinstance(raw, dict) or not events
+                    or raw.get("call_id") not in originals):
+                continue
+            event = events[-1]
+            document = event.get("observation")
+            receipt = RoleCallReceipt.model_validate(raw)
+            original = RoleCallReceipt.model_validate(originals[receipt.call_id])
+            # 과거 canonical receipt는 unavailable token의 null 필드를 생략했다.
+            unavailable = {key: None for key in ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_tokens")}
+            normalized_original = (original.model_copy(update=unavailable)
+                if not original.usage_available and all(getattr(original, key) in (None, 0) for key in unavailable)
+                else original)
+            normalized_receipt = (receipt.model_copy(update=unavailable)
+                if not receipt.usage_available and all(getattr(receipt, key) in (None, 0) for key in unavailable)
+                else receipt)
+            if normalized_original != normalized_receipt:
+                continue
+            if (not event.get("valid") or not isinstance(document, dict)
+                    or event["observation_digest"] != sha256_digest(document)
+                    or event["observation_digest"] != state["observation_digest"]
+                    or document.get("active") is not False
+                    or document.get("terminal_status") not in TERMINAL_STATUSES
+                    or len(receipt.turn_ids) != 1 or receipt.schema_recovery_attempts != 0
+                    or document.get("thread_id") != receipt.thread_id
+                    or document.get("turn_id") != receipt.turn_ids[0]):
+                continue
+            known, values = observation_usage_values(document.get("payload") or {}, receipt)
+            if not known or state["actual_tokens"] != values[0] + values[2]:
+                continue
+            result[receipt.call_id] = {"observation": document, "digest": event["observation_digest"],
+                "provider_call_id": provider_id, "usage_total": dict(zip(
+                    ("inputTokens", "cachedInputTokens", "outputTokens", "reasoningOutputTokens"), values))
+                    | {"totalTokens": values[0] + values[2]}}
+    return result
+
+
+def apply_runtime_usage_observations(turns, calls, effective):
+    """원 terminal artifact와 새 관측을 연결하되 호출의 실패·의미 판정은 바꾸지 않는다."""
+    result = [dict(turn) for turn in turns]
+    captures = {call["receipt_call_id"]: call["capture"] for call in calls if call.get("receipt_call_id")}
+    for call_id, item in effective.items():
+        if call_id not in captures:
+            continue
+        observed = item["observation"]
+        key = (observed["thread_id"], observed["turn_id"])
+        existing = [turn for turn in result if (turn["thread_id"], turn["turn_id"]) == key]
+        if len(existing) > 1:
+            continue
+        prior = existing[0] if existing else {}
+        payload = observed["payload"]
+        updated = prior | {"capture": captures[call_id], "thread_id": key[0], "turn_id": key[1],
+            "usage_source": "runtime.read.reconciliation", "usage_scope": payload.get("usage_scope"),
+            "usage_attribution_verified": True, "usage_total": item["usage_total"],
+            "provider_duration_ms": payload.get("duration_ms", payload.get("lifecycle", {}).get("provider_duration_ms")),
+            "terminal_digest": item["digest"], "original_terminal_digest": prior.get("terminal_digest"),
+            "provider_call_id": item["provider_call_id"]}
+        if existing:
+            result[result.index(prior)] = updated
+        else:
+            result.append(updated)
+    return result
+
+
 def summarize(run, status, error=None):
     """provider 호출 없이 저장 artifact를 요약하고 결과 파일을 한 번만 배타적으로 게시한다."""
     summary_path = run / ("generation-pending.json" if status == "GENERATION_REVIEW_REQUIRED" else "summary.json")
@@ -1544,21 +1651,23 @@ def summarize(run, status, error=None):
     }
     usage_keys = {"input_tokens": "inputTokens", "cached_input_tokens": "cachedInputTokens",
                   "output_tokens": "outputTokens", "reasoning_tokens": "reasoningOutputTokens", "total_tokens": "totalTokens"}
-    turns = collected["provider_turn_usage"]
+    receipts = collected["receipts"]
+    effective = effective_runtime_usage(ledger, receipts)
+    turns = apply_runtime_usage_observations(collected["provider_turn_usage"], collected["calls"], effective)
     unique_turns = {(turn["thread_id"], turn["turn_id"]) for turn in turns
                     if isinstance(turn["thread_id"], str) and isinstance(turn["turn_id"], str)}
     usage_available = (effect_counts["turn_start_receipts"] == len(turns) == len(unique_turns) and bool(turns) and all(
-        turn["empty_new_thread"] is True and isinstance(turn["usage_total"], dict) and
+        (turn.get("usage_attribution_verified") is True or turn.get("empty_new_thread") is True)
+        and isinstance(turn["usage_total"], dict) and
         all(type(turn["usage_total"].get(raw)) is int and turn["usage_total"][raw] >= 0 for raw in usage_keys.values())
         for turn in turns))
     usage = {key: sum(turn["usage_total"][raw] for turn in turns) if usage_available else None
              for key, raw in usage_keys.items()}
-    receipts = collected["receipts"]
     if ledger is not None:
         # Budget ledger의 settled만으로 terminal raw usage가 완전하다고 추정하지 않는다.
         checks["provider_terminal_usage_complete"] = usage_available
         checks["provider_receipt_usage_available"] = bool(receipts) and all(
-            receipt.get("usage_available") is True for receipt in receipts
+            receipt.get("usage_available") is True or receipt.get("call_id") in effective for receipt in receipts
         )
     all_calls_have_receipt = len(receipts) == effect_counts["logical_calls"] and not any(
         issue["code"].startswith(("PARTIAL_RECEIPT", "MALFORMED_RECEIPT", "DUPLICATE_CALL_ID", "CALL_RECEIPT"))

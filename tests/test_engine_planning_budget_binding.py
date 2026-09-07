@@ -60,6 +60,8 @@ class _ProviderOnlyRunner:
             input_digest=request.request_digest,
             output_digest=None if schema_failed else sha256_digest({"role": request.role}),
             output_schema_digest=sha256_digest(strict_json_output_schema(request.output_schema)),
+            timeout_policy_digest=request.timeout_policy_digest,
+            observation_policy_digest=request.observation_policy_digest,
             input_tokens=5,
             cached_input_tokens=0,
             output_tokens=2,

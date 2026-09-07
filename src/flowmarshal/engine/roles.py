@@ -17,6 +17,7 @@ from .runtime import (
     REQUIRED_PERMISSION_PROFILE,
 )
 from .role_execution import bind_active_role_timeout
+from .runtime_observation import RoleObservationPolicy, bounded_observation_call
 
 
 from .model_lock import (
@@ -40,10 +41,18 @@ class RoleCallRequest(EngineModel):
     timeout_policy_digest: str | None = Field(
         default=None, pattern=r"^sha256:[0-9a-f]{64}$"
     )
+    observation_policy: RoleObservationPolicy | None = None
+    observation_policy_digest: str | None = Field(
+        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
+    )
     operational_binding: OperationalBinding | None = None
 
     @model_validator(mode="after")
     def audit_matches_request(self):
+        if ((self.observation_policy is None) != (self.observation_policy_digest is None)
+                or (self.observation_policy is not None
+                    and self.observation_policy.policy_digest != self.observation_policy_digest)):
+            raise ValueError("ROLE_OBSERVATION_POLICY_REQUEST_MISMATCH")
         if self.operational_binding is not None:
             if not set(ROLE_CAPABILITIES).issubset(x.name for x in self.operational_binding.lock.runtime_capabilities):
                 raise ValueError("MODEL_LOCK_REQUIRED_CAPABILITY_MISSING")
@@ -62,11 +71,20 @@ class RoleCallRequest(EngineModel):
         value = handler(self)
         if self.timeout_policy_digest is None:
             value.pop("timeout_policy_digest", None)
+        if self.observation_policy is None:
+            value.pop("observation_policy", None)
+            value.pop("observation_policy_digest", None)
         return value
 
 
 def make_role_request(*, inventory: ModelInventory | None = None, allowed_fallbacks=(), **kwargs) -> RoleCallRequest:
     kwargs = bind_active_role_timeout(kwargs["role"], kwargs)
+    if kwargs.get("observation_policy") is not None:
+        policy = RoleObservationPolicy.model_validate(kwargs["observation_policy"])
+        if kwargs.get("observation_policy_digest", policy.policy_digest) != policy.policy_digest:
+            raise ValueError("ROLE_OBSERVATION_POLICY_REQUEST_MISMATCH")
+        kwargs["observation_policy"] = policy
+        kwargs["observation_policy_digest"] = policy.policy_digest
     binding = None if inventory is None else bind_models(
         inventory, (role_lock(kwargs["role"], kwargs["model"], kwargs["effort"], allowed_fallbacks),),
         required_capabilities=ROLE_CAPABILITIES,
@@ -200,13 +218,13 @@ class CodexStructuredRoleRunner:
                  max_schema_recovery_attempts: int = 1,
                  operational_binding: OperationalBinding | None = None,
                  ephemeral_threads: bool = True,
-                 interrupt_observation_seconds: float = 0) -> None:
+                 interrupt_observation_seconds: float | None = None) -> None:
         if type(max_schema_recovery_attempts) is not int or max_schema_recovery_attempts not in {0, 1}:
             raise ValueError("schema recovery 상한은 0 또는 1이어야 합니다.")
         if type(ephemeral_threads) is not bool:
             raise ValueError("ephemeral_threads는 명시적 bool이어야 합니다.")
-        if interrupt_observation_seconds < 0 or interrupt_observation_seconds > 300:
-            raise ValueError("interrupt 이후 terminal 관측 시간은 0~300초여야 합니다.")
+        if interrupt_observation_seconds is not None:
+            RoleObservationPolicy(interrupt_observation_seconds=interrupt_observation_seconds)
         self.runtime = runtime
         self.ephemeral_threads = ephemeral_threads
         self.operational_binding = operational_binding
@@ -215,6 +233,7 @@ class CodexStructuredRoleRunner:
         self.progress_sink = progress_sink
         self.interrupt_observation_seconds = interrupt_observation_seconds
         self.receipts: list[RoleCallReceipt] = []
+        self.pending_terminal_observations: dict[str, Any] = {}
 
     def _verify_inventory(self, request: RoleCallRequest, inventory: ModelInventory) -> OperationalBinding:
         if self.operational_binding is not None:
@@ -252,6 +271,13 @@ class CodexStructuredRoleRunner:
                 )
             inventory = self.runtime.list_models()
             request = RoleCallRequest.model_validate(request.model_dump(mode="python"))
+            observation_policy = request.observation_policy or RoleObservationPolicy(
+                interrupt_observation_seconds=(self.interrupt_observation_seconds or 0),
+            )
+            if (request.observation_policy is not None
+                    and self.interrupt_observation_seconds is not None
+                    and self.interrupt_observation_seconds != observation_policy.interrupt_observation_seconds):
+                raise ValueError("ROLE_OBSERVATION_POLICY_RUNNER_MISMATCH")
             observed_binding = self._verify_inventory(request, inventory)
             self._progress("role_requested", request, call_id, model=request.model, effort=request.effort)
         except StructuredRoleError:
@@ -329,7 +355,31 @@ class CodexStructuredRoleRunner:
                 and turn.payload.get("turn_id") == turn.operation_id
             )
             first_empty_turn_proofs.append(turn.payload.get("first_empty_thread") is True)
+            role_call_proofs = {
+                "thread_creation_receipt": thread.model_dump(mode="json"),
+                "turn_start_receipt": turn.model_dump(mode="json"),
+            }
             self._progress("turn_started", request, call_id, thread_id=thread_id, turn_id=turn.operation_id)
+            register = getattr(self.runtime, "register_completion_observer", None)
+            if callable(register):
+                def record_terminal(observed, *, expected_turn_id=turn.operation_id, sink=self.progress_sink,
+                                    proofs=role_call_proofs):
+                    if (observed.thread_id != thread_id or observed.turn_id != expected_turn_id
+                            or observed.active):
+                        raise ValueError("ROLE_TERMINAL_OBSERVATION_BINDING_MISMATCH")
+                    observed = observed.model_copy(update={"payload": observed.payload | {
+                        "role_call_proofs": proofs, "role_call_proofs_digest": sha256_digest(proofs),
+                    }})
+                    self.pending_terminal_observations[call_id] = observed
+                    if sink is not None:
+                        sink({"event": ("role_terminal_observed" if observed.terminal_status in
+                              {"completed", "success", "succeeded", "failed", "interrupted", "cancelled"}
+                              else "role_observation_incomplete"), "call_id": call_id,
+                              "role": request.role, "request_digest": request.request_digest,
+                              "recorded_at": utc_now().isoformat(),
+                              "terminal_observation": observed.model_dump(mode="json"),
+                              "terminal_observation_digest": sha256_digest(observed)})
+                register(thread_id=thread_id, turn_id=turn.operation_id, observer=record_terminal)
             deadline = started + request.timeout_seconds
             while True:
                 observation = self.runtime.read(thread_id=thread_id)
@@ -339,12 +389,14 @@ class CodexStructuredRoleRunner:
                 if not observation.active:
                     break
                 if time.monotonic() >= deadline:
+                    observation_deadline = time.monotonic() + observation_policy.interrupt_observation_seconds
                     interrupt_request = {
                         "thread_id": thread_id,
                         "turn_id": turn.operation_id,
                         "reason": "role_timeout",
                         "timeout_seconds": request.timeout_seconds,
                         "timeout_policy_digest": request.timeout_policy_digest,
+                        "observation_policy_digest": request.observation_policy_digest,
                     }
                     interrupt_request_digest = sha256_digest(interrupt_request)
                     self._progress(
@@ -355,8 +407,14 @@ class CodexStructuredRoleRunner:
                     interrupt_receipt_digest = None
                     interrupt_error = None
                     try:
-                        interrupt_receipt = self.runtime.interrupt(
-                            thread_id=thread_id, turn_id=turn.operation_id
+                        interrupt_wait = (
+                            observation_policy.rpc_timeout_seconds
+                            if observation_policy.interrupt_observation_seconds == 0 else
+                            min(observation_policy.rpc_timeout_seconds, observation_deadline - time.monotonic())
+                        )
+                        interrupt_receipt = bounded_observation_call(
+                            lambda: self.runtime.interrupt(thread_id=thread_id, turn_id=turn.operation_id),
+                            timeout_seconds=interrupt_wait, operation_name="role_interrupt",
                         )
                         interrupt_receipt_digest = sha256_digest(interrupt_receipt)
                         self._progress(
@@ -372,12 +430,29 @@ class CodexStructuredRoleRunner:
                     terminal_observation_digest = None
                     terminal_status_after_interrupt = None
                     terminal_observation_error = None
-                    observation_deadline = (
-                        time.monotonic() + self.interrupt_observation_seconds
-                    )
+                    observation_attempted = False
                     while True:
+                        remaining = observation_deadline - time.monotonic()
+                        if observation_attempted and remaining <= 0:
+                            self._progress("terminal_observation_pending", request, call_id,
+                                           observation=observation.model_dump(mode="json"))
+                            break
                         try:
-                            observation = self.runtime.read(thread_id=thread_id)
+                            observation_attempted = True
+                            # 유예 0은 과거 명시적 동작을 위한 단일 조회다.
+                            read_wait = (observation_policy.rpc_timeout_seconds
+                                         if observation_policy.interrupt_observation_seconds == 0 else
+                                         min(observation_policy.rpc_timeout_seconds, remaining))
+                            observation = bounded_observation_call(
+                                lambda: self.runtime.read(thread_id=thread_id),
+                                timeout_seconds=read_wait, operation_name="role_terminal_read",
+                            )
+                            if observation.thread_id != thread_id or observation.turn_id != turn.operation_id:
+                                raise ValueError("ROLE_TERMINAL_OBSERVATION_BINDING_MISMATCH")
+                            observation = observation.model_copy(update={"payload": observation.payload | {
+                                "role_call_proofs": role_call_proofs,
+                                "role_call_proofs_digest": sha256_digest(role_call_proofs),
+                            }})
                         except Exception as error:
                             terminal_observation_error = f"{type(error).__name__}: {error}"
                             self._progress(
@@ -389,10 +464,13 @@ class CodexStructuredRoleRunner:
                         observation_thread_id = observation.thread_id
                         observation_turn_id = observation.turn_id
                         if not observation.active:
-                            terminal_observation_digest = sha256_digest(observation)
-                            terminal_status_after_interrupt = observation.terminal_status
+                            self.pending_terminal_observations[call_id] = observation
+                            if observation.terminal_status in {"completed", "success", "succeeded", "failed", "interrupted", "cancelled"}:
+                                terminal_observation_digest = sha256_digest(observation)
+                                terminal_status_after_interrupt = observation.terminal_status
                             self._progress(
-                                "terminal_observed_after_interrupt", request, call_id,
+                                ("terminal_observed_after_interrupt" if terminal_observation_digest
+                                 else "terminal_observation_pending"), request, call_id,
                                 terminal_observation=observation.model_dump(mode="json"),
                                 terminal_observation_digest=terminal_observation_digest,
                             )
@@ -403,7 +481,7 @@ class CodexStructuredRoleRunner:
                                 observation=observation.model_dump(mode="json"),
                             )
                             break
-                        time.sleep(self.poll_interval_seconds)
+                        time.sleep(min(self.poll_interval_seconds, max(0, observation_deadline - time.monotonic())))
                     receipt = self._receipt(
                         call_id=call_id,
                         request=request, observed_binding=observed_binding,
@@ -445,7 +523,8 @@ class CodexStructuredRoleRunner:
                     thread_id=thread_id,
                     turn_ids=tuple(turn_ids),
                     started=started,
-                    status="failed",
+                    status=("failed" if observation.terminal_status in {"failed", "interrupted", "cancelled"}
+                            else "external_unknown"),
                     recovery_attempts=recovery_attempts,
                     error=f"terminal status={observation.terminal_status}",
                     observation_payload=observation_payload,
@@ -558,6 +637,12 @@ class CodexStructuredRoleRunner:
             empty_thread_creation_proven=empty_thread_creation_proven,
             first_empty_turn_proven=first_empty_turn_proven,
         )
+        if status not in {"succeeded", "failed", "schema_failed", "input_contract_failed"} and terminal_status_after_interrupt not in {
+            "completed", "success", "succeeded", "failed", "interrupted", "cancelled",
+        }:
+            # 수집기 종료나 interrupt ACK는 provider 종료를 증명하지 않는다.
+            input_tokens = cached_tokens = output_tokens = reasoning_tokens = None
+            usage_available = False
         receipt = RoleCallReceipt(
             call_id=call_id,
             role=request.role,
@@ -573,6 +658,7 @@ class CodexStructuredRoleRunner:
             output_digest=output_digest,
             output_schema_digest=schema_digest,
             timeout_policy_digest=request.timeout_policy_digest,
+            observation_policy_digest=request.observation_policy_digest,
             interrupt_request_digest=interrupt_request_digest,
             interrupt_receipt_digest=interrupt_receipt_digest,
             terminal_observation_digest=terminal_observation_digest,
@@ -625,6 +711,7 @@ class ScriptedStructuredRoleRunner:
             output_digest=sha256_digest(payload),
             output_schema_digest=sha256_digest(strict_json_output_schema(request.output_schema)),
             timeout_policy_digest=request.timeout_policy_digest,
+            observation_policy_digest=request.observation_policy_digest,
             latency_ms=0,
             recorded_at=utc_now(),
             observed_binding=request.operational_binding,
@@ -639,6 +726,7 @@ def verify_role_receipt(request: RoleCallRequest, result: RoleCallResult) -> Non
     if (receipt.input_digest != request.request_digest or receipt.output_digest != sha256_digest(result.payload)
             or receipt.output_schema_digest != sha256_digest(strict_json_output_schema(request.output_schema))
             or receipt.timeout_policy_digest != request.timeout_policy_digest
+            or receipt.observation_policy_digest != request.observation_policy_digest
             or (receipt.role, receipt.model, receipt.effort, receipt.inventory_digest)
             != (request.role, request.model, request.effort, request.inventory_digest)):
         raise StructuredRoleError("ROLE_RECEIPT_BINDING_MISMATCH")

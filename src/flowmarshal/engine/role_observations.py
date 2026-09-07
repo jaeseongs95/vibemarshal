@@ -46,6 +46,9 @@ class RoleCallReceipt(EngineModel):
     timeout_policy_digest: str | None = Field(
         default=None, pattern=r"^sha256:[0-9a-f]{64}$"
     )
+    observation_policy_digest: str | None = Field(
+        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
+    )
     interrupt_request_digest: str | None = Field(
         default=None, pattern=r"^sha256:[0-9a-f]{64}$"
     )
@@ -71,11 +74,10 @@ class RoleCallReceipt(EngineModel):
     def omit_absent_execution_observations(self, handler):
         value = handler(self)
         for field_name in (
-            "timeout_policy_digest", "interrupt_request_digest",
+            "timeout_policy_digest", "observation_policy_digest", "interrupt_request_digest",
             "interrupt_receipt_digest", "terminal_observation_digest",
             "terminal_status_after_interrupt",
         ):
             if getattr(self, field_name) is None:
                 value.pop(field_name, None)
         return value
-

@@ -62,7 +62,8 @@ ROLE_STAGES = {
 
 def receipt_usage(receipt: Any, *, project_id: str, goal_digest: str,
                   stage: BudgetStage | None = None) -> BudgetUsageRecord:
-    available = receipt.usage_available and receipt.schema_recovery_attempts == 0
+    terminal = _terminal_receipt(receipt)
+    available = terminal and receipt.usage_available and receipt.schema_recovery_attempts == 0
     return BudgetUsageRecord(
         usage_id=new_id("usage"), project_id=project_id, goal_contract_digest=goal_digest,
         stage=stage or ROLE_STAGES.get(receipt.role, BudgetStage.VALIDATION),
@@ -77,7 +78,8 @@ def receipt_usage(receipt: Any, *, project_id: str, goal_digest: str,
         output_tokens=receipt.output_tokens if available else None,
         reasoning_tokens=receipt.reasoning_tokens if available else None,
         latency_ms=receipt.latency_ms, usage_available=available,
-        unavailable_reason=None if available else "PROVIDER_USAGE_UNAVAILABLE_OR_RECOVERY_UNATTRIBUTABLE",
+        unavailable_reason=(None if available else "PROVIDER_TERMINAL_UNOBSERVED" if not terminal
+                            else "PROVIDER_USAGE_UNAVAILABLE_OR_RECOVERY_UNATTRIBUTABLE"),
         retry_count=receipt.schema_recovery_attempts, recorded_at=receipt.recorded_at,
     )
 
@@ -86,6 +88,23 @@ def _terminal_receipt(receipt: Any | None) -> bool:
     return receipt is not None and (receipt.status in {"succeeded", "failed", "schema_failed"} or
         (getattr(receipt, "terminal_observation_digest", None) is not None and
          getattr(receipt, "terminal_status_after_interrupt", None) in {"completed", "success", "succeeded", "failed", "interrupted", "cancelled"}))
+
+
+def _normalized_unknown_receipt_json(value: str | Any | None) -> str | None:
+    """미제공 token의 구 null과 신규 생략→기본 0만 같은 receipt로 비교한다."""
+    if value is None:
+        return None
+    from .roles import RoleCallReceipt
+    receipt = (RoleCallReceipt.model_validate_json(value) if isinstance(value, str)
+               else RoleCallReceipt.model_validate(value))
+    counts = (receipt.input_tokens, receipt.cached_input_tokens,
+              receipt.output_tokens, receipt.reasoning_tokens)
+    if not receipt.usage_available and all(item in (None, 0) for item in counts):
+        receipt = receipt.model_copy(update={
+            "input_tokens": None, "cached_input_tokens": None,
+            "output_tokens": None, "reasoning_tokens": None,
+        })
+    return canonical_json(receipt)
 
 
 class BudgetManager:
@@ -149,7 +168,7 @@ class BudgetManager:
             remaining_total_tokens=None if blocked else max(0, policy.total_tokens-measured-adjusted),
             error_code="BUDGET_POLICY_REQUIRED" if policy is None else "BUDGET_USAGE_UNKNOWN" if unresolved else None,
             next_action="project budget set으로 정책을 등록하십시오." if policy is None else
-                "기존 호출을 관측하고 usage 미제공이 확정되면 이유와 잠정 차감량을 명시하십시오." if unresolved else None)
+                "원래 thread/turn의 종료·사용량을 재관측하십시오. 귀속 가능한 사용량을 확보하기 전 추가 호출은 차단됩니다." if unresolved else None)
 
     def reserve(self, *, project_id: str, goal_id: str, goal_digest: str | None,
                 call_key: str, role: str, request: dict[str, Any],
@@ -201,6 +220,11 @@ class BudgetManager:
         with self.service.ledger.transaction() as tx:
             call = tx.one("SELECT * FROM provider_calls WHERE id = ?", (call_id,))
             value = None if receipt is None else canonical_json(receipt)
+            if call["receipt_json"] is not None:
+                if _normalized_unknown_receipt_json(call["receipt_json"]) \
+                        != _normalized_unknown_receipt_json(value):
+                    raise BudgetBlocked("BUDGET_RECEIPT_CONFLICT", "기존 관측을 다른 receipt로 덮어쓸 수 없습니다.")
+                return
             if call["status"] != "reserved":
                 if call["receipt_json"] != value:
                     raise BudgetBlocked("BUDGET_RECEIPT_CONFLICT", "기존 관측을 다른 receipt로 덮어쓸 수 없습니다.")
@@ -212,6 +236,10 @@ class BudgetManager:
                 if (sha256_digest(request) != call["request_digest"]
                         or receipt.input_digest != bound_request.request_digest or receipt.role != call["role"]
                         or receipt.model != request["model"] or receipt.effort != request["effort"]
+                        or getattr(receipt, "timeout_policy_digest", None)
+                        != getattr(bound_request, "timeout_policy_digest", None)
+                        or getattr(receipt, "observation_policy_digest", None)
+                        != getattr(bound_request, "observation_policy_digest", None)
                         or receipt.output_schema_digest != sha256_digest(strict_json_output_schema(request["output_schema"]))):
                     raise BudgetBlocked("BUDGET_RECEIPT_BINDING_MISMATCH", "예약한 역할 요청과 다른 receipt는 정산하지 않습니다.")
             terminal = _terminal_receipt(receipt)
@@ -225,12 +253,23 @@ class BudgetManager:
             tx.connection.execute("UPDATE provider_calls SET status=?, actual_tokens=?, receipt_json=?, usage_id=?, completed_at=? "
                                   "WHERE id=?", ("settled" if known else "usage_unknown" if terminal else "reserved",
                                                 actual, value, usage_id, tx.now if terminal else None, call_id))
-            tx.history(call["project_id"], "budget.call_settled", "provider_call", call_id,
-                       {"actual_tokens": actual, "usage_available": known, "receipt": None if receipt is None else receipt.model_dump(mode="json")})
+            if receipt is not None:
+                tx.history(call["project_id"], "budget.call_observed", "provider_call", call_id,
+                           {"observation_kind": "role_receipt", "receipt": json.loads(value),
+                            "receipt_digest": sha256_digest(receipt), "terminal_observed": terminal,
+                            "usage_available": known, "actual_tokens": actual})
+            if known:
+                tx.history(call["project_id"], "budget.call_settled", "provider_call", call_id,
+                           {"actual_tokens": actual, "usage_available": True,
+                            "receipt": json.loads(value),
+                            "settlement_source": "role_receipt"})
 
     def attach_goal(self, project_id: str, goal_id: str, goal_digest: str) -> None:
-        """정규화 이전 호출을 실제 생성된 Goal에 연결하고 원시 receipt는 보존한다."""
+        """정규화 이전 호출을 실제 Goal과 최신 유효 관측에 정확히 한 번 연결한다."""
         from .roles import RoleCallReceipt
+        from .role_usage_reconciliation import (
+            _validate_call_binding, latest_runtime_observation, usage_from_observation,
+        )
         with self.service.ledger.transaction() as tx:
             tx.one("SELECT id FROM goal_revisions WHERE project_id=? AND goal_id=? AND definition_digest=?",
                    (project_id, goal_id, goal_digest))
@@ -239,8 +278,15 @@ class BudgetManager:
                 usage_id = None
                 if call["receipt_json"]:
                     receipt = RoleCallReceipt.model_validate_json(call["receipt_json"])
-                    usage = receipt_usage(receipt, project_id=project_id, goal_digest=goal_digest,
-                                          stage=BudgetStage(call["stage"]))
+                    event = latest_runtime_observation(tx, call["id"])
+                    if event is None:
+                        usage = receipt_usage(receipt, project_id=project_id, goal_digest=goal_digest,
+                                              stage=BudgetStage(call["stage"]))
+                    else:
+                        _validate_call_binding(tx, call, receipt, event["observation"])
+                        usage = usage_from_observation(
+                            call=call, receipt=receipt, event=event, goal_digest=goal_digest,
+                        )
                     usage_id = self.service._insert_budget_usage(tx, usage)
                 tx.connection.execute("UPDATE provider_calls SET goal_contract_digest=?, usage_id=? WHERE id=?",
                                       (goal_digest, usage_id, call["id"]))
@@ -309,7 +355,7 @@ class BudgetManager:
                             "actual_usage_known": known})
         return tuple(identifiers)
 
-    def observe_role_terminal(self, call_id: str, observation: Any) -> None:
+    def observe_role_terminal(self, call_id: str, observation: Any) -> BudgetUsageRecord | None:
         """기존 역할 호출의 terminal usage를 append-only 재관측으로 결속한다."""
         from .role_usage_reconciliation import reconcile_role_usage_terminal
         return reconcile_role_usage_terminal(self.service, call_id, observation)
@@ -356,6 +402,20 @@ class BudgetedRoleRunner:
     def receipts(self):
         return self.runner.receipts
 
+    def _settle_and_observe(self, manager: BudgetManager, call_id: str, receipt: Any | None) -> None:
+        """runner callback은 evidence만 저장하고, Core receipt 정산 뒤에 연결한다."""
+        manager.settle(call_id, receipt)
+        if receipt is None:
+            return
+        pending = getattr(self.runner, "pending_terminal_observations", None)
+        observation = pending.pop(receipt.call_id, None) if isinstance(pending, dict) else None
+        if observation is None:
+            return
+        with self.service.ledger.read() as connection:
+            row = connection.execute("SELECT status FROM provider_calls WHERE id=?", (call_id,)).fetchone()
+        if row is not None and row["status"] in {"reserved", "usage_unknown"}:
+            manager.observe_role_terminal(call_id, observation)
+
     def run(self, request: Any, *, validator: Any = None):
         from .roles import StructuredRoleError
         from .role_budget import current_role_budget_stage
@@ -372,7 +432,7 @@ class BudgetedRoleRunner:
                 manager.release_before_effect(call_id, reason=str(error))
                 raise
             receipt = error.receipt if isinstance(error, StructuredRoleError) else None
-            manager.settle(call_id, receipt)
+            self._settle_and_observe(manager, call_id, receipt)
             if isinstance(error, StructuredRoleError):
                 with self.service.ledger.read() as connection:
                     settled = connection.execute(
@@ -381,7 +441,7 @@ class BudgetedRoleRunner:
                 if settled is not None and settled["status"] == "settled":
                     error.settled_provider_call_id = call_id
             raise
-        manager.settle(call_id, result.receipt)
+        self._settle_and_observe(manager, call_id, result.receipt)
         return result
 
 

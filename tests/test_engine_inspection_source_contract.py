@@ -138,8 +138,10 @@ class InspectionSourceContractTests(unittest.TestCase):
             runtime.run, runtime.capture = run, capture
             arguments = dict(thread_id="thread_fixture", cwd=run, prompt=canonical_json(request.payload),
                              model=request.model, effort=request.effort, output_schema=schema)
+            from flowmarshal.engine.runtime import RuntimeOperationReceipt
             with patch("scripts.diagnostics.r_s06_10.verify_lock"), patch(
-                    "flowmarshal.engine.runtime.CodexAppServerRuntime.start_turn", return_value={"fixture": True}) as provider:
+                    "flowmarshal.engine.runtime.CodexAppServerRuntime.start_turn",
+                    return_value=RuntimeOperationReceipt(operation_id="turn_fixture", payload={"fixture": True})) as provider:
                 runtime.start_turn(**arguments)
                 self.assertEqual(1, provider.call_count)
                 altered = dict(schema, required=["a", "z"])
