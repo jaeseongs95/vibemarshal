@@ -6,7 +6,19 @@ from pathlib import Path
 from typing import Any
 
 from ..canonical import canonical_json
-from .domain import GoalAuthorization, GoalContractRevision, PlanContractRevision
+from .domain import EffectPolicy, GoalAuthorization, GoalContractRevision, PlanContractRevision
+
+
+def _effects_within(approved: EffectPolicy, requested: EffectPolicy) -> bool:
+    """문자열 집합과 명시 checkpoint만 비교한다. 의미상 포함 관계는 추정하지 않는다."""
+    return (
+        requested.mutation_policy == approved.mutation_policy
+        and requested.behavior_policy == approved.behavior_policy
+        and set(requested.allowed_external_effects) <= set(approved.allowed_external_effects)
+        and set(requested.prohibited_effects) >= set(approved.prohibited_effects)
+        and (not approved.irreversible_effects_require_checkpoint
+             or requested.irreversible_effects_require_checkpoint)
+    )
 
 
 def current_budget_policies(connection: Any, project_id: str) -> tuple[str, ...]:
@@ -33,13 +45,19 @@ def authorization_changes(authorization: GoalAuthorization, *, project: Any,
         changed("project", "project_id", authorization.project_id, plan.definition.project_id)
     if Path(authorization.project_root).resolve() != Path(project["root"]).resolve():
         changed("project", "project_root", authorization.project_root, project["root"])
-    if (authorization.goal_id != goal.goal_id or authorization.goal_contract_digest != goal.definition_digest):
+    effects = goal.definition.effect_policy
+    effects_within = _effects_within(authorization.effect_policy, effects)
+    # 효과 정책만 축소한 새 Goal도 immutable Goal/Plan review는 거친다.
+    # 목표·AC·출처·Profile 등 다른 필드 변경을 이 예외로 허용하지 않는다.
+    approved_effect_definition = goal.definition.model_copy(update={"effect_policy": authorization.effect_policy})
+    if (authorization.goal_id != goal.goal_id
+            or not effects_within
+            or authorization.goal_contract_digest != approved_effect_definition.definition_digest):
         changed("goal", "goal_contract_digest", authorization.goal_contract_digest, goal.definition_digest)
     if authorization.profile_definition_digest != profile_digest:
         changed("policy", "profile_definition_digest", authorization.profile_definition_digest, profile_digest)
-    effects = authorization.effect_policy
-    if effects != goal.definition.effect_policy:
-        changed("effect", "effect_policy", effects.model_dump(mode="json"), goal.definition.effect_policy.model_dump(mode="json"))
+    if not effects_within:
+        changed("effect", "effect_policy", authorization.effect_policy.model_dump(mode="json"), effects.model_dump(mode="json"))
     for task in plan.definition.tasks:
         for effect in task.expected_effects:
             if (effect.external and effect.statement not in effects.allowed_external_effects

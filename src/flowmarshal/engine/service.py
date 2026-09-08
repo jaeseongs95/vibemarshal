@@ -1821,17 +1821,25 @@ class EngineService:
         calls = tx.all("SELECT id FROM provider_calls WHERE project_id = ? "
                        "AND (execution_status IN ('reserved','started','unknown') OR effect_status IN ('pending','unknown'))",
                        (project_id,))
+        # 준비 역할은 Attempt/provider call 생성 전에도 예약될 수 있다.
+        # terminal 결과도 Core가 소비하기 전에는 이전 Plan에 결속된 입력이다.
+        # cancelled는 provider terminal의 증거가 아니다. 시작하지 않은 취소만 제외한다.
+        jobs = tx.all("SELECT id, status FROM runtime_jobs WHERE project_id = ? "
+                      "AND (status NOT IN ('consumed','cancelled') OR "
+                      "(status = 'cancelled' AND (started_at IS NOT NULL "
+                      "OR thread_id IS NOT NULL OR turn_id IS NOT NULL)))", (project_id,))
         operations = tx.all("SELECT h.entity_id FROM history_events h WHERE h.project_id = ? "
                             "AND h.event_type = 'operation.prepared' AND NOT EXISTS (SELECT 1 FROM history_events c "
                             "WHERE c.project_id = h.project_id AND c.entity_id = h.entity_id AND c.sequence > h.sequence "
                             "AND c.event_type IN ('operation.completed','operation.failed','operation.no_effect'))",
                             (project_id,))
-        if active or intents or validating or calls or operations:
+        if active or intents or validating or calls or jobs or operations:
             raise EngineServiceError("PLAN_REPLACEMENT_IN_FLIGHT: 기존 실행·검사·미확정 효과를 먼저 관측해야 합니다: "
                                      + canonical_json({"attempts": [dict(row) for row in active],
                                        "intents": [row["id"] for row in intents],
                                        "validating_tasks": [row["id"] for row in validating],
                                        "provider_calls": [row["id"] for row in calls],
+                                       "runtime_jobs": [dict(row) for row in jobs],
                                        "operations": [row["entity_id"] for row in operations]}))
 
     def _reuse_completed_tasks(self, tx: Any, plan: PlanContractRevision, previous_id: str) -> tuple[str, ...]:

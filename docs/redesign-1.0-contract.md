@@ -18,6 +18,8 @@
 
 재계획은 실행 중 Attempt의 입력·binding·효과를 덮어쓰거나 실행 슬롯을 회수하지 않는다. 진행 중 작업과 변경 subgraph의 충돌을 확인하고 보호한 뒤 activation한다. 완료 evidence는 대상·입력·검사 의미·freshness의 유효성을 확인한 경우만 새 revision에서 재사용하며 과거 실패와 원본 결과를 보존한다.
 
+효과 정책만 바뀐 Goal revision에서 외부 허용 효과 제거, 금지 효과 추가, 비가역 효과 checkpoint 강화는 기존 승인 경계 안의 축소로 비교한다. mutation·behavior 정책과 Goal의 나머지 필드는 동일해야 하며 새 Goal에 결속된 Plan의 검토·Gate를 생략하지 않는다. Task 효과는 축소된 활성 Goal 정책에도 맞아야 한다. Attempt가 아직 없는 준비 RuntimeJob도 보호하며, 예약·실행·interrupt·collector 유실·terminal 결과 미소비 상태에서는 Plan 교체를 보류한다. Core가 결과를 소비하거나 미실행 job을 취소한 뒤 교체할 수 있다.
+
 ## D03. 응용 명령과 짧은 tick — planned
 
 `EngineApplication`은 `prepare / authorize / run_once / observe / pause / cancel / status / final-report`의 명령 경계를 연결한다. CLI는 이 응용 계층을 호출하며 별도 상태 권위를 만들지 않는다. 명령 이름은 설계 경계이며 현재 CLI에서 모두 제공된다는 뜻은 아니다.
