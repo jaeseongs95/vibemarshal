@@ -6,13 +6,15 @@ from pathlib import Path
 from typing import Any
 
 from ..canonical import canonical_json
-from .domain import EffectPolicy, GoalAuthorization, GoalContractRevision, PlanContractRevision
+from .domain import EffectPolicy, GoalAuthorization, GoalContractRevision, MutationPolicy, PlanContractRevision
 
 
 def _effects_within(approved: EffectPolicy, requested: EffectPolicy) -> bool:
     """문자열 집합과 명시 checkpoint만 비교한다. 의미상 포함 관계는 추정하지 않는다."""
     return (
-        requested.mutation_policy == approved.mutation_policy
+        # read_only는 변경 효과를 제거한다. 다른 변경 정책 사이의 순위는 추정하지 않는다.
+        (requested.mutation_policy == approved.mutation_policy
+         or requested.mutation_policy is MutationPolicy.READ_ONLY)
         and requested.behavior_policy == approved.behavior_policy
         and set(requested.allowed_external_effects) <= set(approved.allowed_external_effects)
         and set(requested.prohibited_effects) >= set(approved.prohibited_effects)
