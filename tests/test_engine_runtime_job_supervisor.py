@@ -66,10 +66,17 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
             self.assertEqual({"kind": kind.value}, self.prepared.service.consume_runtime_job(job.job_id))
 
     def test_slow_execution_spec_provider_does_not_block_run_once(self) -> None:
+        provider_started = threading.Event()
+        provider_release = threading.Event()
+        provider_finished = threading.Event()
+
         class SlowProvider:
             def prepare_task(inner, *, project_id, task_id, inventory):
                 del inner, project_id, task_id, inventory
-                time.sleep(0.25)
+                provider_started.set()
+                if not provider_release.wait(1):
+                    raise TimeoutError("테스트 provider 해제 신호를 기다리지 못했습니다.")
+                provider_finished.set()
                 return ExecutionPreparation(proposal=self.prepared.proposal)
 
         supervisor = RuntimeJobSupervisor(
@@ -79,14 +86,19 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
             self.prepared.service, self.runtime,
             proposal_provider=SlowProvider(), supervisor=supervisor,
         )
-        started = time.monotonic()
         result = dispatcher.run_once(self.prepared.project_id)
-        self.assertLess(time.monotonic() - started, 0.15)
+        self.assertTrue(provider_started.wait(0.5))
+        self.assertFalse(provider_finished.is_set())
         self.assertEqual(RunOnceAction.DISPATCHED, result.action)
         self.assertEqual(RuntimeJobKind.EXECUTION_SPEC_PREPARE, result.runtime_job_kind)
         self.assertEqual(RuntimeJobStatus.RUNNING, result.runtime_job_status)
-        time.sleep(0.3)
-        result = dispatcher.run_once(self.prepared.project_id)
+        provider_release.set()
+        deadline = time.monotonic() + 1
+        while time.monotonic() < deadline:
+            result = dispatcher.run_once(self.prepared.project_id)
+            if result.action is RunOnceAction.MATERIALIZED:
+                break
+            time.sleep(0.005)
         self.assertEqual(RunOnceAction.MATERIALIZED, result.action)
         self.assertEqual(RuntimeJobStatus.CONSUMED, result.runtime_job_status)
 

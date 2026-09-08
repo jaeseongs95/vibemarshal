@@ -47,11 +47,12 @@ class OperationTraceTests(unittest.TestCase):
             "create", {"cwd": "C:/project"}, call_id="call-logical",
             category="logical", deadline_seconds=30,
         )
-        preflight = trace.begin(
-            "read", {"method": "config/read"}, call_id="call-logical",
-            category="rpc", parent_operation_id=logical.operation_id,
-            rpc_method="config/read", deadline_seconds=30,
-        )
+        with trace.operation_scope(logical) as scope:
+            preflight = trace.begin(
+                "read", {"method": "config/read"}, call_id="call-logical",
+                category="rpc", parent_operation_id=logical.operation_id,
+                rpc_method="config/read", deadline_at=scope.deadline_at,
+            )
         trace.finish(preflight, response={"config": {}})
         trace.finish(logical, response={"thread_id": "thread-1"})
 
