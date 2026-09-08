@@ -10,7 +10,7 @@ VibeMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고
 
 최신 상태의 단일 진입점은 [Engine 구현 현황](docs/engine-implementation-status.md)이다. [1.0 선행 로드맵](docs/pre-1.0-roadmap.md)에 승인된 구현 순서와 후속 기능을 구분했고, [현재 작업 인계](docs/pre-1.0-handoff.md)에 이번 변경과 다음 실행 조건을 기록한다.
 
-현재 제품 1.0은 **미완료 / NO-GO**다. [승인된 12개 설계 항목과 필수 검증](docs/redesign-1.0-contract.md)을 문서에 반영했으며 새 GoalAuthorization·schema 4·RuntimeJobSupervisor·응용 CLI·패키징은 **planned**다. 실제 구현과 결정적·역할48·Planning18·실제 요청 E2E·설치·독립 감사는 후속 태스크의 책임이다. 과거 테스트와 실제 평가 결과는 [승인 이전 구현 현황](docs/engine-implementation-status-before-redesign-1.0.md)에 보존하며 새 PASS로 집계하지 않는다.
+현재 제품 1.0은 **미완료 / NO-GO**다. [승인된 12개 설계 항목과 필수 검증](docs/redesign-1.0-contract.md)을 구현 중이며 GoalAuthorization·schema 4·RuntimeJobSupervisor·응용 CLI·Engine-only wheel은 각각의 변경과 검증 범위에서 확인한다. 결정적·역할48·Planning18·실제 요청 E2E·설치·독립 감사가 모두 끝나기 전에는 1.0 완료로 집계하지 않는다. 과거 테스트와 실제 평가 결과는 [승인 이전 구현 현황](docs/engine-implementation-status-before-redesign-1.0.md)에 보존하며 새 PASS로 집계하지 않는다.
 
 종료·유효 결과가 확인되면 usage 누락만으로 후속 실행을 막지 않고 미측정량은 null/unknown으로 남긴다. 외부 효과 미확정은 기존 intent/binding을 먼저 관측한다. 기본 provider는 qualification된 v1이며 v2 채택 평가와 R3.1 비교 성능은 모든 제품 실행의 선행조건이 아니다. 비교 성능 보고는 비차단 후속이다.
 
@@ -75,16 +75,17 @@ flowmarshal-engine report progress|final
 
 `goal create --live`와 `plan search --live`는 역할별 model/effort를 호출자가 명시해야 한다. Engine은 이를 최신 App Server model inventory와 대조하고, 지원되지 않는 값을 임의 fallback으로 숨기지 않는다.
 
-아래는 schema 3 개발 qualification CLI의 역사적 명령이다. 새 harness와 Engine-only 패키지 분리는 planned다. 기존 thread·원장을 먼저 관측하고 미확정 효과를 새 attempt로 우회하지 않는다. usage 누락만으로 새 실행을 차단하거나 아래 benchmark-report 옵션을 현재 1.0 필수 조건으로 사용하지 않는다.
+아래는 source-tree 개발 평가 전용 module 명령이다. `flowmarshal-engine-eval`은 wheel entrypoint가 아니며, 명시적으로 결속한 source root와 재현 입력 bundle에서만 실행한다. 기존 thread·원장을 먼저 관측하고 미확정 효과를 새 attempt로 우회하지 않는다. usage 누락만으로 새 실행을 차단하거나 아래 benchmark-report 옵션을 현재 1.0 필수 조건으로 사용하지 않는다.
 
 ```powershell
-flowmarshal-engine-eval run --scope deterministic
-flowmarshal-engine-eval run --scope role-fixture
-flowmarshal-engine-eval run --scope full-planning-pipeline
-flowmarshal-engine-eval run --scope project-e2e
-flowmarshal-engine-eval resume --run-root <run-root>
-flowmarshal-engine-eval benchmark --cells-file <36-cell.json> --scope-report <report> ...
-flowmarshal-engine-eval cutover --scope-report <report> ... --benchmark-report <report>
+$env:FLOWMARSHAL_ENGINE_SOURCE_ROOT = (Resolve-Path <승인된-source-root>).Path
+python -m flowmarshal.engine.eval_cli run --scope deterministic --project-root $env:FLOWMARSHAL_ENGINE_SOURCE_ROOT
+python -m flowmarshal.engine.eval_cli run --scope role-fixture --project-root $env:FLOWMARSHAL_ENGINE_SOURCE_ROOT
+python -m flowmarshal.engine.eval_cli run --scope full-planning-pipeline --project-root $env:FLOWMARSHAL_ENGINE_SOURCE_ROOT
+python -m flowmarshal.engine.eval_cli run --scope project-e2e --project-root $env:FLOWMARSHAL_ENGINE_SOURCE_ROOT
+python -m flowmarshal.engine.eval_cli resume --run-root <run-root>
+python -m flowmarshal.engine.eval_cli benchmark --cells-file <36-cell.json> --scope-report <report> ...
+python -m flowmarshal.engine.eval_cli cutover --scope-report <report> ... --benchmark-report <report>
 ```
 
 고정 역할 설정과 상세 합격 기준은 [Engine qualification 실행 지침](docs/engine-qualification.md)을 따른다.
@@ -115,7 +116,7 @@ cd <승인된-source_root>
 .\.venv\Scripts\flowmarshal-engine.exe --help
 ```
 
-기본 상태는 프로젝트 루트의 `.flowmarshal-engine/flowmarshal-engine.sqlite3`와 `.flowmarshal-engine/artifacts`에 저장한다. FM-01 시작 source의 schema revision은 3이며 새 schema 4와 schema 3 read-only reader는 planned다. SQLite application ID `0x464D4531`과 schema revision을 각각 검사하고 prototype/운영 DB의 자동 제자리 migration을 금지한다.
+기본 상태는 프로젝트 루트의 `.flowmarshal-engine/flowmarshal-engine.sqlite3`와 `.flowmarshal-engine/artifacts`에 저장한다. Engine writer는 schema 4 새 DB만 만들고 schema 3/raw receipt/history는 read-only adapter로만 연다. SQLite application ID `0x464D4531`과 schema revision을 각각 검사하고 prototype/운영 DB의 자동 제자리 migration을 금지한다.
 
 ## 코드 지도
 
@@ -135,3 +136,7 @@ cd <승인된-source_root>
 | CLI와 보고 | `src/flowmarshal/engine/cli.py`, `reporting.py` |
 
 전체 문서와 역사적 증거는 [문서 지도](docs/README.md)에서 찾을 수 있다.
+
+사용자 wheel과 source-tree 평가 입력의 경계, SDK/Python pin, schema 4 새 DB와
+schema 3 read-only 계약은 [Engine 설치·개발 평가 계약](docs/engine-package-install.md)을
+따른다.

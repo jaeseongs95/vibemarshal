@@ -5,6 +5,7 @@ from .domain import ModelFallback
 from .roles import make_role_request, verify_role_receipt
 
 import json
+import os
 import random
 import shutil
 import subprocess
@@ -235,8 +236,32 @@ class QualificationRunError(RuntimeError):
     pass
 
 
+DEVELOPER_SOURCE_ROOT_ENV = "FLOWMARSHAL_ENGINE_SOURCE_ROOT"
+
+
 def project_root() -> Path:
-    return Path(__file__).resolve().parents[3]
+    """평가/diagnostic 입력의 명시적 developer source root를 반환한다.
+
+    사용자 wheel에는 config·fixture·legacy source가 포함되지 않는다. 따라서
+    qualification은 설치 위치나 checkout 깊이를 역추적하지 않고, 호출자가
+    ``FLOWMARSHAL_ENGINE_SOURCE_ROOT``로 지정한 source root에서만 실행한다.
+    """
+    configured = os.environ.get(DEVELOPER_SOURCE_ROOT_ENV)
+    if not configured:
+        raise QualificationRunError(
+            f"{DEVELOPER_SOURCE_ROOT_ENV}를 승인된 개발 source root로 지정해야 합니다."
+        )
+    root = Path(configured).expanduser().resolve()
+    required = (
+        root / "pyproject.toml",
+        root / "config" / "qualification-roles.json",
+        root / "tests" / "fixtures" / "engine",
+    )
+    if not root.is_dir() or any(not path.exists() for path in required):
+        raise QualificationRunError(
+            f"{DEVELOPER_SOURCE_ROOT_ENV}가 재현 입력을 갖춘 source root가 아닙니다: {root}"
+        )
+    return root
 
 
 def default_role_configuration(root: Path | None = None) -> EngineRoleConfiguration:

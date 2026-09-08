@@ -17,7 +17,7 @@ R1~R3.1 prototype은 유용한 transport·원장·Planner 실험 자산이자 �
 5. 실행·효과·슬롯과 usage 관측을 분리한다 (**planned**). 유효 terminal 결과는 usage 누락만으로 진행을 막지 않고 외부 효과 미확정은 기존 binding을 먼저 관측한다. 늦은 usage는 회계 관측만 추가하며 원본 receipt·실측 null을 보존한다.
 6. RuntimeJobSupervisor와 EngineApplication의 짧은 run_once tick을 연결한다 (**planned**). 활성화 후 준비·worker·검사·recovery/replanning을 모두 checkpoint에 포함하고 supervisor는 활성 job 동안만 연결·deadline을 관리한다. 완료 판정은 Core가 한다.
 7. 기본 provider는 qualification된 v1이다. v2 static 11/qualification 13은 v2 자체 채택 조건이며 모든 제품 실행의 선행조건이 아니다. inventory 전체 원문은 감사용, 선택·허용 조합/executable/필수 capability projection은 운영 binding으로 유지한다. 임의 fallback·version 간 checkpoint 재사용을 금지한다.
-8. package는 Engine-only 사용자 CLI와 필요한 shared canonical 자산을 포함한다 (**planned**). legacy/eval/developer 도구를 분리하고 source-tree 평가에는 명시 source root와 재현 입력 bundle을 요구할 수 있다. wheel에 없는 fixture/config를 가정하지 않는다.
+8. package는 Engine-only 사용자 CLI와 필요한 shared canonical 자산을 포함한다. legacy/eval/developer 도구 entrypoint를 분리하고 source-tree 평가는 명시 source root와 재현 입력 bundle을 요구한다. wheel에 없는 fixture/config를 가정하지 않는다.
 9. 개발 CLI/package 이름은 `flowmarshal-engine`이다. 아래 필수 검증과 독립 감사 뒤에만 로컬 main 통합·`flowmarshal` 1.0 전환을 수행한다. 원격 push·공개 릴리스·PyPI 업로드는 이 승인의 범위가 아니다. main의 무관한 변경은 보존한다.
 
 ## Cutover 조건 — planned / 미실행
@@ -34,6 +34,6 @@ R1~R3.1 prototype은 유용한 transport·원장·Planner 실험 자산이자 �
 
 ## Consequences와 비차단 범위
 
-GoalAuthorization과 자동 activation, schema 4, supervisor, 패키징, 새 qualification은 문서 승인만 완료됐으며 구현·검증은 후속 task의 책임이다. 과거 원시 결과·fixture·receipt·History·R1~R3.1 동결 근거는 수정하지 않는다.
+GoalAuthorization과 자동 activation, schema 4, supervisor, 패키징, 새 qualification은 각 구현 task의 증거와 함께 검증한다. 이 ADR 자체는 1.0 qualification 완료를 뜻하지 않는다. 과거 원시 결과·fixture·receipt·History·R1~R3.1 동결 근거는 수정하지 않는다.
 
 R3.1 token/speed·performance36·비교 lifecycle 최적화는 별도 비차단 보고다. 과거 `TokenLatencyGateReport` v3.0, `PerformanceQualificationReport` v4.0과 `ReleasePerformanceFloor` 수치·판정은 [이전 비교 계약](performance-release-floor-before-redesign-1.0.md)으로 보존한다. 과거 보고서의 cutover 필드를 현재 1.0 권위로 사용하지 않는다. GUI·Localizer/번역·MCTS/광범위 graph·동일 프로젝트 병렬·remote/multiOS hardening은 1.0 이후다.

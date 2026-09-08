@@ -14,19 +14,8 @@ dependencies = [
 ]
 
 [project.scripts]
-flowmarshal-gate0a = "flowmarshal_gate0a.probe:main"
-flowmarshal-gate0b = "flowmarshal.gate0b.cli:main"
-flowmarshal-gate0c = "flowmarshal.gate0c.cli:main"
-flowmarshal-runtime-r1 = "flowmarshal.orchestration.runtime_probe:main"
-flowmarshal-core-r2-smoke = "flowmarshal.core.smoke:main"
-flowmarshal-planner-r3-smoke = "flowmarshal.planning.smoke:main"
-flowmarshal-planner-r31-smoke = "flowmarshal.planning.r31_smoke:main"
-flowmarshal-planner-r31-live-smoke = "flowmarshal.planning.r31_live_smoke:main"
-flowmarshal-planner-r31-eval = "flowmarshal.planning.r31_eval_cli:main"
-flowmarshal-vm-handoff = "flowmarshal.vm_handoff:main"
 flowmarshal-engine = "flowmarshal.engine.cli:main"
-flowmarshal-engine-smoke = "flowmarshal.engine.smoke:main"
-flowmarshal-engine-eval = "flowmarshal.engine.eval_cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["flowmarshal", "flowmarshal.engine", "flowmarshal.engine.*"]
