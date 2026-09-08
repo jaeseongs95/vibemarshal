@@ -406,12 +406,16 @@ class EngineUserFacadeTests(unittest.TestCase):
         runtime = FakeCodexRuntime(qualification_models)
         application = EngineApplication(prepared.service, runtime=runtime)
 
-        self.assertEqual(
-            RunOnceAction.MATERIALIZED,
-            application.run_once(
-                prepared.project_id, proposal=prepared.proposal
-            ).action,
+        materialized = application.run_once(
+            prepared.project_id, proposal=prepared.proposal
         )
+        self.assertEqual(RunOnceAction.DISPATCHED, materialized.action)
+        for _ in range(20):
+            if materialized.action is RunOnceAction.MATERIALIZED:
+                break
+            time.sleep(0.01)
+            materialized = application.run_once(prepared.project_id)
+        self.assertEqual(RunOnceAction.MATERIALIZED, materialized.action)
         first = application.run_once(prepared.project_id)
         deadline = time.monotonic() + 2
         while True:

@@ -2520,26 +2520,46 @@ class EngineDispatcher:
             return self._advance_validation(validating)
         if ready is not None:
             self.service.assert_project_authorized(project_id)
-            if proposal is None and self.proposal_provider is not None:
+            inventory = None
+            existing_preparation_job = None
+            if self.supervisor is not None:
+                with self.service.ledger.read() as connection:
+                    existing_preparation_job = connection.execute(
+                        "SELECT 1 FROM runtime_jobs WHERE project_id=? AND task_id=? "
+                        "AND kind=? AND status <> ? LIMIT 1",
+                        (
+                            project_id,
+                            ready["id"],
+                            RuntimeJobKind.EXECUTION_SPEC_PREPARE.value,
+                            RuntimeJobStatus.CANCELLED.value,
+                        ),
+                    ).fetchone()
+            if self.supervisor is not None and (
+                proposal is not None
+                or self.proposal_provider is not None
+                or existing_preparation_job is not None
+            ):
                 from .operations import ExternalOperationUnknown
                 try:
                     self._verify_policy(Path(project["root"]))
-                    self.service.reobserve_project(project_id)
-                    if self.supervisor is not None:
-                        prepared_spec = self._execution_spec_job(
-                            project_id=project_id, task_id=ready["id"]
+                    if proposal is None:
+                        self.service.reobserve_project(project_id)
+                    prepared = self._execution_spec_job(
+                        project_id=project_id,
+                        task_id=ready["id"],
+                        supplied_proposal=proposal,
+                    )
+                    if prepared is None:
+                        job = self.service.active_runtime_job(project_id)
+                        return RunOnceOutcome(
+                            action=RunOnceAction.DISPATCHED, project_id=project_id,
+                            task_id=ready["id"],
+                            detail=(
+                                "Execution Spec 준비 job을 예약·관측했습니다: "
+                                f"{job.job_id if job else 'terminal'}"
+                            ),
                         )
-                        if prepared_spec is None:
-                            job = self.service.active_runtime_job(project_id)
-                            return RunOnceOutcome(
-                                action=RunOnceAction.DISPATCHED, project_id=project_id,
-                                task_id=ready["id"],
-                                detail=f"Execution Spec 준비 job을 예약·관측했습니다: {job.job_id if job else 'terminal'}",
-                            )
-                    else:
-                        prepared_spec = self.proposal_provider.prepare_task(
-                            project_id=project_id, task_id=ready["id"], inventory=self.runtime.list_models(),
-                        )
+                    prepared_spec, inventory = prepared
                     if prepared_spec.context_request is not None:
                         return RunOnceOutcome(
                             action=RunOnceAction.BLOCKED, project_id=project_id, task_id=ready["id"],
@@ -2552,6 +2572,37 @@ class EngineDispatcher:
                         blocker_code="EXTERNAL_EFFECT_UNKNOWN", failure_class=FailureClass.EXTERNAL_UNKNOWN,
                         suggested_repair_action=RepairAction.WAIT_EXTERNAL,
                         checkpoint_required=True, detail=str(error),
+                    )
+            elif proposal is None and self.proposal_provider is not None:
+                from .operations import ExternalOperationUnknown
+                try:
+                    self._verify_policy(Path(project["root"]))
+                    self.service.reobserve_project(project_id)
+                    inventory = self.runtime.list_models()
+                    prepared_spec = self.proposal_provider.prepare_task(
+                        project_id=project_id,
+                        task_id=ready["id"],
+                        inventory=inventory,
+                    )
+                    if prepared_spec.context_request is not None:
+                        return RunOnceOutcome(
+                            action=RunOnceAction.BLOCKED,
+                            project_id=project_id,
+                            task_id=ready["id"],
+                            blocker_code="CONTEXT_REQUIRED",
+                            detail=prepared_spec.context_request.model_dump_json(),
+                        )
+                    proposal = prepared_spec.proposal
+                except ExternalOperationUnknown as error:
+                    return RunOnceOutcome(
+                        action=RunOnceAction.BLOCKED,
+                        project_id=project_id,
+                        task_id=ready["id"],
+                        blocker_code="EXTERNAL_EFFECT_UNKNOWN",
+                        failure_class=FailureClass.EXTERNAL_UNKNOWN,
+                        suggested_repair_action=RepairAction.WAIT_EXTERNAL,
+                        checkpoint_required=True,
+                        detail=str(error),
                     )
             if proposal is None:
                 return RunOnceOutcome(
@@ -2571,7 +2622,8 @@ class EngineDispatcher:
                 )
             root = Path(project["root"])
             self._verify_policy(root)
-            inventory = self.runtime.list_models()
+            if inventory is None:
+                inventory = self.runtime.list_models()
             try:
                 spec = self.service.compile_execution_spec(proposal, inventory=inventory)
             except ContextRequiredError as error:
@@ -3199,8 +3251,14 @@ class EngineDispatcher:
             detail="독립 review를 통과한 Plan subgraph revision을 승인 경계 안에서 자동 활성화했습니다.",
         )
 
-    def _execution_spec_job(self, *, project_id: str, task_id: str) -> Any | None:
-        """동기 preparation 역할을 job으로 실행하고 terminal 관측만 소비한다."""
+    def _execution_spec_job(
+        self,
+        *,
+        project_id: str,
+        task_id: str,
+        supplied_proposal: ExecutionSpecProposal | None,
+    ) -> tuple[Any, ModelInventory] | None:
+        """inventory와 preparation 역할을 job에서 관측하고 다음 tick이 소비한다."""
         from .execution import ExecutionPreparation
         with self.service.ledger.read() as connection:
             task = connection.execute(
@@ -3211,21 +3269,58 @@ class EngineDispatcher:
                 raise EngineServiceError("Execution Spec 준비 Task가 없습니다.")
             checkpoint = (
                 f"execution_spec_prepare:{task['plan_revision_id']}:{task_id}:"
-                f"{sha256_digest(task['updated_at'])}"
+                f"{sha256_digest(task['updated_at'])}:"
+                f"{sha256_digest(supplied_proposal) if supplied_proposal is not None else 'provider'}"
             )
-            row = connection.execute(
-                "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
-                (project_id, checkpoint),
-            ).fetchone()
+            if supplied_proposal is None:
+                # 이전 tick이 caller-supplied proposal과 inventory를 이미 job에
+                # 결속했다면 후속 tick은 같은 입력을 다시 요구하지 않고 소비한다.
+                row = connection.execute(
+                    "SELECT * FROM runtime_jobs WHERE project_id=? AND task_id=? "
+                    "AND kind=? AND status <> ? ORDER BY created_at DESC,rowid DESC LIMIT 1",
+                    (
+                        project_id,
+                        task_id,
+                        RuntimeJobKind.EXECUTION_SPEC_PREPARE.value,
+                        RuntimeJobStatus.CANCELLED.value,
+                    ),
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
+                    (project_id, checkpoint),
+                ).fetchone()
         if row is None:
-            inventory = self.runtime.list_models()
+            def prepare() -> dict[str, Any]:
+                inventory = self.runtime.list_models()
+                result = (
+                    ExecutionPreparation(proposal=supplied_proposal)
+                    if supplied_proposal is not None
+                    else self.proposal_provider.prepare_task(
+                        project_id=project_id,
+                        task_id=task_id,
+                        inventory=inventory,
+                    )
+                )
+                return {
+                    "preparation": result.model_dump(mode="json"),
+                    "model_inventory": inventory.model_dump(mode="json"),
+                }
+
             job = self.supervisor.schedule(
                 project_id=project_id, kind=RuntimeJobKind.EXECUTION_SPEC_PREPARE,
                 checkpoint_key=checkpoint,
-                request={"task_id": task_id, "inventory_digest": inventory.inventory_digest},
+                request={
+                    "task_id": task_id,
+                    "supplied_proposal_digest": (
+                        None
+                        if supplied_proposal is None
+                        else sha256_digest(supplied_proposal)
+                    ),
+                    "inventory_observation": "runtime_job_owned",
+                },
                 timeout_seconds=900,
-                target=lambda: self.proposal_provider.prepare_task(
-                    project_id=project_id, task_id=task_id, inventory=inventory),
+                target=prepare,
                 task_id=task_id,
             )
         else:
@@ -3235,7 +3330,10 @@ class EngineDispatcher:
         if job.status not in {RuntimeJobStatus.PROVIDER_TERMINAL, RuntimeJobStatus.CONSUMED}:
             return None
         result = self.service.consume_runtime_job_required_result(job.job_id)
-        return ExecutionPreparation.model_validate(result)
+        return (
+            ExecutionPreparation.model_validate(result["preparation"]),
+            ModelInventory.model_validate(result["model_inventory"]),
+        )
 
     def _verify_policy(self, cwd: Path) -> None:
         policy = self.runtime.verify_execution_policy(cwd)

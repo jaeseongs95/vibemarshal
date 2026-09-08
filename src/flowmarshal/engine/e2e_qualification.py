@@ -1207,6 +1207,33 @@ def _normal_completion(
     }
 
 
+def _materialize_with_application(
+    application: EngineApplication,
+    prepared: PreparedE2E,
+    *,
+    timeout_seconds: float = 2,
+) -> Any:
+    """비동기 execution-spec 준비를 완료한 뒤 materialized 결과를 돌려준다."""
+
+    outcome = application.run_once(
+        prepared.project_id,
+        proposal=prepared.proposal,
+    )
+    deadline = time.monotonic() + timeout_seconds
+    while outcome.action is not RunOnceAction.MATERIALIZED and time.monotonic() < deadline:
+        if outcome.action is RunOnceAction.BLOCKED:
+            raise QualificationRunError(
+                f"{outcome.blocker_code}: {outcome.detail}"
+            )
+        time.sleep(0.01)
+        outcome = application.run_once(prepared.project_id)
+    if outcome.action is not RunOnceAction.MATERIALIZED:
+        raise QualificationRunError(
+            f"{timeout_seconds}초 안에 execution spec이 materialize되지 않음"
+        )
+    return outcome
+
+
 def _stale_after_materialization(
     prepared: PreparedE2E,
     runtime: Any,
@@ -1219,10 +1246,7 @@ def _stale_after_materialization(
         runtime=runtime,
         role_configuration=roles,
     )
-    first = application.run_once(
-        prepared.project_id,
-        proposal=prepared.proposal,
-    )
+    first = _materialize_with_application(application, prepared)
     (prepared.workspace / "app.py").write_text(
         (prepared.workspace / "app.py").read_text(encoding="utf-8") + "\n# external change\n",
         encoding="utf-8",
@@ -1255,7 +1279,7 @@ def _restart_resume(
         runtime=runtime,
         role_configuration=roles,
     )
-    application.run_once(prepared.project_id, proposal=prepared.proposal)
+    _materialize_with_application(application, prepared)
     dispatched = application.run_once(prepared.project_id)
     deadline = time.monotonic() + 2
     row = None
@@ -1313,10 +1337,7 @@ def _unknown_receipt(
         runtime=runtime,
         role_configuration=roles,
     )
-    application.run_once(
-        prepared.project_id,
-        proposal=prepared.proposal,
-    )
+    _materialize_with_application(application, prepared)
 
     fault_triggered = False
 
@@ -1545,7 +1566,7 @@ def _live_restart_resume(
             runtime=recorded,
             role_configuration=roles,
         )
-        application.run_once(prepared.project_id, proposal=prepared.proposal)
+        _materialize_with_application(application, prepared, timeout_seconds=30)
         dispatched = application.run_once(prepared.project_id)
         binding_deadline = time.monotonic() + 30
         row = None

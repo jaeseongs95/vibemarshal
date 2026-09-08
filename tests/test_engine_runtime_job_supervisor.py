@@ -8,10 +8,12 @@ from datetime import timedelta
 from pathlib import Path
 
 from flowmarshal.engine.domain import (
+    IntegrationValidationContract,
     RunOnceAction,
     RuntimeJobKind,
     RuntimeJobObservationKind,
     RuntimeJobStatus,
+    ValidationExecutionStep,
     utc_now,
 )
 from flowmarshal.engine.e2e_qualification import _copy_fixture, _prepare
@@ -19,6 +21,7 @@ from flowmarshal.engine.execution import ExecutionPreparation, ExecutionProposal
 from flowmarshal.engine.operations import ExternalOperationUnknown
 from flowmarshal.engine.qualification import default_role_configuration
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime, RuntimeJobSupervisor
+from flowmarshal.engine.models import AssignmentResolutionError
 from flowmarshal.engine.roles import ScriptedStructuredRoleRunner
 from flowmarshal.engine.service import EngineServiceError
 from tests.test_engine_qualification import qualification_inventory
@@ -41,6 +44,74 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
             roles=default_role_configuration(ROOT),
         )
         self.runtime = FakeCodexRuntime(self.inventory)
+
+    def _complete_task(self, prepared, runtime) -> None:
+        prepared.service.compile_execution_spec(
+            prepared.proposal, inventory=self.inventory,
+        )
+        attempt = prepared.service.reserve_attempt(task_id=prepared.task_id)
+        prepared.service.finish_attempt(attempt_id=attempt.attempt_id, succeeded=True)
+        (prepared.workspace / "app.py").write_text(
+            "def add(left: int, right: int) -> int:\n    return left + right\n",
+            encoding="utf-8",
+        )
+        dispatcher = EngineDispatcher(prepared.service, runtime)
+        self.assertEqual(
+            RunOnceAction.VALIDATED,
+            dispatcher.run_once(prepared.project_id).action,
+        )
+        self.assertEqual(
+            RunOnceAction.COMPLETED,
+            dispatcher.run_once(prepared.project_id).action,
+        )
+
+    def _run_until(self, dispatcher, project_id, action, *, timeout_seconds=2):
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            tick_started = time.monotonic()
+            outcome = dispatcher.run_once(project_id)
+            # 완료 소비 tick에는 SQLite materialization도 포함된다. 전체 suite가
+            # 병렬 worker 정리를 수행하는 Windows에서도 300ms provider 지연과
+            # 명확히 분리되는 상한을 둔다.
+            self.assertLess(time.monotonic() - tick_started, 0.2)
+            if outcome.action is action:
+                return outcome
+            time.sleep(0.005)
+        self.fail(f"runtime job이 {action.value}까지 bounded tick으로 수렴하지 않았습니다.")
+
+    def _assert_one_job(self, prepared, kind: RuntimeJobKind) -> None:
+        with prepared.service.ledger.read() as connection:
+            rows = connection.execute(
+                "SELECT checkpoint_key,status FROM runtime_jobs "
+                "WHERE project_id=? AND kind=?",
+                (prepared.project_id, kind.value),
+            ).fetchall()
+        self.assertEqual(1, len(rows))
+        self.assertEqual(1, len({row["checkpoint_key"] for row in rows}))
+        self.assertEqual(RuntimeJobStatus.CONSUMED.value, rows[0]["status"])
+
+    def _slow_inventory_runtime(self, delay_seconds=0.3):
+        inventory = self.inventory
+
+        class SlowInventoryRuntime(FakeCodexRuntime):
+            def __init__(inner):
+                super().__init__(inventory)
+                inner.list_model_calls = 0
+
+            def list_models(inner):
+                inner.list_model_calls += 1
+                time.sleep(delay_seconds)
+                return super(SlowInventoryRuntime, inner).list_models()
+
+        return SlowInventoryRuntime()
+
+    def _cleanup_supervisor(self, supervisor) -> None:
+        def cleanup() -> None:
+            for worker in tuple(supervisor._workers.values()):
+                worker.join(1)
+            supervisor.close(timeout_seconds=0.05)
+
+        self.addCleanup(cleanup)
 
     def _core_completion_snapshot(self) -> dict[str, object]:
         with self.prepared.service.ledger.read() as connection:
@@ -132,6 +203,210 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
             time.sleep(0.005)
         self.assertEqual(RunOnceAction.MATERIALIZED, result.action)
         self.assertEqual(RuntimeJobStatus.CONSUMED, result.runtime_job_status)
+
+    def test_slow_inventory_lookup_does_not_block_execution_spec_prepare_tick(self) -> None:
+        runtime = self._slow_inventory_runtime()
+
+        class Provider:
+            def prepare_task(inner, **_kwargs):
+                del inner
+                return ExecutionPreparation(proposal=self.prepared.proposal)
+
+        supervisor = RuntimeJobSupervisor(
+            self.prepared.service, runtime, handoff_wait_seconds=0.002,
+        )
+        self._cleanup_supervisor(supervisor)
+        dispatcher = EngineDispatcher(
+            self.prepared.service,
+            runtime,
+            proposal_provider=Provider(),
+            supervisor=supervisor,
+        )
+
+        started = time.monotonic()
+        first = dispatcher.run_once(self.prepared.project_id)
+
+        self.assertLess(time.monotonic() - started, 0.15)
+        self.assertEqual(RunOnceAction.DISPATCHED, first.action)
+        self.assertEqual(RuntimeJobKind.EXECUTION_SPEC_PREPARE, first.runtime_job_kind)
+        self.assertEqual(
+            RunOnceAction.MATERIALIZED,
+            self._run_until(
+                dispatcher, self.prepared.project_id, RunOnceAction.MATERIALIZED,
+            ).action,
+        )
+        self._assert_one_job(self.prepared, RuntimeJobKind.EXECUTION_SPEC_PREPARE)
+
+    def test_slow_inventory_for_supplied_proposal_stays_in_execution_spec_job(self) -> None:
+        runtime = self._slow_inventory_runtime()
+        supervisor = RuntimeJobSupervisor(
+            self.prepared.service, runtime, handoff_wait_seconds=0.002,
+        )
+        self._cleanup_supervisor(supervisor)
+        dispatcher = EngineDispatcher(
+            self.prepared.service,
+            runtime,
+            supervisor=supervisor,
+        )
+
+        started = time.monotonic()
+        first = dispatcher.run_once(
+            self.prepared.project_id,
+            proposal=self.prepared.proposal,
+        )
+
+        self.assertLess(time.monotonic() - started, 0.15)
+        self.assertEqual(RunOnceAction.DISPATCHED, first.action)
+        self.assertEqual(RuntimeJobKind.EXECUTION_SPEC_PREPARE, first.runtime_job_kind)
+        self.assertEqual(
+            RunOnceAction.MATERIALIZED,
+            self._run_until(
+                dispatcher, self.prepared.project_id, RunOnceAction.MATERIALIZED,
+            ).action,
+        )
+        self._assert_one_job(self.prepared, RuntimeJobKind.EXECUTION_SPEC_PREPARE)
+
+    def test_slow_inventory_lookup_does_not_block_goal_test_prepare_tick(self) -> None:
+        self._complete_task(self.prepared, self.runtime)
+        runtime = self._slow_inventory_runtime()
+
+        class Provider:
+            roles = default_role_configuration(ROOT)
+
+            def prepare_goal(inner, **_kwargs):
+                del inner
+                return self.prepared.proposal.validation_steps[0].model_copy(
+                    update={"validation_id": "validation_goal"}
+                )
+
+        supervisor = RuntimeJobSupervisor(
+            self.prepared.service, runtime, handoff_wait_seconds=0.002,
+        )
+        self._cleanup_supervisor(supervisor)
+        dispatcher = EngineDispatcher(
+            self.prepared.service,
+            runtime,
+            proposal_provider=Provider(),
+            supervisor=supervisor,
+        )
+
+        started = time.monotonic()
+        first = dispatcher.run_once(self.prepared.project_id)
+
+        self.assertLess(time.monotonic() - started, 0.15)
+        self.assertEqual(RunOnceAction.DISPATCHED, first.action)
+        self.assertEqual(RuntimeJobKind.GOAL_TEST_PREPARE, first.runtime_job_kind)
+        self.assertEqual(
+            RunOnceAction.MATERIALIZED,
+            self._run_until(
+                dispatcher, self.prepared.project_id, RunOnceAction.MATERIALIZED,
+            ).action,
+        )
+        self._assert_one_job(self.prepared, RuntimeJobKind.GOAL_TEST_PREPARE)
+
+    def test_goal_prepare_model_binding_error_is_consumed_as_core_blocker(self) -> None:
+        self._complete_task(self.prepared, self.runtime)
+
+        class Provider:
+            roles = default_role_configuration(ROOT)
+
+            def prepare_goal(inner, **_kwargs):
+                del inner
+                raise AssignmentResolutionError("MODEL_BINDING_UNAVAILABLE")
+
+        supervisor = RuntimeJobSupervisor(
+            self.prepared.service, self.runtime, handoff_wait_seconds=0.002,
+        )
+        self._cleanup_supervisor(supervisor)
+        dispatcher = EngineDispatcher(
+            self.prepared.service,
+            self.runtime,
+            proposal_provider=Provider(),
+            supervisor=supervisor,
+        )
+
+        first = dispatcher.run_once(self.prepared.project_id)
+        self.assertEqual(RunOnceAction.DISPATCHED, first.action)
+        blocked = self._run_until(
+            dispatcher, self.prepared.project_id, RunOnceAction.BLOCKED,
+        )
+        self.assertEqual("MODEL_BINDING_CHANGED", blocked.blocker_code)
+        self._assert_one_job(self.prepared, RuntimeJobKind.GOAL_TEST_PREPARE)
+
+    def test_slow_inventory_lookup_does_not_block_goal_semantic_validate_tick(self) -> None:
+        base = Path(self.temp.name) / "semantic-goal"
+        workspace, _ = _copy_fixture(ROOT, base)
+        prepared = _prepare(
+            workspace=workspace,
+            state_root=base / "state",
+            inventory=self.inventory,
+            roles=default_role_configuration(ROOT),
+            goal_validation=IntegrationValidationContract(
+                validation_id="validation_goal",
+                statement="직접 evidence로 최종 동작을 독립 검토한다.",
+                criterion_refs=("ac_fix",),
+                method="semantic",
+                required_evidence_kinds=("model_review",),
+            ),
+        )
+        self._complete_task(prepared, FakeCodexRuntime(self.inventory))
+        with prepared.service.ledger.read() as connection:
+            evidence_id = connection.execute(
+                "SELECT id FROM evidence_records WHERE task_id=? AND kind='test' "
+                "ORDER BY rowid LIMIT 1",
+                (prepared.task_id,),
+            ).fetchone()[0]
+        runner = ScriptedStructuredRoleRunner({
+            "goal_validator": [{
+                "passed": True,
+                "rationale": "직접 테스트 evidence를 확인했습니다.",
+                "evidence_refs": [evidence_id],
+            }]
+        })
+        provider = ExecutionProposalAdapter(
+            prepared.service, runner, default_role_configuration(ROOT),
+        )
+        step = ValidationExecutionStep(
+            validation_id="validation_goal",
+            method="semantic",
+            semantic_instruction="직접 evidence로 최종 동작을 검토한다.",
+            required_evidence_kinds=("model_review",),
+        )
+        self.assertEqual(
+            RunOnceAction.MATERIALIZED,
+            EngineDispatcher(
+                prepared.service,
+                FakeCodexRuntime(self.inventory),
+                proposal_provider=provider,
+            ).run_once(
+                prepared.project_id, goal_validation_step=step,
+            ).action,
+        )
+        runtime = self._slow_inventory_runtime()
+        supervisor = RuntimeJobSupervisor(
+            prepared.service, runtime, handoff_wait_seconds=0.002,
+        )
+        self._cleanup_supervisor(supervisor)
+        dispatcher = EngineDispatcher(
+            prepared.service,
+            runtime,
+            proposal_provider=provider,
+            supervisor=supervisor,
+        )
+
+        started = time.monotonic()
+        first = dispatcher.run_once(prepared.project_id)
+
+        self.assertLess(time.monotonic() - started, 0.15)
+        self.assertEqual(RunOnceAction.DISPATCHED, first.action)
+        self.assertEqual(RuntimeJobKind.GOAL_SEMANTIC_VALIDATE, first.runtime_job_kind)
+        self.assertEqual(
+            RunOnceAction.VALIDATED,
+            self._run_until(
+                dispatcher, prepared.project_id, RunOnceAction.VALIDATED,
+            ).action,
+        )
+        self._assert_one_job(prepared, RuntimeJobKind.GOAL_SEMANTIC_VALIDATE)
 
     def test_execution_preparation_job_never_starts_a_second_role_turn(self) -> None:
         runner = ScriptedStructuredRoleRunner({

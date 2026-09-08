@@ -19,6 +19,7 @@ from .domain import (
 )
 from .execution import execution_context
 from .operations import CoreOperations, ExternalOperationUnknown
+from .models import AssignmentResolutionError
 from .service import EngineService, EngineServiceError
 
 
@@ -375,6 +376,92 @@ def _validate_goal_retry(
     )
 
 
+def _prepare_goal_test_job(
+    runtime: Any,
+    provider: Any,
+    *,
+    project_id: str,
+    validation_id: str,
+    supplied_step: ValidationExecutionStep | None,
+) -> dict[str, Any]:
+    """model inventory와 준비 역할을 같은 RuntimeJob owner 안에서 관측한다."""
+
+    inventory = runtime.list_models()
+    if supplied_step is None:
+        try:
+            step = provider.prepare_goal(
+                project_id=project_id,
+                validation_id=validation_id,
+                inventory=inventory,
+            )
+        except AssignmentResolutionError as error:
+            return {
+                "model_binding_error": f"{type(error).__name__}: {error}",
+            }
+    else:
+        step = supplied_step
+    try:
+        operational_binding = (
+            provider.roles.operational_binding(inventory)
+            if step.method == "semantic"
+            else None
+        )
+    except (AttributeError, ValueError) as error:
+        return {
+            "step": step.model_dump(mode="json"),
+            "model_binding_error": f"{type(error).__name__}: {error}",
+        }
+    return {
+        "step": step.model_dump(mode="json"),
+        "model_inventory_digest": (
+            inventory.inventory_digest if operational_binding is not None else None
+        ),
+        "operational_binding": (
+            None
+            if operational_binding is None
+            else operational_binding.model_dump(mode="json")
+        ),
+    }
+
+
+def _run_goal_semantic_validation_job(
+    runtime: Any,
+    provider: Any,
+    *,
+    project_id: str,
+    binding: GoalValidationBinding,
+    context: dict[str, Any],
+    catalog: dict[str, Any],
+) -> dict[str, Any]:
+    """inventory 재검사와 semantic role turn을 같은 RuntimeJob에서 수행한다."""
+
+    inventory = runtime.list_models()
+    try:
+        if (
+            binding.operational_binding is not None
+            and binding.model_inventory_digest
+            != binding.operational_binding.inventory_digest
+        ):
+            raise ValueError("MODEL_LOCK_EVIDENCE_DIGEST_MISMATCH")
+        verify_binding(binding.operational_binding, inventory)
+        if (
+            provider.roles.operational_binding(inventory).lock_digest
+            != binding.operational_binding.lock_digest
+        ):
+            raise ValueError("MODEL_LOCK_ROLE_BINDING_MISMATCH")
+    except (AttributeError, ValueError) as error:
+        return {"model_binding_error": f"{type(error).__name__}: {error}"}
+    return {
+        "validation_result": provider.validate_goal(
+            project_id=project_id,
+            inventory=inventory,
+            context=context,
+            evidence_catalog=catalog,
+            step=binding.step,
+        )
+    }
+
+
 def advance_independent_goal_test(
     service: EngineService, runtime: Any, project_id: str, plan: PlanContractRevision, contract: Any,
     *, supplied_step: ValidationExecutionStep | None = None, provider: Any | None = None,
@@ -409,18 +496,25 @@ def advance_independent_goal_test(
         supplied_step = None
     if supplied_step is not None or binding is None:
         step = supplied_step
-        if step is None:
-            if provider is None:
-                return blocked(project_id, "GOAL_VALIDATION_SPEC_REQUIRED",
-                               f"독립 Goal Test의 실행 binding이 필요합니다: {contract.validation_id}")
+        if step is None and provider is None:
+            return blocked(project_id, "GOAL_VALIDATION_SPEC_REQUIRED",
+                           f"독립 Goal Test의 실행 binding이 필요합니다: {contract.validation_id}")
+        inventory = None
+        model_binding = None
+        inventory_digest = None
+        if provider is not None and (step is None or step.method == "semantic"):
             try:
                 service.assert_project_authorized(project_id)
-                inventory = runtime.list_models()
                 if supervisor is None:
-                    step = provider.prepare_goal(
-                        project_id=project_id, validation_id=contract.validation_id,
-                        inventory=inventory,
-                    )
+                    inventory = runtime.list_models()
+                    if step is None:
+                        step = provider.prepare_goal(
+                            project_id=project_id,
+                            validation_id=contract.validation_id,
+                            inventory=inventory,
+                        )
+                    if step.method == "semantic":
+                        model_binding = provider.roles.operational_binding(inventory)
                 else:
                     checkpoint = (
                         f"goal_test_prepare:{plan.plan_revision_id}:{contract.validation_id}:"
@@ -433,27 +527,63 @@ def advance_independent_goal_test(
                         ).fetchone()
                     if row is None:
                         job = supervisor.schedule(
-                            project_id=project_id, kind=RuntimeJobKind.GOAL_TEST_PREPARE,
+                            project_id=project_id,
+                            kind=RuntimeJobKind.GOAL_TEST_PREPARE,
                             checkpoint_key=checkpoint,
-                            request={"validation_id": contract.validation_id,
-                                     "inventory_digest": inventory.inventory_digest},
+                            request={
+                                "validation_id": contract.validation_id,
+                                "supplied_step_digest": (
+                                    None if step is None else sha256_digest(step)
+                                ),
+                                "inventory_observation": "runtime_job_owned",
+                                "role_configuration_digest": (
+                                    provider.roles.configuration_digest
+                                ),
+                            },
                             timeout_seconds=900,
-                            target=lambda: provider.prepare_goal(
-                                project_id=project_id, validation_id=contract.validation_id,
-                                inventory=inventory),
+                            target=lambda: _prepare_goal_test_job(
+                                runtime,
+                                provider,
+                                project_id=project_id,
+                                validation_id=contract.validation_id,
+                                supplied_step=step,
+                            ),
                         )
                     else:
                         job = service._runtime_job_from_row(row)
-                        if job.status in {RuntimeJobStatus.SCHEDULED, RuntimeJobStatus.RUNNING}:
+                        if job.status in {
+                            RuntimeJobStatus.SCHEDULED,
+                            RuntimeJobStatus.RUNNING,
+                        }:
                             job = supervisor.tick(job.job_id)
-                    if job.status not in {RuntimeJobStatus.PROVIDER_TERMINAL,
-                                          RuntimeJobStatus.CONSUMED}:
+                    if job.status not in {
+                        RuntimeJobStatus.PROVIDER_TERMINAL,
+                        RuntimeJobStatus.CONSUMED,
+                    }:
                         return RunOnceOutcome(
-                            action=RunOnceAction.DISPATCHED, project_id=project_id,
-                            detail=f"Goal Test 준비 job을 예약·관측했습니다: {job.job_id}",
+                            action=RunOnceAction.DISPATCHED,
+                            project_id=project_id,
+                            detail=(
+                                "Goal Test 준비 job을 예약·관측했습니다: "
+                                f"{job.job_id}"
+                            ),
                         )
                     result = service.consume_runtime_job_required_result(job.job_id)
-                    step = ValidationExecutionStep.model_validate(result)
+                    if "model_binding_error" in result:
+                        return blocked(
+                            project_id,
+                            "MODEL_BINDING_CHANGED",
+                            result["model_binding_error"],
+                        )
+                    step = ValidationExecutionStep.model_validate(result["step"])
+                    model_binding = (
+                        None
+                        if result["operational_binding"] is None
+                        else OperationalBinding.model_validate(
+                            result["operational_binding"]
+                        )
+                    )
+                    inventory_digest = result["model_inventory_digest"]
             except ExternalOperationUnknown as error:
                 return blocked(project_id, "EXTERNAL_EFFECT_UNKNOWN", str(error))
         step = _normalize_goal_step(context, contract, step)
@@ -467,14 +597,13 @@ def advance_independent_goal_test(
             )
         else:
             retry = None
-        inventory = runtime.list_models() if step.method == "semantic" else None
-        model_binding = (provider.roles.operational_binding(inventory)
-                         if inventory is not None and provider is not None else None)
+        if inventory is not None and model_binding is not None:
+            inventory_digest = inventory.inventory_digest
         binding = GoalValidationBinding(
             goal_validation_binding_id=new_id("goal_binding"), plan_revision_id=plan.plan_revision_id,
                                         plan_activation_digest=plan.activation_digest,
                                         context_digest=sha256_digest(context), step=step,
-                                        model_inventory_digest=(inventory.inventory_digest if inventory is not None else None),
+                                        model_inventory_digest=inventory_digest,
                                         operational_binding=model_binding,
                                         role_configuration_digest=(None if provider is None else provider.roles.configuration_digest),
                                         retry=retry)
@@ -496,16 +625,6 @@ def advance_independent_goal_test(
     if binding.step.method == "semantic" and provider is not None:
         if binding.role_configuration_digest != provider.roles.configuration_digest:
             return blocked(project_id, "MODEL_BINDING_CHANGED", "Goal Test의 역할 설정이 바뀌었습니다.")
-        inventory = runtime.list_models()
-        try:
-            if (binding.operational_binding is not None
-                    and binding.model_inventory_digest != binding.operational_binding.inventory_digest):
-                raise ValueError("MODEL_LOCK_EVIDENCE_DIGEST_MISMATCH")
-            verify_binding(binding.operational_binding, inventory)
-            if provider.roles.operational_binding(inventory).lock_digest != binding.operational_binding.lock_digest:
-                raise ValueError("MODEL_LOCK_ROLE_BINDING_MISMATCH")
-        except ValueError as error:
-            return blocked(project_id, "MODEL_BINDING_CHANGED", str(error))
         with service.ledger.read() as connection:
             rows = [row for task in plan.definition.tasks
                     for row in service.task_evidence_rows(connection, task.task_id)]
@@ -520,6 +639,16 @@ def advance_independent_goal_test(
         try:
             service.assert_project_authorized(project_id)
             if supervisor is None:
+                inventory = runtime.list_models()
+                try:
+                    if (binding.operational_binding is not None
+                            and binding.model_inventory_digest != binding.operational_binding.inventory_digest):
+                        raise ValueError("MODEL_LOCK_EVIDENCE_DIGEST_MISMATCH")
+                    verify_binding(binding.operational_binding, inventory)
+                    if provider.roles.operational_binding(inventory).lock_digest != binding.operational_binding.lock_digest:
+                        raise ValueError("MODEL_LOCK_ROLE_BINDING_MISMATCH")
+                except ValueError as error:
+                    return blocked(project_id, "MODEL_BINDING_CHANGED", str(error))
                 result = provider.validate_goal(
                     project_id=project_id, inventory=inventory, context=context,
                     evidence_catalog=catalog, step=binding.step,
@@ -541,11 +670,23 @@ def advance_independent_goal_test(
                         request={"validation_id": contract.validation_id,
                                  "binding_digest": binding.binding_digest,
                                  "context_digest": sha256_digest(context),
-                                 "evidence_catalog_digest": sha256_digest(catalog)},
+                                 "evidence_catalog_digest": sha256_digest(catalog),
+                                 "expected_inventory_digest": binding.model_inventory_digest,
+                                 "expected_lock_digest": (
+                                     None
+                                     if binding.operational_binding is None
+                                     else binding.operational_binding.lock_digest
+                                 ),
+                                 "inventory_observation": "runtime_job_owned"},
                         timeout_seconds=900,
-                        target=lambda: provider.validate_goal(
-                            project_id=project_id, inventory=inventory, context=context,
-                            evidence_catalog=catalog, step=binding.step),
+                        target=lambda: _run_goal_semantic_validation_job(
+                            runtime,
+                            provider,
+                            project_id=project_id,
+                            binding=binding,
+                            context=context,
+                            catalog=catalog,
+                        ),
                     )
                 else:
                     job = service._runtime_job_from_row(row)
@@ -557,7 +698,14 @@ def advance_independent_goal_test(
                         action=RunOnceAction.DISPATCHED, project_id=project_id,
                         detail=f"Goal semantic validation job을 예약·관측했습니다: {job.job_id}",
                     )
-                result = service.consume_runtime_job_required_result(job.job_id)
+                job_result = service.consume_runtime_job_required_result(job.job_id)
+                if "model_binding_error" in job_result:
+                    return blocked(
+                        project_id,
+                        "MODEL_BINDING_CHANGED",
+                        job_result["model_binding_error"],
+                    )
+                result = job_result["validation_result"]
         except ExternalOperationUnknown as error:
             return blocked(project_id, "EXTERNAL_EFFECT_UNKNOWN", str(error))
         if sha256_digest(execution_context(service, project_id)) != binding.context_digest:

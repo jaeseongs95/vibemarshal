@@ -471,15 +471,25 @@ class OperationTraceTests(unittest.TestCase):
         self.assertEqual(5.0, interrupt[0]["deadline_seconds"])
 
     def test_sdk_timeout_keeps_late_interrupt_artifact_unsealed_without_duplicate(self) -> None:
+        interrupt_started = threading.Event()
+        interrupt_release = threading.Event()
+        interrupt_completed = threading.Event()
+        self.addCleanup(interrupt_release.set)
+
         class SlowInterruptRuntime(InterruptedRoleRuntime):
             def __init__(self):
                 super().__init__()
                 self.interrupt_calls = 0
 
             def interrupt(self, *, thread_id, turn_id):
-                time.sleep(0.02)
-                self.interrupt_calls += 1
-                return super().interrupt(thread_id=thread_id, turn_id=turn_id)
+                interrupt_started.set()
+                if not interrupt_release.wait(1):
+                    raise TimeoutError("late interrupt 테스트 해제 신호를 기다리지 못했습니다.")
+                try:
+                    self.interrupt_calls += 1
+                    return super().interrupt(thread_id=thread_id, turn_id=turn_id)
+                finally:
+                    interrupt_completed.set()
 
         runtime = SlowInterruptRuntime()
         timeout_policy = RoleTimeoutPolicy(overrides=(RoleTimeoutOverride(
@@ -499,11 +509,13 @@ class OperationTraceTests(unittest.TestCase):
             )
             with self.assertRaises(StructuredRoleError):
                 runner.run(request)
+            self.assertTrue(interrupt_started.wait(1))
             receipt = runner.receipts[-1]
             self.assertFalse(receipt.operation_trace["manifest"]["sealed"])
             self.assertTrue(receipt.operation_trace["manifest"]["pending_operation_ids"])
             trace_path = Path(receipt.operation_trace_ref)
-            time.sleep(0.05)
+            interrupt_release.set()
+            self.assertTrue(interrupt_completed.wait(1))
             verified = verify_operation_trace(trace_path)
             current_trace = OperationTrace.from_path(trace_path).snapshot()
 
