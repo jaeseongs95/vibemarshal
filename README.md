@@ -1,168 +1,165 @@
 # VibeMarshal
 
-VibeMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 만들고, Task마다 적절한 Codex 실행·검사 모델과 추론 수준을 배정한 뒤, 작업 생성·재개·진행·결과·실패·재시도를 추적하는 로컬 Workflow Orchestrator다. 코드와 CLI에서는 기존 식별자 `FlowMarshal`을 사용한다.
+VibeMarshal은 큰 개발 요청을 검증 가능한 목표와 Task DAG로 정리하고, Codex 작업의 실행·관측·검사·복구를 하나의 로컬 원장에서 추적하는 Workflow Orchestrator다. 사용자에게 보이는 제품명은 **VibeMarshal**, Python 패키지와 CLI의 기술 식별자는 `FlowMarshal`과 `flowmarshal-engine`이다.
 
-현재 권위 구현은 `flowmarshal.engine`이다. R1~R3.1 source와 artifact는 감사 가능한 `legacy/prototype` 기준선으로 동결하며 새 Engine에서 도메인 코드로 import하지 않는다.
+> **개발 상태:** 현재 버전은 `0.2.0a1` 프리릴리스다. 사용자 façade, schema 4 원장과 RuntimeJob 구현이 존재하지만 1.0 필수 qualification과 독립 최종 감사가 완료되지 않아 1.0 판정은 **NO-GO**다. `apps/desktop`의 GUI도 실제 Engine에 연결되지 않은 UX 프로토타입이다.
 
-자세한 계약은 [전면 재설계 권위 문서](docs/orchestration-redesign.md), 분리·전환 결정은 [Engine cutover ADR](docs/engine-cutover-adr.md)에 있다.
+## 무엇을 해결하나
 
-## 현재 판정
-
-최신 상태의 단일 진입점은 [Engine 구현 현황](docs/engine-implementation-status.md)이다. [1.0 선행 로드맵](docs/pre-1.0-roadmap.md)에 승인된 구현 순서와 후속 기능을 구분했고, [현재 작업 인계](docs/pre-1.0-handoff.md)에 이번 변경과 다음 실행 조건을 기록한다.
-
-현재 제품 1.0은 **미완료 / NO-GO**다. [승인된 12개 설계 항목과 필수 검증](docs/redesign-1.0-contract.md)을 구현 중이며 GoalAuthorization·schema 4·RuntimeJobSupervisor·응용 CLI·Engine-only wheel은 각각의 변경과 검증 범위에서 확인한다. 결정적·역할48·Planning18·실제 요청 E2E·설치·독립 감사가 모두 끝나기 전에는 1.0 완료로 집계하지 않는다. 과거 테스트와 실제 평가 결과는 [승인 이전 구현 현황](docs/engine-implementation-status-before-redesign-1.0.md)에 보존하며 새 PASS로 집계하지 않는다.
-
-종료·유효 결과가 확인되면 usage 누락만으로 후속 실행을 막지 않고 미측정량은 null/unknown으로 남긴다. 외부 효과 미확정은 기존 intent/binding을 먼저 관측한다. 기본 provider는 qualification된 v1이며 v2 채택 평가와 R3.1 비교 성능은 모든 제품 실행의 선행조건이 아니다. 비교 성능 보고는 비차단 후속이다.
-
-R3.1은 동결된 prototype 감사 기준선이다. [최종 동결 판정](docs/r31-frozen-baseline.md)을 현재 Engine의 qualification으로 재사용하지 않는다.
-
-## 새 권위 구조
+- 사용자 요청을 Goal Contract로 정규화하고 독립 검토한다.
+- 실행 가능한 Plan과 의존성이 있는 Task DAG를 만든다.
+- 사용자는 목표·범위·허용 효과·운영 정책을 승인하고, Core는 그 경계 안에서 Plan revision을 활성화한다.
+- ready Task만 실행 명세로 구체화하고 실제 효과 직전에 입력 freshness와 대상을 다시 확인한다.
+- Codex 실행의 intent, receipt, thread/turn binding과 evidence를 SQLite 원장에 남긴다.
+- 모델의 완료 선언이 아니라 validation과 GoalVerdict로 완료 여부를 결정한다.
+- 중단·재개·실패 분류·제한된 재계획을 원장 상태에 따라 처리한다.
 
 ```text
-사용자 요청
-→ Goal Contract 정규화·독립 검토
-→ Project Map과 State Projection
-→ Skeleton 1~3개 생성
-→ 결정적 Gate·compact review·pruning
-→ 최대 2개만 Plan Contract 후보로 상세화
-→ 사용자 목표·범위·효과·운영 정책 승인(GoalAuthorization)
-→ Core의 내부 Plan revision 자동 활성화
-→ ready Task의 Execution Spec·Context Pack materialize
-→ precondition·snapshot·effect checkpoint
-→ Codex 실행·receipt·binding
-→ Task validation과 State 재관측
-→ plan-level Goal Test
-→ Continue | Repair | Subgraph Replan | Goal Revision
+요청 → prepare → authorize → run-once / observe → validation → final-report
 ```
 
-사용자는 목표·대상·허용 효과·운영 정책을 승인한다. Core는 이 경계 안에서 immutable Plan revision을 자동 활성화하고 작업 분할·재계획·복구를 수행한다 (planned). 목표·범위·효과·정책 확장에만 추가 판단을 요청하며 사용자의 exact Plan ID·digest 입력은 필수가 아니다. 실제 파일·symbol·명령·Context는 ready 시점에 결정하고 효과 직전에 다시 검증한다.
+현재 권위 구현은 `flowmarshal.engine`이다. R1~R3.1 코드는 감사 가능한 `legacy/prototype` 기준선으로 보존하며 새 Engine의 도메인 구현으로 가져오지 않는다.
 
-## 핵심 안전성과 사용성 원칙
+## 설치
 
-- 프로젝트 파일, 전역·프로젝트 `AGENTS.md`, 등록 참고자료, 빌드·테스트와 필요한 localhost는 정상 입력이다.
-- 파일마다 AccessGrant를 만들거나 네트워크를 일괄 차단하지 않는다.
-- 참고자료 안의 명령문은 분석할 데이터이며 사용자 지시나 활성 계약보다 높은 권위를 갖지 않는다.
-- Reviewer는 finding과 rating만 제출한다. Core가 admission·score·상태를 결정한다.
-- 실제 모델은 코드에 하드코딩하지 않고 호출 직전 `model/list`와 대조한다.
-- 로컬 Codex task는 실제 `:danger-full-access`, `approval_policy=never`일 때만 시작한다.
-- 외부 효과는 intent를 먼저 기록하고 receipt·thread·turn binding으로 결속한다.
-- 모델의 “완료” 선언이 아니라 evidence와 validation으로 Task와 Goal을 완료한다.
-- 같은 프로젝트는 먼저 직렬 실행한다. 병렬화와 VM·WSL·permission hardening은 별도 qualification 뒤에 연다.
-
-## 기존 개발 CLI（schema 3）
-
-첫 줄은 통합된 EngineApplication 사용자 명령이고, 아래 중첩 명령은 기존 세부 조회·진단 표면이다. 패키지 전환은 [현재 인계](docs/pre-1.0-handoff.md)의 후속 구현·검증을 거친다. 역사적 adjust-unknown은 새 usage 누락 해소 절차로 사용하지 않는다.
-
-```text
-flowmarshal-engine prepare|authorize|run-once|observe|pause|cancel|status|final-report
-flowmarshal-engine project init|show
-flowmarshal-engine project source add|list
-flowmarshal-engine project budget set|show|observe-role|adjust-unknown
-flowmarshal-engine model status|rebind
-flowmarshal-engine goal create|revise|show
-flowmarshal-engine plan search|compare|activate|status
-flowmarshal-engine task show|materialize
-flowmarshal-engine run once|status
-flowmarshal-engine attempt show|retry|observe|resume|interrupt
-flowmarshal-engine validate task|goal|observe
-flowmarshal-engine recover inspect|resume|abandon
-flowmarshal-engine report progress|final
-```
-
-일반 사용자는 위 첫 줄의 facade를 사용한다. raw request부터 승인·실행·관측·최종 보고까지의 예시는 [Engine 사용자 workflow](docs/engine-user-workflow.md)에 있다. 나머지 명령은 세부 조회·진단·수동 검증 경계다.
-
-`goal create --live`, `plan search --live`, `run once` 전에 `project budget set --policy-file config/pre-1.0-validation-budget.json`으로 검증 예산을 등록한다. 이 파일은 Goal당 1,000,000 token, 호출당 100,000 token 예약, 재계획 reserve 25%의 시작값이다. 최적값이나 구독 한도 환산값이 아니다. 역할별 timeout은 전역 `--role-timeout-policy config/pre-1.0-role-timeouts.json`으로 결속한다.
-
-`goal create --live`와 `plan search --live`는 역할별 model/effort를 호출자가 명시해야 한다. Engine은 이를 최신 App Server model inventory와 대조하고, 지원되지 않는 값을 임의 fallback으로 숨기지 않는다.
-
-## VibeMarshal GUI 클릭형 프로토타입
-
-`apps/desktop`에는 브라우저에서 바로 검토할 수 있는 React/TypeScript GUI 프로토타입이 있다. 사용자 화면의 제품명은 **VibeMarshal**이고, 코드·API·원장의 내부 식별자는 계속 `FlowMarshal`을 사용한다.
+Python 3.10 이상이 필요하다. 현재는 릴리스 전 소스 설치를 제공한다.
 
 ```powershell
-cd <승인된-source-root>\apps\desktop
+git clone https://github.com/jaeseongs95/vibemarshal.git
+cd vibemarshal
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install .
+.\.venv\Scripts\flowmarshal-engine.exe --help
+```
+
+위 명령은 현재 프리릴리스를 소스에서 설치하는 방법이다. 1.0의 깨끗한 non-editable 설치 qualification이 완료됐다는 뜻은 아니다. wheel 경계와 고정 의존성은 [Engine 설치 계약](docs/engine-package-install.md)에서 확인할 수 있다.
+
+## 기본 워크플로
+
+먼저 관리할 프로젝트를 등록한다.
+
+```powershell
+.\.venv\Scripts\flowmarshal-engine.exe project init `
+  --name "my-project" `
+  --root <project-root>
+```
+
+현재 프리릴리스의 역할 설정 예시는 `config/qualification-roles.json`에 있다. 일곱 역할의 model/effort를 고정하며 `executor`와 `validator`를 서로 다른 binding으로 둔다. 아래 Quickstart에서는 이 파일을 그대로 사용하지만, 이는 qualification용 시작값이지 모든 계정과 프로젝트에 맞는 범용 기본값은 아니다. Engine은 실제 호출 전에 현재 model inventory와 대조하고 지원되지 않는 binding을 임의로 바꾸지 않는다.
+
+역할 호출 전에 프로젝트의 검증 예산 정책도 등록해야 한다. 아래 파일은 현재 저장소의 개발 시작값이며 요금 상한이나 구독 한도 환산값이 아니다.
+
+```powershell
+.\.venv\Scripts\flowmarshal-engine.exe project budget set `
+  --project-id <project-id> `
+  --policy-file config/pre-1.0-validation-budget.json
+```
+
+이제 요청을 준비하고 승인한 뒤 첫 scheduler tick을 실행한다.
+
+```powershell
+.\.venv\Scripts\flowmarshal-engine.exe prepare `
+  --project-id <project-id> `
+  --request "두 모듈을 수정하고 회귀 테스트까지 실행해 주세요." `
+  --role-config config/qualification-roles.json
+
+.\.venv\Scripts\flowmarshal-engine.exe authorize `
+  --project-id <project-id>
+
+.\.venv\Scripts\flowmarshal-engine.exe run-once `
+  --project-id <project-id> `
+  --role-config config/qualification-roles.json
+```
+
+`run-once`는 한 번의 상태 전이 또는 RuntimeJob 예약·관측만 수행하고 반환한다. `status`를 확인하면서 `run-once`를 반복하고, 활성 provider job이 있으면 `observe`로 관측한다. `observe`만으로 Task나 Goal이 완료되지는 않는다.
+
+```powershell
+.\.venv\Scripts\flowmarshal-engine.exe status --project-id <project-id>
+.\.venv\Scripts\flowmarshal-engine.exe observe --project-id <project-id>
+.\.venv\Scripts\flowmarshal-engine.exe run-once --project-id <project-id> --role-config config/qualification-roles.json
+.\.venv\Scripts\flowmarshal-engine.exe final-report --project-id <project-id> --format markdown
+```
+
+GoalVerdict가 확정될 때까지 필요한 tick 수는 Plan과 원장 상태에 따라 달라진다. 사용자는 내부 Plan ID나 digest를 승인 입력으로 복사할 필요가 없다.
+
+## 사용자 CLI
+
+| 명령 | 역할 |
+|---|---|
+| `prepare` | 요청 정규화, 독립 review와 Planning 준비 |
+| `authorize` | 목표 범위와 운영 정책 승인, 적합한 Plan 활성화 |
+| `run-once` | bounded scheduler tick 한 번 수행 |
+| `observe` | 활성 provider job 관측 |
+| `pause` | 현재 Goal workflow 일시정지 |
+| `cancel` | 현재 Goal workflow 취소 |
+| `status` | Core, control, job 상태 조회 |
+| `final-report` | GoalVerdict에 근거한 최종 보고 출력 |
+
+`project`, `model`, `goal`, `plan`, `task`, `run`, `attempt`, `validate`, `recover`, `report` 아래에는 진단과 세부 운영을 위한 중첩 명령이 있다. 전체 목록은 `flowmarshal-engine --help`와 각 명령의 `--help`에서 확인할 수 있다.
+
+## 데이터와 안전 경계
+
+별도 `--db`, `--artifacts` 옵션을 주지 않으면 CLI를 실행한 현재 작업 디렉터리 아래에 저장한다.
+
+```text
+.flowmarshal-engine/flowmarshal-engine.sqlite3
+.flowmarshal-engine/artifacts/
+```
+
+- Engine writer는 schema 4의 새 DB만 만들며 schema 3 원장과 과거 receipt/history는 read-only adapter로 연다.
+- prototype이나 운영 DB를 제자리 migration하지 않는다.
+- materialize 이후 입력이나 대상이 바뀌면 `STALE_EXECUTION_INPUT`으로 실행을 중단한다.
+- 결과가 불명확한 외부 intent는 자동으로 다시 실행하지 않고 기존 binding과 provider 상태를 먼저 관측한다.
+- 같은 프로젝트의 Attempt는 qualification 전까지 직렬로 실행한다.
+- 필수 evidence와 validation을 확인해야 Task와 Goal을 완료할 수 있다.
+
+세부 권위와 불변조건은 [전면 재설계 문서](docs/orchestration-redesign.md)와 [1.0 계약](docs/redesign-1.0-contract.md)에 정의되어 있다.
+
+## 개발과 검증
+
+저장소의 개발·평가 모듈까지 검사하려면 사용자 설치와 분리된 개발 환경에 editable로 설치한다.
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e .
+.\.venv\Scripts\python.exe -m compileall -q src tests
+.\.venv\Scripts\python.exe -m unittest discover -s tests -p 'test_engine*.py' -v
+.\.venv\Scripts\python.exe -m flowmarshal.engine.smoke --project-root <project-root>
+.\.venv\Scripts\python.exe -m pip check
+```
+
+이 검사는 로컬 개발 확인용이다. 실제 역할 48회, Planning 18회, 실제 요청 E2E, 깨끗한 설치와 독립 최종 감사까지 모두 통과해야 1.0으로 승격한다. 상세 실행 계약은 [Engine qualification](docs/engine-qualification.md)을 따른다.
+
+## GUI 프로토타입
+
+`apps/desktop`에는 React/TypeScript 기반의 클릭형 UX 프로토타입이 있다. 패키지 관리자는 `pnpm@11.19.0`을 사용한다.
+
+```powershell
+cd apps\desktop
 pnpm install
 pnpm dev
 ```
 
-프로토타입에는 Goal 확인, Plan DAG 비교와 당시 계약의 exact-digest 활성화, `run once` 실행 관찰, `STALE_EXECUTION_INPUT`, `EXTERNAL_UNKNOWN` 복구 흐름이 포함된다. 상단의 `데모 시나리오`에서 세 흐름을 전환할 수 있다. 최신 Engine 계약에서는 사용자가 목표·범위·효과·운영 정책을 GoalAuthorization으로 승인하고 Core가 그 경계 안의 Plan revision을 자동 활성화하므로, 실제 Engine 연결 전에 GUI 승인 흐름을 이 계약에 맞춰야 한다.
+이 앱은 `MockEngineClient`의 합성 snapshot을 사용한다. 실제 Engine, SQLite, Codex runtime을 읽거나 변경하지 않으며 현재 1.0 판정에도 영향을 주지 않는다. 화면과 Engine 연결 경계는 [GUI 인터페이스 설계](docs/gui-interface-design.md)에 정리되어 있다.
 
-이 구현은 `MockEngineClient`의 합성 snapshot을 사용하는 **비권위 UX 검증물**이다. 실제 Engine, SQLite, Codex runtime을 읽거나 변경하지 않으며 현재 `NO-GO` 판정을 바꾸지 않는다. 실제 연결은 transport-neutral `EngineClient` 계약 뒤에 별도 `HttpEngineClient`로 추가한다.
+## 문서
 
-```powershell
-pnpm typecheck
-pnpm test
-pnpm build
-pnpm exec playwright install chromium firefox webkit
-pnpm test:e2e
-```
-
-데스크톱 셸은 UX 검토 후 Windows에서 작은 Tauri sidecar spike를 먼저 수행하고, macOS/Linux는 동일 프런트엔드의 패키징·runtime·서명·복구 E2E를 각각 qualification한 뒤 지원한다. 상세 경계는 [GUI 인터페이스 설계명세](docs/gui-interface-design.md)를 따른다.
-
-## source-tree 개발 평가
-
-아래는 source-tree 개발 평가 전용 module 명령이다. `flowmarshal-engine-eval`은 wheel entrypoint가 아니며, 명시적으로 결속한 source root와 재현 입력 bundle에서만 실행한다. 기존 thread·원장을 먼저 관측하고 미확정 효과를 새 attempt로 우회하지 않는다. usage 누락만으로 새 실행을 차단하거나 아래 benchmark-report 옵션을 현재 1.0 필수 조건으로 사용하지 않는다. 완료 cell만 immutable checkpoint가 되며 사용량 제한은 `PAUSED_RATE_LIMIT`으로 남겨 같은 run root에서 재개한다.
-
-```powershell
-$env:FLOWMARSHAL_ENGINE_SOURCE_ROOT = (Resolve-Path <승인된-source-root>).Path
-python -m flowmarshal.engine.eval_cli run --scope deterministic --project-root $env:FLOWMARSHAL_ENGINE_SOURCE_ROOT
-python -m flowmarshal.engine.eval_cli run --scope role-fixture --project-root $env:FLOWMARSHAL_ENGINE_SOURCE_ROOT
-python -m flowmarshal.engine.eval_cli run --scope full-planning-pipeline --project-root $env:FLOWMARSHAL_ENGINE_SOURCE_ROOT
-python -m flowmarshal.engine.eval_cli run --scope project-e2e --project-root $env:FLOWMARSHAL_ENGINE_SOURCE_ROOT
-python -m flowmarshal.engine.eval_cli resume --run-root <run-root>
-python -m flowmarshal.engine.eval_cli benchmark --cells-file <36-cell.json> --scope-report <report> ...
-python -m flowmarshal.engine.eval_cli cutover --scope-report <report> ... --benchmark-report <report>
-```
-
-고정 역할 설정과 상세 합격 기준은 [Engine qualification 실행 지침](docs/engine-qualification.md)을 따른다.
-
-실제 모델 평가에는 검증할 Codex executable과 명시 source root·재현 입력을 결속한다. 과거 SDK/runtime 실패·성공 관측은 [승인 이전 실행 현황](docs/engine-implementation-status-before-redesign-1.0.md)의 해당 source 근거로만 읽는다. 실행 파일을 바꾸면 새 evaluation 계약과 run root를 사용한다.
-
-기존 benchmark 수집기·S10~S12 계측·정산 감사는 과거 구현 근거다. 측정되지 않은 lifecycle 비율은 null/NOT_OBSERVED로 남긴다. R3.1 36-cell 비교는 별도 비차단 보고이며 새 1.0 필수 검증을 대신하지 않는다.
-
-동결 검사는 이 저장소 외에 형제 디렉터리 `../자동화템플릿/prototypes/skills/flowmarshal-work-planner`의 원본 Planner 스킬 7개 파일도 요구한다. 새 clone에서 해당 감사 기준선이 없으면 freeze Gate는 실패하며 자동으로 생략하거나 재생성하지 않는다. 인증정보·로컬 실행 DB·Codex home 복제본·평가 작업 디렉터리는 Git에서 제외하고 기존 로컬 파일은 보존한다.
-
-## source-tree 개발 설치와 검증
-
-다음 editable 설치는 개발용이다. 승인된 source_root에서 실행하며 로컬 main을 작업 대상으로 묵시 선택하지 않는다. 1.0의 깨끗한 non-editable 설치 검증은 FM-10/12의 별도 필수 책임이다.
-
-```powershell
-cd <승인된-source_root>
-.\.venv\Scripts\python.exe -m pip install -e .
-.\.venv\Scripts\python.exe -m compileall -q src tests
-.\.venv\Scripts\python.exe -m unittest discover -s tests -v
-.\.venv\Scripts\python.exe -m pip check
-```
-
-새 Engine만 빠르게 검사하려면 다음을 사용한다.
-
-```powershell
-.\.venv\Scripts\python.exe -m unittest discover -s tests -p 'test_engine*.py' -v
-.\.venv\Scripts\python.exe -m flowmarshal.engine.smoke --project-root <승인된-source_root>
-.\.venv\Scripts\flowmarshal-engine.exe --help
-```
-
-기본 상태는 프로젝트 루트의 `.flowmarshal-engine/flowmarshal-engine.sqlite3`와 `.flowmarshal-engine/artifacts`에 저장한다. Engine writer는 schema 4 새 DB만 만들고 schema 3/raw receipt/history는 read-only adapter로만 연다. SQLite application ID `0x464D4531`과 schema revision을 각각 검사하고 prototype/운영 DB의 자동 제자리 migration을 금지한다.
+| 문서 | 내용 |
+|---|---|
+| [전면 재설계](docs/orchestration-redesign.md) | 제품 목적, 권위 구조와 실행 설계 |
+| [1.0 계약](docs/redesign-1.0-contract.md) | 1.0 수용 기준과 필수 검증 |
+| [Engine cutover ADR](docs/engine-cutover-adr.md) | legacy 분리와 1.0 전환 결정 |
+| [설치 계약](docs/engine-package-install.md) | wheel, 의존성, schema 경계 |
+| [문서 지도](docs/README.md) | 전체 문서와 역사적 근거 색인 |
 
 ## 코드 지도
 
-| 영역 | 파일 |
+| 영역 | 경로 |
 |---|---|
 | 권위 schema와 불변조건 | `src/flowmarshal/engine/domain.py` |
-| SQLite 원장·History | `src/flowmarshal/engine/ledger.py` |
-| Goal 정규화·검토 | `src/flowmarshal/engine/goal.py` |
-| Project Map·Context Pack | `src/flowmarshal/engine/context.py` |
-| Skeleton-first search | `src/flowmarshal/engine/planning.py` |
-| 실제 Planner 역할 adapter | `src/flowmarshal/engine/planner_roles.py` |
-| 모델 inventory·배정 | `src/flowmarshal/engine/models.py` |
-| 서비스·상태 전이 | `src/flowmarshal/engine/service.py` |
-| Codex Runtime·dispatcher | `src/flowmarshal/engine/runtime.py` |
-| 평가·cutover Gate | `src/flowmarshal/engine/evaluation.py` |
-| qualification 실행기 | `src/flowmarshal/engine/qualification.py`, `e2e_qualification.py`, `eval_cli.py` |
-| CLI와 보고 | `src/flowmarshal/engine/cli.py`, `reporting.py` |
-
-전체 문서와 역사적 증거는 [문서 지도](docs/README.md)에서 찾을 수 있다.
-
-사용자 wheel과 source-tree 평가 입력의 경계, SDK/Python pin, schema 4 새 DB와
-schema 3 read-only 계약은 [Engine 설치·개발 평가 계약](docs/engine-package-install.md)을
-따른다.
+| SQLite 원장과 History | `src/flowmarshal/engine/ledger.py` |
+| Goal 정규화와 검토 | `src/flowmarshal/engine/goal.py` |
+| Project Map과 Context Pack | `src/flowmarshal/engine/context.py` |
+| Skeleton-first Planning | `src/flowmarshal/engine/planning.py` |
+| 응용 façade | `src/flowmarshal/engine/application.py` |
+| RuntimeJob과 Codex adapter | `src/flowmarshal/engine/runtime.py` |
+| 서비스와 상태 전이 | `src/flowmarshal/engine/service.py` |
+| CLI와 보고 | `src/flowmarshal/engine/cli.py`, `src/flowmarshal/engine/reporting.py` |
