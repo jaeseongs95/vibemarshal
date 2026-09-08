@@ -9,7 +9,7 @@ from typing import Any
 
 from ..canonical import sha256_digest
 from .budget import BudgetManager
-from .domain import BudgetUsageRecord
+from .domain import BudgetUsageRecord, EngineModel
 from .evaluation import BenchmarkCell, EvaluationCellCheckpoint
 from .evaluation_budget import EvaluationPolicies
 from .ledger import SQLiteEngineLedger
@@ -30,6 +30,41 @@ _TRACE_COUNTERS = ("duplicate_interrupt_count", "unapproved_retry_or_resume_coun
 
 class BenchmarkSafetyError(ValueError):
     """원본 cell과 안전성 관측의 결속을 검증하지 못했다."""
+
+
+class NonBlockingComparisonReport(EngineModel):
+    """필수 qualification gate와 합산하지 않는 비교 전용 보고서."""
+
+    format: str = "flowmarshal.non-blocking-comparison.v1"
+    suite: str
+    complete: bool
+    observed_metrics: dict[str, Any]
+    not_observed: tuple[str, ...] = ()
+    failures: tuple[str, ...] = ()
+    release_blocking: bool = False
+
+    @property
+    def report_digest(self) -> str:
+        return sha256_digest(self)
+
+
+def non_blocking_comparison_report(
+    *,
+    suite: str,
+    observed_metrics: dict[str, Any],
+    not_observed: tuple[str, ...] = (),
+    failures: tuple[str, ...] = (),
+) -> NonBlockingComparisonReport:
+    """performance36/R3.1/lifecycle 결과를 기능 gate와 분리해 보존한다."""
+
+    return NonBlockingComparisonReport(
+        suite=suite,
+        complete=not not_observed and not failures,
+        observed_metrics=observed_metrics,
+        not_observed=not_observed,
+        failures=failures,
+        release_blocking=False,
+    )
 
 
 def _json(value: str | None) -> Any:

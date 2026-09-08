@@ -25,6 +25,11 @@ from .qualification import (
     _deterministic_contract,
     _checkpoint_fixture_result,
     source_manifest_digest,
+    qualification_suite_manifest,
+)
+from .qualification_manifest import (
+    QualificationCellOutcome,
+    evaluate_qualification_responsibilities,
 )
 
 
@@ -198,9 +203,14 @@ def _planning(
 
 
 def _project_e2e(
-    cells: tuple[EvaluationCellCheckpoint, ...], errors: list[str]
+    *,
+    root: Path,
+    contract: EvaluationContract,
+    cells: tuple[EvaluationCellCheckpoint, ...],
+    errors: list[str],
 ) -> tuple[dict[str, Any], tuple[str, ...]]:
     raws: list[dict[str, Any]] = []
+    outcomes: list[QualificationCellOutcome] = []
     for checkpoint, scenario in zip(cells, E2E_SCENARIOS, strict=False):
         raw = checkpoint.raw_structured_assessment
         if raw.get("scenario") != scenario or raw.get("order_seed") != 0 or not isinstance(raw.get("passed"), bool):
@@ -210,16 +220,33 @@ def _project_e2e(
         events = receipt.get("events") if isinstance(receipt, dict) else None
         if not isinstance(events, list) or receipt.get("events_digest") != sha256_digest(events):
             _error(errors, "SCOPE_REPORT_E2E_RECEIPT_BINDING_MISMATCH")
+        try:
+            outcomes.append(
+                QualificationCellOutcome.model_validate(raw["qualification_outcome"])
+            )
+        except Exception:
+            _error(errors, "SCOPE_REPORT_E2E_RESPONSIBILITY_EVIDENCE_MISSING")
         raws.append(raw)
-    failures = tuple(
+    cell_failures = tuple(
         f"{item['scenario']}: {item.get('failure') or item.get('error') or 'FAIL'}"
         for item in raws if not item["passed"]
     )
+    responsibility_report = evaluate_qualification_responsibilities(
+        qualification_suite_manifest(root),
+        tuple(outcomes),
+        evaluation_contract_digest=contract.contract_digest,
+    )
+    failures = tuple((*cell_failures, *responsibility_report.failures))
     metrics = {
         "cell_count": len(raws),
         "passed_cell_count": sum(1 for item in raws if item["passed"]),
         "actual_codex_cell_count": len(raws),
         "duplicate_effect_count": sum(1 for item in raws if item["scenario"] == "unknown-receipt-no-duplicate" and item.get("thread_create_count") != 1),
+        "responsibility_count": responsibility_report.responsibility_count,
+        "passed_responsibility_count": responsibility_report.passed_responsibility_count,
+        "not_run_responsibility_count": len(
+            responsibility_report.not_run_responsibility_ids
+        ),
     }
     return metrics, failures
 
@@ -259,7 +286,12 @@ def verify_scope_report(
             _error(errors, "SCOPE_REPORT_PLANNING_ORDER_SEEDS_MISMATCH")
         metrics, failures = _planning(root=base, cells=cells, errors=errors)
     elif report.scope.value == "activation_execution_validation_restart_e2e":
-        metrics, failures = _project_e2e(cells, errors)
+        metrics, failures = _project_e2e(
+            root=base,
+            contract=contract,
+            cells=cells,
+            errors=errors,
+        )
     else:  # pydantic EvaluationScope가 막지만 미래 enum 변경에는 fail closed 한다.
         _error(errors, "SCOPE_REPORT_SCOPE_UNSUPPORTED")
         metrics, failures = {}, ()

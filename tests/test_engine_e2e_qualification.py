@@ -17,6 +17,7 @@ from flowmarshal.engine.e2e_qualification import (
     _e2e_failure_disposition,
     _guard_e2e_partial_resume,
     _prepare,
+    _prepare_from_raw_request,
     _preserve_inventory_observation,
     _unknown_receipt,
     run_project_e2e,
@@ -324,6 +325,61 @@ class EngineE2EQualificationTests(unittest.TestCase):
             self.assertEqual("qualification", activated["activation_source"])
             self.assertEqual("flowmarshal-engine-eval project-e2e", activated["driver"])
             self.assertEqual(str(workspace.resolve()), activated["workspace"])
+
+    def test_raw_request_prepare_uses_user_facade_roles_and_one_authorization(self) -> None:
+        from tests.engine_helpers import inventory
+        from tests.engine_inspection_helpers import InspectionScriptedRunner
+        from tests.test_engine_user_facade import _responses, _roles
+
+        policies = load_evaluation_policies(
+            budget_policy_path=ROOT / "config" / "pre-1.0-validation-budget.json",
+            role_timeout_policy_path=ROOT / "config" / "pre-1.0-role-timeouts.json",
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root = Path(raw) / "raw-request-cell"
+            cell_root.mkdir()
+            workspace, _ = _copy_fixture(ROOT, cell_root)
+            runner = InspectionScriptedRunner(_responses())
+            prepared = _prepare_from_raw_request(
+                workspace=workspace,
+                state_root=cell_root / "state",
+                runtime=FakeCodexRuntime(inventory()),
+                roles=_roles(),
+                evaluation_policies=policies,
+                evaluation_contract_digest=sha256_digest({"contract": "raw"}),
+                fixture_digest=sha256_digest({"fixture": "raw"}),
+                source_request="두 단계 변경을 실제 사용자 흐름으로 준비해줘.",
+                structured_runner=runner,
+            )
+            self.assertEqual("live", prepared.preparation_provenance.value)
+            self.assertIsNone(prepared.proposal)
+            self.assertEqual(
+                (
+                    "raw_request",
+                    "goal_normalizer",
+                    "goal_reviewer",
+                    "skeleton_generator",
+                    "skeleton_reviewer",
+                    "plan_expander",
+                    "plan_reviewer",
+                    "goal_authorization",
+                    "plan_activation",
+                ),
+                prepared.pipeline_stages,
+            )
+            generated = json.loads(
+                (cell_root / "generated-plan.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(2, len(generated["plan"]["definition"]["tasks"]))
+            with prepared.service.ledger.read() as connection:
+                authorization_count = connection.execute(
+                    "SELECT COUNT(*) FROM goal_authorizations WHERE project_id=?",
+                    (prepared.project_id,),
+                ).fetchone()[0]
+            self.assertEqual(1, authorization_count)
+            self.assertTrue((cell_root / "raw-request.json").is_file())
+            self.assertTrue((cell_root / "goal-preparation.json").is_file())
+            self.assertTrue((cell_root / "planning-outcome.json").is_file())
 
     def test_unknown_create_receipt_observes_empty_thread_and_safely_releases_reservation(self) -> None:
         policies = load_evaluation_policies(

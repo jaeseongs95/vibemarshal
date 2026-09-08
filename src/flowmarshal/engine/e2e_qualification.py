@@ -67,6 +67,7 @@ from .evaluation_budget import (
     verify_service_budget_policy,
     write_immutable_run_metadata,
 )
+from .application import EngineApplication
 from .budget import BudgetManager
 from .ledger import SQLiteEngineLedger
 from .models import EngineRoleConfiguration, ModelInventory
@@ -84,9 +85,19 @@ from .qualification import (
     _preflight,
     _profile,
     _write_json,
+    build_qualification_reproduction_bundle,
     default_role_configuration,
     project_root,
+    qualification_suite_manifest,
     source_manifest_digest,
+)
+from .qualification_manifest import (
+    EvidenceProvenance,
+    QualificationCellOutcome,
+    QualificationCellStatus,
+    QualificationFailureClass,
+    classify_qualification_failure,
+    evaluate_qualification_responsibilities,
 )
 from .runtime import (
     CodexAppServerRuntime,
@@ -450,8 +461,11 @@ class PreparedE2E:
     task_id: str
     plan_revision_id: str
     activation_digest: str
-    proposal: ExecutionSpecProposal
+    proposal: ExecutionSpecProposal | None
     workspace: Path
+    preparation_provenance: EvidenceProvenance = EvidenceProvenance.FAKE
+    pipeline_stages: tuple[str, ...] = ()
+    preparation_evidence_refs: tuple[str, ...] = ()
 
 
 _CELL_STATE_SCHEMA = "flowmarshal.project-e2e.cell-state.v1"
@@ -475,7 +489,14 @@ def _write_prepared_state(
         "plan_revision_id": prepared.plan_revision_id,
         "activation_digest": prepared.activation_digest,
         "workspace": str(prepared.workspace.resolve()),
-        "proposal": prepared.proposal.model_dump(mode="json"),
+        "proposal": (
+            None
+            if prepared.proposal is None
+            else prepared.proposal.model_dump(mode="json")
+        ),
+        "preparation_provenance": prepared.preparation_provenance.value,
+        "pipeline_stages": list(prepared.pipeline_stages),
+        "preparation_evidence_refs": list(prepared.preparation_evidence_refs),
     }
     payload["state_digest"] = sha256_digest(payload)
     _write_json(cell_root / "cell-state.json", payload)
@@ -515,7 +536,12 @@ def _restore_prepared_state(
     )
     service = EngineService(ledger)
     service.initialize()
-    proposal = ExecutionSpecProposal.model_validate(document.get("proposal"))
+    proposal_document = document.get("proposal")
+    proposal = (
+        None
+        if proposal_document is None
+        else ExecutionSpecProposal.model_validate(proposal_document)
+    )
     prepared = PreparedE2E(
         service=service,
         project_id=str(document["project_id"]),
@@ -524,11 +550,18 @@ def _restore_prepared_state(
         activation_digest=str(document["activation_digest"]),
         proposal=proposal,
         workspace=workspace,
+        preparation_provenance=EvidenceProvenance(
+            document.get("preparation_provenance", EvidenceProvenance.FAKE.value)
+        ),
+        pipeline_stages=tuple(document.get("pipeline_stages", ())),
+        preparation_evidence_refs=tuple(
+            document.get("preparation_evidence_refs", ())
+        ),
     )
     status = service.status(prepared.project_id)
     if status["project"]["active_plan_revision_id"] != prepared.plan_revision_id:
         raise QualificationRunError("E2E cell의 active Plan 결속이 다릅니다.")
-    if proposal.task_id != prepared.task_id:
+    if proposal is not None and proposal.task_id != prepared.task_id:
         raise QualificationRunError("E2E cell의 proposal Task 결속이 다릅니다.")
     return prepared
 
@@ -548,6 +581,162 @@ def _assignment(roles: EngineRoleConfiguration) -> ModelAssignmentContract:
             allowed_fallbacks=tuple(ModelFallback(model=x.model, effort=x.effort) for x in roles.validator.allowed_fallbacks),
         ),
         independence_required=True,
+    )
+
+
+def _prepare_from_raw_request(
+    *,
+    workspace: Path,
+    state_root: Path,
+    runtime: CodexRuntimePort,
+    roles: EngineRoleConfiguration,
+    evaluation_policies: EvaluationPolicies,
+    evaluation_contract_digest: str,
+    fixture_digest: str,
+    source_request: str,
+    structured_runner: Any | None = None,
+) -> PreparedE2E:
+    """실제 사용자 facade로 raw request부터 승인·Plan 활성화까지 수행한다."""
+
+    ledger = SQLiteEngineLedger(
+        state_root / "flowmarshal-engine.sqlite3",
+        artifact_root=state_root / "artifacts",
+    )
+    service = EngineService(ledger)
+    service.initialize()
+    project_id = service.create_project(name="Engine raw-request E2E", root=workspace)
+    service.register_profile(_profile(project_id))
+    BudgetManager(service).configure(project_id, evaluation_policies.budget)
+    application = EngineApplication(
+        service,
+        runtime=runtime,
+        role_configuration=roles,
+        structured_runner=structured_runner,
+    )
+    preparation = application.prepare(
+        project_id,
+        source_request=source_request,
+        candidate_count=1,
+    )
+    if (
+        preparation.status != "ready_for_authorization"
+        or preparation.planning is None
+        or preparation.planning.selected_activation_digest is None
+    ):
+        raise QualificationRunError(
+            "E2E_RAW_REQUEST_PIPELINE_NOT_READY: 실제 Goal/Planning 결과가 승인 후보를 "
+            "만들지 못했습니다."
+        )
+    selected_digest = preparation.planning.selected_activation_digest
+    selected = [
+        item.plan
+        for item in preparation.planning.plan_evaluations
+        if item.plan.activation_digest == selected_digest
+    ]
+    if len(selected) != 1:
+        raise QualificationRunError("E2E_SELECTED_PLAN_CARDINALITY_MISMATCH")
+    plan = selected[0]
+    authorization = application.authorize(
+        project_id,
+        source="qualification user authorization",
+    )
+    evidence_root = state_root.parent
+    raw_request_path = evidence_root / "raw-request.json"
+    goal_path = evidence_root / "goal-preparation.json"
+    planning_path = evidence_root / "planning-outcome.json"
+    authorization_path = evidence_root / "goal-authorization.json"
+    generated_plan_path = evidence_root / "generated-plan.json"
+    activation_receipt_path = evidence_root / "plan-activation-receipt.json"
+    _write_json(
+        raw_request_path,
+        {
+            "schema": "flowmarshal.project-e2e.raw-request.v1",
+            "evaluation_contract_digest": evaluation_contract_digest,
+            "fixture_digest": fixture_digest,
+            "source_request": source_request,
+            "source_request_digest": sha256_bytes(source_request.encode("utf-8")),
+        },
+    )
+    _write_json(goal_path, preparation.goal_preparation)
+    _write_json(planning_path, preparation.planning)
+    _write_json(authorization_path, authorization)
+    _write_json(
+        generated_plan_path,
+        {
+            "schema": "flowmarshal.project-e2e.generated-plan.v2",
+            "evaluation_contract_digest": evaluation_contract_digest,
+            "fixture_digest": fixture_digest,
+            "source": "EngineApplication.prepare",
+            "planning_search_id": preparation.planning_search_id,
+            "plan": plan.model_dump(mode="json"),
+            "plan_revision_id": plan.plan_revision_id,
+            "activation_digest": plan.activation_digest,
+        },
+    )
+    _write_json(
+        activation_receipt_path,
+        {
+            "schema": "flowmarshal.project-e2e.plan-activation-receipt.v2",
+            "evaluation_contract_digest": evaluation_contract_digest,
+            "fixture_digest": fixture_digest,
+            "source": "EngineApplication.authorize",
+            "authorization_id": authorization.authorization.authorization_id,
+            "activation_id": authorization.activation_id,
+            "plan_revision_id": plan.plan_revision_id,
+            "activation_digest": plan.activation_digest,
+        },
+    )
+    with service.ledger.read() as connection:
+        role_rows = connection.execute(
+            "SELECT role FROM provider_calls WHERE project_id=? ORDER BY rowid",
+            (project_id,),
+        ).fetchall()
+    actual_roles = tuple(str(row["role"]) for row in role_rows)
+    required_roles = (
+        "goal_normalizer",
+        "goal_reviewer",
+        "skeleton_generator",
+        "skeleton_reviewer",
+        "plan_expander",
+    )
+    if not all(role in actual_roles for role in required_roles) or not any(
+        role in {"plan_reviewer", "compact_plan_reviewer", "critical_plan_reviewer"}
+        for role in actual_roles
+    ):
+        raise QualificationRunError(
+            "E2E_RAW_REQUEST_ROLE_COVERAGE_MISSING: " + ",".join(actual_roles)
+        )
+    return PreparedE2E(
+        service=service,
+        project_id=project_id,
+        task_id=plan.definition.tasks[0].task_id,
+        plan_revision_id=plan.plan_revision_id,
+        activation_digest=plan.activation_digest,
+        proposal=None,
+        workspace=workspace,
+        preparation_provenance=EvidenceProvenance.LIVE,
+        pipeline_stages=(
+            "raw_request",
+            "goal_normalizer",
+            "goal_reviewer",
+            "skeleton_generator",
+            "skeleton_reviewer",
+            "plan_expander",
+            "plan_reviewer",
+            "goal_authorization",
+            "plan_activation",
+        ),
+        preparation_evidence_refs=tuple(
+            str(path.resolve())
+            for path in (
+                raw_request_path,
+                goal_path,
+                planning_path,
+                authorization_path,
+                generated_plan_path,
+                activation_receipt_path,
+            )
+        ),
     )
 
 
@@ -960,6 +1149,11 @@ def _normal_completion(
             ),
             roles,
         )
+    if provider is None and prepared.proposal is None:
+        raise QualificationRunError(
+            "E2E_EXECUTION_PROPOSAL_PROVIDER_REQUIRED: raw-request E2E는 실제 "
+            "execution_spec_prepare 역할을 사용해야 합니다."
+        )
     dispatcher = EngineDispatcher(prepared.service, runtime, proposal_provider=provider)
     deadline = time.monotonic() + 900
     actions: list[str] = []
@@ -998,17 +1192,28 @@ def _normal_completion(
 
 
 def _stale_after_materialization(
-    prepared: PreparedE2E, runtime: Any, source_digest: str
+    prepared: PreparedE2E,
+    runtime: Any,
+    source_digest: str,
+    *,
+    roles: EngineRoleConfiguration | None = None,
 ) -> dict[str, Any]:
-    dispatcher = EngineDispatcher(prepared.service, runtime)
-    first = dispatcher.run_once(prepared.project_id, proposal=prepared.proposal)
+    application = EngineApplication(
+        prepared.service,
+        runtime=runtime,
+        role_configuration=roles,
+    )
+    first = application.run_once(
+        prepared.project_id,
+        proposal=prepared.proposal,
+    )
     (prepared.workspace / "app.py").write_text(
         (prepared.workspace / "app.py").read_text(encoding="utf-8") + "\n# external change\n",
         encoding="utf-8",
     )
     failure: str | None = None
     try:
-        dispatcher.run_once(prepared.project_id)
+        application.run_once(prepared.project_id)
     except EngineServiceError as error:
         failure = str(error)
     return {
@@ -1023,18 +1228,30 @@ def _stale_after_materialization(
 
 
 def _restart_resume(
-    prepared: PreparedE2E, runtime: FakeCodexRuntime, source_digest: str
+    prepared: PreparedE2E,
+    runtime: FakeCodexRuntime,
+    source_digest: str,
+    *,
+    roles: EngineRoleConfiguration | None = None,
 ) -> dict[str, Any]:
-    dispatcher = EngineDispatcher(prepared.service, runtime)
-    dispatcher.run_once(prepared.project_id, proposal=prepared.proposal)
-    dispatched = dispatcher.run_once(prepared.project_id)
+    application = EngineApplication(
+        prepared.service,
+        runtime=runtime,
+        role_configuration=roles,
+    )
+    application.run_once(prepared.project_id, proposal=prepared.proposal)
+    dispatched = application.run_once(prepared.project_id)
     with prepared.service.ledger.read() as connection:
         row = connection.execute(
             "SELECT binding_json FROM attempts WHERE id = ?", (dispatched.attempt_id,)
         ).fetchone()
     binding = ThreadBinding.model_validate_json(row["binding_json"])
     runtime.threads[binding.thread_id].terminal_status = "interrupted"
-    restarted = EngineDispatcher(prepared.service, runtime)
+    restarted = EngineApplication(
+        prepared.service,
+        runtime=runtime,
+        role_configuration=roles,
+    )
     resumed = restarted.run_once(prepared.project_id)
     read_before_resume = runtime.read_calls >= 1 and runtime.resume_calls == 1
     runtime.complete(binding.thread_id, response="재개된 worker가 종료됨")
@@ -1053,10 +1270,20 @@ def _restart_resume(
 
 
 def _unknown_receipt(
-    prepared: PreparedE2E, runtime: Any, source_digest: str
+    prepared: PreparedE2E,
+    runtime: Any,
+    source_digest: str,
+    *,
+    roles: EngineRoleConfiguration | None = None,
 ) -> dict[str, Any]:
-    EngineDispatcher(prepared.service, runtime).run_once(
-        prepared.project_id, proposal=prepared.proposal
+    application = EngineApplication(
+        prepared.service,
+        runtime=runtime,
+        role_configuration=roles,
+    )
+    application.run_once(
+        prepared.project_id,
+        proposal=prepared.proposal,
     )
 
     def fault(point: str) -> None:
@@ -1065,12 +1292,12 @@ def _unknown_receipt(
 
     failed = False
     try:
-        EngineDispatcher(prepared.service, runtime, fault_hook=fault).run_once(
-            prepared.project_id
-        )
+        dispatcher = application._dispatcher()
+        dispatcher.fault_hook = fault
+        dispatcher.run_once(prepared.project_id)
     except RuntimeError:
         failed = True
-    recovered = EngineDispatcher(prepared.service, runtime).run_once(prepared.project_id)
+    recovered = application.run_once(prepared.project_id)
     reconciliation: dict[str, Any] | None = None
     if (
         isinstance(runtime, RecordedRuntime)
@@ -1258,6 +1485,7 @@ def _live_restart_resume(
     contract: EvaluationContract,
     fixture_digest: str,
     codex_bin: Path | str | None,
+    roles: EngineRoleConfiguration | None = None,
     project_binding: CodexProjectBinding | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """실제 App Server 연결과 Core 인스턴스를 닫은 뒤 같은 저장 turn을 재관측한다."""
@@ -1265,9 +1493,13 @@ def _live_restart_resume(
     journal = cell_root / "runtime-receipts.json"
     with CodexAppServerRuntime(codex_bin=codex_bin, project_binding=project_binding) as first_runtime:
         recorded = RecordedRuntime(first_runtime, journal=journal)
-        dispatcher = EngineDispatcher(prepared.service, recorded)
-        dispatcher.run_once(prepared.project_id, proposal=prepared.proposal)
-        dispatched = dispatcher.run_once(prepared.project_id)
+        application = EngineApplication(
+            prepared.service,
+            runtime=recorded,
+            role_configuration=roles,
+        )
+        application.run_once(prepared.project_id, proposal=prepared.proposal)
+        dispatched = application.run_once(prepared.project_id)
         with prepared.service.ledger.read() as connection:
             row = connection.execute(
                 "SELECT binding_json FROM attempts WHERE id = ?", (dispatched.attempt_id,)
@@ -1311,14 +1543,23 @@ def _live_restart_resume(
     with CodexAppServerRuntime(codex_bin=codex_bin, project_binding=project_binding) as second_runtime:
         recorded = RecordedRuntime(second_runtime, journal=journal)
         restart_index = len(recorded.events)
-        resumed = EngineDispatcher(restored.service, recorded).run_once(restored.project_id)
+        resumed = EngineApplication(
+            restored.service,
+            runtime=recorded,
+            role_configuration=roles,
+        ).run_once(restored.project_id)
         restart_operations = [item["operation"] for item in recorded.events[restart_index:]]
         read_before_resume = (
             "read" in restart_operations
             and "resume" in restart_operations
             and restart_operations.index("read") < restart_operations.index("resume")
         )
-        result = _normal_completion(restored, recorded, source_digest)
+        result = _normal_completion(
+            restored,
+            recorded,
+            source_digest,
+            roles=roles,
+        )
         result.update(
             {
                 "read_before_resume": read_before_resume,
@@ -1339,6 +1580,81 @@ def _live_restart_resume(
         return result, recorded.events
 
 
+def _responsibility_outcome(
+    *,
+    scenario: str,
+    prepared: PreparedE2E,
+    cell: dict[str, Any],
+    contract: EvaluationContract,
+    cell_root: Path,
+) -> QualificationCellOutcome:
+    """기존 4개 실행 cell이 실제로 증명한 책임만 명시적으로 투영한다."""
+
+    mapping = {
+        "normal-completion": (
+            "E2E-01",
+            (),
+            ("raw_request", "role_receipt", "ledger", "activation_receipt"),
+            (EvidenceProvenance.LIVE,),
+        ),
+        "stale-after-materialization": (
+            "E2E-11",
+            ("materialize", "freshness_check"),
+            ("execution_spec", "source_digest", "error", "effect_count"),
+            (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
+        ),
+        "stored-turn-restart-resume": (
+            "E2E-07",
+            (
+                "task_execution",
+                "restart",
+                "observe_existing",
+                "resume",
+                "independent_validation",
+                "goal_verdict",
+            ),
+            ("runtime_receipt", "binding", "restart_journal", "validation"),
+            (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
+        ),
+        "unknown-receipt-no-duplicate": (
+            "E2E-08",
+            ("task_execution", "fault", "observe_existing"),
+            ("intent", "runtime_receipt", "operation_journal", "effect_count"),
+            (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
+        ),
+    }
+    responsibility_id, suffix, evidence_kinds, provenance = mapping[scenario]
+    evidence_refs = (
+        *prepared.preparation_evidence_refs,
+        str((cell_root / "runtime-receipts.json").resolve()),
+        str((cell_root / "cell-state.json").resolve()),
+        str((cell_root / "state" / "flowmarshal-engine.sqlite3").resolve()),
+    )
+    if cell.get("passed"):
+        return QualificationCellOutcome(
+            cell_id=scenario,
+            evaluation_contract_digest=contract.contract_digest,
+            responsibility_ids=(responsibility_id,),
+            status=QualificationCellStatus.PASSED,
+            provenance=provenance,
+            pipeline_stages=prepared.pipeline_stages + suffix,
+            evidence_kinds=evidence_kinds,
+            evidence_refs=evidence_refs,
+        )
+    return QualificationCellOutcome(
+        cell_id=scenario,
+        evaluation_contract_digest=contract.contract_digest,
+        responsibility_ids=(responsibility_id,),
+        status=QualificationCellStatus.FAILED,
+        provenance=provenance,
+        pipeline_stages=prepared.pipeline_stages + suffix,
+        evidence_kinds=evidence_kinds,
+        evidence_refs=evidence_refs,
+        failure_class=QualificationFailureClass.PRODUCT,
+        failure_code=str(cell.get("failure") or cell.get("error") or "E2E_FAILED")[:500],
+    )
+
+
 def _contract(
     root: Path,
     inventory: ModelInventory,
@@ -1350,6 +1666,7 @@ def _contract(
     from .execution import ProviderExecutionPreparation, GoalTestPreparation, EXECUTION_PREPARATION_INSTRUCTIONS, GOAL_TEST_PREPARATION_INSTRUCTIONS
     from .worker_prompt import assemble_worker_prompt, PromptArtifactStore
     from .roles import strict_json_output_schema
+    suite = qualification_suite_manifest(root)
     fixture_digests = tuple(
         sha256_digest({"scenario": scenario, "source_fixture_digest": source_digest})
         for scenario in E2E_SCENARIOS
@@ -1366,7 +1683,12 @@ def _contract(
         role_configuration_digest=roles.configuration_digest,
         source_manifest_digest=source_manifest_digest(root),
         rules_digest=sha256_digest(
-            {"actual_codex": list(E2E_SCENARIOS), "restart": "new-app-server-and-core"}
+            {
+                "actual_codex": list(E2E_SCENARIOS),
+                "restart": "new-app-server-and-core",
+                "raw_request_pipeline": "EngineApplication.prepare+authorize",
+                "responsibility_manifest_digest": suite.manifest_digest,
+            }
             | (
                 policy_contract_fragment(policies)
                 if policies is not None
@@ -1375,7 +1697,12 @@ def _contract(
         ),
         threshold_digest=sha256_digest({"all_scenarios_pass": True, "duplicate_effects": 0}),
         taxonomy_digest=sha256_digest(
-            {"requirements": ["digest", "binding", "evidence", "validation", "goal", "history"]}
+            {
+                "requirements": [
+                    item.model_dump(mode="json")
+                    for item in suite.e2e_responsibilities
+                ]
+            }
         ),
         prompt_digest=sha256_digest({"task": inspect.getsource(assemble_worker_prompt),
                                     "artifact": inspect.getsource(PromptArtifactStore),
@@ -1383,7 +1710,8 @@ def _contract(
                                     "preparation": EXECUTION_PREPARATION_INSTRUCTIONS,
                                     "goal_preparation": GOAL_TEST_PREPARATION_INSTRUCTIONS,
                                     "validator": inspect.getsource(EngineDispatcher._role_for_attempt),
-                                    "fixture_contract": inspect.getsource(_prepare)}),
+                                    "fixture_contract": inspect.getsource(_prepare_from_raw_request),
+                                    "responsibility_evaluator": inspect.getsource(evaluate_qualification_responsibilities)}),
         output_schema_digest=sha256_digest({
             "preparation": strict_json_output_schema(ProviderExecutionPreparation.model_json_schema()),
             "goal": strict_json_output_schema(GoalTestPreparation.model_json_schema()),
@@ -1429,6 +1757,13 @@ def run_project_e2e(
         ).resolve()
         store = ImmutableCheckpointStore(destination, contract)
         store.initialize()
+        build_qualification_reproduction_bundle(
+            root=base,
+            destination=destination / "reproduction-bundle",
+            inventory=inventory,
+            roles=roles,
+            contracts=(contract,),
+        )
         audit_path = destination / (
             "inventory-observation-" + inventory.inventory_digest[7:] + ".json"
         )
@@ -1455,6 +1790,9 @@ def run_project_e2e(
                 if store.completed(digest, 0) is not None:
                     continue
                 cell_root = destination / "work" / scenario
+                recorded = RecordedRuntime(
+                    real_runtime, journal=cell_root / "runtime-receipts.json"
+                )
                 if cell_root.exists():
                     if scenario != "normal-completion" or prior_state not in {
                         EvaluationRunStatus.PAUSED_RATE_LIMIT,
@@ -1470,6 +1808,11 @@ def run_project_e2e(
                         evaluation_contract_digest=contract.contract_digest,
                         fixture_digest=digest,
                     )
+                    if prepared.preparation_provenance is not EvidenceProvenance.LIVE:
+                        raise QualificationRunError(
+                            "E2E_RAW_REQUEST_PIPELINE_BYPASSED: fake/pre-generated Goal·Plan "
+                            "cell은 실제 E2E에서 재사용할 수 없습니다."
+                        )
                     verify_service_budget_policy(
                         prepared.service, prepared.project_id, evaluation_policies
                     )
@@ -1478,15 +1821,18 @@ def run_project_e2e(
                     workspace, copied_digest = _copy_fixture(base, cell_root)
                     if copied_digest != source_digest:
                         raise QualificationRunError("복사 직전 E2E fixture digest가 변경됐습니다.")
-                    prepared = _prepare(
+                    prepared = _prepare_from_raw_request(
                         workspace=workspace,
                         state_root=cell_root / "state",
-                        inventory=inventory,
+                        runtime=recorded,
                         roles=roles,
-                        semantic_task_validation=scenario == "normal-completion",
                         evaluation_policies=evaluation_policies,
                         evaluation_contract_digest=contract.contract_digest,
                         fixture_digest=digest,
+                        source_request=(
+                            "app.py의 add 함수가 두 정수의 합을 반환하도록 최소 수정하고 "
+                            "공개 함수 계약을 유지하며 test_app.py 검증을 통과시켜줘."
+                        ),
                     )
                     _write_prepared_state(
                         cell_root,
@@ -1494,9 +1840,6 @@ def run_project_e2e(
                         evaluation_contract_digest=contract.contract_digest,
                         fixture_digest=digest,
                     )
-                recorded = RecordedRuntime(
-                    real_runtime, journal=cell_root / "runtime-receipts.json"
-                )
                 if scenario == "stored-turn-restart-resume":
                     with use_role_timeout_policy(evaluation_policies.role_timeouts):
                         cell, events = _live_restart_resume(
@@ -1506,6 +1849,7 @@ def run_project_e2e(
                             contract=contract,
                             fixture_digest=digest,
                             codex_bin=codex_bin,
+                            roles=roles,
                             project_binding=evaluation_policies.codex_project,
                         )
                 else:
@@ -1513,9 +1857,13 @@ def run_project_e2e(
                         if scenario == "normal-completion":
                             cell = _normal_completion(prepared, recorded, source_digest, roles=roles)
                         elif scenario == "stale-after-materialization":
-                            cell = _stale_after_materialization(prepared, recorded, source_digest)
+                            cell = _stale_after_materialization(
+                                prepared, recorded, source_digest, roles=roles
+                            )
                         else:
-                            cell = _unknown_receipt(prepared, recorded, source_digest)
+                            cell = _unknown_receipt(
+                                prepared, recorded, source_digest, roles=roles
+                            )
                     events = recorded.events
                 model_observation = _checkpoint_model_observation(events)
                 receipt = {
@@ -1530,6 +1878,13 @@ def run_project_e2e(
                 }
                 generated_plan = cell_root / "generated-plan.json"
                 activation_receipt = cell_root / "plan-activation-receipt.json"
+                responsibility_outcome = _responsibility_outcome(
+                    scenario=scenario,
+                    prepared=prepared,
+                    cell=cell,
+                    contract=contract,
+                    cell_root=cell_root,
+                )
                 cell.update({
                     "scenario": scenario,
                     "order_seed": 0,
@@ -1537,6 +1892,9 @@ def run_project_e2e(
                         "generated_plan_digest": sha256_bytes(generated_plan.read_bytes()),
                         "activation_receipt_digest": sha256_bytes(activation_receipt.read_bytes()),
                     },
+                    "qualification_outcome": responsibility_outcome.model_dump(
+                        mode="json"
+                    ),
                 })
                 store.put(
                     EvaluationCellCheckpoint(
@@ -1569,6 +1927,7 @@ def run_project_e2e(
                     "scenario": active_scenario,
                     "error": type(error).__name__,
                     "message": str(error),
+                    "failure_class": classify_qualification_failure(error).value,
                     "run_status": status.value,
                     "resumable": resumable,
                     "next_action": next_action,
@@ -1584,11 +1943,25 @@ def run_project_e2e(
             store.completed(digest, 0).raw_structured_assessment  # type: ignore[union-attr]
             for digest in contract.fixture_digests
         ]
-        failures = tuple(
+        cell_failures = tuple(
             f"{item['scenario']}: {item.get('failure') or item.get('error') or 'FAIL'}"
             for item in cells
             if not bool(item.get("passed"))
         )
+        suite = qualification_suite_manifest(base)
+        responsibility_report = evaluate_qualification_responsibilities(
+            suite,
+            tuple(
+                QualificationCellOutcome.model_validate(item["qualification_outcome"])
+                for item in cells
+            ),
+            evaluation_contract_digest=contract.contract_digest,
+        )
+        _write_json(
+            destination / "responsibility-qualification-report.json",
+            responsibility_report,
+        )
+        failures = tuple((*cell_failures, *responsibility_report.failures))
         store.set_state(EvaluationRunStatus.COMPLETED, updated_at=utc_now())
         report = ScopeQualificationReport(
             scope=contract.scope,
@@ -1604,6 +1977,13 @@ def run_project_e2e(
                     for item in cells
                     if item.get("scenario") == "unknown-receipt-no-duplicate"
                     and item.get("thread_create_count") != 1
+                ),
+                "responsibility_count": responsibility_report.responsibility_count,
+                "passed_responsibility_count": (
+                    responsibility_report.passed_responsibility_count
+                ),
+                "not_run_responsibility_count": len(
+                    responsibility_report.not_run_responsibility_ids
                 ),
             },
             failures=failures,

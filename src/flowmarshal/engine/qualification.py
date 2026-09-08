@@ -104,6 +104,20 @@ from .roles import (
 )
 from .runtime import CodexAppServerRuntime
 from .role_execution import use_role_timeout_policy
+from .qualification_manifest import (
+    EvidenceProvenance,
+    QualificationCellOutcome,
+    QualificationCellStatus,
+    QualificationFailureClass,
+    QualificationFreezeManifest,
+    QualificationHarnessReport,
+    QualificationManifestError,
+    QualificationSuiteManifest,
+    classify_qualification_failure,
+    evaluate_qualification_responsibilities,
+    verify_qualification_reproduction_bundle,
+    write_qualification_reproduction_bundle,
+)
 
 
 ORDER_SEEDS = (17, 43, 89)
@@ -271,6 +285,13 @@ def default_role_configuration(root: Path | None = None) -> EngineRoleConfigurat
     )
 
 
+def qualification_suite_manifest(
+    root: Path | None = None,
+) -> QualificationSuiteManifest:
+    base = root or project_root()
+    return QualificationSuiteManifest.load(base / "config" / "qualification-suite.json")
+
+
 def _manifest(root: Path) -> LegacyFreezeManifest:
     return LegacyFreezeManifest.load(root / "config" / "legacy-freeze-manifest.json")
 
@@ -280,13 +301,19 @@ def source_manifest_files(root: Path) -> dict[str, str]:
 
     paths: set[Path] = {
         root / "AGENTS.md",
+        root / "README.md",
         root / "pyproject.toml",
+        root / "requirements.lock",
+        root / "setup.py",
         root / "config" / "legacy-freeze-manifest.json",
         root / "config" / "pre-1.0-performance-thresholds.json",
         root / "config" / "qualification-roles.json",
         root / "config" / "qualification-finding-taxonomy.json",
+        root / "config" / "qualification-suite.json",
         root / "docs" / "orchestration-redesign.md",
         root / "docs" / "engine-cutover-adr.md",
+        root / "docs" / "engine-package-install.md",
+        root / "docs" / "engine-user-workflow.md",
         root / "docs" / "performance-release-floor.md",
         root / "docs" / "r31-frozen-baseline.md",
         root / "tests" / "engine_helpers.py",
@@ -355,6 +382,79 @@ def source_manifest_files(root: Path) -> dict[str, str]:
 
 def source_manifest_digest(root: Path) -> str:
     return sha256_digest(source_manifest_files(root))
+
+
+def build_qualification_reproduction_bundle(
+    *,
+    root: Path,
+    destination: Path,
+    inventory: ModelInventory,
+    roles: EngineRoleConfiguration,
+    contracts: tuple[EvaluationContract, ...],
+) -> QualificationFreezeManifest:
+    """qualification 전 입력 축을 clean-install 전달용 bundle로 동결한다."""
+
+    base = root.resolve(strict=True)
+    if not contracts:
+        raise QualificationManifestError("동결할 evaluation 계약이 없습니다.")
+    suite = qualification_suite_manifest(base)
+    files = source_manifest_files(base)
+    fixture_documents = {
+        f"contract:{item.scope.value}": {
+            "fixture_digests": item.fixture_digests,
+            "scenario_set_digest": item.scenario_set_digest,
+            "order_seeds": item.order_seeds,
+            "expected_cell_count": item.expected_cell_count,
+        }
+        for item in contracts
+    }
+    prompt_documents = {
+        f"contract:{item.scope.value}": item.prompt_digest for item in contracts
+    }
+    schema_documents = {
+        f"contract:{item.scope.value}": item.output_schema_digest for item in contracts
+    }
+    threshold_documents = {
+        "suite": {
+            "role_gate": suite.role_gate.model_dump(mode="json"),
+            "planning_gate": suite.planning_gate.model_dump(mode="json"),
+            "non_blocking_comparisons": suite.non_blocking_comparisons.model_dump(
+                mode="json"
+            ),
+        },
+        **{
+            f"contract:{item.scope.value}": item.threshold_digest for item in contracts
+        },
+    }
+    taxonomy_documents = {
+        "suite_e2e_responsibilities": [
+            item.model_dump(mode="json") for item in suite.e2e_responsibilities
+        ],
+        **{
+            f"contract:{item.scope.value}": item.taxonomy_digest for item in contracts
+        },
+    }
+    return write_qualification_reproduction_bundle(
+        source_root=base,
+        destination=destination,
+        suite=suite,
+        source_files=files,
+        source_manifest_digest=source_manifest_digest(base),
+        fixture_documents=fixture_documents,
+        prompt_documents=prompt_documents,
+        schema_documents=schema_documents,
+        threshold_documents=threshold_documents,
+        taxonomy_documents=taxonomy_documents,
+        model_inventory_document=inventory.model_dump(mode="json"),
+        model_lock_document=roles.operational_binding(inventory).model_dump(mode="json"),
+        evaluator_files=(
+            "src/flowmarshal/engine/evaluation.py",
+            "src/flowmarshal/engine/qualification.py",
+            "src/flowmarshal/engine/qualification_manifest.py",
+            "src/flowmarshal/engine/e2e_qualification.py",
+            "src/flowmarshal/engine/benchmark_safety.py",
+        ),
+    )
 
 
 def _default_run_root(root: Path, scope_name: str, contract_hint: str) -> Path:
@@ -806,6 +906,14 @@ def run_role_fixture(
         ).resolve()
         store = ImmutableCheckpointStore(destination, contract)
         store.initialize()
+        qualification_suite_manifest(base)
+        build_qualification_reproduction_bundle(
+            root=base,
+            destination=destination / "reproduction-bundle",
+            inventory=inventory,
+            roles=roles,
+            contracts=(contract,),
+        )
         audit_path = destination / ("inventory-observation-" + inventory.inventory_digest[7:] + ".json")
         if not audit_path.exists():
             _write_json(audit_path, roles.operational_binding(inventory))
@@ -928,6 +1036,7 @@ def run_role_fixture(
                             {
                                 "error": type(error).__name__,
                                 "message": str(error),
+                                "failure_class": classify_qualification_failure(error).value,
                                 "receipts": [
                                     item.model_dump(mode="json") for item in error.receipts
                                 ],
@@ -1553,6 +1662,14 @@ def run_full_planning_pipeline(
         ).resolve()
         store = ImmutableCheckpointStore(destination, contract)
         store.initialize()
+        qualification_suite_manifest(base)
+        build_qualification_reproduction_bundle(
+            root=base,
+            destination=destination / "reproduction-bundle",
+            inventory=inventory,
+            roles=roles,
+            contracts=(contract,),
+        )
         audit_path = destination / ("inventory-observation-" + inventory.inventory_digest[7:] + ".json")
         if not audit_path.exists():
             _write_json(audit_path, roles.operational_binding(inventory))
@@ -1608,6 +1725,7 @@ def run_full_planning_pipeline(
                             {
                                 "error": type(error).__name__,
                                 "message": str(error),
+                                "failure_class": classify_qualification_failure(error).value,
                                 "receipts": [
                                     item.model_dump(mode="json") for item in error.receipts
                                 ],

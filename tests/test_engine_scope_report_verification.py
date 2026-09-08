@@ -171,7 +171,7 @@ class ScopeReportVerificationTests(unittest.TestCase):
         self.assertTrue(result.valid, result.errors)
         self.assertEqual(18, result.recalculated_metrics["cell_count"])
 
-    def test_project_e2e_rejects_tampered_receipt_binding(self) -> None:
+    def test_project_e2e_four_prebuilt_cells_cannot_replace_responsibility_gate(self) -> None:
         fixtures = tuple(sha256_digest({"e2e": scenario}) for scenario in E2E_SCENARIOS)
         contract = _contract(scope=EvaluationScope.PROJECT_E2E, fixtures=fixtures, seeds=(0,))
         cells = []
@@ -188,7 +188,14 @@ class ScopeReportVerificationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             run = Path(raw); _store(run, contract, cells)
             report = _report(contract, passed=True, metrics=metrics, failures=())
-            self.assertTrue(verify_scope_report(root=ROOT, run_root=run, report=report).valid)
+            incomplete = verify_scope_report(root=ROOT, run_root=run, report=report)
+            self.assertFalse(incomplete.valid)
+            self.assertIn(
+                "SCOPE_REPORT_E2E_RESPONSIBILITY_EVIDENCE_MISSING",
+                incomplete.errors,
+            )
+            self.assertEqual(18, incomplete.recalculated_metrics["responsibility_count"])
+            self.assertEqual(0, incomplete.recalculated_metrics["passed_responsibility_count"])
             cells_path = run / "cells" / "seed-0"
             target = next(cells_path.glob("*.json"))
             payload = json.loads(target.read_text(encoding="utf-8"))

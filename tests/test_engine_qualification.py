@@ -466,7 +466,14 @@ class EngineQualificationTests(unittest.TestCase):
         self.assertLessEqual(expected_source, manifest.keys())
         self.assertLessEqual(expected_tests, manifest.keys())
         required = (
+            "README.md",
+            "pyproject.toml",
+            "requirements.lock",
+            "setup.py",
             "config/pre-1.0-performance-thresholds.json",
+            "config/qualification-suite.json",
+            "docs/engine-package-install.md",
+            "docs/engine-user-workflow.md",
             "docs/performance-release-floor.md",
             "src/flowmarshal/gate0c/ledger.py",
             "src/flowmarshal/gate0c/e2e.py",
