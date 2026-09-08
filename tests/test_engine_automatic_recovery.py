@@ -112,6 +112,19 @@ class AutomaticRecoveryIntegrationTests(unittest.TestCase):
         self.assertEqual(RunOnceAction.OBSERVED, observed.action)
         return dispatched
 
+    def _finish_runtime_job_tick(self, dispatcher, project_id):
+        """job 예약/관측/소비를 서로 다른 scheduler tick으로 진행한다."""
+
+        outcome = dispatcher.run_once(project_id)
+        for _ in range(4):
+            if outcome.action not in {
+                RunOnceAction.DISPATCHED,
+                RunOnceAction.OBSERVED,
+            }:
+                return outcome
+            outcome = dispatcher.run_once(project_id)
+        self.fail("runtime job이 bounded tick 안에서 terminal 소비로 수렴하지 않았습니다.")
+
     def test_fault_injection_repairs_without_manual_assessment_and_revalidates(self) -> None:
         prepared, runtime = self.prepared(name="automatic-repair")
         dispatcher = EngineDispatcher(prepared.service, runtime)
@@ -119,7 +132,7 @@ class AutomaticRecoveryIntegrationTests(unittest.TestCase):
             prepared, runtime, dispatcher, "IMPLEMENTATION_ERROR: injected fault"
         )
 
-        recovered = dispatcher.run_once(prepared.project_id)
+        recovered = self._finish_runtime_job_tick(dispatcher, prepared.project_id)
         self.assertEqual(RunOnceAction.RECOVERED, recovered.action)
         with prepared.service.ledger.read() as connection:
             assessment = connection.execute(
@@ -150,7 +163,10 @@ class AutomaticRecoveryIntegrationTests(unittest.TestCase):
         prepared, runtime = self.prepared(name="recovery-limit")
         dispatcher = EngineDispatcher(prepared.service, runtime)
         self._failed_attempt(prepared, runtime, dispatcher, "IMPLEMENTATION_ERROR: same fault")
-        self.assertEqual(RunOnceAction.RECOVERED, dispatcher.run_once(prepared.project_id).action)
+        self.assertEqual(
+            RunOnceAction.RECOVERED,
+            self._finish_runtime_job_tick(dispatcher, prepared.project_id).action,
+        )
 
         for ordinal in (2, 3):
             dispatched = dispatcher.run_once(prepared.project_id)
@@ -160,7 +176,7 @@ class AutomaticRecoveryIntegrationTests(unittest.TestCase):
                 ).fetchone()["binding_json"])
             runtime.fail(binding.thread_id, response="IMPLEMENTATION_ERROR: same fault")
             dispatcher.run_once(prepared.project_id)
-            outcome = dispatcher.run_once(prepared.project_id)
+            outcome = self._finish_runtime_job_tick(dispatcher, prepared.project_id)
             if ordinal == 2:
                 self.assertEqual(RunOnceAction.RECOVERED, outcome.action)
             else:
@@ -266,9 +282,9 @@ class AutomaticRecoveryIntegrationTests(unittest.TestCase):
             dispatcher,
             "TASK_CONTRACT_INVALID: injected contract defect",
         )
-        assessed = dispatcher.run_once(prepared.project_id)
+        assessed = self._finish_runtime_job_tick(dispatcher, prepared.project_id)
         self.assertEqual(RunOnceAction.RECOVERED, assessed.action)
-        activated = dispatcher.run_once(prepared.project_id)
+        activated = self._finish_runtime_job_tick(dispatcher, prepared.project_id)
         self.assertEqual(RunOnceAction.RECOVERED, activated.action)
         with service.ledger.read() as connection:
             project = connection.execute(

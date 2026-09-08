@@ -452,7 +452,7 @@ def advance_independent_goal_test(
                             action=RunOnceAction.DISPATCHED, project_id=project_id,
                             detail=f"Goal Test 준비 job을 예약·관측했습니다: {job.job_id}",
                         )
-                    result = service.consume_runtime_job(job.job_id)
+                    result = service.consume_runtime_job_required_result(job.job_id)
                     step = ValidationExecutionStep.model_validate(result)
             except ExternalOperationUnknown as error:
                 return blocked(project_id, "EXTERNAL_EFFECT_UNKNOWN", str(error))
@@ -557,7 +557,7 @@ def advance_independent_goal_test(
                         action=RunOnceAction.DISPATCHED, project_id=project_id,
                         detail=f"Goal semantic validation job을 예약·관측했습니다: {job.job_id}",
                     )
-                result = service.consume_runtime_job(job.job_id)
+                result = service.consume_runtime_job_required_result(job.job_id)
         except ExternalOperationUnknown as error:
             return blocked(project_id, "EXTERNAL_EFFECT_UNKNOWN", str(error))
         if sha256_digest(execution_context(service, project_id)) != binding.context_digest:

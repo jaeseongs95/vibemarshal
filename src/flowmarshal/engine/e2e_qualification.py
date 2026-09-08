@@ -3,6 +3,7 @@ from __future__ import annotations
 from .domain import ModelFallback
 
 import json
+import inspect
 import shutil
 import sys
 import time
@@ -105,6 +106,7 @@ from .runtime import (
     CodexRuntimePort,
     EngineDispatcher,
     FakeCodexRuntime,
+    RuntimeJobSupervisor,
     RuntimeOperationReceipt,
 )
 from .role_execution import use_role_timeout_policy
@@ -273,7 +275,21 @@ class RecordedRuntime:
         return result
 
     def read_stored(self, **arguments: Any) -> Any:
-        return self._call("read_stored", **arguments)
+        reader = self.runtime.read_stored
+        parameters = inspect.signature(reader).parameters
+        accepts_keywords = any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD
+            for parameter in parameters.values()
+        )
+        forwarded = (
+            arguments
+            if accepts_keywords
+            else {key: value for key, value in arguments.items() if key in parameters}
+        )
+        request_binding = self._request_binding("read_stored", arguments)
+        result = reader(**forwarded)
+        self._append_result_event("read_stored", request_binding, result)
+        return result
 
     def resume(self, **arguments: Any) -> Any:
         result = self._call("resume", **arguments)
@@ -1241,10 +1257,18 @@ def _restart_resume(
     )
     application.run_once(prepared.project_id, proposal=prepared.proposal)
     dispatched = application.run_once(prepared.project_id)
-    with prepared.service.ledger.read() as connection:
-        row = connection.execute(
-            "SELECT binding_json FROM attempts WHERE id = ?", (dispatched.attempt_id,)
-        ).fetchone()
+    deadline = time.monotonic() + 2
+    row = None
+    while time.monotonic() < deadline:
+        with prepared.service.ledger.read() as connection:
+            row = connection.execute(
+                "SELECT binding_json FROM attempts WHERE id = ?", (dispatched.attempt_id,)
+            ).fetchone()
+        if row is not None and row["binding_json"] is not None:
+            candidate = ThreadBinding.model_validate_json(row["binding_json"])
+            if candidate.turn_id is not None:
+                break
+        time.sleep(0.01)
     binding = ThreadBinding.model_validate_json(row["binding_json"])
     runtime.threads[binding.thread_id].terminal_status = "interrupted"
     restarted = EngineApplication(
@@ -1253,9 +1277,17 @@ def _restart_resume(
         role_configuration=roles,
     )
     resumed = restarted.run_once(prepared.project_id)
+    resume_deadline = time.monotonic() + 2
+    while runtime.resume_calls == 0 and time.monotonic() < resume_deadline:
+        time.sleep(0.01)
+        resumed = restarted.run_once(prepared.project_id)
     read_before_resume = runtime.read_calls >= 1 and runtime.resume_calls == 1
     runtime.complete(binding.thread_id, response="재개된 worker가 종료됨")
     observed = restarted.run_once(prepared.project_id)
+    observe_deadline = time.monotonic() + 2
+    while observed.action is not RunOnceAction.OBSERVED and time.monotonic() < observe_deadline:
+        time.sleep(0.01)
+        observed = restarted.run_once(prepared.project_id)
     return {
         "passed": resumed.action is RunOnceAction.DISPATCHED
         and observed.action is RunOnceAction.OBSERVED
@@ -1286,18 +1318,33 @@ def _unknown_receipt(
         proposal=prepared.proposal,
     )
 
+    fault_triggered = False
+
     def fault(point: str) -> None:
+        nonlocal fault_triggered
         if point == "after_thread_effect":
+            fault_triggered = True
             raise RuntimeError("fault after provider effect before receipt")
 
-    failed = False
-    try:
-        dispatcher = application._dispatcher()
-        dispatcher.fault_hook = fault
-        dispatcher.run_once(prepared.project_id)
-    except RuntimeError:
-        failed = True
+    dispatcher = application._dispatcher()
+    dispatcher.fault_hook = fault
+    dispatcher.run_once(prepared.project_id)
+    recovery_deadline = time.monotonic() + 2
     recovered = application.run_once(prepared.project_id)
+    while time.monotonic() < recovery_deadline:
+        with prepared.service.ledger.read() as connection:
+            intent_statuses = {
+                row["status"]
+                for row in connection.execute(
+                    "SELECT i.status FROM runtime_intents i JOIN attempts a ON a.id=i.attempt_id "
+                    "WHERE a.project_id=? AND i.kind='create_thread'",
+                    (prepared.project_id,),
+                )
+            }
+        if fault_triggered and intent_statuses & {"unknown", "received"}:
+            break
+        time.sleep(0.01)
+        recovered = application.run_once(prepared.project_id)
     reconciliation: dict[str, Any] | None = None
     if (
         isinstance(runtime, RecordedRuntime)
@@ -1311,7 +1358,7 @@ def _unknown_receipt(
     ):
         reconciliation = _reconcile_unknown_empty_thread(prepared, runtime)
     return {
-        "passed": failed
+        "passed": fault_triggered
         and (
             recovered.action is RunOnceAction.OBSERVED
             or (
@@ -1500,10 +1547,18 @@ def _live_restart_resume(
         )
         application.run_once(prepared.project_id, proposal=prepared.proposal)
         dispatched = application.run_once(prepared.project_id)
-        with prepared.service.ledger.read() as connection:
-            row = connection.execute(
-                "SELECT binding_json FROM attempts WHERE id = ?", (dispatched.attempt_id,)
-            ).fetchone()
+        binding_deadline = time.monotonic() + 30
+        row = None
+        while time.monotonic() < binding_deadline:
+            with prepared.service.ledger.read() as connection:
+                row = connection.execute(
+                    "SELECT binding_json FROM attempts WHERE id = ?", (dispatched.attempt_id,)
+                ).fetchone()
+            if row is not None and row["binding_json"] is not None:
+                candidate = ThreadBinding.model_validate_json(row["binding_json"])
+                if candidate.turn_id is not None:
+                    break
+            time.sleep(0.05)
         if row is None or row["binding_json"] is None:
             raise QualificationRunError("restart E2E의 실제 thread/turn binding이 없습니다.")
         binding = ThreadBinding.model_validate_json(row["binding_json"])
@@ -1543,16 +1598,31 @@ def _live_restart_resume(
     with CodexAppServerRuntime(codex_bin=codex_bin, project_binding=project_binding) as second_runtime:
         recorded = RecordedRuntime(second_runtime, journal=journal)
         restart_index = len(recorded.events)
-        resumed = EngineApplication(
+        restarted = EngineApplication(
             restored.service,
             runtime=recorded,
             role_configuration=roles,
-        ).run_once(restored.project_id)
+            supervisor=RuntimeJobSupervisor(
+                restored.service,
+                recorded,
+                observation_timeout_seconds=5.0,
+            ),
+        )
+        resumed = restarted.run_once(restored.project_id)
+        resume_deadline = time.monotonic() + 30
+        while recorded.resume_calls == 0 and time.monotonic() < resume_deadline:
+            time.sleep(0.05)
+            resumed = restarted.run_once(restored.project_id)
         restart_operations = [item["operation"] for item in recorded.events[restart_index:]]
+        stored_read_indexes = [
+            index
+            for index, operation in enumerate(restart_operations)
+            if operation in {"read", "read_stored"}
+        ]
         read_before_resume = (
-            "read" in restart_operations
+            bool(stored_read_indexes)
             and "resume" in restart_operations
-            and restart_operations.index("read") < restart_operations.index("resume")
+            and stored_read_indexes[0] < restart_operations.index("resume")
         )
         result = _normal_completion(
             restored,

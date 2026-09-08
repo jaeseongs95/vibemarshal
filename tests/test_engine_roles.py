@@ -566,9 +566,13 @@ class EngineStructuredRoleTests(unittest.TestCase):
         self.assertFalse(receipts[-1].usage_available)
         self.assertIsNone(receipts[-1].input_tokens)
         first_call = [item["event"] for item in progress if item["call_id"] == receipts[0].call_id]
-        self.assertEqual(["role_requested", "thread_created", "turn_started", "role_receipt"], first_call)
+        self.assertEqual(
+            ["role_requested", "thread_created", "turn_started", "role_terminal_observed", "role_receipt"],
+            first_call,
+        )
         second_call = [item["event"] for item in progress if item["call_id"] == receipts[1].call_id]
         self.assertEqual(2, second_call.count("turn_started"))
+        self.assertEqual(2, second_call.count("role_terminal_observed"))
         self.assertEqual("schema_failed", progress[-1]["receipt"]["status"])
 
 

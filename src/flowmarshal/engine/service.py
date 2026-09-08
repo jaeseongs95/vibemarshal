@@ -1454,6 +1454,82 @@ class EngineService:
             tx.history(row["project_id"], f"runtime_job.{event.value}", "runtime_job", job_id, payload)
             return self._runtime_job_from_row(tx.one("SELECT * FROM runtime_jobs WHERE id=?", (job_id,)))
 
+    def bind_runtime_job_provider(
+        self,
+        job_id: str,
+        *,
+        thread_id: str,
+        turn_id: str,
+    ) -> RuntimeJob:
+        """실행 중 job에 exact provider turn을 최초 한 번 결속한다.
+
+        역할 runner의 provider thread/turn 생성은 job worker가 활성 상태가 된 뒤
+        발생한다. deadline/collector 경합으로 상태가 먼저 바뀌어도 late start receipt의
+        exact binding은 보존한다. 이 경계는 provider terminal을 판정하지 않고,
+        재시작 시 같은 turn을 먼저 관측할 수 있는 binding만 영속화한다.
+        """
+
+        if (
+            not isinstance(thread_id, str)
+            or not thread_id.strip()
+            or len(thread_id) > 300
+            or not isinstance(turn_id, str)
+            or not turn_id.strip()
+            or len(turn_id) > 300
+        ):
+            raise EngineServiceError("runtime job provider binding에는 유효한 thread/turn ID가 필요합니다.")
+        with self.ledger.transaction() as tx:
+            row = tx.one("SELECT * FROM runtime_jobs WHERE id = ?", (job_id,))
+            existing = (row["thread_id"], row["turn_id"])
+            candidate = (thread_id, turn_id)
+            if existing == candidate:
+                return self._runtime_job_from_row(row)
+            if existing != (None, None):
+                raise EngineServiceError(
+                    "runtime job provider binding이 기존 exact thread/turn과 다릅니다."
+                )
+            if row["status"] not in {
+                RuntimeJobStatus.RUNNING.value,
+                RuntimeJobStatus.INTERRUPTING.value,
+                RuntimeJobStatus.COLLECTOR_LOST.value,
+            }:
+                raise EngineServiceError(
+                    "활성 runtime job에만 provider binding을 추가할 수 있습니다."
+                )
+            tx.connection.execute(
+                "UPDATE runtime_jobs SET thread_id=?,turn_id=?,updated_at=? "
+                "WHERE id=? AND status IN ('running','interrupting','collector_lost') "
+                "AND thread_id IS NULL AND turn_id IS NULL",
+                (thread_id, turn_id, tx.now, job_id),
+            )
+            payload = {
+                "thread_id": thread_id,
+                "turn_id": turn_id,
+                "binding_source": "role_progress",
+            }
+            observation = self._append_runtime_job_observation(
+                tx,
+                job_id=job_id,
+                project_id=row["project_id"],
+                kind=RuntimeJobObservationKind.PROVIDER_PROGRESS,
+                payload=payload,
+            )
+            tx.history(
+                row["project_id"],
+                "runtime_job.provider_progress",
+                "runtime_job",
+                job_id,
+                {
+                    "observation_id": observation.observation_id,
+                    "payload_digest": observation.payload_digest,
+                    "thread_id": thread_id,
+                    "turn_id": turn_id,
+                },
+            )
+            return self._runtime_job_from_row(
+                tx.one("SELECT * FROM runtime_jobs WHERE id = ?", (job_id,))
+            )
+
     def record_runtime_job_observation(
         self,
         job_id: str,
@@ -1488,6 +1564,31 @@ class EngineService:
                     terminal_status=existing["terminal_status"],
                     payload=json.loads(existing["payload_json"]),
                     payload_digest=existing["payload_digest"], observed_at=_dt(existing["observed_at"]),
+                )
+            payload_digest = sha256_digest(payload)
+            duplicate = tx.maybe_one(
+                "SELECT * FROM runtime_job_observations WHERE job_id=? AND payload_digest=?",
+                (job_id, payload_digest),
+            )
+            if duplicate is not None:
+                if kind is RuntimeJobObservationKind.COLLECTOR_LOST:
+                    # reattach가 상태를 running으로 되돌린 뒤 동일한 수집 실패가
+                    # 재발해도 durable 상태 전이는 다시 collector_lost여야 한다.
+                    tx.connection.execute(
+                        "UPDATE runtime_jobs SET status='collector_lost',updated_at=? WHERE id=? "
+                        "AND status NOT IN ('provider_terminal','consumed','cancelled')",
+                        (tx.now, job_id),
+                    )
+                return RuntimeJobObservation(
+                    observation_id=duplicate["id"],
+                    job_id=job_id,
+                    project_id=row["project_id"],
+                    kind=duplicate["kind"],
+                    provider_terminal=bool(duplicate["provider_terminal"]),
+                    terminal_status=duplicate["terminal_status"],
+                    payload=json.loads(duplicate["payload_json"]),
+                    payload_digest=duplicate["payload_digest"],
+                    observed_at=_dt(duplicate["observed_at"]),
                 )
             observation = self._append_runtime_job_observation(
                 tx, job_id=job_id, project_id=row["project_id"], kind=kind, payload=payload,
@@ -1559,6 +1660,21 @@ class EngineService:
             )
             tx.history(row["project_id"], "runtime_job.consumed", "runtime_job", job_id, payload)
             return None if row["result_json"] is None else json.loads(row["result_json"])
+
+    def consume_runtime_job_required_result(self, job_id: str) -> dict[str, Any] | None:
+        """재시작 뒤 provider terminal만 복원된 typed job 결과는 소비하지 않는다."""
+
+        result = self.consume_runtime_job(job_id)
+        if isinstance(result, dict) and (
+            result.get("runtime_job_result_unavailable") is True
+            or "job_error" in result
+        ):
+            from .operations import ExternalOperationUnknown
+
+            raise ExternalOperationUnknown(
+                "provider terminal은 관측했지만 local typed 결과를 확정할 수 없습니다."
+            )
+        return result
 
     def cancel_runtime_job(self, job_id: str, *, reason: str) -> RuntimeJob:
         """job을 취소하되 interrupt receipt를 provider terminal로 승격하지 않는다."""

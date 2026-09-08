@@ -6,11 +6,13 @@ import tempfile
 import unittest
 from contextlib import redirect_stdout
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from flowmarshal.canonical import sha256_digest
 from flowmarshal.engine.budget import BudgetManager, GoalBudgetPolicy
-from flowmarshal.engine.cli import _runtime, build_parser, main
+from flowmarshal.engine.cli import _cmd_run_once, _run_once_owned, _runtime, build_parser, main
+from flowmarshal.engine.domain import RuntimeJobStatus
 from flowmarshal.engine.domain import new_id, utc_now
 from flowmarshal.engine.ledger import SQLiteEngineLedger
 from flowmarshal.engine.roles import RoleCallReceipt, RoleCallRequest, strict_json_output_schema
@@ -20,6 +22,131 @@ from tests.engine_helpers import profile
 
 
 class EngineCliTests(unittest.TestCase):
+    def test_run_once_spawns_owner_before_emitting(self) -> None:
+        events = []
+        outcome = SimpleNamespace(runtime_job_id="runtime_job_" + "a" * 32)
+        arguments = SimpleNamespace(
+            project_id="project_" + "a" * 32,
+            proposal_file=None,
+            goal_validation_file=None,
+            goal_validation_retry_file=None,
+            resume=False,
+            _raw_argv=["run-once", "--project-id", "project_" + "a" * 32],
+        )
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            patch("flowmarshal.engine.cli._spawn_run_once_owner",
+                  side_effect=lambda _argv: (events.append("spawn") or outcome)),
+            patch("flowmarshal.engine.cli._emit", side_effect=lambda _value: events.append("emit")),
+        ):
+            _cmd_run_once(arguments)
+
+        self.assertEqual(["spawn", "emit"], events)
+
+    def test_main_explicit_argv_is_forwarded_to_owner_process(self) -> None:
+        argv = [
+            "--db", "custom.sqlite3",
+            "run-once", "--project-id", "project_" + "a" * 32,
+        ]
+        outcome = SimpleNamespace(runtime_job_id=None)
+        with (
+            patch.dict("os.environ", {}, clear=True),
+            patch("flowmarshal.engine.cli._spawn_run_once_owner", return_value=outcome) as spawn,
+            patch("flowmarshal.engine.cli._emit"),
+        ):
+            result = main(argv)
+
+        self.assertEqual(0, result)
+        spawn.assert_called_once_with(tuple(argv))
+
+    def test_background_owner_publishes_initial_tick_then_keeps_job_lifetime(self) -> None:
+        events = []
+        outcome = SimpleNamespace(
+            runtime_job_id="runtime_job_" + "a" * 32,
+            model_dump=lambda **_kwargs: {"runtime_job_id": "runtime_job_" + "a" * 32},
+        )
+        job = SimpleNamespace(status=RuntimeJobStatus.PROVIDER_TERMINAL)
+        service = SimpleNamespace(
+            load_runtime_job=lambda _job_id: (events.append("load") or job)
+        )
+        supervisor = SimpleNamespace(close=lambda: events.append("close"))
+        application = SimpleNamespace(
+            service=service,
+            supervisor=supervisor,
+            run_once=lambda *_args, **_kwargs: (events.append("run") or outcome),
+        )
+        arguments = SimpleNamespace(
+            project_id="project_" + "a" * 32,
+            proposal_file=None,
+            goal_validation_file=None,
+            goal_validation_retry_file=None,
+            resume=False,
+        )
+        with (
+            patch("flowmarshal.engine.cli._runtime", return_value=SimpleNamespace()),
+            patch("flowmarshal.engine.cli._application", return_value=application),
+            patch(
+                "flowmarshal.engine.cli._publish_owner_result",
+                side_effect=lambda *_args: events.append("publish"),
+            ),
+        ):
+            _run_once_owned(arguments, Path("owner-result.json"))
+
+        self.assertEqual(["run", "publish", "load", "close"], events)
+
+    def test_background_owner_observes_after_deadline_interrupt(self) -> None:
+        events = []
+        job_id = "runtime_job_" + "a" * 32
+        outcome = SimpleNamespace(
+            runtime_job_id=job_id,
+            model_dump=lambda **_kwargs: {"runtime_job_id": job_id},
+        )
+        jobs = iter((
+            SimpleNamespace(
+                status=RuntimeJobStatus.RUNNING,
+                absolute_deadline_at=utc_now(),
+            ),
+            SimpleNamespace(
+                status=RuntimeJobStatus.PROVIDER_TERMINAL,
+                absolute_deadline_at=utc_now(),
+            ),
+        ))
+        service = SimpleNamespace(
+            load_runtime_job=lambda _job_id: (events.append("load") or next(jobs))
+        )
+        supervisor = SimpleNamespace(
+            request_interrupt=lambda _job_id: events.append("interrupt"),
+            tick=lambda _job_id, **_kwargs: events.append("tick"),
+            close=lambda: events.append("close"),
+        )
+        application = SimpleNamespace(
+            service=service,
+            supervisor=supervisor,
+            run_once=lambda *_args, **_kwargs: (events.append("run") or outcome),
+        )
+        arguments = SimpleNamespace(
+            project_id="project_" + "a" * 32,
+            proposal_file=None,
+            goal_validation_file=None,
+            goal_validation_retry_file=None,
+            resume=False,
+        )
+        with (
+            patch("flowmarshal.engine.cli._runtime", return_value=SimpleNamespace()),
+            patch("flowmarshal.engine.cli._application", return_value=application),
+            patch(
+                "flowmarshal.engine.cli._publish_owner_result",
+                side_effect=lambda *_args: events.append("publish"),
+            ),
+            patch("flowmarshal.engine.cli.time.sleep"),
+        ):
+            _run_once_owned(arguments, Path("owner-result.json"))
+
+        self.assertEqual(
+            ["run", "publish", "load", "interrupt", "tick", "load", "close"],
+            events,
+        )
+
     def test_run_once_passes_explicit_codex_project_binding_to_runtime(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
             root = Path(raw)

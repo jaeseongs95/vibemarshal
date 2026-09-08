@@ -4,6 +4,7 @@ import tempfile
 import unittest
 import io
 import json
+import time
 from contextlib import redirect_stdout
 from pathlib import Path
 
@@ -412,30 +413,56 @@ class EngineUserFacadeTests(unittest.TestCase):
             ).action,
         )
         first = application.run_once(prepared.project_id)
-        with prepared.service.ledger.read() as connection:
-            binding = ThreadBinding.model_validate_json(
-                connection.execute(
+        deadline = time.monotonic() + 2
+        while True:
+            with prepared.service.ledger.read() as connection:
+                raw_binding = connection.execute(
                     "SELECT binding_json FROM attempts WHERE id=?", (first.attempt_id,)
                 ).fetchone()["binding_json"]
+            binding = (
+                None if raw_binding is None
+                else ThreadBinding.model_validate_json(raw_binding)
             )
+            if (binding is not None and binding.turn_id is not None) or time.monotonic() >= deadline:
+                break
+            time.sleep(0.01)
         runtime.fail(binding.thread_id, response="IMPLEMENTATION_ERROR: injected fault")
         self.assertEqual(RunOnceAction.OBSERVED, application.run_once(prepared.project_id).action)
-        self.assertEqual(RunOnceAction.RECOVERED, application.run_once(prepared.project_id).action)
+        recovered = application.run_once(prepared.project_id)
+        for _ in range(20):
+            if recovered.action is RunOnceAction.RECOVERED:
+                break
+            time.sleep(0.01)
+            recovered = application.run_once(prepared.project_id)
+        self.assertEqual(RunOnceAction.RECOVERED, recovered.action)
 
         second = application.run_once(prepared.project_id)
-        with prepared.service.ledger.read() as connection:
-            binding = ThreadBinding.model_validate_json(
-                connection.execute(
+        deadline = time.monotonic() + 2
+        while True:
+            with prepared.service.ledger.read() as connection:
+                raw_binding = connection.execute(
                     "SELECT binding_json FROM attempts WHERE id=?", (second.attempt_id,)
                 ).fetchone()["binding_json"]
+            binding = (
+                None if raw_binding is None
+                else ThreadBinding.model_validate_json(raw_binding)
             )
+            if (binding is not None and binding.turn_id is not None) or time.monotonic() >= deadline:
+                break
+            time.sleep(0.01)
         (workspace / "app.py").write_text(
             "def add(left: int, right: int) -> int:\n    return left + right\n",
             encoding="utf-8",
         )
         runtime.complete(binding.thread_id, response="repair complete")
         self.assertEqual(RunOnceAction.OBSERVED, application.run_once(prepared.project_id).action)
-        self.assertEqual(RunOnceAction.VALIDATED, application.run_once(prepared.project_id).action)
+        validated = application.run_once(prepared.project_id)
+        for _ in range(10):
+            if validated.action is RunOnceAction.VALIDATED:
+                break
+            time.sleep(0.01)
+            validated = application.run_once(prepared.project_id)
+        self.assertEqual(RunOnceAction.VALIDATED, validated.action)
         goal_validation_step = prepared.proposal.validation_steps[0].model_copy(
             update={"validation_id": "validation_goal"}
         )

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import json
 import hashlib
+import inspect
 import os
 import subprocess
 import threading
 import time
 from concurrent.futures import Future
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -68,6 +70,34 @@ from .model_lock import RUNTIME_CAPABILITIES, parse_inventory_models, verify_bin
 
 class RuntimePolicyError(RuntimeError):
     pass
+
+
+_ACTIVE_RUNTIME_JOB: ContextVar[tuple["RuntimeJobSupervisor", str] | None] = ContextVar(
+    "flowmarshal_active_runtime_job", default=None
+)
+
+
+def active_runtime_job_id() -> str | None:
+    current = _ACTIVE_RUNTIME_JOB.get()
+    return None if current is None else current[1]
+
+
+def notify_active_runtime_job_progress(event: dict[str, Any]) -> None:
+    """역할 runner의 provider lifecycle을 현재 durable job에 연결한다."""
+
+    current = _ACTIVE_RUNTIME_JOB.get()
+    if current is not None:
+        current[0].record_role_progress(current[1], event)
+
+
+def capture_active_runtime_job_progress() -> Callable[[dict[str, Any]], None] | None:
+    """callback thread에서도 원래 job 결속을 유지하는 durable sink를 캡처한다."""
+
+    current = _ACTIVE_RUNTIME_JOB.get()
+    if current is None:
+        return None
+    supervisor, job_id = current
+    return lambda event: supervisor.record_role_progress(job_id, event)
 
 
 class ExecutionPolicyEvidence(EngineModel):
@@ -1533,16 +1563,25 @@ class RuntimeJobSupervisor:
 
     def __init__(self, service: EngineService, runtime: CodexRuntimePort, *,
                  interrupt_timeout_seconds: float = 5.0,
-                 handoff_wait_seconds: float = 0.01) -> None:
-        if interrupt_timeout_seconds <= 0 or handoff_wait_seconds < 0:
+                 handoff_wait_seconds: float = 0.05,
+                 observation_timeout_seconds: float = 0.05,
+                 terminal_observation_grace_seconds: float = 30.0) -> None:
+        if (interrupt_timeout_seconds <= 0 or handoff_wait_seconds < 0
+                or observation_timeout_seconds <= 0
+                or terminal_observation_grace_seconds < 0):
             raise ValueError("supervisor bounded wait 값이 유효하지 않습니다.")
         self.service = service
         self.runtime = runtime
         self.interrupt_timeout_seconds = interrupt_timeout_seconds
         self.handoff_wait_seconds = handoff_wait_seconds
+        self.observation_timeout_seconds = observation_timeout_seconds
+        self.terminal_observation_grace_seconds = terminal_observation_grace_seconds
         self._workers: dict[str, threading.Thread] = {}
         self._results: dict[str, tuple[bool, Any]] = {}
         self._result_events: dict[str, threading.Event] = {}
+        self._complete_on_return: dict[str, bool] = {}
+        self._terminal_progress: dict[str, dict[str, Any]] = {}
+        self._owned_job_ids: set[str] = set()
         self._lock = threading.RLock()
 
     @staticmethod
@@ -1557,7 +1596,8 @@ class RuntimeJobSupervisor:
 
     def schedule(self, *, project_id: str, kind: RuntimeJobKind, checkpoint_key: str,
                  request: dict[str, Any], timeout_seconds: float, target: Callable[[], Any],
-                 attempt_id: str | None = None, task_id: str | None = None) -> RuntimeJob:
+                 attempt_id: str | None = None, task_id: str | None = None,
+                 complete_on_return: bool = True) -> RuntimeJob:
         if timeout_seconds <= 0:
             raise ValueError("runtime job timeout은 양수여야 합니다.")
         job = self.service.schedule_runtime_job(
@@ -1565,25 +1605,42 @@ class RuntimeJobSupervisor:
             request=request, absolute_deadline_at=utc_now() + timedelta(seconds=timeout_seconds),
             attempt_id=attempt_id, task_id=task_id,
         )
+        self._owned_job_ids.add(job.job_id)
         if job.status is RuntimeJobStatus.SCHEDULED:
-            self._start_worker(job, target)
-        return self.tick(job.job_id, wait_seconds=self.handoff_wait_seconds)
+            self._start_worker(job, target, complete_on_return=complete_on_return)
+        event = self._result_events.get(job.job_id)
+        if event is not None and self.handoff_wait_seconds:
+            event.wait(self.handoff_wait_seconds)
+        # 예약/시작 tick에서는 빠른 target의 결과도 소비하지 않는다. 다음 tick이
+        # 정확히 한 관측을 durable 상태로 옮긴다.
+        return self.service.load_runtime_job(job.job_id)
 
-    def _start_worker(self, job: RuntimeJob, target: Callable[[], Any]) -> None:
+    def _start_worker(
+        self,
+        job: RuntimeJob,
+        target: Callable[[], Any],
+        *,
+        complete_on_return: bool,
+    ) -> None:
         with self._lock:
             current = self._workers.get(job.job_id)
             if current is not None and current.is_alive():
                 return
             event = threading.Event()
             self._result_events[job.job_id] = event
+            self._complete_on_return[job.job_id] = complete_on_return
 
             def execute() -> None:
+                token = _ACTIVE_RUNTIME_JOB.set((self, job.job_id))
                 try:
                     outcome = (True, self._json_value(target()))
                 except BaseException as error:
                     outcome = (False, {"error_type": type(error).__name__, "error": str(error)})
+                finally:
+                    _ACTIVE_RUNTIME_JOB.reset(token)
                 with self._lock:
-                    self._results[job.job_id] = outcome
+                    if not outcome[0] or complete_on_return:
+                        self._results[job.job_id] = outcome
                     event.set()
 
             self.service.start_runtime_job(job.job_id)
@@ -1591,6 +1648,33 @@ class RuntimeJobSupervisor:
                 name=f"flowmarshal-{job.kind.value}-{job.job_id[-8:]}", daemon=True)
             self._workers[job.job_id] = worker
             worker.start()
+
+    def record_role_progress(self, job_id: str, event: dict[str, Any]) -> None:
+        """현재 role call의 exact provider binding과 lifecycle을 durable하게 남긴다."""
+
+        event_name = event.get("event")
+        thread_id = event.get("thread_id")
+        turn_id = event.get("turn_id")
+        if isinstance(thread_id, str) and isinstance(turn_id, str):
+            before = self.service.load_runtime_job(job_id)
+            bound = self.service.bind_runtime_job_provider(
+                job_id, thread_id=thread_id, turn_id=turn_id,
+            )
+            if (
+                before.thread_id is None
+                and bound.status is RuntimeJobStatus.INTERRUPTING
+                and not self._interrupt_receipt_recorded(job_id)
+            ):
+                self._deliver_bounded_interrupt(bound)
+        payload = {"role_progress": self._json_value(event)}
+        self.service.record_runtime_job_observation(
+            job_id, kind=RuntimeJobObservationKind.PROVIDER_PROGRESS, payload=payload,
+        )
+        if event_name in {
+            "role_terminal_observed", "terminal_observed_after_interrupt"
+        }:
+            with self._lock:
+                self._terminal_progress[job_id] = event
 
     def tick(self, job_id: str, *, wait_seconds: float = 0.0) -> RuntimeJob:
         """최대 한 관측을 저장하고 긴 role turn을 기다리지 않고 반환한다."""
@@ -1611,36 +1695,123 @@ class RuntimeJobSupervisor:
                 self.service.record_runtime_job_observation(
                     job_id, kind=RuntimeJobObservationKind.PROVIDER_TERMINAL,
                     payload={"result": value}, provider_terminal=True, terminal_status="completed")
+            elif job_id in self._terminal_progress:
+                terminal = self._terminal_progress[job_id]
+                observation = terminal.get("terminal_observation")
+                status = (
+                    observation.get("terminal_status")
+                    if isinstance(observation, dict) else None
+                ) or "unknown"
+                self.service.record_runtime_job_observation(
+                    job_id,
+                    kind=RuntimeJobObservationKind.PROVIDER_TERMINAL,
+                    payload={"result": {"job_error": value, "terminal_observation": observation}},
+                    provider_terminal=True,
+                    terminal_status=status,
+                )
             else:
                 self.service.record_runtime_job_observation(
                     job_id, kind=RuntimeJobObservationKind.COLLECTOR_LOST, payload=value)
             return self.service.load_runtime_job(job_id)
         if datetime.now(timezone.utc) >= job.absolute_deadline_at:
             self._request_bounded_interrupt(job)
-            return self.service.load_runtime_job(job_id)
+            job = self.service.load_runtime_job(job_id)
+            if job.status is not RuntimeJobStatus.INTERRUPTING:
+                return job
+            if datetime.now(timezone.utc) >= job.absolute_deadline_at + timedelta(
+                seconds=self.terminal_observation_grace_seconds
+            ):
+                self.service.record_runtime_job_observation(
+                    job_id,
+                    kind=RuntimeJobObservationKind.COLLECTOR_LOST,
+                    payload={
+                        "reason": "terminal observation grace elapsed after deadline interrupt",
+                        "absolute_deadline_at": job.absolute_deadline_at.isoformat(),
+                        "terminal_observation_grace_seconds": (
+                            self.terminal_observation_grace_seconds
+                        ),
+                    },
+                )
+                return self.service.load_runtime_job(job_id)
+            # interrupt receipt는 provider terminal 증거가 아니다. 결속된 job은
+            # 같은 짧은 tick에서 아래의 worker 결과 또는 저장 turn을 계속 관측한다.
         worker = self._workers.get(job_id)
         if worker is not None and not worker.is_alive() and (event is None or not event.is_set()):
             self.service.record_runtime_job_observation(
                 job_id, kind=RuntimeJobObservationKind.COLLECTOR_LOST,
                 payload={"reason": "collector thread exited without a result"})
+            return self.service.load_runtime_job(job_id)
+        if job.thread_id is not None and (
+            worker is None
+            or not worker.is_alive()
+            or self._complete_on_return.get(job_id) is False
+        ):
+            try:
+                return self.reattach(job_id)
+            except Exception as error:
+                current = self.service.load_runtime_job(job_id)
+                if current.status is not RuntimeJobStatus.COLLECTOR_LOST:
+                    self.service.record_runtime_job_observation(
+                        job_id,
+                        kind=RuntimeJobObservationKind.COLLECTOR_LOST,
+                        payload={
+                            "reason": "bounded provider re-observation failed",
+                            "error_type": type(error).__name__,
+                            "error": str(error),
+                        },
+                    )
+                return self.service.load_runtime_job(job_id)
+        if worker is None and job.status is RuntimeJobStatus.RUNNING:
+            self.service.record_runtime_job_observation(
+                job_id,
+                kind=RuntimeJobObservationKind.COLLECTOR_LOST,
+                payload={"reason": "supervisor restarted before provider binding was durable"},
+            )
         return self.service.load_runtime_job(job_id)
 
     def bind_provider_turn(self, job_id: str, *, thread_id: str, turn_id: str) -> RuntimeJob:
-        return self.service.start_runtime_job(job_id, thread_id=thread_id, turn_id=turn_id)
+        return self.service.bind_runtime_job_provider(
+            job_id, thread_id=thread_id, turn_id=turn_id,
+        )
 
-    def _request_bounded_interrupt(self, job: RuntimeJob) -> None:
+    def _request_bounded_interrupt(
+        self, job: RuntimeJob, *, timeout_seconds: float | None = None,
+    ) -> None:
         request = {"reason": "absolute_deadline_exceeded", "thread_id": job.thread_id,
                    "turn_id": job.turn_id,
                    "absolute_deadline_at": job.absolute_deadline_at.isoformat()}
-        if not self.service.begin_runtime_job_interrupt(job.job_id, payload=request):
+        requested = self.service.begin_runtime_job_interrupt(job.job_id, payload=request)
+        current = self.service.load_runtime_job(job.job_id)
+        if not requested and current.status is not RuntimeJobStatus.INTERRUPTING:
             return
-        if job.thread_id is None or job.turn_id is None:
+        if current.thread_id is None or current.turn_id is None:
             return
+        if self._interrupt_receipt_recorded(job.job_id):
+            return
+        self._deliver_bounded_interrupt(current, timeout_seconds=timeout_seconds)
+
+    def _interrupt_receipt_recorded(self, job_id: str) -> bool:
+        with self.service.ledger.read() as connection:
+            return connection.execute(
+                "SELECT 1 FROM runtime_job_observations WHERE job_id=? AND kind=? LIMIT 1",
+                (job_id, RuntimeJobObservationKind.INTERRUPT_RECEIPT.value),
+            ).fetchone() is not None
+
+    def _deliver_bounded_interrupt(
+        self, job: RuntimeJob, *, timeout_seconds: float | None = None,
+    ) -> None:
+        assert job.thread_id is not None and job.turn_id is not None
+        wait = self.interrupt_timeout_seconds if timeout_seconds is None else timeout_seconds
+        if wait <= 0:
+            return
+        request = {"reason": "absolute_deadline_exceeded", "thread_id": job.thread_id,
+                   "turn_id": job.turn_id,
+                   "absolute_deadline_at": job.absolute_deadline_at.isoformat()}
         try:
             receipt = bounded_observation_call(
                 lambda: self.runtime.interrupt(thread_id=job.thread_id, turn_id=job.turn_id,
-                    timeout_seconds=self.interrupt_timeout_seconds),
-                timeout_seconds=self.interrupt_timeout_seconds,
+                    timeout_seconds=wait),
+                timeout_seconds=wait,
                 operation_name="runtime_job_interrupt")
         except Exception as error:
             payload = request | {"interrupt_error": type(error).__name__, "detail": str(error)}
@@ -1651,6 +1822,7 @@ class RuntimeJobSupervisor:
 
     def reattach(self, job_id: str) -> RuntimeJob:
         """재시작 후 저장 binding을 resume 없이 먼저 관측한다."""
+        self._owned_job_ids.add(job_id)
         job = self.service.load_runtime_job(job_id)
         if job.status not in {
             RuntimeJobStatus.RUNNING, RuntimeJobStatus.COLLECTOR_LOST,
@@ -1659,15 +1831,54 @@ class RuntimeJobSupervisor:
             return job
         if job.thread_id is None:
             return job
-        self.service.start_runtime_job(job_id, thread_id=job.thread_id, turn_id=job.turn_id)
+        if (
+            job.status is RuntimeJobStatus.INTERRUPTING
+            and job.turn_id is not None
+            and not self._interrupt_receipt_recorded(job_id)
+        ):
+            self._deliver_bounded_interrupt(job)
+        if job.status is not RuntimeJobStatus.INTERRUPTING:
+            self.service.start_runtime_job(
+                job_id, thread_id=job.thread_id, turn_id=job.turn_id
+            )
+        reader = self.runtime.read_stored
+        parameters = inspect.signature(reader).parameters
+        accepts_keywords = any(
+            parameter.kind is inspect.Parameter.VAR_KEYWORD
+            for parameter in parameters.values()
+        )
+        read_arguments: dict[str, Any] = {"thread_id": job.thread_id}
+        if accepts_keywords or "turn_id" in parameters:
+            read_arguments["turn_id"] = job.turn_id
+        if accepts_keywords or "timeout_seconds" in parameters:
+            read_arguments["timeout_seconds"] = self.observation_timeout_seconds
         observation = bounded_observation_call(
-            lambda: self.runtime.read_stored(thread_id=job.thread_id, turn_id=job.turn_id,
-                timeout_seconds=self.interrupt_timeout_seconds),
-            timeout_seconds=self.interrupt_timeout_seconds,
+            lambda: reader(**read_arguments),
+            # Port 자체의 bounded timeout이 먼저 종료돼 그 결과나 오류를 회수할
+            # 수 있도록 외부 watchdog에는 짧은 정리 여유를 둔다.
+            timeout_seconds=self.observation_timeout_seconds + 0.05,
             operation_name="runtime_job_reattach_read")
+        if (
+            observation.thread_id != job.thread_id
+            or (job.turn_id is not None and observation.turn_id != job.turn_id)
+        ):
+            raise RuntimePolicyError(
+                "RUNTIME_OBSERVATION_BINDING_MISMATCH: 재관측 결과가 저장된 exact turn과 다릅니다."
+            )
         payload = {"observation": self._json_value(observation)}
         if not observation.active and observation.terminal_status is not None:
-            payload["result"] = self._json_value(observation)
+            if job.kind in {
+                RuntimeJobKind.WORKER_TURN,
+                RuntimeJobKind.TASK_SEMANTIC_VALIDATE,
+            }:
+                payload["result"] = self._json_value(observation)
+            else:
+                # 재시작 뒤에는 provider terminal은 입증할 수 있어도, 종료 뒤
+                # 이어지는 local compile/receipt 결속 결과까지 복원했다고 볼 수 없다.
+                payload["result"] = {
+                    "runtime_job_result_unavailable": True,
+                    "provider_observation": self._json_value(observation),
+                }
             self.service.record_runtime_job_observation(
                 job_id, kind=RuntimeJobObservationKind.PROVIDER_TERMINAL, payload=payload,
                 provider_terminal=True, terminal_status=observation.terminal_status)
@@ -1699,21 +1910,41 @@ class RuntimeJobSupervisor:
         self.request_interrupt(job_id)
         return self.service.cancel_runtime_job(job_id, reason=reason)
 
-    def close(self) -> None:
+    def close(self, *, timeout_seconds: float | None = None) -> None:
         """SDK close를 bounded 실행하고 미관측 active job은 collector_lost로 남긴다."""
-        for job_id, worker in tuple(self._workers.items()):
+        wait = self.interrupt_timeout_seconds if timeout_seconds is None else timeout_seconds
+        if wait <= 0:
+            raise ValueError("supervisor close timeout은 양수여야 합니다.")
+        deadline = time.monotonic() + wait
+        active_ids = set(self._owned_job_ids)
+        active_ids.update(self._workers)
+        for job_id in active_ids:
+            worker = self._workers.get(job_id)
             job = self.service.load_runtime_job(job_id)
-            if worker.is_alive() and job.status in {
+            if job.status in {
                 RuntimeJobStatus.RUNNING, RuntimeJobStatus.SCHEDULED,
                 RuntimeJobStatus.COLLECTOR_LOST, RuntimeJobStatus.INTERRUPTING,
             }:
-                self.mark_collector_lost(job_id, reason="supervisor SDK owner closed before provider terminal")
+                if job.thread_id is not None and job.turn_id is not None:
+                    self._request_bounded_interrupt(
+                        job,
+                        timeout_seconds=max(0.0, deadline - time.monotonic()),
+                    )
+                self.mark_collector_lost(
+                    job_id,
+                    reason=(
+                        "supervisor SDK owner closed before provider terminal; "
+                        f"worker_alive={worker is not None and worker.is_alive()}"
+                    ),
+                )
         try:
-            bounded_observation_call(
-                lambda: self.runtime.close(timeout_seconds=self.interrupt_timeout_seconds),
-                timeout_seconds=self.interrupt_timeout_seconds,
-                operation_name="runtime_job_sdk_close",
-            )
+            remaining = deadline - time.monotonic()
+            if remaining > 0:
+                bounded_observation_call(
+                    lambda: self.runtime.close(timeout_seconds=remaining),
+                    timeout_seconds=remaining,
+                    operation_name="runtime_job_sdk_close",
+                )
         except Exception:
             # close timeout은 provider terminal 증거가 아니며 collector_lost 관측을 보존한다.
             pass
@@ -1996,12 +2227,24 @@ class EngineDispatcher:
         with lock:
             resolver = getattr(self.runtime, "operation_kind_for_read", None)
             kind = resolver(thread_id) if callable(resolver) else "read"
+            observation_timeout = (
+                5.0
+                if self.supervisor is None
+                else self.supervisor.observation_timeout_seconds
+            )
             observation = self._invoke_runtime_operation(
                 trace, kind, {"thread_id": thread_id, "turn_id": turn_id},
-                lambda: self.runtime.read(thread_id=thread_id),
+                lambda: bounded_observation_call(
+                    lambda: self.runtime.read(thread_id=thread_id),
+                    timeout_seconds=observation_timeout,
+                    operation_name="runtime_job_active_read",
+                ),
                 attempt_id=attempt_id, thread_id=thread_id, turn_id=turn_id,
                 call_id=self._attempt_provider_call_id(attempt_id),
-                deadline_seconds=5.0 if kind == "read" else None,
+                deadline_seconds=(
+                    observation_timeout
+                    if kind == "read" else None
+                ),
             )
             terminal = (
                 seal_terminal and not observation.active and observation.terminal_status is not None
@@ -2023,6 +2266,14 @@ class EngineDispatcher:
         from .budget import BudgetBlocked
         from .service import GoalAuthorizationRequired
         started = time.monotonic()
+        with self.service.ledger.read() as connection:
+            before_jobs = {
+                row["id"]: (row["status"], row["updated_at"])
+                for row in connection.execute(
+                    "SELECT id,status,updated_at FROM runtime_jobs WHERE project_id=?",
+                    (project_id,),
+                )
+            }
         try:
             outcome = self._run_once(project_id, proposal=proposal,
                                      goal_validation_step=goal_validation_step,
@@ -2031,10 +2282,25 @@ class EngineDispatcher:
             outcome = RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=project_id,
                                      blocker_code=error.code, detail=str(error))
         with self.service.ledger.read() as connection:
-            job = connection.execute(
-                "SELECT * FROM runtime_jobs WHERE project_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1",
-                (project_id,),
-            ).fetchone()
+            changed_jobs = [
+                row
+                for row in connection.execute(
+                    "SELECT * FROM runtime_jobs WHERE project_id=? ORDER BY updated_at DESC,rowid DESC",
+                    (project_id,),
+                )
+                if before_jobs.get(row["id"]) != (row["status"], row["updated_at"])
+            ]
+        job = changed_jobs[0] if changed_jobs else None
+        if job is None and outcome.action in {
+            RunOnceAction.DISPATCHED,
+            RunOnceAction.OBSERVED,
+        }:
+            active = self.service.active_runtime_job(project_id)
+            if active is not None:
+                with self.service.ledger.read() as connection:
+                    job = connection.execute(
+                        "SELECT * FROM runtime_jobs WHERE id=?", (active.job_id,)
+                    ).fetchone()
         job_fields = {} if job is None else {
             "runtime_job_id": job["id"], "runtime_job_kind": job["kind"],
             "runtime_job_status": job["status"],
@@ -2071,6 +2337,36 @@ class EngineDispatcher:
                 "ORDER BY a.created_at, a.rowid LIMIT 1",
                 (project_id,),
             ).fetchone()
+        active_job = self.service.active_runtime_job(project_id)
+        if (
+            active_job is not None
+            and active_job.status is RuntimeJobStatus.COLLECTOR_LOST
+            and active_job.thread_id is None
+            and active_job.attempt_id is not None
+        ):
+            with self.service.ledger.read() as connection:
+                recoverable_intent = connection.execute(
+                    "SELECT 1 FROM runtime_intents WHERE attempt_id=? AND status='prepared' LIMIT 1",
+                    (active_job.attempt_id,),
+                ).fetchone()
+            if recoverable_intent is not None:
+                self.service.cancel_runtime_job(
+                    active_job.job_id,
+                    reason="binding 전 collector가 사라져 prepared effect checkpoint 복구로 전환",
+                )
+                active_job = None
+        if active_job is not None and self.supervisor is not None:
+            observed_job = self.supervisor.tick(active_job.job_id)
+            return RunOnceOutcome(
+                action=RunOnceAction.OBSERVED,
+                project_id=project_id,
+                task_id=observed_job.task_id,
+                attempt_id=observed_job.attempt_id,
+                detail=(
+                    "활성 RuntimeJob의 provider 상태를 한 번 관측했습니다: "
+                    f"{observed_job.kind.value}/{observed_job.status.value}"
+                ),
+            )
         if prepared:
             if len(prepared) == 1:
                 with self.service.ledger.read() as connection:
@@ -2127,7 +2423,14 @@ class EngineDispatcher:
                     if active_attempt["kind"] == AttemptKind.VALIDATION.value
                     else None
                 )
-                self._dispatch_reserved(active_attempt["id"], validation_id=validation_id)
+                if self.supervisor is None:
+                    self._dispatch_reserved(
+                        active_attempt["id"], validation_id=validation_id
+                    )
+                else:
+                    self._dispatch_attempt_job(
+                        active_attempt["id"], validation_id=validation_id
+                    )
                 return RunOnceOutcome(
                     action=RunOnceAction.DISPATCHED,
                     project_id=project_id,
@@ -2286,7 +2589,10 @@ class EngineDispatcher:
         if materialized is not None:
             attempt = self.service.reserve_attempt(task_id=materialized["id"])
             try:
-                self._dispatch_reserved(attempt.attempt_id)
+                if self.supervisor is None:
+                    self._dispatch_reserved(attempt.attempt_id)
+                else:
+                    self._dispatch_attempt_job(attempt.attempt_id)
             except Exception as error:
                 from .budget import BudgetBlocked
                 if not isinstance(error, BudgetBlocked):
@@ -2513,6 +2819,8 @@ class EngineDispatcher:
         evidence_documents: tuple[dict[str, Any], ...],
         validation_result_id: str | None = None,
     ) -> RunOnceOutcome | None:
+        from .operations import ExternalOperationUnknown
+
         failure = diagnosis.failure_class
         if failure is None or failure is FailureClass.UNCLASSIFIED:
             if validation_result_id is not None:
@@ -2594,6 +2902,10 @@ class EngineDispatcher:
                     attempt_id=attempt_id,
                     task_id=task_id,
                 )
+                if self.supervisor is None:
+                    job = self._recovery_supervisor.tick(
+                        job.job_id, wait_seconds=self._recovery_supervisor.handoff_wait_seconds
+                    )
             else:
                 job = self.service._runtime_job_from_row(row)
                 if job.status in {RuntimeJobStatus.SCHEDULED, RuntimeJobStatus.RUNNING}:
@@ -2608,7 +2920,20 @@ class EngineDispatcher:
                     attempt_id=attempt_id,
                     detail="자동 recovery assessment job을 예약·관측했습니다.",
                 )
-            result = self.service.consume_runtime_job(job.job_id)
+            try:
+                result = self.service.consume_runtime_job_required_result(job.job_id)
+            except ExternalOperationUnknown as error:
+                return RunOnceOutcome(
+                    action=RunOnceAction.BLOCKED,
+                    project_id=project_id,
+                    task_id=task_id,
+                    attempt_id=attempt_id,
+                    blocker_code="EXTERNAL_EFFECT_UNKNOWN",
+                    failure_class=FailureClass.EXTERNAL_UNKNOWN,
+                    suggested_repair_action=RepairAction.WAIT_EXTERNAL,
+                    checkpoint_required=True,
+                    detail=str(error),
+                )
             from .domain import RecoveryAssessment
             assessment = RecoveryAssessment.model_validate(result["assessment"])
             self.service.record_recovery_assessment(project_id, assessment)
@@ -2830,6 +3155,10 @@ class EngineDispatcher:
                 attempt_id=attempt_id,
                 task_id=task_id,
             )
+            if self.supervisor is None:
+                job = self._recovery_supervisor.tick(
+                    job.job_id, wait_seconds=self._recovery_supervisor.handoff_wait_seconds
+                )
         else:
             job = self.service._runtime_job_from_row(row)
             if job.status in {RuntimeJobStatus.SCHEDULED, RuntimeJobStatus.RUNNING}:
@@ -2844,7 +3173,20 @@ class EngineDispatcher:
                 attempt_id=attempt_id,
                 detail="Plan subgraph 재계획·독립 review job을 예약·관측했습니다.",
             )
-        result = self.service.consume_runtime_job(job.job_id)
+        try:
+            result = self.service.consume_runtime_job_required_result(job.job_id)
+        except ExternalOperationUnknown as error:
+            return RunOnceOutcome(
+                action=RunOnceAction.BLOCKED,
+                project_id=project_id,
+                task_id=task_id,
+                attempt_id=attempt_id,
+                blocker_code="EXTERNAL_EFFECT_UNKNOWN",
+                failure_class=FailureClass.EXTERNAL_UNKNOWN,
+                suggested_repair_action=RepairAction.WAIT_EXTERNAL,
+                checkpoint_required=True,
+                detail=str(error),
+            )
         from .planning import ExpandedPlanEvaluation
         evaluation = ExpandedPlanEvaluation.model_validate(result)
         self.service.register_authorized_plan_revision(evaluation)
@@ -2892,7 +3234,7 @@ class EngineDispatcher:
                 job = self.supervisor.tick(job.job_id)
         if job.status not in {RuntimeJobStatus.PROVIDER_TERMINAL, RuntimeJobStatus.CONSUMED}:
             return None
-        result = self.service.consume_runtime_job(job.job_id)
+        result = self.service.consume_runtime_job_required_result(job.job_id)
         return ExecutionPreparation.model_validate(result)
 
     def _verify_policy(self, cwd: Path) -> None:
@@ -3254,6 +3596,44 @@ class EngineDispatcher:
                 )
         return recovered
 
+    def _dispatch_attempt_job(
+        self,
+        attempt_id: str,
+        *,
+        validation_id: str | None = None,
+        existing_call_id: str | None = None,
+    ) -> RuntimeJob:
+        """thread 생성·turn 시작도 scheduler 밖의 bounded job owner에서 수행한다."""
+
+        row, spec = self._attempt_context(attempt_id)
+        kind = (
+            RuntimeJobKind.WORKER_TURN
+            if row["kind"] == AttemptKind.EXECUTION.value
+            else RuntimeJobKind.TASK_SEMANTIC_VALIDATE
+        )
+        request = {
+            "attempt_id": attempt_id,
+            "task_id": row["task_id"],
+            "attempt_kind": row["kind"],
+            "execution_spec_digest": spec.definition_digest,
+            "validation_id": validation_id,
+        }
+        return self.supervisor.schedule(
+            project_id=row["project_id"],
+            kind=kind,
+            checkpoint_key=f"{kind.value}:{attempt_id}:dispatch",
+            request=request,
+            timeout_seconds=spec.definition.timeout_seconds,
+            target=lambda: self._dispatch_reserved(
+                attempt_id,
+                validation_id=validation_id,
+                existing_call_id=existing_call_id,
+            ),
+            attempt_id=attempt_id,
+            task_id=row["task_id"],
+            complete_on_return=False,
+        )
+
     def _dispatch_reserved(self, attempt_id: str, *, validation_id: str | None = None,
                            existing_call_id: str | None = None) -> None:
         self.service.assert_attempt_authorized(attempt_id)
@@ -3422,6 +3802,15 @@ class EngineDispatcher:
         )
         turn_receipt = self._attach_receipt_trace(turn_receipt, trace)
         self._hit("after_turn_effect")
+        current_job_id = active_runtime_job_id()
+        if current_job_id is not None and turn_receipt.binding is not None:
+            # start receipt가 생긴 즉시 exact turn을 durable job에 먼저 결속한다.
+            # Attempt receipt 기록과 scheduler 관측이 경합해도 provider turn을 잃지 않는다.
+            self.service.bind_runtime_job_provider(
+                current_job_id,
+                thread_id=turn_receipt.binding.thread_id,
+                turn_id=turn_receipt.binding.turn_id,
+            )
         self.service.record_runtime_receipt(
             intent_id=turn_intent.intent_id,
             provider_operation_id=turn_receipt.operation_id,
@@ -3435,20 +3824,28 @@ class EngineDispatcher:
                 if row["kind"] == AttemptKind.EXECUTION.value
                 else RuntimeJobKind.TASK_SEMANTIC_VALIDATE
             )
-            runtime_job = self.service.schedule_runtime_job(
-                project_id=row["project_id"], kind=runtime_job_kind,
-                checkpoint_key=(
-                    f"{runtime_job_kind.value}:{row['id']}:"
-                    f"{turn_receipt.binding.turn_id}"
-                ),
-                request=request,
-                absolute_deadline_at=utc_now() + timedelta(seconds=spec.definition.timeout_seconds),
-                attempt_id=row["id"], task_id=row["task_id"],
-            )
-            runtime_job = self.service.start_runtime_job(
-                runtime_job.job_id, thread_id=turn_receipt.binding.thread_id,
-                turn_id=turn_receipt.binding.turn_id,
-            )
+            if current_job_id is not None:
+                runtime_job = self.service.bind_runtime_job_provider(
+                    current_job_id,
+                    thread_id=turn_receipt.binding.thread_id,
+                    turn_id=turn_receipt.binding.turn_id,
+                )
+            else:
+                # 직접 호출 호환 경로도 동일한 durable 관측 모델을 사용한다.
+                runtime_job = self.service.schedule_runtime_job(
+                    project_id=row["project_id"], kind=runtime_job_kind,
+                    checkpoint_key=(
+                        f"{runtime_job_kind.value}:{row['id']}:"
+                        f"{turn_receipt.binding.turn_id}"
+                    ),
+                    request=request,
+                    absolute_deadline_at=utc_now() + timedelta(seconds=spec.definition.timeout_seconds),
+                    attempt_id=row["id"], task_id=row["task_id"],
+                )
+                runtime_job = self.service.start_runtime_job(
+                    runtime_job.job_id, thread_id=turn_receipt.binding.thread_id,
+                    turn_id=turn_receipt.binding.turn_id,
+                )
         register = getattr(self.runtime, "register_completion_observer", None)
         if register is not None and turn_receipt.binding is not None:
             def record_completion(observation, *, attempt_id=row["id"], active_trace=trace,
@@ -4012,7 +4409,14 @@ class EngineDispatcher:
                 attempt = self.service.reserve_attempt(
                     task_id=task["id"], kind=AttemptKind.VALIDATION
                 )
-                self._dispatch_reserved(attempt.attempt_id, validation_id=step.validation_id)
+                if self.supervisor is None:
+                    self._dispatch_reserved(
+                        attempt.attempt_id, validation_id=step.validation_id
+                    )
+                else:
+                    self._dispatch_attempt_job(
+                        attempt.attempt_id, validation_id=step.validation_id
+                    )
                 return RunOnceOutcome(
                     action=RunOnceAction.DISPATCHED,
                     project_id=task["project_id"],

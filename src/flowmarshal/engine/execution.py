@@ -292,7 +292,12 @@ class ExecutionProposalAdapter:
                 request=raw.context_request,
                 token_budget=12_000,
             )
-            if resolution.resolved:
+            # RuntimeJob 하나는 exact provider turn 하나만 소유한다. 비동기 준비
+            # 경계에서는 후속 role call을 같은 job 안에서 시작하지 않고 ContextRequest를
+            # Core에 돌려 다음 materialization 입력으로 명시적으로 처리하게 한다.
+            from .runtime import active_runtime_job_id
+
+            if resolution.resolved and active_runtime_job_id() is None:
                 payload = payload | {
                     "additional_context": [
                         item.model_dump(mode="json") for item in resolution.resolved

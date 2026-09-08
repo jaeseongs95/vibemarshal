@@ -311,10 +311,29 @@ class CodexStructuredRoleRunner:
                               role=request.role, model=request.model, effort=request.effort)
 
     def _progress(self, event: str, request: RoleCallRequest, call_id: str, **details: Any) -> None:
-        if self.progress_sink is not None:
-            self.progress_sink({"event": event, "call_id": call_id, "role": request.role,
-                                "request_digest": request.request_digest,
-                                "recorded_at": utc_now().isoformat(), **details})
+        self._progress_to(self.progress_sink, event, request, call_id, **details)
+
+    @staticmethod
+    def _progress_to(
+        sink: Callable[[dict[str, Any]], None] | None,
+        event: str,
+        request: RoleCallRequest,
+        call_id: str,
+        *,
+        durable_sink: Callable[[dict[str, Any]], None] | None = None,
+        **details: Any,
+    ) -> None:
+        from .runtime import notify_active_runtime_job_progress
+
+        progress = {"event": event, "call_id": call_id, "role": request.role,
+                    "request_digest": request.request_digest,
+                    "recorded_at": utc_now().isoformat(), **details}
+        if durable_sink is None:
+            notify_active_runtime_job_progress(progress)
+        else:
+            durable_sink(progress)
+        if sink is not None:
+            sink(progress)
 
     def run(
         self,
@@ -454,8 +473,12 @@ class CodexStructuredRoleRunner:
             self._progress("turn_started", request, call_id, thread_id=thread_id, turn_id=turn.operation_id)
             register = getattr(self.runtime, "register_completion_observer", None)
             if callable(register):
-                def record_terminal(observed, *, expected_turn_id=turn.operation_id, sink=self.progress_sink,
-                                    proofs=role_call_proofs):
+                from .runtime import capture_active_runtime_job_progress
+
+                durable_progress = capture_active_runtime_job_progress()
+                def record_terminal(observed, *, expected_turn_id=turn.operation_id,
+                                    proofs=role_call_proofs, sink=self.progress_sink,
+                                    durable_sink=durable_progress):
                     if (observed.thread_id != thread_id or observed.turn_id != expected_turn_id
                             or observed.active):
                         raise ValueError("ROLE_TERMINAL_OBSERVATION_BINDING_MISMATCH")
@@ -463,14 +486,16 @@ class CodexStructuredRoleRunner:
                         "role_call_proofs": proofs, "role_call_proofs_digest": sha256_digest(proofs),
                     }})
                     self.pending_terminal_observations[call_id] = observed
-                    if sink is not None:
-                        sink({"event": ("role_terminal_observed" if observed.terminal_status in
-                              PROVIDER_TERMINAL_STATUSES
-                              else "role_observation_incomplete"), "call_id": call_id,
-                              "role": request.role, "request_digest": request.request_digest,
-                              "recorded_at": utc_now().isoformat(),
-                              "terminal_observation": observed.model_dump(mode="json"),
-                              "terminal_observation_digest": sha256_digest(observed)})
+                    self._progress_to(
+                        sink,
+                        ("role_terminal_observed" if observed.terminal_status in
+                         PROVIDER_TERMINAL_STATUSES else "role_observation_incomplete"),
+                        request,
+                        call_id,
+                        durable_sink=durable_sink,
+                        terminal_observation=observed.model_dump(mode="json"),
+                        terminal_observation_digest=sha256_digest(observed),
+                    )
                 register(thread_id=thread_id, turn_id=turn.operation_id, observer=record_terminal)
             deadline = started + request.timeout_seconds
             while True:
@@ -484,6 +509,20 @@ class CodexStructuredRoleRunner:
                 observation_thread_id = observation.thread_id
                 observation_turn_id = observation.turn_id
                 if not observation.active:
+                    if observation.terminal_status in PROVIDER_TERMINAL_STATUSES:
+                        terminal_observation = observation.model_copy(update={
+                            "payload": observation.payload | {
+                                "role_call_proofs": role_call_proofs,
+                                "role_call_proofs_digest": sha256_digest(role_call_proofs),
+                            }
+                        })
+                        self._progress(
+                            "role_terminal_observed",
+                            request,
+                            call_id,
+                            terminal_observation=terminal_observation.model_dump(mode="json"),
+                            terminal_observation_digest=sha256_digest(terminal_observation),
+                        )
                     break
                 if time.monotonic() >= deadline:
                     observation_deadline = time.monotonic() + observation_policy.interrupt_observation_seconds

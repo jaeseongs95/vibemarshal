@@ -2,7 +2,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 import sys
+import tempfile
+import time
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +36,8 @@ from .domain import (
     RecoveryAssessment,
     RevisionStatus,
     RuntimeReceipt,
+    RuntimeJobStatus,
+    RunOnceResult,
     SourceTrace,
     StateFact,
     StateSnapshot,
@@ -812,13 +819,70 @@ def _wait_dispatched_turn(
 
 
 def _cmd_run_once(arguments: argparse.Namespace) -> None:
+    owner_result = os.environ.get("FLOWMARSHAL_RUNTIME_OWNER_RESULT")
+    if owner_result is None:
+        _emit(_spawn_run_once_owner(tuple(arguments._raw_argv)))
+        return
+    _run_once_owned(arguments, Path(owner_result))
+
+
+def _spawn_run_once_owner(argv: tuple[str, ...]) -> RunOnceResult:
+    """별도 process가 SDK와 local typed 후처리 수명을 계속 소유하게 한다."""
+
+    result_path = Path(tempfile.gettempdir()) / f"flowmarshal-owner-{uuid.uuid4().hex}.json"
+    environment = os.environ.copy()
+    environment["FLOWMARSHAL_RUNTIME_OWNER_RESULT"] = str(result_path)
+    command = [sys.executable, "-m", "flowmarshal.engine.cli", *argv]
+    popen_kwargs: dict[str, Any] = {
+        "cwd": os.getcwd(),
+        "env": environment,
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+    if os.name == "nt":
+        popen_kwargs["creationflags"] = (
+            getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
+            | getattr(subprocess, "DETACHED_PROCESS", 0)
+            | getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        )
+    else:
+        popen_kwargs["start_new_session"] = True
+    process = subprocess.Popen(command, **popen_kwargs)
+    deadline = time.monotonic() + 5.0
+    while time.monotonic() < deadline:
+        if result_path.exists():
+            payload = json.loads(result_path.read_text(encoding="utf-8"))
+            result_path.unlink(missing_ok=True)
+            if "owner_error" in payload:
+                raise EngineServiceError(payload["owner_error"])
+            return RunOnceResult.model_validate(payload)
+        if process.poll() is not None:
+            break
+        time.sleep(0.01)
+    raise EngineServiceError(
+        "RUNTIME_OWNER_START_FAILED: background owner가 초기 tick 결과를 게시하지 못했습니다. "
+        f"result_path={result_path}"
+    )
+
+
+def _publish_owner_result(path: Path, payload: dict[str, Any]) -> None:
+    temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    os.replace(temporary, path)
+
+
+def _run_once_owned(arguments: argparse.Namespace, result_path: Path) -> None:
+    published = False
     proposal = (
         None
         if arguments.proposal_file is None
         else ExecutionSpecProposal.model_validate(_json(arguments.proposal_file))
     )
-    with _runtime(arguments) as runtime:
-        outcome = _application(arguments, runtime=runtime).run_once(
+    runtime = _runtime(arguments)
+    application = _application(arguments, runtime=runtime)
+    try:
+        outcome = application.run_once(
             arguments.project_id,
             proposal=proposal,
             resume=getattr(arguments, "resume", False),
@@ -829,7 +893,36 @@ def _cmd_run_once(arguments: argparse.Namespace) -> None:
                 else GoalValidationRetryRequest.model_validate(_json(arguments.goal_validation_retry_file))
             ),
         )
-    _emit(outcome)
+        _publish_owner_result(result_path, outcome.model_dump(mode="json"))
+        published = True
+        supervisor = application.supervisor
+        job_id = outcome.runtime_job_id
+        if supervisor is not None and job_id is not None:
+            while True:
+                job = application.service.load_runtime_job(job_id)
+                if job.status in {
+                    RuntimeJobStatus.PROVIDER_TERMINAL,
+                    RuntimeJobStatus.CONSUMED,
+                    RuntimeJobStatus.CANCELLED,
+                    RuntimeJobStatus.COLLECTOR_LOST,
+                }:
+                    break
+                if (job.absolute_deadline_at - utc_now()).total_seconds() <= 0:
+                    supervisor.request_interrupt(job_id)
+                supervisor.tick(job_id, wait_seconds=0.05)
+                time.sleep(0.01)
+    except BaseException as error:
+        if not published:
+            _publish_owner_result(
+                result_path,
+                {"owner_error": f"{type(error).__name__}: {error}"},
+            )
+        raise
+    finally:
+        if application.supervisor is not None:
+            application.supervisor.close()
+        else:
+            runtime.close()
 
 
 def _cmd_run_status(arguments: argparse.Namespace) -> None:
@@ -1390,7 +1483,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
-    arguments = parser.parse_args(argv)
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    arguments = parser.parse_args(raw_argv)
+    arguments._raw_argv = raw_argv
     try:
         policy = (RoleTimeoutPolicy() if arguments.role_timeout_policy is None else
                   RoleTimeoutPolicy.model_validate(_json(arguments.role_timeout_policy)))
