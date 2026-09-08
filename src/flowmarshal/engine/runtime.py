@@ -27,6 +27,8 @@ from .domain import (
     GoalVerdict,
     GoalVerdictStatus,
     PlanContractRevision,
+    PROVIDER_FAILURE_TERMINAL_STATUSES,
+    PROVIDER_SUCCESS_TERMINAL_STATUSES,
     RepairAction,
     RunOnceAction,
     RunOnceOutcome,
@@ -1726,8 +1728,8 @@ class RuntimeJobSupervisor:
 class EngineDispatcher:
     """원장 우선순위에 따라 호출당 한 상태 단계만 전진시키는 실행기."""
 
-    _SUCCESS = {"completed", "success", "succeeded"}
-    _FAILED = {"failed", "error", "systemError", "system_error"}
+    _SUCCESS = PROVIDER_SUCCESS_TERMINAL_STATUSES
+    _FAILED = PROVIDER_FAILURE_TERMINAL_STATUSES
 
     def __init__(
         self,

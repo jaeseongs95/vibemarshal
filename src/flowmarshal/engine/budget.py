@@ -6,7 +6,15 @@ from typing import Any, Literal
 from pydantic import Field
 
 from ..canonical import canonical_json, sha256_digest
-from .domain import BudgetStage, BudgetUsageRecord, EngineModel, UsageObservation, new_id, utc_now
+from .domain import (
+    PROVIDER_TERMINAL_STATUSES,
+    BudgetStage,
+    BudgetUsageRecord,
+    EngineModel,
+    UsageObservation,
+    new_id,
+    utc_now,
+)
 from .service import EngineService, EngineServiceError
 
 
@@ -89,7 +97,7 @@ def _terminal_receipt(receipt: Any | None) -> bool:
         "succeeded", "failed", "schema_failed", "input_contract_failed"
     } or
         (getattr(receipt, "terminal_observation_digest", None) is not None and
-         getattr(receipt, "terminal_status_after_interrupt", None) in {"completed", "success", "succeeded", "failed", "interrupted", "cancelled"}))
+         getattr(receipt, "terminal_status_after_interrupt", None) in PROVIDER_TERMINAL_STATUSES))
 
 
 def _provider_states(receipt: Any | None) -> tuple[str, str, str]:
@@ -225,7 +233,8 @@ class BudgetManager:
                 "WHERE c.project_id=? AND c.goal_id=? AND c.status<>'released'", (project_id, goal_id)).fetchall()
             unresolved = tuple(row["id"] for row in connection.execute(
                 "SELECT id FROM provider_calls WHERE project_id=? AND "
-                "(execution_status IN ('reserved','started','unknown') OR effect_status='unknown') "
+                "(execution_status IN ('reserved','started','unknown') "
+                "OR effect_status IN ('pending','unknown')) "
                 "ORDER BY rowid", (project_id,)))
             usage_incomplete = tuple(row["id"] for row in connection.execute(
                 "SELECT id FROM provider_calls WHERE project_id=? AND goal_id=? AND status='usage_unknown' "
@@ -265,7 +274,8 @@ class BudgetManager:
                            "ON a.call_id = c.id WHERE c.project_id = ? AND c.goal_id = ?", (project_id, goal_id))
             unresolved = [c["id"] for c in tx.all(
                 "SELECT id FROM provider_calls WHERE project_id=? AND "
-                "(execution_status IN ('reserved','started','unknown') OR effect_status='unknown')",
+                "(execution_status IN ('reserved','started','unknown') "
+                "OR effect_status IN ('pending','unknown'))",
                 (project_id,),
             )]
             if unresolved:
@@ -595,7 +605,7 @@ def record_validator_usage(service: EngineService, attempt_id: str, observation:
         # 과거 transport가 정책·usage 관측 계약을 제공하지 않았다면 소급 작성하지 않는다.
         if "permission_profile" not in start or "approval_policy" not in start:
             return None
-        if observation.active or observation.terminal_status not in {"completed", "success", "succeeded", "failed", "interrupted", "cancelled"}:
+        if observation.active or observation.terminal_status not in PROVIDER_TERMINAL_STATUSES:
             raise EngineServiceError("VALIDATOR_USAGE_TERMINAL_REQUIRED: 종료 관측이 필요합니다.")
         if (start.get("permission_profile") != ":danger-full-access" or start.get("approval_policy") != "never"
                 or start.get("prompt_digest") != request["prompt_digest"]

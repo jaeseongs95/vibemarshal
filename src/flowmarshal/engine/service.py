@@ -34,6 +34,7 @@ from .domain import (
     ExternalValidationObservation,
     PlanContractRevision,
     PlanSkeletonCandidate,
+    PROVIDER_TERMINAL_STATUSES,
     ProjectMapRevision,
     ProjectProfileDefinition,
     ProjectProfileRevision,
@@ -4115,7 +4116,7 @@ class EngineService:
         output_digest: str | None = None,
     ) -> BudgetUsageRecord | None:
         """새 Worker turn의 관측만 기록하며 Task/Attempt 상태는 전이하지 않는다."""
-        if terminal_status not in {"completed", "success", "succeeded", "failed", "error", "systemError", "system_error", "interrupted"}:
+        if terminal_status not in PROVIDER_TERMINAL_STATUSES:
             raise EngineServiceError("종료를 관측한 Worker turn만 usage를 기록합니다.")
         with self.ledger.transaction() as tx:
             attempt = tx.one("SELECT * FROM attempts WHERE id = ?", (attempt_id,))

@@ -6,11 +6,12 @@ from datetime import datetime
 from typing import Any
 
 from ..canonical import canonical_json, sha256_digest
-from .domain import BudgetStage, BudgetUsageRecord, new_id
+from .domain import PROVIDER_TERMINAL_STATUSES, BudgetStage, BudgetUsageRecord, new_id
 from .roles import RoleCallReceipt
 
 
-TERMINAL_STATUSES = {"completed", "success", "succeeded", "failed", "interrupted", "cancelled"}
+# 기존 diagnostic import 계약을 유지하되 단일 공통 정의를 참조한다.
+TERMINAL_STATUSES = PROVIDER_TERMINAL_STATUSES
 _USAGE_KEYS = ("inputTokens", "cachedInputTokens", "outputTokens", "reasoningOutputTokens")
 
 
@@ -151,7 +152,10 @@ def usage_from_observation(
     *, call: Any, receipt: RoleCallReceipt, event: dict[str, Any], goal_digest: str
 ) -> BudgetUsageRecord:
     document = event["observation"]
-    terminal = not document.get("active", True) and document.get("terminal_status") in TERMINAL_STATUSES
+    terminal = (
+        not document.get("active", True)
+        and document.get("terminal_status") in PROVIDER_TERMINAL_STATUSES
+    )
     known, values = observation_usage_values(document.get("payload") or {}, receipt)
     known = terminal and known
     if not known:
@@ -215,7 +219,10 @@ def reconcile_role_usage_terminal(service: Any, call_id: str, observation: Any) 
             row = tx.one("SELECT payload_json FROM budget_usage WHERE id=?", (reconciliation["effective_usage_id"],))
             return BudgetUsageRecord.model_validate_json(row["payload_json"])
 
-        terminal = not document.get("active", True) and document.get("terminal_status") in TERMINAL_STATUSES
+        terminal = (
+            not document.get("active", True)
+            and document.get("terminal_status") in PROVIDER_TERMINAL_STATUSES
+        )
         known, values = observation_usage_values(document.get("payload") or {}, receipt)
         known = terminal and known
         if any(item.get("usage_available") is True for item in events):

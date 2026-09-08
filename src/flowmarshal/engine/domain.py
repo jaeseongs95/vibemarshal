@@ -25,6 +25,19 @@ _DIGEST_PATTERN = r"^sha256:[0-9a-f]{64}$"
 _ENTITY_ID_PATTERN = r"^[a-z][a-z0-9_]*_[0-9a-f]{32}$"
 _LOCAL_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$"
 
+# Provider 종료 어휘는 역할 실행, Worker 수집, dispatcher가 함께 사용한다.
+# interrupted는 종료 관측이지만 같은 attempt를 재개할 수 있는 상태다.
+PROVIDER_SUCCESS_TERMINAL_STATUSES = frozenset({"completed", "success", "succeeded"})
+PROVIDER_FAILURE_TERMINAL_STATUSES = frozenset({
+    "failed", "error", "systemError", "system_error", "cancelled", "canceled",
+})
+PROVIDER_RESUMABLE_TERMINAL_STATUSES = frozenset({"interrupted"})
+PROVIDER_TERMINAL_STATUSES = (
+    PROVIDER_SUCCESS_TERMINAL_STATUSES
+    | PROVIDER_FAILURE_TERMINAL_STATUSES
+    | PROVIDER_RESUMABLE_TERMINAL_STATUSES
+)
+
 
 def new_id(prefix: str) -> str:
     normalized = prefix.strip().casefold().replace("-", "_")

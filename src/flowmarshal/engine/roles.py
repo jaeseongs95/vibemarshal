@@ -10,7 +10,13 @@ from typing import Any, Callable, Protocol
 from pydantic import Field, model_serializer, model_validator
 
 from ..canonical import canonical_json, sha256_digest
-from .domain import EngineModel, new_id, utc_now
+from .domain import (
+    PROVIDER_SUCCESS_TERMINAL_STATUSES,
+    PROVIDER_TERMINAL_STATUSES,
+    EngineModel,
+    new_id,
+    utc_now,
+)
 from .runtime import (
     CodexRuntimePort,
     REQUIRED_APPROVAL_POLICY,
@@ -459,7 +465,7 @@ class CodexStructuredRoleRunner:
                     self.pending_terminal_observations[call_id] = observed
                     if sink is not None:
                         sink({"event": ("role_terminal_observed" if observed.terminal_status in
-                              {"completed", "success", "succeeded", "failed", "interrupted", "cancelled"}
+                              PROVIDER_TERMINAL_STATUSES
                               else "role_observation_incomplete"), "call_id": call_id,
                               "role": request.role, "request_digest": request.request_digest,
                               "recorded_at": utc_now().isoformat(),
@@ -578,7 +584,7 @@ class CodexStructuredRoleRunner:
                         observation_turn_id = observation.turn_id
                         if not observation.active:
                             self.pending_terminal_observations[call_id] = observation
-                            if observation.terminal_status in {"completed", "success", "succeeded", "failed", "interrupted", "cancelled"}:
+                            if observation.terminal_status in PROVIDER_TERMINAL_STATUSES:
                                 terminal_observation_digest = sha256_digest(observation)
                                 terminal_status_after_interrupt = observation.terminal_status
                             self._progress(
@@ -628,7 +634,7 @@ class CodexStructuredRoleRunner:
                         receipts=tuple(self.receipts),
                     )
                 time.sleep(self.poll_interval_seconds)
-            if observation.terminal_status not in {"completed", "success", "succeeded"}:
+            if observation.terminal_status not in PROVIDER_SUCCESS_TERMINAL_STATUSES:
                 receipt = self._receipt(
                     call_id=call_id,
                     request=request, observed_binding=observed_binding,
@@ -636,7 +642,8 @@ class CodexStructuredRoleRunner:
                     thread_id=thread_id,
                     turn_ids=tuple(turn_ids),
                     started=started,
-                    status=("failed" if observation.terminal_status in {"failed", "interrupted", "cancelled"}
+                    status=("failed" if observation.terminal_status in
+                            PROVIDER_TERMINAL_STATUSES - PROVIDER_SUCCESS_TERMINAL_STATUSES
                             else "external_unknown"),
                     recovery_attempts=recovery_attempts,
                     error=f"terminal status={observation.terminal_status}",
@@ -750,9 +757,8 @@ class CodexStructuredRoleRunner:
             empty_thread_creation_proven=empty_thread_creation_proven,
             first_empty_turn_proven=first_empty_turn_proven,
         )
-        if status not in {"succeeded", "failed", "schema_failed", "input_contract_failed"} and terminal_status_after_interrupt not in {
-            "completed", "success", "succeeded", "failed", "interrupted", "cancelled",
-        }:
+        if (status not in {"succeeded", "failed", "schema_failed", "input_contract_failed"}
+                and terminal_status_after_interrupt not in PROVIDER_TERMINAL_STATUSES):
             # 수집기 종료나 interrupt ACK는 provider 종료를 증명하지 않는다.
             input_tokens = cached_tokens = output_tokens = reasoning_tokens = None
             usage_available = False

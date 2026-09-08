@@ -597,6 +597,14 @@ CREATE TRIGGER tr_engine_job_observation_no_update BEFORE UPDATE ON runtime_job_
 BEGIN SELECT RAISE(ABORT, 'ENGINE_JOB_OBSERVATION_APPEND_ONLY'); END;
 CREATE TRIGGER tr_engine_job_observation_no_delete BEFORE DELETE ON runtime_job_observations
 BEGIN SELECT RAISE(ABORT, 'ENGINE_JOB_OBSERVATION_APPEND_ONLY'); END;
+CREATE TRIGGER tr_engine_usage_observation_no_update BEFORE UPDATE ON usage_observations
+BEGIN SELECT RAISE(ABORT, 'ENGINE_USAGE_OBSERVATION_APPEND_ONLY'); END;
+CREATE TRIGGER tr_engine_usage_observation_no_delete BEFORE DELETE ON usage_observations
+BEGIN SELECT RAISE(ABORT, 'ENGINE_USAGE_OBSERVATION_APPEND_ONLY'); END;
+CREATE TRIGGER tr_engine_usage_reconciliation_no_update BEFORE UPDATE ON usage_reconciliations
+BEGIN SELECT RAISE(ABORT, 'ENGINE_USAGE_RECONCILIATION_APPEND_ONLY'); END;
+CREATE TRIGGER tr_engine_usage_reconciliation_no_delete BEFORE DELETE ON usage_reconciliations
+BEGIN SELECT RAISE(ABORT, 'ENGINE_USAGE_RECONCILIATION_APPEND_ONLY'); END;
 """
 
 
@@ -763,6 +771,8 @@ class SQLiteEngineLedger:
                 )
             if connection.execute("PRAGMA application_id").fetchone()[0] != SQLITE_APPLICATION_ID:
                 raise EngineLedgerError("SQLite application_id가 FlowMarshal Engine과 다릅니다.")
+            if connection.execute("PRAGMA user_version").fetchone()[0] != ENGINE_SCHEMA_REVISION:
+                raise EngineLedgerError("SQLite user_version과 Engine schema revision이 다릅니다.")
         finally:
             connection.close()
 
@@ -908,6 +918,8 @@ class SQLiteEngineHistoryReader:
                 raise EngineLedgerError("지원하지 않는 Engine history schema revision입니다.")
             if connection.execute("PRAGMA application_id").fetchone()[0] != SQLITE_APPLICATION_ID:
                 raise EngineLedgerError("SQLite application_id가 FlowMarshal Engine과 다릅니다.")
+            if connection.execute("PRAGMA user_version").fetchone()[0] != revision:
+                raise EngineLedgerError("SQLite user_version과 Engine history schema revision이 다릅니다.")
             return {"schema_id": ENGINE_SCHEMA_ID, "schema_revision": revision}
         finally:
             connection.close()

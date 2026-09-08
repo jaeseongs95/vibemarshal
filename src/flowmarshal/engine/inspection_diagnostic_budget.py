@@ -232,7 +232,7 @@ def _ledger_snapshot(database: Path) -> dict[str, Any]:
         })
     unresolved = [call["id"] for call in calls if (
         call["execution_status"] in {"reserved", "started", "unknown"}
-        or call["effect_status"] == "unknown"
+        or call["effect_status"] in {"pending", "unknown"}
     )]
     usage_incomplete = [call["id"] for call in calls if call["actual_tokens"] is None]
     body = {

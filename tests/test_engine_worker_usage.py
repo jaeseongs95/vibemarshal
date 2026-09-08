@@ -235,6 +235,34 @@ class WorkerUsageTests(unittest.TestCase):
         self.assertEqual("CUMULATIVE_USAGE_NOT_ATTRIBUTABLE_TO_TURN", resumed.unavailable_reason)
         self.assertEqual(2, len(self.worker_rows(prepared.service)))
 
+    def test_cancelled_spellings_are_terminal_failures_and_never_resume(self):
+        for terminal in ("cancelled", "canceled"):
+            with self.subTest(terminal=terminal):
+                prepared, runtime, dispatcher, attempt_id = self.dispatched(
+                    "terminal-" + terminal
+                )
+                thread_id, _, _ = self.turn(prepared.service, attempt_id)
+                runtime.threads[thread_id].terminal_status = terminal
+                runtime.threads[thread_id].final_response = "provider cancellation"
+
+                outcome = dispatcher.run_once(prepared.project_id)
+
+                self.assertEqual(RunOnceAction.OBSERVED, outcome.action)
+                self.assertEqual(0, runtime.resume_calls)
+                with prepared.service.ledger.read() as connection:
+                    attempt = connection.execute(
+                        "SELECT status FROM attempts WHERE id=?", (attempt_id,)
+                    ).fetchone()
+                    call = connection.execute(
+                        "SELECT execution_status,effect_status,result_status,status,actual_tokens "
+                        "FROM provider_calls WHERE attempt_id=?", (attempt_id,)
+                    ).fetchone()
+                self.assertEqual("failed", attempt["status"])
+                self.assertEqual(
+                    ("terminal", "terminal", "invalid", "usage_unknown", None),
+                    tuple(call),
+                )
+
     def test_provider_binding_mismatches_are_rejected(self):
         prepared, _, _, attempt_id = self.dispatched("mismatch")
         thread_id, turn_id, request = self.turn(prepared.service, attempt_id)

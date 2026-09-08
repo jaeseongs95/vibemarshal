@@ -118,7 +118,28 @@ class ExecutionUsageSeparationTests(unittest.TestCase):
 
         same_goal = self._reserve("same-goal-next")
         self.manager.settle(same_goal, self._receipt("same-goal-next"))
-        other_goal = self._reserve("other-goal-next", goal_id="goal_independent")
+        independent_root = Path(self.temp.name) / "independent-project"
+        independent_root.mkdir()
+        independent_project = self.service.create_project(
+            name="FM-02-independent", root=independent_root
+        )
+        independent_profile = profile(independent_project)
+        self.service.register_profile(independent_profile)
+        independent = goal(independent_project, independent_profile.definition_digest)
+        self.service.register_goal(independent)
+        independent_manager = BudgetManager(self.service)
+        independent_manager.configure(
+            independent_project,
+            GoalBudgetPolicy(total_tokens=100, call_reservation_tokens=10),
+        )
+        other_goal = independent_manager.reserve(
+            project_id=independent_project,
+            goal_id=independent.goal_id,
+            goal_digest=independent.definition_digest,
+            call_key="other-goal-next",
+            role="goal_reviewer",
+            request={"call_key": "other-goal-next"},
+        )
         self.assertEqual("reserved", self._row(other_goal)["execution_status"])
 
     def test_fm_02_c2_unknown_effect_is_observe_first_but_unknown_usage_is_not(self) -> None:
@@ -142,6 +163,21 @@ class ExecutionUsageSeparationTests(unittest.TestCase):
         ))
         with self.assertRaisesRegex(BudgetBlocked, "PROVIDER_EFFECT_UNKNOWN"):
             self._reserve("must-observe-first", goal_id="goal_independent")
+
+    def test_fm_02_c2_pending_effect_is_observe_first(self) -> None:
+        """terminal 실행이어도 effect pending이면 프로젝트 전체 admission을 차단한다."""
+        call_id = self._reserve("pending-effect")
+        with self.ledger.transaction() as tx:
+            tx.connection.execute(
+                "UPDATE provider_calls SET execution_status='terminal',effect_status='pending',"
+                "result_status='unknown' WHERE id=?",
+                (call_id,),
+            )
+        status = self.manager.status(self.project_id, goal_id=self.goal.goal_id)
+        self.assertEqual((call_id,), status.unresolved_call_ids)
+        self.assertEqual("PROVIDER_EFFECT_UNKNOWN", status.error_code)
+        with self.assertRaisesRegex(BudgetBlocked, "PROVIDER_EFFECT_UNKNOWN"):
+            self._reserve("pending-effect-blocks-next")
 
     def test_fm_02_c3_late_usage_only_appends_accounting_observation(self) -> None:
         """late usage가 실행 슬롯·turn 횟수·완료 시각·원본 receipt를 바꾸지 않는다."""
@@ -200,6 +236,30 @@ class ExecutionUsageSeparationTests(unittest.TestCase):
         self.assertEqual(before_call_count, after_call_count)
         self.assertTrue(self.ledger.verify_history(self.project_id))
 
+        with self.ledger.read() as connection:
+            observation_id = connection.execute(
+                "SELECT id FROM usage_observations WHERE provider_call_id=? ORDER BY rowid LIMIT 1",
+                (call_id,),
+            ).fetchone()["id"]
+            reconciliation_id = connection.execute(
+                "SELECT id FROM usage_reconciliations WHERE call_id=? ORDER BY rowid LIMIT 1",
+                (call_id,),
+            ).fetchone()["id"]
+        for table, row_id in (
+            ("usage_observations", observation_id),
+            ("usage_reconciliations", reconciliation_id),
+        ):
+            with self.subTest(table=table, operation="update"):
+                with self.assertRaisesRegex(sqlite3.IntegrityError, "APPEND_ONLY"):
+                    with self.ledger.transaction() as tx:
+                        tx.connection.execute(
+                            f"UPDATE {table} SET id=id WHERE id=?", (row_id,)
+                        )
+            with self.subTest(table=table, operation="delete"):
+                with self.assertRaisesRegex(sqlite3.IntegrityError, "APPEND_ONLY"):
+                    with self.ledger.transaction() as tx:
+                        tx.connection.execute(f"DELETE FROM {table} WHERE id=?", (row_id,))
+
     def test_fm_02_c4_schema4_history_reader_and_input_contract_terminal(self) -> None:
         """schema 4 신규 생성, schema 3 read-only, input_contract_failed terminal을 회귀한다."""
         with self.ledger.read() as connection:
@@ -246,6 +306,21 @@ class ExecutionUsageSeparationTests(unittest.TestCase):
             history[0]["execution_status"],
         ))
         self.assertEqual(before_digest, hashlib.sha256(historical.read_bytes()).hexdigest())
+
+        inconsistent = Path(self.temp.name) / "schema3-inconsistent.sqlite3"
+        inconsistent.write_bytes(historical.read_bytes())
+        connection = sqlite3.connect(inconsistent)
+        try:
+            connection.execute("PRAGMA user_version=4")
+            connection.commit()
+        finally:
+            connection.close()
+        inconsistent_digest = hashlib.sha256(inconsistent.read_bytes()).hexdigest()
+        with self.assertRaisesRegex(EngineLedgerError, "user_version"):
+            SQLiteEngineHistoryReader(inconsistent)
+        self.assertEqual(
+            inconsistent_digest, hashlib.sha256(inconsistent.read_bytes()).hexdigest()
+        )
 
     def test_benchmark_limits_are_explicit_and_not_token_reservation_conversions(self) -> None:
         first = EvaluationPolicies(

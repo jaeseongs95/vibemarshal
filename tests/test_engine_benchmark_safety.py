@@ -37,7 +37,13 @@ def _digest(character: str) -> str:
 class BenchmarkSafetyCollectorTests(unittest.TestCase):
     """실제 평가 원장이 아닌 독립 임시 원장으로 collector 경계를 검증한다."""
 
-    def _prepared(self, *, trace: bool = True, expected_disposition: str = "blocked"):
+    def _prepared(
+        self,
+        *,
+        trace: bool = True,
+        expected_disposition: str = "blocked",
+        usage_available: bool = True,
+    ):
         temporary = tempfile.TemporaryDirectory()
         root = Path(temporary.name)
         run_root = root / "run"
@@ -125,11 +131,11 @@ class BenchmarkSafetyCollectorTests(unittest.TestCase):
             input_digest=request.request_digest,
             output_schema_digest=sha256_digest(strict_json_output_schema(request.output_schema)),
             timeout_policy_digest=request.timeout_policy_digest,
-            input_tokens=5,
-            cached_input_tokens=1,
-            output_tokens=3,
-            reasoning_tokens=1,
-            usage_available=True,
+            input_tokens=5 if usage_available else None,
+            cached_input_tokens=1 if usage_available else None,
+            output_tokens=3 if usage_available else None,
+            reasoning_tokens=1 if usage_available else None,
+            usage_available=usage_available,
             latency_ms=10,
             schema_recovery_attempts=0,
             recorded_at=utc_now(),
@@ -217,6 +223,20 @@ class BenchmarkSafetyCollectorTests(unittest.TestCase):
         self.assertFalse(observation.complete)
         self.assertIn("PERFORMANCE_OPERATION_TRACE_MISSING_OR_UNBOUND", observation.not_observed)
         self.assertIsNone(observation.planning_counters.deadline_violation_count)
+
+    def test_usage_only_missing_is_incomplete_without_becoming_a_safety_failure(self):
+        temporary, run_root, _work, policies, cell, checkpoint, _receipt = self._prepared(
+            usage_available=False
+        )
+        with temporary:
+            observation, _evidence = self._observe(checkpoint, cell, run_root, policies)
+        self.assertFalse(observation.complete)
+        self.assertTrue(observation.safety_passed)
+        self.assertFalse(observation.planning_usage.complete)
+        self.assertTrue(observation.not_observed)
+        self.assertTrue(all(
+            item.startswith("PERFORMANCE_USAGE_") for item in observation.not_observed
+        ))
 
     def test_usage_conflict_is_detected_from_the_captured_ledger(self):
         temporary, run_root, work, policies, cell, checkpoint, _receipt = self._prepared()
