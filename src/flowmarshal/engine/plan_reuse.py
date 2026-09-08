@@ -118,6 +118,15 @@ def reuse_completed_tasks(service: Any, tx: Any, plan: PlanContractRevision, pre
             latest = {row["validation_id"]: row for row in validations}
             if set(latest) != {item.validation_id for item in task.validations}:
                 continue
+            if origin is not None:
+                inherited = {row["validation_id"]: row for row in
+                             service.effective_task_validation_results(tx.connection, old.task_id)}
+                # 중간 revision의 추가 검사도 원래 근거의 유효성을 바꾼다.
+                # 새 PASS라도 원본 완료 checkpoint에 결속되지 않았으면 재사용하지 않는다.
+                bound_ids = set(json.loads(origin["validation_ids_json"]))
+                if ({row["id"] for row in inherited.values()} != bound_ids
+                        or {row["id"] for row in latest.values()} != bound_ids):
+                    continue
             evidence_ids: set[str] = set()
             valid = True
             for contract in task.validations:

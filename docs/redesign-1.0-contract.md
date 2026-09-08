@@ -18,6 +18,8 @@
 
 재계획은 실행 중 Attempt의 입력·binding·효과를 덮어쓰거나 실행 슬롯을 회수하지 않는다. 진행 중 작업과 변경 subgraph의 충돌을 확인하고 보호한 뒤 activation한다. 완료 evidence는 대상·입력·검사 의미·freshness의 유효성을 확인한 경우만 새 revision에서 재사용하며 과거 실패와 원본 결과를 보존한다.
 
+재사용된 Task에 새 검사 결과가 기록되면 이전 PASS와 함께 기록 순서로 조회해 최신 결과를 반영한다. 원본이나 중간 Task에 늦게 기록된 실패·미확정 결과도 재사용 계보를 따라 현재 Goal 판정에 반영한다. 다음 Plan으로 다시 재사용할 때는 원본과 중간 Task의 최신 검사 모두 기존 완료 근거에 결속되어야 한다. 새 검사로 이 결속이 달라지면 원래 기록을 보존하고 새 Task를 미완료 상태에서 검증한다.
+
 효과 정책만 바뀐 Goal revision에서 외부 허용 효과 제거, 금지 효과 추가, 비가역 효과 checkpoint 강화는 기존 승인 경계 안의 축소로 비교한다. mutation·behavior 정책과 Goal의 나머지 필드는 동일해야 하며 새 Goal에 결속된 Plan의 검토·Gate를 생략하지 않는다. Task 효과는 축소된 활성 Goal 정책에도 맞아야 한다. Attempt가 아직 없는 준비 RuntimeJob도 보호하며, 예약·실행·interrupt·collector 유실·terminal 결과 미소비 상태에서는 Plan 교체를 보류한다. Core가 결과를 소비하거나 미실행 job을 취소한 뒤 교체할 수 있다.
 
 ## D03. 응용 명령과 짧은 tick — planned

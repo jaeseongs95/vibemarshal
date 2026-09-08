@@ -2347,12 +2347,40 @@ class EngineService:
 
     @staticmethod
     def effective_task_validation_results(connection: Any, task_id: str) -> tuple[Any, ...]:
-        """현재 Worker 성공 및 retry epoch 뒤에 기록된 Task validation만 반환한다."""
+        """현재 Worker/reuse 기준과 그 뒤의 Task 검사 관측을 기록 순서로 반환한다."""
 
         reuse = connection.execute("SELECT validation_ids_json FROM task_completion_reuse WHERE task_id = ?", (task_id,)).fetchone()
         if reuse is not None:
-            return tuple(connection.execute("SELECT * FROM validation_results WHERE id = ?", (item,)).fetchone()
-                         for item in json.loads(reuse["validation_ids_json"]))
+            # source_task_id는 최초 Task로 평탄화되므로 직전 Plan의 같은 Task도
+            # History로 따라간다. 중간 revision의 늦은 FAIL을 건너뛰지 않는다.
+            event = connection.execute(
+                "SELECT payload_json FROM history_events WHERE entity_id = ? "
+                "AND event_type = 'task.completion_reused' ORDER BY sequence DESC LIMIT 1",
+                (task_id,),
+            ).fetchone()
+            if event is None:
+                return ()
+            previous = connection.execute(
+                "SELECT p.id FROM task_contracts p JOIN task_contracts t "
+                "ON p.project_id = t.project_id AND p.task_ref = t.task_ref "
+                "WHERE t.id = ? AND p.plan_revision_id = ?",
+                (task_id, json.loads(event["payload_json"])["source_plan_revision_id"]),
+            ).fetchone()
+            if previous is None or previous["id"] == task_id:
+                return ()
+            inherited = EngineService.effective_task_validation_results(connection, previous["id"])
+            latest = {row["validation_id"]: row for row in inherited}
+            if {row["id"] for row in latest.values()} != set(json.loads(reuse["validation_ids_json"])):
+                # 새 PASS를 예전 완료 checkpoint의 근거로 자동 승격하지 않는다.
+                # 알려진 실패/미확정 관측은 현재 Goal 판정에도 전달한다.
+                inherited = tuple(row for row in latest.values() if row["status"] != "pass")
+            own = connection.execute(
+                "SELECT v.*, h.sequence AS history_sequence, h.payload_json AS history_payload_json "
+                "FROM validation_results v JOIN history_events h ON h.project_id = v.project_id "
+                "AND h.event_type = 'validation.recorded' AND h.entity_id = v.id "
+                "WHERE v.task_id = ? ORDER BY h.sequence", (task_id,),
+            ).fetchall()
+            return tuple(sorted((*inherited, *own), key=lambda row: row["history_sequence"]))
 
         task = connection.execute(
             "SELECT project_id FROM task_contracts WHERE id = ?", (task_id,)

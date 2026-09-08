@@ -4464,12 +4464,12 @@ class EngineDispatcher:
         with self.service.ledger.read() as connection:
             rows = connection.execute(
                 "SELECT * FROM validation_results WHERE plan_revision_id = ? "
+                "AND task_id IS NULL "
                 "ORDER BY evaluated_at, rowid",
                 (plan.plan_revision_id,),
             ).fetchall()
             rows += [row for task in plan.definition.tasks
-                     for row in self.service.effective_task_validation_results(connection, task.task_id)
-                     if row["plan_revision_id"] != plan.plan_revision_id]
+                     for row in self.service.effective_task_validation_results(connection, task.task_id)]
             existing_verdict = connection.execute(
                 "SELECT payload_json FROM goal_verdicts WHERE plan_revision_id = ? "
                 "ORDER BY evaluated_at DESC, rowid DESC LIMIT 1",
