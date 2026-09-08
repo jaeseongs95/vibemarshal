@@ -1087,6 +1087,23 @@ def plan_gate(
                 digest,
             )
         )
+    mixed_effect_tasks = {
+        task.task_ref
+        for task in definition.tasks
+        if any(effect.external for effect in task.expected_effects)
+        and any(not effect.external for effect in task.expected_effects)
+    }
+    if mixed_effect_tasks:
+        findings.append(
+            _finding(
+                "PLAN_MIXED_EFFECT_CONTRACT_REQUIRES_SPLIT",
+                GateName.INTENT,
+                "내부/file 효과와 외부 효과는 독립 확인 가능한 별도 Task로 분리해야 합니다: "
+                + ", ".join(sorted(mixed_effect_tasks)),
+                digest,
+                remediable=True,
+            )
+        )
     return tuple(findings)
 
 

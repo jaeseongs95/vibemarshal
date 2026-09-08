@@ -166,6 +166,29 @@ class EngineApplicationTests(unittest.TestCase):
         self.assertEqual(0, summary.latency_ms.incomplete_call_count)
         self.assertEqual(37, summary.by_stage[0].latency_ms.known_subtotal)
 
+    def test_partial_usage_keeps_component_subtotals_and_reports_incomplete(self) -> None:
+        partial = self.usage(
+            digest=self.goal.definition_digest,
+            call_ref="partial",
+            receipt=DIGEST_A,
+        ).model_copy(update={
+            "cached_input_tokens": None,
+            "unavailable_reason": "PROVIDER_USAGE_PARTIAL",
+        })
+        self.service.record_budget_usage(partial)
+
+        summary = self.application.usage_summary(
+            self.project_id, goal_id=self.goal.goal_id
+        )
+
+        self.assertEqual(10, summary.input_tokens.total)
+        self.assertIsNone(summary.cached_input_tokens.total)
+        self.assertEqual(1, summary.cached_input_tokens.incomplete_call_count)
+        self.assertEqual("USAGE_INCOMPLETE", summary.error_code)
+        self.assertIn("USAGE_PARTIAL", {
+            item.code for item in summary.incomplete_reasons
+        })
+
     def test_unsettled_provider_usage_keeps_its_observed_latency(self) -> None:
         usage = self.usage(
             digest=self.goal.definition_digest,
@@ -590,6 +613,14 @@ class PreGoalUsageSummaryTests(unittest.TestCase):
         ))
         self.assertEqual("provider_receipt", summary.provider_receipt_usage[0].projection_source)
         self.assertFalse(summary.provider_receipt_usage[0].usage_available)
+        projection = summary.provider_receipt_usage[0].model_dump(mode="json")
+        self.assertEqual(receipt.model, projection["requested_model"])
+        self.assertEqual(receipt.effort, projection["requested_effort"])
+        self.assertIsNone(projection["observed_model"])
+        self.assertIsNone(projection["observed_effort"])
+        self.assertIn("provider_inventory_digest", projection)
+        self.assertIn("adapter_capability_digest", projection)
+        self.assertEqual("role_request", projection["binding_provenance"]["requested"])
         self.assertFalse(any(
             item.code == "PROVIDER_CALL_HISTORY_BINDING_INVALID"
             for item in summary.incomplete_reasons

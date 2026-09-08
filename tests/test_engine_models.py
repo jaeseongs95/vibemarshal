@@ -50,7 +50,7 @@ class EngineModelAssignmentTests(unittest.TestCase):
         with self.assertRaises(AssignmentResolutionError):
             AssignmentResolver().resolve_policy(policy, inventory)
 
-    def test_independent_validator_cannot_resolve_to_same_binding(self) -> None:
+    def test_independent_validator_may_share_model_binding(self) -> None:
         inventory = ModelInventory(
             executable_digest="sha256:" + "0" * 64, runtime_capabilities=RUNTIME_CAPABILITIES,
             source="model/list",
@@ -66,8 +66,8 @@ class EngineModelAssignmentTests(unittest.TestCase):
             validator=policy,
             independence_required=True,
         )
-        with self.assertRaisesRegex(AssignmentResolutionError, "독립"):
-            AssignmentResolver().resolve_contract(contract, inventory)
+        executor, validator = AssignmentResolver().resolve_contract(contract, inventory)
+        self.assertEqual((executor.model, executor.effort), (validator.model, validator.effort))
 
     def test_product_assignment_code_does_not_hardcode_current_model_names(self) -> None:
         source = inspect.getsource(models_module)

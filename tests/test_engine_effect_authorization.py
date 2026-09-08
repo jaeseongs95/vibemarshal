@@ -4,19 +4,31 @@ import unittest
 
 from flowmarshal.canonical import sha256_digest
 from flowmarshal.engine.authorization import authorization_changes
+from flowmarshal.engine.budget import BudgetManager
 from flowmarshal.engine.domain import (
-    EffectContract, GoalContractRevision, MutationPolicy, RevisionStatus, TaskKind,
+    BudgetStage, CriterionVerdict, EffectContract, EffectIdentity, EvidenceKind,
+    EvidenceRecord, ExternalValidationObservation, GoalContractRevision, GoalVerdict,
+    GoalVerdictStatus, MutationPolicy, RevisionStatus, TaskKind, ValidationResult,
+    ValidationStatus, RuntimeIntentKind, ThreadBinding,
     derive_candidate_decision, new_id, utc_now,
 )
 from flowmarshal.engine.planning import (
     CandidateEvaluation, ExpandedPlanEvaluation, plan_review_evidence_catalog,
-    skeleton_gate, skeleton_review_evidence_catalog,
+    plan_gate, skeleton_gate, skeleton_review_evidence_catalog,
 )
+from flowmarshal.engine.service import EngineServiceError
 from tests import engine_helpers as fixtures
 from tests.test_engine_ledger_service import EngineServiceFixture
 
 
 class EngineEffectAuthorizationTests(EngineServiceFixture):
+    @staticmethod
+    def effect_identity() -> EffectIdentity:
+        return EffectIdentity(
+            provider="github", system="github-api", target="repo:owner/name",
+            account="account:owner", operation="publish-release", scope="release:v1",
+            idempotency_key="release-v1-idempotent", checkpoint_policy="none",
+        )
     def revised_goal(self, effects, **updates):
         definition = self.goal.definition.model_copy(update={"effect_policy": effects, **updates})
         return GoalContractRevision(
@@ -89,6 +101,414 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
         broad = base.model_copy(update={"allowed_external_effects": ("publish",)})
         denied = self.changes(broad, base, plan=plan)
         self.assertTrue(any(item["boundary"] == "effect" and item["field"].startswith(task.task_ref) for item in denied))
+
+    def test_typed_effect_identity_is_authorized_by_exact_digest(self):
+        identity = self.effect_identity()
+        effect = EffectContract(
+            effect_id="publish", external=True, reversible=True,
+            statement="publish", identity_version="2.0", identity=identity,
+        )
+        task = self.task.model_copy(update={"expected_effects": (effect,)})
+        definition = self.plan.definition.model_copy(update={"tasks": (task,)})
+        plan = self.plan.model_copy(update={
+            "definition": definition, "definition_digest": definition.definition_digest,
+        })
+        approved = self.goal.definition.effect_policy.model_copy(update={
+            "allowed_external_effects": ("publish",),
+            "allowed_external_effect_contracts": (identity,),
+        })
+        self.assertEqual((), self.changes(approved, approved, plan=plan))
+        changed = identity.model_copy(update={"target": "repo:other/name"})
+        denied_policy = approved.model_copy(update={
+            "allowed_external_effect_contracts": (changed,),
+        })
+        denied = self.changes(approved, denied_policy, plan=plan)
+        self.assertTrue(any(item["boundary"] == "effect" for item in denied))
+
+    def test_mixed_internal_and_external_effects_require_task_split(self):
+        identity = self.effect_identity()
+        policy = self.goal.definition.effect_policy.model_copy(update={
+            "allowed_external_effects": ("publish",),
+            "allowed_external_effect_contracts": (identity,),
+        })
+        goal = self.revised_goal(policy)
+        state = fixtures.state(
+            self.project_id, goal.definition_digest, self.map.revision_digest,
+        )
+        source = fixtures.skeleton(goal, state)
+        plan, task, _decision = fixtures.plan(
+            self.project_id, goal, state, self.map.revision_digest, source, self.inventory,
+        )
+        task = task.model_copy(update={"expected_effects": (
+            EffectContract(
+                effect_id="write_file", external=False, reversible=True,
+                statement="write project file",
+            ),
+            EffectContract(
+                effect_id="publish", external=True, reversible=True, statement="publish",
+                identity_version="2.0", identity=identity,
+            ),
+        )})
+        definition = plan.definition.model_copy(update={"tasks": (task,)})
+        plan = plan.model_copy(update={
+            "definition": definition, "definition_digest": definition.definition_digest,
+        })
+
+        findings = plan_gate(
+            plan, source=source, goal=goal, state=state, project_map=self.map,
+        )
+
+        self.assertIn(
+            "PLAN_MIXED_EFFECT_CONTRACT_REQUIRES_SPLIT",
+            {finding.finding_code for finding in findings},
+        )
+
+    def test_external_target_observation_binds_identity_and_receipt(self):
+        identity = self.effect_identity()
+        target_document = {
+            "provider": "github",
+            "selector": "release:v1",
+            "observation": "release가 존재한다.",
+            "effect_identity_digest": identity.identity_digest,
+        }
+        observation = ExternalValidationObservation(
+            validation_id="observe_release", task_id=self.task.task_id,
+            provider="github", selector="release:v1", passed=True,
+            observation="release가 존재한다.", receipt_digest=sha256_digest("adapter receipt"),
+            effect_identity=identity, effect_identity_digest=identity.identity_digest,
+            target_observation_digest=sha256_digest(target_document), observed_at=utc_now(),
+        )
+        self.assertEqual(identity.identity_digest, observation.effect_identity_digest)
+        with self.assertRaisesRegex(ValueError, "target observation digest"):
+            ExternalValidationObservation.model_validate(
+                observation.model_dump(mode="python") | {
+                    "target_observation_digest": sha256_digest("다른 관측")
+                }
+            )
+
+    def test_external_effect_requires_every_typed_receipt_and_target_observation(self):
+        first = self.effect_identity()
+        second = first.model_copy(update={
+            "operation": "publish-assets",
+            "scope": "release-assets:v1",
+            "idempotency_key": "release-assets-v1-idempotent",
+        })
+        effects = tuple(
+            EffectContract(
+                effect_id=f"publish_{index}", external=True, reversible=True,
+                statement=f"publish_{index}",
+                identity_version="2.0", identity=identity,
+            )
+            for index, identity in enumerate((first, second), start=1)
+        )
+        policy = self.goal.definition.effect_policy.model_copy(update={
+            "allowed_external_effects": tuple(item.effect_id for item in effects),
+            "allowed_external_effect_contracts": (first, second),
+        })
+        self.goal = self.revised_goal(policy)
+        self.service.register_goal(self.goal)
+        self.state = fixtures.state(
+            self.project_id, self.goal.definition_digest, self.map.revision_digest,
+        )
+        self.service.record_state_snapshot(self.state)
+        self.skeleton = fixtures.skeleton(self.goal, self.state)
+        skeleton_review = fixtures.clean_review(
+            sha256_digest(self.skeleton), role="skeleton_reviewer",
+            evidence_catalog=skeleton_review_evidence_catalog(
+                self.skeleton, self.goal, self.state, self.map,
+            ),
+        )
+        self.service.record_skeleton_evaluation(CandidateEvaluation(
+            candidate=self.skeleton,
+            semantic_submission=skeleton_review,
+            decision=derive_candidate_decision(
+                candidate_digest=sha256_digest(self.skeleton),
+                findings=(), ratings=skeleton_review.ratings,
+            ),
+        ))
+        self.plan, task, _decision = fixtures.plan(
+            self.project_id, self.goal, self.state, self.map.revision_digest,
+            self.skeleton, self.inventory,
+        )
+        task = task.model_copy(update={"expected_effects": effects})
+        definition = self.plan.definition.model_copy(update={"tasks": (task,)})
+        self.plan = self.plan.model_copy(update={
+            "definition": definition,
+            "definition_digest": definition.definition_digest,
+        })
+        self.task = task
+        plan_review = fixtures.clean_review(
+            self.plan.activation_digest, role="external_effect_reviewer",
+            evidence_catalog=plan_review_evidence_catalog(
+                self.plan, self.goal, self.state, self.map,
+            ),
+        )
+        self.service.authorize_goal(project_id=self.project_id, source="typed effect test")
+        self.service.register_authorized_plan_revision(ExpandedPlanEvaluation(
+            plan=self.plan,
+            semantic_submissions=(plan_review,),
+            decision=derive_candidate_decision(
+                candidate_digest=self.plan.activation_digest,
+                findings=(), ratings=plan_review.ratings,
+            ),
+        ))
+        spec = self.spec()
+        self.service.materialize_execution_spec(spec, inventory=self.inventory)
+        attempt = self.service.reserve_attempt(task_id=self.task.task_id)
+        call_id = BudgetManager(self.service).reserve(
+            project_id=self.project_id,
+            goal_id=self.goal.goal_id,
+            goal_digest=self.goal.definition_digest,
+            call_key="two-external-effects",
+            role="worker",
+            stage=BudgetStage.EXECUTION,
+            request={"kind": "worker"},
+            attempt_id=attempt.attempt_id,
+        )
+        thread_id = "typed-effect-thread"
+        turn_id = "typed-effect-turn"
+        runtime_intent = self.service.prepare_runtime_intent(
+            attempt_id=attempt.attempt_id,
+            kind=RuntimeIntentKind.START_TURN,
+            idempotency_key="typed-effect-runtime-turn",
+            request={"thread_id": thread_id, "turn_id": turn_id},
+        )
+        runtime_receipt = self.service.record_runtime_receipt(
+            intent_id=runtime_intent.intent_id,
+            provider_operation_id=turn_id,
+            response={"accepted": True},
+            binding=ThreadBinding(thread_id=thread_id, turn_id=turn_id, bound_at=utc_now()),
+        )
+        with self.ledger.transaction() as tx:
+            tx.connection.execute(
+                "UPDATE provider_calls SET execution_status='terminal',effect_status='unknown',"
+                "result_status='valid',status='settled',completed_at=? WHERE id=?",
+                (tx.now, call_id),
+            )
+
+        def observe(identity: EffectIdentity, label: str) -> str:
+            target_document = {
+                "provider": "github",
+                "selector": label,
+                "observation": f"{label} exists",
+                "effect_identity_digest": identity.identity_digest,
+            }
+            target_digest = sha256_digest(target_document)
+            receipt_digest = self.service.record_effect_receipt(
+                task_id=self.task.task_id,
+                attempt_id=attempt.attempt_id,
+                provider_call_id=call_id,
+                runtime_intent_id=runtime_intent.intent_id,
+                runtime_receipt_id=runtime_receipt.receipt_id,
+                thread_id=thread_id,
+                turn_id=turn_id,
+                effect_identity=identity,
+                provider_operation_id=f"operation-{label}",
+                response_digest=sha256_digest({"operation": label}),
+                target_observation_digest=target_digest,
+            )
+            self.service._confirm_external_effect_observation(ExternalValidationObservation(
+                validation_id="observe_release", task_id=self.task.task_id,
+                provider="github", selector=label, passed=True,
+                observation=f"{label} exists", receipt_digest=receipt_digest,
+                effect_identity=identity, effect_identity_digest=identity.identity_digest,
+                target_observation_digest=target_digest, observed_at=utc_now(),
+            ))
+            return receipt_digest
+
+        first_receipt_digest = observe(first, "release:v1")
+        with self.ledger.read() as connection:
+            status = connection.execute(
+                "SELECT effect_status FROM provider_calls WHERE id=?", (call_id,),
+            ).fetchone()[0]
+        self.assertEqual("unknown", status)
+
+        self.service.finish_attempt(attempt_id=attempt.attempt_id, succeeded=True)
+        task_evidence = EvidenceRecord(
+            evidence_id=new_id("evidence"), project_id=self.project_id,
+            task_id=self.task.task_id, attempt_id=attempt.attempt_id,
+            kind=EvidenceKind.TEST, source_ref="typed-effect-task-test",
+            observation="task validation passed", content_digest=sha256_digest("task-pass"),
+            observed_at=utc_now(),
+        )
+        self.service.record_evidence(task_evidence)
+        self.service.record_validation(
+            project_id=self.project_id, plan_revision_id=self.plan.plan_revision_id,
+            result=ValidationResult(
+                validation_result_id=new_id("validation_result"),
+                validation_id="validation_task", task_id=self.task.task_id,
+                status=ValidationStatus.PASS, evidence_ids=(task_evidence.evidence_id,),
+                rationale="deterministic task validation passed", evaluated_at=utc_now(),
+            ),
+        )
+        with self.assertRaisesRegex(
+            EngineServiceError, "TASK_PROVIDER_EXECUTION_OR_EFFECT_UNRESOLVED",
+        ):
+            self.service.complete_task(self.task.task_id)
+
+        # Goal 판정은 Task status만 신뢰하지 않고 provider ledger를 다시 검사해야 한다.
+        with self.ledger.transaction() as tx:
+            tx.connection.execute(
+                "UPDATE task_contracts SET status='completed',updated_at=? WHERE id=?",
+                (tx.now, self.task.task_id),
+            )
+        goal_evidence = EvidenceRecord(
+            evidence_id=new_id("evidence"), project_id=self.project_id,
+            task_id=None, attempt_id=None, kind=EvidenceKind.TEST,
+            source_ref="typed-effect-goal-test", observation="goal test passed",
+            content_digest=sha256_digest("goal-pass"), observed_at=utc_now(),
+        )
+        self.service.record_evidence(goal_evidence)
+        integration_result = ValidationResult(
+            validation_result_id=new_id("validation_result"),
+            validation_id="validation_goal", task_id=None,
+            status=ValidationStatus.PASS, evidence_ids=(goal_evidence.evidence_id,),
+            rationale="deterministic goal validation passed", evaluated_at=utc_now(),
+        )
+        self.service.record_validation(
+            project_id=self.project_id, plan_revision_id=self.plan.plan_revision_id,
+            result=integration_result,
+        )
+
+        def verdict() -> GoalVerdict:
+            return GoalVerdict(
+                goal_verdict_id=new_id("goal_verdict"),
+                goal_contract_digest=self.goal.definition_digest,
+                plan_activation_digest=self.plan.activation_digest,
+                status=GoalVerdictStatus.SATISFIED,
+                criteria=(CriterionVerdict(
+                    criterion_id="ac_one", status=ValidationStatus.PASS,
+                    evidence_ids=(task_evidence.evidence_id,), rationale="criterion passed",
+                ),),
+                integration_validation_result_ids=(integration_result.validation_result_id,),
+                evaluated_at=utc_now(),
+            )
+
+        with self.assertRaisesRegex(
+            EngineServiceError, "GOAL_PROVIDER_EXECUTION_OR_EFFECT_UNRESOLVED",
+        ):
+            self.service.record_goal_verdict(
+                project_id=self.project_id, plan_revision_id=self.plan.plan_revision_id,
+                verdict=verdict(),
+            )
+
+        observe(second, "release-assets:v1")
+        with self.ledger.read() as connection:
+            status = connection.execute(
+                "SELECT effect_status FROM provider_calls WHERE id=?", (call_id,),
+            ).fetchone()[0]
+            confirmations = connection.execute(
+                "SELECT COUNT(*) FROM history_events WHERE entity_id=? "
+                "AND event_type='provider_effect.confirmed'", (call_id,),
+            ).fetchone()[0]
+        self.assertEqual("terminal", status)
+        self.assertEqual(2, confirmations)
+
+        replayed = self.service.record_effect_receipt(
+            task_id=self.task.task_id,
+            attempt_id=attempt.attempt_id,
+            provider_call_id=call_id,
+            runtime_intent_id=runtime_intent.intent_id,
+            runtime_receipt_id=runtime_receipt.receipt_id,
+            thread_id=thread_id,
+            turn_id=turn_id,
+            effect_identity=first,
+            provider_operation_id="operation-release:v1",
+            response_digest=sha256_digest({"operation": "release:v1"}),
+            target_observation_digest=sha256_digest({
+                "provider": "github",
+                "selector": "release:v1",
+                "observation": "release:v1 exists",
+                "effect_identity_digest": first.identity_digest,
+            }),
+        )
+        self.assertEqual(first_receipt_digest, replayed)
+        with self.assertRaisesRegex(EngineServiceError, "EFFECT_ADAPTER_RECEIPT_CONFLICT"):
+            self.service.record_effect_receipt(
+                task_id=self.task.task_id,
+                attempt_id=attempt.attempt_id,
+                provider_call_id=call_id,
+                runtime_intent_id=runtime_intent.intent_id,
+                runtime_receipt_id=runtime_receipt.receipt_id,
+                thread_id=thread_id,
+                turn_id=turn_id,
+                effect_identity=first,
+                provider_operation_id="operation-release:v1",
+                response_digest=sha256_digest({"operation": "conflicting-release"}),
+                target_observation_digest=sha256_digest({
+                    "provider": "github",
+                    "selector": "release:v1",
+                    "observation": "release:v1 exists",
+                    "effect_identity_digest": first.identity_digest,
+                }),
+            )
+
+        self.service.record_goal_verdict(
+            project_id=self.project_id, plan_revision_id=self.plan.plan_revision_id,
+            verdict=verdict(),
+        )
+
+        # 이전 attempt의 늦은 receipt는 같은 Task의 최신 retry call에 붙을 수 없다.
+        retry_attempt_id = new_id("attempt")
+        retry_call_id = new_id("provider_call")
+        with self.ledger.transaction() as tx:
+            tx.connection.execute(
+                "INSERT INTO attempts (id,project_id,plan_revision_id,task_id,"
+                "execution_spec_digest,attempt_no,kind,status,created_at,ended_at,updated_at) "
+                "VALUES (?,?,?,?,?,2,'execution','succeeded',?,?,?)",
+                (retry_attempt_id, self.project_id, self.plan.plan_revision_id,
+                 self.task.task_id, spec.definition_digest, tx.now, tx.now, tx.now),
+            )
+            tx.connection.execute(
+                "INSERT INTO provider_calls (id,project_id,goal_id,goal_contract_digest,"
+                "call_key,role,stage,request_digest,request_json,estimated_tokens,"
+                "execution_status,effect_status,result_status,status,attempt_id,created_at,completed_at) "
+                "VALUES (?,?,?,?,?,'worker','execution',?,?,0,'terminal','unknown','valid',"
+                "'settled',?,?,?)",
+                (retry_call_id, self.project_id, self.goal.goal_id,
+                 self.goal.definition_digest, "typed-effect-retry",
+                 sha256_digest({"retry": True}), "{}", retry_attempt_id, tx.now, tx.now),
+            )
+        with self.assertRaisesRegex(
+            EngineServiceError, "EFFECT_ADAPTER_RUNTIME_BINDING_MISMATCH",
+        ):
+            self.service.record_effect_receipt(
+                task_id=self.task.task_id,
+                attempt_id=retry_attempt_id,
+                provider_call_id=retry_call_id,
+                runtime_intent_id=runtime_intent.intent_id,
+                runtime_receipt_id=runtime_receipt.receipt_id,
+                thread_id=thread_id,
+                turn_id=turn_id,
+                effect_identity=first,
+                provider_operation_id="delayed-old-operation",
+                response_digest=sha256_digest({"delayed": True}),
+                target_observation_digest=sha256_digest("delayed-target"),
+            )
+        with self.ledger.read() as connection:
+            retry_status = connection.execute(
+                "SELECT effect_status FROM provider_calls WHERE id=?", (retry_call_id,),
+            ).fetchone()[0]
+            retry_receipts = connection.execute(
+                "SELECT COUNT(*) FROM history_events WHERE entity_id=? "
+                "AND event_type='effect.receipt_recorded'", (retry_call_id,),
+            ).fetchone()[0]
+        self.assertEqual(("unknown", 0), (retry_status, retry_receipts))
+
+        with self.assertRaisesRegex(EngineServiceError, "EFFECT_ADAPTER_RESPONSE_DIGEST_INVALID"):
+            self.service.record_effect_receipt(
+                task_id=self.task.task_id,
+                attempt_id=attempt.attempt_id,
+                provider_call_id=call_id,
+                runtime_intent_id=runtime_intent.intent_id,
+                runtime_receipt_id=runtime_receipt.receipt_id,
+                thread_id=thread_id,
+                turn_id=turn_id,
+                effect_identity=first,
+                provider_operation_id="operation-invalid",
+                response_digest="not-a-digest",
+                target_observation_digest=sha256_digest("target"),
+            )
 
     def test_reviewed_restricted_goal_plan_activates_with_original_authorization(self):
         self.activate_restricted_goal({

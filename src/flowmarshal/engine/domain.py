@@ -243,10 +243,28 @@ class GoalQuestion(EngineModel):
     blocking: bool = True
 
 
+class EffectIdentity(EngineModel):
+    """외부 효과를 provider receipt와 target 관측까지 동일하게 지칭하는 식별자."""
+
+    provider: str = Field(min_length=1, max_length=300)
+    system: str = Field(min_length=1, max_length=300)
+    target: str = Field(min_length=1, max_length=2000)
+    account: str = Field(min_length=1, max_length=500)
+    operation: str = Field(min_length=1, max_length=300)
+    scope: str = Field(min_length=1, max_length=2000)
+    idempotency_key: str = Field(min_length=16, max_length=500)
+    checkpoint_policy: Literal["none", "before_irreversible", "always"] = "none"
+
+    @property
+    def identity_digest(self) -> str:
+        return sha256_digest(self)
+
+
 class EffectPolicy(EngineModel):
     mutation_policy: MutationPolicy
     behavior_policy: BehaviorPolicy
     allowed_external_effects: tuple[str, ...] = ()
+    allowed_external_effect_contracts: tuple[EffectIdentity, ...] = ()
     prohibited_effects: tuple[str, ...] = ()
     irreversible_effects_require_checkpoint: bool = True
 
@@ -260,7 +278,21 @@ class EffectPolicy(EngineModel):
         overlap = set(self.allowed_external_effects) & set(self.prohibited_effects)
         if overlap:
             raise ValueError(f"같은 외부 효과를 허용·금지할 수 없습니다: {sorted(overlap)}")
+        _unique(
+            tuple(item.identity_digest for item in self.allowed_external_effect_contracts),
+            "typed external effect",
+        )
         return self
+
+    @model_serializer(mode="wrap")
+    def omit_empty_typed_contracts_for_schema4_compatibility(self, handler):
+        value = handler(self)
+        # schema 4의 동결 Goal payload에는 이 additive projection이 없었다. 빈
+        # collection은 기존 canonical payload를 그대로 보존하고, 새 typed
+        # contract가 실제로 있을 때만 versioned 의미를 직렬화한다.
+        if not self.allowed_external_effect_contracts:
+            value.pop("allowed_external_effect_contracts", None)
+        return value
 
 
 class GoalContractDefinition(EngineModel):
@@ -1024,6 +1056,31 @@ class EffectContract(EngineModel):
     statement: str = Field(min_length=1, max_length=3000)
     external: bool = Field(default=False, description="프로젝트 파일 변경이나 함수 동작이 아닌 외부 시스템·계정·제3자에 대한 효과 여부")
     reversible: bool = True
+    identity_version: Literal["2.0"] | None = None
+    identity: EffectIdentity | None = None
+
+    @model_validator(mode="after")
+    def external_effect_has_typed_identity(self) -> "EffectContract":
+        if self.identity_version is None:
+            # schema 4의 기존 immutable Plan JSON은 statement-only effect를 보존한다.
+            if self.identity is not None:
+                raise ValueError("typed identity에는 identity_version이 필요합니다.")
+            return self
+        if self.external != (self.identity is not None):
+            raise ValueError("v2 외부 효과에는 typed identity가 필요하고 내부 효과에는 둘 수 없습니다.")
+        if self.identity is not None:
+            required = "none" if self.reversible else "before_irreversible"
+            if self.identity.checkpoint_policy not in {required, "always"}:
+                raise ValueError("효과 가역성과 checkpoint policy가 일치하지 않습니다.")
+        return self
+
+    @model_serializer(mode="wrap")
+    def versioned_effect_identity(self, handler):
+        value = handler(self)
+        if self.identity_version is None:
+            value.pop("identity_version", None)
+            value.pop("identity", None)
+        return value
 
 
 class EvidenceKind(StrEnum):
@@ -1599,10 +1656,22 @@ class GoalOperatingPolicy(EngineModel):
     """승인한 운영 상한. 소요량 예측이나 OS 보안 경계가 아니다."""
 
     planning_budget: PlanningBudgetPolicy = PlanningBudgetPolicy()
+    execution_guard_version: Literal["2.0"] | None = None
+    max_provider_calls: int = Field(default=25, ge=1, le=10_000)
+    absolute_deadline_seconds: int = Field(default=86_400, ge=1, le=2_592_000)
     max_same_failure_replans: int = Field(default=2, ge=0, le=10)
     max_goal_replans: int = Field(default=5, ge=0, le=20)
     requires_new_evidence: bool = True
     resume_strategy: Literal["existing_binding_first", "new_attempt_only"] = "existing_binding_first"
+
+    @model_serializer(mode="wrap")
+    def versioned_execution_guard(self, handler):
+        value = handler(self)
+        if self.execution_guard_version is None:
+            value.pop("execution_guard_version", None)
+            value.pop("max_provider_calls", None)
+            value.pop("absolute_deadline_seconds", None)
+        return value
 
 
 class GoalAuthorization(EngineModel):
@@ -1622,8 +1691,33 @@ class GoalAuthorization(EngineModel):
     budget_policies: tuple[str, ...] = ()
     source: str = Field(min_length=1, max_length=2000)
     approved_at: datetime
+    absolute_deadline_at: datetime | None = None
 
     _approved_at_is_aware = field_validator("approved_at")(_aware)
+    _absolute_deadline_at_is_aware = field_validator("absolute_deadline_at")(
+        lambda value: None if value is None else _aware(value)
+    )
+
+    @model_validator(mode="after")
+    def execution_guard_is_immutable_and_bounded(self) -> "GoalAuthorization":
+        if self.absolute_deadline_at is None:
+            # 기존 schema 4 authorization payload는 읽기 호환만 제공한다.
+            return self
+        if self.operating_policy.execution_guard_version != "2.0":
+            raise ValueError("Goal absolute deadline에는 versioned execution guard가 필요합니다.")
+        if self.absolute_deadline_at <= self.approved_at:
+            raise ValueError("Goal absolute deadline은 승인 시각보다 뒤여야 합니다.")
+        seconds = (self.absolute_deadline_at - self.approved_at).total_seconds()
+        if seconds != self.operating_policy.absolute_deadline_seconds:
+            raise ValueError("Goal absolute deadline이 승인한 운영 정책과 다릅니다.")
+        return self
+
+    @model_serializer(mode="wrap")
+    def versioned_absolute_deadline(self, handler):
+        value = handler(self)
+        if self.absolute_deadline_at is None:
+            value.pop("absolute_deadline_at", None)
+        return value
 
     @property
     def authorization_digest(self) -> str:
@@ -2112,9 +2206,30 @@ class ExternalValidationObservation(EngineModel):
     passed: bool | None = None
     observation: str = Field(min_length=1, max_length=10_000)
     receipt_digest: str = Field(pattern=_DIGEST_PATTERN)
+    effect_identity: EffectIdentity | None = None
+    effect_identity_digest: str | None = Field(default=None, pattern=_DIGEST_PATTERN)
+    target_observation_digest: str | None = Field(default=None, pattern=_DIGEST_PATTERN)
     observed_at: datetime
 
     _external_observed_at_is_aware = field_validator("observed_at")(_aware)
+
+    @model_validator(mode="after")
+    def effect_observation_is_bound(self) -> "ExternalValidationObservation":
+        if self.effect_identity is None:
+            if self.effect_identity_digest is not None or self.target_observation_digest is not None:
+                raise ValueError("typed effect identity 없이 target 효과 관측을 결속할 수 없습니다.")
+            return self
+        if self.effect_identity_digest != self.effect_identity.identity_digest:
+            raise ValueError("effect identity digest가 본문과 다릅니다.")
+        document = {
+            "provider": self.provider,
+            "selector": self.selector,
+            "observation": self.observation,
+            "effect_identity_digest": self.effect_identity_digest,
+        }
+        if self.target_observation_digest != sha256_digest(document):
+            raise ValueError("target observation digest가 관측 본문과 다릅니다.")
+        return self
 
 
 class CriterionVerdict(EngineModel):
@@ -2213,12 +2328,17 @@ class UsageObservation(EngineModel):
             self.output_tokens,
             self.reasoning_tokens,
         )
+        present = tuple(value is not None for value in counts)
         if self.measurement_status == "measured":
-            if any(value is None for value in counts):
-                raise ValueError("실측 UsageObservation에는 모든 token 필드가 필요합니다.")
-            if self.unavailable_reason is not None or self.attribution_basis == "unavailable":
+            if not any(present):
+                raise ValueError("실측 UsageObservation에는 하나 이상의 token 필드가 필요합니다.")
+            if self.attribution_basis == "unavailable":
                 raise ValueError("실측 usage와 unavailable provenance를 혼합할 수 없습니다.")
-        elif any(value is not None for value in counts) or self.unavailable_reason is None:
+            if not all(present) and self.unavailable_reason is None:
+                raise ValueError("부분 usage에는 관측 scope와 누락 이유가 필요합니다.")
+            if all(present) and self.unavailable_reason is not None:
+                raise ValueError("완전한 usage와 unavailable 근거를 혼합할 수 없습니다.")
+        elif any(present) or self.unavailable_reason is None:
             raise ValueError("미확인 UsageObservation은 null token과 이유를 보존해야 합니다.")
         if (
             self.cached_input_tokens is not None
@@ -2247,6 +2367,14 @@ class BudgetUsageRecord(EngineModel):
     call_status: str = Field(min_length=1, max_length=100)
     model: str = Field(min_length=1, max_length=200)
     effort: str = Field(min_length=1, max_length=50)
+    binding_provenance_version: Literal["2.0"] | None = None
+    requested_model: str | None = Field(default=None, min_length=1, max_length=200)
+    requested_effort: str | None = Field(default=None, min_length=1, max_length=50)
+    observed_model: str | None = Field(default=None, min_length=1, max_length=200)
+    observed_effort: str | None = Field(default=None, min_length=1, max_length=50)
+    provider_inventory_digest: str | None = Field(default=None, pattern=_DIGEST_PATTERN)
+    adapter_capability_digest: str | None = Field(default=None, pattern=_DIGEST_PATTERN)
+    binding_provenance: dict[str, str | None] | None = None
     permission_profile: str = Field(min_length=1, max_length=100)
     approval_policy: str = Field(min_length=1, max_length=100)
     thread_id: str | None = Field(default=None, max_length=500)
@@ -2281,9 +2409,19 @@ class BudgetUsageRecord(EngineModel):
     @model_validator(mode="after")
     def token_counts_are_consistent(self) -> "BudgetUsageRecord":
         _unique(self.turn_ids, "budget usage turn")
+        if self.binding_provenance_version is not None:
+            if (self.requested_model, self.requested_effort) != (self.model, self.effort):
+                raise ValueError("legacy model/effort alias는 requested binding과 같아야 합니다.")
+            if any(value is None for value in (
+                self.provider_inventory_digest,
+                self.adapter_capability_digest,
+                self.binding_provenance,
+            )):
+                raise ValueError("v2 model provenance 필드가 완전하지 않습니다.")
         counts = (self.input_tokens, self.cached_input_tokens, self.output_tokens, self.reasoning_tokens)
-        if self.usage_available and any(value is None for value in counts):
-            raise ValueError("실측 usage에는 모든 token 필드가 필요합니다.")
+        present = tuple(value is not None for value in counts)
+        if self.usage_available and not any(present):
+            raise ValueError("관측된 usage에는 하나 이상의 token 필드가 필요합니다.")
         if self.cached_input_tokens is not None and self.input_tokens is not None and self.cached_input_tokens > self.input_tokens:
             raise ValueError("cached input token은 input token보다 클 수 없습니다.")
         if self.reasoning_tokens is not None and self.output_tokens is not None and self.reasoning_tokens > self.output_tokens:
@@ -2301,8 +2439,12 @@ class BudgetUsageRecord(EngineModel):
                 raise ValueError("Worker usage의 Prompt/receipt 근거가 누락됐습니다.")
             if not self.usage_available and (any(value is not None for value in counts) or not self.unavailable_reason):
                 raise ValueError("새 Worker unavailable은 null token과 명시적 이유로 보존합니다.")
-            if self.usage_available and (self.attribution_basis == "unavailable" or self.unavailable_reason is not None):
-                raise ValueError("실측 usage와 unavailable 근거를 혼합할 수 없습니다.")
+            if self.usage_available and self.attribution_basis == "unavailable":
+                raise ValueError("관측된 usage에는 귀속 근거가 필요합니다.")
+            if self.usage_available and all(present) and self.unavailable_reason is not None:
+                raise ValueError("완전한 usage와 unavailable 근거를 혼합할 수 없습니다.")
+            if self.usage_available and not all(present) and self.unavailable_reason is None:
+                raise ValueError("부분 usage에는 누락 이유가 필요합니다.")
             if self.usage_available and (self.usage_scope, self.attribution_basis) not in {
                 ("turn", "provider_turn"), ("thread", "first_empty_thread"),
             }:
@@ -2314,11 +2456,22 @@ class BudgetUsageRecord(EngineModel):
                 raise ValueError("Worker usage 원시 관측의 provider turn이 다릅니다.")
         return self
 
+    @model_serializer(mode="wrap")
+    def versioned_model_provenance(self, handler):
+        value = handler(self)
+        if self.binding_provenance_version is None:
+            for field_name in (
+                "binding_provenance_version", "requested_model", "requested_effort",
+                "observed_model", "observed_effort", "provider_inventory_digest",
+                "adapter_capability_digest", "binding_provenance",
+            ):
+                value.pop(field_name, None)
+        return value
+
     @property
     def uncached_input_tokens(self) -> int | None:
-        if not self.usage_available:
+        if not self.usage_available or self.input_tokens is None or self.cached_input_tokens is None:
             return None
-        assert self.input_tokens is not None and self.cached_input_tokens is not None
         return self.input_tokens - self.cached_input_tokens
 
     @property

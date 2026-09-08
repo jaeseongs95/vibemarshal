@@ -336,6 +336,20 @@ def summarize_usage_records(
                 stage=item.stage.value, role=item.role,
                 detail=item.unavailable_reason or "provider가 이 논리 호출의 사용량을 제공하지 않았습니다.",
             ))
+        elif any(
+            value is None
+            for value in (
+                item.input_tokens,
+                item.cached_input_tokens,
+                item.output_tokens,
+                item.reasoning_tokens,
+            )
+        ):
+            reasons.append(UsageIncompleteReason(
+                code="USAGE_PARTIAL", call_ref=item.logical_call_ref,
+                stage=item.stage.value, role=item.role,
+                detail=item.unavailable_reason or "provider usage의 일부 구성요소가 제공되지 않았습니다.",
+            ))
         if item.latency_ms is None:
             reasons.append(UsageIncompleteReason(
                 code="LATENCY_UNAVAILABLE", call_ref=item.logical_call_ref,
@@ -537,8 +551,10 @@ def _provider_receipt_projection(
             available = terminal and available
             if not available:
                 values = (None, None, None, None)
-            actual = values[0] + values[2] if available else None
-            expected_status = "settled" if available else "usage_unknown" if terminal else "reserved"
+            complete = all(value is not None for value in values)
+            complete_total = values[0] is not None and values[2] is not None
+            actual = values[0] + values[2] if complete_total else None
+            expected_status = "settled" if complete_total else "usage_unknown" if terminal else "reserved"
             duration = (document.get("payload") or {}).get("duration_ms")
             latency = duration if type(duration) is int and duration >= 0 and terminal else None
             projection_source = "runtime_observation"
@@ -546,7 +562,7 @@ def _provider_receipt_projection(
             runner_digest = runtime_digest
             recorded_at = event["created_at"]
             call_status = document.get("terminal_status") if terminal else "active"
-            unavailable_reason = (None if available else
+            unavailable_reason = (None if complete else "PROVIDER_USAGE_PARTIAL" if available else
                 "PROVIDER_USAGE_UNAVAILABLE_OR_UNATTRIBUTABLE" if terminal else
                 "PROVIDER_TERMINAL_UNOBSERVED")
             usage_scope = document.get("payload", {}).get("usage_scope") if available else "unavailable"
@@ -563,9 +579,12 @@ def _provider_receipt_projection(
             available = receipt.usage_available and receipt.schema_recovery_attempts == 0
             values = (receipt.input_tokens, receipt.cached_input_tokens,
                       receipt.output_tokens, receipt.reasoning_tokens) if available else (None, None, None, None)
-            actual = values[0] + values[2] if available else None
-            expected_status = "settled" if available else "usage_unknown"
-            unavailable_reason = None if available else "PROVIDER_USAGE_UNAVAILABLE_OR_RECOVERY_UNATTRIBUTABLE"
+            complete = all(value is not None for value in values)
+            complete_total = values[0] is not None and values[2] is not None
+            actual = values[0] + values[2] if complete_total else None
+            expected_status = "settled" if complete_total else "usage_unknown"
+            unavailable_reason = (None if complete else "PROVIDER_USAGE_PARTIAL" if available
+                                  else "PROVIDER_USAGE_UNAVAILABLE_OR_RECOVERY_UNATTRIBUTABLE")
         if row["status"] != expected_status or row["actual_tokens"] != actual:
             return None, ("PROVIDER_RECEIPT_SETTLEMENT_CONFLICT",
                           "provider call 상태·actual_tokens가 최신 유효 관측과 다릅니다.")
@@ -575,6 +594,39 @@ def _provider_receipt_projection(
             provider_call_id=row["id"], project_id=row["project_id"], goal_id=row["goal_id"],
             stage=BudgetStage(row["stage"]), logical_call_ref=receipt.call_id, role=receipt.role,
             call_status=call_status, model=receipt.model, effort=receipt.effort,
+            requested_model=receipt.requested_model or receipt.model,
+            requested_effort=receipt.requested_effort or receipt.effort,
+            observed_model=(
+                (document.get("payload") or {}).get("observed_model")
+                if runtime_events and isinstance((document.get("payload") or {}).get("observed_model"), str)
+                else receipt.observed_model
+            ),
+            observed_effort=(
+                (document.get("payload") or {}).get("observed_effort")
+                if runtime_events and isinstance((document.get("payload") or {}).get("observed_effort"), str)
+                else receipt.observed_effort
+            ),
+            provider_inventory_digest=(
+                receipt.provider_inventory_digest
+                or (receipt.observed_binding.inventory.provider_inventory_digest
+                    if receipt.observed_binding is not None else None)
+            ),
+            adapter_capability_digest=(
+                receipt.adapter_capability_digest
+                or (receipt.observed_binding.inventory.adapter_capability_digest
+                    if receipt.observed_binding is not None else None)
+            ),
+            binding_provenance={
+                "requested": "role_request",
+                "observed": (
+                    "runtime_observation" if runtime_events and (
+                        isinstance((document.get("payload") or {}).get("observed_model"), str)
+                        or isinstance((document.get("payload") or {}).get("observed_effort"), str)
+                    ) else (receipt.binding_provenance or {}).get("observed")
+                ),
+                "provider_inventory": "model/list" if receipt.observed_binding is not None else None,
+                "adapter_capability": "local_operational_binding" if receipt.observed_binding is not None else None,
+            },
             runner_receipt_digest=runner_digest, input_tokens=values[0], cached_input_tokens=values[1],
             output_tokens=values[2], reasoning_tokens=values[3], latency_ms=latency,
             usage_available=available, unavailable_reason=unavailable_reason, recorded_at=recorded_at,

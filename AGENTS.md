@@ -22,14 +22,15 @@
 
 - 기존 Core·revision·DAG·binding·evidence·validation을 유지한다. 재계획은 실행 중 Attempt를 보호하고 유효성이 확인된 완료 evidence만 재사용한다.
 - EngineApplication의 prepare/authorize/run_once/observe/pause/cancel/status/final-report 경계를 연결한다. run_once는 job 예약/시작 또는 관측 소비 후 신속히 반환한다. 활성화 후 준비·실행·검사·복구/replanning 역할 모두 RuntimeJob·checkpoint에 포함한다. 승인 전 대화형 준비는 동기 실행을 유지할 수 있다.
-- supervisor는 활성 job 동안만 연결·stream·receipt·terminal·usage·절대 deadline을 관리한다. 전역 daemon은 필수가 아니며 완료 판정은 Core만 한다.
-- 실제 효과 직전 freshness와 target/context/prompt/model/policy 결속을 재검사한다. lease 만료·collector 종료는 provider terminal이 아니다. 부분 쓰기 후 허용 resume와 immutable 입력 변경을 구분한다.
-- token·API 가격·계정 사용률 %는 구독 한도 차감량이나 정확한 작업 요금으로 환산하지 않는다. 선택적 총 호출/시간 제한은 중단 정책이며 예측·요금 상한·완료 보장이 아니다. exact usage backfill·계정 조회 성공을 필수 선행조건으로 만들지 않는다.
-- 명시 error code와 evidence로 실패를 분류하며 근거가 부족하면 unclassified를 유지한다. 허용 로컬 ContextRequest는 자동 탐색하고 접근 불가 사실·사용자 취향·승인 경계 확장에만 질문한다. 원인·새 근거 없는 반복과 임의 모델 fallback을 금지한다.
-- 같은 의미/canonical Plan만 dedupe하며 다른 전략을 비용 추정만으로 우월 판정·가지치기하지 않는다. ProjectMap은 실제 관측 파일·symbol·검증된 연결만 표현한다. 미사용 CommitHorizon은 새 schema에서 제거하거나 정확한 고정 불변조건으로 바꾸고 역사 reader는 원래 의미를 보존한다.
-- schema 4는 별도 새 DB로 만들고 schema 3/raw receipt/history는 read-only adapter로 연다. 제자리 변환·가짜 Goal/Profile·옛 token budget 재해석을 금지한다. 조율 메타데이터 DB migration은 별개다.
+- supervisor는 활성 job 동안만 연결·stream·receipt·provider terminal·usage·절대 deadline을 관리한다. 전역 daemon은 필수가 아니며 완료 판정은 Core만 한다. provider turn의 terminal은 외부 효과 완료가 아니며, 효과는 typed adapter receipt나 대상 재관측으로 별도 확인한다.
+- 실제 효과 직전 freshness와 target/context/prompt/requested model/policy 결속을 재검사한다. lease 만료·collector 종료는 provider terminal이 아니다. 부분 쓰기 후 허용 resume와 immutable 입력 변경을 구분한다. `model/list`는 요청 조합의 지원 여부만 증명하며 provider가 turn별 model/effort를 명시적으로 echo하지 않으면 실제 적용값으로 기록하지 않는다.
+- 원장 값은 `provider_observed`, `client_requested`, `local_derived`, `model_reported` provenance를 구분한다. model-reported error code·완료·효과·confidence를 provider 관측이나 Core 판정으로 승격하지 않는다.
+- token·API 가격·계정 사용률 %는 구독 한도 차감량이나 정확한 작업 요금으로 환산하지 않는다. usage 구성요소는 제공된 값만 기록하고 미제공 항목은 개별 `null/unknown`으로 둔다. 최대 호출 수와 absolute deadline은 결정적 hard stop으로 유지하며 token stop은 사용자가 선택한 관측량 기반 best-effort 중단 정책으로만 쓴다. exact usage backfill·계정 조회 성공을 필수 선행조건으로 만들지 않는다.
+- provider/local의 명시 error code와 직접 evidence로 실패를 분류하며 근거가 부족하면 unclassified를 유지한다. model-reported code는 진단 가설일 뿐 자동 복구 근거가 아니다. 허용 로컬 ContextRequest는 자동 탐색하고 접근 불가 사실·사용자 취향·승인 경계 확장에만 질문한다. 1.0 자동 복구는 근거 있는 최소 경로와 실제 repair/replan 한 경로를 입증하고, 나머지 분류에는 명시적 정지·revision routing을 보존한다. 원인·새 근거 없는 반복과 임의 모델 fallback을 금지한다.
+- 같은 의미/canonical Plan만 dedupe하며 다른 전략을 비용 추정만으로 우월 판정·가지치기하지 않는다. ProjectMap은 Goal에 필요한 범위에서 실제 관측 파일과 요청 시 lazy 수집한 symbol·검증된 연결만 표현한다. 전체 symbol/module graph를 미리 만들지 않는다. 미사용 CommitHorizon은 새 schema에서 제거하거나 정확한 고정 불변조건으로 바꾸고 역사 reader는 원래 의미를 보존한다.
+- schema 4는 별도 새 DB로 만들고 schema 3/raw receipt/history는 제품 runtime과 분리한 최소 read-only inspector로 연다. 제자리 변환·가짜 Goal/Profile·옛 token budget 재해석을 금지한다. 조율 메타데이터 DB migration은 별개다.
 - 기본 provider는 qualification된 v1이다. v2 static 11/qualification 13은 v2 채택 조건이며 모든 제품 실행의 선행조건이 아니다. Engine-only 사용자 CLI와 shared canonical 자산을 패키지에 넣고 legacy/eval/developer 도구는 분리한다.
-- 결정적·역할·Planning·실제 요청 E2E·설치·독립 최종 감사가 1.0 필수다. R3.1 token/speed·performance36·비교 lifecycle은 별도 비차단 보고이며 GUI·Localizer·광범위 graph·동일 프로젝트 병렬·remote/multiOS hardening은 후속이다.
+- 결정적·역할·Planning·실제 요청 E2E·설치·독립 최종 감사가 1.0 필수다. 실제 요청 수직 canary와 대표 effect-unknown fault를 전체 campaign보다 먼저 실행하고, 통과한 canary cell은 동결 입력이 같을 때 본 campaign 수량에 포함한다. Role 48회와 Planning 18회는 유지하되 freeze 뒤 독립 shard를 병렬 실행한다. 동일 wheel의 깨끗한 설치는 한 번 완전 검증하고 이후 단계는 변경분만 확인한다. 개발 조율 FM-09는 제품 기능의 critical path가 아니며, 두 최종 감사는 병렬 수행한 뒤 Core가 finding을 결정적으로 join한다. R3.1 token/speed·performance36·v2 채택 검사는 별도 비차단 보고이며 GUI·Localizer·광범위 graph·동일 프로젝트 병렬·remote/multiOS hardening은 후속이다.
 
 현재 사용자의 최신 명시 승인은 사용자 제공 지침과 과거 프로젝트 조항보다 우선한다. 충돌하는 과거 usage 누락 전역 차단·exact Plan 수동 승인·비교 성능 필수 릴리스 조건을 다시 적용하지 않는다.
 
@@ -49,7 +50,7 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 | `ProjectProfileRevision` | 장기 목적·호환성·기본 validation·위험 정책 |
 | `GoalContractRevision` | 사용자 원문·관찰·Hard AC·Soft preference·제약·비목표·가정·효과 정책과 preparation binding |
 | `StateSnapshot` | Goal에 필요한 사실·evidence·freshness·무효화 조건 |
-| `ProjectMapRevision` | 파일·symbol·module·test·build·`AGENTS.md`·등록 자료 색인 |
+| `ProjectMapRevision` | Goal 범위의 파일·`AGENTS.md`·등록 자료와 필요할 때 관측한 symbol·검증된 연결의 색인 |
 | `PlanSkeletonCandidate` | 상세 경로·명령 전의 전략·Task 목적·DAG·입출력·위험·unknown |
 | `PlanContractRevision` | Goal·State 결속, Task 의미·DAG·AC 연결·효과·위험·완료·validation·recovery·모델 배정·Goal Test |
 | `TaskExecutionSpecRevision` | ready 시점의 경로·symbol·명령·Context Pack·lock·timeout·idempotency·snapshot·model binding |
@@ -60,11 +61,11 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 - Goal 후보는 정규화 후 독립 검토하고 normalization·review digest, reviewer role과 finding 또는 rating을 preparation binding에 남긴다.
 - Goal 준비의 blocking 질문 없는 수정 가능한 충돌에는 원본 요청·Profile·관측·평가를 결속한 한 번의 별도 피드백을 허용한다. 수정은 같은 Goal의 새 revision과 독립 검토로 남기며, 동일 후보·반박·미해결은 원래 거절을 유지한다. 입력 부족이나 비수정 가능 실패를 자동 정규화 재호출로 우회하지 않는다.
 - SQLite 원장만 revision·활성 계약·Task·Attempt·binding·evidence·validation·budget·History의 권위다. Domain Core만 상태를 전이하고 완료를 판정한다.
-- 실행 슬롯·효과 상태와 usage 관측을 분리한다. terminal과 유효 결과가 확인되면 usage 누락만으로 후속 호출을 차단하지 않는다. 미확인 token은 null/unknown으로 남기고 0·예약량·추정으로 채우지 않는다. 효과 미확정은 intent·binding을 먼저 관측하고 자동 재실행하지 않는다. 늦은 사용량은 회계 관측만 추가하며 슬롯 환불·재차감·재실행을 유발하지 않는다.
+- 실행 슬롯·provider turn·외부 효과 상태와 usage 관측을 분리한다. provider terminal과 유효 결과가 확인되면 usage 누락만으로 후속 호출을 차단하지 않는다. usage의 미확인 구성요소는 각각 null/unknown으로 남기고 0·예약량·추정으로 채우지 않는다. 외부 효과는 provider/system, target·account, operation, scope, idempotency key와 checkpoint policy를 가진 typed identity로 승인·intent·receipt·재관측에 결속한다. 1.0에서는 내부 파일·명령 효과와 외부 효과를 같은 Task에 섞지 않고 별도 Task와 dependency로 분리한다. provider terminal만으로 외부 효과 완료를 만들지 않으며, 효과 미확정은 intent·binding과 대상을 먼저 관측하고 자동 재실행하지 않는다. 늦은 사용량은 기존 실행·효과·완료 상태를 바꾸지 않는 append-only 회계 관측만 추가한다.
 - interrupt 응답·수집기 종료와 provider terminal 관측을 구분한다. 원래 turn을 새 turn·resume 없이 먼저 관측하고 원본 receipt를 보존한다. schema 3의 reserved/usage_unknown/settled는 역사 reader에서 원래 의미로 읽으며 새 실행 상태를 usage 상태에 종속시키지 않는다.
 - Goal 등록 전 역할 호출도 원래 프로젝트·Goal 계보·요청·receipt·thread/turn에 결속해 재관측할 수 있다. Goal·Profile을 임의 생성하지 않고 History에 관측 원문·digest를 추가한다. 실제 Goal 등록 시 최신 유효 관측을 한 번만 연결하며, 후속 실행 가능 여부는 효과·유효 결과·운영 한도로 판정하며 usage 누락만으로 차단하지 않는다.
 - 대화·모델의 완료 선언만으로 Task·Goal을 완료하지 않는다. Plan·Execution Spec의 evidence 종류는 실제 `EvidenceKind` 지원 집합으로 제한하고 provider schema와 Core에서 함께 검사한다.
-- Planner는 후보, Worker는 배정된 Task 하나의 결과·evidence 후보, Validator는 관측값만 제출한다. Worker는 다음 Task를 선택하지 않는다. Trigger·Scheduled Task도 Core의 `run once`만 호출한다.
+- Planner는 후보, Worker는 배정된 Task 하나의 결과·evidence 후보, Validator는 관측값만 제출한다. Validator는 Worker와 분리된 실행 경로에서 원자료를 다시 관측하고, Worker가 만든 설명이나 evidence 후보를 독립 증거로 재사용하지 않는다. 다른 model/effort 표기만으로 독립성을 충족했다고 보지 않는다. Worker는 다음 Task를 선택하지 않는다. Trigger·Scheduled Task도 Core의 `run once`만 호출한다.
 - Reviewer는 직접 evidence ref가 있는 최소 finding code·affected Task·remediable 여부, finding이 없을 때의 rating만 제출한다. ref는 제공된 catalog·Task 집합에 실제 존재해야 하며 상관 결함은 별도 직접 증거가 필요하다.
 - `status`·admission·score·weakest task는 Core가 결정적으로 계산한다. 외부 deterministic finding·decision도 원장의 Goal·State·Project Map·Skeleton로 재계산하며, finding과 무결함 rating 또는 finding이 있는 `admissible`을 함께 허용하지 않는다.
 
@@ -137,7 +138,7 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 
 ### `flowmarshal-model-lock-v2`
 
-- 실제 모델 이름을 제품 코드에 하드코딩하지 않는다. 실행·검사 역할을 별도로 배정하고 선택 이유·inventory digest·순서 있는 fallback envelope를 Plan에 남긴다. 호출자가 model/effort를 주입하며 실제 호출 직전 App Server `model/list`를 확인한다.
+- 실제 모델 이름을 제품 코드에 하드코딩하지 않는다. 실행·검사 역할을 별도로 배정하고 선택 이유·inventory digest·순서 있는 fallback envelope를 Plan에 남긴다. 호출자가 requested model/effort를 주입하며 실제 호출 직전 App Server `model/list`에서 지원 여부를 확인한다. requested/observed model·effort, provider inventory digest, adapter capability digest와 provenance는 원장·receipt·read model에 직렬화한다. provider의 turn별 echo가 없으면 observed 값은 null이고 요청값을 실제 적용 model/effort로 표기하지 않는다.
 - 제한 diagnostics의 역할 후보는 prepare의 명시적 외부 설정으로만 주입한다. 절대 입력 경로·선택 이유·원문 bytes와 canonical digest·typed configuration digest·원문 snapshot을 잠그고 실제 호출 전에 재대조한다. 실행 모드에서 설정을 교체하거나 cwd로 다른 입력을 선택하지 않으며, 요청의 역할·선택·fallback 순서와 v2 결속 불일치를 차단한다. 후보 검증을 기본 역할 변경이나 실제 의미 검증 성공으로 승격하지 않는다.
 - 전체 원본 JSON은 typed coercion 전에 검사한다. hidden 행을 포함해 duplicate, 빈/null/잘못된 model·effort와 불완전 pagination을 제거·정규화·생략하지 않고 거부하며 원문 순서와 전체 digest를 감사 evidence로 보존한다.
 - 실행 잠금은 역할별 선택·fallback 조합의 지원 상태, fallback 순서, executable digest와 필요한 runtime capability만 투영한다. 무관한 모델·순서·미사용 effort 변화는 감사 digest만 바꿀 수 있지만 선택·fallback·capability·executable 변화는 새 binding 없이 실행할 수 없다.
@@ -149,15 +150,15 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 - dependency를 만족한 Task만 `ready`가 된다. 같은 프로젝트는 먼저 직렬 실행하며 resource lock·충돌 검증 전에는 병렬화하지 않는다.
 - 기본 순서는 `Execution Spec → precondition·snapshot·context·effect checkpoint → Attempt reserve → intent → provider call → receipt/binding → 결과 관측 → Task validation → State 재관측 → Goal Test`다.
 - 준비 역할과 결정적 검증도 효과 전에 append-only intent를 남긴다. 완료 관측이 없는 효과는 `external_unknown`으로 보존하고 입력 변경·새 Task·모델 변경으로 우회해 자동 재실행하지 않는다. 기존 intent·binding·receipt와 provider 상태를 재개 없이 먼저 대조하고, 실제 후속 turn이 필요할 때만 마지막 validated checkpoint에서 resume한다.
-- 파일·artifact·build·test·diff의 결정적 검사를 우선하고 의미 검토에만 별도 Validator를 쓴다. Task validation과 plan-level Goal Test를 분리하며 모든 필수 Task·criterion·integration evidence 뒤에만 Goal을 완료한다.
-- 독립 Goal Test는 실제 명령 또는 별도 Validator 관측이 필요하다. Task evidence 집계는 Plan에 `task_aggregate`가 명시된 경우만 허용한다.
-- 실패 분류는 `implementation`, `context`, `task_contract`, `dependency`, `environment`, `requirement_change`, `external_unknown`이다. 각각 Task repair, Execution Spec/Context revision, subgraph replan, 환경 복구, Goal revision 또는 기존 효과 대조로 처리한다.
+- 파일·artifact·build·test·diff의 결정적 검사를 우선하고 의미 검토에만 별도 Validator를 쓴다. Validator는 Worker와 분리된 실행 경로에서 원자료를 다시 관측하고 독립 request·receipt·evidence binding을 남긴다. Task validation과 plan-level Goal Test를 분리하며 모든 필수 Task·criterion·integration evidence 뒤에만 Goal을 완료한다.
+- 독립 Goal Test는 실제 명령 또는 별도 Validator의 새 관측이 필요하다. 다른 model/effort 표기만으로 독립성을 충족하지 않으며, Task evidence 집계는 Plan에 `task_aggregate`가 명시된 경우만 허용한다.
+- 실패 분류는 `implementation`, `context`, `task_contract`, `dependency`, `environment`, `requirement_change`, `external_unknown`이다. provider/local code와 직접 evidence로 분류하고 model-reported code는 진단 가설로만 보존한다. 1.0은 로컬 Context 해소·effect unknown observe-first와 직접 evidence에 결속한 실제 repair/replan 한 경로를 검증하며, 나머지는 명시적 정지·revision routing을 제공한다.
 - 동일 실패 재계획은 최대 2회, Goal 전체 재계획은 최대 5회이며 원장에서 계산한다. 첫 재계획 뒤 새 evidence 없는 반복을 차단한다.
 - 최종 GoalVerdict 전 deterministic Goal Test의 운영 상세를 복구할 때는 최신 FAIL·직접 evidence·원인 분류·동일 의미의 변경 명세를 명시하고 freshness·최대 두 번의 복구 한도를 검사한다. 이전 결과를 보존하고 새 binding·History·intent·receipt·validation으로 연결한다.
 
 ## Qualification·legacy·cutover
 
-- 결정적 schema/DAG/원장/정책/검사·변경 영향 회귀, 실제 역할 48회, 실제 Planning 18회, 실제 요청부터 한 번의 승인·실행·독립 검사·최종 결과까지의 E2E, 깨끗한 non-editable 설치, 독립 최종 감사가 각각 필수다. 상세 임계값·E2E 책임은 docs/redesign-1.0-contract.md를 따른다.
+- 결정적 schema/DAG/원장/정책/검사·변경 영향 회귀, 실제 역할 48회, 실제 Planning 18회, 실제 요청부터 한 번의 승인·실행·독립 검사·최종 결과까지의 E2E, 깨끗한 non-editable 설치와 두 독립 최종 감사의 결정적 join이 각각 필수다. 전체 campaign 전에 수직 canary와 대표 effect-unknown fault를 실행한다. Role·Planning 입력은 freeze한 뒤 shard를 병렬 실행하며 같은 동결 입력의 canary cell은 총수에 포함한다. 상세 임계값·E2E 책임은 docs/redesign-1.0-contract.md를 따른다.
 - evaluation cell은 fixture digest·order seed·prompt·schema·threshold·taxonomy·model lock·receipt에 결속한다. 계약이 달라진 checkpoint와 미완료 cell을 재사용하지 않는다. 결정적 테스트·synthetic smoke·일부 fixture·aggregate 점수는 실제 역할과 전체 qualification을 대체하지 못한다.
 - development-diagnostic 단계는 사전 고정한 독립 static 11사례와 명시적으로 선택한 provider version을 모델 호출 최대 11회, schema recovery 0회로 관측한다. v1의 행 내부 검사·첫 실패 중단과 qualification 13의 기존 첫 실패, `expansion → 독립 생성 검토 → expanded-review` 경계는 바꾸지 않는다. 정상 완료 또는 receipt·terminal·lock 귀속이 완료된 model/schema/semantic FAIL만 다음 독립 사례로 진행한다. 환경·계약·입력 stale·외부 효과 불명은 즉시 전체를 중단하며, 관측된 실패는 FAIL로 보존하고 호출하지 않은 사례는 NOT_RUN으로 남긴다.
 - 단계 A 공통 preflight는 현재 승인된 checkout의 HEAD·source_manifest·clean tracked files, 전용 Python·`flowmarshal` import origin, fixture whitelist package와 relocation proof, 명시적 Codex executable, roles·instruction actual sources와 model lock을 결속한다. origin/main과 다른 checkout HEAD는 시작 provenance일 뿐 실행 중 비교하지 않는다. 과거 detached worktree 조건은 당시 diagnostics의 provenance이며 현재 승인된 Git 작업 위치를 바꾸는 권한이 아니다. 기존 harness가 다른 checkout을 요구하면 충돌을 보고하고 계약·도구 정합화 후 검증한다. payload 의미·oracle·과거 FAIL은 보정하지 않으며, 11사례 완료는 qualification PASS가 아니다.
@@ -167,7 +168,7 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 - 과거 ReleasePerformanceFloor v4.0과 TokenLatencyGateReport v3.0은 원래 수치·판정의 읽기 호환 및 비차단 비교 보고 계약으로 보존한다. 비교 성능은 현재 1.0 필수 조건이 아니다.
 - 평가 입력이 부분 발췌인지 실행 준비 계약인지 명시한다. fixture·evaluator 결함은 새 revision으로 고치되 과거 입력·원시 결과·판정을 provenance로 보존하고 모델 결과 뒤 oracle alias·합격선을 완화하지 않는다.
 - R1~R3.1 source·artifact는 수정·삭제하지 않고 `legacy/prototype` 감사 기준선으로 보존한다. 기존 campaign을 다시 돌려 GO로 만들지 않으며 실패 사례만 provenance와 함께 새 회귀 fixture로 이전한다.
-- 새 Engine은 별도 SQLite application ID와 artifact root를 사용하고 prototype DB를 자동·제자리 migration하지 않는다. 개발 package·CLI는 `flowmarshal-engine`이며 현재 필수 기능·안전·역할·Planning·E2E·설치·독립 감사 통과 뒤에만 `flowmarshal` 1.0으로 승격한다. 하나라도 실패·미실행이면 `NO-GO`다.
+- 새 Engine은 별도 SQLite application ID와 artifact root를 사용하고 prototype DB를 자동·제자리 migration하지 않는다. schema 3은 제품 runtime과 분리한 최소 read-only inspector로만 조회한다. 개발 package·CLI는 `flowmarshal-engine`이며 현재 필수 기능·안전·역할·Planning·E2E·설치·독립 감사 통과 뒤에만 `flowmarshal` 1.0으로 승격한다. 동일 candidate wheel은 한 번 완전 설치 검증하고 cutover는 entrypoint·이름·설정·smoke 변경분만 확인한다. FM-09 개발 조율 자동화는 delivery 보조 도구이며 제품 critical path가 아니다. 하나라도 실패·미실행이면 `NO-GO`다.
 - 원장 schema가 바뀌면 과거 원장을 보존하고 검증된 계약·호출 계보만 명시적으로 새 원장에 등록한다. 원본 receipt·실패 판정·불완전 사용량을 새 성공 결과로 덮어쓰지 않는다. 측정되지 않은 실행 lifecycle 비율은 null이며 0% 성공으로 판정하지 않는다.
 
 ## GitHub commit과 push

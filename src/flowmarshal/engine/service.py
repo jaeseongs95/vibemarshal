@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable
 
@@ -22,6 +22,7 @@ from .domain import (
     ContextSourceRegistrationKind,
     DeterministicValidationObservation,
     ExecutionSpecProposal,
+    EffectIdentity,
     EvidenceKind,
     EvidenceRecord,
     FailureClass,
@@ -1325,9 +1326,21 @@ class EngineService:
             raise EngineServiceError("runtime job deadline에는 timezone이 필요합니다.")
         request_digest = sha256_digest(request)
         with self.ledger.transaction() as tx:
-            project = tx.maybe_one("SELECT active_plan_revision_id FROM projects WHERE id = ?", (project_id,))
+            project = tx.maybe_one("SELECT * FROM projects WHERE id = ?", (project_id,))
             if project is None or project["active_plan_revision_id"] is None:
                 raise EngineServiceError("활성 PlanContract 없이 runtime job을 예약할 수 없습니다.")
+            plan = PlanContractRevision.model_validate_json(tx.one(
+                "SELECT payload_json FROM plan_revisions WHERE id=?",
+                (project["active_plan_revision_id"],),
+            )["payload_json"])
+            authorization = self._plan_authorization(tx, project, plan)
+            if authorization.absolute_deadline_at is None:
+                raise EngineServiceError("GOAL_EXECUTION_GUARD_REAUTHORIZATION_REQUIRED")
+            if _dt(tx.now) >= authorization.absolute_deadline_at:
+                raise EngineServiceError("GOAL_ABSOLUTE_DEADLINE_EXCEEDED")
+            absolute_deadline_at = min(
+                absolute_deadline_at, authorization.absolute_deadline_at,
+            )
             existing = tx.maybe_one(
                 "SELECT * FROM runtime_jobs WHERE project_id = ? AND checkpoint_key = ?",
                 (project_id, checkpoint_key),
@@ -1347,7 +1360,14 @@ class EngineService:
                     absolute_deadline_at.isoformat(), tx.now, tx.now,
                 ),
             )
-            payload = {"kind": kind.value, "checkpoint_key": checkpoint_key, "request_digest": request_digest}
+            payload = {"kind": kind.value, "checkpoint_key": checkpoint_key,
+                       "request_digest": request_digest,
+                       "execution_guard": {
+                           "authorization_id": authorization.authorization_id,
+                           "authorization_digest": authorization.authorization_digest,
+                           "max_provider_calls": authorization.operating_policy.max_provider_calls,
+                           "absolute_deadline_at": authorization.absolute_deadline_at.isoformat(),
+                       }}
             self._append_runtime_job_observation(
                 tx, job_id=job_id, project_id=project_id,
                 kind=RuntimeJobObservationKind.SCHEDULED, payload=payload,
@@ -1838,6 +1858,10 @@ class EngineService:
                 "SELECT * FROM goal_authorizations WHERE project_id = ? ORDER BY revision_no DESC LIMIT 1",
                 (project_id,),
             )
+            policy = (operating_policy or GoalOperatingPolicy()).model_copy(update={
+                "execution_guard_version": "2.0",
+            })
+            approved_at = _dt(tx.now)
             authorization = GoalAuthorization(
                 authorization_id=new_id("goal_authorization"),
                 revision_no=1 if previous is None else previous["revision_no"] + 1,
@@ -1846,9 +1870,12 @@ class EngineService:
                 goal_id=goal.goal_id, goal_revision_id=goal.goal_revision_id,
                 goal_contract_digest=goal.definition_digest,
                 profile_definition_digest=profile["definition_digest"], effect_policy=goal.definition.effect_policy,
-                operating_policy=operating_policy or GoalOperatingPolicy(),
+                operating_policy=policy,
                 budget_policies=current_budget_policies(tx.connection, project_id),
-                source=source, approved_at=_dt(tx.now),
+                source=source, approved_at=approved_at,
+                absolute_deadline_at=(
+                    approved_at + timedelta(seconds=policy.absolute_deadline_seconds)
+                ),
             )
             authorization = GoalAuthorization.model_validate_json(authorization.model_dump_json())
             tx.connection.execute(
@@ -1857,7 +1884,9 @@ class EngineService:
                 authorization.authorization_digest, canonical_json(authorization), tx.now),
             )
             tx.history(project_id, "goal.authorized", "goal_authorization", authorization.authorization_id,
-                       {"authorization_digest": authorization.authorization_digest, "source": source})
+                       {"authorization_digest": authorization.authorization_digest, "source": source,
+                        "max_provider_calls": policy.max_provider_calls,
+                        "absolute_deadline_at": authorization.absolute_deadline_at.isoformat()})
             return authorization
 
     def activate_authorized_plan(self, *, plan_revision_id: str) -> str:
@@ -3194,6 +3223,7 @@ class EngineService:
                 item
                 for item in contract["expected_effects"]
                 if item["effect_id"] == effect_id and item["external"] and not item["reversible"]
+                and item.get("identity_version") == "2.0" and isinstance(item.get("identity"), dict)
             ]
             if contract["approval_class"] != ApprovalClass.EXECUTION_CHECKPOINT.value or not matching:
                 raise EngineServiceError("checkpoint 대상인 비가역 외부 효과가 아닙니다.")
@@ -3205,6 +3235,8 @@ class EngineService:
             if spec["definition_digest"] != execution_spec_digest:
                 raise EngineServiceError("checkpoint가 현재 ExecutionSpec과 다릅니다.")
             checkpoint_id = new_id("checkpoint")
+            identity = matching[0]["identity"]
+            identity_digest = sha256_digest(identity)
             tx.connection.execute(
                 "INSERT INTO effect_checkpoints "
                 "(id, task_id, effect_id, execution_spec_digest, approved_by, approved_at) "
@@ -3216,7 +3248,11 @@ class EngineService:
                 "effect.checkpointed",
                 "effect_checkpoint",
                 checkpoint_id,
-                {"task_id": task_id, "effect_id": effect_id, "execution_spec_digest": execution_spec_digest},
+                {"task_id": task_id, "effect_id": effect_id,
+                 "execution_spec_digest": execution_spec_digest,
+                 "effect_identity": identity,
+                 "effect_identity_digest": identity_digest,
+                 "checkpoint_policy": identity["checkpoint_policy"]},
             )
             return checkpoint_id
 
@@ -3247,6 +3283,20 @@ class EngineService:
             if kind is AttemptKind.EXECUTION:
                 self._verify_execution_inputs(tx, task, spec_row)
             contract = json.loads(task["payload_json"])
+            has_external_effects = any(item["external"] for item in contract["expected_effects"])
+            has_internal_effects = any(not item["external"] for item in contract["expected_effects"])
+            if has_external_effects and has_internal_effects and kind is AttemptKind.EXECUTION:
+                raise EngineServiceError("MIXED_EFFECT_CONTRACT_REQUIRES_TASK_SPLIT")
+            untyped_external = [
+                item["effect_id"] for item in contract["expected_effects"]
+                if item["external"] and (
+                    item.get("identity_version") != "2.0" or not isinstance(item.get("identity"), dict)
+                )
+            ]
+            if untyped_external and kind is AttemptKind.EXECUTION:
+                raise EngineServiceError(
+                    "EFFECT_IDENTITY_REQUIRED: " + ", ".join(untyped_external)
+                )
             irreversible = {
                 item["effect_id"]
                 for item in contract["expected_effects"]
@@ -3751,6 +3801,62 @@ class EngineService:
                 {"task_id": evidence.task_id, "kind": evidence.kind.value, "content_digest": evidence.content_digest},
             )
 
+    def confirm_worker_target_observation(
+        self, *, attempt_id: str, evidence_ids: tuple[str, ...]
+    ) -> None:
+        """직접 target 재관측으로 내부/file 효과의 불확실성만 해소한다."""
+        with self.ledger.transaction() as tx:
+            attempt = tx.one("SELECT * FROM attempts WHERE id=?", (attempt_id,))
+            if attempt["kind"] != AttemptKind.EXECUTION.value:
+                raise EngineServiceError("Worker execution Attempt만 효과를 확인할 수 있습니다.")
+            task = tx.one("SELECT payload_json FROM task_contracts WHERE id=?", (attempt["task_id"],))
+            contract = json.loads(task["payload_json"])
+            if not contract["expected_effects"]:
+                return
+            if any(item["external"] for item in contract["expected_effects"]):
+                # 외부 효과는 typed adapter receipt나 별도 external target 관측이 필요하다.
+                return
+            call = tx.maybe_one(
+                "SELECT * FROM provider_calls WHERE attempt_id=? ORDER BY rowid DESC LIMIT 1",
+                (attempt_id,),
+            )
+            if call is None or call["execution_status"] != "terminal":
+                raise EngineServiceError("provider terminal 호출을 찾을 수 없습니다.")
+            if call["effect_status"] == "terminal":
+                return
+            if not evidence_ids:
+                raise EngineServiceError("EFFECT_TARGET_OBSERVATION_REQUIRED")
+            placeholders = ",".join("?" for _ in evidence_ids)
+            evidence = tx.all(
+                f"SELECT id,attempt_id,kind,content_digest,source_ref FROM evidence_records "
+                f"WHERE id IN ({placeholders})", tuple(evidence_ids),
+            )
+            target_evidence = [
+                row for row in evidence
+                if row["attempt_id"] == attempt_id and row["kind"] in {"file", "diff"}
+            ]
+            if not target_evidence:
+                raise EngineServiceError("EFFECT_TARGET_OBSERVATION_BINDING_MISMATCH")
+            binding = {
+                "status": "confirmed",
+                "source": "target_reobservation",
+                "attempt_id": attempt_id,
+                "execution_spec_digest": attempt["execution_spec_digest"],
+                "evidence": [
+                    {"evidence_id": row["id"], "source_ref": row["source_ref"],
+                     "content_digest": row["content_digest"]}
+                    for row in target_evidence
+                ],
+            }
+            tx.connection.execute(
+                "UPDATE provider_calls SET effect_status='terminal' WHERE id=? AND effect_status='unknown'",
+                (call["id"],),
+            )
+            tx.history(
+                attempt["project_id"], "provider_effect.confirmed", "provider_call", call["id"],
+                {**binding, "binding_digest": sha256_digest(binding)},
+            )
+
     @staticmethod
     def _verify_task_validation_operation_binding(
         tx: Any,
@@ -3887,6 +3993,59 @@ class EngineService:
             ):
                 raise EngineServiceError("Task validation evidence가 현재 Worker Attempt에 결속되지 않았습니다.")
 
+    @staticmethod
+    def _verify_semantic_validation_independence(
+        tx: Any, *, task_id: str, evidence_ids: tuple[str, ...]
+    ) -> None:
+        """독립성은 model 이름이 아니라 별도 Attempt/job/turn/evidence provenance로 확인한다."""
+        if not evidence_ids:
+            raise EngineServiceError("INDEPENDENT_VALIDATION_EVIDENCE_REQUIRED")
+        placeholders = ",".join("?" for _ in evidence_ids)
+        rows = tx.all(
+            f"SELECT e.id,e.kind,e.attempt_id,a.kind AS attempt_kind FROM evidence_records e "
+            f"LEFT JOIN attempts a ON a.id=e.attempt_id WHERE e.id IN ({placeholders})",
+            tuple(evidence_ids),
+        )
+        validator_attempt_ids = {
+            row["attempt_id"] for row in rows
+            if row["kind"] == EvidenceKind.MODEL_REVIEW.value
+            and row["attempt_kind"] == AttemptKind.VALIDATION.value
+        }
+        if len(validator_attempt_ids) != 1:
+            raise EngineServiceError("INDEPENDENT_VALIDATION_ATTEMPT_REQUIRED")
+        validator_attempt_id = next(iter(validator_attempt_ids))
+        validator_attempt = tx.one(
+            "SELECT task_id,binding_json FROM attempts WHERE id=?", (validator_attempt_id,),
+        )
+        worker = tx.one(
+            "SELECT id FROM attempts WHERE task_id=? AND kind='execution' "
+            "ORDER BY attempt_no DESC,rowid DESC LIMIT 1", (task_id,),
+        )
+        job = tx.maybe_one(
+            "SELECT thread_id,turn_id,status FROM runtime_jobs WHERE attempt_id=? "
+            "AND kind='task_semantic_validate' ORDER BY rowid DESC LIMIT 1",
+            (validator_attempt_id,),
+        )
+        receipt = tx.maybe_one(
+            "SELECT r.binding_json FROM runtime_receipts r JOIN runtime_intents i ON i.id=r.intent_id "
+            "WHERE i.attempt_id=? AND i.kind='start_turn' ORDER BY i.rowid DESC LIMIT 1",
+            (validator_attempt_id,),
+        )
+        if (
+            validator_attempt["task_id"] != task_id
+            or validator_attempt_id == worker["id"]
+            or job is None
+            or job["status"] not in {"provider_terminal", "consumed"}
+            or job["thread_id"] is None
+            or job["turn_id"] is None
+            or receipt is None
+            or receipt["binding_json"] is None
+        ):
+            raise EngineServiceError("INDEPENDENT_VALIDATION_PROVENANCE_MISSING")
+        binding = json.loads(receipt["binding_json"])
+        if (binding.get("thread_id"), binding.get("turn_id")) != (job["thread_id"], job["turn_id"]):
+            raise EngineServiceError("INDEPENDENT_VALIDATION_TURN_BINDING_MISMATCH")
+
     def record_validation(
         self,
         *,
@@ -3925,6 +4084,29 @@ class EngineService:
             expected_task = task_validation_ids.get(result.validation_id)
             if expected_task != result.task_id:
                 raise EngineServiceError("validation의 Task binding이 계약과 다릅니다.")
+            if result.task_id is not None:
+                task_contract = next(
+                    item for item in plan.definition.tasks if item.task_id == result.task_id
+                )
+                validation_contract = validation_contracts[result.validation_id]
+                submitted_kinds: set[str] = set()
+                if result.evidence_ids:
+                    placeholders = ",".join("?" for _ in result.evidence_ids)
+                    submitted_kinds = {
+                        row["kind"] for row in tx.all(
+                            f"SELECT kind FROM evidence_records WHERE id IN ({placeholders})",
+                            tuple(result.evidence_ids),
+                        )
+                    }
+                if (
+                    task_contract.assignment.independence_required
+                    and validation_contract.method == "semantic"
+                    and EvidenceKind.MODEL_REVIEW.value in submitted_kinds
+                    and result.status in {ValidationStatus.PASS, ValidationStatus.FAIL}
+                ):
+                    self._verify_semantic_validation_independence(
+                        tx, task_id=result.task_id, evidence_ids=result.evidence_ids,
+                    )
             if result.evidence_ids:
                 placeholders = ",".join("?" for _ in result.evidence_ids)
                 rows = tx.all(
@@ -4134,7 +4316,200 @@ class EngineService:
             plan_revision_id=plan_revision_id,
             result=result,
         )
+        if isinstance(observation, ExternalValidationObservation) and observation.task_id is not None:
+            self._confirm_external_effect_observation(observation)
         return result
+
+    def _confirm_external_effect_observation(
+        self, observation: ExternalValidationObservation,
+    ) -> None:
+        """typed target observation을 같은 Task의 미확정 Worker 호출에 결속한다."""
+        if observation.effect_identity is None:
+            return
+        with self.ledger.transaction() as tx:
+            task = tx.one("SELECT project_id,payload_json FROM task_contracts WHERE id=?",
+                          (observation.task_id,))
+            contract = json.loads(task["payload_json"])
+            if (
+                any(item["external"] for item in contract["expected_effects"])
+                and any(not item["external"] for item in contract["expected_effects"])
+            ):
+                raise EngineServiceError("MIXED_EFFECT_CONTRACT_REQUIRES_TASK_SPLIT")
+            expected = {
+                sha256_digest(item["identity"])
+                for item in contract["expected_effects"]
+                if item["external"] and item.get("identity_version") == "2.0"
+                and isinstance(item.get("identity"), dict)
+            }
+            if observation.effect_identity_digest not in expected:
+                raise EngineServiceError("EFFECT_TARGET_OBSERVATION_IDENTITY_MISMATCH")
+            call = tx.maybe_one(
+                "SELECT c.* FROM provider_calls c JOIN attempts a ON a.id=c.attempt_id "
+                "WHERE a.task_id=? AND a.kind='execution' AND c.execution_status='terminal' "
+                "AND c.effect_status='unknown' ORDER BY c.rowid DESC LIMIT 1",
+                (observation.task_id,),
+            )
+            if call is None:
+                return
+            receipts = tx.all(
+                "SELECT payload_json FROM history_events WHERE project_id=? "
+                "AND entity_type='provider_call' AND entity_id=? "
+                "AND event_type='effect.receipt_recorded' ORDER BY sequence",
+                (task["project_id"], call["id"]),
+            )
+            receipt_payloads = [json.loads(row["payload_json"]) for row in receipts]
+            receipt = next((item for item in receipt_payloads if (
+                item.get("receipt_digest") == observation.receipt_digest
+                and item.get("effect_identity_digest") == observation.effect_identity_digest
+                and item.get("target_observation_digest") == observation.target_observation_digest
+            )), None)
+            if receipt is None:
+                raise EngineServiceError("EFFECT_ADAPTER_RECEIPT_BINDING_MISMATCH")
+            binding = {
+                "status": "confirmed",
+                "source": "external_target_observation",
+                "effect_identity": observation.effect_identity.model_dump(mode="json"),
+                "effect_identity_digest": observation.effect_identity_digest,
+                "target_observation_digest": observation.target_observation_digest,
+                "provider_receipt_digest": observation.receipt_digest,
+            }
+            tx.history(
+                task["project_id"], "provider_effect.confirmed", "provider_call", call["id"],
+                {**binding, "binding_digest": sha256_digest(binding)},
+            )
+            confirmed_rows = tx.all(
+                "SELECT payload_json FROM history_events WHERE project_id=? "
+                "AND entity_type='provider_call' AND entity_id=? "
+                "AND event_type='provider_effect.confirmed' ORDER BY sequence",
+                (task["project_id"], call["id"]),
+            )
+            confirmed = {
+                json.loads(row["payload_json"]).get("effect_identity_digest")
+                for row in confirmed_rows
+            }
+            if confirmed >= expected:
+                tx.connection.execute(
+                    "UPDATE provider_calls SET effect_status='terminal' WHERE id=?",
+                    (call["id"],),
+                )
+
+    def record_effect_receipt(
+        self,
+        *,
+        task_id: str,
+        attempt_id: str,
+        provider_call_id: str,
+        runtime_intent_id: str,
+        runtime_receipt_id: str,
+        thread_id: str,
+        turn_id: str,
+        effect_identity: EffectIdentity,
+        provider_operation_id: str,
+        response_digest: str,
+        target_observation_digest: str,
+    ) -> str:
+        """typed adapter가 제공한 효과 receipt를 target 관측 전에 append-only로 기록한다."""
+        if not provider_operation_id.strip():
+            raise EngineServiceError("EFFECT_ADAPTER_OPERATION_ID_REQUIRED")
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", response_digest):
+            raise EngineServiceError("EFFECT_ADAPTER_RESPONSE_DIGEST_INVALID")
+        if not re.fullmatch(r"sha256:[0-9a-f]{64}", target_observation_digest):
+            raise EngineServiceError("EFFECT_TARGET_OBSERVATION_DIGEST_INVALID")
+        with self.ledger.transaction() as tx:
+            task = tx.one("SELECT project_id,payload_json FROM task_contracts WHERE id=?", (task_id,))
+            contract = json.loads(task["payload_json"])
+            expected = {
+                sha256_digest(item["identity"])
+                for item in contract["expected_effects"]
+                if item["external"] and item.get("identity_version") == "2.0"
+                and isinstance(item.get("identity"), dict)
+            }
+            if effect_identity.identity_digest not in expected:
+                raise EngineServiceError("EFFECT_ADAPTER_RECEIPT_IDENTITY_MISMATCH")
+            attempt = tx.one("SELECT * FROM attempts WHERE id=?", (attempt_id,))
+            call = tx.one("SELECT * FROM provider_calls WHERE id=?", (provider_call_id,))
+            intent = tx.one("SELECT * FROM runtime_intents WHERE id=?", (runtime_intent_id,))
+            runtime_receipt = tx.one(
+                "SELECT * FROM runtime_receipts WHERE id=?", (runtime_receipt_id,),
+            )
+            binding = (
+                None if runtime_receipt["binding_json"] is None
+                else json.loads(runtime_receipt["binding_json"])
+            )
+            if (
+                attempt["task_id"] != task_id
+                or attempt["kind"] != AttemptKind.EXECUTION.value
+                or call["attempt_id"] != attempt_id
+                or call["role"] != "worker"
+                or call["execution_status"] != "terminal"
+                or intent["attempt_id"] != attempt_id
+                or intent["kind"] not in {
+                    RuntimeIntentKind.START_TURN.value,
+                    RuntimeIntentKind.RESUME_TURN.value,
+                }
+                or runtime_receipt["intent_id"] != runtime_intent_id
+                or runtime_receipt["provider_operation_id"] != turn_id
+                or binding is None
+                or (binding.get("thread_id"), binding.get("turn_id"))
+                != (thread_id, turn_id)
+            ):
+                raise EngineServiceError("EFFECT_ADAPTER_RUNTIME_BINDING_MISMATCH")
+            attempt_binding = (
+                None if attempt["binding_json"] is None else json.loads(attempt["binding_json"])
+            )
+            if attempt_binding is not None and (
+                attempt_binding.get("thread_id") != thread_id
+                or attempt_binding.get("turn_id") not in {None, turn_id}
+            ):
+                raise EngineServiceError("EFFECT_ADAPTER_ATTEMPT_BINDING_MISMATCH")
+            if call["receipt_json"] is not None:
+                call_receipt = json.loads(call["receipt_json"])
+                if (
+                    call_receipt.get("thread_id") not in {None, thread_id}
+                    or call_receipt.get("turn_id") not in {None, turn_id}
+                ):
+                    raise EngineServiceError("EFFECT_ADAPTER_PROVIDER_CALL_BINDING_MISMATCH")
+            body = {
+                "task_id": task_id,
+                "attempt_id": attempt_id,
+                "provider_call_id": provider_call_id,
+                "runtime_intent_id": runtime_intent_id,
+                "runtime_receipt_id": runtime_receipt_id,
+                "thread_id": thread_id,
+                "turn_id": turn_id,
+                "effect_identity": effect_identity.model_dump(mode="json"),
+                "effect_identity_digest": effect_identity.identity_digest,
+                "provider_operation_id": provider_operation_id,
+                "response_digest": response_digest,
+                "target_observation_digest": target_observation_digest,
+            }
+            receipt_digest = sha256_digest(body)
+            prior_rows = tx.all(
+                "SELECT payload_json FROM history_events WHERE project_id=? "
+                "AND entity_type='provider_call' AND entity_id=? "
+                "AND event_type='effect.receipt_recorded' ORDER BY sequence",
+                (task["project_id"], call["id"]),
+            )
+            prior = next(
+                (
+                    json.loads(row["payload_json"])
+                    for row in prior_rows
+                    if json.loads(row["payload_json"]).get("effect_identity_digest")
+                    == effect_identity.identity_digest
+                ),
+                None,
+            )
+            if prior is not None:
+                if prior.get("receipt_digest") != receipt_digest:
+                    raise EngineServiceError("EFFECT_ADAPTER_RECEIPT_CONFLICT")
+                return receipt_digest
+            if call["effect_status"] != "unknown":
+                raise EngineServiceError("EFFECT_ADAPTER_RECEIPT_STATE_MISMATCH")
+            tx.history(
+                task["project_id"], "effect.receipt_recorded", "provider_call", call["id"],
+                {**body, "receipt_digest": receipt_digest},
+            )
+            return receipt_digest
 
     def block_task_from_validation(self, *, task_id: str, detail: str) -> None:
         with self.ledger.transaction() as tx:
@@ -4153,11 +4528,35 @@ class EngineService:
                 {"detail": detail},
             )
 
+    @staticmethod
+    def _unresolved_execution_provider_calls(
+        tx: Any, *, task_id: str | None = None, plan_revision_id: str | None = None,
+    ) -> tuple[str, ...]:
+        if (task_id is None) == (plan_revision_id is None):
+            raise ValueError("Task 또는 Plan 범위 중 하나가 필요합니다.")
+        scope = "a.task_id=?" if task_id is not None else "t.plan_revision_id=?"
+        value = task_id if task_id is not None else plan_revision_id
+        rows = tx.all(
+            "SELECT c.id FROM provider_calls c "
+            "JOIN attempts a ON a.id=c.attempt_id "
+            "JOIN task_contracts t ON t.id=a.task_id "
+            f"WHERE a.kind='execution' AND {scope} AND ("
+            "c.execution_status IN ('reserved','started','unknown') "
+            "OR c.effect_status IN ('pending','unknown')) ORDER BY c.created_at,c.rowid",
+            (value,),
+        )
+        return tuple(row["id"] for row in rows)
+
     def complete_task(self, task_id: str) -> tuple[str, ...]:
         with self.ledger.transaction() as tx:
             task = tx.one("SELECT * FROM task_contracts WHERE id = ?", (task_id,))
             if task["status"] != "validating":
                 raise EngineServiceError("validating Task만 완료 판정할 수 있습니다.")
+            unresolved = self._unresolved_execution_provider_calls(tx, task_id=task_id)
+            if unresolved:
+                raise EngineServiceError(
+                    "TASK_PROVIDER_EXECUTION_OR_EFFECT_UNRESOLVED: " + ", ".join(unresolved)
+                )
             contract = json.loads(task["payload_json"])
             expected = {item["validation_id"] for item in contract["validations"]}
             latest: dict[str, str] = {}
@@ -4203,6 +4602,14 @@ class EngineService:
                 ).fetchone()[0]
                 if incomplete:
                     raise EngineServiceError("모든 Task가 완료되기 전에는 Goal satisfied를 선언할 수 없습니다.")
+                unresolved = self._unresolved_execution_provider_calls(
+                    tx, plan_revision_id=plan_revision_id,
+                )
+                if unresolved:
+                    raise EngineServiceError(
+                        "GOAL_PROVIDER_EXECUTION_OR_EFFECT_UNRESOLVED: "
+                        + ", ".join(unresolved)
+                    )
                 expected_integrations = {
                     item.validation_id for item in plan.definition.integration_validations
                 }
@@ -4365,15 +4772,31 @@ class EngineService:
             elif raw is not None:
                 reason = "PROVIDER_USAGE_SCOPE_UNDETERMINED"
             keys = ("inputTokens", "cachedInputTokens", "outputTokens", "reasoningOutputTokens")
-            values = tuple(counts.get(key) for key in keys) if isinstance(counts, dict) else (None,) * 4
-            valid = all(type(value) is int and value >= 0 for value in values)
-            if valid:
-                valid = values[1] <= values[0] and values[3] <= values[2]
-                if "totalTokens" in counts:
-                    valid = valid and type(counts["totalTokens"]) is int and counts["totalTokens"] == values[0] + values[2]
-            if basis != "unavailable" and not valid:
+            values = tuple(
+                value if type(value) is int and value >= 0 else None
+                for value in (
+                    (counts.get(key) for key in keys)
+                    if isinstance(counts, dict) else (None,) * 4
+                )
+            )
+            if values[0] is not None and values[1] is not None and values[1] > values[0]:
+                values = (values[0], None, values[2], values[3])
+            if values[2] is not None and values[3] is not None and values[3] > values[2]:
+                values = (values[0], values[1], values[2], None)
+            if (
+                isinstance(counts, dict)
+                and values[0] is not None and values[2] is not None
+                and "totalTokens" in counts
+                and not (
+                    type(counts["totalTokens"]) is int
+                    and counts["totalTokens"] == values[0] + values[2]
+                )
+            ):
+                values = (None,) * 4
+            available = basis != "unavailable" and any(value is not None for value in values)
+            complete = all(value is not None for value in values)
+            if basis != "unavailable" and not complete:
                 reason = "PROVIDER_USAGE_FIELDS_INCOMPLETE_OR_INVALID"
-            available = basis != "unavailable" and valid
             if not available:
                 values, basis = (None,) * 4, "unavailable"
             if existing is not None:
@@ -4387,11 +4810,29 @@ class EngineService:
             duration = provider_payload.get("duration_ms")
             observation = {"thread_id": thread_id, "turn_id": turn_id, "terminal_status": terminal_status,
                            "output_digest": output_digest, "payload": provider_payload}
+            from .model_lock import OperationalBinding
+            model_observation = OperationalBinding.model_validate(request["model_observation"])
+            observed_model = provider_payload.get("observed_model")
+            observed_effort = provider_payload.get("observed_effort")
             usage = BudgetUsageRecord(
                 usage_id=new_id("usage"), project_id=attempt["project_id"],
                 goal_contract_digest=plan.definition.goal_contract_digest, stage=BudgetStage.EXECUTION,
                 logical_call_ref=call_ref, role=spec.definition.executor.role, call_status=terminal_status,
                 model=request["model"], effort=request["effort"],
+                binding_provenance_version="2.0",
+                requested_model=request["model"], requested_effort=request["effort"],
+                observed_model=observed_model if isinstance(observed_model, str) else None,
+                observed_effort=observed_effort if isinstance(observed_effort, str) else None,
+                provider_inventory_digest=model_observation.inventory.provider_inventory_digest,
+                adapter_capability_digest=model_observation.inventory.adapter_capability_digest,
+                binding_provenance={
+                    "requested": "runtime_intent",
+                    "observed": "provider_terminal" if (
+                        isinstance(observed_model, str) or isinstance(observed_effort, str)
+                    ) else None,
+                    "provider_inventory": "model/list",
+                    "adapter_capability": "local_operational_binding",
+                },
                 permission_profile=start["permission_profile"], approval_policy=start["approval_policy"],
                 thread_id=thread_id, turn_ids=(turn_id,), input_digest=request["prompt_digest"],
                 output_digest=output_digest, output_schema_digest=sha256_digest(None),
@@ -4404,7 +4845,8 @@ class EngineService:
                 prompt_token_estimate=request["prompt_token_estimate"],
                 usage_scope=scope if scope in {"turn", "thread"} else "unavailable",
                 usage_source=provider_payload.get("usage_source", "runtime.read"), attribution_basis=basis,
-                unavailable_reason=None if available else reason, provider_observation=observation,
+                unavailable_reason=(None if complete else "PROVIDER_USAGE_PARTIAL" if available else reason),
+                provider_observation=observation,
                 recorded_at=utc_now(),
             )
             self._insert_budget_usage(tx, usage)
@@ -4669,12 +5111,11 @@ class EngineService:
                 )
                 if (
                     matching_policy is None
-                    or matching_policy.get("call_reservation_tokens")
-                    != call["estimated_tokens"]
+                    or call["estimated_tokens"] != 0
                 ):
                     reject(
                         "EMPTY_THREAD_POLICY_BINDING_MISMATCH",
-                        "provider 예약량과 명시 예산 정책의 결속이 다릅니다.",
+                        "provider 예약의 정책 digest 또는 non-synthetic token 결속이 다릅니다.",
                     )
 
             response = receipt.response_payload

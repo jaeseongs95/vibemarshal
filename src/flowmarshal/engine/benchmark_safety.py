@@ -236,7 +236,13 @@ def _trace_rows(payload: dict[str, Any], *, expected_call_id: str | None, thread
 
 
 def _usage_summary(records: list[BudgetUsageRecord], *, complete: bool) -> PerformanceUsageCounters:
-    if not complete or any(not item.usage_available for item in records):
+    if not complete or any(
+        not item.usage_available
+        or item.input_tokens is None
+        or item.cached_input_tokens is None
+        or item.output_tokens is None
+        for item in records
+    ):
         return PerformanceUsageCounters()
     inputs = sum(item.input_tokens for item in records)
     cached = sum(item.cached_input_tokens for item in records)
@@ -270,9 +276,13 @@ def _project_calls(snapshot: dict[str, Any], calls: list[dict[str, Any]], *, pol
         if not isinstance(request, dict) or sha256_digest(request) != call["request_digest"]:
             failures.append("PERFORMANCE_REQUEST_DIGEST_MISMATCH")
             continue
-        if call["policy_digest"] != sha256_digest(policies.budget) or call["estimated_tokens"] != policies.budget.call_reservation_tokens:
+        if call["policy_digest"] != sha256_digest(policies.budget) or call["estimated_tokens"] != 0:
             _increment(counts, "budget_policy_violation_count")
-        if call.get("execution_status") != "terminal" or call.get("effect_status") != "terminal":
+        if (
+            call.get("execution_status") != "terminal"
+            or call.get("effect_status") in {"pending", "unknown"}
+            or call.get("result_status") in {"pending", "unknown"}
+        ):
             _increment(counts, "unknown_effect_count")
             failures.append("PERFORMANCE_PROVIDER_EFFECT_UNRESOLVED")
         if type(call["actual_tokens"]) is not int:

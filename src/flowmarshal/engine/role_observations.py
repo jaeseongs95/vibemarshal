@@ -37,6 +37,18 @@ class RoleCallReceipt(EngineModel):
     status: str
     model: str
     effort: str
+    binding_provenance_version: str | None = None
+    requested_model: str | None = None
+    requested_effort: str | None = None
+    observed_model: str | None = None
+    observed_effort: str | None = None
+    provider_inventory_digest: str | None = Field(
+        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
+    )
+    adapter_capability_digest: str | None = Field(
+        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
+    )
+    binding_provenance: dict[str, str | None] | None = None
     inventory_digest: str
     permission_profile: str
     approval_policy: str
@@ -77,8 +89,31 @@ class RoleCallReceipt(EngineModel):
         default=None, pattern=r"^sha256:[0-9a-f]{64}$"
     )
 
+    @property
+    def usage_complete(self) -> bool:
+        return self.usage_available and all(
+            value is not None
+            for value in (
+                self.input_tokens,
+                self.cached_input_tokens,
+                self.output_tokens,
+                self.reasoning_tokens,
+            )
+        )
+
     @model_validator(mode="after")
     def operation_trace_is_bound(self):
+        if self.binding_provenance_version is not None:
+            if self.binding_provenance_version != "2.0":
+                raise ValueError("지원하지 않는 model provenance projection입니다.")
+            if (self.requested_model, self.requested_effort) != (self.model, self.effort):
+                raise ValueError("legacy model/effort alias는 requested binding과 같아야 합니다.")
+            if any(value is None for value in (
+                self.provider_inventory_digest,
+                self.adapter_capability_digest,
+                self.binding_provenance,
+            )):
+                raise ValueError("v2 model provenance 필드가 완전하지 않습니다.")
         if self.operation_trace is None:
             if self.operation_trace_digest is not None:
                 raise ValueError("operation trace body 없이 digest를 결속할 수 없습니다.")
@@ -96,5 +131,12 @@ class RoleCallReceipt(EngineModel):
             "operation_trace", "operation_trace_ref", "operation_trace_digest",
         ):
             if getattr(self, field_name) is None:
+                value.pop(field_name, None)
+        if self.binding_provenance_version is None:
+            for field_name in (
+                "binding_provenance_version", "requested_model", "requested_effort",
+                "observed_model", "observed_effort", "provider_inventory_digest",
+                "adapter_capability_digest", "binding_provenance",
+            ):
                 value.pop(field_name, None)
         return value

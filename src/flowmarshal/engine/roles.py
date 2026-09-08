@@ -205,16 +205,23 @@ def _usage(
         return (None, None, None, None, False)
 
     keys = ("inputTokens", "cachedInputTokens", "outputTokens", "reasoningOutputTokens")
-    values = tuple(source.get(key) for key in keys)
-    known = all(type(value) is int and value >= 0 for value in values)
-    if known:
-        known = values[1] <= values[0] and values[3] <= values[2]
-    if known and "totalTokens" in source:
+    values = tuple(
+        value if type(value) is int and value >= 0 else None
+        for value in (source.get(key) for key in keys)
+    )
+    if values[0] is not None and values[1] is not None and values[1] > values[0]:
+        values = (values[0], None, values[2], values[3])
+    if values[2] is not None and values[3] is not None and values[3] > values[2]:
+        values = (values[0], values[1], values[2], None)
+    if values[0] is not None and values[2] is not None and "totalTokens" in source:
         total_tokens = source["totalTokens"]
-        known = type(total_tokens) is int and total_tokens >= 0 and total_tokens == values[0] + values[2]
-    if not known:
-        return (None, None, None, None, False)
-    return (*values, True)
+        if not (
+            type(total_tokens) is int
+            and total_tokens >= 0
+            and total_tokens == values[0] + values[2]
+        ):
+            return (None, None, None, None, False)
+    return (*values, any(value is not None for value in values))
 
 
 class CodexStructuredRoleRunner:
@@ -812,6 +819,32 @@ class CodexStructuredRoleRunner:
             status=status,
             model=request.model,
             effort=request.effort,
+            binding_provenance_version="2.0",
+            requested_model=request.model,
+            requested_effort=request.effort,
+            observed_model=(
+                observation_payload.get("observed_model")
+                if isinstance(observation_payload.get("observed_model"), str)
+                else None
+            ),
+            observed_effort=(
+                observation_payload.get("observed_effort")
+                if isinstance(observation_payload.get("observed_effort"), str)
+                else None
+            ),
+            provider_inventory_digest=observed_binding.inventory.provider_inventory_digest,
+            adapter_capability_digest=observed_binding.inventory.adapter_capability_digest,
+            binding_provenance={
+                "requested": "role_request",
+                "observed": (
+                    "provider_terminal"
+                    if isinstance(observation_payload.get("observed_model"), str)
+                    or isinstance(observation_payload.get("observed_effort"), str)
+                    else None
+                ),
+                "provider_inventory": "model/list",
+                "adapter_capability": "local_operational_binding",
+            },
             inventory_digest=request.inventory_digest,
             permission_profile=REQUIRED_PERMISSION_PROFILE,
             approval_policy=REQUIRED_APPROVAL_POLICY,
@@ -864,12 +897,34 @@ class ScriptedStructuredRoleRunner:
             raise StructuredRoleError(f"scripted response가 없습니다: {request.role}") from error
         if validator is not None:
             validator(payload)
+        provenance = {}
+        if request.operational_binding is not None:
+            provenance = {
+                "binding_provenance_version": "2.0",
+                "requested_model": request.model,
+                "requested_effort": request.effort,
+                "observed_model": None,
+                "observed_effort": None,
+                "provider_inventory_digest": (
+                    request.operational_binding.inventory.provider_inventory_digest
+                ),
+                "adapter_capability_digest": (
+                    request.operational_binding.inventory.adapter_capability_digest
+                ),
+                "binding_provenance": {
+                    "requested": "role_request",
+                    "observed": None,
+                    "provider_inventory": "model/list",
+                    "adapter_capability": "local_operational_binding",
+                },
+            }
         receipt = RoleCallReceipt(
             call_id=new_id("model_call"),
             role=request.role,
             status="succeeded",
             model=request.model,
             effort=request.effort,
+            **provenance,
             inventory_digest=request.inventory_digest,
             permission_profile=REQUIRED_PERMISSION_PROFILE,
             approval_policy=REQUIRED_APPROVAL_POLICY,
@@ -896,6 +951,14 @@ def verify_role_receipt(request: RoleCallRequest, result: RoleCallResult) -> Non
             or (receipt.role, receipt.model, receipt.effort, receipt.inventory_digest)
             != (request.role, request.model, request.effort, request.inventory_digest)):
         raise StructuredRoleError("ROLE_RECEIPT_BINDING_MISMATCH")
+    if receipt.binding_provenance_version == "2.0":
+        if receipt.observed_binding is None or (
+            receipt.provider_inventory_digest
+            != receipt.observed_binding.inventory.provider_inventory_digest
+            or receipt.adapter_capability_digest
+            != receipt.observed_binding.inventory.adapter_capability_digest
+        ):
+            raise StructuredRoleError("ROLE_RECEIPT_PROVENANCE_MISMATCH")
     if receipt.operation_trace is not None:
         verification = OperationTrace.verify(
             receipt.operation_trace, expected_call_ids=(receipt.call_id,)

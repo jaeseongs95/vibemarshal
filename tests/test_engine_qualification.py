@@ -855,7 +855,10 @@ class EngineQualificationTests(unittest.TestCase):
                     "SELECT binding_json FROM attempts WHERE id = ?", (dispatched.attempt_id,)
                 ).fetchone()
             binding = ThreadBinding.model_validate_json(row["binding_json"])
-            runtime.fail(binding.thread_id, response="구현 실패")
+            runtime.fail(
+                binding.thread_id, response="구현 실패",
+                error_code="IMPLEMENTATION_ERROR",
+            )
             observed = dispatcher.run_once(prepared.project_id)
             self.assertEqual(RunOnceAction.OBSERVED, observed.action)
 
@@ -869,6 +872,24 @@ class EngineQualificationTests(unittest.TestCase):
                 self.assertEqual("materialized", connection.execute(
                     "SELECT status FROM task_contracts WHERE id=?", (prepared.task_id,)
                 ).fetchone()[0])
+
+    def test_model_text_implementation_claim_is_not_recovery_authority(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            prepared, _ = self.prepared(Path(temp) / "model-text-not-authority")
+            runtime = FakeCodexRuntime(self.inventory)
+            dispatcher = EngineDispatcher(prepared.service, runtime)
+            dispatcher.run_once(prepared.project_id, proposal=prepared.proposal)
+            dispatched = dispatcher.run_once(prepared.project_id)
+            with prepared.service.ledger.read() as connection:
+                row = connection.execute(
+                    "SELECT binding_json FROM attempts WHERE id=?", (dispatched.attempt_id,)
+                ).fetchone()
+            binding = ThreadBinding.model_validate_json(row["binding_json"])
+            runtime.fail(binding.thread_id, response="구현 실패")
+            dispatcher.run_once(prepared.project_id)
+            blocked = dispatcher.run_once(prepared.project_id)
+            self.assertEqual(RunOnceAction.BLOCKED, blocked.action)
+            self.assertEqual("RECOVERY_DIAGNOSIS_REQUIRED", blocked.blocker_code)
 
     def test_validation_and_state_reobservation_faults_resume_without_duplicate_result(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

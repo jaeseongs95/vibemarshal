@@ -30,6 +30,7 @@ class FailureDiagnosis(EngineModel):
     evidence_ids: tuple[str, ...] = ()
     rationale: str = Field(min_length=1, max_length=5000)
     source: str = Field(pattern=r"^(explicit_code|effect|transport|direct_evidence|unclassified)$")
+    model_reported_codes: tuple[str, ...] = ()
 
     @property
     def failure_fingerprint(self) -> str:
@@ -111,17 +112,17 @@ class EvidenceFirstFailureClassifier:
 
     @classmethod
     def _explicit_codes(cls, signal: FailureSignal) -> tuple[str, ...]:
+        """provider/local typed payload와 직접 evidence의 구조화 코드만 반환한다.
+
+        ``final_response``는 모델이 작성한 비권위 텍스트다. 선두에 알려진 코드가
+        있더라도 자동 recovery의 explicit error로 승격하지 않는다.
+        """
         codes: list[str] = []
         for key, value in cls._walk(signal.provider_payload):
             if key in _CODE_KEYS and isinstance(value, str):
                 match = _CODE_PATTERN.search(value)
                 if match:
                     codes.append(match.group(1))
-        # 최종 응답에서는 선두의 ``CODE: detail`` 형식만 명시 코드로 인정한다.
-        response = (signal.final_response or "").strip()
-        match = re.match(r"^([A-Z][A-Z0-9_]{2,99})(?:\s*[:;-]|$)", response)
-        if match:
-            codes.append(match.group(1))
         for document in signal.evidence_documents:
             for key, value in cls._walk(document):
                 if key in _CODE_KEYS and isinstance(value, str):
@@ -130,9 +131,16 @@ class EvidenceFirstFailureClassifier:
                         codes.append(match.group(1))
         return tuple(dict.fromkeys(codes))
 
+    @staticmethod
+    def _model_reported_codes(signal: FailureSignal) -> tuple[str, ...]:
+        response = (signal.final_response or "").strip()
+        match = re.match(r"^([A-Z][A-Z0-9_]{2,99})(?:\s*[:;-]|$)", response)
+        return () if match is None else (match.group(1),)
+
     @classmethod
     def classify(cls, signal: FailureSignal) -> FailureDiagnosis:
         codes = cls._explicit_codes(signal)
+        model_reported_codes = cls._model_reported_codes(signal)
         for code in codes:
             failure_class = cls._CODE_CLASS.get(code)
             if failure_class is None and code.startswith("MODEL_LOCK_"):
@@ -145,6 +153,7 @@ class EvidenceFirstFailureClassifier:
                     evidence_ids=signal.evidence_ids,
                     rationale=f"직접 관측된 error code {code}를 우선 적용했습니다.",
                     source="explicit_code",
+                    model_reported_codes=model_reported_codes,
                 )
 
         flattened = json.dumps(signal.provider_payload, ensure_ascii=False).casefold()
@@ -158,6 +167,7 @@ class EvidenceFirstFailureClassifier:
                 evidence_ids=signal.evidence_ids,
                 rationale="외부 효과 또는 receipt 상태가 unknown인 직접 관측을 우선했습니다.",
                 source="effect",
+                model_reported_codes=model_reported_codes,
             )
         if any(token in flattened for token in (
             '"transport_error"', '"rpc_error"', '"connection_error"',
@@ -169,6 +179,7 @@ class EvidenceFirstFailureClassifier:
                 evidence_ids=signal.evidence_ids,
                 rationale="transport 결과가 불명인 직접 관측이 있어 구현 재시도를 금지했습니다.",
                 source="transport",
+                model_reported_codes=model_reported_codes,
             )
 
         # 직접 test/diff evidence는 의미 추측 없이 그 관측 필드로만 판정한다.
@@ -193,17 +204,8 @@ class EvidenceFirstFailureClassifier:
                     evidence_ids=signal.evidence_ids,
                     rationale="Task에 직접 결속된 test/file/diff 실패 evidence가 구현 결함을 입증합니다.",
                     source="direct_evidence",
+                    model_reported_codes=model_reported_codes,
                 )
-
-        # 한국어 fixture의 명시적인 구현 실패 표기는 일반 failed terminal과 구분한다.
-        if (signal.final_response or "").strip() == "구현 실패":
-            return FailureDiagnosis(
-                failure_class=FailureClass.IMPLEMENTATION,
-                repair_action=RepairAction.TASK_REPAIR,
-                evidence_ids=signal.evidence_ids,
-                rationale="최종 응답이 명시적으로 구현 실패를 보고했습니다.",
-                source="direct_evidence",
-            )
 
         return FailureDiagnosis(
             evidence_ids=signal.evidence_ids,
@@ -212,4 +214,5 @@ class EvidenceFirstFailureClassifier:
                 "failed terminal만으로 원인을 추정하지 않았습니다."
             ),
             source="unclassified",
+            model_reported_codes=model_reported_codes,
         )

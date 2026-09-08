@@ -177,7 +177,7 @@ class EngineStructuredRoleTests(unittest.TestCase):
         self.assertTrue(raised.exception.receipt.usage_available)
         self.assertEqual(['{}'], runtime.outputs)
 
-    def test_usage_requires_explicit_scope_single_turn_and_complete_exact_counts(self) -> None:
+    def test_usage_requires_bound_scope_and_preserves_valid_partial_components(self) -> None:
         proof = {
             "thread_id": "thread_1",
             "turn_ids": ("turn_1",),
@@ -197,19 +197,25 @@ class EngineStructuredRoleTests(unittest.TestCase):
         }
         self.assertEqual((100, 40, 10, 4, True), _usage(valid, **proof))
 
-        invalid = (
-            {"usage": valid["usage"]},
-            {**valid, "usage": {key: value for key, value in valid["usage"].items()
+        cases = (
+            ({"usage": valid["usage"]}, (None, None, None, None, False)),
+            ({**valid, "usage": {key: value for key, value in valid["usage"].items()
                                   if key != "reasoningOutputTokens"}},
-            {**valid, "usage": {**valid["usage"], "inputTokens": True}},
-            {**valid, "usage": {**valid["usage"], "inputTokens": -1}},
-            {**valid, "usage": {**valid["usage"], "cachedInputTokens": 101}},
-            {**valid, "usage": {**valid["usage"], "reasoningOutputTokens": 11}},
-            {**valid, "usage": {**valid["usage"], "totalTokens": 109}},
+             (100, 40, 10, None, True)),
+            ({**valid, "usage": {**valid["usage"], "inputTokens": True}},
+             (None, 40, 10, 4, True)),
+            ({**valid, "usage": {**valid["usage"], "inputTokens": -1}},
+             (None, 40, 10, 4, True)),
+            ({**valid, "usage": {**valid["usage"], "cachedInputTokens": 101}},
+             (100, None, 10, 4, True)),
+            ({**valid, "usage": {**valid["usage"], "reasoningOutputTokens": 11}},
+             (100, 40, 10, None, True)),
+            ({**valid, "usage": {**valid["usage"], "totalTokens": 109}},
+             (None, None, None, None, False)),
         )
-        for payload in invalid:
+        for payload, expected in cases:
             with self.subTest(payload=payload):
-                self.assertEqual((None, None, None, None, False), _usage(payload, **proof))
+                self.assertEqual(expected, _usage(payload, **proof))
         self.assertEqual(
             (None, None, None, None, False),
             _usage(valid, **{**proof, "turn_ids": ("turn_0", "turn_1")}),

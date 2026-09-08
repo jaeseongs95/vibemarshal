@@ -25,7 +25,7 @@ from flowmarshal.engine.role_execution import (
     RoleTimeoutPolicy,
     use_role_timeout_policy,
 )
-from flowmarshal.engine.roles import RoleCallReceipt, make_role_request
+from flowmarshal.engine.roles import RoleCallReceipt, StructuredRoleError, make_role_request
 from flowmarshal.engine.budget import GoalBudgetPolicy
 from tests.engine_helpers import goal, profile
 
@@ -212,7 +212,7 @@ class EvaluationBudgetTests(unittest.TestCase):
                 profile=original_profile, policies=changed_policies,
             )
 
-    def test_missing_policy_blocks_before_live_provider_call(self) -> None:
+    def test_missing_token_policy_does_not_block_live_provider_call(self) -> None:
         # 새 cell helper를 우회해 정책이 없는 원장을 의도적으로 만든다.
         from flowmarshal.engine.ledger import SQLiteEngineLedger
         from flowmarshal.engine.service import EngineService
@@ -229,12 +229,13 @@ class EvaluationBudgetTests(unittest.TestCase):
             runtime, service, project_id=self.project_id, goal_id=current_goal.goal_id,
             goal_digest=current_goal.definition_digest,
         )
-        with self.assertRaisesRegex(BudgetBlocked, "BUDGET_POLICY_REQUIRED"):
+        with self.assertRaises(StructuredRoleError) as caught:
             runner.run(self._request())
-        self.assertEqual(0, runtime.calls)
+        self.assertNotIsInstance(caught.exception, BudgetBlocked)
+        self.assertGreater(runtime.calls, 0)
         with service.ledger.read() as connection:
             calls = connection.execute("SELECT COUNT(*) FROM provider_calls").fetchone()[0]
-        self.assertEqual(0, calls)
+        self.assertEqual(1, calls)
 
 
 if __name__ == "__main__":

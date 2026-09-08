@@ -133,6 +133,20 @@ class WorkerUsageTests(unittest.TestCase):
         self.assertGreater(recorded.prompt_token_estimate or 0, 1)
         self.assertNotEqual(recorded.prompt_token_estimate, recorded.input_tokens)
         self.assertEqual(sha256_digest("worker final report"), recorded.output_digest)
+        projection = recorded.model_dump(mode="json")
+        self.assertEqual("2.0", projection["binding_provenance_version"])
+        self.assertEqual(request["model"], projection["requested_model"])
+        self.assertEqual(request["effort"], projection["requested_effort"])
+        self.assertIsNone(projection["observed_model"])
+        self.assertIsNone(projection["observed_effort"])
+        self.assertIsNotNone(projection["provider_inventory_digest"])
+        self.assertIsNotNone(projection["adapter_capability_digest"])
+        with prepared.service.ledger.read() as connection:
+            stored = json.loads(connection.execute(
+                "SELECT payload_json FROM budget_usage WHERE id=?", (recorded.usage_id,)
+            ).fetchone()["payload_json"])
+        self.assertEqual(projection["requested_model"], stored["requested_model"])
+        self.assertIn("observed_model", stored)
 
     def test_measured_zero_and_unavailable_usage_remain_distinct(self):
         measured, _, _, measured_attempt = self.dispatched("measured-zero")
@@ -259,7 +273,7 @@ class WorkerUsageTests(unittest.TestCase):
                     ).fetchone()
                 self.assertEqual("failed", attempt["status"])
                 self.assertEqual(
-                    ("terminal", "terminal", "invalid", "usage_unknown", None),
+                    ("terminal", "none", "invalid", "usage_unknown", None),
                     tuple(call),
                 )
 
@@ -280,14 +294,27 @@ class WorkerUsageTests(unittest.TestCase):
                 )
         self.assertEqual([], self.worker_rows(prepared.service))
 
-    def test_partial_or_malformed_usage_is_preserved_as_unavailable(self):
+    def test_partial_usage_preserves_components_and_invalid_total_is_unavailable(self):
         cases = {
-            "partial": {"inputTokens": 10, "cachedInputTokens": 1},
-            "negative": self.usage(input_tokens=-1),
-            "invalid-total": self.usage() | {"totalTokens": 1},
-            "wrong-type": self.usage() | {"outputTokens": "50"},
+            "partial": (
+                {"inputTokens": 10, "cachedInputTokens": 1},
+                True, (10, 1, None, None), "PROVIDER_USAGE_PARTIAL",
+            ),
+            "negative": (
+                self.usage(input_tokens=-1),
+                True, (None, 20, 50, 10), "PROVIDER_USAGE_PARTIAL",
+            ),
+            "invalid-total": (
+                self.usage() | {"totalTokens": 1},
+                False, (None, None, None, None),
+                "PROVIDER_USAGE_FIELDS_INCOMPLETE_OR_INVALID",
+            ),
+            "wrong-type": (
+                self.usage() | {"outputTokens": "50"},
+                True, (120, 20, None, 10), "PROVIDER_USAGE_PARTIAL",
+            ),
         }
-        for name, raw in cases.items():
+        for name, (raw, available, values, reason) in cases.items():
             with self.subTest(name=name):
                 prepared, _, _, attempt_id = self.dispatched("malformed-" + name)
                 thread_id, turn_id, request = self.turn(prepared.service, attempt_id)
@@ -297,8 +324,12 @@ class WorkerUsageTests(unittest.TestCase):
                     provider_payload=self.payload(thread_id, turn_id, request, usage=raw),
                 )
                 assert result is not None
-                self.assertFalse(result.usage_available)
-                self.assertEqual("PROVIDER_USAGE_FIELDS_INCOMPLETE_OR_INVALID", result.unavailable_reason)
+                self.assertEqual(available, result.usage_available)
+                self.assertEqual(reason, result.unavailable_reason)
+                self.assertEqual(values, (
+                    result.input_tokens, result.cached_input_tokens,
+                    result.output_tokens, result.reasoning_tokens,
+                ))
                 self.assertEqual(raw, result.provider_observation["payload"]["usage"])
 
     def test_usage_is_recorded_before_terminal_attempt_state_and_legacy_intent_is_not_backfilled(self):

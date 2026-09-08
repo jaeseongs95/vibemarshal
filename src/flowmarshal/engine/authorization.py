@@ -17,6 +17,11 @@ def _effects_within(approved: EffectPolicy, requested: EffectPolicy) -> bool:
          or requested.mutation_policy is MutationPolicy.READ_ONLY)
         and requested.behavior_policy == approved.behavior_policy
         and set(requested.allowed_external_effects) <= set(approved.allowed_external_effects)
+        and {
+            item.identity_digest for item in requested.allowed_external_effect_contracts
+        } <= {
+            item.identity_digest for item in approved.allowed_external_effect_contracts
+        }
         and set(requested.prohibited_effects) >= set(approved.prohibited_effects)
         and (not approved.irreversible_effects_require_checkpoint
              or requested.irreversible_effects_require_checkpoint)
@@ -62,8 +67,17 @@ def authorization_changes(authorization: GoalAuthorization, *, project: Any,
         changed("effect", "effect_policy", authorization.effect_policy.model_dump(mode="json"), effects.model_dump(mode="json"))
     for task in plan.definition.tasks:
         for effect in task.expected_effects:
-            if (effect.external and effect.statement not in effects.allowed_external_effects
-                    or effect.statement in effects.prohibited_effects):
+            typed_allowed = {
+                item.identity_digest for item in effects.allowed_external_effect_contracts
+            }
+            if (
+                effect.external
+                and (
+                    effect.identity is None
+                    or effect.identity.identity_digest not in typed_allowed
+                )
+                or effect.statement in effects.prohibited_effects
+            ):
                 changed("effect", f"{task.task_ref}.{effect.effect_id}", effects.model_dump(mode="json"), effect.model_dump(mode="json"))
     policy = authorization.operating_policy
     for field, requested in plan.definition.planning_budget.model_dump().items():

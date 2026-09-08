@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import timedelta
 from pathlib import Path
 
 from flowmarshal.engine.benchmark_lifecycle import _successful_worker_for_current_spec
@@ -19,6 +20,9 @@ from flowmarshal.engine.domain import (
     RevisionStatus,
     RoleAssignmentPolicy,
     RuntimeIntentKind,
+    RuntimeJobKind,
+    RuntimeJobObservationKind,
+    ThreadBinding,
     ValidationResult,
     ValidationStatus,
     new_id,
@@ -522,6 +526,37 @@ class ModelRebindingTests(ModelRebindingFixture):
             observed_at=utc_now(),
         )
         self.service.record_evidence(review_evidence)
+        thread_id = "validator-thread-rebind"
+        turn_id = "validator-turn-rebind"
+        job = self.service.schedule_runtime_job(
+            project_id=self.project_id,
+            kind=RuntimeJobKind.TASK_SEMANTIC_VALIDATE,
+            checkpoint_key="validator-rebind-independent-review",
+            request={"attempt_id": validator_attempt.attempt_id},
+            absolute_deadline_at=utc_now() + timedelta(minutes=1),
+            attempt_id=validator_attempt.attempt_id,
+            task_id=self.task.task_id,
+        )
+        self.service.start_runtime_job(job.job_id, thread_id=thread_id, turn_id=turn_id)
+        intent = self.service.prepare_runtime_intent(
+            attempt_id=validator_attempt.attempt_id,
+            kind=RuntimeIntentKind.START_TURN,
+            idempotency_key="validator-rebind-independent-turn",
+            request={"thread_id": thread_id, "turn_id": turn_id},
+        )
+        self.service.record_runtime_receipt(
+            intent_id=intent.intent_id,
+            provider_operation_id=turn_id,
+            response={"accepted": True},
+            binding=ThreadBinding(thread_id=thread_id, turn_id=turn_id, bound_at=utc_now()),
+        )
+        self.service.record_runtime_job_observation(
+            job.job_id,
+            kind=RuntimeJobObservationKind.PROVIDER_TERMINAL,
+            payload={"result": {"passed": False}},
+            provider_terminal=True,
+            terminal_status="completed",
+        )
         self.service.finish_attempt(attempt_id=validator_attempt.attempt_id, succeeded=True)
         self.service.record_validation(
             project_id=self.project_id,

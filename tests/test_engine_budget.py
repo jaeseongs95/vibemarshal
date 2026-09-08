@@ -99,7 +99,7 @@ class BudgetFixture(unittest.TestCase):
 
         row = self.provider_call(call)
         assert row is not None
-        self.assertEqual(7, row["estimated_tokens"])
+        self.assertEqual(0, row["estimated_tokens"])
         self.assertEqual(sha256_digest(override), row["policy_digest"])
         with self.ledger.read() as connection:
             revisions = connection.execute(
@@ -116,7 +116,7 @@ class BudgetFixture(unittest.TestCase):
 
         row = self.provider_call(call)
         assert row is not None
-        self.assertEqual(11, row["estimated_tokens"])
+        self.assertEqual(0, row["estimated_tokens"])
         self.assertEqual(sha256_digest(policy), row["policy_digest"])
 
     def test_normal_reserve_keeps_replan_quarter_but_replan_can_use_it(self) -> None:

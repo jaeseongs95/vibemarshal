@@ -55,6 +55,33 @@ def binding(value):
 
 
 class ModelLockV2Tests(unittest.TestCase):
+    def test_provider_inventory_and_adapter_capability_have_separate_provenance(self):
+        original = inventory()
+        provider_changed = original.model_copy(update={
+            "models": (*original.models, ModelCapability(
+                model="provider-added", supported_efforts=("low",)
+            )),
+        })
+        adapter_changed = original.model_copy(update={
+            "executable_digest": "sha256:" + "1" * 64,
+        })
+        self.assertNotEqual(
+            original.provider_inventory_digest,
+            provider_changed.provider_inventory_digest,
+        )
+        self.assertEqual(
+            original.adapter_capability_digest,
+            provider_changed.adapter_capability_digest,
+        )
+        self.assertEqual(
+            original.provider_inventory_digest,
+            adapter_changed.provider_inventory_digest,
+        )
+        self.assertNotEqual(
+            original.adapter_capability_digest,
+            adapter_changed.adapter_capability_digest,
+        )
+
     def test_projection_ignores_unrelated_models_order_and_unused_efforts(self):
         original = inventory()
         expected = binding(original)
@@ -226,11 +253,32 @@ class ModelLockV2Tests(unittest.TestCase):
             verify_role_receipt(request, result)
             self.assertEqual(runtime.inventory.inventory_digest, result.receipt.observed_binding.inventory_digest)
             self.assertEqual(original.inventory_digest, result.receipt.inventory_digest)
+            self.assertEqual(request.model, result.receipt.requested_model)
+            self.assertEqual(request.effort, result.receipt.requested_effort)
+            self.assertEqual(
+                result.receipt.observed_binding.inventory.provider_inventory_digest,
+                result.receipt.provider_inventory_digest,
+            )
+            self.assertEqual(
+                result.receipt.observed_binding.inventory.adapter_capability_digest,
+                result.receipt.adapter_capability_digest,
+            )
+            projection = result.receipt.model_dump(mode="json")
+            self.assertEqual("2.0", projection["binding_provenance_version"])
+            self.assertEqual(request.model, projection["requested_model"])
+            self.assertEqual(request.effort, projection["requested_effort"])
+            self.assertIsNone(projection["observed_model"])
+            self.assertIsNone(projection["observed_effort"])
+            self.assertEqual("role_request", projection["binding_provenance"]["requested"])
             forged = request.model_copy(update={"inventory_digest": "sha256:" + "f" * 64})
             with patch.object(runtime, "create_thread") as create, self.assertRaises(StructuredRoleError):
                 CodexStructuredRoleRunner(runtime).run(forged)
             create.assert_not_called()
             for key in ("inventory_digest", "input_digest", "output_digest"):
+                receipt = result.receipt.model_copy(update={key: "sha256:" + "f" * 64})
+                with self.assertRaises(StructuredRoleError):
+                    verify_role_receipt(request, result.model_copy(update={"receipt": receipt}))
+            for key in ("provider_inventory_digest", "adapter_capability_digest"):
                 receipt = result.receipt.model_copy(update={key: "sha256:" + "f" * 64})
                 with self.assertRaises(StructuredRoleError):
                     verify_role_receipt(request, result.model_copy(update={"receipt": receipt}))

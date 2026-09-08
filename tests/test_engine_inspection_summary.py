@@ -129,6 +129,22 @@ class InspectionSummaryTests(unittest.TestCase):
             self.assertTrue(summary["usage"]["reasoning_included_in_output"])
             self.assertEqual(receipt["call_id"], summary["receipts"][0]["call_id"])
 
+    def test_legacy_receipt_without_v2_model_provenance_remains_readable(self):
+        with tempfile.TemporaryDirectory() as temp:
+            run = Path(temp)
+            self._run(run)
+            _capture, receipt = self._call(run, 1, status="success")
+            self.assertNotIn("binding_provenance_version", receipt)
+
+            summary = self._summarize(run, status="PASS", error=None)
+
+            self.assertEqual("PASS", summary["status"])
+            self.assertEqual(1, summary["outcomes"]["success"])
+            self.assertNotIn(
+                "PARTIAL_RECEIPT",
+                [item["code"] for item in summary["diagnostic_errors"]],
+            )
+
     def test_missing_terminal_is_external_unknown_and_keeps_consumed_budget(self):
         with tempfile.TemporaryDirectory() as temp:
             run = Path(temp)

@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import sqlite3
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from flowmarshal.canonical import sha256_digest
+from flowmarshal.canonical import canonical_json, sha256_digest
 from flowmarshal.engine.budget import BudgetBlocked, BudgetManager, GoalBudgetPolicy
 from flowmarshal.engine.benchmark import _legacy_hard_timeout_contract
-from flowmarshal.engine.domain import UsageObservation, utc_now
+from flowmarshal.engine.domain import GoalAuthorization, GoalOperatingPolicy, UsageObservation, utc_now
 from flowmarshal.engine.evaluation_budget import EvaluationPolicies
 from flowmarshal.engine.ledger import (
     ENGINE_SCHEMA_REVISION,
@@ -105,7 +107,7 @@ class ExecutionUsageSeparationTests(unittest.TestCase):
         self.manager.settle(first, self._receipt("valid-without-usage"))
         row = self._row(first)
         self.assertEqual(
-            ("terminal", "terminal", "valid", "usage_unknown", None),
+            ("terminal", "none", "valid", "usage_unknown", None),
             (
                 row["execution_status"], row["effect_status"], row["result_status"],
                 row["status"], row["actual_tokens"],
@@ -163,6 +165,86 @@ class ExecutionUsageSeparationTests(unittest.TestCase):
         ))
         with self.assertRaisesRegex(BudgetBlocked, "PROVIDER_EFFECT_UNKNOWN"):
             self._reserve("must-observe-first", goal_id="goal_independent")
+
+    def test_partial_usage_preserves_available_components_without_blocking(self) -> None:
+        call_id = self._reserve("partial-usage")
+        receipt = self._receipt("partial-usage", usage_available=True).model_copy(update={
+            "cached_input_tokens": None,
+            "reasoning_tokens": None,
+        })
+        self.manager.settle(call_id, receipt)
+        row = self._row(call_id)
+        self.assertEqual(
+            ("terminal", "none", "valid", "settled", 5),
+            (
+                row["execution_status"], row["effect_status"], row["result_status"],
+                row["status"], row["actual_tokens"],
+            ),
+        )
+        with self.ledger.read() as connection:
+            stored = connection.execute(
+                "SELECT payload_json FROM usage_observations WHERE provider_call_id=?",
+                (call_id,),
+            ).fetchone()
+        observation = UsageObservation.model_validate_json(stored["payload_json"])
+        self.assertEqual("measured", observation.measurement_status)
+        self.assertEqual((3, None, 2, None), (
+            observation.input_tokens,
+            observation.cached_input_tokens,
+            observation.output_tokens,
+            observation.reasoning_tokens,
+        ))
+        self.assertIsNone(self.manager.status(
+            self.project_id, goal_id=self.goal.goal_id
+        ).error_code)
+
+        before = dict(row)
+        effective = self.manager.observe_role_terminal(
+            call_id,
+            RuntimeObservation(
+                thread_id=receipt.thread_id or "",
+                turn_id=receipt.turn_ids[0],
+                active=False,
+                terminal_status="completed",
+                final_response="유효 결과",
+                payload={
+                    "usage_scope": "turn",
+                    "usage": {
+                        "inputTokens": 3,
+                        "cachedInputTokens": 1,
+                        "outputTokens": 2,
+                        "reasoningOutputTokens": 1,
+                        "totalTokens": 5,
+                    },
+                },
+            ),
+        )
+        after = dict(self._row(call_id))
+        self.assertEqual((3, 1, 2, 1), (
+            effective.input_tokens, effective.cached_input_tokens,
+            effective.output_tokens, effective.reasoning_tokens,
+        ))
+        for key in (
+            "execution_status", "effect_status", "result_status", "status",
+            "actual_tokens", "completed_at", "receipt_json", "raw_receipt_digest",
+        ):
+            self.assertEqual(before[key], after[key], key)
+
+        with self.assertRaisesRegex(BudgetBlocked, "BUDGET_RECONCILIATION_CONFLICT"):
+            self.manager.observe_role_terminal(
+                call_id,
+                RuntimeObservation(
+                    thread_id=receipt.thread_id or "",
+                    turn_id=receipt.turn_ids[0],
+                    active=False,
+                    terminal_status="completed",
+                    final_response="충돌",
+                    payload={
+                        "usage_scope": "turn",
+                        "usage": {"inputTokens": 4, "outputTokens": 2, "totalTokens": 6},
+                    },
+                ),
+            )
 
     def test_fm_02_c2_pending_effect_is_observe_first(self) -> None:
         """terminal 실행이어도 effect pending이면 프로젝트 전체 admission을 차단한다."""
@@ -273,7 +355,7 @@ class ExecutionUsageSeparationTests(unittest.TestCase):
             call_id, self._receipt("input-contract", status="input_contract_failed")
         )
         row = self._row(call_id)
-        self.assertEqual(("terminal", "terminal", "invalid"), (
+        self.assertEqual(("terminal", "none", "invalid"), (
             row["execution_status"], row["effect_status"], row["result_status"],
         ))
         following = self._reserve("after-input-contract")
@@ -341,6 +423,73 @@ class ExecutionUsageSeparationTests(unittest.TestCase):
             ))
             self.assertNotIn("maximum_reserved_calls", contract)
             self.assertNotIn("budget_policy_digest", contract)
+
+    def test_goal_provider_call_limit_is_hard_and_usage_independent(self) -> None:
+        authorization = self.service.authorize_goal(
+            project_id=self.project_id,
+            source="test",
+            operating_policy=GoalOperatingPolicy(
+                max_provider_calls=2, absolute_deadline_seconds=3600,
+            ),
+        )
+        for index in range(2):
+            call_id = self._reserve(f"hard-call-{index}")
+            self.manager.settle(call_id, self._receipt(f"hard-call-{index}"))
+        with self.assertRaisesRegex(BudgetBlocked, "GOAL_PROVIDER_CALL_LIMIT_REACHED"):
+            self._reserve("hard-call-2")
+        with self.ledger.read() as connection:
+            events = connection.execute(
+                "SELECT payload_json FROM history_events WHERE event_type='budget.call_reserved' "
+                "ORDER BY sequence DESC LIMIT 2"
+            ).fetchall()
+        self.assertEqual(
+            {1, 2},
+            {json.loads(row["payload_json"])["execution_guard"]["provider_call_ordinal"]
+             for row in events},
+        )
+        self.assertTrue(all(
+            json.loads(row["payload_json"])["execution_guard"]["authorization_id"]
+            == authorization.authorization_id for row in events
+        ))
+
+    def test_goal_absolute_deadline_blocks_new_provider_call(self) -> None:
+        class Clock:
+            current = datetime(2030, 1, 1, tzinfo=timezone.utc)
+
+            def now(self) -> str:
+                return self.current.isoformat()
+
+        clock = Clock()
+        self.ledger.clock = clock
+        authorization = self.service.authorize_goal(
+            project_id=self.project_id,
+            source="test",
+            operating_policy=GoalOperatingPolicy(
+                max_provider_calls=25, absolute_deadline_seconds=1,
+            ),
+        )
+        clock.current = clock.current + timedelta(seconds=1)
+        with self.assertRaisesRegex(BudgetBlocked, "GOAL_ABSOLUTE_DEADLINE_EXCEEDED"):
+            self._reserve("after-deadline")
+        self.assertEqual(
+            datetime(2030, 1, 1, 0, 0, 1, tzinfo=timezone.utc),
+            authorization.absolute_deadline_at,
+        )
+
+    def test_schema4_authorization_without_execution_guard_keeps_frozen_digest(self) -> None:
+        authorization = self.service.authorize_goal(
+            project_id=self.project_id, source="new guard",
+        )
+        legacy = json.loads(canonical_json(authorization))
+        legacy.pop("absolute_deadline_at")
+        legacy["operating_policy"].pop("execution_guard_version")
+        legacy["operating_policy"].pop("max_provider_calls")
+        legacy["operating_policy"].pop("absolute_deadline_seconds")
+
+        restored = GoalAuthorization.model_validate(legacy)
+
+        self.assertEqual(legacy, json.loads(canonical_json(restored)))
+        self.assertEqual(sha256_digest(legacy), restored.authorization_digest)
 
 
 if __name__ == "__main__":

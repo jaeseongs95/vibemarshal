@@ -9,7 +9,7 @@ import threading
 import time
 from concurrent.futures import Future
 from contextvars import ContextVar
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Protocol
@@ -226,7 +226,10 @@ class CodexAppServerRuntime:
     config와 thread receipt가 full-access/never인지 검증한다.
     """
 
-    requires_budget_policy = True
+    # Token usage는 terminal 뒤에도 부분/미제공일 수 있으므로 live 실행의
+    # 선행조건으로 예산 정책을 요구하지 않는다. 각 요청의 absolute deadline과
+    # Planning의 max-provider-call limit이 기본 운영 guard다.
+    requires_budget_policy = False
     emits_rpc_operation_trace = True
 
     @property
@@ -918,6 +921,10 @@ class CodexAppServerRuntime:
                 "turn_id": handle.id,
                 "model": model,
                 "effort": effort,
+                "requested_model": model,
+                "requested_effort": effort,
+                "model_provenance": "requested",
+                "effort_provenance": "requested",
                 "permission_profile": REQUIRED_PERMISSION_PROFILE,
                 "approval_policy": REQUIRED_APPROVAL_POLICY,
                 "prompt_digest": prompt_digest,
@@ -1393,6 +1400,7 @@ class _FakeThread:
     turn_id: str | None = None
     terminal_status: str | None = None
     final_response: str | None = None
+    provider_payload: dict[str, Any] = field(default_factory=dict)
 
 
 class FakeCodexRuntime:
@@ -1465,6 +1473,7 @@ class FakeCodexRuntime:
         thread.turn_id = turn_id
         thread.terminal_status = None
         thread.final_response = None
+        thread.provider_payload = {}
         binding = ThreadBinding(thread_id=thread_id, turn_id=turn_id, bound_at=utc_now())
         return RuntimeOperationReceipt(
             operation_id=turn_id,
@@ -1478,9 +1487,14 @@ class FakeCodexRuntime:
         self.threads[thread_id].terminal_status = "completed"
         self.threads[thread_id].final_response = response
 
-    def fail(self, thread_id: str, *, response: str = "실패") -> None:
+    def fail(
+        self, thread_id: str, *, response: str = "실패", error_code: str | None = None,
+    ) -> None:
         self.threads[thread_id].terminal_status = "failed"
         self.threads[thread_id].final_response = response
+        self.threads[thread_id].provider_payload = (
+            {} if error_code is None else {"error_code": error_code}
+        )
 
     def read(self, *, thread_id: str) -> RuntimeObservation:
         self.read_calls += 1
@@ -1491,7 +1505,11 @@ class FakeCodexRuntime:
             active=thread.turn_id is not None and thread.terminal_status is None,
             terminal_status=thread.terminal_status,
             final_response=thread.final_response,
-            payload={"thread_id": thread_id, "turn_id": thread.turn_id},
+            payload={
+                "thread_id": thread_id,
+                "turn_id": thread.turn_id,
+                **thread.provider_payload,
+            },
         )
 
     def operation_kind_for_read(self, thread_id: str) -> str:
@@ -1521,6 +1539,7 @@ class FakeCodexRuntime:
                 "turn_status": thread.terminal_status,
                 "usage": None,
                 "usage_scope": "unavailable",
+                **thread.provider_payload,
                 "usage_source": "thread/read",
                 "turn_history_available": True,
                 "turn_history_source": "thread/read(includeTurns=true)",
@@ -3765,6 +3784,12 @@ class EngineDispatcher:
             ),
             "resume_notice": False,
         }
+        if row["kind"] == AttemptKind.EXECUTION.value:
+            task_contract = json.loads(row["task_json"])
+            request["effect_identities"] = [
+                item["identity"] for item in task_contract["expected_effects"]
+                if item["external"] and item.get("identity_version") == "2.0"
+            ]
         if row["kind"] == AttemptKind.VALIDATION.value:
             semantic_validation_id = validation_id or self._validation_id_from_attempt(attempt_id)
             request["semantic_evidence_ids"] = list(
@@ -3867,12 +3892,17 @@ class EngineDispatcher:
             "resume_notice": resumed,
         }
         if row["kind"] == AttemptKind.EXECUTION.value:
+            task_contract = json.loads(row["task_json"])
             request.update({
                 "worker_usage_contract": 1,
                 "execution_spec_digest": spec.definition_digest,
                 "prompt_binding_digest": spec.definition.context_manifest.prompt_binding.binding_digest,
                 # Context selector와 같은 UTF-8 byte/4 추정이며 실제 usage와 분리한다.
                 "prompt_token_estimate": max(1, (len(prompt.encode("utf-8")) + 3) // 4),
+                "effect_identities": [
+                    item["identity"] for item in task_contract["expected_effects"]
+                    if item["external"] and item.get("identity_version") == "2.0"
+                ],
             })
         self._hit("before_turn_intent")
         turn_intent = self.service.prepare_runtime_intent(
@@ -3912,7 +3942,11 @@ class EngineDispatcher:
         self.service.record_runtime_receipt(
             intent_id=turn_intent.intent_id,
             provider_operation_id=turn_receipt.operation_id,
-            response=turn_receipt.payload,
+            response=turn_receipt.payload | {
+                "effect_identity_digests": [
+                    sha256_digest(item) for item in request.get("effect_identities", [])
+                ],
+            },
             binding=turn_receipt.binding,
         )
         runtime_job = None
@@ -4209,6 +4243,9 @@ class EngineDispatcher:
                     detail="독립 validator 결과를 typed observation과 evidence로 기록했습니다.",
                 )
             evidence_ids, violation = self._collect_worker_evidence(row, spec, observation)
+            self.service.confirm_worker_target_observation(
+                attempt_id=attempt_id, evidence_ids=evidence_ids,
+            )
             self._hit("after_execution_observed")
             self.service.finish_attempt(
                 attempt_id=attempt_id,

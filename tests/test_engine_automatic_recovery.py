@@ -78,6 +78,25 @@ class EvidenceFirstClassifierTests(unittest.TestCase):
         self.assertIsNone(diagnosis.failure_class)
         self.assertEqual("unclassified", diagnosis.source)
 
+    def test_model_reported_code_is_diagnostic_only(self) -> None:
+        diagnosis = EvidenceFirstFailureClassifier().classify(FailureSignal(
+            terminal_status="failed",
+            final_response="RATE_LIMITED: 모델이 추측한 제한",
+            provider_payload={"thread_id": "thread"},
+        ))
+        self.assertIsNone(diagnosis.failure_class)
+        self.assertEqual("unclassified", diagnosis.source)
+        self.assertEqual(("RATE_LIMITED",), diagnosis.model_reported_codes)
+
+    def test_model_reported_korean_failure_is_not_direct_evidence(self) -> None:
+        diagnosis = EvidenceFirstFailureClassifier().classify(FailureSignal(
+            terminal_status="failed",
+            final_response="구현 실패",
+            provider_payload={"thread_id": "thread"},
+        ))
+        self.assertIsNone(diagnosis.failure_class)
+        self.assertEqual("unclassified", diagnosis.source)
+
 
 class AutomaticRecoveryIntegrationTests(unittest.TestCase):
     def setUp(self):
@@ -107,7 +126,8 @@ class AutomaticRecoveryIntegrationTests(unittest.TestCase):
                 "SELECT binding_json FROM attempts WHERE id=?", (dispatched.attempt_id,)
             ).fetchone()
         binding = ThreadBinding.model_validate_json(row["binding_json"])
-        runtime.fail(binding.thread_id, response=response)
+        error_code = response.partition(":")[0] if ":" in response else None
+        runtime.fail(binding.thread_id, response=response, error_code=error_code)
         observed = dispatcher.run_once(prepared.project_id)
         self.assertEqual(RunOnceAction.OBSERVED, observed.action)
         return dispatched
@@ -174,7 +194,11 @@ class AutomaticRecoveryIntegrationTests(unittest.TestCase):
                 binding = ThreadBinding.model_validate_json(connection.execute(
                     "SELECT binding_json FROM attempts WHERE id=?", (dispatched.attempt_id,)
                 ).fetchone()["binding_json"])
-            runtime.fail(binding.thread_id, response="IMPLEMENTATION_ERROR: same fault")
+            runtime.fail(
+                binding.thread_id,
+                response="IMPLEMENTATION_ERROR: same fault",
+                error_code="IMPLEMENTATION_ERROR",
+            )
             dispatcher.run_once(prepared.project_id)
             outcome = self._finish_runtime_job_tick(dispatcher, prepared.project_id)
             if ordinal == 2:

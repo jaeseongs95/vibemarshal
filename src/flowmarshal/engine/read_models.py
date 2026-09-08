@@ -119,6 +119,14 @@ class ProviderReceiptUsage(EngineModel):
     call_status: str = Field(min_length=1, max_length=100)
     model: str = Field(min_length=1, max_length=200)
     effort: str = Field(min_length=1, max_length=50)
+    binding_provenance_version: Literal["2.0"] = "2.0"
+    requested_model: str = Field(min_length=1, max_length=200)
+    requested_effort: str = Field(min_length=1, max_length=50)
+    observed_model: str | None = Field(default=None, min_length=1, max_length=200)
+    observed_effort: str | None = Field(default=None, min_length=1, max_length=50)
+    provider_inventory_digest: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
+    adapter_capability_digest: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
+    binding_provenance: dict[str, str | None]
     runner_receipt_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     input_tokens: int | None = Field(default=None, ge=0)
     cached_input_tokens: int | None = Field(default=None, ge=0)
@@ -137,12 +145,17 @@ class ProviderReceiptUsage(EngineModel):
             self.output_tokens,
             self.reasoning_tokens,
         )
-        if self.usage_available and any(value is None for value in counts):
-            raise ValueError("실측 provider receipt projection에는 모든 token 필드가 필요합니다.")
+        present = tuple(value is not None for value in counts)
+        if (self.model, self.effort) != (self.requested_model, self.requested_effort):
+            raise ValueError("legacy model/effort alias는 requested binding과 같아야 합니다.")
+        if self.usage_available and not any(present):
+            raise ValueError("관측된 provider receipt projection에는 token 필드가 필요합니다.")
         if not self.usage_available and any(value is not None for value in counts):
             raise ValueError("미확인 provider receipt projection에는 token 수를 넣지 않습니다.")
-        if self.usage_available and self.unavailable_reason is not None:
-            raise ValueError("실측 usage와 unavailable 이유를 함께 표시할 수 없습니다.")
+        if self.usage_available and all(present) and self.unavailable_reason is not None:
+            raise ValueError("완전한 usage와 unavailable 이유를 함께 표시할 수 없습니다.")
+        if self.usage_available and not all(present) and self.unavailable_reason is None:
+            raise ValueError("부분 usage에는 누락 이유가 필요합니다.")
         if not self.usage_available and self.unavailable_reason is None:
             raise ValueError("미확인 usage에는 이유가 필요합니다.")
         if (

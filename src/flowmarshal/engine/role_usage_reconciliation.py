@@ -80,12 +80,23 @@ def observation_usage_values(
     raw = _usage_source(payload, receipt)
     if raw is None:
         return False, (None,) * len(_USAGE_KEYS)
-    values = tuple(raw.get(key) for key in _USAGE_KEYS)
-    known = all(type(value) is int and value >= 0 for value in values)
-    known = known and values[1] <= values[0] and values[3] <= values[2]
-    if known and "totalTokens" in raw:
-        known = type(raw["totalTokens"]) is int and raw["totalTokens"] == values[0] + values[2]
-    return (True, values) if known else (False, (None,) * len(_USAGE_KEYS))
+    values = tuple(
+        value if type(value) is int and value >= 0 else None
+        for value in (raw.get(key) for key in _USAGE_KEYS)
+    )
+    if values[0] is not None and values[1] is not None and values[1] > values[0]:
+        values = (values[0], None, values[2], values[3])
+    if values[2] is not None and values[3] is not None and values[3] > values[2]:
+        values = (values[0], values[1], values[2], None)
+    if (
+        values[0] is not None and values[2] is not None and "totalTokens" in raw
+        and not (
+            type(raw["totalTokens"]) is int
+            and raw["totalTokens"] == values[0] + values[2]
+        )
+    ):
+        return False, (None,) * len(_USAGE_KEYS)
+    return any(value is not None for value in values), values
 
 
 def runtime_observation_events(tx: Any, call_id: str) -> tuple[dict[str, Any], ...]:
@@ -156,13 +167,34 @@ def usage_from_observation(
         not document.get("active", True)
         and document.get("terminal_status") in PROVIDER_TERMINAL_STATUSES
     )
-    known, values = observation_usage_values(document.get("payload") or {}, receipt)
-    known = terminal and known
-    if not known:
+    available, values = observation_usage_values(document.get("payload") or {}, receipt)
+    available = terminal and available
+    if not available:
         values = (None,) * len(_USAGE_KEYS)
+    complete = all(value is not None for value in values)
     duration = (document.get("payload") or {}).get("duration_ms")
     latency = duration if type(duration) is int and duration >= 0 and terminal else None
     observed_scope = (document.get("payload") or {}).get("usage_scope")
+    provenance = {}
+    if receipt.binding_provenance_version == "2.0":
+        provenance = {
+            "binding_provenance_version": "2.0",
+            "requested_model": receipt.requested_model,
+            "requested_effort": receipt.requested_effort,
+            "observed_model": (
+                (document.get("payload") or {}).get("observed_model")
+                if isinstance((document.get("payload") or {}).get("observed_model"), str)
+                else receipt.observed_model
+            ),
+            "observed_effort": (
+                (document.get("payload") or {}).get("observed_effort")
+                if isinstance((document.get("payload") or {}).get("observed_effort"), str)
+                else receipt.observed_effort
+            ),
+            "provider_inventory_digest": receipt.provider_inventory_digest,
+            "adapter_capability_digest": receipt.adapter_capability_digest,
+            "binding_provenance": receipt.binding_provenance,
+        }
     return BudgetUsageRecord(
         usage_id=new_id("usage"), project_id=call["project_id"], goal_contract_digest=goal_digest,
         stage=BudgetStage(call["stage"]), logical_call_ref=receipt.call_id, role=receipt.role,
@@ -175,16 +207,18 @@ def usage_from_observation(
         output_schema_digest=receipt.output_schema_digest,
         runner_receipt_digest=event["observation_digest"], input_tokens=values[0],
         cached_input_tokens=values[1], output_tokens=values[2], reasoning_tokens=values[3],
-        latency_ms=latency, usage_available=known,
-        usage_scope=observed_scope if known else "unavailable",
+        latency_ms=latency, usage_available=available,
+        usage_scope=observed_scope if available else "unavailable",
         usage_source="runtime.read.reconciliation",
-        attribution_basis=("first_empty_thread" if known and observed_scope == "thread"
-                           else "provider_turn" if known else "unavailable"),
-        unavailable_reason=None if known else (
+        attribution_basis=("first_empty_thread" if available and observed_scope == "thread"
+                           else "provider_turn" if available else "unavailable"),
+        unavailable_reason=None if complete else (
+            "PROVIDER_USAGE_PARTIAL" if available else
             "PROVIDER_USAGE_UNAVAILABLE_OR_UNATTRIBUTABLE" if terminal
             else "PROVIDER_TERMINAL_UNOBSERVED"
         ), provider_observation=document, retry_count=receipt.schema_recovery_attempts,
         recorded_at=datetime.fromisoformat(event["history_created_at"]),
+        **provenance,
     )
 
 
@@ -223,42 +257,67 @@ def reconcile_role_usage_terminal(service: Any, call_id: str, observation: Any) 
             not document.get("active", True)
             and document.get("terminal_status") in PROVIDER_TERMINAL_STATUSES
         )
-        known, values = observation_usage_values(document.get("payload") or {}, receipt)
-        known = terminal and known
-        if any(item.get("usage_available") is True for item in events):
-            raise _blocked("BUDGET_RECONCILIATION_CONFLICT", "확정된 실측 usage를 다른 runtime 관측으로 바꿀 수 없습니다.")
+        available, values = observation_usage_values(document.get("payload") or {}, receipt)
+        available = terminal and available
+        if not available:
+            values = (None,) * len(_USAGE_KEYS)
+        complete = all(value is not None for value in values)
+        complete_total = values[0] is not None and values[2] is not None
+        prior_event_values: tuple[int | None, ...] | None = None
+        for prior_event in reversed(events):
+            if prior_event.get("usage_available") is not True:
+                continue
+            prior_available, candidate = observation_usage_values(
+                (prior_event["observation"].get("payload") or {}), receipt,
+            )
+            if prior_available:
+                prior_event_values = candidate
+                break
+        if prior_event_values is not None:
+            for name, old, new in zip(_USAGE_KEYS, prior_event_values, values):
+                if old is not None and new is not None and old != new:
+                    raise _blocked(
+                        "BUDGET_RECONCILIATION_CONFLICT",
+                        f"기존 {name}={old}와 late observation {new}가 충돌합니다.",
+                    )
         if not terminal and any(item.get("terminal_observed") is True for item in events):
             raise _blocked("BUDGET_OBSERVATION_REGRESSION", "이미 확인한 terminal 상태를 active 관측으로 되돌릴 수 없습니다.")
-        if call["status"] == "settled" and call["actual_tokens"] is not None:
-            raise _blocked("BUDGET_RECONCILIATION_CONFLICT", "확정된 실측 usage를 다른 runtime 관측으로 바꿀 수 없습니다.")
 
-        actual = values[0] + values[2] if known else None
+        actual = values[0] + values[2] if complete_total else None
         event_payload = {
             "observation_kind": "runtime_observation", "observation": document,
             "observation_digest": observation_digest,
             "original_receipt_digest": sha256_digest(json.loads(call["receipt_json"])),
-            "terminal_observed": terminal, "usage_available": known, "actual_tokens": actual,
+            "terminal_observed": terminal, "usage_available": available,
+            "usage_complete": complete, "actual_tokens": actual,
         }
         tx.history(call["project_id"], "budget.call_observed", "provider_call", call_id, event_payload)
         from .budget import _insert_usage_observation
         _insert_usage_observation(
             tx, call=call, source="runtime_observation", raw_document=document,
-            known=known, values=values,
+            known=available, values=values,
             usage_scope=(document.get("payload") or {}).get("usage_scope", "unavailable"),
             attribution_basis=(
-                "first_empty_thread" if known and (document.get("payload") or {}).get("usage_scope") == "thread"
-                else "provider_turn" if known else "unavailable"
+                "first_empty_thread" if available and (document.get("payload") or {}).get("usage_scope") == "thread"
+                else "provider_turn" if available else "unavailable"
             ),
-            unavailable_reason=None if known else (
+            unavailable_reason=None if complete else (
+                "PROVIDER_USAGE_PARTIAL" if available else
                 "PROVIDER_USAGE_UNAVAILABLE_OR_UNATTRIBUTABLE" if terminal
                 else "PROVIDER_TERMINAL_UNOBSERVED"
             ),
             late=True,
         )
-        status = "settled" if known else "usage_unknown" if terminal else "reserved"
+        status = "settled" if complete_total else "usage_unknown" if terminal else "reserved"
         completed_at = call["completed_at"] or (tx.now if terminal else None)
-        execution_status = "terminal" if terminal else call["execution_status"]
-        effect_status = "terminal" if terminal else call["effect_status"]
+        execution_status = call["execution_status"] if call["execution_status"] == "terminal" else (
+            "terminal" if terminal else call["execution_status"]
+        )
+        effect_status = (
+            "none"
+            if terminal and call["attempt_id"] is None and call["role"] != "worker"
+            else call["effect_status"]
+        )
         result_status = call["result_status"]
         if terminal and result_status in {"pending", "unknown"}:
             result_status = "unknown"
@@ -268,7 +327,7 @@ def reconcile_role_usage_terminal(service: Any, call_id: str, observation: Any) 
                 "status=?,actual_tokens=?,completed_at=? WHERE id=?",
                 (execution_status, effect_status, result_status, status, actual, completed_at, call_id),
             )
-            if known:
+            if complete_total:
                 tx.history(call["project_id"], "budget.call_settled", "provider_call", call_id,
                            {"observation_digest": observation_digest, "actual_tokens": actual,
                             "usage_available": True, "settlement_source": "runtime_observation"})
@@ -280,8 +339,43 @@ def reconcile_role_usage_terminal(service: Any, call_id: str, observation: Any) 
         prior_usage = BudgetUsageRecord.model_validate_json(prior["payload_json"])
         if prior_usage.project_id != call["project_id"] or prior_usage.logical_call_ref != receipt.call_id:
             raise _blocked("BUDGET_RECONCILIATION_USAGE_BINDING_MISMATCH", "원본 usage와 역할 receipt의 호출 결속이 다릅니다.")
+        prior_values = (
+            prior_usage.input_tokens, prior_usage.cached_input_tokens,
+            prior_usage.output_tokens, prior_usage.reasoning_tokens,
+        )
+        for name, old, new in zip(_USAGE_KEYS, prior_values, values):
+            if old is not None and new is not None and old != new:
+                raise _blocked(
+                    "BUDGET_RECONCILIATION_CONFLICT",
+                    f"기존 {name}={old}와 late observation {new}가 충돌합니다.",
+                )
+        merged_values = tuple(
+            old if old is not None else new for old, new in zip(prior_values, values)
+        )
+        merged_available = any(value is not None for value in merged_values)
+        merged_complete = all(value is not None for value in merged_values)
+        merged_complete_total = merged_values[0] is not None and merged_values[2] is not None
+        merged_actual = (
+            merged_values[0] + merged_values[2] if merged_complete_total else None
+        )
+        if call["actual_tokens"] is not None and merged_actual != call["actual_tokens"]:
+            raise _blocked(
+                "BUDGET_RECONCILIATION_CONFLICT",
+                "late observation은 기존 actual_tokens를 변경할 수 없습니다.",
+            )
         usage = usage_from_observation(call=call, receipt=receipt,
             event={**event_payload, "history_created_at": tx.now}, goal_digest=call["goal_contract_digest"])
+        usage = usage.model_copy(update={
+            "input_tokens": merged_values[0],
+            "cached_input_tokens": merged_values[1],
+            "output_tokens": merged_values[2],
+            "reasoning_tokens": merged_values[3],
+            "usage_available": merged_available,
+            "unavailable_reason": (
+                None if merged_complete else "PROVIDER_USAGE_PARTIAL"
+                if merged_available else usage.unavailable_reason
+            ),
+        })
         reconciliation_id = new_id("usage_reconciliation")
         tx.connection.execute(
             "INSERT INTO budget_usage (id,project_id,goal_contract_digest,stage,logical_call_ref,payload_json,recorded_at) "
@@ -298,18 +392,24 @@ def reconcile_role_usage_terminal(service: Any, call_id: str, observation: Any) 
              canonical_json(original_receipt), sha256_digest(original_receipt), canonical_json(document),
              observation_digest, tx.now),
         )
+        preserved_status = call["status"] if call["status"] == "settled" else (
+            "settled" if merged_complete_total else status
+        )
+        preserved_actual = call["actual_tokens"] if call["actual_tokens"] is not None else merged_actual
         tx.connection.execute(
             "UPDATE provider_calls SET execution_status=?,effect_status=?,result_status=?,"
             "status=?,actual_tokens=?,usage_id=?,completed_at=? WHERE id=?",
-            (execution_status, effect_status, result_status, status, actual,
+            (execution_status, effect_status, result_status, preserved_status, preserved_actual,
              usage.usage_id, completed_at, call_id),
         )
         tx.history(call["project_id"], "budget.role_usage_reconciled", "provider_call", call_id,
                    {"reconciliation_id": reconciliation_id, "prior_usage_id": prior_usage.usage_id,
                     "effective_usage_id": usage.usage_id, "observation_digest": observation_digest,
-                    "actual_tokens": actual, "usage_available": known, "original_receipt_preserved": True})
-        if known:
+                    "actual_tokens": preserved_actual, "usage_available": merged_available,
+                    "usage_complete": merged_complete, "original_receipt_preserved": True,
+                    "late_component_completion": True})
+        if merged_complete_total and call["status"] != "settled":
             tx.history(call["project_id"], "budget.call_settled", "provider_call", call_id,
-                       {"observation_digest": observation_digest, "actual_tokens": actual,
+                       {"observation_digest": observation_digest, "actual_tokens": preserved_actual,
                         "usage_available": True, "settlement_source": "runtime_observation"})
         return usage

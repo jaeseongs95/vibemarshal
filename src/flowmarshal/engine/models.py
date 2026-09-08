@@ -44,15 +44,6 @@ class EngineRoleConfiguration(EngineModel):
     executor: RoleModelBinding
     validator: RoleModelBinding
 
-    @model_validator(mode="after")
-    def executor_and_validator_are_independent(self) -> "EngineRoleConfiguration":
-        if (self.executor.model, self.executor.effort) == (
-            self.validator.model,
-            self.validator.effort,
-        ):
-            raise ValueError("실행과 독립 validation 역할 binding이 동일합니다.")
-        return self
-
     @property
     def configuration_digest(self) -> str:
         return sha256_digest(self)
@@ -168,9 +159,4 @@ class AssignmentResolver:
             if contract.validator is not None
             else None
         )
-        if contract.independence_required and validator is not None:
-            if (executor.model, executor.effort) == (validator.model, validator.effort):
-                raise AssignmentResolutionError(
-                    "독립 검사가 필요한데 실행·검사 배정이 동일합니다."
-                )
         return executor, validator

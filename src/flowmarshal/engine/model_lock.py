@@ -73,7 +73,25 @@ class ModelInventory(LockModel):
 
     @property
     def inventory_digest(self) -> str:
+        """provider observation과 adapter capability를 함께 묶는 감사 digest."""
         return sha256_digest(self)
+
+    @property
+    def provider_inventory_digest(self) -> str:
+        """model/list가 광고한 모델/effort 원문만의 digest."""
+        return sha256_digest({
+            "source": self.source,
+            "models": self.models,
+            "raw_response": self.raw_response,
+        })
+
+    @property
+    def adapter_capability_digest(self) -> str:
+        """로컬 adapter/executable이 선언하고 검사한 capability digest."""
+        return sha256_digest({
+            "executable_digest": self.executable_digest,
+            "runtime_capabilities": self.runtime_capabilities,
+        })
 
     def supports(self, model: str, effort: str) -> bool:
         return any(item.model == model and effort in item.supported_efforts for item in self.models)

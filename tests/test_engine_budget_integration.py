@@ -383,7 +383,7 @@ class EngineBudgetIntegrationTests(unittest.TestCase):
                             goal_digest=self._goal_digest(prepared), call_key="wrong-goal",
                             role="goal_reviewer", request={})
 
-    def test_interrupted_attempt_can_resume_after_explicit_budget_increase(self) -> None:
+    def test_interrupted_attempt_resume_is_not_blocked_by_synthetic_token_reservation(self) -> None:
         prepared = self.prepared("resume-budget")
         manager = self.configure_small_policy(prepared, total=20, reserve=10)
         runtime = UsageFakeCodexRuntime(self.inventory)
@@ -393,16 +393,14 @@ class EngineBudgetIntegrationTests(unittest.TestCase):
         thread_id = self._attempt_thread(prepared, dispatched.attempt_id)
         turn_id = runtime.read(thread_id=thread_id).turn_id
         runtime.interrupt(thread_id=thread_id, turn_id=turn_id)
-        blocked = dispatcher.run_once(prepared.project_id)
-        self.assertEqual((RunOnceAction.BLOCKED, "BUDGET_BLOCKED"), (blocked.action, blocked.blocker_code))
+        resumed = dispatcher.run_once(prepared.project_id)
+        self.assertEqual(
+            (RunOnceAction.DISPATCHED, dispatched.attempt_id),
+            (resumed.action, resumed.attempt_id),
+        )
         with prepared.service.ledger.read() as db:
             attempt = db.execute("SELECT status FROM attempts WHERE id=?", (dispatched.attempt_id,)).fetchone()
         self.assertEqual("running", attempt["status"])
-        self.assertEqual((1, 1, 0), (runtime.create_calls, runtime.turn_calls, runtime.resume_calls))
-        manager.configure(prepared.project_id, GoalBudgetPolicy(total_tokens=100, call_reservation_tokens=10))
-        restarted = EngineDispatcher(EngineService(prepared.service.ledger), runtime)
-        resumed = restarted.run_once(prepared.project_id)
-        self.assertEqual((RunOnceAction.DISPATCHED, dispatched.attempt_id), (resumed.action, resumed.attempt_id))
         self.assertEqual((1, 2, 1), (runtime.create_calls, runtime.turn_calls, runtime.resume_calls))
 
     @staticmethod

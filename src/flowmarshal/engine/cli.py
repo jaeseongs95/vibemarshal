@@ -328,7 +328,6 @@ def _cmd_goal_create(arguments: argparse.Namespace) -> None:
     service = _service(arguments)
     if arguments.live:
         goal_id = new_id("goal")
-        BudgetManager(service).require_policy(arguments.project_id, goal_id)
         role_config = _role_configuration(arguments)
         normalizer_model = (
             role_config.normalizer.model if role_config else arguments.normalizer_model
@@ -415,7 +414,6 @@ def _cmd_goal_revise(arguments: argparse.Namespace) -> None:
     if arguments.goal_id and arguments.goal_id != latest.goal_id:
         raise EngineServiceError("--goal-id가 최신 Goal과 다릅니다.")
     if arguments.live:
-        BudgetManager(service).require_policy(arguments.project_id, latest.goal_id)
         role_config = _role_configuration(arguments)
         normalizer_model = (
             role_config.normalizer.model if role_config else arguments.normalizer_model
@@ -600,7 +598,6 @@ def _cmd_plan_search(arguments: argparse.Namespace) -> None:
             inventory = runtime.list_models()
             if role_config is not None:
                 role_config.validate_inventory(inventory)
-            BudgetManager(service).require_policy(arguments.project_id, goal.goal_id)
             runner = BudgetedRoleRunner(CodexStructuredRoleRunner(runtime, max_schema_recovery_attempts=0, ephemeral_threads=False),
                 service, project_id=arguments.project_id, goal_id=goal.goal_id, goal_digest=goal.definition_digest)
             worker_assignment = ModelAssignmentContract(

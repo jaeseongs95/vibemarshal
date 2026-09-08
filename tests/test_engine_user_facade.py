@@ -430,7 +430,11 @@ class EngineUserFacadeTests(unittest.TestCase):
             if (binding is not None and binding.turn_id is not None) or time.monotonic() >= deadline:
                 break
             time.sleep(0.01)
-        runtime.fail(binding.thread_id, response="IMPLEMENTATION_ERROR: injected fault")
+        runtime.fail(
+            binding.thread_id,
+            response="IMPLEMENTATION_ERROR: injected fault",
+            error_code="IMPLEMENTATION_ERROR",
+        )
         self.assertEqual(RunOnceAction.OBSERVED, application.run_once(prepared.project_id).action)
         recovered = application.run_once(prepared.project_id)
         for _ in range(20):
