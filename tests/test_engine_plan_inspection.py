@@ -461,7 +461,12 @@ class PlanInspectionTests(unittest.TestCase):
                     original = strict_json_output_schema(request.output_schema)
                     restored = strict_json_output_schema(reloaded.output_schema)
                     for schema in (original, restored):
-                        for name, field in (("ValidationScopeInspection", "finding_codes"),
+                        scope_name = (
+                            "PlanExpansionValidationScopeInspection"
+                            if request.role == "plan_expander"
+                            else "ValidationScopeInspection"
+                        )
+                        for name, field in ((scope_name, "finding_codes"),
                                             ("InspectionFindingLink", "basis_refs")):
                             description = schema["$defs"][name]["properties"][field]["description"]
                             for phrase in ("전체 basis_refs", "claim_ref", "복수", "다른 citation ID", "supported sibling"):

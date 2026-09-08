@@ -6,7 +6,7 @@ from .roles import make_role_request, verify_role_receipt
 from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 from pydantic import Field, model_validator
 
@@ -14,7 +14,6 @@ from ..canonical import sha256_digest
 from .domain import (
     ApproachSignature,
     ApprovalClass,
-    CommitHorizon,
     DependencyType,
     EffectContract,
     EngineModel,
@@ -57,8 +56,13 @@ from .planning import (
     skeleton_review_evidence_catalog,
 )
 from .plan_inspection import (
+    ACValidationInspection,
+    ConstraintTaskInspection,
+    InspectionFindingLink,
     PLAN_INSPECTION_INSTRUCTIONS,
     PlanInspection,
+    ValidationInspection,
+    ValidationScopeInspection,
     inspection_file_content,
     validate_plan_inspection,
 )
@@ -378,14 +382,26 @@ PLAN_EXPANSION_INSPECTION_INSTRUCTIONS = (
     "재사용하며 claim:// 같은 별도 ID 체계를 만들지 않는다. "
     "scope_id는 scope_ids에 쓰는 검사 범위의 관계 ID이며 citation_id와 구분한다. "
     "AC 행의 basis_refs에는 선택한 scope 행의 claim_ref와 basis_refs 값을 합치며 scope_id "
-    "자체를 복사하지 않는다. claim_ref·basis_refs·separate_check_refs에는 인용 ID만 쓴다. "
+    "자체를 복사하지 않는다. 구체적으로 scope_ids에는 scope_id만 쓰고, basis_refs에는 그 "
+    "scope_id 문자열이 아니라 validation_scope_rows에서 같은 scope_id 행을 찾아 claim_ref와 "
+    "basis_refs를 펼쳐 쓴다. claim_ref·basis_refs·separate_check_refs에는 인용 ID만 쓴다. "
     "inspection_source_catalog는 인용 가능한 주소 목록이며 모든 항목을 등록하라는 뜻이 아니다. "
+    "출력 schema 순서대로 plan 전체를 먼저 확정한 뒤 inspection을 작성한다. plan을 작성하면서 "
+    "예정했던 문구를 기억해 인용하지 말고, 앞에서 실제 제출한 plan의 validation statement를 "
+    "다시 읽어 selector와 quote를 정한다. project 파일 quote는 가능한 한 근거가 되는 짧은 한 줄만 "
+    "선택하고, 전체 파일이나 JSON에 escape된 복제 문자열을 복사하지 않는다. "
     "inspection.citations는 배경 참고문헌 목록이 아니라 후속 행이 실제 참조하는 인용의 정확한 "
     "집합이다. 제출 직전에 validation_rows의 claim_ref·mechanisms[].basis_refs·separate_check_refs, "
     "validation_scope_rows의 claim_ref·basis_refs, ac_validation_rows·constraint_task_rows·"
     "finding_links의 basis_refs에 쓰인 모든 citation ID를 모아 등록 citation_id 집합과 정확히 "
     "같은지 확인한다. 실제 판단에 쓰지 않는 objective·Skeleton 필드·배경 문장은 미리 인용으로 "
-    "등록하지 않는다. 미사용 인용을 없애려고 무관한 행에 근거를 억지로 추가하지 않는다."
+    "등록하지 않는다. 미사용 인용을 없애려고 무관한 행에 근거를 억지로 추가하지 않는다. "
+    "작성자 출력은 결함을 보정한 완성 plan이므로 모든 scope assessment는 supported, 모든 "
+    "finding_codes와 finding_links는 빈 배열이다. validation_rows.separate_check_refs는 같은 "
+    "validation statement 안에 서로 별도인 실제 실행 책임이 있을 때만 그 statement를 가리키는 "
+    "artifact:plan_draft citation ID를 쓰며, 단일 실행의 기대 결과나 등록 자료 citation을 넣지 않는다. "
+    "제출 직전 각 scope마다 같은 validation·같은 phase의 mechanism 하나를 골라 그 mechanism의 "
+    "basis_refs를 하나도 빠짐없이 scope basis_refs에 복사한 뒤 scope claim_ref를 더한다."
 )
 
 
@@ -442,8 +458,14 @@ class SkeletonDependencyDraft(EngineModel):
     producer_task_ref: str
     consumer_task_ref: str
     dependency_type: DependencyType
-    produces: tuple[str, ...] = ()
-    consumes: tuple[str, ...] = ()
+    produces: tuple[str, ...] = Field(
+        default=(),
+        description="producer가 제공할 수 있는 산출물 key. consumer가 실제 전달받을 key보다 넓을 수 있다.",
+    )
+    consumes: tuple[str, ...] = Field(
+        default=(),
+        description="consumer가 이 edge로 실제 전달받는 handoff key. 상세 Plan dependency.products는 이 집합과 정확히 같아야 한다.",
+    )
 
 
 class SkeletonCandidateDraft(EngineModel):
@@ -481,7 +503,7 @@ class PlanTaskValidationDraft(ValidationContract):
     statement: str = Field(
         min_length=1,
         max_length=3000,
-        description="이 Task 완료 전에 실제 수행할 검사 수단과 그 수단이 관측하는 범위. 선언·annotation·시그니처를 확인하는 절차에는 실행하지 않는 입력·호출 검사를 부여하지 않는다. 별도 실제 검사가 필요하면 같은 문장에 추가 실행과 기대값 비교 책임을 명시한다. Goal이 요구한 해당 Task의 검사 의무를 유지하며 구체 argv는 나중에 확정한다.",
+        description="이 Task 완료 전에 실제 수행할 검사 수단과 그 수단이 관측하는 범위. 선언·annotation·시그니처를 확인하는 절차에는 실행하지 않는 입력·호출 검사를 부여하지 않는다. 별도 실제 검사가 필요하면 같은 문장에 추가 실행과 기대값 비교 책임을 명시한다. 파일·source 무변경을 판정하면 보호 대상의 작업 전 baseline과 작업 후 관측을 동일 범위의 digest·목록·diff 등으로 대조하는 절차를 명시하며 '별도 확인'만 쓰지 않는다. Goal이 요구한 해당 Task의 검사 의무를 유지하며 구체 argv는 나중에 확정한다.",
     )
 
 
@@ -489,7 +511,7 @@ class PlanIntegrationValidationDraft(IntegrationValidationContract):
     statement: str = Field(
         min_length=1,
         max_length=5000,
-        description="Task 검사 이후 수행할 Goal 검사 수단과 실제 검사 범위. independent는 새 실행·evidence의 구분이며 도구의 선택 phase가 수행하지 않는 검사 능력을 보충하지 않는다. 필요한 입력·호출·기대값 비교를 지원하는 수단 또는 별도 실제 검사 책임을 명시한다. 구체 argv는 나중에 확정한다.",
+        description="Task 검사 이후 수행할 Goal 검사 수단과 실제 검사 범위. independent는 새 실행·evidence의 구분이며 도구의 선택 phase가 수행하지 않는 검사 능력을 보충하지 않는다. 필요한 입력·호출·기대값 비교를 지원하는 수단 또는 별도 실제 검사 책임을 명시한다. 파일·source 무변경을 판정하면 보호 대상의 작업 전 baseline과 작업 후 관측을 동일 범위의 digest·목록·diff 등으로 대조하는 절차를 명시하며 '별도 확인'만 쓰지 않는다. 구체 argv는 나중에 확정한다.",
     )
 
 
@@ -516,7 +538,10 @@ class PlanDependencyDraft(EngineModel):
     producer_task_ref: str
     consumer_task_ref: str
     dependency_type: DependencyType
-    products: tuple[str, ...] = ()
+    products: tuple[str, ...] = Field(
+        default=(),
+        description="동일 Skeleton dependency.consumes의 정확한 handoff key 집합. producer의 모든 produces를 복사하지 않는다.",
+    )
 
 
 class PlanGoalCoverageDraft(EngineModel):
@@ -550,6 +575,103 @@ class PlanRefinementDraft(EngineModel):
         return self
 
 
+def _bind_detail_revision_to_skeleton(
+    draft: PlanExpansionDraft,
+    candidate,
+) -> PlanExpansionDraft:
+    """detail 수정에서 정확히 같은 Skeleton 의미인 Task만 원본에 재결속한다."""
+    draft_refs = {item.task_ref for item in draft.tasks}
+    candidate_refs = {item.task_ref for item in candidate.tasks}
+    if draft_refs != candidate_refs:
+        raise PlannerRoleAdapterError("상세 Plan 수정이 Skeleton Task 집합을 바꿨습니다.")
+
+    candidate_edges = {
+        (
+            item.producer_task_ref,
+            item.consumer_task_ref,
+            item.dependency_type,
+            tuple(sorted(item.consumes)),
+        )
+        for item in candidate.dependencies
+    }
+    draft_edges = {
+        (
+            item.producer_task_ref,
+            item.consumer_task_ref,
+            item.dependency_type,
+            tuple(sorted(item.products)),
+        )
+        for item in draft.dependencies
+    }
+    if draft_edges != candidate_edges:
+        raise PlannerRoleAdapterError("상세 Plan 수정이 Skeleton dependency 의미를 바꿨습니다.")
+
+    def same_skeleton_meaning(detail, source) -> bool:
+        return all((
+            detail.kind == source.kind,
+            detail.objective == source.objective,
+            set(detail.goal_criterion_refs) == set(source.contributes_to),
+            set(detail.produces) == set(source.produces),
+            set(detail.consumes) == set(source.consumes),
+        ))
+
+    paired = []
+    for source in candidate.tasks:
+        matches = [
+            detail for detail in draft.tasks
+            if detail.task_ref == source.task_ref and same_skeleton_meaning(detail, source)
+        ]
+        if not matches:
+            raise PlannerRoleAdapterError(
+                f"상세 Plan 수정이 {source.task_ref}의 Skeleton 의미를 바꿨습니다."
+            )
+        if len(matches) != 1:
+            raise PlannerRoleAdapterError(
+                f"상세 Plan 수정에 {source.task_ref}의 동일 의미 Task가 중복됐습니다."
+            )
+        paired.append((source, matches[0]))
+
+    tasks = tuple(
+        detail.model_copy(update={
+            "task_ref": source.task_ref,
+            "kind": source.kind,
+            "objective": source.objective,
+            "goal_criterion_refs": source.contributes_to,
+            "produces": source.produces,
+            "consumes": source.consumes,
+        })
+        for source, detail in paired
+    )
+    dependencies = tuple(
+        PlanDependencyDraft(
+            producer_task_ref=item.producer_task_ref,
+            consumer_task_ref=item.consumer_task_ref,
+            dependency_type=item.dependency_type,
+            products=item.consumes,
+        )
+        for item in candidate.dependencies
+    )
+
+    coverage_by_criterion = {item.criterion_id: item for item in draft.goal_coverage}
+    candidate_criteria = {item.criterion_id for item in candidate.goal_coverage}
+    if len(coverage_by_criterion) != len(draft.goal_coverage):
+        raise PlannerRoleAdapterError("상세 Plan 수정에 Goal coverage criterion이 중복됐습니다.")
+    if set(coverage_by_criterion) == candidate_criteria:
+        coverage = tuple(
+            coverage_by_criterion[source.criterion_id].model_copy(
+                update={"task_refs": source.task_refs}
+            )
+            for source in candidate.goal_coverage
+        )
+    else:
+        coverage = draft.goal_coverage
+    return draft.model_copy(update={
+        "tasks": tasks,
+        "dependencies": dependencies,
+        "goal_coverage": coverage,
+    })
+
+
 def _inline_local_schema_refs(schema: dict[str, Any]) -> dict[str, Any]:
     """Pydantic 단일 model schema의 local $defs를 provider branch 안에 전개한다."""
     root = deepcopy(schema)
@@ -573,9 +695,58 @@ def _inline_local_schema_refs(schema: dict[str, Any]) -> dict[str, Any]:
     return visit(root)
 
 
+class PlanExpansionValidationInspection(ValidationInspection):
+    separate_check_refs: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "작성자가 한 validation 문장 안에 별도 실행 책임을 둔 경우에만 그 같은 validation "
+            "statement를 가리키는 plan_draft citation ID를 쓴다. 등록 자료 citation은 넣지 않는다."
+        ),
+    )
+
+
+class PlanExpansionValidationScopeInspection(ValidationScopeInspection):
+    assessment: Literal["supported"] = "supported"
+    finding_codes: tuple[str, ...] = Field(
+        default=(),
+        max_length=0,
+        description=ValidationScopeInspection.model_fields["finding_codes"].description,
+    )
+
+
+class PlanExpansionACValidationInspection(ACValidationInspection):
+    finding_codes: tuple[str, ...] = Field(
+        default=(),
+        max_length=0,
+        description=ACValidationInspection.model_fields["finding_codes"].description,
+    )
+
+
+class PlanExpansionConstraintTaskInspection(ConstraintTaskInspection):
+    finding_codes: tuple[str, ...] = Field(
+        default=(),
+        max_length=0,
+        description=ConstraintTaskInspection.model_fields["finding_codes"].description,
+    )
+
+
+class PlanExpansionInspection(PlanInspection):
+    """완성 Plan 작성자에게 허용되는 결함 없는 v1 대조표 schema."""
+
+    validation_rows: tuple[PlanExpansionValidationInspection, ...]
+    validation_scope_rows: tuple[PlanExpansionValidationScopeInspection, ...]
+    ac_validation_rows: tuple[PlanExpansionACValidationInspection, ...]
+    constraint_task_rows: tuple[PlanExpansionConstraintTaskInspection, ...]
+    finding_links: tuple[InspectionFindingLink, ...] = Field(
+        default=(),
+        max_length=0,
+        description=PlanInspection.model_fields["finding_links"].description,
+    )
+
+
 class PlanExpansionEnvelope(EngineModel):
-    inspection: PlanInspection
     plan: PlanExpansionDraft
+    inspection: PlanExpansionInspection
 
 
 class PlanReviewEnvelope(EngineModel):
@@ -620,8 +791,8 @@ class PlanReviewEnvelope(EngineModel):
 
 
 class PlanExpansionEnvelopeV2(EngineModel):
-    inspection: PlanInspectionV2
     plan: PlanExpansionDraft
+    inspection: PlanInspectionV2
 
 
 class PlanReviewEnvelopeV2(EngineModel):
@@ -1035,7 +1206,6 @@ class PlanExpanderAdapter:
     inventory: ModelInventory | None = None
     allowed_fallbacks: tuple[ModelChoice, ...] = ()
     planning_budget: PlanningBudgetPolicy = PlanningBudgetPolicy()
-    commit_horizon: CommitHorizon = CommitHorizon()
     inspection_provider_contract: PlanInspectionProviderVersion = PLAN_INSPECTION_PROVIDER_V1
     receipts: list[RoleCallReceipt] = field(default_factory=list)
 
@@ -1083,6 +1253,8 @@ class PlanExpanderAdapter:
                 "선택된 Skeleton 하나만 Task 계약으로 상세화한다. 목표·Task 목적·dependency·"
                 "produces/consumes 의미는 바꾸지 않는다. 파일·symbol·실행 명령·Context Pack은 "
                 "ready-time 상세이므로 넣지 않는다. 완료조건·validation·recovery만 구체화한다."
+                "각 Plan dependency.products는 같은 Skeleton dependency.consumes의 정확한 집합이다. "
+                "producer Task나 dependency의 produces 전체를 복사하지 않는다. "
                 "독립 Goal Test는 integration_validations에 넣고 Task validation과 분리한다. "
                 "Goal의 Task별 필수 검증은 적용 대상 Task의 validations에 보존한다. "
                 "각 validation.statement는 해당 Task에 적용되는 Goal의 검사 대상·종류·실행 목적을 "
@@ -1111,6 +1283,10 @@ class PlanExpanderAdapter:
                 "각각 별도 항목으로 작성하고 external 값을 구분한다. 한 항목에 두 범위를 섞지 않는다. "
                 "expected_effects에는 실제 발생시키는 효과만 넣는다. '파일을 변경하지 않는다', "
                 "'외부 효과가 없다'는 미발생 조건은 prohibited_effects나 완료 조건에만 둔다. "
+                "Task 또는 Goal 검사가 프로젝트·source·보호 파일의 무변경을 판정하면, 그 검사 "
+                "statement 자체에 정확한 보호 범위의 작업 전 baseline과 작업 후 관측을 동일한 "
+                "digest·파일 목록·diff 등으로 비교한다고 명시한다. '별도로 확인한다'는 선언만으로 "
+                "무변경 검사 절차를 대신하지 않는다. "
                 "Core의 이후 Plan digest 활성화를 별도 승인 Task나 현재 필요한 승인 입력으로 발명하지 않는다."
                 "Worker 응답 보고는 Core가 external_observation evidence로 수집한다. 응답 내용의 "
                 "의미 검사는 원본 file 근거와 응답 관측을 함께 참조하는 semantic validation으로 "
@@ -1219,7 +1395,13 @@ class PlanExpanderAdapter:
                 "수정 명령이나 정답이 아니다. 원본 Goal·Skeleton·Plan·등록 자료와 대조한다. "
                 "원문으로 확인한 상세 validation·완료·효과 계약 결함은 detail_revision으로 "
                 "필요한 부분을 수정한 전체 plan을 제출한다. Task 목적·kind·기여·produces/consumes·"
-                "dependency는 보존한다. 그 의미를 바꿔야 해결되는 결함은 skeleton_revision으로 "
+                "dependency는 보존한다. detail_revision에서는 원본 Skeleton의 Task 순서와 task_ref를 "
+                "그대로 복사하고, 각 Task의 kind·objective·goal_criterion_refs·produces·consumes 및 "
+                "dependency와 goal_coverage.task_refs를 글자 단위로 유지한다. Plan dependency.products는 "
+                "동일 Skeleton dependency.consumes의 정확한 집합으로 유지하며 producer의 전체 produces를 "
+                "복사하지 않는다. validation 결함이면 해당 "
+                "validation·완료·효과 필드만 고치며 Task를 복제하거나 다른 Task의 ref를 덮어쓰지 않는다. "
+                "Core는 이 고정 필드를 원본 Skeleton에 다시 결속한다. 그 의미를 바꿔야 해결되는 결함은 skeleton_revision으로 "
                 "전체 Skeleton을 제출하며 기존 strategy_family는 유지한다. 허용 예산이 없는 "
                 "skeleton_revision은 unresolved로 이유를 남긴다. "
                 "finding이 원문과 충돌하면 disputed로 정확한 원문 필드·문장과 반증을 설명하고 "
@@ -1263,8 +1445,9 @@ class PlanExpanderAdapter:
                 raise PlannerRoleAdapterError("수정 제안이 제공되지 않은 evidence를 참조합니다.")
             revised_plan = revised_skeleton = None
             if draft.plan is not None:
+                bound_plan = _bind_detail_revision_to_skeleton(draft.plan, candidate)
                 revised_plan = self._compile(
-                    draft.plan, candidate=candidate, goal=goal, state=state,
+                    bound_plan, candidate=candidate, goal=goal, state=state,
                     project_map=project_map, planning_budget=planning_budget,
                     previous_plan=evaluation.plan,
                 )
@@ -1327,7 +1510,7 @@ class PlanExpanderAdapter:
                 item.producer_task_ref,
                 item.consumer_task_ref,
                 item.dependency_type,
-                tuple(sorted(item.produces)),
+                tuple(sorted(item.consumes)),
             )
             for item in candidate.dependencies
         }
@@ -1402,7 +1585,6 @@ class PlanExpanderAdapter:
             dependencies=dependencies,
             goal_coverage=coverage,
             integration_validations=draft.integration_validations,
-            commit_horizon=self.commit_horizon,
             planning_budget=planning_budget,
             model_inventory_digest=self.inventory_digest,
             expected_effects=draft.expected_effects,

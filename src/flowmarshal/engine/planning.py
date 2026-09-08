@@ -49,6 +49,7 @@ class PlanningError(RuntimeError):
 
 
 def compact_project_map(project_map: ProjectMapRevision) -> dict[str, Any]:
+    legacy_vocabulary = any(item.dependency_refs is not None for item in project_map.entries)
     return {
         "revision_digest": project_map.revision_digest,
         "root": project_map.root,
@@ -60,6 +61,11 @@ def compact_project_map(project_map: ProjectMapRevision) -> dict[str, Any]:
                 "path": item.path,
                 "content_digest": item.content_digest,
                 "symbols": item.symbols,
+                **(
+                    {}
+                    if legacy_vocabulary
+                    else {"observed_link_refs": item.observed_link_refs}
+                ),
                 "tags": item.tags,
             }
             for item in project_map.entries
@@ -674,14 +680,14 @@ class PlanningSearchOutcome(EngineModel):
         if not set(self.shortlist_digests).issubset(admissible_skeletons):
             raise ValueError("shortlist에는 admissible Skeleton만 들어갈 수 있습니다.")
         shortlisted_signatures = [
-            (admissible_skeletons[digest].candidate.graph_signature,
+            (skeleton_semantic_digest(admissible_skeletons[digest].candidate),
              roots[admissible_skeletons[digest].candidate.candidate_id])
             for digest in self.shortlist_digests
         ]
         if any(signature == other_signature and root != other_root
                for signature, root in shortlisted_signatures
                for other_signature, other_root in shortlisted_signatures):
-            raise ValueError("동일 graph signature의 Skeleton을 중복 shortlist할 수 없습니다.")
+            raise ValueError("동일 semantic Skeleton을 중복 shortlist할 수 없습니다.")
 
         plan_digests = tuple(item.plan.activation_digest for item in self.plan_evaluations)
         if len(plan_digests) != len(set(plan_digests)):
@@ -863,7 +869,9 @@ def skeleton_gate(
             task_refs=invalid_inputs, remediable=True,
         ))
     for edge in candidate.dependencies:
-        incoming_products[edge.consumer_task_ref].update(edge.products if hasattr(edge, "products") else edge.produces)
+        incoming_products[edge.consumer_task_ref].update(
+            edge.products if hasattr(edge, "products") else edge.consumes
+        )
     disconnected: list[str] = []
     for task in candidate.tasks:
         dynamic_consumes = {
@@ -995,7 +1003,7 @@ def plan_gate(
                 item.producer_task_ref,
                 item.consumer_task_ref,
                 item.dependency_type,
-                tuple(sorted(item.produces)),
+                tuple(sorted(item.consumes)),
             )
             for item in source.dependencies
         }
@@ -1475,7 +1483,7 @@ class SkeletonFirstPlanner:
                         if revised_evaluation.decision.status is not CandidateStatus.ADMISSIBLE:
                             break
                         if any(
-                            other.candidate.graph_signature == refined.graph_signature
+                            skeleton_semantic_digest(other.candidate) == skeleton_semantic_digest(refined)
                             and root_id(other.candidate) != root
                             and sha256_digest(other.candidate) in shortlist_history
                             for other in evaluations
@@ -1586,21 +1594,20 @@ class SkeletonFirstPlanner:
 
     @staticmethod
     def _candidate_count(goal: GoalContractRevision) -> int:
-        # 명확한 단일 변경은 1개, 실제 전략 선택 가능성이 큰 구조 작업만 복수 후보다.
+        # 후보 수는 단순 AC 개수가 아니라 Goal이 명시한 실제 전략 trade-off에만 따른다.
         if goal.definition.mission_class in {
             MissionClass.LEGACY_REFACTOR,
             MissionClass.MIGRATION_MODERNIZATION,
         }:
-            return 3
-        if len(goal.definition.hard_acceptance) >= 4:
             return 2
         return 1
 
     @staticmethod
     def _prune(evaluations: list[CandidateEvaluation]) -> list[CandidateEvaluation]:
+        """의미적으로 같은 Skeleton만 하나로 묶고, 비용은 동점군 대표 선택에만 쓴다."""
         deduped: dict[str, CandidateEvaluation] = {}
         for item in evaluations:
-            signature = item.candidate.graph_signature
+            signature = skeleton_semantic_digest(item.candidate)
             existing = deduped.get(signature)
             if existing is None or (
                 item.candidate.estimated_change_cost,
@@ -1610,25 +1617,4 @@ class SkeletonFirstPlanner:
                 existing.candidate.estimated_context_tokens,
             ):
                 deduped[signature] = item
-        values = list(deduped.values())
-        kept: list[CandidateEvaluation] = []
-        for item in values:
-            dominated = any(
-                other is not item
-                and other.candidate.approach.strategy_family
-                == item.candidate.approach.strategy_family
-                and other.candidate.estimated_change_cost
-                <= item.candidate.estimated_change_cost
-                and other.candidate.estimated_context_tokens
-                <= item.candidate.estimated_context_tokens
-                and (
-                    other.candidate.estimated_change_cost
-                    < item.candidate.estimated_change_cost
-                    or other.candidate.estimated_context_tokens
-                    < item.candidate.estimated_context_tokens
-                )
-                for other in values
-            )
-            if not dominated:
-                kept.append(item)
-        return kept
+        return list(deduped.values())

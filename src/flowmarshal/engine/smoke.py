@@ -15,7 +15,6 @@ from .domain import (
     BehaviorPolicy,
     CandidateDecision,
     CandidateStatus,
-    CommitHorizon,
     ContextManifest,
     CriterionVerdict,
     Criticality,
@@ -295,7 +294,6 @@ def run_synthetic_lifecycle(
                 required_evidence_kinds=("test",),
             ),
         ),
-        commit_horizon=CommitHorizon(),
         planning_budget=PlanningBudgetPolicy(),
         model_inventory_digest=inventory.inventory_digest,
     )

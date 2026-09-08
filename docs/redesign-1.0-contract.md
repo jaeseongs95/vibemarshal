@@ -68,9 +68,9 @@
 
 ## D10. Planning과 ProjectMap의 정확한 범위 — planned
 
-같은 의미/canonical Plan만 dedupe한다. 서로 다른 전략은 목표 적합성·품질·위험을 비교하며 비용 추정만으로 우월성을 선언해 가지치기하지 않는다. 실제로 사용하지 않는 `CommitHorizon` 설정은 새 schema에서 제거하거나 정확한 고정 불변조건으로 바꾼다. 역사 reader는 원래 필드와 의미를 보존한다.
+같은 의미/canonical Plan만 dedupe한다. 서로 다른 전략은 목표 적합성·품질·위험을 비교하며 비용 추정만으로 우월성을 선언해 가지치기하지 않는다. 후보 수는 Hard AC 개수만으로 늘리지 않고 Goal에 실제 전략 trade-off가 있을 때만 늘린다. 실행 경로가 소비하지 않는 `CommitHorizon` 설정은 새 schema에 저장하지 않는다. schema 3의 과거 reader는 원래 필드와 의미를 보존한다.
 
-`ProjectMap`은 실제 관측한 파일·symbol·검증된 연결만 표현한다. 전체 의존성을 완전히 복원한 그래프라고 주장하지 않는다. 필요한 사실만 State/Context에 투영하며 영향 매트릭스는 보수적 평가 재사용 근거로 제한한다. 범용 그래프 제품을 새로 구현하는 승인이 아니다.
+`ProjectMap`은 실제 관측한 파일·symbol·`observed_link_refs`로 검증된 연결만 표현한다. `test`·`build` 표지는 관측 파일의 분류일 뿐 module/test/build 관계를 추론하지 않는다. 전체 의존성을 완전히 복원한 그래프라고 주장하지 않는다. 필요한 사실만 State/Context에 투영하며 영향 매트릭스는 보수적 평가 재사용 근거로 제한한다. 범용 그래프 제품을 새로 구현하는 승인이 아니다.
 
 ## D11. schema 4와 과거 reader — planned
 

@@ -4,9 +4,16 @@ from copy import deepcopy
 import unittest
 
 from flowmarshal.canonical import sha256_digest
-from flowmarshal.engine.domain import derive_candidate_decision
+from flowmarshal.engine.domain import (
+    DependencyType,
+    SkeletonDependency,
+    TaskKind,
+    TaskSkeleton,
+    derive_candidate_decision,
+)
 from flowmarshal.engine.planner_roles import (
     PlanExpanderAdapter, PlanExpansionDraft, PlannerRoleAdapterError, RuleBasedTaskAssigner,
+    _bind_detail_revision_to_skeleton,
 )
 from flowmarshal.engine.planning import ExpandedPlanEvaluation
 from flowmarshal.engine.planning_feedback import PlanRefinementProposal, validate_plan_revision
@@ -88,13 +95,107 @@ class PlanRefinerAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "model_inventory_digest"):
             validate_plan_revision(evaluation.plan, altered)
 
-    def test_detail_revision_cannot_change_skeleton_objective(self):
+    def test_detail_revision_cannot_change_skeleton_owned_fields(self):
         response = self._proposal()
+        response["plan"]["tasks"][0]["kind"] = "validate"
         response["plan"]["tasks"][0]["objective"] = "Goal 대신 다른 작업을 한다."
+        response["plan"]["tasks"][0]["goal_criterion_refs"] = ["ac_other"]
+        response["plan"]["tasks"][0]["produces"] = ["result:other"]
+        response["plan"]["tasks"][0]["consumes"] = ["input:other"]
         adapter, _, evaluation, candidate = self._adapter(response)
         with self.assertRaisesRegex(PlannerRoleAdapterError, "Skeleton 의미"):
             self._refine(adapter, evaluation, candidate)
         self.assertEqual([], adapter.receipts)
+
+    def test_detail_revision_selects_one_exact_task_from_wrong_same_ref_duplicate(self):
+        response = self._proposal()
+        duplicate = deepcopy(response["plan"]["tasks"][0])
+        duplicate["kind"] = "validate"
+        duplicate["objective"] = "같은 ref로 별도 검증 Task를 복제한다."
+        duplicate["validations"] = duplicate["validations"][:1]
+        response["plan"]["tasks"].append(duplicate)
+        adapter, _, evaluation, candidate = self._adapter(response)
+        proposal = self._refine(adapter, evaluation, candidate)
+        self.assertEqual(1, len(proposal.plan.definition.tasks))
+        task = proposal.plan.definition.tasks[0]
+        source = candidate.tasks[0]
+        self.assertEqual(source.task_ref, task.task_ref)
+        self.assertEqual(source.kind, task.kind)
+        self.assertEqual(source.objective, task.objective)
+        self.assertEqual(source.contributes_to, task.goal_criterion_refs)
+        self.assertEqual(source.produces, task.produces)
+        self.assertEqual(source.consumes, task.consumes)
+        self.assertIn("Core는 이 고정 필드를 원본 Skeleton에 다시 결속", adapter.runner.calls[0].instructions)
+
+    def test_detail_revision_rejects_duplicate_goal_coverage_criterion(self):
+        response = self._proposal()
+        duplicate = deepcopy(response["plan"]["goal_coverage"][0])
+        duplicate["validation_ids"] = ["validation_goal"]
+        response["plan"]["goal_coverage"].append(duplicate)
+        adapter, _, evaluation, candidate = self._adapter(response)
+
+        with self.assertRaisesRegex(PlannerRoleAdapterError, "Goal coverage criterion이 중복"):
+            self._refine(adapter, evaluation, candidate)
+        self.assertEqual([], adapter.receipts)
+
+    def test_detail_revision_preserves_consumer_handoff_without_silent_repair(self):
+        candidate = skeleton(self.goal, self.state)
+        producer = candidate.tasks[0].model_copy(update={
+            "produces": ("result:one", "result:producer_only"),
+        })
+        consumer = TaskSkeleton(
+            task_ref="task_two",
+            kind=TaskKind.VALIDATE,
+            objective="전달된 결과를 검증한다.",
+            contributes_to=("ac_one",),
+            produces=("result:checked",),
+            consumes=("result:one",),
+        )
+        dependency = SkeletonDependency(
+            producer_task_ref="task_one",
+            consumer_task_ref="task_two",
+            dependency_type=DependencyType.DATA,
+            produces=("result:one", "result:producer_only"),
+            consumes=("result:one",),
+        )
+        candidate = candidate.model_copy(update={
+            "tasks": (producer, consumer),
+            "dependencies": (dependency,),
+            "goal_coverage": (
+                candidate.goal_coverage[0].model_copy(
+                    update={"task_refs": ("task_one", "task_two")}
+                ),
+            ),
+        })
+        plan = role_fixtures._plan_response()
+        plan["tasks"][0]["produces"].append("result:producer_only")
+        detail = deepcopy(plan["tasks"][0])
+        detail.update({
+            "task_ref": "task_two",
+            "kind": "validate",
+            "objective": "전달된 결과를 검증한다.",
+            "produces": ["result:checked"],
+            "consumes": ["result:one"],
+        })
+        plan["tasks"].append(detail)
+        plan["dependencies"] = [{
+            "producer_task_ref": "task_one",
+            "consumer_task_ref": "task_two",
+            "dependency_type": "data",
+            "products": ["result:one"],
+        }]
+        plan["goal_coverage"][0]["task_refs"] = ["task_one", "task_two"]
+
+        bound = _bind_detail_revision_to_skeleton(
+            PlanExpansionDraft.model_validate(plan), candidate,
+        )
+        self.assertEqual(("result:one",), bound.dependencies[0].products)
+
+        plan["dependencies"][0]["products"].append("result:producer_only")
+        with self.assertRaisesRegex(PlannerRoleAdapterError, "Skeleton dependency 의미"):
+            _bind_detail_revision_to_skeleton(
+                PlanExpansionDraft.model_validate(plan), candidate,
+            )
 
     def test_unknown_counterevidence_is_rejected_before_a_dispute_is_recorded(self):
         response = {"action": "disputed", "rationale": "원문과 지적이 충돌한다.",

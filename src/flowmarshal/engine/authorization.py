@@ -51,10 +51,6 @@ def authorization_changes(authorization: GoalAuthorization, *, project: Any,
         # reserve 비율은 상한이 아니라 배분 정책이므로 동일성을 보존한다.
         if (requested != approved if field == "replan_reserve_percent" else requested > approved):
             changed("policy", f"planning_budget.{field}", approved, requested)
-    for field, requested in plan.definition.commit_horizon.model_dump().items():
-        approved = getattr(policy.commit_horizon, field)
-        if (requested > approved if field == "max_ready_tasks" else approved and not requested):
-            changed("policy", f"commit_horizon.{field}", approved, requested)
     for task in plan.definition.tasks:
         for field in ("max_same_failure_replans", "max_goal_replans"):
             if getattr(task.recovery, field) > getattr(policy, field):

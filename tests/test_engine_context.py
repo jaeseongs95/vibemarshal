@@ -12,7 +12,7 @@ from flowmarshal.engine.context import (
     ProjectMapper,
     PromptAssembler,
 )
-from flowmarshal.engine.domain import ProjectMapEntryKind
+from flowmarshal.engine.domain import ProjectMapEntryKind, ProjectMapRevision
 
 from tests.engine_helpers import assignment, goal, inventory, plan, profile, state, skeleton
 
@@ -232,6 +232,36 @@ class EngineContextTests(unittest.TestCase):
         self.assertEqual(ProjectMapEntryKind.REFERENCE, by_path[str(self.reference.resolve())].kind)
         self.assertIn(by_path["AGENTS.md"].entry_id, project_map.instruction_source_refs)
         self.assertIn("execute_task", by_path["service.py"].symbols)
+
+    def test_map_keeps_only_explicitly_observed_entry_links(self) -> None:
+        tests = self.root / "tests"
+        tests.mkdir()
+        (tests / "test_service.py").write_text("from service import execute_task\n", encoding="utf-8")
+        (self.root / "pyproject.toml").write_text("[project]\nname = 'example'\n", encoding="utf-8")
+        project_map = ProjectMapper().build(project_id=self.project_id, root=self.root, revision_no=1)
+        service = next(entry for entry in project_map.entries if entry.path == "service.py")
+        policy = next(entry for entry in project_map.entries if entry.path == "AGENTS.md")
+        test_file = next(entry for entry in project_map.entries if entry.path == "tests/test_service.py")
+        build_file = next(entry for entry in project_map.entries if entry.path == "pyproject.toml")
+        self.assertEqual((), service.observed_link_refs)
+        self.assertEqual(ProjectMapEntryKind.TEST, test_file.kind)
+        self.assertEqual(ProjectMapEntryKind.BUILD, build_file.kind)
+        self.assertEqual((), test_file.observed_link_refs)
+        self.assertEqual((), build_file.observed_link_refs)
+        self.assertNotIn("dependency_refs", service.model_dump(mode="json"))
+
+        raw = project_map.model_dump(mode="json")
+        raw["entries"] = [
+            {**entry, "observed_link_refs": [policy.entry_id]} if entry["entry_id"] == service.entry_id else entry
+            for entry in raw["entries"]
+        ]
+        restored = ProjectMapRevision.model_validate(raw)
+        restored_service = next(entry for entry in restored.entries if entry.entry_id == service.entry_id)
+        self.assertEqual((policy.entry_id,), restored_service.observed_link_refs)
+
+        raw["entries"][0]["observed_link_refs"] = ["entry_missing"]
+        with self.assertRaisesRegex(ValueError, "observed link"):
+            ProjectMapRevision.model_validate(raw)
 
     def test_missing_required_context_returns_structured_request(self) -> None:
         project_map = ProjectMapper().build(

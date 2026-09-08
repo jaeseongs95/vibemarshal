@@ -189,7 +189,11 @@ class EvaluationBindingTests(unittest.TestCase):
             sorted(expansion_catalog),
             expansion_schema["$defs"]["InspectionCitation"]["properties"]["source_ref"]["enum"],
         )
+        self.assertEqual(["plan", "inspection"], list(expansion_schema["properties"]))
+        expansion_inspection = expansion_schema["$defs"]["PlanExpansionInspection"]
+        self.assertEqual(0, expansion_inspection["properties"]["finding_links"]["maxItems"])
         self.assertIn("작성자(writer) 모드", capture.request.instructions)
+        self.assertIn("plan 전체를 먼저 확정", capture.request.instructions)
         self.assertIn("claim:// 같은 별도 ID 체계를 만들지 않는다", capture.request.instructions)
         self.assertIn("/dependencies/...", PLAN_EXPANSION_INSPECTION_INSTRUCTIONS)
         for entry in project_map.entries:

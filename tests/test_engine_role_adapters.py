@@ -23,6 +23,7 @@ from flowmarshal.engine.planner_roles import (
     PLANNING_PROJECT_PATH_INSTRUCTIONS,
     PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS,
     PlanExpanderAdapter,
+    PlanExpansionDraft,
     PlanReviewerAdapter,
     PlannerRoleAdapterError,
     RuleBasedTaskAssigner,
@@ -253,7 +254,46 @@ class EngineRoleAdapterTests(unittest.TestCase):
         self.assertIn("아직 없는 활성화 증적", runner.calls[0].instructions)
         self.assertIn("Skeleton schema에 없는", runner.calls[1].instructions)
         self.assertIn("integration_validations", runner.calls[2].instructions)
+        self.assertIn("Skeleton dependency.consumes의 정확한 집합", runner.calls[2].instructions)
         self.assertIn("미래 activation receipt", runner.calls[3].instructions)
+
+    def test_plan_dependency_uses_skeleton_consumer_handoff_set(self) -> None:
+        skeleton, plan = self._validation_boundary_case()
+        producer = skeleton["candidates"][0]["tasks"][0]
+        producer["produces"].append("result:producer_only")
+        dependency = skeleton["candidates"][0]["dependencies"][0]
+        dependency["produces"].append("result:producer_only")
+        plan["tasks"][0]["produces"].append("result:producer_only")
+
+        runner = ScriptedStructuredRoleRunner({"skeleton_generator": [skeleton]})
+        options = dict(
+            model="worker", effort="medium",
+            inventory_digest=self.inventory.inventory_digest, cwd=self.root,
+        )
+        candidate = SkeletonGeneratorAdapter(runner, **options).generate(
+            goal=self.goal, state=self.state, project_map=self.map, candidate_count=1,
+        )[0]
+        expander = PlanExpanderAdapter(
+            runner,
+            RuleBasedTaskAssigner(assignment(), assignment(), assignment()),
+            **options,
+        )
+
+        compiled = expander._compile(
+            PlanExpansionDraft.model_validate(plan), candidate=candidate,
+            goal=self.goal, state=self.state, project_map=self.map,
+            planning_budget=expander.planning_budget,
+        )
+        self.assertEqual(("result:one",), compiled.definition.dependencies[0].products)
+
+        invalid = deepcopy(plan)
+        invalid["dependencies"][0]["products"].append("result:producer_only")
+        with self.assertRaisesRegex(PlannerRoleAdapterError, "Skeleton dependency 의미"):
+            expander._compile(
+                PlanExpansionDraft.model_validate(invalid), candidate=candidate,
+                goal=self.goal, state=self.state, project_map=self.map,
+                planning_budget=expander.planning_budget,
+            )
 
     def test_skeleton_task_schema_rejects_empty_core_links(self) -> None:
         for field in ("contributes_to", "produces"):
@@ -387,6 +427,84 @@ class EngineRoleAdapterTests(unittest.TestCase):
         self.assertEqual("payload.skeleton", request.payload["inspection_source_catalog"]["artifact:skeleton"])
         self.assertEqual("output.plan", request.payload["inspection_source_catalog"]["artifact:plan_draft"])
         self.assertEqual("요구를 구현한다.", result.definition.tasks[0].objective)
+
+    def test_expander_rejects_scope_shorthand_and_unused_citations(self) -> None:
+        from flowmarshal.engine.plan_inspection import PlanInspectionError
+        from tests.engine_inspection_helpers import inspection_fixture
+
+        def attempt(mutate) -> None:
+            plan = _plan_response()
+            inspection = inspection_fixture(
+                plan, self.goal.definition.model_dump(mode="json")
+            )
+            mutate(inspection)
+            runner = ScriptedStructuredRoleRunner({
+                "skeleton_generator": [_skeleton_response()],
+                "plan_expander": [{"plan": plan, "inspection": inspection}],
+            })
+            options = dict(
+                model="worker", effort="medium",
+                inventory_digest=self.inventory.inventory_digest, cwd=self.root,
+            )
+            candidate = SkeletonGeneratorAdapter(runner, **options).generate(
+                goal=self.goal, state=self.state, project_map=self.map,
+                candidate_count=1,
+            )[0]
+            PlanExpanderAdapter(
+                runner,
+                RuleBasedTaskAssigner(assignment(), assignment(), assignment()),
+                **options,
+            ).expand(
+                candidate=candidate, goal=self.goal, state=self.state,
+                project_map=self.map,
+            )
+
+        def add_scope_shorthand(inspection) -> None:
+            row = inspection["ac_validation_rows"][0]
+            scope = next(
+                item for item in inspection["validation_scope_rows"]
+                if item["validation_id"] == row["validation_id"]
+            )
+            row["scope_ids"] = [scope["scope_id"]]
+            row["ac_link_required"] = True
+            row["basis_refs"].append(scope["scope_id"])
+
+        def add_unused(inspection, **updates) -> None:
+            citation = {
+                "citation_id": "unused_background",
+                "source_ref": "source:goal",
+                "selector": "/observable_outcome",
+                "quote": self.goal.definition.observable_outcome,
+            }
+            citation.update(updates)
+            inspection["citations"].append(citation)
+
+        cases = (
+            ("scope shorthand", "대조표에 없는 인용 ID", add_scope_shorthand),
+            ("valid unused", "대조표 미사용 인용", add_unused),
+            (
+                "unused wrong source",
+                "source_ref",
+                lambda inspection: add_unused(
+                    inspection, source_ref="artifact:plan_contract"
+                ),
+            ),
+            (
+                "unused wrong selector",
+                "selector",
+                lambda inspection: add_unused(inspection, selector="/missing"),
+            ),
+            (
+                "unused wrong quote",
+                "원문 문자열",
+                lambda inspection: add_unused(inspection, quote="조작된 원문"),
+            ),
+        )
+        for name, error, mutate in cases:
+            with self.subTest(name=name), self.assertRaisesRegex(
+                PlanInspectionError, error
+            ):
+                attempt(mutate)
 
     def test_expander_still_rejects_wrong_source_selector_and_undefined_claim(self) -> None:
         from flowmarshal.engine.plan_inspection import PlanInspectionError

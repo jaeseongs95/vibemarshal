@@ -7,7 +7,15 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal
 from uuid import uuid4
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 from ..canonical import sha256_digest
 
@@ -491,9 +499,9 @@ class StateDelta(EngineModel):
 
 
 class ProjectMapEntryKind(StrEnum):
+    """관측한 파일의 역할 표지다. 범용 의존 그래프의 노드 종류가 아니다."""
+
     FILE = "file"
-    SYMBOL = "symbol"
-    MODULE = "module"
     TEST = "test"
     BUILD = "build"
     INSTRUCTION = "instruction"
@@ -502,18 +510,54 @@ class ProjectMapEntryKind(StrEnum):
 
 
 class ProjectMapEntry(EngineModel):
+    """파일·추출한 symbol·확인된 entry 간 링크만 담는 ProjectMap 항목이다."""
+
     entry_id: str = Field(pattern=_LOCAL_ID_PATTERN)
     kind: ProjectMapEntryKind
     path: str = Field(min_length=1, max_length=2000)
     content_digest: str = Field(pattern=_DIGEST_PATTERN)
     symbols: tuple[str, ...] = ()
-    dependency_refs: tuple[str, ...] = ()
+    observed_link_refs: tuple[str, ...] = ()
+    # 동결된 1.0 ProjectMap의 canonical payload를 보존하는 읽기 전용 필드다.
+    dependency_refs: tuple[str, ...] | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
     tags: tuple[str, ...] = ()
 
-    @field_validator("symbols", "dependency_refs", "tags")
+    @field_validator("symbols", "observed_link_refs", "tags")
     @classmethod
     def entry_values_are_unique(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         return _unique(value, "ProjectMap entry")
+
+    @field_validator("dependency_refs")
+    @classmethod
+    def legacy_dependency_values_are_unique(
+        cls,
+        value: tuple[str, ...] | None,
+    ) -> tuple[str, ...] | None:
+        return None if value is None else _unique(value, "legacy ProjectMap dependency")
+
+    @model_validator(mode="after")
+    def link_vocabularies_do_not_mix(self) -> "ProjectMapEntry":
+        if self.dependency_refs is not None and self.observed_link_refs:
+            raise ValueError("legacy dependency_refs와 observed_link_refs를 함께 사용할 수 없습니다.")
+        return self
+
+    @model_serializer(mode="wrap")
+    def preserve_explicit_link_vocabulary(self, handler: Any) -> dict[str, Any]:
+        payload = handler(self)
+        if "observed_link_refs" not in self.model_fields_set:
+            payload.pop("observed_link_refs", None)
+        if "dependency_refs" not in self.model_fields_set:
+            payload.pop("dependency_refs", None)
+        return payload
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema: Any, handler: Any) -> dict[str, Any]:
+        schema = handler(core_schema)
+        schema.get("properties", {}).pop("dependency_refs", None)
+        return schema
 
 
 class ProjectMapRevision(EngineModel):
@@ -535,13 +579,13 @@ class ProjectMapRevision(EngineModel):
             raise ValueError("ProjectMap entry ID가 중복됐습니다.")
         known = set(ids)
         missing = {
-            dependency
+            link
             for item in self.entries
-            for dependency in item.dependency_refs
-            if dependency not in known
+            for link in (item.observed_link_refs or item.dependency_refs or ())
+            if link not in known
         }
         if missing:
-            raise ValueError(f"ProjectMap dependency가 알 수 없는 entry를 참조합니다: {sorted(missing)}")
+            raise ValueError(f"ProjectMap observed link가 알 수 없는 entry를 참조합니다: {sorted(missing)}")
         if not set(self.instruction_source_refs).issubset(known):
             raise ValueError("ProjectMap instruction source가 알려진 entry가 아닙니다.")
         _unique(self.instruction_source_refs, "ProjectMap instruction source")
@@ -1167,7 +1211,9 @@ class IntegrationValidationContract(EngineModel):
         return self
 
 
-class CommitHorizon(EngineModel):
+class _LegacyCommitHorizon(EngineModel):
+    """동결된 1.0 Plan artifact를 읽기 위한 비공개 호환 타입."""
+
     max_ready_tasks: int = Field(default=1, ge=1, le=100)
     project_serial_execution: bool = True
     revalidate_snapshot_before_materialization: bool = True
@@ -1201,11 +1247,22 @@ class PlanContractDefinition(EngineModel):
     dependencies: tuple[PlanDependency, ...] = ()
     goal_coverage: tuple[PlanGoalCoverage, ...] = Field(min_length=1)
     integration_validations: tuple[IntegrationValidationContract, ...] = Field(min_length=1)
-    commit_horizon: CommitHorizon = CommitHorizon()
+    # 새 계약의 공개 스키마에서는 제거됐지만, 기존 동결 artifact의 digest와
+    # canonical payload를 그대로 검증할 수 있도록 읽기 호환성만 유지한다.
+    commit_horizon: _LegacyCommitHorizon | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
     planning_budget: PlanningBudgetPolicy = PlanningBudgetPolicy()
     model_inventory_digest: str = Field(pattern=_DIGEST_PATTERN)
     expected_effects: tuple[str, ...] = ()
     prohibited_effects: tuple[str, ...] = ()
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema: Any, handler: Any) -> dict[str, Any]:
+        schema = handler(core_schema)
+        schema.get("properties", {}).pop("commit_horizon", None)
+        return schema
 
     @field_validator("expected_effects", "prohibited_effects")
     @classmethod
@@ -1529,7 +1586,6 @@ class GoalOperatingPolicy(EngineModel):
     """승인한 운영 상한. 소요량 예측이나 OS 보안 경계가 아니다."""
 
     planning_budget: PlanningBudgetPolicy = PlanningBudgetPolicy()
-    commit_horizon: CommitHorizon = CommitHorizon()
     max_same_failure_replans: int = Field(default=2, ge=0, le=10)
     max_goal_replans: int = Field(default=5, ge=0, le=20)
     requires_new_evidence: bool = True

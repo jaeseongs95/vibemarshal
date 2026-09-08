@@ -46,7 +46,7 @@ def _synthetic_source(root: Path) -> tuple[Path, Path, Path]:
     entries = [
         {
             "content_digest": sha256_bytes(workspace_files["AGENTS.md"]),
-            "dependency_refs": [],
+            "observed_link_refs": [],
             "entry_id": "entry_instruction",
             "kind": "instruction",
             "path": "AGENTS.md",
@@ -55,7 +55,7 @@ def _synthetic_source(root: Path) -> tuple[Path, Path, Path]:
         },
         {
             "content_digest": sha256_bytes(workspace_files["app.py"]),
-            "dependency_refs": [],
+            "observed_link_refs": [],
             "entry_id": "entry_app",
             "kind": "file",
             "path": "app.py",
@@ -64,7 +64,7 @@ def _synthetic_source(root: Path) -> tuple[Path, Path, Path]:
         },
         {
             "content_digest": sha256_bytes(workspace_files["test_app.py"]),
-            "dependency_refs": [],
+            "observed_link_refs": [],
             "entry_id": "entry_test",
             "kind": "test",
             "path": "test_app.py",
@@ -73,7 +73,7 @@ def _synthetic_source(root: Path) -> tuple[Path, Path, Path]:
         },
         {
             "content_digest": sha256_bytes(reference.read_bytes()),
-            "dependency_refs": [],
+            "observed_link_refs": [],
             "entry_id": "entry_reference",
             "kind": "reference",
             "path": str(reference),
