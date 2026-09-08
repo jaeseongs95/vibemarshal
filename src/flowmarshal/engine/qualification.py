@@ -462,6 +462,62 @@ def _default_run_root(root: Path, scope_name: str, contract_hint: str) -> Path:
     return root / ".flowmarshal-engine-eval" / "runs" / f"{scope_name}-{stamp}-{contract_hint}"
 
 
+_WINDOWS_LEGACY_MAX_PATH = 259
+# 역할 runner의 new_id("model_call")와 실제 trace suffix에 결속한다.
+_OPERATION_TRACE_FILENAME_BUDGET = len(
+    "model_call_" + ("x" * 32) + ".operation-trace.jsonl"
+)
+
+
+def _role_cell_state_root(run_root: Path, *, order_seed: int, catalog_index: int) -> Path:
+    """role fixture 원장을 짧고 계약 순서에 결속된 경로에 materialize한다.
+
+    전체 fixture digest는 evaluation contract/checkpoint에 이미 결속된다. 파일시스템
+    경로에는 catalog index를 사용해 충돌 가능성 없이 Windows MAX_PATH 여유를 확보한다.
+    """
+
+    if catalog_index < 0:
+        raise QualificationRunError("role fixture catalog index는 음수일 수 없습니다.")
+    state_root = run_root / "w" / f"s{order_seed}" / f"c{catalog_index:02d}"
+    if sys.platform == "win32":
+        trace_probe = (
+            state_root
+            / "artifacts"
+            / "operation-traces"
+            / ("x" * _OPERATION_TRACE_FILENAME_BUDGET)
+        ).resolve()
+        if len(str(trace_probe)) > _WINDOWS_LEGACY_MAX_PATH:
+            raise QualificationRunError(
+                "EVALUATION_ARTIFACT_PATH_TOO_LONG: provider 예약 전에 더 짧은 "
+                f"--run-root를 선택해야 합니다: projected_length={len(str(trace_probe))}; "
+                f"max={_WINDOWS_LEGACY_MAX_PATH}; state_root={state_root.resolve()}"
+            )
+    return state_root
+
+
+def _planning_cell_work_root(run_root: Path, *, order_seed: int, catalog_index: int) -> Path:
+    """Planning cell을 Windows operation-trace 경로 예산 안에 배치한다."""
+
+    if catalog_index < 0:
+        raise QualificationRunError("planning scenario catalog index는 음수일 수 없습니다.")
+    work_root = run_root / "p" / f"s{order_seed}" / f"c{catalog_index:02d}"
+    if sys.platform == "win32":
+        trace_probe = (
+            work_root
+            / "budget-state"
+            / "artifacts"
+            / "operation-traces"
+            / ("x" * _OPERATION_TRACE_FILENAME_BUDGET)
+        ).resolve()
+        if len(str(trace_probe)) > _WINDOWS_LEGACY_MAX_PATH:
+            raise QualificationRunError(
+                "EVALUATION_ARTIFACT_PATH_TOO_LONG: provider 예약 전에 더 짧은 "
+                f"--run-root를 선택해야 합니다: projected_length={len(str(trace_probe))}; "
+                f"max={_WINDOWS_LEGACY_MAX_PATH}; work_root={work_root.resolve()}"
+            )
+    return work_root
+
+
 def _write_json(path: Path, value: Any) -> None:
     if isinstance(value, BaseModel):
         document = value.model_dump(mode="json")
@@ -849,14 +905,15 @@ def _guard_full_planning_resume(
     ):
         raise QualificationRunError("resume 대상 planning scenario 계약이 다릅니다.")
     for seed in contract.order_seeds:
-        for scenario in catalog.scenarios:
+        for catalog_index, scenario in enumerate(catalog.scenarios):
             if store.completed(scenario.scenario_digest, seed) is not None:
                 continue
             state_root = (
-                destination
-                / "work"
-                / f"seed-{seed}"
-                / scenario.scenario_id
+                _planning_cell_work_root(
+                    destination,
+                    order_seed=seed,
+                    catalog_index=catalog_index,
+                )
                 / "budget-state"
             )
             if not evaluation_cell_provider_calls(state_root):
@@ -904,8 +961,25 @@ def run_role_fixture(
         destination = (
             run_root or _default_run_root(base, "role-fixture", contract.contract_digest[7:15])
         ).resolve()
+        catalog_indexes = {
+            fixture.fixture_digest: index for index, fixture in enumerate(catalog.fixtures)
+        }
+        cell_state_roots = {
+            (seed, fixture.fixture_digest): _role_cell_state_root(
+                destination,
+                order_seed=seed,
+                catalog_index=catalog_indexes[fixture.fixture_digest],
+            )
+            for seed in contract.order_seeds
+            for fixture in catalog.fixtures
+        }
         store = ImmutableCheckpointStore(destination, contract)
         store.initialize()
+        if store.state().status is EvaluationRunStatus.FAILED:
+            raise QualificationRunError(
+                "ROLE_FIXTURE_FAILED_RUN_REQUIRES_NEW_RUN_ROOT: 실패한 run의 원장과 "
+                "provider effect evidence를 보존하고 새 Attempt에는 새 --run-root를 사용하세요."
+            )
         qualification_suite_manifest(base)
         build_qualification_reproduction_bundle(
             root=base,
@@ -954,10 +1028,7 @@ def run_role_fixture(
                             )
                         }
                     )
-                    state_root = (
-                        destination / "work" / f"seed-{seed}" / fixture.fixture_digest[7:]
-                        / "budget-state"
-                    )
+                    state_root = cell_state_roots[(seed, fixture.fixture_digest)]
                     service, manager = initialize_cell_budget(
                         state_root=state_root,
                         workspace=base,
@@ -1660,6 +1731,13 @@ def run_full_planning_pipeline(
             run_root
             or _default_run_root(base, "full-planning-pipeline", contract.contract_digest[7:15])
         ).resolve()
+        cell_work_roots = {
+            (seed, scenario.scenario_digest): _planning_cell_work_root(
+                destination, order_seed=seed, catalog_index=catalog_index,
+            )
+            for seed in contract.order_seeds
+            for catalog_index, scenario in enumerate(catalog.scenarios)
+        }
         store = ImmutableCheckpointStore(destination, contract)
         store.initialize()
         qualification_suite_manifest(base)
@@ -1714,7 +1792,7 @@ def run_full_planning_pipeline(
                             inventory=inventory,
                             roles=roles,
                             inspection_provider_contract=inspection_provider_contract,
-                            work_root=destination / "work" / f"seed-{seed}" / scenario.scenario_id,
+                            work_root=cell_work_roots[(seed, scenario.scenario_digest)],
                             progress_sink=_role_progress(destination, scenario_id=scenario.scenario_id, order_seed=seed),
                             evaluation_policies=evaluation_policies,
                             partial_feasible_observer=collect_partial_feasible,
@@ -1737,10 +1815,7 @@ def run_full_planning_pipeline(
                             _record_full_planning_rate_limit(
                                 store,
                                 state_root=(
-                                    destination
-                                    / "work"
-                                    / f"seed-{seed}"
-                                    / scenario.scenario_id
+                                    cell_work_roots[(seed, scenario.scenario_digest)]
                                     / "budget-state"
                                 ),
                                 scenario_id=scenario.scenario_id,

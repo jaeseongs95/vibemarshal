@@ -63,6 +63,7 @@ from flowmarshal.engine.qualification import (
     ORDER_SEEDS,
     _deterministic_contract,
     _guard_full_planning_resume,
+    _planning_cell_work_root,
     _planning_contract,
     _planning_cell,
     _record_full_planning_rate_limit,
@@ -196,9 +197,11 @@ class EngineQualificationTests(unittest.TestCase):
             catalog, contract, store, _ = self.full_planning_paused_run(destination)
             scenario = catalog.scenarios[0]
             seed = contract.order_seeds[0]
-            state_root = (
-                destination / "work" / f"seed-{seed}" / scenario.scenario_id / "budget-state"
-            )
+            state_root = _planning_cell_work_root(
+                destination,
+                order_seed=seed,
+                catalog_index=0,
+            ) / "budget-state"
             database = state_root / "flowmarshal-engine.sqlite3"
             database.parent.mkdir(parents=True)
             connection = sqlite3.connect(database)
@@ -248,13 +251,11 @@ class EngineQualificationTests(unittest.TestCase):
             completed_scenario = catalog.scenarios[0]
             scenario = catalog.scenarios[1]
             seed = contract.order_seeds[0]
-            completed_state_root = (
-                destination
-                / "work"
-                / f"seed-{seed}"
-                / completed_scenario.scenario_id
-                / "budget-state"
-            )
+            completed_state_root = _planning_cell_work_root(
+                destination,
+                order_seed=seed,
+                catalog_index=0,
+            ) / "budget-state"
             completed_database = completed_state_root / "flowmarshal-engine.sqlite3"
             completed_database.parent.mkdir(parents=True)
             connection = sqlite3.connect(completed_database)
@@ -277,9 +278,11 @@ class EngineQualificationTests(unittest.TestCase):
                     runner_receipts=({"status": "success"},),
                 )
             )
-            state_root = (
-                destination / "work" / f"seed-{seed}" / scenario.scenario_id / "budget-state"
-            )
+            state_root = _planning_cell_work_root(
+                destination,
+                order_seed=seed,
+                catalog_index=1,
+            ) / "budget-state"
             paused = _record_full_planning_rate_limit(
                 store,
                 state_root=state_root,
@@ -300,7 +303,11 @@ class EngineQualificationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             destination = Path(raw) / "full-planning"
             catalog, contract, store, _ = self.full_planning_paused_run(destination)
-            state_root = destination / "work" / "seed-17" / catalog.scenarios[0].scenario_id / "budget-state"
+            state_root = _planning_cell_work_root(
+                destination,
+                order_seed=17,
+                catalog_index=0,
+            ) / "budget-state"
             state_root.mkdir(parents=True)
             database = state_root / "flowmarshal-engine.sqlite3"
             connection = sqlite3.connect(database)
