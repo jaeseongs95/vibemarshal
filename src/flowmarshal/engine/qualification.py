@@ -1196,6 +1196,7 @@ def _planning_contract(
     import inspect
     from . import goal as goal_roles, planner_roles
     from .goal import GoalNormalizationProposal
+    from .goal_feedback import GoalPreparationRefiner, GoalRefinementProposal
     from .planner_roles import (
         PlanExpansionEnvelope, PlanExpansionEnvelopeV2,
         PlanReviewEnvelope, PlanReviewEnvelopeV2,
@@ -1234,7 +1235,8 @@ def _planning_contract(
         role_configuration_digest=roles.configuration_digest,
         source_manifest_digest=source_manifest_digest(root),
         rules_digest=sha256_digest(
-            {"pipeline": "goal-to-selected-plan", "budget_calls": 14, "versions": 5}
+            {"pipeline": "goal-to-selected-plan", "budget_calls": 14, "versions": 5,
+             "goal_feedback": "bounded-goal-feedback-v1"}
             | policy_contract_fragment(policies)
             | ({"inspection_provider_contract": inspection_provider_contract}
                if provider_contract_values else {})
@@ -1247,7 +1249,8 @@ def _planning_contract(
         prompt_digest=sha256_digest(
             ({
                 role.__name__: inspect.getsource(role)
-                for role in (GoalNormalizerAdapter, GoalReviewerAdapter, SkeletonGeneratorAdapter,
+                for role in (GoalNormalizerAdapter, GoalReviewerAdapter, GoalPreparationRefiner,
+                             SkeletonGeneratorAdapter,
                              SkeletonReviewerAdapter, PlanExpanderAdapter, PlanReviewerAdapter)
             } | {
                 "shared_instructions": {
@@ -1262,7 +1265,8 @@ def _planning_contract(
         output_schema_digest=sha256_digest(
             {
                 model.__name__: strict_json_output_schema(model.model_json_schema())
-                for model in (GoalNormalizationProposal, SkeletonBatchDraft, SkeletonCandidateDraft,
+                for model in (GoalNormalizationProposal, GoalRefinementProposal,
+                              SkeletonBatchDraft, SkeletonCandidateDraft,
                               SkeletonRefinementDraft,
                               expansion_envelope, review_envelope, ReviewDraft,
                               PlanningPartialFeasibleObservation, PlanRefinementDraft,
@@ -1364,6 +1368,7 @@ def _planning_cell(
     retain_execution_checkpoint: bool = False,
     partial_feasible_observer: Callable[[PlanningPartialFeasibleObservation], None] | None = None,
 ) -> tuple[dict[str, Any], tuple[RoleCallReceipt, ...]]:
+    from .goal_feedback import GoalPreparationRefiner
     from .planning_recovery import PlanningRecoveryPolicy
     if retain_execution_checkpoint and (work_root is None or evaluation_policies is None):
         raise QualificationRunError("실행 lifecycle 연결에는 영속 cell 경로와 예산 정책이 필요합니다.")
@@ -1466,17 +1471,40 @@ def _planning_cell(
             if evaluation_policies is None
             else use_role_timeout_policy(evaluation_policies.role_timeouts)
         )
+        observed_facts = goal_context_observations(project_map, scenario.source_request)
         with timeout_context:
             prepared = GoalPreparationPipeline(normalizer, goal_reviewer).prepare(
                 project_id=project_id,
                 profile=profile,
                 source_request=scenario.source_request,
-                observed_facts=goal_context_observations(project_map, scenario.source_request),
+                observed_facts=observed_facts,
                 goal_id=goal_id,
             )
+            goal_refinement = None
+            if (
+                prepared.goal_contract.status is RevisionStatus.CONFLICT
+                and prepared.review.findings
+                and all(item.remediable for item in prepared.review.findings)
+                and not any(item.blocking for item in prepared.proposal.unresolved_questions)
+            ):
+                goal_refinement = GoalPreparationRefiner(
+                    normalizer, goal_reviewer
+                ).refine(
+                    previous=prepared,
+                    profile=profile,
+                    observed_facts=observed_facts,
+                )
+                if goal_refinement.revised_outcome is not None:
+                    prepared = goal_refinement.revised_outcome
         goal = prepared.goal_contract
-        preparation_calls = len(runner.receipts) if inspection_provider_contract == PLAN_INSPECTION_PROVIDER_V2 else 2
+        preparation_calls = len(runner.receipts)
         if service is not None and manager is not None:
+            if goal_refinement is not None and goal_refinement.revised_outcome is not None:
+                # feedback의 rev2보다 원본 거절 rev1을 먼저 보존한다. 사용량은
+                # 아래에서 최종 revision에 한 번만 연결한다.
+                service.register_goal(
+                    goal_refinement.original_outcome.goal_contract, activate=False
+                )
             register_and_attach_goal(service, manager, goal)
             _bind_planning_runner_goal(runner, goal)
         blocking_questions = [
@@ -1497,6 +1525,9 @@ def _planning_cell(
             "passed": False,
             "failure": None,
             "goal_preparation": prepared.model_dump(mode="json"),
+            "goal_refinement": (
+                None if goal_refinement is None else goal_refinement.model_dump(mode="json")
+            ),
             "blocking_questions": blocking_questions,
             "latency_ms_to_first_feasible": None,
             "latency_ms_to_disposition": max(1, int((time.monotonic() - started) * 1000)),

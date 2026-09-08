@@ -1,15 +1,15 @@
 {
   "normalizer": {
     "model": "gpt-5.6-luna",
-    "effort": "medium"
+    "effort": "high"
   },
   "skeleton_generator": {
     "model": "gpt-5.6-luna",
-    "effort": "medium"
+    "effort": "high"
   },
   "plan_expander": {
     "model": "gpt-5.6-luna",
-    "effort": "medium"
+    "effort": "high"
   },
   "general_reviewer": {
     "model": "gpt-5.6-terra",

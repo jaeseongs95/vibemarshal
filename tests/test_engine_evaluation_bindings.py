@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 from flowmarshal.canonical import sha256_digest
 from flowmarshal.engine.goal import GoalNormalizerAdapter, GoalReviewerAdapter, GoalNormalizationProposal, ReviewDraft
+from flowmarshal.engine.goal_feedback import GoalPreparationRefiner, GoalRefinementProposal
 from flowmarshal.engine.planner_roles import (
     PlanExpanderAdapter, PlanReviewerAdapter, PlanExpansionEnvelope, PlanExpansionEnvelopeV2,
     PlanReviewEnvelope, PlanReviewEnvelopeV2, SkeletonBatchDraft,
@@ -101,7 +102,8 @@ class EvaluationBindingTests(unittest.TestCase):
         v2_schemas = {
             model.__name__: strict_json_output_schema(model.model_json_schema())
             for model in (
-                GoalNormalizationProposal, SkeletonBatchDraft, SkeletonCandidateDraft,
+                GoalNormalizationProposal, GoalRefinementProposal,
+                SkeletonBatchDraft, SkeletonCandidateDraft,
                 SkeletonRefinementDraft,
                 PlanExpansionEnvelopeV2, PlanReviewEnvelopeV2, ReviewDraft,
                 PlanningPartialFeasibleObservation,
@@ -136,8 +138,12 @@ class EvaluationBindingTests(unittest.TestCase):
         catalog = PlanningScenarioCatalog.model_validate_json(
             (ROOT / "tests/fixtures/engine/planning-scenarios.json").read_text(encoding="utf-8"))
         contract = _planning_contract(ROOT, catalog, qualification_inventory(), default_role_configuration(ROOT), POLICIES)
+        roles = default_role_configuration(ROOT)
+        for binding in (roles.normalizer, roles.skeleton_generator, roles.plan_expander):
+            self.assertEqual(("gpt-5.6-luna", "high"), (binding.model, binding.effort))
         prompts = {role.__name__: inspect.getsource(role) for role in (
-            GoalNormalizerAdapter, GoalReviewerAdapter, SkeletonGeneratorAdapter,
+            GoalNormalizerAdapter, GoalReviewerAdapter, GoalPreparationRefiner,
+            SkeletonGeneratorAdapter,
             SkeletonReviewerAdapter, PlanExpanderAdapter, PlanReviewerAdapter)}
         from flowmarshal.engine import goal as goal_roles, planner_roles
         prompts["shared_instructions"] = {
@@ -147,7 +153,8 @@ class EvaluationBindingTests(unittest.TestCase):
         prompts["inspection_input_projection"] = inspect.getsource(planner_roles.inspection_source_catalog)
         prompts["inspection_source_verification"] = inspect.getsource(planner_roles.inspection_file_content)
         schemas = {model.__name__: strict_json_output_schema(model.model_json_schema()) for model in (
-            GoalNormalizationProposal, SkeletonBatchDraft, SkeletonCandidateDraft,
+            GoalNormalizationProposal, GoalRefinementProposal,
+            SkeletonBatchDraft, SkeletonCandidateDraft,
             SkeletonRefinementDraft, PlanExpansionEnvelope, PlanReviewEnvelope, ReviewDraft,
             PlanningPartialFeasibleObservation, PlanRefinementDraft, PlanningSearchOutcome)}
         self.assertEqual(sha256_digest(prompts), contract.prompt_digest)
