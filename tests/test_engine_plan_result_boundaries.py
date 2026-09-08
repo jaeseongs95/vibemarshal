@@ -6,7 +6,7 @@ from pathlib import Path
 
 from flowmarshal.canonical import sha256_bytes
 from flowmarshal.engine.context import ProjectMapper
-from flowmarshal.engine.domain import CandidateStatus, GoalCriterion, GoalContractRevision, SourceTrace
+from flowmarshal.engine.domain import CandidateStatus, GoalCriterion, GoalContractRevision, PlanningBudgetPolicy, SourceTrace
 from flowmarshal.engine.ledger import SQLiteEngineLedger
 from flowmarshal.engine.planner_roles import (
     PlanExpanderAdapter,
@@ -242,7 +242,8 @@ class PlanResultBoundaryRegressionTests(unittest.TestCase):
                 **options,
             ),
             PlanReviewerAdapter(runner, **{**options, "model": "validator", "effort": "high"}),
-        ).search(goal=contract, state=snapshot, project_map=project_map, candidate_count=1)
+        ).search(goal=contract, state=snapshot, project_map=project_map, candidate_count=1,
+                 budget=PlanningBudgetPolicy(max_refinement_per_candidate=0))
         evaluation = outcome.plan_evaluations[0]
         service.record_skeleton_evaluation(outcome.skeleton_evaluations[0])
         service.register_plan_evaluation(evaluation)
@@ -306,6 +307,7 @@ class PlanResultBoundaryRegressionTests(unittest.TestCase):
 
                 if finding_code is None:
                     self.assertIsNotNone(outcome.selected_activation_digest)
+                    service.authorize_goal(project_id=evaluation.plan.definition.project_id, source="합성 사용자 승인")
                     service.activate_plan(
                         plan_revision_id=evaluation.plan.plan_revision_id,
                         activation_digest=evaluation.plan.activation_digest,
@@ -315,6 +317,7 @@ class PlanResultBoundaryRegressionTests(unittest.TestCase):
                 else:
                     self.assertIsNone(outcome.selected_activation_digest)
                     with self.assertRaisesRegex(EngineServiceError, "ready"):
+                        service.authorize_goal(project_id=evaluation.plan.definition.project_id, source="합성 사용자 승인")
                         service.activate_plan(
                             plan_revision_id=evaluation.plan.plan_revision_id,
                             activation_digest=evaluation.plan.activation_digest,

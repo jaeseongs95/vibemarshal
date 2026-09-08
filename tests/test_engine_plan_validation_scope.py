@@ -14,6 +14,7 @@ from flowmarshal.engine.domain import (
     GoalConstraint,
     GoalContractRevision,
     IntegrationValidationContract,
+    PlanningBudgetPolicy,
     SourceTrace,
     ValidationContract,
 )
@@ -317,7 +318,8 @@ class PlanValidationScopeRegressionTests(unittest.TestCase):
                 **options,
             ),
             PlanReviewerAdapter(runner, **{**options, "model": "validator", "effort": "high"}),
-        ).search(goal=contract, state=snapshot, project_map=project_map, candidate_count=1)
+        ).search(goal=contract, state=snapshot, project_map=project_map, candidate_count=1,
+                 budget=PlanningBudgetPolicy(max_refinement_per_candidate=0))
         self.assertEqual(1, len(outcome.skeleton_evaluations))
         self.assertEqual(1, len(outcome.plan_evaluations))
         service.record_skeleton_evaluation(outcome.skeleton_evaluations[0])
@@ -439,6 +441,7 @@ class PlanValidationScopeRegressionTests(unittest.TestCase):
                     self.assertNotIn(task.task_id, finding.affected_task_refs)
                     self.assertIsNone(outcome.selected_activation_digest)
                     with self.assertRaisesRegex(EngineServiceError, "ready"):
+                        service.authorize_goal(project_id=evaluation.plan.definition.project_id, source="합성 사용자 승인")
                         service.activate_plan(
                             plan_revision_id=evaluation.plan.plan_revision_id,
                             activation_digest=evaluation.plan.activation_digest,
@@ -451,6 +454,7 @@ class PlanValidationScopeRegressionTests(unittest.TestCase):
                     self.assertNotIn(task.task_id, finding.affected_task_refs)
                     self.assertIsNone(outcome.selected_activation_digest)
                     with self.assertRaisesRegex(EngineServiceError, "ready"):
+                        service.authorize_goal(project_id=evaluation.plan.definition.project_id, source="합성 사용자 승인")
                         service.activate_plan(
                             plan_revision_id=evaluation.plan.plan_revision_id,
                             activation_digest=evaluation.plan.activation_digest,
@@ -467,6 +471,7 @@ class PlanValidationScopeRegressionTests(unittest.TestCase):
                         self.assertIn("직접 대조", task_validation.statement)
                         self.assertNotIn("task phase가 양수·음수·0", task_validation.statement)
                     self.assertIsNotNone(outcome.selected_activation_digest)
+                    service.authorize_goal(project_id=evaluation.plan.definition.project_id, source="합성 사용자 승인")
                     service.activate_plan(
                         plan_revision_id=evaluation.plan.plan_revision_id,
                         activation_digest=evaluation.plan.activation_digest,

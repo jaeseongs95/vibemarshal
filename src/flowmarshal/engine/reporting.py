@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections import Counter
-
 from .domain import (
     AttemptRecord,
     BudgetUsageRecord,
@@ -10,6 +8,13 @@ from .domain import (
     GoalVerdict,
     PlanContractRevision,
     RecoveryAssessment,
+)
+from .application import summarize_usage_records
+from .read_models import (
+    HistoryCursor,
+    ReadOnlyReportVerification,
+    ReadPresentation,
+    UsageSummary,
 )
 
 
@@ -68,14 +73,27 @@ def render_final(
     plan: PlanContractRevision,
     verdict: GoalVerdict,
     usage: tuple[BudgetUsageRecord, ...],
+    usage_summary: UsageSummary | None = None,
+    read_only_verification: ReadOnlyReportVerification | None = None,
 ) -> str:
-    stages = Counter(item.stage.value for item in usage)
-    known = tuple(item for item in usage if item.usage_available)
-    total_input = sum(item.input_tokens for item in known)
-    total_cached = sum(item.cached_input_tokens for item in known)
-    total_output = sum(item.output_tokens for item in known)
-    total_latency = sum(item.latency_ms for item in usage)
-    cache_ratio = 0 if total_input == 0 else total_cached / total_input
+    if usage_summary is None:
+        usage_summary = summarize_usage_records(
+            project_id=goal.definition.project_id,
+            goal_id=goal.goal_id,
+            goal_revision_digests=(goal.definition_digest,),
+            records=usage,
+            presentation=ReadPresentation(
+                entity_refs=(), history_cursor=HistoryCursor(
+                    project_id=goal.definition.project_id, sequence=0,
+                ),
+            ),
+        )
+    total_input = usage_summary.input_tokens.total
+    total_cached = usage_summary.cached_input_tokens.total
+    total_output = usage_summary.output_tokens.total
+    total_latency = usage_summary.latency_ms.total
+    cache_ratio = None if total_input in (None, 0) or total_cached is None else total_cached / total_input
+    display = lambda value: "미확인" if value is None else f"{value:,}"
     lines = [
         "# FlowMarshal 최종 보고",
         "",
@@ -83,14 +101,54 @@ def render_final(
         f"- Plan: `{plan.activation_digest}`",
         f"- 최종 판정: `{verdict.status.value}`",
         f"- Evidence가 결속된 Hard AC: {len(verdict.criteria)}개",
-        f"- 기록된 논리 역할 호출: {len(usage)}회",
-        f"- 실제 token usage가 제공된 호출: {len(known)}회",
-        f"- 입력/캐시 입력/출력 token: {total_input:,} / {total_cached:,} / {total_output:,}",
-        f"- 입력 캐시 비율: {cache_ratio:.2%}",
-        f"- 누적 지연: {total_latency:,} ms",
+        f"- 원장 provider 호출: {display(usage_summary.provider_call_count)}회",
+        f"- 소계 집계 대상 usage 호출: {usage_summary.logical_call_count}회",
+        f"- 확인된 입력/캐시 입력/출력 소계: {usage_summary.input_tokens.known_subtotal:,} / {usage_summary.cached_input_tokens.known_subtotal:,} / {usage_summary.output_tokens.known_subtotal:,} token",
+        f"- 입력/캐시 입력/출력 token: {display(total_input)} / {display(total_cached)} / {display(total_output)}",
+        f"- 입력 캐시 비율: {'미확인' if cache_ratio is None else f'{cache_ratio:.2%}'}",
+        f"- 누적 지연: {display(total_latency)} ms",
         "",
-        "## 단계별 호출",
+        "## Hard AC 판정과 근거",
         "",
     ]
-    lines.extend(f"- {stage}: {count}회" for stage, count in sorted(stages.items()))
+    criterion_by_id = {item.criterion_id: item for item in verdict.criteria}
+    for criterion in goal.definition.hard_acceptance:
+        result = criterion_by_id.get(criterion.criterion_id)
+        if result is None:
+            lines.append(f"- `{criterion.criterion_id}` 미보고 — {criterion.statement}")
+            continue
+        evidence = ", ".join(f"`{item}`" for item in result.evidence_ids) or "없음"
+        lines.append(
+            f"- `{criterion.criterion_id}` `{result.status.value}` — {criterion.statement} "
+            f"(evidence: {evidence}; {result.rationale})"
+        )
+    if read_only_verification is not None:
+        lines.extend(
+            (
+                "",
+                "## read_only 검증",
+                "",
+                f"- 전체 AC 포함: {'PASS' if read_only_verification.criteria_complete else 'FAIL'}",
+                f"- evidence 결속: {'PASS' if read_only_verification.evidence_grounded else 'FAIL'}",
+                f"- 프로젝트 source 무변경: {'PASS' if read_only_verification.source_unchanged else 'FAIL'}",
+                f"- 기준/현재 source digest: `{read_only_verification.baseline_project_map_semantic_digest}` / "
+                f"`{read_only_verification.observed_project_map_semantic_digest}`",
+            )
+        )
+    lines.extend([
+        "",
+        "## 단계별 소계 집계 호출",
+        "",
+    ])
+    lines.extend(f"- {item.value}: {item.logical_call_count}회" for item in usage_summary.by_stage)
+    if usage_summary.incomplete_reasons:
+        lines.extend(("", "## 미확인 사용량", ""))
+        lines.extend(
+            f"- `{item.call_ref}` ({item.code}): {item.detail}"
+            for item in usage_summary.incomplete_reasons
+        )
+    if usage_summary.conflicts:
+        lines.extend(("", "## Usage 충돌", ""))
+        lines.extend(f"- `{item.logical_call_ref}`: 서로 다른 receipt가 있어 합산하지 않았습니다."
+                     for item in usage_summary.conflicts)
     return "\n".join(lines) + "\n"

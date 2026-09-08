@@ -1,0 +1,155 @@
+"""Plan 교체 시 로컬 완료 근거의 보수적인 재사용. 원본 Attempt/receipt는 이동하지 않는다."""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any
+
+from ..canonical import canonical_json, sha256_bytes, sha256_digest
+from .context import ProjectMapper
+from .domain import PlanContractRevision, TaskExecutionSpecRevision, ValidationResult
+
+
+def observation_checkpoint(service: Any, connection: Any, task_id: str) -> dict[str, Any] | None:
+    task = connection.execute("SELECT * FROM task_contracts WHERE id = ?", (task_id,)).fetchone()
+    contract = json.loads(task["payload_json"])
+    # 외부 시스템의 freshness를 파일 관측으로 증명할 수 없다.
+    if any(effect["external"] for effect in contract["expected_effects"]):
+        return None
+    project = connection.execute("SELECT * FROM projects WHERE id = ?", (task["project_id"],)).fetchone()
+    spec_row = connection.execute("SELECT payload_json FROM execution_spec_revisions WHERE task_id = ? AND is_current = 1",
+                                  (task_id,)).fetchone()
+    if spec_row is None:
+        return None
+    spec = TaskExecutionSpecRevision.model_validate_json(spec_row["payload_json"])
+    sources = connection.execute("SELECT path FROM context_source_registrations WHERE project_id = ?",
+                                 (task["project_id"],)).fetchall()
+    root = Path(project["root"]).resolve()
+    try:
+        observed = ProjectMapper().build(project_id=task["project_id"], root=root, revision_no=1,
+                                          registered_references=(row["path"] for row in sources),
+                                          excluded_paths=(service.ledger.artifact_root.resolve(),))
+        paths = {item.path for item in spec.definition.resolved_targets}
+        paths.update(item.source_ref for item in spec.definition.context_manifest.fragments)
+        paths.update(path for step in spec.definition.validation_steps for path in step.artifact_paths)
+        files = {}
+        for path in sorted(paths):
+            target = (root / path).resolve()
+            if not target.is_file():
+                return None
+            files[str(target)] = sha256_bytes(target.read_bytes())
+        state_row = connection.execute("SELECT payload_json FROM state_snapshots WHERE project_id = ? AND is_current = 1",
+                                       (task["project_id"],)).fetchone()
+        if state_row is None:
+            return None
+        state = json.loads(state_row["payload_json"])
+        if any(fact["freshness"] != "current" for fact in state["facts"]):
+            return None
+        map_row = connection.execute("SELECT revision_digest, payload_json FROM project_map_revisions "
+                                     "WHERE project_id = ? AND is_current = 1", (task["project_id"],)).fetchone()
+        if map_row is None:
+            return None
+        mapped_paths = {item["path"]: item["content_digest"] for item in json.loads(map_row["payload_json"])["entries"]}
+
+        def derived_file_fact(fact: dict[str, Any]) -> bool:
+            if fact["source_ref"] == "project-map":
+                return fact["value"] == fact["evidence_digest"] == map_row["revision_digest"]
+            path = fact["source_ref"]
+            digest = mapped_paths.get(path)
+            return (fact["fact_id"] == "fact_target_" + sha256_digest(path).split(":", 1)[1][:20]
+                    and fact["predicate"] == f"Goal 관련 target의 현재 content digest: {path}"
+                    and fact["value"] == digest
+                    and fact["evidence_digest"] == sha256_digest({"path": path, "content_digest": digest,
+                                                                  "map": map_row["revision_digest"]}))
+        # Core가 재관측으로 교체하는 map/target 사실은 위의 실제 파일 관측으로 대조한다.
+        # revision ID만 새로 생기는 것과 별도 의미를 가진 State 사실 변경을 구분한다.
+        semantic_facts = [fact for fact in state["facts"] if not derived_file_fact(fact)]
+        return {"format": "local-completion-observation-v1", "root": str(root),
+                "map_semantic_digest": observed.semantic_digest, "files": files,
+                "state_facts_digest": sha256_digest({"facts": semantic_facts, "unknowns": state["unknowns"]})}
+    except (OSError, ValueError):
+        # 읽을 수 없는 근거는 재사용 대상에서 제외한다. 원래 완료 판정을 소급 변경하지 않는다.
+        return None
+
+
+def _contract_semantics(task: Any) -> dict[str, Any]:
+    value = task.model_dump(mode="json")
+    value.pop("task_id")
+    return value
+
+
+def _incoming(plan: PlanContractRevision, task_id: str) -> tuple[Any, ...]:
+    refs = {task.task_id: task.task_ref for task in plan.definition.tasks}
+    return tuple(sorted((refs[item.producer_task_id], item.dependency_type.value, item.products)
+                        for item in plan.definition.dependencies if item.consumer_task_id == task_id))
+
+
+def reuse_completed_tasks(service: Any, tx: Any, plan: PlanContractRevision, previous_id: str) -> tuple[str, ...]:
+    previous = PlanContractRevision.model_validate_json(tx.one("SELECT payload_json FROM plan_revisions WHERE id = ?",
+                                                              (previous_id,))["payload_json"])
+    if previous.definition.goal_contract_digest != plan.definition.goal_contract_digest:
+        return ()
+    previous_tasks = {task.task_ref: task for task in previous.definition.tasks}
+    reused: dict[str, str] = {}
+    remaining = list(plan.definition.tasks)
+    while remaining:
+        progressed = False
+        for task in tuple(remaining):
+            incoming = _incoming(plan, task.task_id)
+            if any(ref not in reused for ref, _, _ in incoming):
+                continue
+            remaining.remove(task)
+            old = previous_tasks.get(task.task_ref)
+            if old is None or _contract_semantics(old) != _contract_semantics(task) or _incoming(previous, old.task_id) != incoming:
+                continue
+            row = tx.one("SELECT status FROM task_contracts WHERE id = ?", (old.task_id,))
+            if row["status"] != "completed":
+                continue
+            origin = tx.maybe_one("SELECT * FROM task_completion_reuse WHERE task_id = ?", (old.task_id,))
+            source_task_id = old.task_id if origin is None else origin["source_task_id"]
+            completion = tx.maybe_one("SELECT payload_json FROM history_events WHERE entity_id = ? "
+                                     "AND event_type = 'task.completed' ORDER BY sequence DESC LIMIT 1", (source_task_id,))
+            if completion is None:
+                continue
+            checkpoint = json.loads(completion["payload_json"]).get("reuse_checkpoint")
+            if checkpoint is None or observation_checkpoint(service, tx.connection, source_task_id) != checkpoint:
+                continue
+            validations = service.effective_task_validation_results(tx.connection, source_task_id)
+            latest = {row["validation_id"]: row for row in validations}
+            if set(latest) != {item.validation_id for item in task.validations}:
+                continue
+            evidence_ids: set[str] = set()
+            valid = True
+            for contract in task.validations:
+                result_row = latest[contract.validation_id]
+                result = ValidationResult.model_validate_json(result_row["payload_json"])
+                history = json.loads(result_row["history_payload_json"])
+                if result.status.value != "pass" or not result.evidence_ids or history.get("reuse_checkpoint") != checkpoint:
+                    valid = False
+                    break
+                evidence = [tx.maybe_one("SELECT * FROM evidence_records WHERE id = ?", (item,)) for item in result.evidence_ids]
+                if (any(item is None or item["project_id"] != task.project_id or item["task_id"] != source_task_id
+                        or item["kind"] in {"external_observation", "user_decision"} for item in evidence)
+                        or not set(contract.required_evidence_kinds).issubset({item["kind"] for item in evidence if item})):
+                    valid = False
+                    break
+                evidence_ids.update(result.evidence_ids)
+            if not valid:
+                continue
+            # Worker 산출물도 원래 ID/Attempt로 연결해 후속 Task의 입력에서 유실하지 않는다.
+            evidence_ids.update(row["id"] for row in service.task_evidence_rows(tx.connection, source_task_id))
+            tx.connection.execute("INSERT INTO task_completion_reuse "
+                                  "(task_id,source_task_id,validation_ids_json,evidence_ids_json,checkpoint_json,created_at) "
+                                  "VALUES (?,?,?,?,?,?)", (task.task_id, source_task_id,
+                                  canonical_json(sorted(row["id"] for row in latest.values())),
+                                  canonical_json(sorted(evidence_ids)), canonical_json(checkpoint), tx.now))
+            tx.connection.execute("UPDATE task_contracts SET status = 'completed', updated_at = ? WHERE id = ?",
+                                  (tx.now, task.task_id))
+            tx.history(task.project_id, "task.completion_reused", "task_contract", task.task_id,
+                       {"source_task_id": source_task_id, "source_plan_revision_id": previous_id,
+                        "checkpoint": checkpoint, "evidence_ids": sorted(evidence_ids)})
+            reused[task.task_ref] = task.task_id
+            progressed = True
+        if not progressed:
+            break
+    return tuple(reused.values())

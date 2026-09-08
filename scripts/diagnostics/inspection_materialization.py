@@ -219,7 +219,7 @@ def _workspace_files(root: Path) -> dict[str, str]:
     }
 
 
-def prepare_relocated_inputs(package: Path, run: Path) -> dict[str, Any]:
+def prepare_relocated_inputs(package: Path, run: Path, *, fixture_version: str = "v5") -> dict[str, Any]:
     """package를 복제하고 고정 fixture의 물리 경로 결속만 새 run에 맞춘다."""
     package_binding = verify_fixture_package(package)
     package_root = Path(package_binding["package"])
@@ -246,7 +246,7 @@ def prepare_relocated_inputs(package: Path, run: Path) -> dict[str, Any]:
     source_inputs = Path(materialization["source_inputs_dir"])
     original_project_map = ProjectMapRevision.model_validate(_read(source_inputs / "input-project-map.json"))
     user_goal_checks = _check_user_goal_paths(source_inputs, original_project_map)
-    build_revision(source_inputs, fixture_revision)
+    build_revision(source_inputs, fixture_revision, fixture_version=fixture_version)
 
     expectations = _read(fixture_revision / "expectations.json")
     static_cases = _static_cases(expectations)

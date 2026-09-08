@@ -13,6 +13,7 @@ from flowmarshal.engine.plan_inspection_eval_v2 import (
 from flowmarshal.engine.plan_inspection_v2 import (
     CompiledPlanInspectionV2, InspectionRowClosureV2, InspectionTargetV2,
     PlanInspectionV2, ResolvedFindingTargetsV2, ReviewFindingV2,
+    TASK_RESULT_FIELD_SEMANTICS_V2, compile_plan_inspection_v2,
     plan_inspection_citation_catalog_v2, plan_inspection_target_catalog_v2,
 )
 from flowmarshal.engine.planning import plan_review_evidence_catalog, plan_validation_scope_rows, validation_comparison_targets
@@ -132,6 +133,38 @@ class PlanInspectionEvalV2Tests(unittest.TestCase):
         self.assertEqual(28, len(report["fixed_ac_link_requirement_assessment"]["link_presence"]))
         self.assertTrue(report["fixed_ac_link_requirement_assessment"]["passed"])
         self.assertEqual(V2_EVALUATION_CONTRACT, report["v2_contract"])
+
+    def test_task_field_description_does_not_suppress_semantic_false_positive(self):
+        """입력 설명이 있어도 Reviewer의 잘못된 finding을 compiler가 PASS로 바꾸지 않는다."""
+        payload, plan, goal, project_map, expectation, inspection, catalog = self._baseline()
+        payload["task_result_field_semantics"] = dict(TASK_RESULT_FIELD_SEMANTICS_V2)
+        citation_catalog = plan_inspection_citation_catalog_v2(catalog, project_map)
+        product_ref = next(
+            item.citation_id for item in citation_catalog
+            if item.source_ref == "artifact:plan_contract"
+            and item.selector == "/definition/tasks/0/produces/3"
+            and item.quote == "evidence:task_validator_review"
+        )
+        finding = ReviewFindingV2(
+            finding_code="TASK_PRODUCES_OWN_FUTURE_VALIDATOR_EVIDENCE",
+            defect_kind="result_order", remediable=True,
+            primary_target_ids=("val_task_validator_review",),
+            direct_extra_refs=(product_ref,), direct_task_refs=(),
+        )
+        compiled = compile_plan_inspection_v2(
+            inspection, findings=(finding,), plan=plan, goal=goal, project_map=project_map,
+            evidence_catalog=catalog, citation_catalog=citation_catalog,
+            target_catalog=plan_inspection_target_catalog_v2(goal, plan),
+        )
+        self.assertEqual(finding.finding_code, compiled.derived_findings[0].finding_code)
+        self.assertIn(product_ref, {item.citation_id for item in compiled.used_citations})
+        report = assess_case_inspection_review_v2(
+            inspection, (finding,), None, expectation, case_id="clean", payload=payload,
+            plan=plan, goal=goal, project_map=project_map, evidence_catalog=catalog,
+        )
+        self.assertFalse(report["passed"])
+        self.assertTrue(report["fixed_ac_link_requirement_assessment"]["passed"])
+        self.assertEqual([finding.finding_code], report["unexpected_findings"])
 
     def test_wrong_positive_scope_link_fails_without_treating_compiled_closure_as_meaning_answer(self):
         payload, plan, goal, project_map, expectation, inspection, catalog = self._baseline()

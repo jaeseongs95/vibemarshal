@@ -15,7 +15,6 @@ from .domain import (
     BehaviorPolicy,
     CandidateDecision,
     CandidateStatus,
-    CommitHorizon,
     ContextManifest,
     CriterionVerdict,
     Criticality,
@@ -295,7 +294,6 @@ def run_synthetic_lifecycle(
                 required_evidence_kinds=("test",),
             ),
         ),
-        commit_horizon=CommitHorizon(),
         planning_budget=PlanningBudgetPolicy(),
         model_inventory_digest=inventory.inventory_digest,
     )
@@ -335,6 +333,7 @@ def run_synthetic_lifecycle(
             decision=plan_decision,
         )
     )
+    service.authorize_goal(project_id=project_id, source="합성 사용자 승인")
     service.activate_plan(
         plan_revision_id=plan.plan_revision_id,
         activation_digest=plan.activation_digest,

@@ -144,6 +144,7 @@ class EngineServiceFixture(unittest.TestCase):
         self.temp.cleanup()
 
     def activate(self) -> None:
+        self.service.authorize_goal(project_id=self.project_id, source="합성 사용자 승인")
         self.service.activate_plan(
             plan_revision_id=self.plan.plan_revision_id,
             activation_digest=self.plan.activation_digest,
@@ -775,6 +776,7 @@ class EngineLedgerServiceTests(EngineServiceFixture):
             )
         )
         self.plan = second_plan
+        self.service.authorize_goal(project_id=self.project_id, source="합성 사용자 승인")
         self.service.activate_plan(
             plan_revision_id=second_plan.plan_revision_id,
             activation_digest=second_plan.activation_digest,

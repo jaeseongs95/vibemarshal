@@ -28,6 +28,7 @@ from .domain import (
     ProjectMapRevision,
     ProjectProfileDefinition,
     ProjectProfileRevision,
+    RecoveryAssessment,
     RevisionStatus,
     RuntimeReceipt,
     SourceTrace,
@@ -74,11 +75,16 @@ from .plan_inspection_provider import (
 )
 from .planning import PlanningError, PlanningSearchOutcome
 from .planning import SkeletonFirstPlanner
-from .runtime import CodexAppServerRuntime, EngineDispatcher, RuntimePolicyError
+from .planning_recovery import PlanningRecoveryPolicy
+from .runtime import CodexAppServerRuntime, CodexProjectBinding, EngineDispatcher, RuntimePolicyError
 from .validation_execution import GoalValidationRetryRequest
 from .roles import CodexStructuredRoleRunner, RoleCallReceipt, StructuredRoleError
 from .reporting import render_final
 from .service import EngineService, EngineServiceError
+from .budget import BudgetManager, BudgetedRoleRunner, GoalBudgetPolicy, receipt_usage
+from .application import EngineApplication, EngineApplicationError
+from .model_rebinding import ModelRebindRequest, ModelRebindingError
+from .role_execution import RoleTimeoutPolicy, use_role_timeout_policy
 
 
 def _json(path: str | Path) -> Any:
@@ -103,6 +109,21 @@ def _role_configuration(arguments: argparse.Namespace) -> EngineRoleConfiguratio
     if path is None:
         return None
     return EngineRoleConfiguration.model_validate(_json(path))
+
+
+def _application(
+    arguments: argparse.Namespace,
+    *,
+    runtime: CodexAppServerRuntime | None = None,
+) -> EngineApplication:
+    return EngineApplication(
+        _service(arguments),
+        runtime=runtime,
+        role_configuration=_role_configuration(arguments),
+        inspection_contract=getattr(
+            arguments, "inspection_contract", PLAN_INSPECTION_PROVIDER_V1
+        ),
+    )
 
 
 def _active_profile_digest(service: EngineService, project_id: str) -> str:
@@ -138,35 +159,8 @@ def _record_role_usage(
     receipts: tuple[RoleCallReceipt, ...] | list[RoleCallReceipt],
 ) -> None:
     for receipt in receipts:
-        service.record_budget_usage(
-            BudgetUsageRecord(
-                usage_id=new_id("usage"),
-                project_id=project_id,
-                goal_contract_digest=goal_digest,
-                stage=stage,
-                logical_call_ref=receipt.call_id,
-                role=receipt.role,
-                call_status=receipt.status,
-                model=receipt.model,
-                effort=receipt.effort,
-                permission_profile=receipt.permission_profile,
-                approval_policy=receipt.approval_policy,
-                thread_id=receipt.thread_id,
-                turn_ids=receipt.turn_ids,
-                input_digest=receipt.input_digest,
-                output_digest=receipt.output_digest,
-                output_schema_digest=receipt.output_schema_digest,
-                runner_receipt_digest=sha256_digest(receipt),
-                input_tokens=receipt.input_tokens,
-                cached_input_tokens=receipt.cached_input_tokens,
-                output_tokens=receipt.output_tokens,
-                reasoning_tokens=receipt.reasoning_tokens,
-                latency_ms=receipt.latency_ms,
-                retry_count=receipt.schema_recovery_attempts,
-                usage_available=receipt.usage_available,
-                recorded_at=receipt.recorded_at,
-            )
-        )
+        service.record_budget_usage(receipt_usage(receipt, project_id=project_id,
+                                                  goal_digest=goal_digest, stage=stage))
 
 
 def _cmd_project_init(arguments: argparse.Namespace) -> None:
@@ -326,6 +320,8 @@ def _goal_definition_from_args(
 def _cmd_goal_create(arguments: argparse.Namespace) -> None:
     service = _service(arguments)
     if arguments.live:
+        goal_id = new_id("goal")
+        BudgetManager(service).require_policy(arguments.project_id, goal_id)
         role_config = _role_configuration(arguments)
         normalizer_model = (
             role_config.normalizer.model if role_config else arguments.normalizer_model
@@ -352,11 +348,12 @@ def _cmd_goal_create(arguments: argparse.Namespace) -> None:
                 "--live에는 request와 normalizer/reviewer model·effort가 모두 필요합니다."
             )
         profile_revision = _active_profile(service, arguments.project_id)
-        with CodexAppServerRuntime(codex_bin=arguments.codex_bin) as runtime:
+        with _runtime(arguments) as runtime:
             inventory = runtime.list_models()
             if role_config is not None:
                 role_config.validate_inventory(inventory)
-            runner = CodexStructuredRoleRunner(runtime)
+            runner = BudgetedRoleRunner(CodexStructuredRoleRunner(runtime, max_schema_recovery_attempts=0, ephemeral_threads=False),
+                service, project_id=arguments.project_id, goal_id=goal_id)
             normalizer = GoalNormalizerAdapter(
                 runner,
                 model=normalizer_model,
@@ -373,6 +370,7 @@ def _cmd_goal_create(arguments: argparse.Namespace) -> None:
             )
             outcome = GoalPreparationPipeline(normalizer, reviewer).prepare(
                 project_id=arguments.project_id,
+                goal_id=goal_id,
                 profile=profile_revision,
                 source_request=arguments.request,
                 observed_facts=service.observe_goal_inputs(arguments.project_id, arguments.request),
@@ -381,20 +379,7 @@ def _cmd_goal_create(arguments: argparse.Namespace) -> None:
             outcome.goal_contract,
             activate=outcome.goal_contract.status is RevisionStatus.READY,
         )
-        _record_role_usage(
-            service,
-            project_id=arguments.project_id,
-            goal_digest=outcome.goal_contract.definition_digest,
-            stage=BudgetStage.GOAL_NORMALIZATION,
-            receipts=(outcome.normalizer_receipt,),
-        )
-        _record_role_usage(
-            service,
-            project_id=arguments.project_id,
-            goal_digest=outcome.goal_contract.definition_digest,
-            stage=BudgetStage.GOAL_REVIEW,
-            receipts=(outcome.reviewer_receipt,),
-        )
+        BudgetManager(service).attach_goal(arguments.project_id, goal_id, outcome.goal_contract.definition_digest)
         _emit(outcome)
         return
     definition = _goal_definition_from_args(service, arguments)
@@ -423,6 +408,7 @@ def _cmd_goal_revise(arguments: argparse.Namespace) -> None:
     if arguments.goal_id and arguments.goal_id != latest.goal_id:
         raise EngineServiceError("--goal-id가 최신 Goal과 다릅니다.")
     if arguments.live:
+        BudgetManager(service).require_policy(arguments.project_id, latest.goal_id)
         role_config = _role_configuration(arguments)
         normalizer_model = (
             role_config.normalizer.model if role_config else arguments.normalizer_model
@@ -449,11 +435,12 @@ def _cmd_goal_revise(arguments: argparse.Namespace) -> None:
                 "--live에는 request와 normalizer/reviewer model·effort가 모두 필요합니다."
             )
         profile_revision = _active_profile(service, arguments.project_id)
-        with CodexAppServerRuntime(codex_bin=arguments.codex_bin) as runtime:
+        with _runtime(arguments) as runtime:
             inventory = runtime.list_models()
             if role_config is not None:
                 role_config.validate_inventory(inventory)
-            runner = CodexStructuredRoleRunner(runtime)
+            runner = BudgetedRoleRunner(CodexStructuredRoleRunner(runtime, max_schema_recovery_attempts=0, ephemeral_threads=False),
+                service, project_id=arguments.project_id, goal_id=latest.goal_id)
             normalizer = GoalNormalizerAdapter(
                 runner,
                 model=normalizer_model,
@@ -481,20 +468,7 @@ def _cmd_goal_revise(arguments: argparse.Namespace) -> None:
             outcome.goal_contract,
             activate=outcome.goal_contract.status is RevisionStatus.READY,
         )
-        _record_role_usage(
-            service,
-            project_id=arguments.project_id,
-            goal_digest=outcome.goal_contract.definition_digest,
-            stage=BudgetStage.GOAL_NORMALIZATION,
-            receipts=(outcome.normalizer_receipt,),
-        )
-        _record_role_usage(
-            service,
-            project_id=arguments.project_id,
-            goal_digest=outcome.goal_contract.definition_digest,
-            stage=BudgetStage.GOAL_REVIEW,
-            receipts=(outcome.reviewer_receipt,),
-        )
+        BudgetManager(service).attach_goal(arguments.project_id, latest.goal_id, outcome.goal_contract.definition_digest)
         _emit(outcome)
         return
     definition = _goal_definition_from_args(service, arguments)
@@ -562,6 +536,8 @@ def _cmd_plan_search(arguments: argparse.Namespace) -> None:
             service.record_skeleton_evaluation(evaluation)
         for evaluation in outcome.plan_evaluations:
             service.register_plan_evaluation(evaluation)
+        service.record_planning_search(outcome)
+        _activate_search_if_authorized(service, arguments.project_id, outcome)
         _emit(outcome)
         return
     if arguments.live:
@@ -613,11 +589,13 @@ def _cmd_plan_search(arguments: argparse.Namespace) -> None:
                 "--live에는 generator/reviewer/executor/validator model·effort가 모두 필요합니다."
             )
         root = Path(service.status(arguments.project_id)["project"]["root"])
-        with CodexAppServerRuntime(codex_bin=arguments.codex_bin) as runtime:
+        with _runtime(arguments) as runtime:
             inventory = runtime.list_models()
             if role_config is not None:
                 role_config.validate_inventory(inventory)
-            runner = CodexStructuredRoleRunner(runtime)
+            BudgetManager(service).require_policy(arguments.project_id, goal.goal_id)
+            runner = BudgetedRoleRunner(CodexStructuredRoleRunner(runtime, max_schema_recovery_attempts=0, ephemeral_threads=False),
+                service, project_id=arguments.project_id, goal_id=goal.goal_id, goal_digest=goal.definition_digest)
             worker_assignment = ModelAssignmentContract(
                 executor=RoleAssignmentPolicy(
                     role="executor",
@@ -680,24 +658,15 @@ def _cmd_plan_search(arguments: argparse.Namespace) -> None:
                 state=state,
                 project_map=project_map,
                 candidate_count=arguments.candidate_count,
+                recovery_policy=(PlanningRecoveryPolicy()
+                                 if arguments.inspection_contract == PLAN_INSPECTION_PROVIDER_V2 else None),
             )
         for evaluation in outcome.skeleton_evaluations:
             service.record_skeleton_evaluation(evaluation)
         for evaluation in outcome.plan_evaluations:
             service.register_plan_evaluation(evaluation)
-        for stage, receipts in (
-            (BudgetStage.SKELETON_GENERATION, generator.receipts),
-            (BudgetStage.SKELETON_REVIEW, skeleton_reviewer.receipts),
-            (BudgetStage.PLAN_EXPANSION, expander.receipts),
-            (BudgetStage.PLAN_REVIEW, plan_reviewer.receipts),
-        ):
-            _record_role_usage(
-                service,
-                project_id=arguments.project_id,
-                goal_digest=goal.definition_digest,
-                stage=stage,
-                receipts=receipts,
-            )
+        service.record_planning_search(outcome)
+        _activate_search_if_authorized(service, arguments.project_id, outcome)
         _emit(outcome)
         return
     _emit(
@@ -734,12 +703,34 @@ def _cmd_plan_compare(arguments: argparse.Namespace) -> None:
 
 
 def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
-    activation_id = _service(arguments).activate_plan(
-        plan_revision_id=arguments.plan_revision_id,
-        activation_digest=arguments.digest,
-        source=arguments.source,
+    service = _service(arguments)
+    if arguments.project_id:
+        activation_id = service.activate_selected_plan(project_id=arguments.project_id)
+    elif arguments.digest:
+        activation_id = service.activate_plan(plan_revision_id=arguments.plan_revision_id,
+                                               activation_digest=arguments.digest, source=arguments.source)
+    else:
+        activation_id = service.activate_authorized_plan(plan_revision_id=arguments.plan_revision_id)
+    _emit({"activation_id": activation_id})
+
+
+def _cmd_goal_authorize(arguments: argparse.Namespace) -> None:
+    from .domain import GoalOperatingPolicy
+    policy = None if arguments.policy_file is None else GoalOperatingPolicy.model_validate(_json(arguments.policy_file))
+    _emit(
+        _application(arguments).authorize(
+            arguments.project_id,
+            source=arguments.source,
+            operating_policy=policy,
+        )
     )
-    _emit({"activation_id": activation_id, "activation_digest": arguments.digest})
+
+
+def _activate_search_if_authorized(service: EngineService, project_id: str, outcome: PlanningSearchOutcome) -> None:
+    with service.ledger.read() as connection:
+        authorized = connection.execute("SELECT id FROM goal_authorizations WHERE project_id = ?", (project_id,)).fetchone()
+    if authorized is not None and outcome.selected_activation_digest is not None:
+        service.activate_selected_plan(project_id=project_id)
 
 
 def _cmd_plan_status(arguments: argparse.Namespace) -> None:
@@ -793,6 +784,12 @@ def _cmd_task_materialize(arguments: argparse.Namespace) -> None:
 
 
 def _runtime(arguments: argparse.Namespace) -> CodexAppServerRuntime:
+    binding_path = getattr(arguments, "codex_project_binding", None)
+    if binding_path is not None:
+        return CodexAppServerRuntime(
+            codex_bin=arguments.codex_bin,
+            project_binding=CodexProjectBinding.model_validate(_json(binding_path)),
+        )
     return CodexAppServerRuntime(codex_bin=arguments.codex_bin)
 
 
@@ -815,21 +812,16 @@ def _wait_dispatched_turn(
 
 
 def _cmd_run_once(arguments: argparse.Namespace) -> None:
-    service = _service(arguments)
     proposal = (
         None
         if arguments.proposal_file is None
         else ExecutionSpecProposal.model_validate(_json(arguments.proposal_file))
     )
     with _runtime(arguments) as runtime:
-        from .execution import ExecutionProposalAdapter
-        role_configuration = _role_configuration(arguments)
-        provider = None if role_configuration is None else ExecutionProposalAdapter(
-            service, CodexStructuredRoleRunner(runtime), role_configuration,
-        )
-        outcome = EngineDispatcher(service, runtime, proposal_provider=provider).run_once(
+        outcome = _application(arguments, runtime=runtime).run_once(
             arguments.project_id,
             proposal=proposal,
+            resume=getattr(arguments, "resume", False),
             goal_validation_step=(None if arguments.goal_validation_file is None
                                   else ValidationExecutionStep.model_validate(_json(arguments.goal_validation_file))),
             goal_validation_retry=(
@@ -837,32 +829,30 @@ def _cmd_run_once(arguments: argparse.Namespace) -> None:
                 else GoalValidationRetryRequest.model_validate(_json(arguments.goal_validation_retry_file))
             ),
         )
-        # 이 CLI 프로세스가 App Server의 소유자다. dispatch 단계만 전이한 뒤
-        # 현재 turn 종료까지 연결을 유지하고 결과 판정은 다음 호출에 맡긴다.
-        _wait_dispatched_turn(service, runtime, outcome.attempt_id)
     _emit(outcome)
 
 
 def _cmd_run_status(arguments: argparse.Namespace) -> None:
-    _emit(_service(arguments).status(arguments.project_id))
+    _emit(_application(arguments).status(arguments.project_id))
 
 
 def _cmd_attempt_show(arguments: argparse.Namespace) -> None:
-    service = _service(arguments)
-    with service.ledger.read() as connection:
-        attempt = connection.execute("SELECT * FROM attempts WHERE id = ?", (arguments.attempt_id,)).fetchone()
-        if attempt is None:
-            raise EngineServiceError("Attempt를 찾을 수 없습니다.")
-        intents = connection.execute(
-            "SELECT * FROM runtime_intents WHERE attempt_id = ? ORDER BY prepared_at, rowid",
-            (arguments.attempt_id,),
-        ).fetchall()
-    _emit({"attempt": dict(attempt), "intents": [dict(row) for row in intents]})
+    _emit(EngineApplication(_service(arguments)).attempt_detail(arguments.attempt_id))
 
 
 def _cmd_attempt_retry(arguments: argparse.Namespace) -> None:
     service = _service(arguments)
-    service.retry_task(task_id=arguments.task_id, new_evidence_ids=tuple(arguments.evidence_id or ()))
+    assessment = (
+        None
+        if arguments.recovery_assessment_file is None
+        else RecoveryAssessment.model_validate(_json(arguments.recovery_assessment_file))
+    )
+    service.retry_task(
+        task_id=arguments.task_id,
+        new_evidence_ids=tuple(arguments.evidence_id or ()),
+        recovery_assessment=assessment,
+        failed_validation_result_id=arguments.failed_validation_result_id,
+    )
     attempt = service.reserve_attempt(task_id=arguments.task_id)
     _emit(attempt)
 
@@ -930,7 +920,25 @@ def _cmd_validate_observe(arguments: argparse.Namespace) -> None:
 
 def _cmd_recover_inspect(arguments: argparse.Namespace) -> None:
     service = _service(arguments)
-    _emit({"unknown_intent_ids": service.recover_inspect(arguments.project_id)})
+    service.recover_inspect(arguments.project_id)
+    _emit(EngineApplication(service).recovery_status(arguments.project_id))
+
+
+def _cmd_model_status(arguments: argparse.Namespace) -> None:
+    application = EngineApplication(_service(arguments))
+    if arguments.live:
+        with _runtime(arguments) as runtime:
+            result = application.model_binding_status(arguments.project_id, inventory=runtime.list_models())
+    else:
+        result = application.model_binding_status(arguments.project_id)
+    _emit(result)
+
+
+def _cmd_model_rebind(arguments: argparse.Namespace) -> None:
+    service = _service(arguments)
+    request = ModelRebindRequest.model_validate(_json(arguments.request_file))
+    with _runtime(arguments) as runtime:
+        _emit(service.rebind_model(request=request, inventory=runtime.list_models()))
 
 
 def _cmd_recover_resume(arguments: argparse.Namespace) -> None:
@@ -963,55 +971,106 @@ def _progress_report(service: EngineService, project_id: str) -> dict[str, Any]:
 
 
 def _cmd_report_progress(arguments: argparse.Namespace) -> None:
-    _emit(_progress_report(_service(arguments), arguments.project_id))
+    _emit(_application(arguments).status(arguments.project_id))
 
 
 def _cmd_report_final(arguments: argparse.Namespace) -> None:
+    report = EngineApplication(_service(arguments)).final_report(arguments.project_id, goal_verdict_id=arguments.goal_verdict_id)
+    if arguments.format == "markdown":
+        print(render_final(goal=report.goal, plan=report.plan, verdict=report.verdict,
+                           usage=report.usage.usage_records, usage_summary=report.usage,
+                           read_only_verification=report.read_only_verification), end="")
+        return
+    _emit(report)
+
+
+def _cmd_budget_set(arguments: argparse.Namespace) -> None:
+    service = _service(arguments)
+    policy = GoalBudgetPolicy.model_validate(_json(arguments.policy_file))
+    identifier = BudgetManager(service).configure(arguments.project_id, policy, goal_id=arguments.goal_id or "")
+    _emit({"policy_revision_id": identifier, "policy": policy.model_dump(mode="json")})
+
+
+def _cmd_budget_show(arguments: argparse.Namespace) -> None:
+    service = _service(arguments)
+    try:
+        usage = EngineApplication(service).usage_summary(
+            arguments.project_id, goal_id=arguments.goal_id
+        )
+    except EngineApplicationError as error:
+        if str(error) not in {"GOAL_NOT_FOUND", "ACTIVE_GOAL_NOT_FOUND"}:
+            raise
+        usage = None
+    status = BudgetManager(service).status(
+        arguments.project_id,
+        goal_id=arguments.goal_id if usage is None else usage.goal_id,
+    )
+    _emit({"budget": status.model_dump(mode="json"), "usage": None if usage is None else usage.model_dump(mode="json")})
+
+
+def _cmd_budget_adjust(arguments: argparse.Namespace) -> None:
+    BudgetManager(_service(arguments)).adjust_unknown(call_id=arguments.call_id,
+        charge_tokens=arguments.charge_tokens, reason=arguments.reason)
+    _emit({"call_id": arguments.call_id, "actual_usage_known": False, "charge_tokens": arguments.charge_tokens})
+
+
+def _cmd_budget_observe(arguments: argparse.Namespace) -> None:
     service = _service(arguments)
     with service.ledger.read() as connection:
-        verdict = connection.execute(
-            "SELECT plan_revision_id, payload_json FROM goal_verdicts WHERE project_id = ? "
-            "ORDER BY evaluated_at DESC, rowid DESC LIMIT 1",
-            (arguments.project_id,),
-        ).fetchone()
-        usage = connection.execute(
-            "SELECT payload_json FROM budget_usage WHERE project_id = ? ORDER BY recorded_at, rowid",
-            (arguments.project_id,),
-        ).fetchall()
-    if verdict is None:
-        raise EngineServiceError("최종 GoalVerdict가 아직 없습니다.")
-    usage_docs = [json.loads(row["payload_json"]) for row in usage]
-    if arguments.format == "markdown":
-        with service.ledger.read() as connection:
-            plan_row = connection.execute(
-                "SELECT payload_json FROM plan_revisions WHERE id = ?",
-                (verdict["plan_revision_id"],),
-            ).fetchone()
-        if plan_row is None:
-            raise EngineServiceError("GoalVerdict의 PlanContract를 찾을 수 없습니다.")
-        print(
-            render_final(
-                goal=service.load_active_goal(arguments.project_id),
-                plan=PlanContractRevision.model_validate_json(plan_row["payload_json"]),
-                verdict=GoalVerdict.model_validate_json(verdict["payload_json"]),
-                usage=tuple(BudgetUsageRecord.model_validate(item) for item in usage_docs),
-            ),
-            end="",
+        call = connection.execute("SELECT receipt_json FROM provider_calls WHERE id=?", (arguments.call_id,)).fetchone()
+    if call is None or call["receipt_json"] is None:
+        raise EngineServiceError("BUDGET_ROLE_RECEIPT_REQUIRED: 원본 역할 receipt가 없습니다.")
+    receipt = RoleCallReceipt.model_validate_json(call["receipt_json"])
+    if receipt.thread_id is None:
+        raise EngineServiceError("BUDGET_ROLE_RECEIPT_REQUIRED: 원본 역할 thread 결속이 없습니다.")
+    with _runtime(arguments) as runtime:
+        if len(receipt.turn_ids) != 1:
+            raise EngineServiceError("BUDGET_ROLE_TURN_BINDING_REQUIRED: 단일 원본 turn이 필요합니다.")
+        observation = runtime.read_stored(thread_id=receipt.thread_id, turn_id=receipt.turn_ids[0])
+    BudgetManager(service).observe_role_terminal(arguments.call_id, observation)
+    _emit({"call_id": arguments.call_id, "observation": observation})
+
+
+def _cmd_prepare(arguments: argparse.Namespace) -> None:
+    if arguments.role_config is None:
+        raise EngineApplicationError("ROLE_CONFIGURATION_REQUIRED")
+    with _runtime(arguments) as runtime:
+        result = _application(arguments, runtime=runtime).prepare(
+            arguments.project_id,
+            source_request=arguments.request,
+            candidate_count=arguments.candidate_count,
         )
-        return
-    _emit(
-        {
-            "verdict": json.loads(verdict["payload_json"]),
-            "budget": {
-                "records": len(usage_docs),
-                "input_tokens": sum(item["input_tokens"] for item in usage_docs),
-                "cached_input_tokens": sum(item["cached_input_tokens"] for item in usage_docs),
-                "output_tokens": sum(item["output_tokens"] for item in usage_docs),
-                "latency_ms": sum(item["latency_ms"] for item in usage_docs),
-            },
-            "ledger_history_valid": service.ledger.verify_history(arguments.project_id),
-        }
-    )
+    _emit(result)
+
+
+def _cmd_observe(arguments: argparse.Namespace) -> None:
+    with _runtime(arguments) as runtime:
+        result = _application(arguments, runtime=runtime).observe(arguments.project_id)
+    _emit(result)
+
+
+def _cmd_pause(arguments: argparse.Namespace) -> None:
+    service = _service(arguments)
+    if service.active_runtime_job(arguments.project_id) is None:
+        result = EngineApplication(service).pause(arguments.project_id, reason=arguments.reason)
+    else:
+        with _runtime(arguments) as runtime:
+            result = EngineApplication(service, runtime=runtime).pause(
+                arguments.project_id, reason=arguments.reason
+            )
+    _emit(result)
+
+
+def _cmd_cancel(arguments: argparse.Namespace) -> None:
+    service = _service(arguments)
+    if service.active_runtime_job(arguments.project_id) is None:
+        result = EngineApplication(service).cancel(arguments.project_id, reason=arguments.reason)
+    else:
+        with _runtime(arguments) as runtime:
+            result = EngineApplication(service, runtime=runtime).cancel(
+                arguments.project_id, reason=arguments.reason
+            )
+    _emit(result)
 
 
 def _add_goal_arguments(parser: argparse.ArgumentParser, *, revise: bool = False) -> None:
@@ -1039,9 +1098,75 @@ def _add_goal_arguments(parser: argparse.ArgumentParser, *, revise: bool = False
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="flowmarshal-engine", description="FlowMarshal 새 authority engine")
+    parser.add_argument("--role-timeout-policy", help="역할별 timeout 운영 설정 JSON")
+    parser.add_argument("--codex-project-binding", help="새 역할·Worker thread의 App Server 프로젝트 결속 JSON")
     parser.add_argument("--db", default=str(Path.cwd() / ".flowmarshal-engine" / DEFAULT_DB_NAME))
     parser.add_argument("--artifacts", default=str(Path.cwd() / ".flowmarshal-engine" / DEFAULT_ARTIFACT_DIRECTORY))
     commands = parser.add_subparsers(dest="command", required=True)
+
+    prepare = commands.add_parser(
+        "prepare",
+        help="raw request를 실제 Goal 정규화·독립 review·Planning으로 준비",
+    )
+    prepare.add_argument("--project-id", required=True)
+    prepare.add_argument("--request", required=True)
+    prepare.add_argument("--role-config", required=True)
+    prepare.add_argument("--codex-bin")
+    prepare.add_argument("--candidate-count", type=int, choices=(1, 2, 3))
+    prepare.add_argument(
+        "--inspection-contract",
+        choices=(PLAN_INSPECTION_PROVIDER_V1, PLAN_INSPECTION_PROVIDER_V2),
+        default=PLAN_INSPECTION_PROVIDER_V1,
+    )
+    prepare.set_defaults(handler=_cmd_prepare)
+
+    authorize_facade = commands.add_parser(
+        "authorize", help="목표·범위·효과·운영 정책을 승인하고 선택 Plan을 활성화"
+    )
+    authorize_facade.add_argument("--project-id", required=True)
+    authorize_facade.add_argument("--source", default="cli-user")
+    authorize_facade.add_argument("--policy-file")
+    authorize_facade.set_defaults(handler=_cmd_goal_authorize)
+
+    run_once_facade = commands.add_parser("run-once", help="bounded scheduler tick 한 번 실행")
+    run_once_facade.add_argument("--project-id", required=True)
+    run_once_facade.add_argument("--codex-bin")
+    run_once_facade.add_argument("--proposal-file")
+    run_once_facade.add_argument("--role-config")
+    run_once_facade.add_argument("--resume", action="store_true")
+    facade_goal_validation = run_once_facade.add_mutually_exclusive_group()
+    facade_goal_validation.add_argument("--goal-validation-file")
+    facade_goal_validation.add_argument("--goal-validation-retry-file")
+    run_once_facade.set_defaults(handler=_cmd_run_once)
+
+    observe_facade = commands.add_parser("observe", help="active provider job을 한 번 관측")
+    observe_facade.add_argument("--project-id", required=True)
+    observe_facade.add_argument("--codex-bin")
+    observe_facade.set_defaults(handler=_cmd_observe)
+
+    pause_facade = commands.add_parser("pause", help="현재 Goal workflow 일시정지")
+    pause_facade.add_argument("--project-id", required=True)
+    pause_facade.add_argument("--reason", default="사용자 요청")
+    pause_facade.add_argument("--codex-bin")
+    pause_facade.set_defaults(handler=_cmd_pause)
+
+    cancel_facade = commands.add_parser("cancel", help="현재 Goal workflow 취소")
+    cancel_facade.add_argument("--project-id", required=True)
+    cancel_facade.add_argument("--reason", default="사용자 요청")
+    cancel_facade.add_argument("--codex-bin")
+    cancel_facade.set_defaults(handler=_cmd_cancel)
+
+    status_facade = commands.add_parser("status", help="Core·control·job 상태 표시")
+    status_facade.add_argument("--project-id", required=True)
+    status_facade.set_defaults(handler=_cmd_run_status)
+
+    final_report_facade = commands.add_parser(
+        "final-report", help="GoalVerdict에 결속된 최종 보고 표시"
+    )
+    final_report_facade.add_argument("--project-id", required=True)
+    final_report_facade.add_argument("--format", choices=("json", "markdown"), default="json")
+    final_report_facade.add_argument("--goal-verdict-id")
+    final_report_facade.set_defaults(handler=_cmd_report_final)
 
     project = commands.add_parser("project")
     project_commands = project.add_subparsers(dest="project_command", required=True)
@@ -1075,6 +1200,39 @@ def build_parser() -> argparse.ArgumentParser:
     source_list.add_argument("--project-id", required=True)
     source_list.set_defaults(handler=_cmd_project_source_list)
 
+    budget = project_commands.add_parser("budget")
+    budget_commands = budget.add_subparsers(dest="budget_command", required=True)
+    budget_set = budget_commands.add_parser("set")
+    budget_set.add_argument("--project-id", required=True)
+    budget_set.add_argument("--goal-id")
+    budget_set.add_argument("--policy-file", required=True)
+    budget_set.set_defaults(handler=_cmd_budget_set)
+    budget_show = budget_commands.add_parser("show")
+    budget_show.add_argument("--project-id", required=True)
+    budget_show.add_argument("--goal-id")
+    budget_show.set_defaults(handler=_cmd_budget_show)
+    budget_adjust = budget_commands.add_parser("adjust-unknown")
+    budget_adjust.add_argument("--call-id", required=True)
+    budget_adjust.add_argument("--charge-tokens", type=int, required=True)
+    budget_adjust.add_argument("--reason", required=True)
+    budget_adjust.set_defaults(handler=_cmd_budget_adjust)
+    budget_observe = budget_commands.add_parser("observe-role")
+    budget_observe.add_argument("--call-id", required=True)
+    budget_observe.add_argument("--codex-bin")
+    budget_observe.set_defaults(handler=_cmd_budget_observe)
+
+    model = commands.add_parser("model")
+    model_commands = model.add_subparsers(dest="model_command", required=True)
+    model_status = model_commands.add_parser("status")
+    model_status.add_argument("--project-id", required=True)
+    model_status.add_argument("--live", action="store_true")
+    model_status.add_argument("--codex-bin")
+    model_status.set_defaults(handler=_cmd_model_status)
+    model_rebind = model_commands.add_parser("rebind")
+    model_rebind.add_argument("--request-file", required=True)
+    model_rebind.add_argument("--codex-bin")
+    model_rebind.set_defaults(handler=_cmd_model_rebind)
+
     goal = commands.add_parser("goal")
     goal_commands = goal.add_subparsers(dest="goal_command", required=True)
     create = goal_commands.add_parser("create")
@@ -1086,6 +1244,11 @@ def build_parser() -> argparse.ArgumentParser:
     goal_show = goal_commands.add_parser("show")
     goal_show.add_argument("--project-id", required=True)
     goal_show.set_defaults(handler=_cmd_goal_show)
+    authorize = goal_commands.add_parser("authorize", help="목표·대상·효과·운영 정책 승인 후 선택 Plan 자동 활성화")
+    authorize.add_argument("--project-id", required=True)
+    authorize.add_argument("--source", default="cli-user")
+    authorize.add_argument("--policy-file")
+    authorize.set_defaults(handler=_cmd_goal_authorize)
 
     plan = commands.add_parser("plan")
     plan_commands = plan.add_subparsers(dest="plan_command", required=True)
@@ -1115,8 +1278,10 @@ def build_parser() -> argparse.ArgumentParser:
     compare.add_argument("--project-id", required=True)
     compare.set_defaults(handler=_cmd_plan_compare)
     activate = plan_commands.add_parser("activate")
-    activate.add_argument("--plan-revision-id", required=True)
-    activate.add_argument("--digest", required=True)
+    activation_target = activate.add_mutually_exclusive_group(required=True)
+    activation_target.add_argument("--project-id", help="Core가 선택한 후보를 활성화")
+    activation_target.add_argument("--plan-revision-id", help="내부 진단용 후보 식별자")
+    activate.add_argument("--digest", help="선택적 내부 digest 검증")
     activate.add_argument("--source", default="cli")
     activate.set_defaults(handler=_cmd_plan_activate)
     plan_status = plan_commands.add_parser("status")
@@ -1143,6 +1308,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_once.add_argument("--codex-bin")
     run_once.add_argument("--proposal-file")
     run_once.add_argument("--role-config")
+    run_once.add_argument("--resume", action="store_true")
     goal_validation_input = run_once.add_mutually_exclusive_group()
     goal_validation_input.add_argument("--goal-validation-file")
     goal_validation_input.add_argument("--goal-validation-retry-file")
@@ -1163,6 +1329,8 @@ def build_parser() -> argparse.ArgumentParser:
     retry = attempt_commands.add_parser("retry")
     retry.add_argument("--task-id", required=True)
     retry.add_argument("--evidence-id", action="append")
+    retry.add_argument("--recovery-assessment-file", type=Path)
+    retry.add_argument("--failed-validation-result-id")
     retry.set_defaults(handler=_cmd_attempt_retry)
     resume = attempt_commands.add_parser("resume")
     resume.add_argument("--attempt-id", required=True)
@@ -1215,6 +1383,7 @@ def build_parser() -> argparse.ArgumentParser:
     final = report_commands.add_parser("final")
     final.add_argument("--project-id", required=True)
     final.add_argument("--format", choices=("json", "markdown"), default="json")
+    final.add_argument("--goal-verdict-id")
     final.set_defaults(handler=_cmd_report_final)
     return parser
 
@@ -1223,7 +1392,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     arguments = parser.parse_args(argv)
     try:
-        arguments.handler(arguments)
+        policy = (RoleTimeoutPolicy() if arguments.role_timeout_policy is None else
+                  RoleTimeoutPolicy.model_validate(_json(arguments.role_timeout_policy)))
+        with use_role_timeout_policy(policy):
+            arguments.handler(arguments)
     except StructuredRoleError as error:
         _emit(
             {
@@ -1236,6 +1408,8 @@ def main(argv: list[str] | None = None) -> int:
     except (
         AssignmentResolutionError,
         EngineServiceError,
+        EngineApplicationError,
+        ModelRebindingError,
         EngineLedgerError,
         GoalPreparationError,
         PlannerRoleAdapterError,
@@ -1246,7 +1420,9 @@ def main(argv: list[str] | None = None) -> int:
         OSError,
         KeyError,
     ) as error:
-        _emit({"error": type(error).__name__, "message": str(error)})
+        prefix = str(error).split(":", 1)[0]
+        code = getattr(error, "code", None) or (prefix if prefix.isupper() and " " not in prefix else None)
+        _emit({"error": type(error).__name__, "error_code": code, "message": str(error)})
         return 2
     return 0
 

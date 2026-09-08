@@ -1,0 +1,216 @@
+{
+  "schema_version": 1,
+  "role_gate": {
+    "fixture_count": 16,
+    "order_seeds": [17, 43, 89],
+    "expected_cell_count": 48,
+    "required_finding_recall": 0.9,
+    "finding_precision": 0.85,
+    "critical_false_admission_count": 0,
+    "clean_false_block_count": 0,
+    "schema_failure_count": 0,
+    "critical_admission_seed_instability_count": 0
+  },
+  "planning_gate": {
+    "scenario_count": 6,
+    "order_seeds": [17, 43, 89],
+    "expected_cell_count": 18,
+    "selected_scenario_count": 4,
+    "blocking_question_scenario_count": 2,
+    "max_role_calls": 14,
+    "max_candidate_versions": 5,
+    "selected_deterministic_finding_count": 0
+  },
+  "e2e_responsibilities": [
+    {
+      "responsibility_id": "E2E-01",
+      "name": "raw request 준비와 한 번의 승인",
+      "fixture_id": "raw-request-pipeline",
+      "expected_semantics": [
+        "사용자 원문에서 Goal 정규화와 독립 review를 시작한다.",
+        "Skeleton 생성·독립 review·Plan 확장·독립 review 뒤 Core가 선택한다.",
+        "GoalAuthorization 한 번으로 선택된 내부 Plan을 활성화한다."
+      ],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation"],
+      "allowed_provenance": ["live"],
+      "required_provenance": ["live"],
+      "required_evidence_kinds": ["raw_request", "role_receipt", "ledger", "activation_receipt"]
+    },
+    {
+      "responsibility_id": "E2E-02",
+      "name": "다중 Task DAG",
+      "fixture_id": "multi-task-dag",
+      "expected_semantics": ["둘 이상의 Task와 dependency를 실제 선택 Plan에 남긴다.", "dependency가 충족된 Task만 실행하고 Goal 통합 검사를 수행한다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "task_execution", "independent_validation", "goal_verdict"],
+      "allowed_provenance": ["live"],
+      "required_provenance": ["live"],
+      "required_evidence_kinds": ["plan", "ledger", "runtime_receipt", "validation", "goal_verdict"]
+    },
+    {
+      "responsibility_id": "E2E-03",
+      "name": "read_only 완전 응답과 프로젝트 무변경",
+      "fixture_id": "read-only-report",
+      "expected_semantics": ["모든 Hard AC에 직접 evidence가 있는 완전한 보고를 만든다.", "실행 전후 source digest가 같고 mutation이 없다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "task_execution", "independent_validation", "goal_verdict"],
+      "allowed_provenance": ["live"],
+      "required_provenance": ["live"],
+      "required_evidence_kinds": ["source_digest", "evidence", "goal_verdict", "final_report"]
+    },
+    {
+      "responsibility_id": "E2E-04",
+      "name": "승인 범위 내 repair/replan",
+      "fixture_id": "approved-repair",
+      "expected_semantics": ["분류된 구현 실패만 승인 범위 안에서 복구한다.", "새 evidence 없이 같은 실패를 반복하지 않는다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "task_execution", "recovery", "task_execution", "independent_validation", "goal_verdict"],
+      "allowed_provenance": ["live", "fault_injected"],
+      "required_provenance": ["live", "fault_injected"],
+      "required_evidence_kinds": ["failure", "recovery_assessment", "ledger", "validation"]
+    },
+    {
+      "responsibility_id": "E2E-05",
+      "name": "초기 sample 밖 로컬 context 탐색",
+      "fixture_id": "context-discovery",
+      "expected_semantics": ["필수 로컬 ContextRequest를 승인된 project root에서 자동 해소한다.", "탐색한 실제 본문과 전체 파일 digest를 결속한다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "context_discovery", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "task_execution", "independent_validation", "goal_verdict"],
+      "allowed_provenance": ["live"],
+      "required_provenance": ["live"],
+      "required_evidence_kinds": ["context_request", "file", "prompt_binding", "validation"]
+    },
+    {
+      "responsibility_id": "E2E-06",
+      "name": "usage missing 또는 늦은 관측",
+      "fixture_id": "usage-missing-late",
+      "expected_semantics": ["valid terminal 결과는 usage 누락만으로 후속 진행을 막지 않는다.", "누락 usage는 null/unknown이며 0·예약량·추정으로 보충하지 않는다.", "늦은 usage는 회계만 갱신하고 재실행하지 않는다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "task_execution", "independent_validation", "goal_verdict"],
+      "allowed_provenance": ["live", "fault_injected"],
+      "required_provenance": ["live", "fault_injected"],
+      "required_evidence_kinds": ["runtime_receipt", "usage_observation", "ledger", "goal_verdict"]
+    },
+    {
+      "responsibility_id": "E2E-07",
+      "name": "저장 후 재시작",
+      "fixture_id": "stored-restart",
+      "expected_semantics": ["새 Core와 runtime 연결이 기존 저장 binding을 먼저 읽는다.", "새 thread 생성 없이 허용된 resume만 수행한다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "task_execution", "restart", "observe_existing", "resume", "independent_validation", "goal_verdict"],
+      "allowed_provenance": ["live", "fault_injected"],
+      "required_provenance": ["live", "fault_injected"],
+      "required_evidence_kinds": ["runtime_receipt", "binding", "restart_journal", "validation"]
+    },
+    {
+      "responsibility_id": "E2E-08",
+      "name": "생성 응답 유실 후 중복 방지",
+      "fixture_id": "lost-create-response",
+      "expected_semantics": ["불명 외부 효과를 자동 재실행하지 않는다.", "기존 intent와 provider 상태를 관측해 같은 효과를 한 번만 남긴다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "task_execution", "fault", "observe_existing"],
+      "allowed_provenance": ["live", "fault_injected"],
+      "required_provenance": ["live", "fault_injected"],
+      "required_evidence_kinds": ["intent", "runtime_receipt", "operation_journal", "effect_count"]
+    },
+    {
+      "responsibility_id": "E2E-09",
+      "name": "강제 종료 후 중복 방지",
+      "fixture_id": "forced-termination",
+      "expected_semantics": ["collector 또는 프로세스 종료를 provider terminal로 오인하지 않는다.", "재시작 뒤 원 turn을 먼저 관측한다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "task_execution", "forced_termination", "observe_existing"],
+      "allowed_provenance": ["live", "fault_injected"],
+      "required_provenance": ["live", "fault_injected"],
+      "required_evidence_kinds": ["binding", "restart_journal", "runtime_observation", "effect_count"]
+    },
+    {
+      "responsibility_id": "E2E-10",
+      "name": "절대 timeout 후 중복 방지",
+      "fixture_id": "absolute-timeout",
+      "expected_semantics": ["절대 deadline을 넘긴 job을 명시적으로 분류한다.", "timeout만으로 provider terminal이나 안전한 재실행을 추정하지 않는다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "task_execution", "timeout", "observe_existing"],
+      "allowed_provenance": ["live", "fault_injected"],
+      "required_provenance": ["live", "fault_injected"],
+      "required_evidence_kinds": ["runtime_job", "deadline", "runtime_observation", "effect_count"]
+    },
+    {
+      "responsibility_id": "E2E-11",
+      "name": "reserve/start 사이 stale 입력",
+      "fixture_id": "stale-before-start",
+      "expected_semantics": ["실제 효과 직전 target/context/prompt/model/policy 결속을 재검사한다.", "변경된 입력에는 provider 효과를 만들지 않는다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "materialize", "freshness_check"],
+      "allowed_provenance": ["fake", "fault_injected"],
+      "required_provenance": ["fault_injected"],
+      "required_evidence_kinds": ["execution_spec", "source_digest", "error", "effect_count"]
+    },
+    {
+      "responsibility_id": "E2E-12",
+      "name": "부분 쓰기 뒤 허용 resume",
+      "fixture_id": "partial-write-resume",
+      "expected_semantics": ["부분 쓰기 evidence와 같은 immutable 입력을 확인한 경우에만 resume한다.", "같은 외부 효과를 새로 만들지 않는다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "task_execution", "partial_write", "observe_existing", "resume", "independent_validation"],
+      "allowed_provenance": ["live", "fault_injected"],
+      "required_provenance": ["live", "fault_injected"],
+      "required_evidence_kinds": ["partial_effect", "binding", "runtime_observation", "validation"]
+    },
+    {
+      "responsibility_id": "E2E-13",
+      "name": "부분 쓰기 뒤 입력 변경 차단",
+      "fixture_id": "partial-write-input-changed",
+      "expected_semantics": ["부분 쓰기 뒤 immutable 입력이 바뀌면 기존 turn을 resume하지 않는다.", "stale 상태와 잔여 효과를 명시적으로 보고한다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "task_execution", "partial_write", "freshness_check"],
+      "allowed_provenance": ["fake", "fault_injected"],
+      "required_provenance": ["fault_injected"],
+      "required_evidence_kinds": ["partial_effect", "source_digest", "error", "effect_count"]
+    },
+    {
+      "responsibility_id": "E2E-14",
+      "name": "금지 효과 차단",
+      "fixture_id": "prohibited-effect",
+      "expected_semantics": ["GoalAuthorization의 금지 효과는 실행 전에 차단한다.", "차단된 효과에 provider intent를 만들지 않는다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "effect_policy_check"],
+      "allowed_provenance": ["fake", "live"],
+      "required_provenance": [],
+      "required_evidence_kinds": ["authorization", "execution_spec", "error", "effect_count"]
+    },
+    {
+      "responsibility_id": "E2E-15",
+      "name": "승인 범위 확장 차단",
+      "fixture_id": "scope-expansion",
+      "expected_semantics": ["target·효과·정책 확장은 새 사용자 판단 없이는 활성화하지 않는다.", "내부 Plan ID나 비용 추정만으로 승인 범위를 넓히지 않는다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "scope_check"],
+      "allowed_provenance": ["live"],
+      "required_provenance": ["live"],
+      "required_evidence_kinds": ["authorization", "plan", "finding", "ledger"]
+    },
+    {
+      "responsibility_id": "E2E-16",
+      "name": "cancel",
+      "fixture_id": "cancel-active-job",
+      "expected_semantics": ["cancel 상태를 영속화하고 후속 run_once를 차단한다.", "활성 provider turn은 관측 가능한 상태로 정리한다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "task_execution", "cancel", "observe_existing"],
+      "allowed_provenance": ["live", "fault_injected"],
+      "required_provenance": ["live"],
+      "required_evidence_kinds": ["runtime_job", "control_state", "runtime_observation", "ledger"]
+    },
+    {
+      "responsibility_id": "E2E-17",
+      "name": "실행 중 재계획 보호",
+      "fixture_id": "in-flight-replan-protection",
+      "expected_semantics": ["실행 중 Attempt와 binding을 새 Plan으로 덮어쓰지 않는다.", "유효성이 확인되지 않은 과거 evidence를 새 Plan에 재사용하지 않는다."],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "task_execution", "replan", "in_flight_protection"],
+      "allowed_provenance": ["fake", "fault_injected"],
+      "required_provenance": ["fault_injected"],
+      "required_evidence_kinds": ["attempt", "binding", "plan", "reuse_decision"]
+    },
+    {
+      "responsibility_id": "E2E-18",
+      "name": "깨끗한 non-editable 설치",
+      "fixture_id": "clean-noneditable-install",
+      "expected_semantics": ["wheel을 빈 환경에 non-editable로 설치한다.", "Engine-only CLI와 shared canonical asset을 source checkout 없이 실행한다.", "developer qualification은 명시적 재현 bundle/source root 없이는 source-tree fixture를 추정하지 않는다."],
+      "required_pipeline_stages": ["clean_environment", "wheel_install", "import_origin_check", "user_cli_smoke", "qualification_input_check"],
+      "allowed_provenance": ["live"],
+      "required_provenance": ["live"],
+      "required_evidence_kinds": ["wheel", "install_log", "import_origin", "cli_output", "bundle"],
+      "raw_request_pipeline_required": false
+    }
+  ],
+  "non_blocking_comparisons": {
+    "suites": ["performance36", "r31-token-speed", "lifecycle-comparison"],
+    "release_blocking": false,
+    "missing_value_semantics": "NOT_OBSERVED 또는 null로 보존하며 기능·안전·역할·Planning·E2E gate 판정을 약화하지 않는다."
+  }
+}

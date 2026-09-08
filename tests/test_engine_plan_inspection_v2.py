@@ -14,6 +14,7 @@ from flowmarshal.engine.plan_inspection_provider import (
     verify_plan_inspection_result_binding,
 )
 from flowmarshal.engine.plan_inspection_v2 import (
+    TASK_RESULT_FIELD_SEMANTICS_V2,
     PlanInspectionV2,
     ReviewFindingV2,
     compile_plan_inspection_v2,
@@ -29,6 +30,7 @@ from flowmarshal.engine.planner_roles import (
     SkeletonGeneratorAdapter,
 )
 from flowmarshal.engine.roles import RoleCallResult, ScriptedStructuredRoleRunner
+from flowmarshal.engine.validation_obligations import EXPLICIT_VALIDATION_OBLIGATION_INSTRUCTIONS
 from tests.engine_helpers import assignment, goal as simple_goal, inventory, profile, project_map, state
 from tests.engine_inspection_helpers import inspection_fixture
 from tests.test_engine_role_adapters import _plan_response, _skeleton_response
@@ -321,6 +323,59 @@ class PlanInspectionV2Tests(unittest.TestCase):
         self.assertFalse(witness.observed_present)
         self.assertIsNone(witness.member_selector)
         self.assertTrue(witness.collection_selector.endswith("/validation_ids"))
+        with self.assertRaisesRegex(PlanInspectionError, "AC coverage finding 일관성"):
+            compile_fixture(inspection, plan=changed_plan)
+        with self.assertRaisesRegex(PlanInspectionError, "AC coverage finding 일관성"):
+            compile_fixture(inspection, findings, plan=plan)
+
+    def test_other_scope_finding_does_not_replace_required_missing_coverage_finding(self):
+        plan, _, _, _, inspection = v2_inputs()
+        row = next(item for item in compile_fixture(inspection).ac_validation_decisions
+                   if item.ac_link_required)
+        raw_plan = plan.model_dump(mode="json")
+        coverage = next(item for item in raw_plan["definition"]["goal_coverage"]
+                        if item["criterion_id"] == row.criterion_id)
+        coverage["validation_ids"].remove(row.validation_id)
+        raw_plan["definition_digest"] = sha256_digest(raw_plan["definition"])
+        changed_plan = PlanContractRevision.model_validate(raw_plan)
+
+        raw_inspection = inspection.model_dump(mode="json")
+        extra_scope = next(item for item in raw_inspection["validation_scope_rows"]
+                           if item["scope_id"] == row.scope_ids[0]).copy()
+        extra_scope.update(
+            scope_id="separate_unsupported_claim",
+            status="contradicted",
+            claim="같은 검사 수단에 추가로 부여한 별도 책임은 지원되지 않는다.",
+        )
+        raw_inspection["validation_scope_rows"].append(extra_scope)
+        changed_inspection = PlanInspectionV2.model_validate(raw_inspection)
+        scope_finding = {
+            "finding_code": "SEPARATE_SCOPE_DEFECT",
+            "defect_kind": "validation_scope",
+            "remediable": True,
+            **finding_targets("validation_scope", extra_scope["scope_id"]),
+        }
+        with self.assertRaisesRegex(PlanInspectionError, "AC coverage finding 일관성"):
+            compile_fixture(changed_inspection, (scope_finding,), plan=changed_plan)
+        self.assertEqual(raw_inspection, changed_inspection.model_dump(mode="json"))
+
+        link_finding = {
+            "finding_code": "SEPARATE_MISSING_LINK",
+            "defect_kind": "missing_validation_link",
+            "remediable": True,
+            **finding_targets(
+                "ac_validation", row.criterion_id,
+                secondary_ref=row.validation_id, plan=changed_plan,
+            ),
+        }
+        compiled = compile_fixture(
+            changed_inspection, (scope_finding, link_finding), plan=changed_plan,
+        )
+        self.assertEqual(
+            {"SEPARATE_SCOPE_DEFECT", "SEPARATE_MISSING_LINK"},
+            {finding.finding_code for finding in compiled.derived_findings},
+        )
+        self.assertEqual(raw_inspection, changed_inspection.model_dump(mode="json"))
 
     def test_unknown_direct_ref_is_rejected(self):
         *_, inspection = v2_inputs()
@@ -649,8 +704,13 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
             )
             request = runner.calls[-1]
             self.assertEqual(draft["tasks"][0]["objective"], plan.definition.tasks[0].objective)
+            self.assertEqual(draft["tasks"][0]["produces"], list(plan.definition.tasks[0].produces))
+            self.assertEqual(
+                dict(TASK_RESULT_FIELD_SEMANTICS_V2), request.payload["task_result_field_semantics"],
+            )
             self.assertIn("plan-inspection-v2", request.instructions)
             self.assertIn(PLAN_VALIDATION_TRACE_V2_INSTRUCTIONS, request.instructions)
+            self.assertEqual(1, request.instructions.count(EXPLICIT_VALIDATION_OBLIGATION_INSTRUCTIONS))
             for v1_field in (
                 "citations에 원문", "basis_refs", "claim_ref", "affected_task_refs",
                 "ac_validation_rows",
@@ -720,7 +780,18 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
         )
         request = runner.calls[-1]
         self.assertEqual((), submission.findings)
+        self.assertEqual(1, request.instructions.count(EXPLICIT_VALIDATION_OBLIGATION_INSTRUCTIONS))
+        self.assertIn("Reviewer는 최종 제출 전에", request.instructions)
+        self.assertIn("goal_coverage.validation_ids와 대조한다", request.instructions)
+        self.assertIn("ac_validation target을 missing_validation_link finding에 빠짐없이 포함한다", request.instructions)
+        self.assertIn("다른 scope finding은 이 연결 누락 finding을 대신하지 않으며", request.instructions)
         self.assertEqual(4, submission.ratings.verification)
+        self.assertEqual(
+            dict(TASK_RESULT_FIELD_SEMANTICS_V2), request.payload["task_result_field_semantics"],
+        )
+        self.assertEqual(
+            plan.model_dump(mode="json"), request.payload["evidence_catalog"]["artifact:plan_contract"],
+        )
         self.assertNotIn("target_refs", str(request.output_schema))
         self.assertNotIn("InspectionTargetV2", str(request.output_schema))
         finding_properties = request.output_schema["properties"]["review"]["anyOf"][1][
@@ -749,6 +820,13 @@ class PlanInspectionV2AdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "REQUEST_BINDING_MISMATCH"):
             verify_plan_inspection_result_binding(
                 changed, request, RoleCallResult(payload=envelope, receipt=adapter.receipts[-1]),
+            )
+        changed_payload = deepcopy(request.payload)
+        changed_payload["task_result_field_semantics"]["produces"] = "Worker 응답에 포함할 필수 항목."
+        changed_request = request.model_copy(update={"payload": changed_payload})
+        with self.assertRaisesRegex(ValueError, "REQUEST_BINDING_MISMATCH"):
+            verify_plan_inspection_result_binding(
+                binding, changed_request, RoleCallResult(payload=envelope, receipt=adapter.receipts[-1]),
             )
 
 

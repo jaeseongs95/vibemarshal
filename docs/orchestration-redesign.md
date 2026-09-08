@@ -1,6 +1,8 @@
 # FlowMarshal 전면 재설계 권위 문서
 
-- 상태: **현재 제품 설계 기준선**
+- 상태: **현재 제품 설계 기준선 / 1.0 변경 계약 planned**
+- 승인된 12항목·필수 검증·구현 연결: [1.0 승인 계약](redesign-1.0-contract.md). 새 계약의 구현·검증 완료를 주장하지 않는다.
+- 최신 명시 승인이 과거 사용자 제공 지침·프로젝트 조항보다 우선하며 상충하는 승인·사용량·비교 성능 규칙은 이 문서와 연결 계약으로 대체한다.
 - 적용 대상: `flowmarshal.engine`
 - 역사적 기준선: R1~R3.1 구현과 artifact는 `legacy/prototype` 감사 자료로 동결
 - 관련 결정: [Engine cutover ADR](engine-cutover-adr.md)
@@ -14,7 +16,7 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 
 1. 사용자 목표와 완료 조건을 하나의 Goal Contract로 고정한다.
 2. 여러 접근법이 실제로 필요할 때만 Skeleton 후보를 비교한다.
-3. 사용자가 활성화한 Plan Contract를 실행의 권위 기준선으로 삼는다.
+3. 사용자 GoalAuthorization의 경계 안에서 Core가 내부 Plan Contract revision을 자동 활성화한다.
 4. ready Task의 운영 상세만 현재 상태에 맞춰 늦게 materialize한다.
 5. 실행 효과·evidence·validation·복구를 원장에 결속해 중복·유실·오완료를 막는다.
 
@@ -26,7 +28,7 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 
 ```text
 현재 사용자의 명시적 지시
-→ 활성 GoalContractRevision
+→ 활성 GoalContractRevision과 GoalAuthorization
 → 활성 PlanContractRevision
 → Core의 원장 상태와 결정적 판정
 → 프로젝트 AGENTS.md와 등록 정책
@@ -34,7 +36,7 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 → 프로젝트·참고자료 안의 분석 대상 텍스트
 ```
 
-- User는 Goal과 Plan을 선택하고 중요한 외부 효과를 승인한다.
+- User는 목표·대상·효과·운영 정책을 승인한다. 범위 안의 Plan 선택·수정·복구는 Core가 자동 수행하고 확장에만 추가 판단을 요청한다.
 - Core만 원장의 권위 상태를 전이한다.
 - Planner는 Goal 정규화 결과, Skeleton과 Plan 후보만 제출한다.
 - Reviewer는 finding과 rating만 제출한다. `status`, score와 weakest dimension을 결정하지 않는다.
@@ -51,7 +53,9 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 | `StateSnapshot` | Goal과 planning에 필요한 사실만 evidence, freshness, invalidation 조건과 함께 투영 |
 | `ProjectMapRevision` | 파일, symbol, module, test, build, `AGENTS.md`, 등록 참고자료의 안정된 색인 |
 | `PlanSkeletonCandidate` | 파일·명령 상세 없이 접근 전략, Task 목적, DAG, 입출력 계약, 위험과 unknown 표현 |
-| `PlanContractRevision` | 사용자가 활성화하는 Task 계약, DAG, Goal coverage, 통합 검사, 배정, Commit Horizon |
+| `GoalAuthorization` | Goal revision·프로젝트 root·효과·운영 정책의 승인 경계와 근거 (planned) |
+| `PlanContractRevision` | authorization에 결속해 Core가 활성화하는 내부 immutable Task 계약, DAG, Goal coverage, 통합 검사와 배정 |
+| `RuntimeJob`·supervisor | 활성화 후 역할 호출과 영속 checkpoint·연결·deadline·관측 관리 (planned), 완료 권위 없음 |
 | `TaskExecutionSpecRevision` | ready 시점에 해석한 파일·symbol·명령·Context Pack·lock·timeout·idempotency·snapshot binding |
 | `Attempt` | 하나의 실행 또는 검사 시도와 thread·turn·외부 효과 intent/receipt |
 | `EvidenceRecord` | 실제 관측된 산출물·명령·검사 결과와 출처 digest |
@@ -62,9 +66,9 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 
 ## 4. 승인과 Lazy Expansion 경계
 
-### 4.1 사용자가 활성화하는 계약
+### 4.1 목표 승인과 내부 Plan activation — planned
 
-`plan activate --plan-revision-id ... --digest ...` 한 번이 정확한 Plan Contract의 승인과 활성화다. 별도의 HMAC proof나 이중 승인 장부를 요구하지 않는다.
+사용자는 GoalAuthorization의 목표·범위·효과·운영 정책을 한 번 승인한다. Core는 프로젝트 root·알려진 효과·정책을 결정적으로 대조하고 의미 범위의 근거 있는 review를 거쳐 Plan revision·digest를 authorization에 결속해 자동 활성화한다. 사용자가 정확한 ID·digest를 직접 입력하는 절차는 필수가 아니다. 목표·범위·효과·정책 확장에만 추가 판단을 요청한다. 파일별 승인·HMAC proof·이중 승인 장부는 요구하지 않는다. 이 결속은 OS sandbox나 의미 안전성의 수학적 보장이 아니다.
 
 `PlanContractRevision`은 다음을 고정한다.
 
@@ -74,7 +78,7 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 - 기대 효과와 금지 효과
 - 위험, 외부 효과와 checkpoint 등급
 - 완료 조건과 validation 요구
-- recovery envelope와 Commit Horizon
+- recovery envelope; 미사용 CommitHorizon은 새 schema에서 제거하거나 고정 불변조건으로 대체하고 역사 reader는 보존
 - 실행·검사 역할, 기본 model/effort와 명시적 fallback envelope
 - plan-level integration/Goal Test
 
@@ -86,6 +90,8 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 - 대상 프로젝트
 - 완료 조건과 validation의 의미
 - 계획에 없던 외부 부작용 또는 금지 효과
+
+새 revision은 기존 revision을 덮어쓰지 않는다. 승인 경계 내의 Task 분할·replan은 새 Plan을 Core가 자동 활성화하며 실행 중 Attempt를 보호한다. 목표 변경에는 Goal revision과 authorization 갱신도 필요하다. 완료 evidence는 입력·대상·검사 의미·freshness를 확인한 경우만 재사용한다.
 
 ### 4.2 ready 시점에 늦게 결정하는 상세
 
@@ -107,6 +113,8 @@ Task 준비 역할과 Goal Test 준비 역할의 입력·지침·출력은 분�
 
 사용자 요청은 한 번만 Goal 후보로 정규화한다. 별도 reviewer는 source trace와 모순·누락을 검토하고 Core가 최종 `GoalContractRevision`을 컴파일한다. Goal revision에는 normalization·review digest, reviewer role과 finding 또는 rating을 preparation binding으로 남긴다. 모델은 Goal revision 번호나 권위 상태를 직접 정하지 않는다.
 
+완료된 준비 결과가 blocking 질문 없이 수정 가능한 `conflict`이면, 원본 요청·Profile·관측과 proposal·독립 finding을 그대로 결속한 별도 `goal_refiner`가 한 번 응답할 수 있다. 정규화와 같은 모델 설정을 사용하되 finding을 정답으로 취급하지 않는다. 변경 proposal은 같은 Goal ID의 직전 revision을 supersede하고 기존 Reviewer와 compiler를 거친다. canonical 동일 후보는 재검토하지 않으며 `disputed`·`unresolved`는 새 Goal을 만들지 않는다. 입력 부족·비수정 가능 finding은 이 경로에 들어오지 않는다. 원본 preparation, 변경 이유·evidence, request/output receipt와 새 preparation을 함께 보존하며, 호출자는 원본별 한 번의 한도와 전체 호출 예산을 적용한다.
+
 Hard AC는 반드시 관측 가능해야 하고 출처를 갖는다. Soft preference는 점수화할 수 있지만 Hard AC를 대신하지 못한다. 비목표는 constraint 목록에 섞지 않고 명시적으로 보존한다.
 
 정규화와 독립 검토는 지침의 출처와 적용 단계를 함께 해석한다. 현재 정규화·계획 역할에만 적용되는 파일 수정·명령 실행 금지는 승인 후 Task의 제약으로 전사하지 않는다. 사용자 원문이나 실행 단계에도 적용되는 정책이 명시한 금지는 보존한다. 파일 무변경과 정적 분석만으로 명령 미실행 증명을 새 요구로 추가하지 않으며, 특정 작업의 실행 금지를 모든 읽기·검증 명령의 금지로 넓히지 않는다. API 변경·보존 전략에는 이름·import·시그니처와 함께 문서·테스트의 정상 동작 계약을 실제 값이나 관계로 명시하고 현재 구현의 결함과 구분한다. 원인 분석의 AC에 필요한 정상 기대값과 현재 불일치가 포함돼 있으면 이를 별도 구현·호환성 보존 의무로 승격하지 않는다. 전체 Goal에 이미 명시된 의미를 특정 항목에 다시 요구하지 않는다.
@@ -126,10 +134,10 @@ Task semantic 검사가 `external_observation`을 요구할 때 현재 Execution
 Project Map은 다음 순서로 만든다.
 
 ```text
-File Manifest → Symbol Index → module/test/build 관계 → ProjectMapRevision
+실제 관측 File Manifest → Symbol Index → 검증된 module/test/build 연결 → ProjectMapRevision
 ```
 
-Map 전체 revision digest와 planning 의미에 영향을 주는 semantic digest를 분리한다. Goal에 필요한 사실만 `StateSnapshot`으로 투영하고 각 사실에 evidence, freshness와 invalidation 조건을 둔다.
+Map은 관측 범위의 색인이며 완전한 의존 그래프라고 주장하지 않는다. Map 전체 revision digest와 planning 의미에 영향을 주는 semantic digest를 분리한다. Goal에 필요한 사실만 `StateSnapshot`으로 투영하고 각 사실에 evidence, freshness와 invalidation 조건을 둔다.
 
 `.flowmarshal-engine`, `.flowmarshal-engine-eval`과 설정된 artifact root는 일반 source 탐색에서 제외한다. 같은 제외 정책을 Goal 관찰, State 재관측과 실행 준비 freshness 검사에 적용하여 운영 로그 추가로 Project Map이 바뀌지 않게 한다. 해당 위치의 자료라도 명시적으로 등록한 참고자료·지침은 입력에 포함한다. 필수 지침은 일반 파일 크기 제한 때문에 조용히 생략하지 않는다.
 
@@ -150,7 +158,7 @@ Static Policy Prefix
 
 Context가 부족하면 모델이 추측하지 않고 필요한 source, selector와 이유를 담은 구조화된 추가 Context 요청을 반환한다.
 
-정책과 required need를 먼저 선택하고 예산 적용 후에도 해당 need가 요구한 모든 매칭 source·symbol의 본문이 남아 있는지 확인한다. 한 need의 여러 path hint로 찾은 필수 자료도 일부만 포함해 성공으로 처리하지 않는다. 정책은 예산을 초과해 강제로 넣지 않으며, 선택적 전체 파일 요청이 필수 symbol의 범위를 확장해 예산을 소진하지 않도록 한다. 부족하면 누락 need와 이유를 포함한 `AdditionalContextRequest`를 반환하고 Execution Spec·Attempt·Worker를 생성하지 않는다. Task 분할이 필요하면 Plan revision 제안으로 다루며 자동으로 계약을 바꾸지 않는다.
+정책과 required need를 먼저 선택하고 예산 적용 후에도 해당 need가 요구한 모든 매칭 source·symbol의 본문이 남아 있는지 확인한다. 한 need의 여러 path hint로 찾은 필수 자료도 일부만 포함해 성공으로 처리하지 않는다. 정책은 예산을 초과해 강제로 넣지 않으며, 선택적 전체 파일 요청이 필수 symbol의 범위를 확장해 예산을 소진하지 않도록 한다. 부족하면 누락 need와 이유를 포함한 `AdditionalContextRequest`를 반환하고 Execution Spec·Attempt·Worker를 생성하지 않는다. 허용된 로컬 ContextRequest는 초기 sample 밖까지 자동 탐색해 해소한다. Task 분할은 새 Plan revision으로 다루고 승인 경계 내에서는 검토·Gate 후 자동 활성화한다. 접근 불가 사실·사용자 취향·승인 경계 확장에만 질문한다.
 
 Python symbol은 AST의 실제 정의 범위를 선택한다. decorator·async 함수·클래스·한정된 메서드 이름을 포함하고 겹치는 범위를 합친다. selector는 1기반 양끝 포함 `python-lines:start-end[,start-end]`를 사용한다. 경로만 요청하거나 지원하지 않는 형식·파싱 불가 파일은 `whole-file`로 표시한다. 유효한 Python에서 요청한 symbol이 없으면 경로만 일치한다는 이유로 충족했다고 간주하지 않는다. 범위가 selector 표현 한도를 넘으면 내용 일부를 버리지 않고 전체 파일로 확장해 예산을 다시 검사한다.
 
@@ -176,12 +184,14 @@ Goal Contract 정규화·독립 검토
 → Skeleton 1~3개 생성
 → 결정적 coverage·grounding·DAG·cycle·scope Gate
 → compact semantic review
-→ dedupe·dead-end·dominance pruning
+→ 동일 의미 dedupe·근거 있는 dead-end 제거·목표 적합성/품질/위험 비교
 → 최대 2개 shortlist
 → shortlisted Skeleton만 Plan Contract 후보로 상세화
 → 5개 Hard Gate와 위험별 review
+→ 수정 가능한 상세 실패를 근거와 함께 최대 한 번 피드백
+→ 상세 revision의 재검토 또는 같은 shortlist 자리의 Skeleton 수정·검토·상세화
 → admissible 후보만 score·비교
-→ 사용자 활성화
+→ GoalAuthorization 내 Core 자동 활성화
 ```
 
 기본 search budget은 다음과 같다.
@@ -191,9 +201,23 @@ Goal Contract 정규화·독립 검토
 - 초기 후보 최대 3개
 - shortlist 최대 2개
 - 후보별 refinement 최대 1회
-- replan reserve 25%
+- 과거 token replan reserve 25%는 schema 3 역사 계약으로 보존하고 새 실행 한도로 재해석하지 않음
 
-명확한 단일 변경은 후보 1개만 만든다. 실제 trade-off가 있을 때만 2~3개를 생성한다. 첫 feasible plan을 확보한 뒤 남은 budget에서만 anytime improvement를 수행한다.
+같은 의미/canonical Plan만 dedupe하며 서로 다른 전략을 비용 추정만으로 우월 판정·가지치기하지 않는다. 명확한 단일 변경은 후보 1개만 만든다. 실제 trade-off가 있을 때만 2~3개를 생성한다. 첫 feasible plan을 확보한 뒤 남은 budget에서만 anytime improvement를 수행한다.
+
+상세 Plan의 `needs_revision`은 수정 제안의 시작 조건이며 finding의 진실성을 승인하지 않는다. `plan_refiner`는 원본 Goal·State·Project Map·Skeleton·Plan과 직접 finding을 대조하여 `detail_revision`, `skeleton_revision`, `disputed`, `unresolved` 중 하나와 이유·직접 evidence ref를 제출한다. 상세 수정은 기존 Skeleton 의미를 보존하는 compiler를 거친다. Task 목적·DAG를 바꿔야 하는 수정은 같은 전략 계열의 새 Skeleton로 돌아가 기존 Gate와 독립 검토를 거친다. refiner의 반박이나 미해결 응답만으로는 원래 거절을 바꾸지 않으며 같은 Plan을 통과할 때까지 재호출하지 않는다. 수정 결과는 이전 평가를 보존하고 새 Gate·독립 Reviewer 검토를 통과해야만 선택된다.
+
+복구 정책이 없는 기존 검색은 후보별 refinement 1회를 최초 Skeleton 계보 전체에서 공유한다. 명시적 `planning-recovery-v2` 검색은 Skeleton 준비와 상세 Plan 수정에 각각 1회를 배정하되 전체 14회 역할 호출·5개 candidate version·Goal 운영 한도는 공유한다. 상세 실패에서 생성하는 새 Skeleton도 상세 수정 슬롯을 소비한다. `candidate_versions`는 평가한 Skeleton과 추가로 생성한 상세 수정 후보를 세며 최초 상세화는 중복 계산하지 않는다. 변경 없는 수정 제안도 생성 시도·예산으로 보존하되 새 독립 검토는 하지 않는다. 상세 수정에는 최소 2회, Skeleton 수정 경로에는 최소 4회의 잔여 호출을 먼저 확보한다. 원장 ID·검사 ID 이름·배열 순서·비용 추정만 달라진 동일 후보는 무진전으로 중단한다. 후속 Skeleton은 기존 shortlist 자리를 이어받으며 별도의 초기 전략 슬롯을 얻지 않는다. `replan_reserve_percent`는 이 검색의 호출 한도에서 별도 감산하지 않으며 과거 token 예약·정산은 역사 reader로 보존하고 새 실행 admission과 usage 관측은 분리한다.
+
+`planning-recovery-v2`에서는 원검토가 수정 가능하게 거절한 동일 Plan에 대해 직접 원문 반증을 제출한 `disputed`를 별도 독립 재심으로 보낼 수 있다. 최초 후보 계보별 재심은 최대 1회이며 원 Plan·Goal·원검토·반박·request/output/receipt를 결속한다. 원 finding마다 `upheld` 또는 `withdrawn`과 직접 근거를 정확히 한 번 제출하고, 유지 finding은 원객체 그대로 보존한다. 불확실성은 유지로 남기고 deterministic finding은 이 경로로 뒤집지 않는다. 추가로 발견한 직접 결함도 별도로 제출한다. Core는 이 새로운 관측으로 판정을 재계산하며 원검토·원판정·새판정을 History에 함께 기록한다. 재심은 실제 후보 수정 슬롯이나 version을 소비하지 않으며 피드백과 재심 호출·토큰은 같은 전체 운영 한도에 포함한다. 남은 상세 수정 슬롯이 있을 때만 재심에서 확인한 결함을 수정하고, 수정된 Plan이 다시 실패하면 명시적 중단 사유를 기록한다.
+
+새 복구 정책의 후보별 schema 실패 격리는 단일 terminal turn과 유효 결과 귀속, 원 요청·receipt·정책 결속이 모두 확인된 경우에만 허용한다. 해당 후보를 성공으로 바꾸거나 같은 호출을 다시 실행하지 않고 다른 admissible 후보를 보존한다. 검색 결과에는 실패 단계·Skeleton/Plan·provider call·receipt를 기록하며 qualification의 schema/전체 판정은 FAIL을 유지한다. 운영 한도·권한·model lock·입력 무결성·불명 효과 오류는 전체를 중단한다. 기존 v1 계약과 과거 실패 artifact는 새 복구 결과로 재해석하지 않는다.
+
+초기 후보와 초기 수정 후보의 검토 실패는 `initial_skeleton_review`, 초기 Skeleton 수정 실패는 `skeleton_refine`이다. 두 operation은 원본 Skeleton digest가 필수이고 Plan digest는 없어야 한다. 기존 `skeleton_review`는 상세 Plan 복구에서 반환된 수정 Skeleton을 재검토하는 단계로서 Skeleton과 원본 Plan을 모두 요구한다. 최초 일괄 생성 실패는 전체 중단한다. 초기·상세 검토 실패는 `semantic_submission=None`인 `REJECTED`를 남기고 성공 제출의 동시 기록, 추가 수정, shortlist와 선택을 차단한다. 초기 수정 실패는 원본 후보·판정을 보존하고 수정 기회를 한 번 소모한다. 정산 실패 호출은 호출 수·비용·수정 시도에 한 번만 포함하며 완성된 새 후보가 없으면 `candidate_versions`를 늘리지 않는다.
+
+원장은 `skeleton_refine`을 실제 요청의 `payload.candidate`로, 검토는 `payload.evidence_catalog["artifact:skeleton"]`로 대조하며 Goal·provider call·receipt 결속을 함께 검사한다. 후보 계보의 성공·실패 수정 이력은 합산하고, 효과 전 해제된 호출만 소비에서 제외한다. 동일 후보 또는 ID만 달라진 동일 의미의 실패 요청은 새 검색에서도 provider 호출 예약 전에 차단한다. 이미 저장된 동일 검색의 재등록은 멱등적이지만, 실패를 누락하거나 성공으로 바꾸거나 수정 슬롯을 되살린 새 검색은 거부한다. 이것은 입력·효과가 불명확한 호출을 자동 재실행하는 허가가 아니다.
+
+같은 Plan 계보의 수정은 동일 `plan_id`, 증가한 `revision_no`, 직전 `supersedes_plan_revision_id`를 가진다. 원장의 전역 Task ID는 새로 생성하며 `task_ref`와 의미 관계로 후보를 비교한다. 검색 입력·모델 inventory 결속을 수정으로 교체하지 않는다. 실제 refiner의 요청·응답·receipt digest와 원본 평가·제안 digest는 프로그램이 계산해 결속하며 모델에게 다시 작성시키지 않는다. `PlanningSearchOutcome`의 원본 실패·수정·중단 이유·선택 결과는 등록된 후보와 Core 판정에 대조한 뒤 `planning.search_recorded` History에 보존한다. 외부 outcome 입력과 합성 회귀는 실제 provider receipt 없는 상태를 그대로 보존한다.
 
 Task의 `contributes_to`와 Skeleton의 `goal_coverage.task_refs`는 AC 충족에 기여하는 산출물·근거의 연결이다. 해당 Task가 연결된 AC의 모든 검사 절차를 직접 실행한다는 뜻은 아니다. 모든 Task 완료 후의 독립 Goal Test AC도 관련 산출물을 제공하는 Task와 연결하고, 상세 Plan의 `goal_coverage.validation_ids`에서 `integration_validations`의 검사 ID로 연결한다. 필요하면 Skeleton의 `detail_requirements`에 이 책임을 명확히 한다. Skeleton 단계에서 Goal Test 전용 Task나 상세 integration validation 필드가 없다는 이유만으로 추가 Task를 요구하지 않는다. Goal과 AC 기여 관계로 이미 전달된 요구는 선택 `detail_requirements`의 반복 부재만으로 차단하지 않는다. 후속 상세화에서 누락될 수 있다는 가정은 현재 결함의 직접 evidence가 아니다. 실제 AC 기여 누락·Task 요구 충돌이나 상세 Plan의 독립 검사·evidence mode·validation ID 연결 결함은 계속 검토한다.
 
@@ -207,6 +231,8 @@ Goal의 AC 또는 전역 constraint가 각 Task 또는 특정 범위 Task의 완
 
 Worker의 작업·응답 제출, 이후 Task 검증과 Core의 완료 판정을 구분한다. Task 완료 조건에 독립 Validator 통과를 요구할 수 있지만, Worker 응답을 입력으로 뒤에 수행하는 Validator의 결과를 같은 Worker가 미리 제출하도록 요구하지 않는다. 검증된 선행 Task 결과의 후속 인용은 허용하며 자연어 시점 충돌을 실제 runtime 교착으로 단정하지 않는다. produces·consumes·preconditions·완료 조건과 validation 입력을 함께 대조하여 Worker 실행 보고와 Validator의 별도 검사 결과를 구분한다.
 
+`Task.produces`는 검증까지 포함한 Task 전체의 논리적 산출물 key이며 Worker 응답의 필수 항목 목록이 아니다. 독립 Validator의 별도 결과를 Task 산출물로 선언할 수 있다. 실제 Worker 제출 요구·작성 주체·시점 충돌은 계약 문장과 후속 검사의 입력으로 판단하며 key 이름으로 추정하지 않는다. v2의 생성·검토 요청은 `task_result_field_semantics`에 이 기존 필드 의미를 함께 결속한다. 이 입력 설명은 개별 계약의 정상·결함 판정이나 새로운 evidence가 아니며 원본 계약·직접 finding·citation 선택을 바꾸지 않는다. v1 요청·schema와 기존 권위 객체의 형식은 유지한다.
+
 검증 계약의 `statement`는 Goal이 명시한 검사 대상·종류·실행 목적을 보존한다. `required_evidence_kinds`의 `test`는 evidence 종류이며 특정 검사 절차를 보장하지 않는다. 기존 unittest 실행을 요구했다면 적용 대상 Task의 검사 문장에도 해당 실행·통과 확인을 보존하고 일반 동작 검사로 바꾸지 않는다. 실제 명령은 ready-time Execution Spec에서 확정한다.
 
 상세 Plan의 Task·integration validation이 등록 검사 도구·자료의 phase·mode·절차를 참조하면 상세화와 Reviewer는 등록 경로의 관련 본문과 필요한 구현 분기를 읽어 실제 검사 범위를 대조한다. 같은 도구의 다른 phase가 수행하는 검사를 합쳐 설명하거나 선언·시그니처 검사를 실제 입력·호출 방식 검사로 확대하지 않는다. Goal의 검사 목적과 수단의 실제 능력을 구분하며, 부족한 필수 검사는 별도 실제 검사 책임으로 보존한다. Goal이 Task에 요구하지 않은 검사를 일괄 추가하지 않고 정상 Task 검사와 독립 Goal Test의 범위 차이를 허용한다. 도구·phase 참조로 검사 의미를 식별하는 것은 계획 단계에서 허용하되 argv 등 운영 상세는 ready-time에 확정한다. 이미 명시된 phase와 검사 의미의 충돌은 Plan Contract 결함이며 새 revision으로 수정한다. 자료 부족과 직접 확인된 모순을 구분하고 원래 검사 의무나 합격선을 약화하지 않는다.
@@ -216,6 +242,8 @@ Worker의 작업·응답 제출, 이후 Task 검증과 Core의 완료 판정을 
 Plan Reviewer에는 모든 Task·integration validation을 원래 순서대로 펼친 비권위 검사 색인과, AC의 statement·validation_intent 및 전역 constraint를 구분한 Goal 원문 색인을 함께 제공할 수 있다. 두 색인은 ID·순서·selector·원문과 현재 AC 연결만 투영하고 필수 연결·phase 능력·runtime evidence 범위의 판정을 추가하지 않는다. `required_evidence_kinds`는 각 validation 계약의 필요 evidence 종류이지 이후 semantic Validator 직접 catalog의 허용 목록이 아니다. 현재 연결과 필요한 연결은 구분하며, 전역 constraint나 단순 선후조건을 근거로 모든 검사 ID를 모든 AC에 연결하지 않는다. finding의 evidence ref는 원본 catalog만 사용하고 색인은 새 권위나 evidence가 아니다. Task·integration 작성 draft의 statement 설명도 수단별 범위를 안내하되 원래 권위 validation schema의 필드와 값 제약을 유지한다.
 
 상세 Plan의 `goal_coverage.task_ids`는 Skeleton의 AC 기여 Task 집합을 보존하며, `validation_ids`의 소유 Task를 제한하지 않는다. **AC가 각 Task에 명시한 검사 절차**가 있으면 해당 AC의 `validation_ids`에 적용 대상 모든 Task의 자체 필수 검사 ID를 연결한다. 전역 constraint가 요구한 검사는 해당 Task에 존재해야 하지만 그 전역 의무만으로 특정 AC 연결을 만들지 않는다. 검사 소유 Task가 AC 기여 목록에 없어도 명시 AC 연결은 필요하며, 연결을 추가하기 위해 기여 집합이나 Task 의미를 바꾸지 않는다. 특정 Task에만 적용되는 요구의 범위도 유지한다. Reviewer는 자체 검사 존재와 해당 AC의 검사 ID 연결을 각각 확인하고, 연결 누락은 Goal·Task validation·Goal coverage를 직접 근거로 제출한다.
+
+v2 Reviewer는 최종 제출 전에 양의 AC scope 선택을 소유 validation ID로 전개해 현재 `goal_coverage.validation_ids`와 대조한다. 필수로 판단한 관계가 실제 coverage에 없으면 해당 AC×validation target의 `missing_validation_link` finding을 제출한다. 다른 scope의 검사 능력 finding은 이 연결 누락 finding을 대신하지 않는다. 이미 연결된 관계나 필수로 판단하지 않은 관계에 연결 누락 finding을 붙이지 않으며, adapter는 누락 finding을 자동 생성하지 않고 제출의 일관성을 검증한다.
 
 Skeleton·`PlanExpansionDraft`의 `task_refs`는 Compiler가 `Task.task_id`에 대응시켜 권위 `PlanContractDefinition.goal_coverage.task_ids`로 변환한다. 컴파일된 Plan을 받는 Reviewer는 `task_ids`를 실제 Task ID에 대조하고 대응되는 `task_ref` 집합으로 기여 관계를 확인한다. `task_ids`를 draft의 `task_refs`로 바꾸도록 요구하지 않는다. Reviewer finding의 `affected_task_refs`는 별도 입력 계약에 따라 `Task.task_ref`를 사용한다.
 
@@ -238,6 +266,8 @@ Reviewer의 각 `InspectionFindingLink.basis_refs`는 citation ID를 참조한�
 앞의 반복 `basis_refs`·`finding_codes`·`finding_links` 계약은 `plan-inspection-v1`로 동결한다. 기존 raw 응답·strict schema·validator·evaluator·checkpoint와 판정은 수정하거나 v2 결과로 덮어쓰지 않는다. provider 형식은 요청 전에 명시적으로 선택하고, 선택한 version·지침·역할별 strict schema·실제 request와 receipt를 digest로 결속한다. 실행 중 다른 version으로 자동 fallback하거나 과거 version의 기대값·checkpoint를 새 version의 합격 근거로 사용하지 않는다.
 
 #### `plan-inspection-v2` 의미 제출과 기계 전개
+
+v2의 공통 의미는 `validation_obligations.py`에 둔다. AC 연결은 이미 계획된 모든 검사에 대한 기여 관계이며 최소 충족 검사 집합의 선택이 아니다. 각 AC×validation을 독립적으로 대조해 명시 절차·도구·phase·범위를 실제 수행하는 supported scope를 모두 선택한다. 동일 절차를 여러 ID가 수행하면 각 관계를 보존하고, 등록 도구의 내부 호출·재실행도 실제 본문에 따라 포함한다. 같은 validation의 contradicted·unresolved 부분은 별도 finding의 근거이며 다른 supported 부분의 관계를 제거하지 않는다. AC가 제한하지 않은 phase·범위를 임의 한정하지 않고, 관련 결과·evidence나 전역 의무만으로 새 절차 요구를 추정하지 않는다. 역할 지침과 출력 필드 설명은 이 같은 경계를 사용하며, 원시 선택의 실제 의미 정확성은 별도 평가로 확인한다.
 
 `plan-inspection-v2`에서 adapter는 결속된 입력 원문으로 immutable citation catalog를 먼저 만들고 모델은 실제 판단에 사용한 ID만 선택한다. 모델은 validation의 tool·phase·직접 근거와 실제 절차·상태만 나타내는 최소 scope, 모든 constraint×Task의 적용 여부와 실제 validation ID, Reviewer finding의 종류·복구 가능성·주 target ID를 직접 제출한다. AC 연결은 scope 판정과 분리한다. 모델은 `ac_scope_requirements`에 모든 AC를 정확히 한 행씩 쓰고 criterion과 `statement_scope_ids`·`validation_intent_scope_ids`를 제출한다. 각 원문 필드가 명시한 실제 절차의 supported scope를 해당 목록에서 선택하며, 그 필드에 절차 요구가 없으면 빈 목록을 쓴다. 두 필드는 전체 AC 문맥으로 해석하되 한 필드의 단계·독립성 설명이 다른 필드의 명시적 절차를 면제하지 않는다. 두 원문이 같은 절차를 요구하면 같은 scope를 양쪽에 선택할 수 있다. 합집합·validation ID·전체 AC×validation 행렬은 다시 작성하지 않는다. 동일 절차를 Task와 Goal validation이 각각 실행하면 각 validation 소유 scope를 선택한다. AC가 특정 Task 또는 Goal validation 단계에 검사 책임을 열거하면 그 단계에서 열거된 책임을 실제 수행하는 scope를 선택하되, 단계의 경계·순서만 나타내는 문구나 같은 Task·phase·evidence·결과 주제를 묶음 의무로 확대하지 않는다. 고정 복합 target인 AC×validation과 constraint×Task는 adapter가 content hash `inspection_target_catalog` ID로 제공한다. Reviewer는 결함 종류에 맞는 복합 catalog ID, 자신이 만든 scope ID, validation ID 또는 citation ID를 `primary_target_ids`에서 선택하고, 추가 직접 citation과 소유 관계로 계산할 수 없는 영향 Task만 별도 목록에 둔다. 다섯 표준 defect kind 밖의 직접 결함은 `other`와 직접 gate·severity, citation ID로 보존한다. 이 선택은 의미 판단이며 adapter가 생성·삭제·교정하지 않는다. Expander는 같은 직접 검사 구조를 사용하되 finding 없이 일관된 완성 Plan만 제출한다. Reviewer의 finding/rating 상호배타성과 Core의 admission·score·상태 판정 권위는 그대로 유지한다.
 
@@ -336,6 +366,7 @@ ready Task
 → precondition·snapshot·context·effect checkpoint
 → Attempt reserve
 → intent 기록
+→ 실제 효과 직전 freshness·target/context/prompt/model/policy 재검사
 → thread start/resume와 turn start
 → receipt·binding
 → 결과 관측
@@ -345,7 +376,7 @@ ready Task
 → Continue | Task Repair | ExecutionSpec Revision | Subgraph Replan | Goal Revision
 ```
 
-실패 분류는 다음 일곱 가지다.
+명시적 transport/error code와 직접 evidence를 먼저 대조한다. 의미가 불명확하면 진단 모델을 쓰되 근거가 부족하면 unclassified를 유지한다. failed terminal을 모두 implementation으로 분류하지 않는다. 기본 분류는 다음과 같다.
 
 | 분류 | 기본 처리 |
 |---|---|
@@ -356,14 +387,19 @@ ready Task
 | `environment` | 환경을 복구한 뒤 동일 계약 재개 |
 | `requirement_change` | 새 Goal revision |
 | `external_unknown` | 기존 intent·binding·receipt 우선 대조 |
+| `unclassified` | 근거 보강 전 분류·재시도 확정 금지 |
 
 동일 실패 재계획은 최대 2회, Goal 전체 재계획은 최대 5회다. 횟수는 원장에서 계산하며 호출자가 제공한 값을 신뢰하지 않는다. 첫 재계획 이후에는 새 evidence 없는 반복을 차단한다.
 
 PC 종료, thread 생성 결과 불명, turn 중단 뒤에는 새 task를 추측 생성하지 않는다. unreceipted intent를 `external_unknown`으로 표시하고 기존 provider operation·thread binding을 먼저 관측한다. 마지막 validated checkpoint에서만 재개한다.
 
+실행 직전 검증은 reserve 이후 입력 변화도 잡아야 한다. 생성 응답 유실·abrupt process death·timeout을 각각 검증한다. lease 만료·collector 종료·interrupt ACK를 terminal로 보지 않는다. 기존 binding을 먼저 관측하고 필요할 때만 새 turn을 만든다. 부분 쓰기 후 허용 resume와 immutable 입력 변경을 구분한다.
+
 ## 10. 개발·공개 인터페이스
 
-1.0 전에는 `flowmarshal-engine` CLI를 사용한다.
+EngineApplication의 prepare/authorize/run_once/observe/pause/cancel/status/final-report 경계 연결은 **planned**다. run_once는 RuntimeJob 예약/시작 또는 관측 소비 후 신속히 반환한다. 활성화 후 준비·worker·semantic validation·Goal Test·recovery/replanning 역할 모두 job/checkpoint에 포함한다. supervisor는 활성 job 동안만 연결·stream·receipt·terminal·usage·절대 deadline을 관리하고 Core만 완료를 판정한다. 승인 전 대화형 준비는 동기 Coordinator/RoleRunner를 유지할 수 있으며 전역 daemon은 필수가 아니다.
+
+아래는 schema 3 개발 CLI의 기존 명령 표면이다. 새 응용 명령이 모두 구현됐다는 증거가 아니다. 1.0 전에는 `flowmarshal-engine` CLI를 사용한다.
 
 ```text
 project init|show
@@ -381,16 +417,13 @@ report progress|final
 
 ## 11. Qualification과 cutover Gate
 
-다음 네 범위는 독립 artifact와 immutable evaluation contract를 가져야 한다.
+현재 필수 조건은 [1.0 승인 계약 V01·V02](redesign-1.0-contract.md)의 결정적·영향 회귀, 실제 역할48·Planning18, 실제 요청부터 한 번의 승인·실행·독립 검사·최종 결과까지의 E2E, 깨끗한 non-editable 설치와 독립 최종 감사다. 책임별 실제 provider·synthetic stub·fault injection·과거 evidence를 구분하며 고정 case 수만으로 완료를 주장하지 않는다. 상세 임계값과 E2E 책임을 빠짐없이 충족해야 한다. 모두 **planned / 미실행**이며 문서 변경은 PASS가 아니다.
 
-1. strict schema·DAG·ledger의 결정적 검사
-2. R3.1 실패 fixture를 포함한 실제 Goal/Reviewer 역할 평가
-3. Skeleton 생성부터 Plan 선택까지의 전체 실제 모델 pipeline과 순서 변형
-4. 활성화·실행·Task validation·Goal Test·중단 후 복구를 포함한 실제 프로젝트 E2E
+각 cell은 source/fixture/prompt/schema/lock/evaluator digest와 seed에 결속한다. 이번 공통 계약 변경의 최초 실제 역할·Planning qualification은 새로 실행하고, 과거 51개/1,056개 검사 결과를 새 실행으로 세지 않는다. 이후 재사용은 보수적 영향 매트릭스로 유효성을 확인한다. 판정 후 oracle·threshold를 낮추지 않는다.
 
-각 evaluation cell은 `(fixture digest, order seed)`에 결속하고 원시 structured assessment와 Runner receipt를 저장한다. fixture, prompt, schema, threshold, taxonomy 또는 model lock digest가 다르면 checkpoint를 재사용할 수 없다. 사용량 한도 중단은 완료 cell이 아니다.
+### 11.1 v2 채택용 Development-diagnostic 단계 A
 
-### 11.1 Development-diagnostic 단계 A
+기본 provider는 qualification된 v1이다. 아래 static 11/qualification 13은 v2 자체 채택 조건이며 모든 제품 실행의 필수 선행조건이 아니다.
 
 단계 A의 development-diagnostic 실행 모드는 사전에 고정한 서로 독립적인 static 11사례를 관측한다. 모델 호출은 사례당 하나로 하고 전체 최대 11회이며 schema recovery는 0회다. 이는 기존 Reviewer v1의 행 내부 검사와 첫 실패 중단을 바꾸지 않는다. qualification 13의 기존 첫 실패 정책과 `expansion → 독립 생성 검토 → expanded-review` 경계도 유지한다.
 
@@ -402,38 +435,31 @@ report progress|final
 
 단계 A는 payload 의미나 oracle을 수정하지 않고 과거 FAIL을 보정하지 않는다. 11사례가 모두 관측되어도 이는 development-diagnostic 완료일 뿐 기존 qualification 또는 cutover PASS를 의미하지 않는다.
 
-기능 Gate와 함께 같은 입력의 R3.1 baseline 대비 다음 token/latency Gate를 확인한다.
+### 11.2 비교 성능 — 비차단 후속
 
-- multi-path planning token 중앙값 30% 이상 감소
-- 전체 평균 token 20% 이상 감소
-- single-path token 회귀 최대 5%
-- 상세화됐지만 실행되지 않은 Task 비율 최대 10%
-- 폐기 후보 상세 출력 비율 최대 25%
-- Time to First Feasible Plan 중앙값 20% 이상 개선
+R3.1 대비 token/speed, performance36와 비교 lifecycle 최적화는 별도 비차단 보고로 분리한다. [이전 Release Performance Floor 계약](performance-release-floor-before-redesign-1.0.md)의 36 cell·18 pair·v3/v4·여섯 하한·최적화 지표와 원본 결과는 보존한다. 그 보고서의 cutover 필드나 미관측 값을 현재 제품 릴리스 권위로 사용하지 않는다. 미관측은 null/NOT_OBSERVED이며 0·추정치로 채우지 않는다. 내부 exact Plan digest 결속은 수동 승인 의무와 다르다.
 
-정상 결과가 질문·차단인 시나리오는 최초 feasible plan 시간이 없으므로 이 지표에서는 제외한다. 해당 값은 `null`이고 질문·차단 판정 지연을 별도로 기록하며, 기존 token 비교에는 포함한다. 정상 Plan을 요구한 입력이 실패하면 시간 표본에서 조용히 제외하지 않고 기능 Gate 실패로 남긴다. 차단 지연에는 별도 합격선을 임의로 추가하지 않는다.
-
-성능 비교의 중립 입력은 요청과 실제 fixture 파일·프로젝트 정책을 함께 digest에 결속한다. 상세 Task는 파일·명령을 확정한 운영 실행 명세이며 semantic TaskContract를 세지 않는다. 최초 feasible 시각은 Core admission 직후, 후보별 상세 출력은 expander/refiner receipt에서 측정한다. batched Skeleton token을 임의로 후보별 배분하거나 사용량이 없는 호출을 0으로 채우지 않는다. R3.1 호출은 Engine 밖의 별도 benchmark harness에서 수행하며 원본 source와 동결 판정을 변경하지 않는다.
-
-결정적 테스트나 합성 smoke는 구현 검증이지 1.0 qualification을 대신하지 않는다. 네 범위와 token/latency Gate가 모두 통과하기 전에는 package와 기본 CLI를 `flowmarshal`로 승격하지 않는다.
+GUI, Localizer/번역 최적화, MCTS/광범위 graph, 동일 프로젝트 병렬, remote/multiOS hardening은 1.0 이후다. 결정적 테스트나 합성 smoke는 실제 qualification을 대신하지 않는다. 현재 필수 기능·안전·역할·Planning·E2E·설치·독립 감사가 통과하기 전에는 package와 CLI를 flowmarshal 1.0으로 승격하지 않는다.
 
 ## 12. Legacy 동결과 migration 정책
 
 - R1~R3.1 source와 해당 artifact는 수정·삭제하지 않는다.
 - R3.1 campaign을 GO로 만들기 위한 추가 보정이나 재실행은 하지 않는다.
 - 완료된 campaign의 실패 사례만 provenance와 함께 새 회귀 fixture로 복사한다.
-- 기존 prototype DB를 자동 또는 제자리 migration하지 않는다.
+- Engine schema 4는 별도 새 DB로 만든다 (planned). schema 3/raw receipt/history는 read-only adapter로 읽으며 prototype/운영 DB의 자동 제자리 변환, 가짜 Goal/Profile 생성, 옛 token budget 재해석을 금지한다. 조율 메타데이터 migration은 별개다.
 - migration 수요가 확인되면 안정화 후 검증된 일회성 import 도구를 별도 계획으로 만든다.
 - 역사적 문서의 당시 판정은 감사 기록으로 유지하되 현재 제품 상태의 권위로 사용하지 않는다.
 
-## 13. 구현 단계
+## 13. 실행 admission과 usage 운영 계약 — planned
 
-| 단계 | 산출물과 종료 조건 |
-|---|---|
-| M0 | R3.1 최종 수치 정정, legacy 동결, 회귀 fixture, schema/DB/cutover ADR |
-| M1 | strict authority schema, 별도 SQLite, digest·History·intent/receipt, 결정적 불변조건 |
-| M2 | Goal 독립 검토, Project Map, State Projection, Context Selector, prompt digest |
-| M3 | Skeleton-first bounded search, Core-derived 판정, shortlist-only expansion, 5 Hard Gate |
-| M4 | `model/list` 배정, exact digest activation, lazy Execution Spec, Runtime Port와 dispatcher |
-| M5 | Task/Goal validation 분리, 실패 분류, 제한 재계획, crash recovery와 최종 보고 |
-| Cutover | 네 실제 qualification 범위와 token/latency Gate 통과 후 package·CLI 1.0 승격 |
+실행 상태·효과·호출 슬롯과 usage 관측을 분리한다. 종료·유효 결과가 확인되면 사용량 누락만으로 후속 실행을 막지 않는다. 필수 evidence·validation·운영 한도는 계속 검사한다. 효과가 불명확한 호출은 기존 intent·thread/turn binding·receipt를 먼저 관측하고 재실행하지 않는다. 늦은 usage는 원본 receipt를 보존한 회계 관측만 멱등 추가하며 실행 슬롯 환불·재차감·재실행을 유발하지 않는다.
+
+누락 token은 null/unknown과 이유로 남기고 0·예약량·추정값으로 채우지 않는다. 실제 token은 유효한 근거지만 API 가격·계정 사용률 %와 함께 구독 한도 차감량이나 정확한 작업 요금으로 환산하지 않는다. 선택적 총 호출/시간 제한은 사용자 중단 정책이며 필요량 예측·요금 상한·완료 보장이 아니다. exact usage backfill·실시간 지원·계정 조회 성공을 필수 의존성으로 만들지 않는다. 관측된 rate-limit 오류·reset 조건에 따른 대기는 허용한다.
+
+planning 준비 포함 역할14·후보 version5·refinement1, 동일 실패 replan2/Goal5, resume1, schema retry 기본0, 역할 timeout900초/명시 compact reviewer1800초, 관측30초/RPC5초를 보존한다. 실제 적용 범위·기산점·소비 조건은 [D07](redesign-1.0-contract.md)에 따라 구현과 대조하며 새 ID로 한도를 초기화하지 않는다. 역할 timeout·절대 deadline·관측 정책은 요청·receipt·checkpoint에 결속하고 RPC 대기도 관측 창에 포함한다.
+
+Goal 등록 전 호출도 같은 프로젝트·Goal 계보·요청·원본 receipt·thread/turn에 결속한다. 가짜 Goal/Profile을 만들지 않는다. 최종 보고는 Verdict가 참조한 정확한 Goal·Plan revision과 동일 Goal 계보만 집계한다. 확인된 소계·누락/충돌 이유와 불완전 총량 null을 구분하며 과거 token budget·잠정 차감·reserved/usage_unknown/settled의 원래 의미는 read-only reader에서 보존한다.
+
+모델은 실제 inventory와 허용 envelope로 확인하며 미지원 조합을 조용히 fallback하지 않는다. 명시적인 변경 사유·새 binding·Spec/Attempt를 기록하고 완료 Worker를 Validator 변경으로 재실행하지 않는다. 필요한 목표·정책 확장은 authorization 변경으로 다룬다.
+
+구현 순서는 [로드맵](pre-1.0-roadmap.md), 승인 12항목별 책임은 [연결표 M01](redesign-1.0-contract.md)을 따른다. 이 문서는 FM-02~FM-16의 구현·검사 완료 상태를 갱신하지 않는다.

@@ -1,6 +1,16 @@
-# VibeMarshal 문서 지도
+# FlowMarshal 문서 지도
+
+- [1.0 승인 계약과 책임 연결표](redesign-1.0-contract.md): 승인된 12개 설계 항목, 필수 검증·E2E 책임과 FM 태스크 연결. 새 계약은 planned이며 구현·검증 완료가 아니다.
+- [비차단 비교 성능](performance-release-floor.md): 현재 릴리스 필수 Gate와 이전 비교 계약의 구분
+- [현재 구현 현황](engine-implementation-status.md): 현재 상태의 단일 진입점
+- [승인된 1.0 선행 로드맵](pre-1.0-roadmap.md): FM-00~FM-16 구현·검증 책임과 비차단 후속 기능
+- [현재 작업 인계](pre-1.0-handoff.md): 이번 변경의 검증 결과와 재개 조건
+- [보완 후 반복 검증](pre-1.0-iterative-validation.md): source별 실패·사용량 보존, v25 의미 개선·예산 중단과 v26 검증본
+- [최초 실제 역할 48건 qualification](role-fixture-48-qualification.md): v9 FAIL의 원인과 실측·무결성 감사
 
 - [검사 계약 구조 개선 진행 기록](inspection-recovery-progress.md): 고정 검증 환경, 독립 11사례 기준선, 참조 계약 개선과 실제 Goal 경로의 공통 완료 조건
+- [길 찾기 알고리즘과 현재 개발 방향의 비교](inspection-search-direction-review.md): 다른 대화의 과거 근거와 최신 결과 구분, 상세 Plan 실패 피드백 부재의 4/14 호출 재현과 우선순위 재검토
+- [상세 Plan 실패 피드백 구현과 검증](planning-feedback-loop.md): 제한된 수정·재검토, 판단 충돌 보존, 예산·원장 계보와 실제 계획 준비 결과
 - [Plan inspection v1 독립 11사례 기준선](inspection-v1-static11-baseline.md): 고정 환경에서 전수 관측한 7 PASS·4 FAIL 분포와 실측 usage
 - [Plan inspection v2 독립 11사례 기준선](inspection-v2-static11-baseline.md): 첫 완전 v2 실행의 1 PASS·10 FAIL 분포, 기계 장부 실패와 의미 실패 분리, v1 대비 실측 usage
 - [Plan inspection v2 2차 구조 보정 부분 실행](inspection-v2r2-partial-baseline.md): 7개 schema/compiler 통과 뒤 timeout으로 중단된 실행, 의미 실패군과 prompt/catalog 구조 원인
@@ -15,7 +25,9 @@
 - [Plan inspection v2 7차 부분 실행 기준선](inspection-v2r7-partial-baseline.md): 첫 3사례 PASS 뒤 프로세스 소실로 남은 combined unknown과 7사례 미실행을 보존한 결과
 - [저장형 진단 실행 준비](inspection-durable-runtime.md): 저장형 역할 thread 결속과 포그라운드 세션 밖 실행을 위한 운영 보완
 - [Reviewer 참조·scope 축소와 저장형 복구 경계 인계](inspection-v2r8-boundary-handoff.md): 8차 11사례의 9 PASS·2 의미 FAIL, 같은 AC-004 누락 원인군, token·latency와 종료 후 저장 조회 검증
-- [AC 원문별 검사 의무 분리](inspection-v2r9-source-requirements.md): statement·validation_intent의 직접 선택을 나누고 adapter가 합집합을 만드는 새 개발 계약과 검증 기준
+- [AC 원문별 검사 의무 분리](inspection-v2r9-source-requirements.md): 원문별 직접 선택·adapter 합집합 계약, 677개 Gate와 실제 static 11/11 PASS·사용량 비교
+- [S06 재진입 기록](inspection-s06-reentry.md): 첫 clean의 Task/Worker 산출물 의미 오판·12 NOT_RUN, 저장 응답과 실패 근거 보존, 실제 Goal 완료까지 남은 경계
+- [Task 산출물 책임의 입력 설명](inspection-v2r10-task-result-context.md): Task 필드 의미를 v2 생성·검토 요청에 결속하고 실제 순서 충돌의 직접 판단을 보존하는 다음 검증 계약
 - [Inspection Provider v2 계약](inspection-provider-v2.md): 모델의 직접 의미 판단과 adapter의 결정적 참조 전개 경계, 호환성·평가·승격 조건
 
 ## 현재 권위 문서
@@ -24,9 +36,14 @@
 - [Engine cutover ADR](engine-cutover-adr.md): legacy 동결, 별도 namespace·DB, migration과 1.0 승격 결정
 - [입력 자료와 실행 범위 정책](file-access-policy.md): 프로젝트·`AGENTS.md`·등록 참고자료·localhost를 정상 입력으로 다루는 정책
 - [저장소 작업 지침](../AGENTS.md): 구현 시 지켜야 할 안정된 불변조건
-- [Engine 1.0 qualification](engine-qualification.md): 네 실행 scope, immutable checkpoint, benchmark와 cutover 절차
+- [Engine 1.0 qualification](engine-qualification.md): 실제 역할48·Planning18, 실제 요청 E2E·결정적·호환·설치·독립 감사 책임
 - [Engine 실행 구현 현황](engine-implementation-status.md): 실제 실행 결과, NO-GO 근거와 남은 qualification 범위
 - [VibeMarshal GUI 인터페이스 설계명세](gui-interface-design.md): 비권위 React 클릭형 prototype, Engine client 경계, exact-digest 활성화·복구 UX와 Tauri 단계
+
+### 승인 이전 개발·검증 기록（현재 실행 지시 아님）
+
+아래 R-S06 기록 및 위의 반복 검증·inspection baseline·feedback 기록은 각 source·시점의 provenance다. 사용량 누락 전역 차단·exact Plan 수동 승인·비교 성능 필수 조항은 최신 승인 계약으로 대체하며 과거 본문·수치·receipt를 수정하지 않는다.
+
 - [근거 우선 strict schema 순서 보정](r-s06-evidence-first-schema-order-fix-handoff.md): 선언 property 순서의 canonical 왕복 보존, 근거 우선 Reviewer envelope와 R25 의미 실패 회귀
 - [참조 결속 규격 설명·진단 보정](r-s06-scope-binding-spec-diagnostics-handoff.md): mechanism→scope→AC 추적 규칙, R27 원본 거부·boolean 오류 보존 회귀와 fresh 결정론 Gate 5/5
 - [R-S06-28 Sol/high 제한 실제 검증](r-s06-28-sol-high-limited-validation-handoff.md): 새 결정론 Gate 5/5, 첫 clean 구조 PASS·AC 27/28 의미 FAIL, 이후 12사례 NOT_RUN·1.0 NO-GO
@@ -63,6 +80,14 @@
 - `src/flowmarshal/engine/eval_cli.py`: 개발용 `flowmarshal-engine-eval` qualification 인터페이스
 
 ## 역사적 설계와 증거
+
+다음 다섯 파일은 FM-01 변경 전 원문 bytes를 보존한 역사본이다. 그 안의 현재/다음 실행·NO-GO 원인은 당시 계약이며 현재 지시로 사용하지 않는다.
+
+- [이전 로드맵](pre-1.0-roadmap-before-redesign-1.0.md)
+- [이전 인계](pre-1.0-handoff-before-redesign-1.0.md)
+- [이전 구현 현황](engine-implementation-status-before-redesign-1.0.md)
+- [이전 qualification 실행기 계약](engine-qualification-before-redesign-1.0.md)
+- [이전 Release Performance Floor 계약](performance-release-floor-before-redesign-1.0.md)
 
 다음 자료는 당시 계약과 실험 결과를 재현하기 위한 감사 이력이다. 현재 Engine의 권위 API로 import하거나 현재 상태로 재해석하지 않는다.
 

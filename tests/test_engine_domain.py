@@ -12,6 +12,8 @@ from flowmarshal.engine.domain import (
     FindingSeverity,
     GateName,
     GoalCoverage,
+    GoalOperatingPolicy,
+    PlanContractDefinition,
     PlanSkeletonCandidate,
     ReviewFinding,
     ReviewRatings,
@@ -198,6 +200,12 @@ class EngineDomainTests(unittest.TestCase):
                 rationale="근거 없이 통과",
                 evaluated_at=utc_now(),
             )
+
+    def test_new_schema_does_not_accept_unconsumed_commit_horizon(self) -> None:
+        self.assertNotIn("commit_horizon", PlanContractDefinition.model_json_schema()["properties"])
+        self.assertNotIn("commit_horizon", GoalOperatingPolicy.model_json_schema()["properties"])
+        with self.assertRaisesRegex(ValidationError, "commit_horizon"):
+            GoalOperatingPolicy.model_validate({"commit_horizon": {"max_ready_tasks": 2}})
 
 
 if __name__ == "__main__":

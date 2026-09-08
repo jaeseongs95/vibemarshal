@@ -13,6 +13,7 @@ from ..canonical import sha256_bytes, sha256_digest
 from .domain import (
     DeterministicValidationObservation, EngineModel, EvidenceKind, EvidenceRecord,
     FailureClass, PlanContractRevision, RepairAction, RunOnceAction, RunOnceOutcome,
+    RuntimeJobKind, RuntimeJobStatus,
     SemanticValidationObservation, ValidationExecutionStep, ValidationResult, ValidationStatus, new_id, utc_now,
     TaskExecutionSpecRevision,
 )
@@ -59,9 +60,25 @@ def run_command_validation(service: EngineService, task: Any, step: ValidationEx
             "SELECT definition_digest, payload_json FROM execution_spec_revisions WHERE task_id = ? AND is_current = 1",
             (task_id,),
         ).fetchone()
+        worker = (
+            None
+            if task_id is None or spec is None
+            else service.resolve_task_validation_worker(
+                connection,
+                task_id=task_id,
+                current_spec_digest=spec["definition_digest"],
+            )
+        )
+        retry_sequence = 0 if task_id is None else int(connection.execute(
+            "SELECT COALESCE(MAX(sequence), 0) FROM history_events WHERE project_id = ? "
+            "AND event_type = 'task.retry_enabled' AND entity_id = ?",
+            (project_id, task_id),
+        ).fetchone()[0])
         root = Path(connection.execute("SELECT root FROM projects WHERE id = ?", (project_id,)).fetchone()[0]).resolve()
         map_row = connection.execute("SELECT payload_json FROM project_map_revisions WHERE project_id = ? AND is_current = 1",
                                      (project_id,)).fetchone()
+    if task_id is not None and worker is None:
+        raise EngineServiceError("Task deterministic validation에는 현재 성공 Worker Attempt가 필요합니다.")
     artifacts = ()
     if set(step.required_evidence_kinds) & {"file", "diff"}:
         paths = step.artifact_paths
@@ -88,8 +105,17 @@ def run_command_validation(service: EngineService, task: Any, step: ValidationEx
         "step": step.model_dump(mode="json"),
         "artifacts": artifacts,
     }
+    if worker is not None:
+        request.update({
+            "worker_attempt_id": worker["id"],
+            "worker_succeeded_sequence": int(worker["sequence"]),
+            "validation_epoch_sequence": max(int(worker["sequence"]), retry_sequence),
+            "validation_execution_spec_digest": spec["definition_digest"],
+            "source_worker_execution_spec_digest": worker["execution_spec_digest"],
+        })
 
     def execute():
+        service.assert_project_authorized(project_id)
         stdout, stderr, code, timed_out = b"", b"", None, False
         try:
             result = subprocess.run(step.argv, cwd=step.working_directory, capture_output=True,
@@ -127,12 +153,28 @@ def run_command_validation(service: EngineService, task: Any, step: ValidationEx
     if "launch_error" in response:
         return blocked(project_id, "VALIDATION_ENVIRONMENT_ERROR", response["launch_error"], task_id)
     observation = DeterministicValidationObservation.model_validate(response["observation"])
+    operation_request_digest = sha256_digest({"kind": "validation_command", "request": request})
+    operation_id = "operation_" + sha256_digest(
+        {"project_id": project_id, "request_digest": operation_request_digest}
+    )[7:39]
+    operation_binding = None if worker is None else {
+        "format": "task-validation-operation-v1",
+        "operation_id": operation_id,
+        "request_digest": operation_request_digest,
+        "result_digest": sha256_digest(response),
+        "worker_attempt_id": worker["id"],
+        "worker_succeeded_sequence": int(worker["sequence"]),
+        "validation_epoch_sequence": max(int(worker["sequence"]), retry_sequence),
+        "validation_execution_spec_digest": spec["definition_digest"],
+        "source_worker_execution_spec_digest": worker["execution_spec_digest"],
+    }
     evidence_ids = []
     for kind in step.required_evidence_kinds:
         if kind in {"file", "diff"}:
             for document in response["artifacts"]:
                 evidence = EvidenceRecord(
                     evidence_id=new_id("evidence"), project_id=project_id, task_id=task_id,
+                    attempt_id=None if worker is None else worker["id"],
                     kind=EvidenceKind(kind), source_ref=document["path"],
                     observation=json.dumps(document, ensure_ascii=False, sort_keys=True),
                     content_digest=sha256_digest({"kind": kind, "direct_file_observation": document}),
@@ -143,6 +185,7 @@ def run_command_validation(service: EngineService, task: Any, step: ValidationEx
             continue
         evidence = EvidenceRecord(
             evidence_id=new_id("evidence"), project_id=project_id, task_id=task_id,
+            attempt_id=None if worker is None else worker["id"],
             kind=EvidenceKind(kind), source_ref=f"validation:{step.validation_id}:{step.argv[0]}",
             observation=observation.model_dump_json()[:10_000],
             content_digest=sha256_digest({"kind": kind, "observation": observation}),
@@ -160,7 +203,12 @@ def run_command_validation(service: EngineService, task: Any, step: ValidationEx
         rationale=f"직접 명령 관측: exit={observation.actual_exit_code}, timeout={observation.timed_out}",
         evaluated_at=observation.observed_at,
     )
-    service.record_validation(project_id=project_id, plan_revision_id=plan_id, result=result)
+    service.record_validation(
+        project_id=project_id,
+        plan_revision_id=plan_id,
+        result=result,
+        operation_binding=operation_binding,
+    )
     if fault_hook:
         fault_hook("after_validation_observed")
     return RunOnceOutcome(
@@ -332,7 +380,9 @@ def advance_independent_goal_test(
     *, supplied_step: ValidationExecutionStep | None = None, provider: Any | None = None,
     retry_request: GoalValidationRetryRequest | None = None,
     fault_hook: Callable[[str], None] | None = None,
+    supervisor: Any | None = None,
 ) -> RunOnceOutcome:
+    service.assert_project_authorized(project_id)
     try:
         context = execution_context(service, project_id)
     except EngineServiceError as error:
@@ -364,8 +414,46 @@ def advance_independent_goal_test(
                 return blocked(project_id, "GOAL_VALIDATION_SPEC_REQUIRED",
                                f"독립 Goal Test의 실행 binding이 필요합니다: {contract.validation_id}")
             try:
-                step = provider.prepare_goal(project_id=project_id, validation_id=contract.validation_id,
-                                             inventory=runtime.list_models())
+                service.assert_project_authorized(project_id)
+                inventory = runtime.list_models()
+                if supervisor is None:
+                    step = provider.prepare_goal(
+                        project_id=project_id, validation_id=contract.validation_id,
+                        inventory=inventory,
+                    )
+                else:
+                    checkpoint = (
+                        f"goal_test_prepare:{plan.plan_revision_id}:{contract.validation_id}:"
+                        f"{0 if retry_request is None else retry_request.failed_validation_result_id}"
+                    )
+                    with service.ledger.read() as connection:
+                        row = connection.execute(
+                            "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
+                            (project_id, checkpoint),
+                        ).fetchone()
+                    if row is None:
+                        job = supervisor.schedule(
+                            project_id=project_id, kind=RuntimeJobKind.GOAL_TEST_PREPARE,
+                            checkpoint_key=checkpoint,
+                            request={"validation_id": contract.validation_id,
+                                     "inventory_digest": inventory.inventory_digest},
+                            timeout_seconds=900,
+                            target=lambda: provider.prepare_goal(
+                                project_id=project_id, validation_id=contract.validation_id,
+                                inventory=inventory),
+                        )
+                    else:
+                        job = service._runtime_job_from_row(row)
+                        if job.status in {RuntimeJobStatus.SCHEDULED, RuntimeJobStatus.RUNNING}:
+                            job = supervisor.tick(job.job_id)
+                    if job.status not in {RuntimeJobStatus.PROVIDER_TERMINAL,
+                                          RuntimeJobStatus.CONSUMED}:
+                        return RunOnceOutcome(
+                            action=RunOnceAction.DISPATCHED, project_id=project_id,
+                            detail=f"Goal Test 준비 job을 예약·관측했습니다: {job.job_id}",
+                        )
+                    result = service.consume_runtime_job(job.job_id)
+                    step = ValidationExecutionStep.model_validate(result)
             except ExternalOperationUnknown as error:
                 return blocked(project_id, "EXTERNAL_EFFECT_UNKNOWN", str(error))
         step = _normalize_goal_step(context, contract, step)
@@ -419,11 +507,8 @@ def advance_independent_goal_test(
         except ValueError as error:
             return blocked(project_id, "MODEL_BINDING_CHANGED", str(error))
         with service.ledger.read() as connection:
-            rows = connection.execute(
-                "SELECT e.* FROM evidence_records e JOIN task_contracts t ON t.id = e.task_id "
-                "WHERE e.project_id = ? AND t.plan_revision_id = ? ORDER BY e.observed_at",
-                (project_id, plan.plan_revision_id),
-            ).fetchall()
+            rows = [row for task in plan.definition.tasks
+                    for row in service.task_evidence_rows(connection, task.task_id)]
         catalog = {
             row["id"]: json.loads(row["payload_json"]) for row in rows
             if not (row["kind"] == "external_observation"
@@ -433,8 +518,46 @@ def advance_independent_goal_test(
         if not catalog:
             return blocked(project_id, "GOAL_TEST_INPUT_INCOMPLETE", "독립 검사에 필요한 직접 evidence가 없습니다.")
         try:
-            result = provider.validate_goal(project_id=project_id, inventory=inventory,
-                                            context=context, evidence_catalog=catalog, step=binding.step)
+            service.assert_project_authorized(project_id)
+            if supervisor is None:
+                result = provider.validate_goal(
+                    project_id=project_id, inventory=inventory, context=context,
+                    evidence_catalog=catalog, step=binding.step,
+                )
+            else:
+                checkpoint = (
+                    f"goal_semantic_validate:{plan.plan_revision_id}:"
+                    f"{contract.validation_id}:{binding.binding_digest}"
+                )
+                with service.ledger.read() as connection:
+                    row = connection.execute(
+                        "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
+                        (project_id, checkpoint),
+                    ).fetchone()
+                if row is None:
+                    job = supervisor.schedule(
+                        project_id=project_id, kind=RuntimeJobKind.GOAL_SEMANTIC_VALIDATE,
+                        checkpoint_key=checkpoint,
+                        request={"validation_id": contract.validation_id,
+                                 "binding_digest": binding.binding_digest,
+                                 "context_digest": sha256_digest(context),
+                                 "evidence_catalog_digest": sha256_digest(catalog)},
+                        timeout_seconds=900,
+                        target=lambda: provider.validate_goal(
+                            project_id=project_id, inventory=inventory, context=context,
+                            evidence_catalog=catalog, step=binding.step),
+                    )
+                else:
+                    job = service._runtime_job_from_row(row)
+                    if job.status in {RuntimeJobStatus.SCHEDULED, RuntimeJobStatus.RUNNING}:
+                        job = supervisor.tick(job.job_id)
+                if job.status not in {RuntimeJobStatus.PROVIDER_TERMINAL,
+                                      RuntimeJobStatus.CONSUMED}:
+                    return RunOnceOutcome(
+                        action=RunOnceAction.DISPATCHED, project_id=project_id,
+                        detail=f"Goal semantic validation job을 예약·관측했습니다: {job.job_id}",
+                    )
+                result = service.consume_runtime_job(job.job_id)
         except ExternalOperationUnknown as error:
             return blocked(project_id, "EXTERNAL_EFFECT_UNKNOWN", str(error))
         if sha256_digest(execution_context(service, project_id)) != binding.context_digest:

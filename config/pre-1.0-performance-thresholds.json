@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "format": "flowmarshal-pre-1.0-performance-thresholds-v1",
+  "token_measure": "planning_uncached_input_plus_output",
+  "aggregation": "pairwise_relative_mean_and_median",
+  "missing_measurement": "not_observed",
+  "minimum_overall_mean_reduction": -0.20,
+  "minimum_multi_path_median_reduction": -0.25,
+  "maximum_worst_single_path_regression": 0.50,
+  "maximum_worst_cell_token_regression": 1.00,
+  "minimum_time_to_first_feasible_median_improvement": -0.25,
+  "minimum_all_pair_disposition_median_improvement": -0.25,
+  "optimization_minimum_multi_path_median_reduction": 0.30,
+  "optimization_minimum_overall_mean_reduction": 0.20,
+  "optimization_maximum_worst_single_path_regression": 0.05,
+  "optimization_maximum_unexecuted_detail_ratio": 0.10,
+  "optimization_maximum_discarded_candidate_output_ratio": 0.25,
+  "optimization_minimum_time_to_first_feasible_median_improvement": 0.20
+}

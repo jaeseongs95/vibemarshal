@@ -20,6 +20,18 @@ from flowmarshal.engine.smoke import run_synthetic_lifecycle
 
 
 class EngineRuntimeE2ETests(unittest.TestCase):
+    def test_stored_observation_labels_only_direct_turn_usage(self) -> None:
+        runtime = CodexAppServerRuntime.__new__(CodexAppServerRuntime)
+        for usage in (None, {"inputTokens": 7, "outputTokens": 3}):
+            with self.subTest(usage=usage):
+                latest = SimpleNamespace(id="stored-turn", status="completed", items=[],
+                                         model_dump=lambda **kwargs: {"usage": usage})
+                runtime._codex = SimpleNamespace(_client=SimpleNamespace(
+                    thread_read=lambda *args, **kwargs: SimpleNamespace(thread=SimpleNamespace(turns=[latest]))))
+                observation = runtime.read_stored(thread_id="stored-thread")
+                self.assertEqual(usage, observation.payload["usage"])
+                self.assertEqual("turn" if usage is not None else "unavailable", observation.payload["usage_scope"])
+
     def test_interrupt_does_not_resume_existing_thread(self) -> None:
         runtime = CodexAppServerRuntime.__new__(CodexAppServerRuntime)
         calls = []

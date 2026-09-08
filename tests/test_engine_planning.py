@@ -8,12 +8,16 @@ from flowmarshal.canonical import sha256_digest
 from flowmarshal.engine.domain import (
     CandidateDecision,
     CandidateStatus,
+    DependencyType,
     FindingSeverity,
     GateName,
     PlanningBudgetPolicy,
     ReviewFinding,
     ReviewRatings,
     ReviewerSubmission,
+    SkeletonDependency,
+    TaskKind,
+    TaskSkeleton,
     new_id,
 )
 from flowmarshal.engine.planning import (
@@ -189,6 +193,46 @@ class EnginePlanningTests(unittest.TestCase):
         findings = skeleton_gate(candidate, goal=self.goal, state=self.state, project_map=self.map)
         self.assertIn("INPUT_REFERENCE_INVALID", {finding.finding_code for finding in findings})
 
+    def test_skeleton_connectivity_uses_consumer_handoff_products(self) -> None:
+        producer = self.candidate.tasks[0].model_copy(update={
+            "produces": ("result:one", "result:producer_only"),
+        })
+        consumer = TaskSkeleton(
+            task_ref="task_two",
+            kind=TaskKind.VALIDATE,
+            objective="전달된 결과를 검증한다.",
+            contributes_to=("ac_one",),
+            produces=("result:checked",),
+            consumes=("result:one", "result:producer_only"),
+        )
+        dependency = SkeletonDependency(
+            producer_task_ref="task_one",
+            consumer_task_ref="task_two",
+            dependency_type=DependencyType.DATA,
+            produces=("result:one", "result:producer_only"),
+            consumes=("result:one",),
+        )
+        candidate = self.candidate.model_copy(update={
+            "tasks": (producer, consumer),
+            "dependencies": (dependency,),
+            "goal_coverage": (
+                self.candidate.goal_coverage[0].model_copy(
+                    update={"task_refs": ("task_one", "task_two")}
+                ),
+            ),
+        })
+
+        findings = skeleton_gate(
+            candidate, goal=self.goal, state=self.state, project_map=self.map,
+        )
+
+        disconnected = [
+            finding for finding in findings
+            if finding.finding_code == "DISCONNECTED_CONSUME"
+        ]
+        self.assertEqual(1, len(disconnected))
+        self.assertEqual(("task_two",), disconnected[0].affected_task_refs)
+
     def test_duplicate_skeletons_are_deduplicated_before_expansion(self) -> None:
         duplicate = self.candidate.model_copy(update={"candidate_id": new_id("candidate")})
         generator = Generator((self.candidate, duplicate))
@@ -202,6 +246,24 @@ class EnginePlanningTests(unittest.TestCase):
         self.assertEqual(2, len(outcome.skeleton_evaluations))
         self.assertEqual(1, expander.calls)
         self.assertEqual(1, len(outcome.shortlist_digests))
+
+    def test_cost_only_does_not_prune_a_semantically_distinct_candidate(self) -> None:
+        """같은 graph 모양이어도 unknown은 전략의 trade-off이므로 비용으로 제거할 수 없다."""
+        alternative = self.candidate.model_copy(update={
+            "candidate_id": new_id("candidate"),
+            "unknowns": ("호환성 검증이 추가로 필요하다.",),
+            "estimated_change_cost": 99,
+            "estimated_context_tokens": 9_999,
+        })
+        planner, expander = self._planner(Generator((self.candidate, alternative)))
+        outcome = planner.search(
+            goal=self.goal,
+            state=self.state,
+            project_map=self.map,
+            candidate_count=2,
+        )
+        self.assertEqual(2, expander.calls)
+        self.assertEqual(2, len(outcome.shortlist_digests))
 
     def test_hard_gate_failure_is_not_scored_or_reviewed(self) -> None:
         invalid = self.candidate.model_copy(

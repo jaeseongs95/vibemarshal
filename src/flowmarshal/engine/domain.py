@@ -7,7 +7,15 @@ from enum import StrEnum
 from typing import Annotated, Any, Literal
 from uuid import uuid4
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_serializer,
+    model_validator,
+)
 
 from ..canonical import sha256_digest
 
@@ -491,9 +499,9 @@ class StateDelta(EngineModel):
 
 
 class ProjectMapEntryKind(StrEnum):
+    """관측한 파일의 역할 표지다. 범용 의존 그래프의 노드 종류가 아니다."""
+
     FILE = "file"
-    SYMBOL = "symbol"
-    MODULE = "module"
     TEST = "test"
     BUILD = "build"
     INSTRUCTION = "instruction"
@@ -502,18 +510,54 @@ class ProjectMapEntryKind(StrEnum):
 
 
 class ProjectMapEntry(EngineModel):
+    """파일·추출한 symbol·확인된 entry 간 링크만 담는 ProjectMap 항목이다."""
+
     entry_id: str = Field(pattern=_LOCAL_ID_PATTERN)
     kind: ProjectMapEntryKind
     path: str = Field(min_length=1, max_length=2000)
     content_digest: str = Field(pattern=_DIGEST_PATTERN)
     symbols: tuple[str, ...] = ()
-    dependency_refs: tuple[str, ...] = ()
+    observed_link_refs: tuple[str, ...] = ()
+    # 동결된 1.0 ProjectMap의 canonical payload를 보존하는 읽기 전용 필드다.
+    dependency_refs: tuple[str, ...] | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
     tags: tuple[str, ...] = ()
 
-    @field_validator("symbols", "dependency_refs", "tags")
+    @field_validator("symbols", "observed_link_refs", "tags")
     @classmethod
     def entry_values_are_unique(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         return _unique(value, "ProjectMap entry")
+
+    @field_validator("dependency_refs")
+    @classmethod
+    def legacy_dependency_values_are_unique(
+        cls,
+        value: tuple[str, ...] | None,
+    ) -> tuple[str, ...] | None:
+        return None if value is None else _unique(value, "legacy ProjectMap dependency")
+
+    @model_validator(mode="after")
+    def link_vocabularies_do_not_mix(self) -> "ProjectMapEntry":
+        if self.dependency_refs is not None and self.observed_link_refs:
+            raise ValueError("legacy dependency_refs와 observed_link_refs를 함께 사용할 수 없습니다.")
+        return self
+
+    @model_serializer(mode="wrap")
+    def preserve_explicit_link_vocabulary(self, handler: Any) -> dict[str, Any]:
+        payload = handler(self)
+        if "observed_link_refs" not in self.model_fields_set:
+            payload.pop("observed_link_refs", None)
+        if "dependency_refs" not in self.model_fields_set:
+            payload.pop("dependency_refs", None)
+        return payload
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema: Any, handler: Any) -> dict[str, Any]:
+        schema = handler(core_schema)
+        schema.get("properties", {}).pop("dependency_refs", None)
+        return schema
 
 
 class ProjectMapRevision(EngineModel):
@@ -535,13 +579,13 @@ class ProjectMapRevision(EngineModel):
             raise ValueError("ProjectMap entry ID가 중복됐습니다.")
         known = set(ids)
         missing = {
-            dependency
+            link
             for item in self.entries
-            for dependency in item.dependency_refs
-            if dependency not in known
+            for link in (item.observed_link_refs or item.dependency_refs or ())
+            if link not in known
         }
         if missing:
-            raise ValueError(f"ProjectMap dependency가 알 수 없는 entry를 참조합니다: {sorted(missing)}")
+            raise ValueError(f"ProjectMap observed link가 알 수 없는 entry를 참조합니다: {sorted(missing)}")
         if not set(self.instruction_source_refs).issubset(known):
             raise ValueError("ProjectMap instruction source가 알려진 entry가 아닙니다.")
         _unique(self.instruction_source_refs, "ProjectMap instruction source")
@@ -1167,7 +1211,9 @@ class IntegrationValidationContract(EngineModel):
         return self
 
 
-class CommitHorizon(EngineModel):
+class _LegacyCommitHorizon(EngineModel):
+    """동결된 1.0 Plan artifact를 읽기 위한 비공개 호환 타입."""
+
     max_ready_tasks: int = Field(default=1, ge=1, le=100)
     project_serial_execution: bool = True
     revalidate_snapshot_before_materialization: bool = True
@@ -1201,11 +1247,22 @@ class PlanContractDefinition(EngineModel):
     dependencies: tuple[PlanDependency, ...] = ()
     goal_coverage: tuple[PlanGoalCoverage, ...] = Field(min_length=1)
     integration_validations: tuple[IntegrationValidationContract, ...] = Field(min_length=1)
-    commit_horizon: CommitHorizon = CommitHorizon()
+    # 새 계약의 공개 스키마에서는 제거됐지만, 기존 동결 artifact의 digest와
+    # canonical payload를 그대로 검증할 수 있도록 읽기 호환성만 유지한다.
+    commit_horizon: _LegacyCommitHorizon | None = Field(
+        default=None,
+        exclude_if=lambda value: value is None,
+    )
     planning_budget: PlanningBudgetPolicy = PlanningBudgetPolicy()
     model_inventory_digest: str = Field(pattern=_DIGEST_PATTERN)
     expected_effects: tuple[str, ...] = ()
     prohibited_effects: tuple[str, ...] = ()
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema: Any, handler: Any) -> dict[str, Any]:
+        schema = handler(core_schema)
+        schema.get("properties", {}).pop("commit_horizon", None)
+        return schema
 
     @field_validator("expected_effects", "prohibited_effects")
     @classmethod
@@ -1525,6 +1582,41 @@ class ResolvedRoleAssignment(EngineModel):
     operational_binding: OperationalBinding | None = None
 
 
+class GoalOperatingPolicy(EngineModel):
+    """승인한 운영 상한. 소요량 예측이나 OS 보안 경계가 아니다."""
+
+    planning_budget: PlanningBudgetPolicy = PlanningBudgetPolicy()
+    max_same_failure_replans: int = Field(default=2, ge=0, le=10)
+    max_goal_replans: int = Field(default=5, ge=0, le=20)
+    requires_new_evidence: bool = True
+    resume_strategy: Literal["existing_binding_first", "new_attempt_only"] = "existing_binding_first"
+
+
+class GoalAuthorization(EngineModel):
+    """사용자 목표·대상·효과·정책 승인. Plan 선택은 내부 revision에 결속한다."""
+
+    authorization_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    revision_no: int = Field(ge=1)
+    supersedes_authorization_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
+    project_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    project_root: str = Field(min_length=1, max_length=2000)
+    goal_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    goal_revision_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    goal_contract_digest: str = Field(pattern=_DIGEST_PATTERN)
+    profile_definition_digest: str = Field(pattern=_DIGEST_PATTERN)
+    effect_policy: EffectPolicy
+    operating_policy: GoalOperatingPolicy = GoalOperatingPolicy()
+    budget_policies: tuple[str, ...] = ()
+    source: str = Field(min_length=1, max_length=2000)
+    approved_at: datetime
+
+    _approved_at_is_aware = field_validator("approved_at")(_aware)
+
+    @property
+    def authorization_digest(self) -> str:
+        return sha256_digest(self)
+
+
 class TaskExecutionSpecDefinition(EngineModel):
     plan_activation_digest: str = Field(pattern=_DIGEST_PATTERN)
     task_contract_digest: str = Field(pattern=_DIGEST_PATTERN)
@@ -1621,11 +1713,115 @@ class RunOnceAction(StrEnum):
     OBSERVED = "observed"
     VALIDATED = "validated"
     COMPLETED = "completed"
+    RECOVERED = "recovered"
     BLOCKED = "blocked"
     IDLE = "idle"
 
 
+class RuntimeJobKind(StrEnum):
+    """Plan 활성화 뒤 Core가 예약할 수 있는 provider 역할 경계."""
+
+    EXECUTION_SPEC_PREPARE = "execution_spec_prepare"
+    WORKER_TURN = "worker_turn"
+    TASK_SEMANTIC_VALIDATE = "task_semantic_validate"
+    GOAL_TEST_PREPARE = "goal_test_prepare"
+    GOAL_SEMANTIC_VALIDATE = "goal_semantic_validate"
+    RECOVERY = "recovery"
+    REPLANNING = "replanning"
+
+
+class RuntimeJobStatus(StrEnum):
+    SCHEDULED = "scheduled"
+    RUNNING = "running"
+    INTERRUPTING = "interrupting"
+    PROVIDER_TERMINAL = "provider_terminal"
+    COLLECTOR_LOST = "collector_lost"
+    CONSUMED = "consumed"
+    CANCELLED = "cancelled"
+
+
+class RuntimeJobObservationKind(StrEnum):
+    SCHEDULED = "scheduled"
+    STARTED = "started"
+    PROVIDER_PROGRESS = "provider_progress"
+    PROVIDER_TERMINAL = "provider_terminal"
+    INTERRUPT_REQUESTED = "interrupt_requested"
+    INTERRUPT_RECEIPT = "interrupt_receipt"
+    COLLECTOR_LOST = "collector_lost"
+    COLLECTOR_REATTACHED = "collector_reattached"
+    CONSUMED = "consumed"
+    CANCELLED = "cancelled"
+
+
+class RuntimeJob(EngineModel):
+    """provider 실행 수명과 Core 상태 판정을 분리한 durable job."""
+
+    job_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    project_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    kind: RuntimeJobKind
+    status: RuntimeJobStatus
+    request_digest: str = Field(pattern=_DIGEST_PATTERN)
+    request: dict[str, Any]
+    checkpoint_key: str = Field(min_length=1, max_length=1000)
+    attempt_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
+    task_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
+    thread_id: str | None = Field(default=None, max_length=300)
+    turn_id: str | None = Field(default=None, max_length=300)
+    absolute_deadline_at: datetime
+    provider_terminal_status: str | None = Field(default=None, max_length=100)
+    result_digest: str | None = Field(default=None, pattern=_DIGEST_PATTERN)
+    created_at: datetime
+    started_at: datetime | None = None
+    ended_at: datetime | None = None
+    updated_at: datetime
+
+    _absolute_deadline_at_is_aware = field_validator("absolute_deadline_at")(_aware)
+    _created_at_is_aware = field_validator("created_at")(_aware)
+    _started_at_is_aware = field_validator("started_at")(
+        lambda value: None if value is None else _aware(value)
+    )
+    _ended_at_is_aware = field_validator("ended_at")(
+        lambda value: None if value is None else _aware(value)
+    )
+    _updated_at_is_aware = field_validator("updated_at")(_aware)
+
+    @model_validator(mode="after")
+    def terminal_is_provider_observed(self) -> "RuntimeJob":
+        terminal = self.status in {
+            RuntimeJobStatus.PROVIDER_TERMINAL,
+            RuntimeJobStatus.CONSUMED,
+        }
+        if terminal != (self.provider_terminal_status is not None):
+            raise ValueError("provider terminal 상태와 관측값이 일치해야 합니다.")
+        if self.result_digest is not None and not terminal:
+            raise ValueError("provider terminal 전에는 job 결과 digest를 둘 수 없습니다.")
+        return self
+
+
+class RuntimeJobObservation(EngineModel):
+    observation_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    job_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    project_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    kind: RuntimeJobObservationKind
+    provider_terminal: bool = False
+    terminal_status: str | None = Field(default=None, max_length=100)
+    payload: dict[str, Any]
+    payload_digest: str = Field(pattern=_DIGEST_PATTERN)
+    observed_at: datetime
+
+    _observed_at_is_aware = field_validator("observed_at")(_aware)
+
+    @model_validator(mode="after")
+    def observation_is_bound(self) -> "RuntimeJobObservation":
+        if self.payload_digest != sha256_digest(self.payload):
+            raise ValueError("runtime job observation digest가 payload와 다릅니다.")
+        if self.provider_terminal != (self.terminal_status is not None):
+            raise ValueError("provider terminal 관측에만 terminal_status가 필요합니다.")
+        return self
+
+
 class FailureClass(StrEnum):
+    UNCLASSIFIED = "unclassified"
     IMPLEMENTATION = "implementation"
     CONTEXT = "context"
     TASK_CONTRACT = "task_contract"
@@ -1673,6 +1869,26 @@ class RunOnceOutcome(EngineModel):
             raise ValueError("실패 repair 제안은 blocked RunOnceOutcome에만 기록합니다.")
         if self.checkpoint_required and self.suggested_repair_action is None:
             raise ValueError("checkpoint_required에는 repair 제안이 필요합니다.")
+        return self
+
+
+class RunOnceResult(RunOnceOutcome):
+    """한 번의 bounded scheduler tick 결과.
+
+    ``outcome``의 완료 의미는 계속 Core가 판정하며, job 필드는 그 tick이 예약·시작·
+    관측 소비한 provider 작업만 설명한다.
+    """
+
+    runtime_job_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
+    runtime_job_kind: RuntimeJobKind | None = None
+    runtime_job_status: RuntimeJobStatus | None = None
+    tick_elapsed_ms: int = Field(default=0, ge=0)
+
+    @model_validator(mode="after")
+    def job_fields_are_atomic(self) -> "RunOnceResult":
+        fields = (self.runtime_job_id, self.runtime_job_kind, self.runtime_job_status)
+        if any(value is not None for value in fields) and not all(value is not None for value in fields):
+            raise ValueError("run once job 결속 필드는 함께 기록해야 합니다.")
         return self
 
 
@@ -1948,6 +2164,66 @@ class BudgetStage(StrEnum):
     REPLAN = "replan"
 
 
+class UsageObservation(EngineModel):
+    """provider 실행 상태와 분리된 append-only 사용량 관측.
+
+    ``unavailable``은 측정값 0이 아니다. 늦게 도착한 실측은 새 관측으로
+    연결하며 원래 receipt나 실행 완료 시각을 수정하지 않는다.
+    """
+
+    schema_version: Literal["1.0"] = "1.0"
+    observation_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    provider_call_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    project_id: str = Field(pattern=_ENTITY_ID_PATTERN)
+    source: Literal["role_receipt", "runtime_observation", "worker_terminal", "validator_terminal"]
+    measurement_status: Literal["measured", "unavailable"]
+    input_tokens: int | None = Field(default=None, ge=0)
+    cached_input_tokens: int | None = Field(default=None, ge=0)
+    output_tokens: int | None = Field(default=None, ge=0)
+    reasoning_tokens: int | None = Field(default=None, ge=0)
+    usage_scope: Literal["unspecified", "turn", "thread", "unavailable"] = "unavailable"
+    attribution_basis: Literal["provider_turn", "first_empty_thread", "unavailable"] = "unavailable"
+    unavailable_reason: str | None = Field(default=None, min_length=1, max_length=500)
+    raw_observation_digest: str = Field(pattern=_DIGEST_PATTERN)
+    original_receipt_digest: str | None = Field(default=None, pattern=_DIGEST_PATTERN)
+    previous_observation_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
+    late: bool = False
+    observed_at: datetime
+
+    _observed_at_is_aware = field_validator("observed_at")(_aware)
+
+    @model_validator(mode="after")
+    def measurement_is_not_estimated(self) -> "UsageObservation":
+        counts = (
+            self.input_tokens,
+            self.cached_input_tokens,
+            self.output_tokens,
+            self.reasoning_tokens,
+        )
+        if self.measurement_status == "measured":
+            if any(value is None for value in counts):
+                raise ValueError("실측 UsageObservation에는 모든 token 필드가 필요합니다.")
+            if self.unavailable_reason is not None or self.attribution_basis == "unavailable":
+                raise ValueError("실측 usage와 unavailable provenance를 혼합할 수 없습니다.")
+        elif any(value is not None for value in counts) or self.unavailable_reason is None:
+            raise ValueError("미확인 UsageObservation은 null token과 이유를 보존해야 합니다.")
+        if (
+            self.cached_input_tokens is not None
+            and self.input_tokens is not None
+            and self.cached_input_tokens > self.input_tokens
+        ):
+            raise ValueError("cached input token은 input token보다 클 수 없습니다.")
+        if (
+            self.reasoning_tokens is not None
+            and self.output_tokens is not None
+            and self.reasoning_tokens > self.output_tokens
+        ):
+            raise ValueError("reasoning token은 output token보다 클 수 없습니다.")
+        if self.late and self.previous_observation_id is None:
+            raise ValueError("late UsageObservation에는 직전 관측 연결이 필요합니다.")
+        return self
+
+
 class BudgetUsageRecord(EngineModel):
     usage_id: str = Field(pattern=_ENTITY_ID_PATTERN)
     project_id: str = Field(pattern=_ENTITY_ID_PATTERN)
@@ -2046,6 +2322,7 @@ class RecoveryAssessment(EngineModel):
     failure_class: FailureClass
     action: RepairAction
     rationale: str = Field(min_length=1, max_length=5000)
+    failure_fingerprint: str | None = Field(default=None, pattern=_DIGEST_PATTERN)
     new_evidence_ids: tuple[str, ...] = ()
     same_failure_replan_count: int = Field(ge=0)
     goal_replan_count: int = Field(ge=0)
@@ -2053,10 +2330,4 @@ class RecoveryAssessment(EngineModel):
     @model_validator(mode="after")
     def recovery_has_new_evidence_when_repeating(self) -> "RecoveryAssessment":
         _unique(self.new_evidence_ids, "recovery evidence")
-        if (
-            (self.same_failure_replan_count > 0 or self.goal_replan_count > 0)
-            and self.action in {RepairAction.SUBGRAPH_REPLAN, RepairAction.GOAL_REVISION}
-            and not self.new_evidence_ids
-        ):
-            raise ValueError("반복 재계획에는 새 evidence가 필요합니다.")
         return self

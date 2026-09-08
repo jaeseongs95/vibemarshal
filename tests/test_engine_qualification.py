@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from flowmarshal.engine.model_lock import RUNTIME_CAPABILITIES
+from flowmarshal.engine.model_lock import OperationalBinding, RUNTIME_CAPABILITIES
 
 import tempfile
 import unittest
@@ -12,6 +12,8 @@ from unittest.mock import patch
 from types import SimpleNamespace
 
 from flowmarshal.canonical import sha256_bytes, sha256_digest
+from flowmarshal.engine.budget import GoalBudgetPolicy
+from flowmarshal.engine.benchmark import _implementation_runtime_contract
 from flowmarshal.engine.domain import (
     ContextSourceRegistration,
     ContextSourceRegistrationKind,
@@ -36,28 +38,75 @@ from flowmarshal.engine.e2e_qualification import (
     _unknown_receipt,
     _write_prepared_state,
 )
-from flowmarshal.engine.eval_cli import build_parser, validate_benchmark_matrix
-from flowmarshal.engine.evaluation import BenchmarkCell
+from flowmarshal.engine.eval_cli import _bound_scope_reports, build_parser, validate_benchmark_matrix
+from flowmarshal.engine.evaluation import (
+    BenchmarkCell,
+    BenchmarkLifecycleObservation,
+    BenchmarkTaskLifecycleObservation,
+    EvaluationCellCheckpoint,
+    EvaluationRunStatus,
+    ImmutableCheckpointStore,
+    RegressionCatalog,
+)
+from flowmarshal.engine.evaluation_budget import (
+    EvaluationPolicies,
+    write_immutable_run_metadata,
+)
 from flowmarshal.engine.freeze import LegacyFreezeManifest, verify_legacy_freeze
 from flowmarshal.engine.ledger import ENGINE_SCHEMA_REVISION, EngineLedgerError, SQLiteEngineLedger
 from flowmarshal.engine.models import ModelCapability, ModelInventory
 from flowmarshal.engine.qualification import (
+    GenericFixtureReviewDraft,
     PlanningScenarioCatalog,
     QualificationRunError,
+    ScopeQualificationReport,
     ORDER_SEEDS,
     _deterministic_contract,
+    _guard_full_planning_resume,
+    _planning_cell_work_root,
+    _planning_contract,
     _planning_cell,
+    _record_full_planning_rate_limit,
+    _review_result,
+    _write_json,
     default_role_configuration,
+    resume_run,
     source_manifest_digest,
     source_manifest_files,
 )
-from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime
+from flowmarshal.engine.role_execution import RoleTimeoutPolicy
+from flowmarshal.engine.roles import strict_json_output_schema
+from flowmarshal.engine.runtime import CodexProjectBinding, EngineDispatcher, FakeCodexRuntime
 from flowmarshal.engine.service import EngineService, EngineServiceError
 
 from tests.engine_helpers import goal, profile
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _benchmark_lifecycle(model_lock: str, neutral: str) -> BenchmarkLifecycleObservation:
+    return BenchmarkLifecycleObservation(
+        project_id="project_" + "1" * 32,
+        plan_revision_id="plan_revision_" + "2" * 32,
+        plan_activation_digest="sha256:" + "d" * 64,
+        model_lock_digest=model_lock,
+        neutral_input_digest=neutral,
+        tasks=(BenchmarkTaskLifecycleObservation(
+            task_id="task_" + "3" * 32,
+            execution_spec_revision_id="execution_spec_" + "4" * 32,
+            execution_spec_digest="sha256:" + "5" * 64,
+            attempt_id="attempt_" + "6" * 32,
+            runtime_receipt_digest="sha256:" + "7" * 64,
+            validation_result_digests=("sha256:" + "8" * 64,),
+        ),),
+        integration_validation_result_digests=("sha256:" + "9" * 64,),
+        state_before_digest="sha256:" + "a" * 64,
+        state_after_digest="sha256:" + "b" * 64,
+        state_reobservation_event_digest="sha256:" + "c" * 64,
+        goal_verdict_digest="sha256:" + "e" * 64,
+        history_head_digest="sha256:" + "f" * 64,
+    )
 
 
 def qualification_inventory() -> ModelInventory:
@@ -100,6 +149,249 @@ class EngineQualificationTests(unittest.TestCase):
         )
         return prepared, digest
 
+    def full_planning_paused_run(self, destination: Path):
+        catalog = PlanningScenarioCatalog.load(
+            ROOT / "tests" / "fixtures" / "engine" / "planning-scenarios.json"
+        )
+        policies = EvaluationPolicies(
+            budget=GoalBudgetPolicy(
+                total_tokens=1_000_000,
+                call_reservation_tokens=100_000,
+                replan_reserve_percent=25,
+            ),
+            role_timeouts=RoleTimeoutPolicy(),
+        )
+        contract = _planning_contract(
+            ROOT, catalog, self.inventory, self.roles, policies
+        )
+        store = ImmutableCheckpointStore(destination, contract)
+        store.initialize()
+        write_immutable_run_metadata(
+            destination / "run-metadata.json",
+            {
+                "scope": "full-planning-pipeline",
+                "evaluation_contract_digest": contract.contract_digest,
+                "project_root": str(ROOT),
+                "role_configuration": self.roles.model_dump(mode="json"),
+                "codex_bin": None,
+                "inspection_provider_contract": "plan-inspection-v1",
+            },
+            policies,
+        )
+        return catalog, contract, store, policies
+
+    def test_inventory_observation_preserves_operational_binding(self) -> None:
+        # model/list 관측은 EngineModel 계층 밖의 strict model도 그대로 보존해야 한다.
+        binding = self.roles.operational_binding(self.inventory)
+        with tempfile.TemporaryDirectory() as raw:
+            path = Path(raw) / "inventory-observation.json"
+            _write_json(path, binding)
+            restored = OperationalBinding.model_validate_json(path.read_text(encoding="utf-8"))
+        self.assertEqual(binding, restored)
+        self.assertEqual(self.inventory.inventory_digest, restored.inventory_digest)
+        self.assertEqual(binding.lock_digest, restored.lock_digest)
+
+    def test_full_planning_partial_provider_cell_becomes_non_resumable_before_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            destination = Path(raw) / "full-planning"
+            catalog, contract, store, _ = self.full_planning_paused_run(destination)
+            scenario = catalog.scenarios[0]
+            seed = contract.order_seeds[0]
+            state_root = _planning_cell_work_root(
+                destination,
+                order_seed=seed,
+                catalog_index=0,
+            ) / "budget-state"
+            database = state_root / "flowmarshal-engine.sqlite3"
+            database.parent.mkdir(parents=True)
+            connection = sqlite3.connect(database)
+            try:
+                connection.execute("CREATE TABLE provider_calls(id TEXT, status TEXT)")
+                connection.execute(
+                    "INSERT INTO provider_calls(id, status) VALUES (?, ?)",
+                    ("provider_call_partial", "usage_unknown"),
+                )
+                connection.commit()
+            finally:
+                connection.close()
+            store.set_state(
+                EvaluationRunStatus.PAUSED_RATE_LIMIT,
+                updated_at=utc_now(),
+                reason="rate limit exceeded",
+            )
+
+            with patch("flowmarshal.engine.qualification.CodexAppServerRuntime") as runtime:
+                with self.assertRaisesRegex(
+                    QualificationRunError,
+                    "FULL_PLANNING_PARTIAL_CELL_NON_RESUMABLE",
+                ):
+                    resume_run(destination)
+                runtime.assert_not_called()
+
+            failed = store.state()
+            self.assertEqual(EvaluationRunStatus.FAILED, failed.status)
+            self.assertIn("provider_call_partial=usage_unknown", failed.reason or "")
+            self.assertIn(str(database.resolve()), failed.reason or "")
+            self.assertIn("project budget observe-role", failed.reason or "")
+            self.assertIn(str((state_root / "artifacts").resolve()), failed.reason or "")
+
+            with patch("flowmarshal.engine.qualification.CodexAppServerRuntime") as runtime:
+                with self.assertRaisesRegex(
+                    QualificationRunError,
+                    "FULL_PLANNING_PARTIAL_CELL_NON_RESUMABLE",
+                ):
+                    resume_run(destination)
+                runtime.assert_not_called()
+            self.assertEqual(EvaluationRunStatus.FAILED, store.state().status)
+
+    def test_full_planning_pre_provider_rate_limit_remains_resumable(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            destination = Path(raw) / "full-planning"
+            catalog, contract, store, _ = self.full_planning_paused_run(destination)
+            completed_scenario = catalog.scenarios[0]
+            scenario = catalog.scenarios[1]
+            seed = contract.order_seeds[0]
+            completed_state_root = _planning_cell_work_root(
+                destination,
+                order_seed=seed,
+                catalog_index=0,
+            ) / "budget-state"
+            completed_database = completed_state_root / "flowmarshal-engine.sqlite3"
+            completed_database.parent.mkdir(parents=True)
+            connection = sqlite3.connect(completed_database)
+            try:
+                connection.execute("CREATE TABLE provider_calls(id TEXT, status TEXT)")
+                connection.execute(
+                    "INSERT INTO provider_calls(id, status) VALUES (?, ?)",
+                    ("provider_call_completed", "settled"),
+                )
+                connection.commit()
+            finally:
+                connection.close()
+            store.put(
+                EvaluationCellCheckpoint(
+                    model_lock_format="flowmarshal-model-lock-v2",
+                    contract_digest=contract.contract_digest,
+                    fixture_digest=completed_scenario.scenario_digest,
+                    order_seed=seed,
+                    raw_structured_assessment={"passed": True},
+                    runner_receipts=({"status": "success"},),
+                )
+            )
+            state_root = _planning_cell_work_root(
+                destination,
+                order_seed=seed,
+                catalog_index=1,
+            ) / "budget-state"
+            paused = _record_full_planning_rate_limit(
+                store,
+                state_root=state_root,
+                scenario_id=scenario.scenario_id,
+                order_seed=seed,
+                original_reason="rate limit before reservation",
+                codex_bin=None,
+            )
+
+            self.assertEqual(EvaluationRunStatus.PAUSED_RATE_LIMIT, paused.status)
+            self.assertIn("FULL_PLANNING_RATE_LIMIT_BEFORE_PROVIDER_CALL", paused.reason or "")
+            self.assertIn("provider_calls=[]", paused.reason or "")
+            self.assertIn("next_action=resume_same_run_root", paused.reason or "")
+            _guard_full_planning_resume(destination, base=ROOT, codex_bin=None)
+            self.assertEqual(EvaluationRunStatus.PAUSED_RATE_LIMIT, store.state().status)
+
+    def test_full_planning_process_crash_is_blocked_before_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            destination = Path(raw) / "full-planning"
+            catalog, contract, store, _ = self.full_planning_paused_run(destination)
+            state_root = _planning_cell_work_root(
+                destination,
+                order_seed=17,
+                catalog_index=0,
+            ) / "budget-state"
+            state_root.mkdir(parents=True)
+            database = state_root / "flowmarshal-engine.sqlite3"
+            connection = sqlite3.connect(database)
+            try:
+                connection.execute("CREATE TABLE provider_calls(id TEXT, status TEXT)")
+                connection.execute("INSERT INTO provider_calls VALUES ('partial_call', 'reserved')")
+                connection.commit()
+            finally:
+                connection.close()
+            self.assertEqual(EvaluationRunStatus.RUNNING, store.state().status)
+            before = database.read_bytes()
+            with patch("flowmarshal.engine.qualification.CodexAppServerRuntime") as runtime:
+                with self.assertRaisesRegex(QualificationRunError, "FULL_PLANNING_PARTIAL_CELL_NON_RESUMABLE"):
+                    resume_run(destination)
+                runtime.assert_not_called()
+            self.assertEqual(before, database.read_bytes())
+            self.assertEqual(EvaluationRunStatus.FAILED, store.state().status)
+
+    def test_generic_fixture_schema_and_typed_validation_require_empty_task_refs(self) -> None:
+        finding = {
+            "finding_code": "DUPLICATE_STRATEGY",
+            "gate": "plan",
+            "severity": "error",
+            "summary": "두 후보의 전략과 DAG가 같습니다.",
+            "evidence_refs": ["artifact:candidate"],
+            "affected_task_refs": [],
+            "remediable": True,
+        }
+        valid = GenericFixtureReviewDraft.model_validate(
+            {"findings": [finding], "ratings": None}
+        )
+        self.assertEqual((), valid.findings[0].affected_task_refs)
+
+        provider_schema = strict_json_output_schema(
+            GenericFixtureReviewDraft.model_json_schema()
+        )
+        finding_schema = provider_schema["$defs"]["GenericFixtureFindingDraft"]
+        task_refs_schema = finding_schema["properties"]["affected_task_refs"]
+        self.assertEqual(0, task_refs_schema["maxItems"])
+        self.assertIn("affected_task_refs", finding_schema["required"])
+
+        with self.assertRaisesRegex(ValueError, "at most 0 items"):
+            GenericFixtureReviewDraft.model_validate(
+                {
+                    "findings": [finding | {"affected_task_refs": ["candidate-a"]}],
+                    "ratings": None,
+                }
+            )
+
+    def test_generic_fixture_empty_task_refs_preserve_deterministic_decision(self) -> None:
+        catalog = RegressionCatalog.load(
+            ROOT / "tests" / "fixtures" / "engine" / "r31-reviewer-regressions.json"
+        )
+        fixture = next(item for item in catalog.fixtures if item.fixture_id == "P11-adversarial")
+        raw = {
+            "findings": [
+                {
+                    "finding_code": code,
+                    "gate": "plan",
+                    "severity": "error",
+                    "summary": f"{code} 직접 근거가 있습니다.",
+                    "evidence_refs": ["artifact:candidate"],
+                    "affected_task_refs": [],
+                    "remediable": True,
+                }
+                for code in ("DUPLICATE_STRATEGY", "DIVERSITY_FAILURE")
+            ],
+            "ratings": None,
+        }
+
+        result = _review_result(
+            fixture, order_seed=17, raw=raw, reviewer_role="critical_reviewer"
+        )
+
+        self.assertTrue(result.schema_valid)
+        self.assertEqual("needs_revision", result.decision.status.value)
+        self.assertEqual(
+            {"DUPLICATE_STRATEGY", "DIVERSITY_FAILURE"},
+            set(result.decision.finding_codes),
+        )
+        self.assertTrue(
+            all(not item.affected_task_refs for item in result.submission.findings)
+        )
+
     def test_eval_cli_exposes_all_qualification_commands_and_scopes(self) -> None:
         parser = build_parser()
         self.assertIn("run", parser.format_help())
@@ -114,6 +406,42 @@ class EngineQualificationTests(unittest.TestCase):
         ):
             arguments = parser.parse_args(["run", "--scope", scope])
             self.assertEqual(scope, arguments.scope)
+
+    def test_benchmark_project_binding_changes_only_legacy_thread_persistence(self) -> None:
+        policies = EvaluationPolicies(
+            budget=GoalBudgetPolicy(total_tokens=1_000_000, call_reservation_tokens=100_000),
+            role_timeouts=RoleTimeoutPolicy(),
+        )
+        original = _implementation_runtime_contract(policies)
+        bound = policies.model_copy(update={"codex_project": CodexProjectBinding(
+            project_id="server-project-id", expected_root=str(ROOT)
+        )})
+        actual = _implementation_runtime_contract(bound)
+        self.assertTrue(original["r31_baseline"]["ephemeral_threads"])
+        self.assertFalse(actual["r31_baseline"]["ephemeral_threads"])
+        self.assertEqual(original["skeleton_engine"], actual["skeleton_engine"])
+        self.assertEqual(0, actual["r31_baseline"]["max_schema_recovery_attempts"])
+        self.assertEqual(original, _implementation_runtime_contract(policies))
+
+    def test_scope_prerequisites_reject_a_repeated_valid_report(self) -> None:
+        contract = _deterministic_contract(ROOT)
+        report = ScopeQualificationReport(
+            scope=contract.scope,
+            contract_digest=contract.contract_digest,
+            status=EvaluationRunStatus.COMPLETED,
+            passed=True,
+            metrics={"check_count": 5, "failure_count": 0},
+            failures=(),
+            generated_at=utc_now(),
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            directory = Path(raw)
+            report_path = directory / "qualification-report.json"
+            _write_json(directory / "evaluation-contract.json", contract)
+            _write_json(report_path, report)
+            self.assertEqual((report,), _bound_scope_reports([str(report_path)], ROOT))
+            with self.assertRaisesRegex(QualificationRunError, "scope.*중복"):
+                _bound_scope_reports([str(report_path)] * 3, ROOT)
 
     def test_qualification_contracts_fix_expected_cells_and_model_ids_stay_in_config(self) -> None:
         scenarios = PlanningScenarioCatalog.load(
@@ -145,6 +473,15 @@ class EngineQualificationTests(unittest.TestCase):
         self.assertLessEqual(expected_source, manifest.keys())
         self.assertLessEqual(expected_tests, manifest.keys())
         required = (
+            "README.md",
+            "pyproject.toml",
+            "requirements.lock",
+            "setup.py",
+            "config/pre-1.0-performance-thresholds.json",
+            "config/qualification-suite.json",
+            "docs/engine-package-install.md",
+            "docs/engine-user-workflow.md",
+            "docs/performance-release-floor.md",
             "src/flowmarshal/gate0c/ledger.py",
             "src/flowmarshal/gate0c/e2e.py",
             "src/flowmarshal/canonical.py",
@@ -278,8 +615,39 @@ class EngineQualificationTests(unittest.TestCase):
                 disposition=scenario.expected_disposition,
                 uncached_input_tokens=100, output_tokens=50,
                 latency_ms_to_first_feasible=(1000 if scenario.expected_disposition == "selected" else None),
-                latency_ms_to_disposition=1000, detailed_task_count=1,
-                unexecuted_detailed_task_count=0, candidate_output_tokens=50,
+                latency_ms_to_disposition=1000,
+                selected_plan_activation_digest=(
+                    "sha256:" + "d" * 64
+                    if implementation == "skeleton_engine" and scenario.expected_disposition == "selected"
+                    else None
+                ),
+                lifecycle_observation=(
+                    _benchmark_lifecycle(
+                        "sha256:" + "a" * 64,
+                        sha256_digest({"neutral_fixture": scenario.scenario_id}),
+                    )
+                    if implementation == "skeleton_engine" and scenario.expected_disposition == "selected"
+                    else None
+                ),
+                lifecycle_evidence_digest=(
+                    _benchmark_lifecycle(
+                        "sha256:" + "a" * 64,
+                        sha256_digest({"neutral_fixture": scenario.scenario_id}),
+                    ).observation_digest
+                    if implementation == "skeleton_engine" and scenario.expected_disposition == "selected"
+                    else None
+                ),
+                detailed_task_count=(
+                    None
+                    if implementation == "skeleton_engine" and scenario.expected_disposition == "blocked"
+                    else 1
+                ),
+                unexecuted_detailed_task_count=(
+                    None
+                    if implementation == "skeleton_engine" and scenario.expected_disposition == "blocked"
+                    else 0
+                ),
+                candidate_output_tokens=50,
                 discarded_candidate_output_tokens=0,
             )
             for scenario in catalog.scenarios for seed in ORDER_SEEDS
@@ -464,18 +832,18 @@ class EngineQualificationTests(unittest.TestCase):
                     )
                     self.assertLessEqual(runtime.create_calls, 1)
                     self.assertLessEqual(runtime.turn_calls, 1)
-                    if point in {
-                        "after_thread_intent",
-                        "after_thread_effect",
-                        "after_turn_intent",
-                        "after_turn_effect",
-                    }:
+                    if point in {"after_thread_intent", "after_turn_intent"}:
                         self.assertEqual(RunOnceAction.BLOCKED, recovered.action)
                         self.assertEqual("EXTERNAL_EFFECT_UNKNOWN", recovered.blocker_code)
                         self.assertEqual(create_before, runtime.create_calls)
                         self.assertEqual(turn_before, runtime.turn_calls)
+                    elif point in {"after_thread_effect", "after_turn_effect"}:
+                        self.assertEqual(RunOnceAction.OBSERVED, recovered.action)
+                        self.assertIn("정확한 provider receipt/binding", recovered.detail)
+                        self.assertEqual(create_before, runtime.create_calls)
+                        self.assertEqual(turn_before, runtime.turn_calls)
 
-    def test_run_once_returns_typed_repair_proposal_after_attempt_failure(self) -> None:
+    def test_run_once_automatically_repairs_allowed_implementation_failure(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             prepared, _ = self.prepared(Path(temp) / "repair")
             runtime = FakeCodexRuntime(self.inventory)
@@ -491,12 +859,16 @@ class EngineQualificationTests(unittest.TestCase):
             observed = dispatcher.run_once(prepared.project_id)
             self.assertEqual(RunOnceAction.OBSERVED, observed.action)
 
-            blocked = dispatcher.run_once(prepared.project_id)
-            self.assertEqual(RunOnceAction.BLOCKED, blocked.action)
-            self.assertEqual("TASK_RECOVERY_REQUIRED", blocked.blocker_code)
-            self.assertEqual(FailureClass.IMPLEMENTATION, blocked.failure_class)
-            self.assertEqual(RepairAction.TASK_REPAIR, blocked.suggested_repair_action)
-            self.assertFalse(blocked.checkpoint_required)
+            recovered = dispatcher.run_once(prepared.project_id)
+            self.assertEqual(RunOnceAction.RECOVERED, recovered.action)
+            self.assertIsNone(recovered.blocker_code)
+            with prepared.service.ledger.read() as connection:
+                self.assertEqual(1, connection.execute(
+                    "SELECT COUNT(*) FROM recovery_assessments"
+                ).fetchone()[0])
+                self.assertEqual("materialized", connection.execute(
+                    "SELECT status FROM task_contracts WHERE id=?", (prepared.task_id,)
+                ).fetchone()[0])
 
     def test_validation_and_state_reobservation_faults_resume_without_duplicate_result(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -681,8 +1053,8 @@ class EngineQualificationTests(unittest.TestCase):
             with self.assertRaisesRegex(EngineServiceError, "등록되지 않은"):
                 service.register_profile(invalid)
 
-    def test_new_engine_database_uses_revision_two(self) -> None:
-        self.assertEqual(2, ENGINE_SCHEMA_REVISION)
+    def test_new_engine_database_uses_revision_four_without_automatic_migration(self) -> None:
+        self.assertEqual(4, ENGINE_SCHEMA_REVISION)
         with tempfile.TemporaryDirectory() as temp:
             database = Path(temp) / "old-engine.sqlite3"
             ledger = SQLiteEngineLedger(database)
@@ -690,13 +1062,18 @@ class EngineQualificationTests(unittest.TestCase):
             connection = sqlite3.connect(database)
             try:
                 connection.execute(
-                    "UPDATE schema_meta SET value = '1' WHERE key = 'schema_revision'"
+                    "UPDATE schema_meta SET value = '2' WHERE key = 'schema_revision'"
                 )
                 connection.commit()
             finally:
                 connection.close()
             with self.assertRaisesRegex(EngineLedgerError, "revision"):
                 SQLiteEngineLedger(database).initialize()
+            connection = sqlite3.connect(database)
+            try:
+                self.assertEqual("2", connection.execute("SELECT value FROM schema_meta WHERE key='schema_revision'").fetchone()[0])
+            finally:
+                connection.close()
 
 
 if __name__ == "__main__":

@@ -10,7 +10,12 @@ from typing import Any, Callable
 from pydantic import Field, model_validator
 
 from ..canonical import sha256_digest
-from .context import AdditionalContextRequest, ProjectMapper, goal_context_observations
+from .context import (
+    AdditionalContextRequest,
+    ProjectMapper,
+    goal_context_observations,
+    resolve_additional_context_request,
+)
 from .domain import (
     BudgetStage, BudgetUsageRecord, EngineModel, ExecutionSpecProposal, GoalContractRevision, PlanContractRevision,
     ProjectMapRevision, ProjectProfileRevision, TaskContract, ValidationExecutionStep,
@@ -183,16 +188,19 @@ class ExecutionProposalAdapter:
         self.roles = roles
         self.operations = CoreOperations(service, fault_hook)
 
+    def _budgeted_runner(self, project_id: str, context: dict[str, Any]):
+        from .budget import BudgetedRoleRunner
+        return BudgetedRoleRunner(self.runner, self.service, project_id=project_id,
+                                  goal_id=context["goal"]["goal_id"],
+                                  goal_digest=context["goal"]["definition_digest"])
+
     def _predecessor_outputs(self, plan: PlanContractRevision, task: TaskContract) -> list[dict[str, Any]]:
         outputs = []
         with self.service.ledger.read() as connection:
             for dependency in plan.definition.dependencies:
                 if dependency.consumer_task_id != task.task_id:
                     continue
-                rows = connection.execute(
-                    "SELECT payload_json FROM evidence_records WHERE project_id = ? AND task_id = ? ORDER BY id",
-                    (task.project_id, dependency.producer_task_id),
-                ).fetchall()
+                rows = self.service.task_evidence_rows(connection, dependency.producer_task_id)
                 outputs.append({"producer_task_id": dependency.producer_task_id,
                                 "products": list(dependency.products),
                                 "evidence": [json.loads(row["payload_json"]) for row in rows]})
@@ -239,10 +247,14 @@ class ExecutionProposalAdapter:
             inventory_digest=inventory.inventory_digest,
             cwd=context["project_map"]["root"],
         )
+        runner = self._budgeted_runner(project_id, context)
+        def execute_authorized():
+            self.service.assert_project_authorized(project_id)
+            return runner.run(request, validator=output_validator).model_dump(mode="json")
         result = self.operations.invoke(
             project_id=project_id, kind=kind,
             request={"role_request": request.model_dump(mode="json"), "authority_context_digest": sha256_digest(context)},
-            execute=lambda: self.runner.run(request, validator=output_validator).model_dump(mode="json"),
+            execute=execute_authorized,
         )
         verify_role_receipt(request, RoleCallResult.model_validate(result))
         self._record_usage(project_id, context, result,
@@ -274,6 +286,37 @@ class ExecutionProposalAdapter:
             payload=payload,
             validator=validate_task_preparation,
         )
+        if raw.context_request is not None:
+            resolution = resolve_additional_context_request(
+                project_map=ProjectMapRevision.model_validate(context["project_map"]),
+                request=raw.context_request,
+                token_budget=12_000,
+            )
+            if resolution.resolved:
+                payload = payload | {
+                    "additional_context": [
+                        item.model_dump(mode="json") for item in resolution.resolved
+                    ],
+                    "unresolved_context_request": (
+                        None
+                        if resolution.unresolved_request is None
+                        else resolution.unresolved_request.model_dump(mode="json")
+                    ),
+                }
+                raw = self._run(
+                    project_id,
+                    inventory,
+                    context,
+                    ProviderExecutionPreparation,
+                    "execution_preparation",
+                    payload=payload,
+                    instructions=(
+                        EXECUTION_PREPARATION_INSTRUCTIONS
+                        + "\n직전 ContextRequest에 대해 Project Map 전체를 검색한 additional_context가 "
+                        "제공됐다. 그 본문을 사용해 proposal을 완성하되 unresolved 항목은 추측하지 않는다."
+                    ),
+                    validator=validate_task_preparation,
+                )
         result = compile_task_preparation(raw, task)
         # 모델 호출 사이 원장 revision·관찰이 바뀌면 이전 응답을 새 snapshot에 세탁하지 않는다.
         current = execution_context(self.service, project_id)
@@ -338,9 +381,13 @@ class ExecutionProposalAdapter:
                 raise ValueError("제공되지 않은 semantic evidence ref입니다.")
             return judgement
 
+        runner = self._budgeted_runner(project_id, context)
+        def execute_authorized():
+            self.service.assert_project_authorized(project_id)
+            return runner.run(request, validator=validate).model_dump(mode="json")
         result = self.operations.invoke(
             project_id=project_id, kind="goal_validation", request=request.model_dump(mode="json"),
-            execute=lambda: self.runner.run(request, validator=validate).model_dump(mode="json"),
+            execute=execute_authorized,
         )
         verify_role_receipt(request, RoleCallResult.model_validate(result))
         self._record_usage(project_id, context, result, BudgetStage.VALIDATION)

@@ -2,16 +2,30 @@
 from __future__ import annotations
 
 import argparse
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
 import subprocess
+import threading
 from typing import Any
 
 from flowmarshal.canonical import canonical_json, json_value, sha256_bytes, sha256_digest
-from flowmarshal.engine.domain import GoalContractRevision, PlanContractRevision, PlanSkeletonCandidate, ProjectMapRevision, StateSnapshot, utc_now
+from flowmarshal.engine.domain import GoalContractRevision, PlanContractRevision, PlanSkeletonCandidate, ProjectMapRevision, StateSnapshot, new_id, utc_now
+from flowmarshal.engine.inspection_diagnostic_budget import (
+    DiagnosticBudgetRegistry,
+    bind_diagnostic_policy_input,
+    diagnostic_budget_ledger_observation,
+    verify_diagnostic_policy_input,
+)
+from flowmarshal.engine.inspection_generation_review import (
+    GenerationReviewSourceBinding,
+    bind_generation_review_source,
+    generation_review_criteria_binding,
+    generation_review_criteria_digest,
+    verify_generation_assessment,
+)
 from flowmarshal.engine.models import EngineRoleConfiguration
 from flowmarshal.engine.model_lock import LOCK_FORMAT, ModelInventory, OperationalBinding, verify_binding
 from flowmarshal.engine.plan_inspection_eval import (
@@ -44,6 +58,7 @@ from flowmarshal.engine.roles import (
     strict_json_output_schema, verify_role_receipt,
 )
 from flowmarshal.engine.runtime import CodexAppServerRuntime
+from flowmarshal.engine.role_execution import use_role_timeout_policy, verify_role_timeout_binding
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -340,6 +355,9 @@ def instruction_binding(run: Path, *, observed_sources: list[str] | None = None,
 
 def portable_preflight(run: Path, *, fixture_package: Path, codex_bin: Path,
                        role_configuration: RoleConfigurationInput, execution_mode: str,
+                       budget_policy_path: Path | None = None,
+                       role_timeout_policy_path: Path | None = None,
+                       codex_project_binding_path: Path | None = None,
                        inspection_provider_contract: str = INSPECTION_PROVIDER_CONTRACT) -> dict[str, Any]:
     """모델 호출·fixture 생성 전에 고정 checkout과 외부 입력 경로를 검사한다."""
     from scripts.diagnostics.inspection_inputs import verify_fixture_package
@@ -351,6 +369,9 @@ def portable_preflight(run: Path, *, fixture_package: Path, codex_bin: Path,
     if role_configuration.selection_reason != "caller_provided_explicit_role_configuration":
         raise RuntimeError("PORTABLE_ROLE_CONFIGURATION_MUST_BE_EXPLICIT")
     provider_manifest = inspection_provider_manifest(inspection_provider_contract)
+    require_policies = inspection_provider_contract == PLAN_INSPECTION_PROVIDER_V2
+    if require_policies and None in (budget_policy_path, role_timeout_policy_path, codex_project_binding_path):
+        raise RuntimeError("PORTABLE_V2_DIAGNOSTIC_POLICY_REQUIRED")
     executable = codex_bin.resolve(strict=True)
     body = {
         "format": "flowmarshal-inspection-preflight-v1", "execution_mode": execution_mode,
@@ -363,6 +384,17 @@ def portable_preflight(run: Path, *, fixture_package: Path, codex_bin: Path,
         "role_configuration_input": role_configuration.binding,
         "role_threads_ephemeral": False,
     }
+    if budget_policy_path is not None or role_timeout_policy_path is not None or codex_project_binding_path is not None:
+        if None in (budget_policy_path, role_timeout_policy_path, codex_project_binding_path):
+            raise RuntimeError("DIAGNOSTIC_POLICY_PATHS_REQUIRED")
+        policy_binding, _policies = bind_diagnostic_policy_input(
+            snapshot_root=run / "policy-inputs",
+            budget_policy_path=budget_policy_path,
+            role_timeout_policy_path=role_timeout_policy_path,
+            codex_project_binding_path=codex_project_binding_path,
+            require_project_binding=True,
+        )
+        body["diagnostic_policy_input"] = policy_binding.model_dump(mode="json")
     write_new(run / "workspace-preflight.json", body | {"binding_digest": sha256_digest(body)})
     return body
 
@@ -415,6 +447,8 @@ class CapturingRuntime(CodexAppServerRuntime):
         self.phase = phase
         self.capture = claim_runtime_phase(run, phase)
         self.indices = {}
+        self.turn_captures = {}
+        self.terminal_capture_lock = threading.Lock()
         super().__init__(**kwargs)
 
     def record(self, kind, value):
@@ -480,12 +514,19 @@ class CapturingRuntime(CodexAppServerRuntime):
         claim_turn(self.run, self.capture, kwargs)
         result = super().start_turn(**kwargs)
         write_new(self.capture / "turn.receipt.json", result)
+        if not hasattr(self, "turn_captures"):
+            self.turn_captures = {}
+        self.turn_captures[(kwargs["thread_id"], result.operation_id)] = self.capture
         return result
 
     def read(self, **kwargs):
         result = super().read(**kwargs)
-        if not result.active and not (self.capture / "terminal.json").exists():
-            write_new(self.capture / "terminal.json", result)
+        capture = getattr(self, "turn_captures", {}).get((result.thread_id, result.turn_id), self.capture)
+        if not hasattr(self, "terminal_capture_lock"):
+            self.terminal_capture_lock = threading.Lock()
+        with self.terminal_capture_lock:
+            if not result.active and not (capture / "terminal.json").exists():
+                write_new(capture / "terminal.json", result)
         return result
 
 
@@ -510,7 +551,7 @@ def options(role, inventory_digest, workspace):
 
 def invoke(name, runner, run, roles, inventory_digest,
            inspection_provider_contract=INSPECTION_PROVIDER_CONTRACT):
-    goal = GoalContractRevision.model_validate(read(run / "input-goal.json"))
+    goal = goal_for_name(run, name)
     state = StateSnapshot.model_validate(read(run / "input-state.json"))
     project_map = ProjectMapRevision.model_validate(read(run / "input-project-map.json"))
     if name in {"semantic-explicit", "semantic-missing-link"}:
@@ -533,6 +574,16 @@ def invoke(name, runner, run, roles, inventory_digest,
     return reviewer.review(plan=plan, goal=goal, state=state, project_map=project_map, risk_route=risk_route(plan))
 
 
+def goal_for_name(run: Path, name: str) -> GoalContractRevision:
+    """fixture가 명시한 Goal 원문을 그대로 쓰며 새 진단 Goal을 만들지 않는다."""
+    source = (
+        "input-semantic-explicit-goal.json"
+        if name in {"semantic-explicit", "semantic-missing-link"}
+        else "input-goal.json"
+    )
+    return GoalContractRevision.model_validate(read(run / source))
+
+
 def capture_request(name, run, roles, inventory_digest,
                     inspection_provider_contract=INSPECTION_PROVIDER_CONTRACT):
     capture = RequestCapture()
@@ -541,6 +592,23 @@ def capture_request(name, run, roles, inventory_digest,
     except CapturedRequest:
         return capture.request
     raise AssertionError("요청이 생성되지 않았습니다.")
+
+
+def capture_request_with_policy(name, run, roles, inventory_digest, *,
+                                inspection_provider_contract, evaluation_policies=None):
+    context = (use_role_timeout_policy(evaluation_policies.role_timeouts)
+               if evaluation_policies is not None else nullcontext())
+    with context:
+        return capture_request(name, run, roles, inventory_digest, inspection_provider_contract)
+
+
+def instruction_probe_arguments(run: Path, roles: EngineRoleConfiguration, evaluation_policies=None) -> dict[str, Any]:
+    """Project-bound portable V2는 runtime의 저장 thread 계약으로 instruction source를 관측한다."""
+    return {
+        "cwd": run / "workspace", "title": "검사 입력 지침 관측",
+        "model": roles.general_reviewer.model, "developer_instructions": "",
+        "ephemeral": evaluation_policies is None,
+    }
 
 
 def case_expectation(run: Path, name: str, request: RoleCallRequest) -> dict[str, Any]:
@@ -578,6 +646,16 @@ def verify_lock(run):
         if lock.get("role_threads_ephemeral") is not False:
             raise RuntimeError("ROLE_THREAD_PERSISTENCE_BINDING_MISMATCH")
         verify_portable_inputs(lock)
+    if requires_generation_review_provenance(lock):
+        if lock.get("generation_review_criteria") != generation_review_criteria_binding():
+            raise RuntimeError("GENERATION_REVIEW_CRITERIA_BINDING_MISMATCH")
+    policy_input = lock.get("diagnostic_policy_input")
+    if policy_input is not None:
+        policies = verify_diagnostic_policy_input(
+            policy_input, run_root=run, require_project_binding=True,
+        )
+    else:
+        policies = None
     roles = verify_role_configuration_artifacts(run, lock.get("role_configuration_input", {}))
     planning_binding = read(run / "planning-binding.json")
     if (planning_binding.get("role_configuration_input") != lock["role_configuration_input"] or
@@ -600,6 +678,17 @@ def verify_lock(run):
         if (binding.binding_digest != expected_digest or
                 binding != bind_plan_inspection_request(request, provider)):
             raise RuntimeError(f"PLAN_INSPECTION_REQUEST_BINDING_CHANGED: {name}")
+        if policies is not None:
+            try:
+                verify_role_timeout_binding(
+                    role=request.role, timeout_seconds=request.timeout_seconds,
+                    timeout_policy_digest=request.timeout_policy_digest,
+                    policy=policies.role_timeouts,
+                    observation_policy=request.observation_policy,
+                    observation_policy_digest=request.observation_policy_digest,
+                )
+            except ValueError as error:
+                raise RuntimeError("ROLE_TIMEOUT_POLICY_BINDING_MISMATCH") from error
     binding = read(run / "instruction-binding.json")
     for item in binding["sources"]:
         if sha256_bytes(Path(item["path"]).read_bytes()) != item["content_digest"]:
@@ -626,11 +715,21 @@ def verify_lock(run):
                 generated["preflight_digest"] != lock["lock_digest"] or
                 generated["plan_digest"] != PlanContractRevision.model_validate(read(run / "expanded-plan.json")).activation_digest):
             raise RuntimeError("GENERATED_INPUT_LOCK_CHANGED")
+        if requires_generation_review_provenance(lock):
+            source_binding = GenerationReviewSourceBinding.model_validate(
+                read(run / "generation-review-source-binding.json")
+            )
+            if (generated.get("generation_review_source_binding_digest") != source_binding.source_binding_digest
+                    or generated.get("generation_review_criteria_digest")
+                    != generation_review_criteria_digest()):
+                raise RuntimeError("GENERATION_REVIEW_GENERATED_LOCK_MISMATCH")
     return lock
 
 
 def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, execution_mode="qualification",
             fixture_package: Path | None = None, codex_bin: Path | None = None,
+            budget_policy_path: Path | None = None, role_timeout_policy_path: Path | None = None,
+            codex_project_binding_path: Path | None = None,
             inspection_provider_contract: str = INSPECTION_PROVIDER_CONTRACT):
     if execution_mode not in EXECUTION_MODES:
         raise RuntimeError("UNKNOWN_EXECUTION_MODE")
@@ -646,6 +745,7 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, ex
     if portable != (codex_bin is not None):
         raise RuntimeError("PORTABLE_PACKAGE_AND_EXECUTABLE_REQUIRED_TOGETHER")
     isolation = None
+    evaluation_policies = None
     if portable:
         isolation = read(run / "workspace-preflight.json")
         isolation_body = dict(isolation)
@@ -661,17 +761,36 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, ex
                 isolation["codex_bin"] != str(codex_bin.resolve(strict=True)) or
                 isolation["fixture_package_binding"]["package"] != str(fixture_package.resolve(strict=True))):
             raise RuntimeError("WORKSPACE_PREFLIGHT_INPUT_CHANGED")
+        policy_binding = isolation.get("diagnostic_policy_input")
+        if inspection_provider_contract == PLAN_INSPECTION_PROVIDER_V2 and policy_binding is None:
+            raise RuntimeError("PORTABLE_V2_DIAGNOSTIC_POLICY_REQUIRED")
+        if policy_binding is not None:
+            if None in (budget_policy_path, role_timeout_policy_path, codex_project_binding_path):
+                raise RuntimeError("DIAGNOSTIC_POLICY_PATHS_REQUIRED")
+            expected_paths = {
+                "budget_policy": str(budget_policy_path.resolve(strict=True)),
+                "role_timeout_policy": str(role_timeout_policy_path.resolve(strict=True)),
+                "codex_project_binding": str(codex_project_binding_path.resolve(strict=True)),
+            }
+            if policy_binding.get("source_paths") != expected_paths:
+                raise RuntimeError("DIAGNOSTIC_POLICY_PATH_BINDING_MISMATCH")
+            evaluation_policies = verify_diagnostic_policy_input(
+                policy_binding, run_root=run, require_project_binding=True,
+            )
+    if evaluation_policies is None:
+        raise RuntimeError("DIAGNOSTIC_POLICY_REQUIRED_FOR_NEW_PREPARE")
     report = ScopeQualificationReport.model_validate(read(run / "deterministic/qualification-report.json"))
     source = source_manifest_digest(ROOT)
     if not report.passed or read(run / "deterministic/evaluation-contract.json")["source_manifest_digest"] != source:
         raise RuntimeError("DETERMINISTIC_GATE_FAILED_OR_STALE")
     from scripts.diagnostics.r_s06_10_fixtures import build_revision, verify_reviewed_case
+    fixture_version = "v6" if inspection_provider_contract == PLAN_INSPECTION_PROVIDER_V2 else "v5"
     relocation = None
     if portable:
         from scripts.diagnostics.inspection_materialization import prepare_relocated_inputs
-        relocation = prepare_relocated_inputs(fixture_package, run)
+        relocation = prepare_relocated_inputs(fixture_package, run, fixture_version=fixture_version)
     else:
-        build_revision(OLD, run)
+        build_revision(OLD, run, fixture_version=fixture_version)
     review = read(run / "independent-fixture-review.json")
     if (review.get("review_complete") is not True or review.get("reviewed_cases") != list(STATIC_CASES) or
             review.get("expectations_digest") != sha256_bytes((run / "expectations.json").read_bytes())):
@@ -694,7 +813,11 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, ex
         plan = PlanContractRevision.model_validate(read(run / f"input-{name}-plan.json"))
         if plan_gate(plan, source=skeleton, goal=case_goal, state=case_state, project_map=project_map):
             raise RuntimeError(f"FIXED_INPUT_GATE_FAILED: {name}")
-    with CapturingRuntime(run=run, phase="prepare", codex_bin=Path(old_lock["codex_bin"])) as runtime:
+    with CapturingRuntime(run=run, phase="prepare", codex_bin=Path(old_lock["codex_bin"]),
+                          project_binding=(None if evaluation_policies is None else evaluation_policies.codex_project)) as runtime:
+        if (evaluation_policies is not None
+                and runtime.project_binding != evaluation_policies.codex_project):
+            raise RuntimeError("ACTUAL_CODEX_PROJECT_BINDING_MISMATCH")
         policy = runtime.verify_execution_policy(run / "workspace")
         inventory = runtime.list_models()
         validate_role_configuration_inventory(roles, inventory)
@@ -706,20 +829,25 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, ex
         operational = roles.operational_binding(inventory)
         if portable:
             # 모델 turn을 시작하지 않는 새 ephemeral thread에서 실제 주입 경로만 관측한다.
-            probe_arguments = {"cwd": run / "workspace", "title": "검사 입력 지침 관측",
-                               "model": roles.general_reviewer.model, "developer_instructions": "",
-                               "ephemeral": True}
+            probe_arguments = instruction_probe_arguments(run, roles, evaluation_policies)
             write_new(runtime.capture / "instructions-probe.intent.json", probe_arguments)
             probe = CodexAppServerRuntime.create_thread(runtime, **probe_arguments)
             probe_path = runtime.capture / "instructions-probe.receipt.json"
             write_new(probe_path, probe)
-            if probe.payload.get("thread", {}).get("turns") != []:
+            observed_thread = probe.payload.get("thread", {})
+            if (observed_thread.get("turns") != []
+                    or observed_thread.get("ephemeral") is not probe_arguments["ephemeral"]
+                    or (evaluation_policies is not None
+                        and observed_thread.get("projectId") != evaluation_policies.codex_project.project_id)):
                 raise RuntimeError("INSTRUCTION_PROBE_REQUIRES_EMPTY_THREAD")
             write_new(run / "instruction-binding.json", instruction_binding(
                 run, observed_sources=probe.payload.get("instructionSources", []), probe_receipt=probe_path))
         provider_request_binding_digests = {}
         for name in (call_order if execution_mode == "development-diagnostic" else call_order[:-1]):
-            request = capture_request(name, run, roles, inventory, inspection_provider_contract)
+            request = capture_request_with_policy(
+                name, run, roles, inventory, inspection_provider_contract=inspection_provider_contract,
+                evaluation_policies=evaluation_policies,
+            )
             verify_role_request_binding(request, roles, inventory)
             write_new(run / "requests" / f"{name}.json", request)
             write_new(run / "schemas" / f"{name}.json", strict_json_output_schema(request.output_schema))
@@ -737,14 +865,17 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, ex
                 write_new(run / "case-expectations" / f"{name}.json", expectation)
         catalog = PlanningScenarioCatalog.model_validate(read(ROOT / "tests/fixtures/engine/planning-scenarios.json"))
         contract = _planning_contract(
-            ROOT, catalog, inventory, roles,
+            ROOT, catalog, inventory, roles, policies=evaluation_policies,
             inspection_provider_contract=inspection_provider_contract,
         )
         write_new(run / "planning-binding.json", json_value(contract) | {
             "role_configuration_input": role_configuration.binding,
         })
         templates = {}
-        base = capture_request("clean", run, roles, inventory, inspection_provider_contract)
+        base = capture_request_with_policy(
+            "clean", run, roles, inventory, inspection_provider_contract=inspection_provider_contract,
+            evaluation_policies=evaluation_policies,
+        )
         for role, binding in (("compact_plan_reviewer", roles.general_reviewer),
                               ("critical_effect_reviewer", roles.critical_reviewer),
                               ("high_risk_reviewer", roles.critical_reviewer),
@@ -791,6 +922,11 @@ def prepare(run, role_configuration: RoleConfigurationInput | None = None, *, ex
                 "prompt_digest": contract.prompt_digest, "output_schema_digest": contract.output_schema_digest,
                 "deterministic_report_digest": report.report_digest, "observed_at": utc_now(),
                 "scope": "제한 진단. 전체 S06·qualification·Plan 활성화·Worker 실행·1.0 cutover는 수행하지 않는다."}
+        if evaluation_policies is not None:
+            body["diagnostic_policy_input"] = isolation["diagnostic_policy_input"]
+        if (portable and evaluation_policies is not None
+                and inspection_provider_contract == PLAN_INSPECTION_PROVIDER_V2):
+            body["generation_review_criteria"] = generation_review_criteria_binding()
         if portable:
             body.update({"workspace_binding": isolation["workspace_binding"],
                          "fixture_package_binding": isolation["fixture_package_binding"],
@@ -812,8 +948,31 @@ class RecordedRunner:
         self.name = None
         self.last_result = None
 
+    @property
+    def receipts(self):
+        return self.runner.receipts
+
+    @property
+    def pending_terminal_observations(self):
+        return self.runner.pending_terminal_observations
+
     def run(self, request, *, validator=None):
         verify_lock(self.run_root)
+        if self.lock.get("diagnostic_policy_input") is not None:
+            policies = verify_diagnostic_policy_input(
+                self.lock["diagnostic_policy_input"], run_root=self.run_root,
+                require_project_binding=True,
+            )
+            try:
+                verify_role_timeout_binding(
+                    role=request.role, timeout_seconds=request.timeout_seconds,
+                    timeout_policy_digest=request.timeout_policy_digest,
+                    policy=policies.role_timeouts,
+                    observation_policy=request.observation_policy,
+                    observation_policy_digest=request.observation_policy_digest,
+                )
+            except ValueError as error:
+                raise RuntimeError("ROLE_TIMEOUT_POLICY_BINDING_MISMATCH") from error
         expected = RoleCallRequest.model_validate(read(self.run_root / "requests" / f"{self.name}.json"))
         if request.request_digest != expected.request_digest:
             raise RuntimeError("ACTUAL_REQUEST_BINDING_MISMATCH")
@@ -841,6 +1000,10 @@ class RecordedRunner:
         number = execution_order(self.lock).index(self.name) + 1
         capture = self.run_root / "calls" / f"{number:02d}-{request.role}"
         capture.mkdir(parents=True, exist_ok=False)
+        # 완료 callback은 call_capture가 해제된 뒤에도 이 호출의 고정 경로에 남는다.
+        self.runner.progress_sink = lambda event, root=capture: write_new(
+            root / "role-progress" / f"{new_id('observation')}.json", event,
+        )
         with self.runtime.call_capture(capture):
             write_new(capture / "request.json", request)
             write_new(capture / "strict-schema.json", actual_schema)
@@ -868,6 +1031,41 @@ class RecordedRunner:
             if not verification["passed"]:
                 raise RuntimeError("ACTUAL_COMPLETED_CALL_BINDING_MISMATCH")
             return result
+
+
+class BudgetedRecordedRunner:
+    """기록 runner의 request/receipt 검증을 유지한 채 reserve·settle을 바깥에 둔다."""
+
+    max_schema_recovery_attempts = 0
+
+    def __init__(self, runner: RecordedRunner, registry: DiagnosticBudgetRegistry, run: Path):
+        self.runner = runner
+        self.registry = registry
+        self.run_root = run
+        self.name: str | None = None
+
+    @property
+    def receipts(self):
+        return self.runner.receipts
+
+    @property
+    def pending_terminal_observations(self):
+        return self.runner.pending_terminal_observations
+
+    @property
+    def last_result(self):
+        return self.runner.last_result
+
+    @property
+    def runtime(self):
+        return self.runner.runtime
+
+    def run(self, request, *, validator=None):
+        if self.name is None:
+            raise RuntimeError("DIAGNOSTIC_CASE_GOAL_REQUIRED")
+        self.runner.name = self.name
+        goal = goal_for_name(self.run_root, self.name)
+        return self.registry.runner_for(self.runner, goal).run(request, validator=validator)
 
 
 def common_call_verification(
@@ -929,6 +1127,8 @@ def common_call_verification(
         "terminal_completed": terminal_record.get("active") is False and
                               terminal_record.get("terminal_status") in accepted_terminal_statuses,
         "receipt_terminal_usage": receipt_usage_valid,
+        "receipt_timeout_policy": receipt_value.get("timeout_policy_digest") == request.timeout_policy_digest,
+        "receipt_observation_policy": receipt_value.get("observation_policy_digest") == request.observation_policy_digest,
         "model_observation": observation_valid,
     }
     provider_binding_path = capture / "provider-binding.json"
@@ -1006,7 +1206,20 @@ def _receipt_document(raw: Any, *, capture: str, artifact: str,
         return None
     # canonical JSON은 값이 None인 nullable 필드를 생략한다. 수치·bool default는
     # 누락을 0/false로 보정하지 않도록 반드시 원문에 있어야 한다.
-    missing = sorted((set(RoleCallReceipt.model_fields) - {"output_digest", "error_summary"}) - set(raw))
+    serializer_optional = {
+        "output_digest",
+        "error_summary",
+        "timeout_policy_digest",
+        "observation_policy_digest",
+        "interrupt_request_digest",
+        "interrupt_receipt_digest",
+        "terminal_observation_digest",
+        "terminal_status_after_interrupt",
+        "operation_trace",
+        "operation_trace_ref",
+        "operation_trace_digest",
+    }
+    missing = sorted((set(RoleCallReceipt.model_fields) - serializer_optional) - set(raw))
     if missing:
         _issue(issues, "PARTIAL_RECEIPT", capture, artifact, "누락 필드: " + ", ".join(missing))
         return None
@@ -1269,6 +1482,123 @@ def _summary_input_digest(run: Path) -> str:
     return sha256_digest(observed)
 
 
+def generation_input_manifest(run: Path) -> dict[str, str]:
+    """late review 전에 허용한 generation assessment 외 입력·raw artifact의 bytes를 고정한다."""
+    excluded_names = {
+        "summary.json", "generation-pending.json", "generation-assessment.json",
+        # generation assessment가 digest로 직접 결속하는 독립 provenance note만 late input으로 허용한다.
+        "generation-review-notes.md",
+    }
+    return {
+        str(path.relative_to(run)): sha256_bytes(path.read_bytes())
+        for path in sorted(run.rglob("*"))
+        if path.is_file() and path.name not in excluded_names and "budget-state" not in path.parts
+    }
+
+
+def requires_generation_review_provenance(lock: dict[str, Any]) -> bool:
+    """기존 v1 artifact는 읽기 호환을 유지하고 새 portable V2 운영 계약만 강화한다."""
+    return (
+        lock.get("inspection_provider_contract") == PLAN_INSPECTION_PROVIDER_V2
+        and "workspace_binding" in lock
+        and lock.get("diagnostic_policy_input") is not None
+    )
+
+
+def ledger_receipt_binding(ledger: dict[str, Any], receipts: list[dict[str, Any]]) -> bool:
+    """BudgetManager가 정산한 receipt가 capture 원문과 정확히 같은지 대조한다."""
+    expected = {item.get("call_id"): item for item in receipts if isinstance(item.get("call_id"), str)}
+    observed: dict[str, dict[str, Any]] = {}
+    for entry in ledger["entries"].values():
+        for item in entry["provider_receipts"]:
+            receipt = item["receipt"]
+            if not isinstance(receipt, dict) or not isinstance(receipt.get("call_id"), str):
+                return False
+            call_id = receipt["call_id"]
+            if call_id in observed and observed[call_id] != receipt:
+                return False
+            observed[call_id] = receipt
+    return bool(expected) and observed == expected
+
+
+def effective_runtime_usage(ledger, receipts):
+    """원본 receipt를 보존하며 History 원문에서 귀속 가능한 현재 사용량만 읽는다."""
+    from flowmarshal.engine.role_usage_reconciliation import TERMINAL_STATUSES, observation_usage_values
+    if ledger is None or not ledger.get("all_history_chains_valid"):
+        return {}
+    originals = {item["call_id"]: item for item in receipts}
+    result = {}
+    for entry in ledger["entries"].values():
+        stored_receipts = {item["provider_call_id"]: item["receipt"] for item in entry["provider_receipts"]}
+        observations = {item["provider_call_id"]: item["observations"] for item in entry.get("provider_observations", [])}
+        for state in entry.get("effective_provider_usage", []):
+            provider_id = state["provider_call_id"]
+            raw = stored_receipts.get(provider_id)
+            events = observations.get(provider_id, [])
+            if (state["source"] != "runtime_observation" or state["status"] != "settled"
+                    or not isinstance(raw, dict) or not events
+                    or raw.get("call_id") not in originals):
+                continue
+            event = events[-1]
+            document = event.get("observation")
+            receipt = RoleCallReceipt.model_validate(raw)
+            original = RoleCallReceipt.model_validate(originals[receipt.call_id])
+            # 과거 canonical receipt는 unavailable token의 null 필드를 생략했다.
+            unavailable = {key: None for key in ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_tokens")}
+            normalized_original = (original.model_copy(update=unavailable)
+                if not original.usage_available and all(getattr(original, key) in (None, 0) for key in unavailable)
+                else original)
+            normalized_receipt = (receipt.model_copy(update=unavailable)
+                if not receipt.usage_available and all(getattr(receipt, key) in (None, 0) for key in unavailable)
+                else receipt)
+            if normalized_original != normalized_receipt:
+                continue
+            if (not event.get("valid") or not isinstance(document, dict)
+                    or event["observation_digest"] != sha256_digest(document)
+                    or event["observation_digest"] != state["observation_digest"]
+                    or document.get("active") is not False
+                    or document.get("terminal_status") not in TERMINAL_STATUSES
+                    or len(receipt.turn_ids) != 1 or receipt.schema_recovery_attempts != 0
+                    or document.get("thread_id") != receipt.thread_id
+                    or document.get("turn_id") != receipt.turn_ids[0]):
+                continue
+            known, values = observation_usage_values(document.get("payload") or {}, receipt)
+            if not known or state["actual_tokens"] != values[0] + values[2]:
+                continue
+            result[receipt.call_id] = {"observation": document, "digest": event["observation_digest"],
+                "provider_call_id": provider_id, "usage_total": dict(zip(
+                    ("inputTokens", "cachedInputTokens", "outputTokens", "reasoningOutputTokens"), values))
+                    | {"totalTokens": values[0] + values[2]}}
+    return result
+
+
+def apply_runtime_usage_observations(turns, calls, effective):
+    """원 terminal artifact와 새 관측을 연결하되 호출의 실패·의미 판정은 바꾸지 않는다."""
+    result = [dict(turn) for turn in turns]
+    captures = {call["receipt_call_id"]: call["capture"] for call in calls if call.get("receipt_call_id")}
+    for call_id, item in effective.items():
+        if call_id not in captures:
+            continue
+        observed = item["observation"]
+        key = (observed["thread_id"], observed["turn_id"])
+        existing = [turn for turn in result if (turn["thread_id"], turn["turn_id"]) == key]
+        if len(existing) > 1:
+            continue
+        prior = existing[0] if existing else {}
+        payload = observed["payload"]
+        updated = prior | {"capture": captures[call_id], "thread_id": key[0], "turn_id": key[1],
+            "usage_source": "runtime.read.reconciliation", "usage_scope": payload.get("usage_scope"),
+            "usage_attribution_verified": True, "usage_total": item["usage_total"],
+            "provider_duration_ms": payload.get("duration_ms", payload.get("lifecycle", {}).get("provider_duration_ms")),
+            "terminal_digest": item["digest"], "original_terminal_digest": prior.get("terminal_digest"),
+            "provider_call_id": item["provider_call_id"]}
+        if existing:
+            result[result.index(prior)] = updated
+        else:
+            result.append(updated)
+    return result
+
+
 def summarize(run, status, error=None):
     """provider 호출 없이 저장 artifact를 요약하고 결과 파일을 한 번만 배타적으로 게시한다."""
     summary_path = run / ("generation-pending.json" if status == "GENERATION_REVIEW_REQUIRED" else "summary.json")
@@ -1281,6 +1611,8 @@ def summarize(run, status, error=None):
     lock = read(run / "preflight.json")
     binding = read(run / "instruction-binding.json")
     collected = collect_call_artifacts(run)
+    policy_bound = lock.get("diagnostic_policy_input") is not None
+    ledger = diagnostic_budget_ledger_observation(run) if policy_bound else None
     portable = "workspace_binding" in lock
     isolation_error = None
     if portable:
@@ -1297,6 +1629,14 @@ def summarize(run, status, error=None):
                                       else files(run / "workspace") == files(OLD / "workspace"))}
     if portable:
         checks["isolated_inputs_unchanged"] = isolation_error is None
+    if ledger is not None:
+        checks.update({
+            "budget_ledger_history_chains": ledger["all_history_chains_valid"],
+            "budget_ledger_receipts": ledger["all_receipts_well_formed"],
+            "budget_ledger_usage_complete": not ledger["unresolved_provider_call_ids"],
+            "budget_ledger_state_present": not ledger["missing_ledger_state_roots"],
+            "budget_ledger_receipt_raw_binding": ledger_receipt_binding(ledger, collected["receipts"]),
+        })
     for call in collected["calls"]:
         if call["common_binding"] is not None:
             checks[f"{call['capture']}_common_binding"] = call["common_binding"]["passed"]
@@ -1314,16 +1654,24 @@ def summarize(run, status, error=None):
     }
     usage_keys = {"input_tokens": "inputTokens", "cached_input_tokens": "cachedInputTokens",
                   "output_tokens": "outputTokens", "reasoning_tokens": "reasoningOutputTokens", "total_tokens": "totalTokens"}
-    turns = collected["provider_turn_usage"]
+    receipts = collected["receipts"]
+    effective = effective_runtime_usage(ledger, receipts)
+    turns = apply_runtime_usage_observations(collected["provider_turn_usage"], collected["calls"], effective)
     unique_turns = {(turn["thread_id"], turn["turn_id"]) for turn in turns
                     if isinstance(turn["thread_id"], str) and isinstance(turn["turn_id"], str)}
     usage_available = (effect_counts["turn_start_receipts"] == len(turns) == len(unique_turns) and bool(turns) and all(
-        turn["empty_new_thread"] is True and isinstance(turn["usage_total"], dict) and
+        (turn.get("usage_attribution_verified") is True or turn.get("empty_new_thread") is True)
+        and isinstance(turn["usage_total"], dict) and
         all(type(turn["usage_total"].get(raw)) is int and turn["usage_total"][raw] >= 0 for raw in usage_keys.values())
         for turn in turns))
     usage = {key: sum(turn["usage_total"][raw] for turn in turns) if usage_available else None
              for key, raw in usage_keys.items()}
-    receipts = collected["receipts"]
+    if ledger is not None:
+        # Budget ledger의 settled만으로 terminal raw usage가 완전하다고 추정하지 않는다.
+        checks["provider_terminal_usage_complete"] = usage_available
+        checks["provider_receipt_usage_available"] = bool(receipts) and all(
+            receipt.get("usage_available") is True or receipt.get("call_id") in effective for receipt in receipts
+        )
     all_calls_have_receipt = len(receipts) == effect_counts["logical_calls"] and not any(
         issue["code"].startswith(("PARTIAL_RECEIPT", "MALFORMED_RECEIPT", "DUPLICATE_CALL_ID", "CALL_RECEIPT"))
         for issue in collected["issues"])
@@ -1376,10 +1724,17 @@ def summarize(run, status, error=None):
                "schema_recovery_attempts": recovery_count,
                "budget": budget, "usage": usage, "provider_turn_usage": turns,
                "all_usage_available": usage_available,
+               "diagnostic_budget_ledgers": ledger,
                "billed_cost": None, "billed_cost_reason": "provider receipt가 청구 금액을 제공하지 않는다.",
                "generation_assessment": read(run / "generation-assessment.json") if (run / "generation-assessment.json").exists() else None,
-               "plan_activated": False, "worker_executed": False, "new_ledger_writes": 0,
+               "plan_activated": False, "worker_executed": False,
+               "new_ledger_writes": (0 if ledger is None else sum(
+                   item["history_event_count"] for item in ledger["entries"].values()
+               )),
                "full_qualification": "NOT_RUN", "cutover": "NO-GO", "observed_at": utc_now()}
+    if final_status == "GENERATION_REVIEW_REQUIRED":
+        summary["generation_input_manifest"] = generation_input_manifest(run)
+        summary["generation_ledger_snapshot"] = ledger
     write_new(summary_path, summary)
     published = read(summary_path)
     print(json.dumps({key: published[key] for key in ("status", "logical_calls", "provider_turns", "usage", "error")}, ensure_ascii=False), flush=True)
@@ -1394,6 +1749,20 @@ def verify_generation_pending(run: Path) -> None:
             len(list((run / "calls").glob("*/result.json"))) != 12 or
             len(list((run / "calls").glob("*/turn.intent.json"))) != 12):
         raise RuntimeError("GENERATION_PENDING_FAILED_OR_INCOMPLETE")
+    lock_path = run / "preflight.json"
+    policy_bound = lock_path.is_file() and read(lock_path).get("diagnostic_policy_input") is not None
+    # 과거 policy 없는 v1 pending은 당시 계약으로 읽는다. 새 policy-bound 실행의
+    # proof 누락을 과거 형식으로 취급해 검사를 우회하지 않는다.
+    if ((policy_bound or "generation_input_manifest" in pending)
+            and pending.get("generation_input_manifest") != generation_input_manifest(run)):
+        raise RuntimeError("GENERATION_PENDING_INPUT_CHANGED")
+    expected_ledger = pending.get("generation_ledger_snapshot")
+    if policy_bound and expected_ledger is None:
+        raise RuntimeError("GENERATION_PENDING_LEDGER_CHANGED")
+    if expected_ledger is not None:
+        observed_ledger = diagnostic_budget_ledger_observation(run)
+        if observed_ledger != expected_ledger:
+            raise RuntimeError("GENERATION_PENDING_LEDGER_CHANGED")
 
 
 def incomplete_provider_intents(run: Path) -> list[Path]:
@@ -1423,12 +1792,23 @@ def execute(run, generated=False):
     if (run / "summary.json").exists():
         raise RuntimeError("완료·실패한 진단을 반복하지 않습니다.")
     lock = verify_lock(run)
+    evaluation_policies = (
+        None if lock.get("diagnostic_policy_input") is None else verify_diagnostic_policy_input(
+            lock["diagnostic_policy_input"], run_root=run, require_project_binding=True,
+        )
+    )
+    if (evaluation_policies is None and "workspace_binding" in lock
+            and lock.get("inspection_provider_contract") == PLAN_INSPECTION_PROVIDER_V2):
+        raise RuntimeError("PORTABLE_V2_DIAGNOSTIC_POLICY_REQUIRED")
     inspection_provider_contract = lock.get(
         "inspection_provider_contract", PLAN_INSPECTION_PROVIDER_V1
     )
     diagnostic = lock.get("execution_mode", "qualification") == "development-diagnostic"
     if generated and diagnostic:
         raise RuntimeError("GENERATED_REVIEW_NOT_IN_STATIC_DIAGNOSTIC")
+    # pending proof 대조는 late phase marker나 새 call artifact를 쓰기 전에 수행한다.
+    if generated:
+        verify_generation_pending(run)
     # claim은 요약 예외 처리보다 앞에 둔다. 패자는 summary나 provider 효과를 만들 수 없다.
     claim_execution_phase(run, marker, lock["lock_digest"])
     status = "FAIL"
@@ -1440,7 +1820,6 @@ def execute(run, generated=False):
             request = RoleCallRequest.model_validate(read(run / "requests" / f"{name}.json"))
             case_expectation(run, name, request)
         if generated:
-            verify_generation_pending(run)
             assessment = read(run / "generation-assessment.json")
             plan = PlanContractRevision.model_validate(read(run / "expanded-plan.json"))
             template_document = read(run / "generated-review-template.json")
@@ -1451,10 +1830,39 @@ def execute(run, generated=False):
                     template_document.get("inspection_provider_manifest_digest") !=
                     lock.get("inspection_provider_manifest_digest")):
                 raise RuntimeError("GENERATION_DEFECT_OR_BINDING_FAILURE")
-            request = capture_request(
+            source_binding = None
+            if requires_generation_review_provenance(lock):
+                matches = []
+                for result_path in sorted((run / "calls").glob("*/result.json")):
+                    request_path = result_path.with_name("request.json")
+                    if request_path.is_file() and RoleCallRequest.model_validate(
+                        read(request_path)
+                    ).role == "plan_expander":
+                        matches.append(result_path)
+                if len(matches) != 1:
+                    raise RuntimeError("GENERATION_REVIEW_EXPANSION_RESULT_MISSING")
+                expansion_request = RoleCallRequest.model_validate(read(matches[0].with_name("request.json")))
+                expansion_result = RoleCallResult.model_validate(read(matches[0]))
+                source_binding = GenerationReviewSourceBinding.model_validate(
+                    read(run / "generation-review-source-binding.json")
+                )
+                try:
+                    verify_generation_assessment(
+                        assessment, run_root=run, expansion_request=expansion_request,
+                        expansion_result=expansion_result, goal=goal_for_name(run, "expansion"),
+                        state=StateSnapshot.model_validate(read(run / "input-state.json")),
+                        project_map=ProjectMapRevision.model_validate(
+                            read(run / "input-project-map.json")
+                        ),
+                        expanded_plan=plan, expected_source_binding=source_binding,
+                    )
+                except ValueError as error:
+                    raise RuntimeError("GENERATION_REVIEW_PROVENANCE_BINDING_MISMATCH") from error
+            request = capture_request_with_policy(
                 "expanded-review", run, roles,
                 OperationalBinding.model_validate(lock["operational_binding"]).inventory,
-                inspection_provider_contract,
+                inspection_provider_contract=inspection_provider_contract,
+                evaluation_policies=evaluation_policies,
             )
             template = read(run / "generated-review-template.json")["templates"][request.role]
             for key in ("instructions", "model", "effort"):
@@ -1478,17 +1886,37 @@ def execute(run, generated=False):
             write_new(run / "case-expectations/expanded-review.json", generated_expectation)
             write_new(run / "generated-input-lock.json", {"request_digest": request.request_digest,
                       "plan_digest": plan.activation_digest, "assessment_digest": sha256_bytes((run / "generation-assessment.json").read_bytes()),
-                      "expectation_digest": generated_expectation["expectation_digest"],
-                      "expected_defects": [], "preflight_digest": lock["lock_digest"],
-                      "provider_binding_digest": generated_provider_binding.binding_digest})
+                       "expectation_digest": generated_expectation["expectation_digest"],
+                       "expected_defects": [], "preflight_digest": lock["lock_digest"],
+                       "provider_binding_digest": generated_provider_binding.binding_digest,
+                       "generation_review_source_binding_digest": (
+                           None if source_binding is None else source_binding.source_binding_digest
+                       ),
+                       "generation_review_criteria_digest": (
+                           None if source_binding is None else generation_review_criteria_digest()
+                       )})
             names = ("expanded-review",)
         else:
             names = execution_order(lock) if diagnostic else execution_order(lock)[:-1]
         phase = "review-generated" if generated else "run"
-        with CapturingRuntime(run=run, phase=phase, codex_bin=Path(lock["codex_bin"])) as runtime:
-            runner = RecordedRunner(runtime, run, lock)
+        with CapturingRuntime(
+            run=run, phase=phase, codex_bin=Path(lock["codex_bin"]),
+            project_binding=(None if evaluation_policies is None else evaluation_policies.codex_project),
+        ) as runtime:
+            if (evaluation_policies is not None
+                    and runtime.project_binding != evaluation_policies.codex_project):
+                raise RuntimeError("ACTUAL_CODEX_PROJECT_BINDING_MISMATCH")
+            recorded_runner = RecordedRunner(runtime, run, lock)
+            registry = (None if evaluation_policies is None else DiagnosticBudgetRegistry(
+                run_root=run, workspace=run / "workspace", policies=evaluation_policies,
+            ))
+            runner = (recorded_runner if registry is None
+                      else BudgetedRecordedRunner(recorded_runner, registry, run))
             failed_cases = []
-            for name in names:
+            timeout_context = (use_role_timeout_policy(evaluation_policies.role_timeouts)
+                               if evaluation_policies is not None else nullcontext())
+            with timeout_context:
+              for name in names:
                 runner.name = name
                 print(json.dumps({"starting_case": name, "maximum_calls": len(execution_order(lock))}), flush=True)
                 try:
@@ -1508,6 +1936,22 @@ def execute(run, generated=False):
                     continue
                 if name == "expansion":
                     write_new(run / "expanded-plan.json", result)
+                    if requires_generation_review_provenance(lock):
+                        expansion_request = RoleCallRequest.model_validate(
+                            read(run / "requests" / "expansion.json")
+                        )
+                        source_binding = bind_generation_review_source(
+                            run_root=run,
+                            expansion_request=expansion_request,
+                            expansion_result=runner.last_result,
+                            goal=goal_for_name(run, "expansion"),
+                            state=StateSnapshot.model_validate(read(run / "input-state.json")),
+                            project_map=ProjectMapRevision.model_validate(
+                                read(run / "input-project-map.json")
+                            ),
+                            expanded_plan=result,
+                        )
+                        write_new(run / "generation-review-source-binding.json", source_binding)
                     record_case_result(run, name, status="PASS", failure_kind=None, semantic_evaluated=False)
                     status = "GENERATION_REVIEW_REQUIRED"
                 else:
@@ -1578,10 +2022,14 @@ def parse_arguments(argv=None):
     parser.add_argument("--inspection-contract", choices=INSPECTION_PROVIDER_CONTRACTS)
     parser.add_argument("--fixture-package", type=Path)
     parser.add_argument("--codex-bin", type=Path)
+    parser.add_argument("--budget-policy", type=Path)
+    parser.add_argument("--role-timeout-policy", type=Path)
+    parser.add_argument("--codex-project-binding", type=Path)
     arguments = parser.parse_args(argv)
     preparation_options = (
         arguments.role_config, arguments.execution_mode, arguments.inspection_contract,
-        arguments.fixture_package, arguments.codex_bin,
+        arguments.fixture_package, arguments.codex_bin, arguments.budget_policy,
+        arguments.role_timeout_policy, arguments.codex_project_binding,
     )
     if any(option is not None for option in preparation_options) and arguments.mode not in ("preflight", "prepare"):
         parser.error("입력 설정은 preflight/prepare에서만 사용할 수 있습니다.")
@@ -1591,6 +2039,13 @@ def parse_arguments(argv=None):
         parser.error("preflight에는 --fixture-package, --codex-bin, --role-config가 필요합니다.")
     if arguments.fixture_package is not None and arguments.role_config is None:
         parser.error("독립 package 실행에는 명시적 --role-config가 필요합니다.")
+    policy_options = (arguments.budget_policy, arguments.role_timeout_policy, arguments.codex_project_binding)
+    if any(option is not None for option in policy_options) and any(option is None for option in policy_options):
+        parser.error("운영 예산·timeout·Codex project 결속을 함께 지정해야 합니다.")
+    if (arguments.inspection_contract == PLAN_INSPECTION_PROVIDER_V2
+            and arguments.mode in ("preflight", "prepare")
+            and any(option is None for option in policy_options)):
+        parser.error("새 portable v2 진단에는 정책 세 입력이 필요합니다.")
     return arguments
 
 
@@ -1605,6 +2060,9 @@ if __name__ == "__main__":
         binding = portable_preflight(destination, fixture_package=arguments.fixture_package,
             codex_bin=arguments.codex_bin, role_configuration=load_role_configuration_input(arguments.role_config),
             execution_mode=arguments.execution_mode or "qualification",
+            budget_policy_path=arguments.budget_policy,
+            role_timeout_policy_path=arguments.role_timeout_policy,
+            codex_project_binding_path=arguments.codex_project_binding,
             inspection_provider_contract=arguments.inspection_contract or INSPECTION_PROVIDER_CONTRACT)
         print(json.dumps({"preflight_passed": True, "binding_digest": sha256_digest(binding)}), flush=True)
     elif arguments.mode == "prepare":
@@ -1612,6 +2070,9 @@ if __name__ == "__main__":
             prepare(destination, load_role_configuration_input(arguments.role_config),
                     execution_mode=arguments.execution_mode or "qualification",
                     fixture_package=arguments.fixture_package, codex_bin=arguments.codex_bin,
+                    budget_policy_path=arguments.budget_policy,
+                    role_timeout_policy_path=arguments.role_timeout_policy,
+                    codex_project_binding_path=arguments.codex_project_binding,
                     inspection_provider_contract=arguments.inspection_contract or INSPECTION_PROVIDER_CONTRACT)
         except Exception as error:
             write_new(destination / "preparation-failed.json", {

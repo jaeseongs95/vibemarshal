@@ -210,7 +210,8 @@ class InspectionCaseBindingTests(unittest.TestCase):
             self.assertEqual({"request_strict_artifact", "strict_artifact_turn_intent",
                               "strict_artifact_receipt_digest", "terminal_result_output_digest",
                               "prompt_instruction", "receipt_request_identity", "model_effort", "thread_turn",
-                              "terminal_completed", "receipt_terminal_usage", "model_observation"},
+                              "terminal_completed", "receipt_terminal_usage", "model_observation",
+                              "receipt_timeout_policy", "receipt_observation_policy"},
                              set(verification["checks"]))
 
         def verify_failure(**kwargs):

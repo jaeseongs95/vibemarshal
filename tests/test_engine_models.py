@@ -73,22 +73,33 @@ class EngineModelAssignmentTests(unittest.TestCase):
         source = inspect.getsource(models_module)
         self.assertNotIn("gpt-", source)
 
-    def test_nested_app_server_usage_is_measured_from_total(self) -> None:
+    def test_nested_app_server_usage_requires_first_empty_thread_proof(self) -> None:
+        payload = {
+            "usage_scope": "thread",
+            "usage": {
+                "last": {"inputTokens": 2, "outputTokens": 1},
+                "total": {
+                    "inputTokens": 100,
+                    "cachedInputTokens": 60,
+                    "outputTokens": 20,
+                    "reasoningOutputTokens": 7,
+                    "totalTokens": 120,
+                },
+            },
+        }
+        self.assertEqual((None, None, None, None, False), _usage(payload))
         measured = _usage(
-            {
-                "usage": {
-                    "last": {"inputTokens": 2, "outputTokens": 1},
-                    "total": {
-                        "inputTokens": 100,
-                        "cachedInputTokens": 60,
-                        "outputTokens": 20,
-                        "reasoningOutputTokens": 7,
-                    },
-                }
-            }
+            payload,
+            thread_id="thread_1",
+            turn_ids=("turn_1",),
+            observation_thread_id="thread_1",
+            observation_turn_id="turn_1",
+            turn_binding_proven=True,
+            empty_thread_creation_proven=True,
+            first_empty_turn_proven=True,
         )
         self.assertEqual((100, 60, 20, 7, True), measured)
-        self.assertEqual((0, 0, 0, 0, False), _usage({"usage": {"total": {}}}))
+        self.assertEqual((None, None, None, None, False), _usage({"usage": {"total": {}}}))
 
 
 if __name__ == "__main__":

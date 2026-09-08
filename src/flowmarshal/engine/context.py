@@ -102,6 +102,21 @@ class ContextSelection(EngineModel):
         return self
 
 
+class ResolvedAdditionalContext(EngineModel):
+    """추가 요청을 Project Map 전체에서 찾은 비권위 준비 역할 입력."""
+
+    source_ref: str
+    selector: str
+    reason: str
+    content_digest: str
+    content: str
+
+
+class AdditionalContextResolution(EngineModel):
+    resolved: tuple[ResolvedAdditionalContext, ...] = ()
+    unresolved_request: AdditionalContextRequest | None = None
+
+
 class PromptBundle(EngineModel):
     binding: PromptBinding
     static_policy_prefix: str
@@ -388,6 +403,96 @@ def read_context_fragment(root: Path | str, fragment: ContextFragmentRef) -> str
             or ranges != _merge_ranges(ranges)):
         raise ValueError(f"Context selector 행 범위가 유효하지 않습니다: {fragment.selector}")
     return _range_content(text, ranges)
+
+
+def resolve_additional_context_request(
+    *,
+    project_map: ProjectMapRevision,
+    request: AdditionalContextRequest,
+    token_budget: int = 12_000,
+) -> AdditionalContextResolution:
+    """초기 관측 sample에 한정하지 않고 등록된 전체 로컬 source를 탐색한다.
+
+    선호·승인 확장 요청은 파일 검색으로 답을 발명하지 않는다. 찾지 못했거나 실제
+    읽을 수 없는 source도 원래 구조화 요청으로 남겨 호출자가 질문 경계를 보존한다.
+    """
+
+    if token_budget < 1:
+        raise ValueError("추가 Context token 예산은 양수여야 합니다.")
+    reason = request.reason.casefold()
+    if any(marker in reason for marker in (
+        "사용자 선호", "preference", "승인 확장", "scope expansion",
+        "authorization expansion", "권한 확대",
+    )):
+        return AdditionalContextResolution(unresolved_request=request)
+
+    root = Path(project_map.root)
+    resolved: list[ResolvedAdditionalContext] = []
+    unresolved: list[ContextNeed] = []
+    used = 0
+    for need in request.missing_needs:
+        matches: list[ProjectMapEntry] = []
+        for entry in project_map.entries:
+            path_match = any(hint.casefold() in entry.path.casefold() for hint in need.path_hints)
+            symbol_match = any(
+                hint.casefold() == symbol.casefold()
+                for hint in need.symbol_hints
+                for symbol in entry.symbols
+            )
+            tag_match = any(
+                hint.casefold() == tag.casefold()
+                for hint in need.tag_hints
+                for tag in entry.tags
+            )
+            if path_match or symbol_match or tag_match:
+                matches.append(entry)
+        need_resolved = False
+        for entry in sorted(matches, key=lambda item: item.path.casefold()):
+            try:
+                text = _read_context_source(root, entry.path, entry.content_digest)
+            except (OSError, UnicodeError, ValueError):
+                continue
+            ranges = None
+            if need.symbol_hints and Path(entry.path).suffix.casefold() == ".py":
+                symbols = _python_symbol_ranges(text) or {}
+                selected = [
+                    span
+                    for name, spans in symbols.items()
+                    if any(name.casefold() == hint.casefold() for hint in need.symbol_hints)
+                    for span in spans
+                ]
+                if selected:
+                    ranges = _merge_ranges(selected)
+            selector = _range_selector(ranges)
+            content = _range_content(text, ranges)
+            estimate = max(1, (len(content.encode("utf-8")) + 3) // 4)
+            if used + estimate > token_budget:
+                continue
+            resolved.append(ResolvedAdditionalContext(
+                source_ref=entry.path,
+                selector=selector,
+                reason=f"{need.need_id}: {need.description}",
+                content_digest=entry.content_digest,
+                content=content,
+            ))
+            used += estimate
+            need_resolved = True
+        if not need_resolved:
+            unresolved.append(ContextNeed(**need.model_dump()))
+
+    unresolved_request = None
+    if unresolved:
+        unresolved_request = AdditionalContextRequest(
+            task_id=request.task_id,
+            missing_needs=tuple(unresolved),
+            reason=(
+                "Project Map 전체를 검색했지만 요청한 로컬 source/selector를 읽을 수 "
+                "없거나 예산 안에 포함할 수 없습니다. " + request.reason
+            )[:3000],
+        )
+    return AdditionalContextResolution(
+        resolved=tuple(resolved), unresolved_request=unresolved_request
+    )
 
 
 @dataclass(frozen=True)
