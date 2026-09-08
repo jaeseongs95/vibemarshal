@@ -1,0 +1,28 @@
+7:## D01. 목표 단위 승인과 내부 Plan — planned
+13:## D02. GoalAuthorization과 activation 결속 — planned
+21:## D03. 응용 명령과 짧은 tick — planned
+27:## D04. 모든 활성화 후 역할의 job화 — planned
+31:## D05. 실행·효과와 usage 관측 분리 — planned
+37:## D06. 관측값과 운영 한도의 의미 — planned
+43:## D07. 유효 운영 제한 보존 — planned
+57:## D08. 실제 효과 직전 검증과 재시작 — planned
+63:## D09. 근거 기반 복구와 ContextRequest — planned
+69:## D10. Planning과 ProjectMap의 정확한 범위 — planned
+75:## D11. schema 4와 과거 reader — planned
+79:## D12. provider와 배포물 경계 — planned
+85:## V01. 기능·안전 기반 1.0 필수 검증 — planned / 미실행
+100:### V02. E2E 책임별 evidence — planned / 미실행
+118:## V03. 비차단 후속 범위와 효과 제한
+124:## M01. 설계별 구현 연결표
+128:| 1 | D01, 제품 설계 §2·4 | FM-03, FM-08 | FM-12, FM-14 |
+129:| 2 | D02, 제품 설계 §4·9 | FM-03, FM-05 | FM-12, FM-14 |
+130:| 3 | D03, 제품 설계 §10 | FM-04, FM-08 | FM-12, FM-14 |
+131:| 4 | D04 | FM-04, FM-06, FM-08 | FM-12, FM-14 |
+132:| 5 | D05, 제품 설계 §13 | FM-02, FM-04 | FM-12, FM-14 |
+133:| 6 | D06 | FM-02, FM-08 | FM-12, FM-15 |
+134:| 7 | D07 | FM-02, FM-04, FM-06, FM-07 | FM-12, FM-13, FM-14 |
+135:| 8 | D08, 제품 설계 §9 | FM-05 | FM-12, FM-14 |
+136:| 9 | D09 | FM-06 | FM-12, FM-14 |
+137:| 10 | D10, 제품 설계 §5·6 | FM-07 | FM-12, FM-13 |
+138:| 11 | D11, ADR | FM-02, FM-10 | FM-12, FM-15 |
+139:| 12 | D12, ADR | FM-07, FM-10 | FM-12, FM-13, FM-15 |

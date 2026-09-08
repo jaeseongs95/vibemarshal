@@ -13,11 +13,13 @@
 | 제품 연결 | FM-08, FM-09, FM-10 | EngineApplication/사용자 CLI, 배정 조율 강화, Engine-only 패키지·입력 bundle |
 | 검증 도구 | FM-11 | 필수 책임과 provenance를 보존하는 qualification harness |
 | 독립 검증 | FM-12, FM-13, FM-14 | 결정적·호환·설치, 실제 역할48/Planning18, 실제 요청 E2E·스케줄러 |
-| 최종 감사·전환 | FM-15, FM-16 | 필수 근거 독립 감사 후 검증된 로컬 main/1.0 전환과 조율 종료 |
+| 최종 감사·전환 | FM-15, FM-16 | 필수 근거 독립 감사 후 main의 검증된 변경 확인·1.0 전환과 조율 종료 |
 
 승인 순서는 FM-00 → FM-01 → FM-02 → FM-03/FM-04 → FM-05 → FM-06이며 FM-07은 FM-01 이후다. 이후 FM-08 → FM-09/FM-10 → FM-11 → FM-12 → FM-13 → FM-14 → FM-15 → FM-16으로 연결한다. 실제 ready 선택은 등록된 dependency·order_index로만 결정한다. 이 문서에서 다음 앱 작업을 생성하거나 원장의 완료 상태를 변경하지 않는다.
 
-FM-02~FM-16 계약은 **planned**다. 각 태스크의 완료는 실제 source/계약/검증 입력 digest·receipt·필수 검사 evidence를 확인한 원장 판정이 필요하다. 과거 51개 재검증과 1,056개 결과는 시점·대상이 다른 provenance이며 이번 새 실행이 아니다.
+FM-02~FM-16 계약은 이 문서에서 **planned**로 유지한다. 이는 코드 부재나 다른 태스크 상태를 판정한 결과가 아니다. 각 태스크의 완료는 실제 source/계약/검증 입력 digest·receipt·필수 검사 evidence를 확인한 원장 판정이 필요하다. 과거 51개 재검증과 1,056개 결과는 시점·대상이 다른 provenance이며 이번 새 실행이 아니다.
+
+1.0 릴리스 완료까지 모든 파일 변경·커밋은 `D:/codex/flowmarshal`의 `main` 브랜치 main checkout에서 수행한다. 다른 브랜치·worktree·detached HEAD를 개발·검증 작업 위치로 만들지 않는다. FM-16은 감사 후 1.0 전환 책임이며, 앞선 작업의 main 개발·커밋을 지연시키는 조건이 아니다. 정확한 입력 출처와 보존 범위는 [인계](pre-1.0-handoff.md)를 따른다.
 
 ## 1.0 수용 기준
 

@@ -1,0 +1,248 @@
+{
+  "manifest_sha256": "f20e2dba1321aaac16d31cad6545ee6756bd05e658da79dbc8aa40b42ffd2254",
+  "entries": [
+    {
+      "path": "src/flowmarshal/core/__init__.py",
+      "expected": "sha256:fdd11dabd0a88b0da0375354d9e144bdeeaa136903ce3164d9e25c9f81a40152",
+      "actual": "sha256:fdd11dabd0a88b0da0375354d9e144bdeeaa136903ce3164d9e25c9f81a40152",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/core/domain.py",
+      "expected": "sha256:37725e7dad5730f97c6addddbe2bc86022de2d19c861c41a14b088180aa51383",
+      "actual": "sha256:37725e7dad5730f97c6addddbe2bc86022de2d19c861c41a14b088180aa51383",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/core/ledger.py",
+      "expected": "sha256:cf0d12a9371ea9937330d0c2d78ab0bbbd8b565298431c224a49f3206bc79c88",
+      "actual": "sha256:cf0d12a9371ea9937330d0c2d78ab0bbbd8b565298431c224a49f3206bc79c88",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/core/service.py",
+      "expected": "sha256:57a0a93ed2ef1469746dc06962e2c08337355c148893184f1e266f82f3590a5c",
+      "actual": "sha256:57a0a93ed2ef1469746dc06962e2c08337355c148893184f1e266f82f3590a5c",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/core/smoke.py",
+      "expected": "sha256:47da4b8f0e8085dd9358790a3a23984792cd5bd2c335c8bd7f3c0738079ca9d2",
+      "actual": "sha256:47da4b8f0e8085dd9358790a3a23984792cd5bd2c335c8bd7f3c0738079ca9d2",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/orchestration/__init__.py",
+      "expected": "sha256:3870bb5c274ea4634f6610f8945c45de18deba9ef260fb2a2471d4270a674dc9",
+      "actual": "sha256:3870bb5c274ea4634f6610f8945c45de18deba9ef260fb2a2471d4270a674dc9",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/orchestration/runtime_probe.py",
+      "expected": "sha256:c5178bdfef8553a8d8c7212f02fcd1b2567c2afb0fed763299574f43546fd326",
+      "actual": "sha256:c5178bdfef8553a8d8c7212f02fcd1b2567c2afb0fed763299574f43546fd326",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/__init__.py",
+      "expected": "sha256:636f1f488719482998b8a20e55f34a23191fdd863ccd8d607b7d1633d3395713",
+      "actual": "sha256:636f1f488719482998b8a20e55f34a23191fdd863ccd8d607b7d1633d3395713",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/domain.py",
+      "expected": "sha256:12f2c1c19588af1c060426e90f6333ca3a4a4bd975339f37865f0c430221cbf8",
+      "actual": "sha256:12f2c1c19588af1c060426e90f6333ca3a4a4bd975339f37865f0c430221cbf8",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/input.py",
+      "expected": "sha256:0943de9f0fb0c4f7238474e6056968407ab0d5effae12a9c3e8eae4c7d0fa116",
+      "actual": "sha256:0943de9f0fb0c4f7238474e6056968407ab0d5effae12a9c3e8eae4c7d0fa116",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/planner.py",
+      "expected": "sha256:667dcbae498b22082d86a3e45310c07bc473c8f7078436dd9b2de7df8df36011",
+      "actual": "sha256:667dcbae498b22082d86a3e45310c07bc473c8f7078436dd9b2de7df8df36011",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_domain.py",
+      "expected": "sha256:60b57dda2f419c64842e6c1416dc8bf366dc1b354eab350685679223aa59b9a8",
+      "actual": "sha256:60b57dda2f419c64842e6c1416dc8bf366dc1b354eab350685679223aa59b9a8",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_eval_campaign.py",
+      "expected": "sha256:6f25560f0a8fd09686ec736ceacce30f64ecfcde2c342688b2fb790f9aa1d2ce",
+      "actual": "sha256:6f25560f0a8fd09686ec736ceacce30f64ecfcde2c342688b2fb790f9aa1d2ce",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_eval_cli.py",
+      "expected": "sha256:210240879886e0b6492e02e91420b457a0321c02297126c4b18c9f721fb9335a",
+      "actual": "sha256:210240879886e0b6492e02e91420b457a0321c02297126c4b18c9f721fb9335a",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_eval_runner.py",
+      "expected": "sha256:6b1902bbb464570a1e0dd0e49806c0da14043a28acfb3d16f60fa3db88bdf86a",
+      "actual": "sha256:6b1902bbb464570a1e0dd0e49806c0da14043a28acfb3d16f60fa3db88bdf86a",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_evaluation.py",
+      "expected": "sha256:694628a485c05025ae3bdc8eead8bc499ce4c7a5426608d4c3730efea8a29668",
+      "actual": "sha256:694628a485c05025ae3bdc8eead8bc499ce4c7a5426608d4c3730efea8a29668",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_intent.py",
+      "expected": "sha256:2973cbfe01e3ce186b29695bf17c6a9a5e78ceccf4a5419d68fb9c26cb8805d3",
+      "actual": "sha256:2973cbfe01e3ce186b29695bf17c6a9a5e78ceccf4a5419d68fb9c26cb8805d3",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_live_smoke.py",
+      "expected": "sha256:b3d195137fc79f0b120a7089a8b2ec955ee063c94fd5f2e9dd19e0b86bbd1b3c",
+      "actual": "sha256:b3d195137fc79f0b120a7089a8b2ec955ee063c94fd5f2e9dd19e0b86bbd1b3c",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_models.py",
+      "expected": "sha256:ef970ab691ada74db26cfe48829c0df23cf42f090c5787cbe58a6e5b4f1c5724",
+      "actual": "sha256:ef970ab691ada74db26cfe48829c0df23cf42f090c5787cbe58a6e5b4f1c5724",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_pipeline.py",
+      "expected": "sha256:d1b00f6865c511ff99fdab50568401b7bee50f8c77953d84b2152050c0e1f958",
+      "actual": "sha256:d1b00f6865c511ff99fdab50568401b7bee50f8c77953d84b2152050c0e1f958",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_prototype.py",
+      "expected": "sha256:d9ecbd83336bb9306c4e7cd6b79ce48a0e6d5a5db15e8a7ea72f36cc043c8c20",
+      "actual": "sha256:d9ecbd83336bb9306c4e7cd6b79ce48a0e6d5a5db15e8a7ea72f36cc043c8c20",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_role_adapters.py",
+      "expected": "sha256:8aa46b1c01aa442266f66e263c89823c4bb064f4c0c3ae00779cd3295d127df5",
+      "actual": "sha256:8aa46b1c01aa442266f66e263c89823c4bb064f4c0c3ae00779cd3295d127df5",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_runtime.py",
+      "expected": "sha256:62da72bd4314c1673cc0bd766ecdfe712c609ea9389ead99db2951c7c9e02ab2",
+      "actual": "sha256:62da72bd4314c1673cc0bd766ecdfe712c609ea9389ead99db2951c7c9e02ab2",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_search.py",
+      "expected": "sha256:4a2c3a8d7fdcf0065f031b3bf83e914d3cbc43a930729b3696b08995e9d7e45a",
+      "actual": "sha256:4a2c3a8d7fdcf0065f031b3bf83e914d3cbc43a930729b3696b08995e9d7e45a",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_session.py",
+      "expected": "sha256:3c4e0705a6c1ebd5cf8a873599b403e4ce78f0d4e0d8743d3d6148310e0a0c9c",
+      "actual": "sha256:3c4e0705a6c1ebd5cf8a873599b403e4ce78f0d4e0d8743d3d6148310e0a0c9c",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_smoke.py",
+      "expected": "sha256:5f68efbc329862913d0dc37d25a50b7a3a6c1e52f2da8d78e862fc885e84f79a",
+      "actual": "sha256:5f68efbc329862913d0dc37d25a50b7a3a6c1e52f2da8d78e862fc885e84f79a",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/r31_store.py",
+      "expected": "sha256:3d7f2f859b9a9d3fab64ec4f6adcbb2fa6f84a3233a7c115ce3bd3b8af4e96f0",
+      "actual": "sha256:3d7f2f859b9a9d3fab64ec4f6adcbb2fa6f84a3233a7c115ce3bd3b8af4e96f0",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/smoke.py",
+      "expected": "sha256:f38348bb5f397f1abb42d87f3f1721ea2e967d41149f11e4c19032e49c84b05c",
+      "actual": "sha256:f38348bb5f397f1abb42d87f3f1721ea2e967d41149f11e4c19032e49c84b05c",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/planning/validator.py",
+      "expected": "sha256:1442035bfd851dc8bcaa0f5320ec8bda541e52accb73d81ea581e37aa4590503",
+      "actual": "sha256:1442035bfd851dc8bcaa0f5320ec8bda541e52accb73d81ea581e37aa4590503",
+      "match": true
+    },
+    {
+      "path": "../자동화템플릿/prototypes/skills/flowmarshal-work-planner/references/candidate-selection.md",
+      "expected": "sha256:34b0c1359382553ff422aff14acc19ef255e24e9c647260606dfca76367a86d5",
+      "actual": "sha256:34b0c1359382553ff422aff14acc19ef255e24e9c647260606dfca76367a86d5",
+      "match": true
+    },
+    {
+      "path": "../자동화템플릿/prototypes/skills/flowmarshal-work-planner/references/evaluation.md",
+      "expected": "sha256:3ef1ebe2ed922156eb46a56261ffddee2b3a0bdec89ca8b114a2bd0b2f1519cf",
+      "actual": "sha256:3ef1ebe2ed922156eb46a56261ffddee2b3a0bdec89ca8b114a2bd0b2f1519cf",
+      "match": true
+    },
+    {
+      "path": "../자동화템플릿/prototypes/skills/flowmarshal-work-planner/references/intent-contract.md",
+      "expected": "sha256:c18cdcc8870bda876e473d571888f5eb7f05d6982ad73f0e9b38f342295d2e71",
+      "actual": "sha256:c18cdcc8870bda876e473d571888f5eb7f05d6982ad73f0e9b38f342295d2e71",
+      "match": true
+    },
+    {
+      "path": "../자동화템플릿/prototypes/skills/flowmarshal-work-planner/references/plan-contract.md",
+      "expected": "sha256:daff8be40ebe0f6401485023471a5c36528af3e62369636c88edf2c4544d8d26",
+      "actual": "sha256:daff8be40ebe0f6401485023471a5c36528af3e62369636c88edf2c4544d8d26",
+      "match": true
+    },
+    {
+      "path": "../자동화템플릿/prototypes/skills/flowmarshal-work-planner/references/quality-gates.md",
+      "expected": "sha256:5228c0a3b3e661cbe788289ae37b152e5711e998d25dd9ec9d7a636977fa66e1",
+      "actual": "sha256:5228c0a3b3e661cbe788289ae37b152e5711e998d25dd9ec9d7a636977fa66e1",
+      "match": true
+    },
+    {
+      "path": "../자동화템플릿/prototypes/skills/flowmarshal-work-planner/references/session-strategy.md",
+      "expected": "sha256:c8f7c0449242b1402dbc981cfa22fe8d77df6d229f5e46ccb6dd46faf61fb39f",
+      "actual": "sha256:c8f7c0449242b1402dbc981cfa22fe8d77df6d229f5e46ccb6dd46faf61fb39f",
+      "match": true
+    },
+    {
+      "path": "../자동화템플릿/prototypes/skills/flowmarshal-work-planner/SKILL.md",
+      "expected": "sha256:c291d690d79c37ed5a05d89dae076a2e0774039f21e981ae06dd5ac074dd1328",
+      "actual": "sha256:c291d690d79c37ed5a05d89dae076a2e0774039f21e981ae06dd5ac074dd1328",
+      "match": true
+    },
+    {
+      "path": "spikes/orchestration/r31/artifacts/runs/r31-role-eval-campaign10-20260903/AGENTS.md",
+      "expected": "sha256:c9bc1641624387ce6f0d8e342755efa5e5126bcef0917e3705eed9fc5b086a06",
+      "actual": "sha256:c9bc1641624387ce6f0d8e342755efa5e5126bcef0917e3705eed9fc5b086a06",
+      "match": true
+    },
+    {
+      "path": "spikes/orchestration/r31/artifacts/runs/r31-role-eval-campaign10-20260903/campaign-manifest.json",
+      "expected": "sha256:2d775302ecca5a2792921bbd9a2c0e3d73492e0d40e2f40305579e8e2add6ba7",
+      "actual": "sha256:2d775302ecca5a2792921bbd9a2c0e3d73492e0d40e2f40305579e8e2add6ba7",
+      "match": true
+    },
+    {
+      "path": "spikes/orchestration/r31/artifacts/runs/r31-role-eval-campaign10-20260903/model-lock.json",
+      "expected": "sha256:3401d47187c6f88ad718be396c78ec0edc178cc2a902f226f535387140a58176",
+      "actual": "sha256:3401d47187c6f88ad718be396c78ec0edc178cc2a902f226f535387140a58176",
+      "match": true
+    },
+    {
+      "path": "spikes/orchestration/r31/artifacts/runs/r31-role-eval-campaign10-20260903/r31-role-fixture-evaluation.json",
+      "expected": "sha256:e8274de75a68d5217fb8a4f82245e64f823c414108070ad42b7dda1437fd1b26",
+      "actual": "sha256:e8274de75a68d5217fb8a4f82245e64f823c414108070ad42b7dda1437fd1b26",
+      "match": true
+    }
+  ],
+  "missing_roots": [],
+  "unexpected_paths": [],
+  "passed": true
+}

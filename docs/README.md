@@ -38,11 +38,14 @@
 - [저장소 작업 지침](../AGENTS.md): 구현 시 지켜야 할 안정된 불변조건
 - [Engine 1.0 qualification](engine-qualification.md): 실제 역할48·Planning18, 실제 요청 E2E·결정적·호환·설치·독립 감사 책임
 - [Engine 실행 구현 현황](engine-implementation-status.md): 실제 실행 결과, NO-GO 근거와 남은 qualification 범위
-- [VibeMarshal GUI 인터페이스 설계명세](gui-interface-design.md): 비권위 React 클릭형 prototype, Engine client 경계, exact-digest 활성화·복구 UX와 Tauri 단계
+
+### 1.0 이후 후속 설계
+
+- [VibeMarshal GUI 인터페이스 설계명세](gui-interface-design.md): 비권위 React 클릭형 prototype과 Tauri 후속 제안. 당시 exact-digest 활성화 UX는 현재 GoalAuthorization·내부 Plan 자동 활성화 계약을 대체하지 않는다. 실제 Engine 연결 전 승인 흐름을 새 계약에 맞춰야 하며 GUI는 1.0 비차단 범위다.
 
 ### 승인 이전 개발·검증 기록（현재 실행 지시 아님）
 
-아래 R-S06 기록 및 위의 반복 검증·inspection baseline·feedback 기록은 각 source·시점의 provenance다. 사용량 누락 전역 차단·exact Plan 수동 승인·비교 성능 필수 조항은 최신 승인 계약으로 대체하며 과거 본문·수치·receipt를 수정하지 않는다.
+아래 R-S06 기록 및 위의 반복 검증·inspection baseline·feedback 기록, `alpha-a4-handoff.md`·`alpha-a4-a5-execution.md`의 실행 인계는 각 source·시점의 provenance다. 사용량 누락 전역 차단·exact Plan 수동 승인·비교 성능 필수 조항은 최신 승인 계약으로 대체하며 과거 본문·수치·receipt를 수정하지 않는다. 당시 detached 실행·push·다음 단계 명령도 현재 main 작업 위치와 효과 승인을 대체하지 않는다.
 
 - [근거 우선 strict schema 순서 보정](r-s06-evidence-first-schema-order-fix-handoff.md): 선언 property 순서의 canonical 왕복 보존, 근거 우선 Reviewer envelope와 R25 의미 실패 회귀
 - [참조 결속 규격 설명·진단 보정](r-s06-scope-binding-spec-diagnostics-handoff.md): mechanism→scope→AC 추적 규칙, R27 원본 거부·boolean 오류 보존 회귀와 fresh 결정론 Gate 5/5

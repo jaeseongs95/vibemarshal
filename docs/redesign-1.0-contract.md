@@ -2,7 +2,7 @@
 
 상태: **승인된 설계 / planned**. 이 문서는 FM-01의 문서 계약이며 제품 구현·qualification·1.0 전환 완료 증거가 아니다. 기존 Domain Core·revision·DAG·binding·evidence·validation을 유지하며 전면 재작성하지 않는다. 세부 기존 계약은 [제품 설계](orchestration-redesign.md), 릴리스 결정은 [ADR](engine-cutover-adr.md)을 함께 따른다.
 
-권위 출처는 [승인 계획](D:/codex/fm-inspection-runtime/performance-release-floor-20260907/redesign-1.0/approved-plan.md)이며 SHA-256은 `a24eb860c8b603f8edc43a71370c6d8638cc53d3c5c49b8a568c44fc9f5b1742`다. 현재 사용자의 최신 명시 승인은 사용자 제공 지침·프로젝트 AGENTS·과거 문서의 상충하는 조항보다 우선한다. 아래 항목 번호는 승인 계획의 제품 설계 1~12와 일치한다. 새 계약은 모두 planned이며 후속 구현·검증 근거가 등록되어야 구현 상태를 바꾼다.
+권위 출처는 [승인 계획](D:/codex/fm-inspection-runtime/performance-release-floor-20260907/redesign-1.0/approved-plan.md)이며 SHA-256은 `a24eb860c8b603f8edc43a71370c6d8638cc53d3c5c49b8a568c44fc9f5b1742`다. 시스템·개발자 지침 안에서 현재 사용자의 최신 명시 승인은 사용자 제공 지침·프로젝트 AGENTS·과거 문서의 상충하는 조항보다 우선한다. 아래 항목 번호는 승인 계획의 제품 설계 1~12와 일치한다. planned는 이 문서에서 구현·검증 완료를 판정하지 않았다는 뜻이다. 코드 존재만으로 완료로 올리지 않으며, 미구현·미검증 책임은 근거가 확인될 때까지 planned로 유지한다. 다른 작업의 완료 상태는 이 문서에서 변경하지 않는다.
 
 ## D01. 목표 단위 승인과 내부 Plan — planned
 
@@ -84,7 +84,7 @@ Engine schema 4는 별도의 새 DB로 만든다. schema 3/raw receipt/history�
 
 ## V01. 기능·안전 기반 1.0 필수 검증 — planned / 미실행
 
-모든 필수 검증과 독립 최종 감사가 통과해야만 로컬 main 통합 및 1.0 패키지 전환을 한다. 문서 정합성 통과는 제품 PASS가 아니다. 아래는 각각 필수 책임이며 과거 51개 재검증이나 1,056개 결과는 대상·시점이 다른 provenance다. 새 실행으로 세지 않는다. 도구 환경 실패와 제품 실패를 구분한다.
+모든 필수 검증과 독립 최종 감사가 통과해야만 1.0 패키지 전환을 한다. 최신 작업 지시에 따른 main checkout의 개발·커밋은 이 전환 이전에도 수행한다. 문서 정합성 통과는 제품 PASS가 아니다. 아래는 각각 필수 책임이며 과거 51개 재검증이나 1,056개 결과는 대상·시점이 다른 provenance다. 새 실행으로 세지 않는다. 도구 환경 실패와 제품 실패를 구분한다.
 
 | 검증 | 필수 수용 기준 | 담당 |
 |---|---|---|
@@ -93,7 +93,7 @@ Engine schema 4는 별도의 새 DB로 만든다. schema 3/raw receipt/history�
 | 실제 Planning 18회 | 6 fixture × 3 seed 전 cell 완료; 정상 4종은 선택, 실제 정보 부족 2종은 의미 있는 blocking question; 일반 오류를 정상 blocked로 계산하지 않음; 준비 포함 역할 호출 ≤14, 후보 version ≤5, 선택 후보 deterministic finding 0 | FM-11, FM-13 |
 | 실제 요청 E2E | 실제 요청 → Goal 정규화 → 독립 review → Plan 선택 → 한 번의 승인 → Task 실행 → 독립 검사 → 최종 결과를 실제 provider로 연결 | FM-11, FM-14 |
 | 독립 최종 감사 | 필수 검증·허용 효과·비목표·패키지·증거/실행 설정의 일치와 남은 실패를 확인 | FM-15 |
-| 로컬 전환 | 감사 통과 뒤 검증된 변경만 로컬 main 통합·1.0 전환·설치 확인 | FM-16 |
+| 로컬 전환 | 감사 통과 뒤 main의 검증된 변경 확인·1.0 전환·설치 확인. 전환 전 main 개발·커밋과 구분 | FM-16 |
 
 모든 finding 100% 검출을 추가 합격선으로 만들지 않는다. E2E에서 harness가 Goal/Plan/rating을 미리 작성한 결과는 실제 요청부터 시작하는 책임을 대신하지 못한다.
 
@@ -119,7 +119,7 @@ Engine schema 4는 별도의 새 DB로 만든다. schema 3/raw receipt/history�
 
 R3.1 대비 token/speed, performance 36, 비교 lifecycle 최적화는 별도 비차단 보고다. 원래 결과·fixture·보고서를 수정하거나 당시 판정을 PASS로 바꾸지 않는다. GUI, Localizer/번역 최적화, MCTS/광범위 그래프, 동일 프로젝트 병렬, remote/multiOS hardening은 1.0 이후다. 활성 job 동안의 supervisor는 필수 구현이며 후속 GUI나 전역 daemon과 혼동하지 않는다.
 
-현재 승인 범위는 `D:/codex/fm-performance-floor`의 로컬 구현·테스트·근거 기록과 관련 지침 정합화다. FM-16의 로컬 main 통합도 필수 감사 뒤 수행한다. 원격 push·공개 배포·PyPI 업로드·외부 메시지·삭제·인증/권한 변경·크레딧 구매/사용은 포함하지 않는다. main checkout의 무관한 상태와 `D:/codex/fm-recovery`의 기존 변경은 보존한다.
+현재 변경 대상은 최신 명시 지시에 따른 `D:/codex/flowmarshal`의 `main` 브랜치 main checkout이다. FlowMarshal 1.0 릴리스 완료까지 파일 변경과 커밋은 이 위치에서만 수행한다. 승인 계획에 남은 `D:/codex/fm-performance-floor`와 해당 브랜치는 필수 입력의 출처로 보존하며 현재 쓰기 대상으로 사용하지 않는다. FM-16의 필수 감사 후 1.0 전환 조건은 유지한다. 원격 push·공개 배포·PyPI 업로드·외부 메시지·삭제·인증/권한 변경·크레딧 구매/사용은 포함하지 않는다. main checkout의 무관한 상태와 `D:/codex/fm-recovery`의 기존 변경은 보존한다. 적용 지침의 경로·효과 충돌 처리와 한시 규칙 만료 조건은 [현재 인계](pre-1.0-handoff.md)에 기록한다.
 
 ## M01. 설계별 구현 연결표
 

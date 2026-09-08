@@ -1,0 +1,86 @@
+diff --git a/AGENTS.md b/AGENTS.md
+index de4a8d2..281b6d8 100644
+--- a/AGENTS.md
++++ b/AGENTS.md
+@@ -8 +8 @@
+-- 현재 사용자의 최신 명시적 지시를 우선한다. 작업 전 대상 경로의 `AGENTS.md`를 확인하고, 기존 구조·관례와 유효한 결과를 재사용하되 정확성·완성도·검증을 token 절약보다 우선한다.
++- 시스템·개발자 지침 안에서 현재 사용자의 최신 명시적 지시를 우선한다. 과거 사용자 제공 지침·source/template AGENTS·등록 자료의 상충하는 조항을 최신 승인보다 앞세우지 않는다. 작업 전 대상 경로의 `AGENTS.md`를 확인하고, 기존 구조·관례와 유효한 결과를 재사용하되 정확성·완성도·검증을 token 절약보다 우선한다.
+@@ -15,0 +16 @@
++| 승인 설계·검증 책임·구현 연결 | `docs/redesign-1.0-contract.md` |
+@@ -162 +163 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정
+-- 단계 A 공통 preflight는 detached worktree의 HEAD·source_manifest·clean tracked files, 전용 Python·`flowmarshal` import origin, fixture whitelist package와 relocation proof, 명시적 Codex executable, roles·instruction actual sources와 model lock을 결속한다. origin/main과 다른 checkout HEAD는 시작 provenance일 뿐 실행 중 비교하지 않는다. payload 의미·oracle·과거 FAIL은 보정하지 않으며, 11사례 완료는 qualification PASS가 아니다.
++- 단계 A 공통 preflight는 현재 승인된 checkout의 HEAD·source_manifest·clean tracked files, 전용 Python·`flowmarshal` import origin, fixture whitelist package와 relocation proof, 명시적 Codex executable, roles·instruction actual sources와 model lock을 결속한다. origin/main과 다른 checkout HEAD는 시작 provenance일 뿐 실행 중 비교하지 않는다. 과거 detached worktree 조건은 당시 diagnostics의 provenance이며 현재 승인된 Git 작업 위치를 바꾸는 권한이 아니다. 기존 harness가 다른 checkout을 요구하면 충돌을 보고하고 계약·도구 정합화 후 검증한다. payload 의미·oracle·과거 FAIL은 보정하지 않으며, 11사례 완료는 qualification PASS가 아니다.
+@@ -175 +176 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정
+-- 세션의 요청 작업과 검증이 끝나면 그 세션 변경만 하나의 한국어 commit으로 기록해 push한다. 무관한 사용자 변경을 포함하지 않는다.
++- 세션의 요청 작업과 검증이 끝나면 현재 승인된 브랜치·checkout에 그 세션 변경만 하나의 한국어 commit으로 기록한다. 원격 push는 현재 사용자가 명시적으로 승인한 경우에만 수행하며, 로컬 commit·제품 전환 승인을 push 승인으로 해석하지 않는다. 무관한 사용자 변경을 포함하지 않는다.
+diff --git a/docs/README.md b/docs/README.md
+index 8628e66..ef96005 100644
+--- a/docs/README.md
++++ b/docs/README.md
+@@ -41 +41,4 @@
+-- [VibeMarshal GUI 인터페이스 설계명세](gui-interface-design.md): 비권위 React 클릭형 prototype, Engine client 경계, exact-digest 활성화·복구 UX와 Tauri 단계
++
++### 1.0 이후 후속 설계
++
++- [VibeMarshal GUI 인터페이스 설계명세](gui-interface-design.md): 비권위 React 클릭형 prototype과 Tauri 후속 제안. 당시 exact-digest 활성화 UX는 현재 GoalAuthorization·내부 Plan 자동 활성화 계약을 대체하지 않는다. 실제 Engine 연결 전 승인 흐름을 새 계약에 맞춰야 하며 GUI는 1.0 비차단 범위다.
+@@ -45 +48 @@
+-아래 R-S06 기록 및 위의 반복 검증·inspection baseline·feedback 기록은 각 source·시점의 provenance다. 사용량 누락 전역 차단·exact Plan 수동 승인·비교 성능 필수 조항은 최신 승인 계약으로 대체하며 과거 본문·수치·receipt를 수정하지 않는다.
++아래 R-S06 기록 및 위의 반복 검증·inspection baseline·feedback 기록, `alpha-a4-handoff.md`·`alpha-a4-a5-execution.md`의 실행 인계는 각 source·시점의 provenance다. 사용량 누락 전역 차단·exact Plan 수동 승인·비교 성능 필수 조항은 최신 승인 계약으로 대체하며 과거 본문·수치·receipt를 수정하지 않는다. 당시 detached 실행·push·다음 단계 명령도 현재 main 작업 위치와 효과 승인을 대체하지 않는다.
+diff --git a/docs/engine-cutover-adr.md b/docs/engine-cutover-adr.md
+index d1e4d23..c7dc203 100644
+--- a/docs/engine-cutover-adr.md
++++ b/docs/engine-cutover-adr.md
+@@ -21 +21 @@ R1~R3.1 prototype은 유용한 transport·원장·Planner 실험 자산이자
+-9. 개발 CLI/package 이름은 `flowmarshal-engine`이다. 아래 필수 검증과 독립 감사 뒤에만 로컬 main 통합·`flowmarshal` 1.0 전환을 수행한다. 원격 push·공개 릴리스·PyPI 업로드는 이 승인의 범위가 아니다. main의 무관한 변경은 보존한다.
++9. 개발 CLI/package 이름은 `flowmarshal-engine`이다. 최신 작업 지시에 따라 개발·커밋은 `main` 브랜치 main checkout에서 수행하고, 아래 필수 검증과 독립 감사 뒤에만 `flowmarshal` 1.0 전환을 수행한다. main에서 작업했다는 사실은 릴리스 Gate 통과가 아니다. 원격 push·공개 릴리스·PyPI 업로드는 이 승인의 범위가 아니다. main의 무관한 변경은 보존한다.
+diff --git a/docs/orchestration-redesign.md b/docs/orchestration-redesign.md
+index e75ec02..26c6db4 100644
+--- a/docs/orchestration-redesign.md
++++ b/docs/orchestration-redesign.md
+@@ -432 +432 @@ report progress|final
+-공통 preflight는 실험용 detached worktree의 HEAD, source manifest, clean tracked files, 전용 Python identity와 실제 `flowmarshal` import origin을 결속한다. fixture whitelist package와 relocation proof, 명시한 Codex executable, roles와 instruction의 actual source, model lock도 같은 실행 입력으로 고정한다. origin/main과 다른 checkout의 HEAD는 시작 provenance로만 기록하며 실행 중 비교하지 않는다.
++공통 preflight는 현재 승인된 checkout의 HEAD, source manifest, clean tracked files, 전용 Python identity와 실제 `flowmarshal` import origin을 결속한다. fixture whitelist package와 relocation proof, 명시한 Codex executable, roles와 instruction의 actual source, model lock도 같은 실행 입력으로 고정한다. origin/main과 다른 checkout의 HEAD는 시작 provenance로만 기록하며 실행 중 비교하지 않는다. 실험용 detached worktree는 과거 diagnostics의 실행 조건이며 최신 Git 작업 위치 승인을 대체하지 않는다. 기존 harness가 이 조건에 고정되어 있으면 계약·도구 정합화와 재검증이 필요하다. 현재 작업 위치와 한시 규칙은 [인계의 실행 대상](pre-1.0-handoff.md)을 따른다.
+diff --git a/docs/pre-1.0-handoff.md b/docs/pre-1.0-handoff.md
+index 5aaa9ba..cf20d50 100644
+--- a/docs/pre-1.0-handoff.md
++++ b/docs/pre-1.0-handoff.md
+@@ -7 +7,2 @@
+-- 승인 source: `D:/codex/fm-performance-floor`, 기준 `a5bf2bf7a21a0dfe7ffe2e4bb34e8ae67808da08` / `codex/performance-release-floor`.
++- 현재 변경 대상: `D:/codex/flowmarshal`의 `main` 브랜치 main checkout. 1.0 릴리스 완료까지 모든 파일 변경·커밋을 이 위치에서만 수행한다. 다른 브랜치·worktree·detached HEAD에서는 작업하거나 커밋하지 않는다. 릴리스 완료가 확인되면 이 한시 규칙은 만료되고 당시 Git 작업 지침을 따른다.
++- 필수 입력의 과거 source: `D:/codex/fm-performance-floor`, 승인 당시 기준 `a5bf2bf7a21a0dfe7ffe2e4bb34e8ae67808da08` / `codex/performance-release-floor`. 현재 쓰기 대상이 아니며 최신 명시 지시에 따라 main 상태와 직접 대조한다.
+@@ -11 +12,3 @@
+-- 역할 cwd·자료 저장 위치나 main checkout으로 source를 바꾸지 않는다. main의 무관한 상태, `D:/codex/fm-recovery`, 동결 source·실제 DB·receipt·History는 보존한다.
++- 역할 cwd나 자료 저장 위치만으로 source를 추정하지 않는다. 이번 main 지정은 사용자의 최신 명시 승인에 근거한다. main의 무관한 상태, `D:/codex/fm-recovery`, 동결 source·실제 DB·receipt·History는 보존한다.
++
++source·template·실제 작업 프로젝트의 AGENTS는 최신 명시 승인과 함께 적용한다. `D:/codex/자동화템플릿/AGENTS.md`의 승인 source_root 보존 원칙도 과거 경로를 고정하는 근거로 사용하지 않는다. template의 main 한시 규칙은 현재 지시와 일치한다. 과거 source 지침의 detached preflight·자동 push 조항은 현재 main-only·push 금지를 대체하지 못한다. main 밖 source/template 파일은 입력으로 보존하고, 제품의 장기 원칙은 main AGENTS와 권위 문서에 반영한다. 조율 스크립트·원장·다른 작업 상태의 수정은 FM-01에 포함하지 않는다.
+@@ -17 +20 @@
+-[M01 설계별 연결표](redesign-1.0-contract.md)에 승인 1~12 전 항목, [V01·V02](redesign-1.0-contract.md)에 필수 검증 임계값·E2E 책임과 FM 태스크를 연결했다. 다음 배정은 조율 원장의 정확한 immutable 명세를 읽어 수행한다. 문서만 바뀐 현 시점에는 schema 4·GoalAuthorization·supervisor·새 CLI·패키지·qualification이 구현/검증됐다고 가정하지 않는다.
++[M01 설계별 연결표](redesign-1.0-contract.md)에 승인 1~12 전 항목, [V01·V02](redesign-1.0-contract.md)에 필수 검증 임계값·E2E 책임과 FM 태스크를 연결했다. 다음 배정은 조율 원장의 정확한 immutable 명세를 읽어 수행한다. FM-01은 문서 계약을 검증하므로 schema 4·GoalAuthorization·supervisor·새 CLI·패키지·qualification의 구현/검증 완료 여부를 판정하지 않는다. 미구현·미검증 책임은 planned로 유지한다.
+diff --git a/docs/pre-1.0-roadmap.md b/docs/pre-1.0-roadmap.md
+index bc744a1..5938859 100644
+--- a/docs/pre-1.0-roadmap.md
++++ b/docs/pre-1.0-roadmap.md
+@@ -16 +16 @@
+-| 최종 감사·전환 | FM-15, FM-16 | 필수 근거 독립 감사 후 검증된 로컬 main/1.0 전환과 조율 종료 |
++| 최종 감사·전환 | FM-15, FM-16 | 필수 근거 독립 감사 후 main의 검증된 변경 확인·1.0 전환과 조율 종료 |
+@@ -20 +20,3 @@
+-FM-02~FM-16 계약은 **planned**다. 각 태스크의 완료는 실제 source/계약/검증 입력 digest·receipt·필수 검사 evidence를 확인한 원장 판정이 필요하다. 과거 51개 재검증과 1,056개 결과는 시점·대상이 다른 provenance이며 이번 새 실행이 아니다.
++FM-02~FM-16 계약은 이 문서에서 **planned**로 유지한다. 이는 코드 부재나 다른 태스크 상태를 판정한 결과가 아니다. 각 태스크의 완료는 실제 source/계약/검증 입력 digest·receipt·필수 검사 evidence를 확인한 원장 판정이 필요하다. 과거 51개 재검증과 1,056개 결과는 시점·대상이 다른 provenance이며 이번 새 실행이 아니다.
++
++1.0 릴리스 완료까지 모든 파일 변경·커밋은 `D:/codex/flowmarshal`의 `main` 브랜치 main checkout에서 수행한다. 다른 브랜치·worktree·detached HEAD를 개발·검증 작업 위치로 만들지 않는다. FM-16은 감사 후 1.0 전환 책임이며, 앞선 작업의 main 개발·커밋을 지연시키는 조건이 아니다. 정확한 입력 출처와 보존 범위는 [인계](pre-1.0-handoff.md)를 따른다.
+diff --git a/docs/redesign-1.0-contract.md b/docs/redesign-1.0-contract.md
+index 8a89b37..a0d579b 100644
+--- a/docs/redesign-1.0-contract.md
++++ b/docs/redesign-1.0-contract.md
+@@ -5 +5 @@
+-권위 출처는 [승인 계획](D:/codex/fm-inspection-runtime/performance-release-floor-20260907/redesign-1.0/approved-plan.md)이며 SHA-256은 `a24eb860c8b603f8edc43a71370c6d8638cc53d3c5c49b8a568c44fc9f5b1742`다. 현재 사용자의 최신 명시 승인은 사용자 제공 지침·프로젝트 AGENTS·과거 문서의 상충하는 조항보다 우선한다. 아래 항목 번호는 승인 계획의 제품 설계 1~12와 일치한다. 새 계약은 모두 planned이며 후속 구현·검증 근거가 등록되어야 구현 상태를 바꾼다.
++권위 출처는 [승인 계획](D:/codex/fm-inspection-runtime/performance-release-floor-20260907/redesign-1.0/approved-plan.md)이며 SHA-256은 `a24eb860c8b603f8edc43a71370c6d8638cc53d3c5c49b8a568c44fc9f5b1742`다. 시스템·개발자 지침 안에서 현재 사용자의 최신 명시 승인은 사용자 제공 지침·프로젝트 AGENTS·과거 문서의 상충하는 조항보다 우선한다. 아래 항목 번호는 승인 계획의 제품 설계 1~12와 일치한다. planned는 이 문서에서 구현·검증 완료를 판정하지 않았다는 뜻이다. 코드 존재만으로 완료로 올리지 않으며, 미구현·미검증 책임은 근거가 확인될 때까지 planned로 유지한다. 다른 작업의 완료 상태는 이 문서에서 변경하지 않는다.
+@@ -87 +87 @@ Engine schema 4는 별도의 새 DB로 만든다. schema 3/raw receipt/history
+-모든 필수 검증과 독립 최종 감사가 통과해야만 로컬 main 통합 및 1.0 패키지 전환을 한다. 문서 정합성 통과는 제품 PASS가 아니다. 아래는 각각 필수 책임이며 과거 51개 재검증이나 1,056개 결과는 대상·시점이 다른 provenance다. 새 실행으로 세지 않는다. 도구 환경 실패와 제품 실패를 구분한다.
++모든 필수 검증과 독립 최종 감사가 통과해야만 1.0 패키지 전환을 한다. 최신 작업 지시에 따른 main checkout의 개발·커밋은 이 전환 이전에도 수행한다. 문서 정합성 통과는 제품 PASS가 아니다. 아래는 각각 필수 책임이며 과거 51개 재검증이나 1,056개 결과는 대상·시점이 다른 provenance다. 새 실행으로 세지 않는다. 도구 환경 실패와 제품 실패를 구분한다.
+@@ -96 +96 @@ Engine schema 4는 별도의 새 DB로 만든다. schema 3/raw receipt/history
+-| 로컬 전환 | 감사 통과 뒤 검증된 변경만 로컬 main 통합·1.0 전환·설치 확인 | FM-16 |
++| 로컬 전환 | 감사 통과 뒤 main의 검증된 변경 확인·1.0 전환·설치 확인. 전환 전 main 개발·커밋과 구분 | FM-16 |
+@@ -122 +122 @@ R3.1 대비 token/speed, performance 36, 비교 lifecycle 최적화는 별도
+-현재 승인 범위는 `D:/codex/fm-performance-floor`의 로컬 구현·테스트·근거 기록과 관련 지침 정합화다. FM-16의 로컬 main 통합도 필수 감사 뒤 수행한다. 원격 push·공개 배포·PyPI 업로드·외부 메시지·삭제·인증/권한 변경·크레딧 구매/사용은 포함하지 않는다. main checkout의 무관한 상태와 `D:/codex/fm-recovery`의 기존 변경은 보존한다.
++현재 변경 대상은 최신 명시 지시에 따른 `D:/codex/flowmarshal`의 `main` 브랜치 main checkout이다. FlowMarshal 1.0 릴리스 완료까지 파일 변경과 커밋은 이 위치에서만 수행한다. 승인 계획에 남은 `D:/codex/fm-performance-floor`와 해당 브랜치는 필수 입력의 출처로 보존하며 현재 쓰기 대상으로 사용하지 않는다. FM-16의 필수 감사 후 1.0 전환 조건은 유지한다. 원격 push·공개 배포·PyPI 업로드·외부 메시지·삭제·인증/권한 변경·크레딧 구매/사용은 포함하지 않는다. main checkout의 무관한 상태와 `D:/codex/fm-recovery`의 기존 변경은 보존한다. 적용 지침의 경로·효과 충돌 처리와 한시 규칙 만료 조건은 [현재 인계](pre-1.0-handoff.md)에 기록한다.

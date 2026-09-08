@@ -1,0 +1,19 @@
+{
+  "base_commit": "c484243cfa871b04b9858a71f74c4736ac505a00",
+  "observed_head": "c484243cfa871b04b9858a71f74c4736ac505a00",
+  "branch": "main",
+  "checkout": "D:\\codex\\flowmarshal",
+  "observed_at_utc": "2026-09-08T09:57:55.0508065Z",
+  "input_count": 8,
+  "authority_document_count": 7,
+  "freeze_entries": 40,
+  "freeze_failures": 0,
+  "unexpected_frozen_paths": [],
+  "missing_freeze_roots": [],
+  "protected_document_count": 8,
+  "protected_document_failures": [],
+  "diff_check_exit": 0,
+  "unexpected_changed_paths": [],
+  "semantic_review": "Separate human/agent review required; rg matches and hashes are not semantic PASS",
+  "product_qualification": "NOT_RUN"
+}

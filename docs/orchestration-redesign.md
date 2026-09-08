@@ -429,7 +429,7 @@ report progress|final
 
 정상 완료 사례와, receipt·terminal·lock 귀속이 완료된 model/schema/semantic FAIL만 다음 독립 사례로 진행할 수 있다. 환경, 계약, 입력 stale 또는 외부 효과 불명은 즉시 전체 실행을 중단한다. 관측한 실패는 FAIL로 그대로 보존하고 호출하지 못한 나머지 사례는 NOT_RUN으로 기록한다. 이 흐름은 실패를 재시도하거나 사례 사이에서 의미 판단을 보정하는 경로가 아니다.
 
-공통 preflight는 실험용 detached worktree의 HEAD, source manifest, clean tracked files, 전용 Python identity와 실제 `flowmarshal` import origin을 결속한다. fixture whitelist package와 relocation proof, 명시한 Codex executable, roles와 instruction의 actual source, model lock도 같은 실행 입력으로 고정한다. origin/main과 다른 checkout의 HEAD는 시작 provenance로만 기록하며 실행 중 비교하지 않는다.
+공통 preflight는 현재 승인된 checkout의 HEAD, source manifest, clean tracked files, 전용 Python identity와 실제 `flowmarshal` import origin을 결속한다. fixture whitelist package와 relocation proof, 명시한 Codex executable, roles와 instruction의 actual source, model lock도 같은 실행 입력으로 고정한다. origin/main과 다른 checkout의 HEAD는 시작 provenance로만 기록하며 실행 중 비교하지 않는다. 실험용 detached worktree는 과거 diagnostics의 실행 조건이며 최신 Git 작업 위치 승인을 대체하지 않는다. 기존 harness가 이 조건에 고정되어 있으면 계약·도구 정합화와 재검증이 필요하다. 현재 작업 위치와 한시 규칙은 [인계의 실행 대상](pre-1.0-handoff.md)을 따른다.
 
 새 고정 diagnostics는 실제 역할 thread의 `ephemeral=false`를 preflight에 고정하고 thread 생성 intent와 provider receipt를 대조한다. 모델 turn 없는 지침 probe는 기존 ephemeral 방식이고 일반 역할 runner의 기본값도 유지한다. 프로세스 중단 뒤에는 저장된 thread를 `thread/read`로 먼저 관측하며, 저장 설정 자체를 완료·usage 복구·재실행 권한으로 해석하지 않는다. 장시간 진단은 대화의 포그라운드 실행 세션 밖에서 시작하고 launch intent·PID·시작 시각·출력 경로를 별도 운영 기록에 남긴다. 기존 실행의 summary나 미확인 turn을 새 결과로 덮어쓰지 않는다.
 

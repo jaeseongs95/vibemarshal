@@ -1,0 +1,37 @@
+[
+  {
+    "path": "AGENTS.md",
+    "base_git_blob": "de4a8d2bee6a1d1486a893ef640a3f6a5316dded",
+    "sha256": "d8a86389c8cb128e4cbc83d6a011393e239a39a8f9ac6d4b27daec085e7695ab"
+  },
+  {
+    "path": "docs/README.md",
+    "base_git_blob": "8628e66b2907449b9dfde66972fe192f7c834da8",
+    "sha256": "e3574b8de0260c3c27e63c33925934d10aa2c70e8fdcaf6f6efbd972fadbbec5"
+  },
+  {
+    "path": "docs/orchestration-redesign.md",
+    "base_git_blob": "e75ec02ca9937c5c1b6bac95f2775d864ad9fd9a",
+    "sha256": "b52e0cf0db753de0e27e5580e207cc0853a59b1f5abc6a54ce302fed1f0c848f"
+  },
+  {
+    "path": "docs/engine-cutover-adr.md",
+    "base_git_blob": "d1e4d2343ea67af0dd9936354797983f72b6f4ea",
+    "sha256": "251912c6f6e0e94737da17ecfae629561b989959ba8724a32524c6fff0a8925f"
+  },
+  {
+    "path": "docs/pre-1.0-roadmap.md",
+    "base_git_blob": "bc744a1bda75c176568f8fe25428934d0bf432cc",
+    "sha256": "b08b4319854dff816cc1d8296f335fd132b83124f246dcbef4d67deaf27028a8"
+  },
+  {
+    "path": "docs/pre-1.0-handoff.md",
+    "base_git_blob": "5aaa9bae7f3f99be38e934b1fcef8457825a44c7",
+    "sha256": "af2d51786c56c321109ae64af64dec72dad45019e797057852b735cc85a51c61"
+  },
+  {
+    "path": "docs/redesign-1.0-contract.md",
+    "base_git_blob": "8a89b377cbce24c5ccaee9b1e642769f985804a3",
+    "sha256": "eb29f05a5be872ffa470008242c73a7986aff61747d417178224e1497c16be9f"
+  }
+]

@@ -1,0 +1,50 @@
+[
+  {
+    "path": "config/legacy-freeze-manifest.json",
+    "base_git_blob": "1991b219334b0c51b68b9de7d4d0931ff1db3ab6",
+    "current_git_blob": "1991b219334b0c51b68b9de7d4d0931ff1db3ab6",
+    "unchanged": true
+  },
+  {
+    "path": "docs/r31-frozen-baseline.md",
+    "base_git_blob": "cdc57b42bb6c2cbd8d886bf5e0638a6ae056bea2",
+    "current_git_blob": "cdc57b42bb6c2cbd8d886bf5e0638a6ae056bea2",
+    "unchanged": true
+  },
+  {
+    "path": "tests/fixtures/engine/r31-reviewer-regressions.json",
+    "base_git_blob": "73463e0e042e5efa52dbd9e6b6e563da0ea6dcf6",
+    "current_git_blob": "73463e0e042e5efa52dbd9e6b6e563da0ea6dcf6",
+    "unchanged": true
+  },
+  {
+    "path": "docs/engine-implementation-status-before-redesign-1.0.md",
+    "base_git_blob": "c0dce35ae131593c29bc638d3587f2cf026aa7fd",
+    "current_git_blob": "c0dce35ae131593c29bc638d3587f2cf026aa7fd",
+    "unchanged": true
+  },
+  {
+    "path": "docs/engine-qualification-before-redesign-1.0.md",
+    "base_git_blob": "6231b4297db0e3cef3a9cc6a1941d7925601165a",
+    "current_git_blob": "6231b4297db0e3cef3a9cc6a1941d7925601165a",
+    "unchanged": true
+  },
+  {
+    "path": "docs/performance-release-floor-before-redesign-1.0.md",
+    "base_git_blob": "07cb06abab50aab1c796c3d6d2eed7a66892faf2",
+    "current_git_blob": "07cb06abab50aab1c796c3d6d2eed7a66892faf2",
+    "unchanged": true
+  },
+  {
+    "path": "docs/pre-1.0-handoff-before-redesign-1.0.md",
+    "base_git_blob": "bfe1d195e6f333cb81049a4c747e1d2dc7e27ea2",
+    "current_git_blob": "bfe1d195e6f333cb81049a4c747e1d2dc7e27ea2",
+    "unchanged": true
+  },
+  {
+    "path": "docs/pre-1.0-roadmap-before-redesign-1.0.md",
+    "base_git_blob": "48740e2081ec43934f56c1b963e49804a1c03893",
+    "current_git_blob": "48740e2081ec43934f56c1b963e49804a1c03893",
+    "unchanged": true
+  }
+]

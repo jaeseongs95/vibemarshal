@@ -1,0 +1,2 @@
+git diff --check c484243cfa871b04b9858a71f74c4736ac505a00
+exit_code=0

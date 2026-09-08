@@ -18,7 +18,7 @@ R1~R3.1 prototype은 유용한 transport·원장·Planner 실험 자산이자 �
 6. RuntimeJobSupervisor와 EngineApplication의 짧은 run_once tick을 연결한다 (**planned**). 활성화 후 준비·worker·검사·recovery/replanning을 모두 checkpoint에 포함하고 supervisor는 활성 job 동안만 연결·deadline을 관리한다. 완료 판정은 Core가 한다.
 7. 기본 provider는 qualification된 v1이다. v2 static 11/qualification 13은 v2 자체 채택 조건이며 모든 제품 실행의 선행조건이 아니다. inventory 전체 원문은 감사용, 선택·허용 조합/executable/필수 capability projection은 운영 binding으로 유지한다. 임의 fallback·version 간 checkpoint 재사용을 금지한다.
 8. package는 Engine-only 사용자 CLI와 필요한 shared canonical 자산을 포함한다. legacy/eval/developer 도구 entrypoint를 분리하고 source-tree 평가는 명시 source root와 재현 입력 bundle을 요구한다. wheel에 없는 fixture/config를 가정하지 않는다.
-9. 개발 CLI/package 이름은 `flowmarshal-engine`이다. 아래 필수 검증과 독립 감사 뒤에만 로컬 main 통합·`flowmarshal` 1.0 전환을 수행한다. 원격 push·공개 릴리스·PyPI 업로드는 이 승인의 범위가 아니다. main의 무관한 변경은 보존한다.
+9. 개발 CLI/package 이름은 `flowmarshal-engine`이다. 최신 작업 지시에 따라 개발·커밋은 `main` 브랜치 main checkout에서 수행하고, 아래 필수 검증과 독립 감사 뒤에만 `flowmarshal` 1.0 전환을 수행한다. main에서 작업했다는 사실은 릴리스 Gate 통과가 아니다. 원격 push·공개 릴리스·PyPI 업로드는 이 승인의 범위가 아니다. main의 무관한 변경은 보존한다.
 
 ## Cutover 조건 — planned / 미실행
 

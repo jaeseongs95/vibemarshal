@@ -1,0 +1,34 @@
+[
+  {
+    "path": "D:/codex/fm-inspection-runtime/performance-release-floor-20260907/redesign-1.0/approved-plan.md",
+    "sha256": "a24eb860c8b603f8edc43a71370c6d8638cc53d3c5c49b8a568c44fc9f5b1742"
+  },
+  {
+    "path": "D:/codex/자동화템플릿/AGENTS.md",
+    "sha256": "be5667c2e7c8195e298def71f975dcb60a2924b44d262d6fafef0c831352a608"
+  },
+  {
+    "path": "D:/codex/fm-performance-floor/AGENTS.md",
+    "sha256": "3dad00f91f1c3fecedaa3326178e4d03e70aedfe844449ce8d5d799823418e28"
+  },
+  {
+    "path": "D:/codex/fm-performance-floor/docs/orchestration-redesign.md",
+    "sha256": "a07677f78ba759e04397440d35f67374271c520d9d13e0751d65344efb4756e7"
+  },
+  {
+    "path": "D:/codex/fm-performance-floor/docs/engine-cutover-adr.md",
+    "sha256": "b00a8d1936cb847a79dab25ebf964e8e0ef1d45df30b5212905b6b50b680a98e"
+  },
+  {
+    "path": "D:/codex/fm-performance-floor/docs/pre-1.0-roadmap.md",
+    "sha256": "e03597e59ebeabd714fb0fb21b187c93ba333caebbeca1e8ca9f7667dd9e8ec1"
+  },
+  {
+    "path": "D:/codex/fm-performance-floor/docs/pre-1.0-handoff.md",
+    "sha256": "3382a9b930da0fd9e8be5ad3c82f3e60686efa7796abaa504e495a527bd6bb5a"
+  },
+  {
+    "path": "D:/codex/fm-performance-floor/docs/r31-frozen-baseline.md",
+    "sha256": "b3330c9db44ca4cf491f294ecba258b737b30fbddab87323e1fde27dac4c61b2"
+  }
+]

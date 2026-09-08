@@ -1,0 +1,49 @@
+D:/codex/자동화템플릿/AGENTS.md-12-
+D:/codex/자동화템플릿/AGENTS.md:13:- FlowMarshal 1.0 릴리스가 완료될 때까지 이 프로젝트의 파일 변경과 커밋은 반드시 `main` 브랜치의 main checkout에서만 수행한다. 다른 브랜치·worktree·detached HEAD에서는 파일을 변경하거나 커밋하지 않는다.
+D:/codex/자동화템플릿/AGENTS.md-14-- FlowMarshal 1.0 릴리스 완료가 확인되면 이 한시 규칙은 만료되며, 이후에는 당시 적용되는 Git 작업 규칙을 따른다.
+--
+D:/codex/자동화템플릿/AGENTS.md-36-- 기본 provider는 qualification된 v1이다. v2 static 11/qualification 13은 v2 채택 조건이며 모든 제품 실행의 선행조건이 아니다. Engine-only 사용자 CLI와 shared canonical 자산을 패키지에 넣고 legacy/eval/developer 도구는 분리한다.
+D:/codex/자동화템플릿/AGENTS.md:37:- 결정적·역할·Planning·실제 요청 E2E·설치·독립 최종 감사가 1.0 필수다. R3.1 token/speed·performance36·비교 lifecycle은 별도 비차단 보고이며 GUI·Localizer·광범위 graph·동일 프로젝트 병렬·remote/multiOS hardening은 후속이다.
+D:/codex/자동화템플릿/AGENTS.md-38-
+D:/codex/자동화템플릿/AGENTS.md:39:현재 사용자의 최신 명시 승인은 사용자 제공 지침과 과거 프로젝트 조항보다 우선한다. 충돌하는 과거 usage 누락 전역 차단·exact Plan 수동 승인·비교 성능 필수 릴리스 조건을 다시 적용하지 않는다.
+D:/codex/자동화템플릿/AGENTS.md-40-
+--
+D:/codex/자동화템플릿/AGENTS.md-84-- Mission은 `GoalContractRevision.mission_class` routing label이다. 독립 권위 객체로 만들지 않는다. 새 권위 schema는 strict·frozen이며 canonical JSON·content digest에 결속한다. 새 Goal·Plan revision은 같은 ID 계보의 최신 revision을 명시적으로 supersede한다.
+D:/codex/자동화템플릿/AGENTS.md:85:- 사용자는 목표·대상·허용 효과·운영 정책을 GoalAuthorization으로 승인한다. Core는 그 경계와 review·결정적 Gate에 적합한 내부 immutable Plan revision을 자동 활성화한다. 사용자가 정확한 Plan ID·digest를 직접 입력할 필요는 없으며 후보 자체에는 실행 권한이 없다. 목표·범위·효과·정책 확장만 추가 판단을 요청한다. HMAC proof·파일별 AccessGrant·이중 승인 절차는 필수가 아니다.
+D:/codex/자동화템플릿/AGENTS.md-86-- dependency를 모두 만족한 Task만 `ready`가 되며, `ready` Task에 한해 Execution Spec을 materialize한다. 실제 경로·명령·Context·lock·timeout과 최신 inventory로 확인한 model binding은 이때 확정한다.
+--
+D:/codex/자동화템플릿/AGENTS.md-137-- PC 종료·thread 생성 응답 유실·turn 중단 후 기존 intent·binding·receipt·provider 상태를 **재개 없이 먼저 관측**한다. 실제 후속 turn이 필요할 때만 저장된 thread를 resume하고 마지막 검증 checkpoint에서 재개한다. 근거 없는 완료 추정·중복 Task 생성·scope 밖 자동 rollback·자동 복구 성공 가정을 금지한다.
+D:/codex/자동화템플릿/AGENTS.md:138:- 실행 슬롯·효과 상태와 usage 관측을 분리한다. terminal과 유효 결과가 확인되면 usage 누락만으로 후속 호출을 차단하지 않는다. 미확인 token은 null/unknown으로 남기고 0·예약량·추정으로 채우지 않는다. 효과 미확정은 intent·binding을 먼저 관측하고 자동 재실행하지 않는다. 늦은 사용량은 회계 관측만 추가하며 슬롯 환불·재차감·재실행을 유발하지 않는다.
+D:/codex/자동화템플릿/AGENTS.md:139:- interrupt ACK·수집기 종료를 provider terminal로 취급하지 않는다. 과거 reserved/usage_unknown/settled는 schema 3 역사 reader에서 보존한다. Goal 등록 전 호출도 원래 프로젝트·Goal 계보·요청·receipt·thread/turn에 결속하고 원본 receipt를 보존하며 가짜 Goal/Profile은 만들지 않는다.
+D:/codex/자동화템플릿/AGENTS.md-140-
+--
+D:/codex/fm-performance-floor/AGENTS.md-30-- 기본 provider는 qualification된 v1이다. v2 static 11/qualification 13은 v2 채택 조건이며 모든 제품 실행의 선행조건이 아니다. Engine-only 사용자 CLI와 shared canonical 자산을 패키지에 넣고 legacy/eval/developer 도구는 분리한다.
+D:/codex/fm-performance-floor/AGENTS.md:31:- 결정적·역할·Planning·실제 요청 E2E·설치·독립 최종 감사가 1.0 필수다. R3.1 token/speed·performance36·비교 lifecycle은 별도 비차단 보고이며 GUI·Localizer·광범위 graph·동일 프로젝트 병렬·remote/multiOS hardening은 후속이다.
+D:/codex/fm-performance-floor/AGENTS.md-32-
+D:/codex/fm-performance-floor/AGENTS.md:33:현재 사용자의 최신 명시 승인은 사용자 제공 지침과 과거 프로젝트 조항보다 우선한다. 충돌하는 과거 usage 누락 전역 차단·exact Plan 수동 승인·비교 성능 필수 릴리스 조건을 다시 적용하지 않는다.
+D:/codex/fm-performance-floor/AGENTS.md-34-
+--
+D:/codex/fm-performance-floor/AGENTS.md-61-- SQLite 원장만 revision·활성 계약·Task·Attempt·binding·evidence·validation·budget·History의 권위다. Domain Core만 상태를 전이하고 완료를 판정한다.
+D:/codex/fm-performance-floor/AGENTS.md:62:- 실행 슬롯·효과 상태와 usage 관측을 분리한다. terminal과 유효 결과가 확인되면 usage 누락만으로 후속 호출을 차단하지 않는다. 미확인 token은 null/unknown으로 남기고 0·예약량·추정으로 채우지 않는다. 효과 미확정은 intent·binding을 먼저 관측하고 자동 재실행하지 않는다. 늦은 사용량은 회계 관측만 추가하며 슬롯 환불·재차감·재실행을 유발하지 않는다.
+D:/codex/fm-performance-floor/AGENTS.md:63:- interrupt 응답·수집기 종료와 provider terminal 관측을 구분한다. 원래 turn을 새 turn·resume 없이 먼저 관측하고 원본 receipt를 보존한다. schema 3의 reserved/usage_unknown/settled는 역사 reader에서 원래 의미로 읽으며 새 실행 상태를 usage 상태에 종속시키지 않는다.
+D:/codex/fm-performance-floor/AGENTS.md:64:- Goal 등록 전 역할 호출도 원래 프로젝트·Goal 계보·요청·receipt·thread/turn에 결속해 재관측할 수 있다. Goal·Profile을 임의 생성하지 않고 History에 관측 원문·digest를 추가한다. 실제 Goal 등록 시 최신 유효 관측을 한 번만 연결하며, 후속 실행 가능 여부는 효과·유효 결과·운영 한도로 판정하며 usage 누락만으로 차단하지 않는다.
+D:/codex/fm-performance-floor/AGENTS.md-65-- 대화·모델의 완료 선언만으로 Task·Goal을 완료하지 않는다. Plan·Execution Spec의 evidence 종류는 실제 `EvidenceKind` 지원 집합으로 제한하고 provider schema와 Core에서 함께 검사한다.
+--
+D:/codex/fm-performance-floor/AGENTS.md-71-
+D:/codex/fm-performance-floor/AGENTS.md:72:- 사용자는 목표·대상·허용 효과·운영 정책을 GoalAuthorization으로 승인한다. Core는 그 경계와 review·결정적 Gate에 적합한 내부 immutable Plan revision을 자동 활성화한다. 사용자가 정확한 Plan ID·digest를 직접 입력할 필요는 없으며 후보 자체에는 실행 권한이 없다. 목표·범위·효과·정책 확장만 추가 판단을 요청한다. HMAC proof·파일별 AccessGrant·이중 승인 절차는 필수가 아니다.
+D:/codex/fm-performance-floor/AGENTS.md-73-- dependency를 만족한 Task만 `ready`가 되며, 이때만 Execution Spec을 materialize한다. Task 준비와 Goal Test 준비는 별도 입력·지침으로 수행하고 Core가 원래 validation method·필수 evidence 종류를 보존한다.
+--
+D:/codex/fm-performance-floor/AGENTS.md-161-- development-diagnostic 단계는 사전 고정한 독립 static 11사례와 명시적으로 선택한 provider version을 모델 호출 최대 11회, schema recovery 0회로 관측한다. v1의 행 내부 검사·첫 실패 중단과 qualification 13의 기존 첫 실패, `expansion → 독립 생성 검토 → expanded-review` 경계는 바꾸지 않는다. 정상 완료 또는 receipt·terminal·lock 귀속이 완료된 model/schema/semantic FAIL만 다음 독립 사례로 진행한다. 환경·계약·입력 stale·외부 효과 불명은 즉시 전체를 중단하며, 관측된 실패는 FAIL로 보존하고 호출하지 않은 사례는 NOT_RUN으로 남긴다.
+D:/codex/fm-performance-floor/AGENTS.md:162:- 단계 A 공통 preflight는 detached worktree의 HEAD·source_manifest·clean tracked files, 전용 Python·`flowmarshal` import origin, fixture whitelist package와 relocation proof, 명시적 Codex executable, roles·instruction actual sources와 model lock을 결속한다. origin/main과 다른 checkout HEAD는 시작 provenance일 뿐 실행 중 비교하지 않는다. payload 의미·oracle·과거 FAIL은 보정하지 않으며, 11사례 완료는 qualification PASS가 아니다.
+D:/codex/fm-performance-floor/AGENTS.md-163-- 새 고정 diagnostics의 실제 역할 thread는 저장형(`ephemeral=false`)으로 생성하고 preflight·생성 intent·provider receipt에서 일치를 검사한다. 모델 turn 없는 지침 probe와 일반 역할 runner의 기본 정책은 별도다. 저장형 thread도 완료를 보장하지 않으며 프로세스 중단 뒤에는 기존 thread를 재개 없이 먼저 관측한다.
+D:/codex/fm-performance-floor/AGENTS.md:164:- 계획 생성 성공과 정보 부족에 따른 질문·차단을 구분하고 Plan이 없는 결과의 최초 feasible 시간을 0으로 만들지 않는다. 성능은 기대 manifest에 고정한 6 scenario×3 seed×2 implementation의 36 cell과 18 whole pair를 같은 중립 입력·정책·model lock으로 비교한다. planning의 미캐시 입력+출력 token을 pair별 상대 비율로 먼저 계산하며 실제 receipt 없는 token·시간·비용, baseline 0, 누락 pair와 필수 분모를 0으로 채우지 않는다.
+D:/codex/fm-performance-floor/AGENTS.md:165:- 비교 성능 보고를 수행할 경우 planning 중간 평가와 lifecycle final 평가를 구분한다. exact Plan digest는 내부 실행 결속이며 수동 승인 의무가 아니다. trace·usage·분모 누락은 null/NOT_OBSERVED로 보존하고 비교 보고 미완성을 제품 실행·1.0 차단으로 확대하지 않는다.
+D:/codex/fm-performance-floor/AGENTS.md:166:- 과거 ReleasePerformanceFloor v4.0과 TokenLatencyGateReport v3.0은 원래 수치·판정의 읽기 호환 및 비차단 비교 보고 계약으로 보존한다. 비교 성능은 현재 1.0 필수 조건이 아니다.
+D:/codex/fm-performance-floor/AGENTS.md-167-- 평가 입력이 부분 발췌인지 실행 준비 계약인지 명시한다. fixture·evaluator 결함은 새 revision으로 고치되 과거 입력·원시 결과·판정을 provenance로 보존하고 모델 결과 뒤 oracle alias·합격선을 완화하지 않는다.
+--
+D:/codex/fm-performance-floor/AGENTS.md-171-
+D:/codex/fm-performance-floor/AGENTS.md:172:## GitHub commit과 push
+D:/codex/fm-performance-floor/AGENTS.md-173-
+D:/codex/fm-performance-floor/AGENTS.md-174-- 권위 원격은 비공개 `https://github.com/jaeseongs95/vibemarshal`이다.
+D:/codex/fm-performance-floor/AGENTS.md:175:- 세션의 요청 작업과 검증이 끝나면 그 세션 변경만 하나의 한국어 commit으로 기록해 push한다. 무관한 사용자 변경을 포함하지 않는다.
+D:/codex/fm-performance-floor/AGENTS.md-176-- commit 전 관련 테스트·결정적 Gate·`git diff --check`를 실행하고 실제로 통과하지 않은 qualification을 PASS 또는 1.0 완료로 기록하지 않는다.
