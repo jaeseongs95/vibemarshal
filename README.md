@@ -51,9 +51,10 @@ R3.1은 동결된 prototype 감사 기준선이다. [최종 동결 판정](docs/
 
 ## 기존 개발 CLI（schema 3）
 
-아래는 재설계 전 명령 표면이다. 새 EngineApplication 명령과 패키지 전환은 planned이며 [현재 인계](docs/pre-1.0-handoff.md)의 후속 구현·검증을 거친다. 역사적 adjust-unknown은 새 usage 누락 해소 절차로 사용하지 않는다.
+첫 줄은 통합된 EngineApplication 사용자 명령이고, 아래 중첩 명령은 기존 세부 조회·진단 표면이다. 패키지 전환은 [현재 인계](docs/pre-1.0-handoff.md)의 후속 구현·검증을 거친다. 역사적 adjust-unknown은 새 usage 누락 해소 절차로 사용하지 않는다.
 
 ```text
+flowmarshal-engine prepare|authorize|run-once|observe|pause|cancel|status|final-report
 flowmarshal-engine project init|show
 flowmarshal-engine project source add|list
 flowmarshal-engine project budget set|show|observe-role|adjust-unknown
@@ -67,6 +68,8 @@ flowmarshal-engine validate task|goal|observe
 flowmarshal-engine recover inspect|resume|abandon
 flowmarshal-engine report progress|final
 ```
+
+일반 사용자는 위 첫 줄의 facade를 사용한다. raw request부터 승인·실행·관측·최종 보고까지의 예시는 [Engine 사용자 workflow](docs/engine-user-workflow.md)에 있다. 나머지 명령은 세부 조회·진단·수동 검증 경계다.
 
 `goal create --live`, `plan search --live`, `run once` 전에 `project budget set --policy-file config/pre-1.0-validation-budget.json`으로 검증 예산을 등록한다. 이 파일은 Goal당 1,000,000 token, 호출당 100,000 token 예약, 재계획 reserve 25%의 시작값이다. 최적값이나 구독 한도 환산값이 아니다. 역할별 timeout은 전역 `--role-timeout-policy config/pre-1.0-role-timeouts.json`으로 결속한다.
 

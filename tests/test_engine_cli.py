@@ -41,6 +41,38 @@ class EngineCliTests(unittest.TestCase):
         help_text = parser.format_help()
         for command in ("project", "goal", "plan", "task", "run", "attempt", "validate", "recover", "report"):
             self.assertIn(command, help_text)
+        for command in (
+            "prepare",
+            "authorize",
+            "run-once",
+            "observe",
+            "pause",
+            "cancel",
+            "status",
+            "final-report",
+        ):
+            self.assertIn(command, help_text)
+
+    def test_user_facade_commands_parse_without_internal_plan_identifiers(self) -> None:
+        parser = build_parser()
+        prepared = parser.parse_args(
+            [
+                "prepare",
+                "--project-id",
+                "project_" + "a" * 32,
+                "--request",
+                "요청을 검증 가능한 workflow로 실행한다.",
+                "--role-config",
+                "roles.json",
+            ]
+        )
+        authorized = parser.parse_args(
+            ["authorize", "--project-id", "project_" + "a" * 32]
+        )
+        self.assertEqual("prepare", prepared.command)
+        self.assertEqual("authorize", authorized.command)
+        self.assertFalse(hasattr(authorized, "plan_revision_id"))
+        self.assertFalse(hasattr(authorized, "digest"))
 
     def test_project_goal_and_planning_context_roundtrip(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

@@ -10,7 +10,12 @@ from .domain import (
     RecoveryAssessment,
 )
 from .application import summarize_usage_records
-from .read_models import HistoryCursor, ReadPresentation, UsageSummary
+from .read_models import (
+    HistoryCursor,
+    ReadOnlyReportVerification,
+    ReadPresentation,
+    UsageSummary,
+)
 
 
 def render_plan_review(
@@ -69,6 +74,7 @@ def render_final(
     verdict: GoalVerdict,
     usage: tuple[BudgetUsageRecord, ...],
     usage_summary: UsageSummary | None = None,
+    read_only_verification: ReadOnlyReportVerification | None = None,
 ) -> str:
     if usage_summary is None:
         usage_summary = summarize_usage_records(
@@ -102,9 +108,38 @@ def render_final(
         f"- 입력 캐시 비율: {'미확인' if cache_ratio is None else f'{cache_ratio:.2%}'}",
         f"- 누적 지연: {display(total_latency)} ms",
         "",
-        "## 단계별 소계 집계 호출",
+        "## Hard AC 판정과 근거",
         "",
     ]
+    criterion_by_id = {item.criterion_id: item for item in verdict.criteria}
+    for criterion in goal.definition.hard_acceptance:
+        result = criterion_by_id.get(criterion.criterion_id)
+        if result is None:
+            lines.append(f"- `{criterion.criterion_id}` 미보고 — {criterion.statement}")
+            continue
+        evidence = ", ".join(f"`{item}`" for item in result.evidence_ids) or "없음"
+        lines.append(
+            f"- `{criterion.criterion_id}` `{result.status.value}` — {criterion.statement} "
+            f"(evidence: {evidence}; {result.rationale})"
+        )
+    if read_only_verification is not None:
+        lines.extend(
+            (
+                "",
+                "## read_only 검증",
+                "",
+                f"- 전체 AC 포함: {'PASS' if read_only_verification.criteria_complete else 'FAIL'}",
+                f"- evidence 결속: {'PASS' if read_only_verification.evidence_grounded else 'FAIL'}",
+                f"- 프로젝트 source 무변경: {'PASS' if read_only_verification.source_unchanged else 'FAIL'}",
+                f"- 기준/현재 source digest: `{read_only_verification.baseline_project_map_semantic_digest}` / "
+                f"`{read_only_verification.observed_project_map_semantic_digest}`",
+            )
+        )
+    lines.extend([
+        "",
+        "## 단계별 소계 집계 호출",
+        "",
+    ])
     lines.extend(f"- {item.value}: {item.logical_call_count}회" for item in usage_summary.by_stage)
     if usage_summary.incomplete_reasons:
         lines.extend(("", "## 미확인 사용량", ""))

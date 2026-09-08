@@ -197,6 +197,20 @@ class UsageSummary(ReadPresentation):
     provider_receipt_usage: tuple[ProviderReceiptUsage, ...] = ()
 
 
+class ReadOnlyReportVerification(EngineModel):
+    """read_only 응답의 AC/evidence 완전성과 source 불변성을 분리한 검사 결과."""
+
+    required_criterion_ids: tuple[str, ...]
+    reported_criterion_ids: tuple[str, ...]
+    evidence_ids: tuple[str, ...]
+    missing_evidence_ids: tuple[str, ...] = ()
+    criteria_complete: bool
+    evidence_grounded: bool
+    source_unchanged: bool
+    baseline_project_map_semantic_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    observed_project_map_semantic_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+
+
 class FinalReport(ReadPresentation):
     project_id: str = Field(min_length=1, max_length=500)
     goal: GoalContractRevision
@@ -204,6 +218,7 @@ class FinalReport(ReadPresentation):
     verdict: GoalVerdict
     usage: UsageSummary
     ledger_history_valid: bool
+    read_only_verification: ReadOnlyReportVerification | None = None
 
 
 class IntentDetail(EngineModel):

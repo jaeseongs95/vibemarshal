@@ -1679,6 +1679,24 @@ class RuntimeJobSupervisor:
             job_id, kind=RuntimeJobObservationKind.COLLECTOR_LOST, payload={"reason": reason})
         return self.service.load_runtime_job(job_id)
 
+    def request_interrupt(self, job_id: str) -> RuntimeJob:
+        """pause/cancel facade가 쓰는 bounded interrupt 요청 경계."""
+
+        job = self.service.load_runtime_job(job_id)
+        if job.status not in {
+            RuntimeJobStatus.PROVIDER_TERMINAL,
+            RuntimeJobStatus.CONSUMED,
+            RuntimeJobStatus.CANCELLED,
+        }:
+            self._request_bounded_interrupt(job)
+        return self.service.load_runtime_job(job_id)
+
+    def cancel(self, job_id: str, *, reason: str) -> RuntimeJob:
+        """중단 요청을 먼저 남긴 뒤 Core job을 cancelled로 표시한다."""
+
+        self.request_interrupt(job_id)
+        return self.service.cancel_runtime_job(job_id, reason=reason)
+
     def close(self) -> None:
         """SDK close를 bounded 실행하고 미관측 active job은 collector_lost로 남긴다."""
         for job_id, worker in tuple(self._workers.items()):

@@ -1,13 +1,10 @@
-"""명령 경계에서 쓰는 Engine 원장 조회 facade.
-
-이 모듈은 ``EngineService``의 상태 전이 API를 호출하지 않는다. 모든 결과는
-Core 원장에 이미 기록된 사실을 사용자에게 표시하기 위한 read model이다.
-"""
+"""일반 사용자 workflow와 원장 조회를 연결하는 Engine application facade."""
 from __future__ import annotations
 
 import json
 from collections import defaultdict
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any
 
 from ..canonical import canonical_json, sha256_digest
@@ -15,14 +12,32 @@ from .domain import (
     AttemptRecord,
     BudgetStage,
     BudgetUsageRecord,
+    ContextSourceRegistrationKind,
+    EngineModel,
+    GoalAuthorization,
     GoalContractRevision,
+    GoalOperatingPolicy,
     GoalVerdict,
+    ExecutionSpecProposal,
+    ModelAssignmentContract,
+    ModelFallback,
+    MutationPolicy,
     PlanContractRevision,
     RecoveryAssessment,
+    RevisionStatus,
+    RoleAssignmentPolicy,
+    RunOnceAction,
+    RunOnceResult,
+    RuntimeJob,
+    RuntimeJobStatus,
     RuntimeIntentRecord,
     RuntimeReceipt,
+    ValidationExecutionStep,
+    new_id,
 )
-from .models import ModelInventory
+from .models import EngineRoleConfiguration, ModelInventory
+from .goal import GoalPreparationOutcome
+from .planning import PlanningSearchOutcome
 from .read_models import (
     AttemptDetail,
     DuplicateLogicalCall,
@@ -35,6 +50,7 @@ from .read_models import (
     ProviderCallExpectation,
     ProviderReceiptUsage,
     ReadPresentation,
+    ReadOnlyReportVerification,
     RecoveryStatus,
     TaskValidationRecovery,
     UsageBreakdown,
@@ -43,8 +59,31 @@ from .read_models import (
     UsageReconciliationPointer,
     UsageSummary,
 )
-from .roles import RoleCallReceipt, RoleCallRequest, strict_json_output_schema
+from .roles import (
+    CodexStructuredRoleRunner,
+    RoleCallReceipt,
+    RoleCallRequest,
+    StructuredRolePort,
+    strict_json_output_schema,
+)
 from .service import EngineService
+from .validation_execution import GoalValidationRetryRequest
+
+
+class EnginePreparationResult(EngineModel):
+    """실제 정규화·독립 review·Planning을 거친 승인 전 결과."""
+
+    status: str
+    project_id: str
+    goal_preparation: GoalPreparationOutcome
+    planning: PlanningSearchOutcome | None = None
+    planning_search_id: str | None = None
+
+
+class EngineAuthorizationResult(EngineModel):
+    project_id: str
+    authorization: GoalAuthorization
+    activation_id: str
 
 
 class EngineApplicationError(RuntimeError):
@@ -548,10 +587,358 @@ def _provider_receipt_projection(
 
 
 class EngineApplication:
-    """Core 상태를 바꾸지 않는 typed read facade."""
+    """준비부터 최종 보고까지 Core 권위를 유지하는 단일 facade."""
 
-    def __init__(self, service: EngineService) -> None:
+    def __init__(
+        self,
+        service: EngineService,
+        *,
+        runtime: Any | None = None,
+        role_configuration: EngineRoleConfiguration | None = None,
+        structured_runner: StructuredRolePort | None = None,
+        supervisor: Any | None = None,
+        inspection_contract: str = "plan-inspection-v1",
+    ) -> None:
         self.service = service
+        self.runtime = runtime
+        self.role_configuration = role_configuration
+        self.inspection_contract = inspection_contract
+        self._structured_runner = structured_runner
+        if supervisor is not None:
+            self.supervisor = supervisor
+        elif runtime is not None:
+            from .runtime import RuntimeJobSupervisor
+
+            self.supervisor = RuntimeJobSupervisor(service, runtime)
+        else:
+            self.supervisor = None
+
+    def _execution_components(self) -> tuple[Any, EngineRoleConfiguration, StructuredRolePort]:
+        if self.runtime is None:
+            raise EngineApplicationError("RUNTIME_REQUIRED")
+        if self.role_configuration is None:
+            raise EngineApplicationError("ROLE_CONFIGURATION_REQUIRED")
+        runner = self._structured_runner
+        if runner is None:
+            runner = CodexStructuredRoleRunner(
+                self.runtime,
+                max_schema_recovery_attempts=0,
+                ephemeral_threads=False,
+            )
+            self._structured_runner = runner
+        return self.runtime, self.role_configuration, runner
+
+    @staticmethod
+    def _assignment(binding: Any, *, role: str) -> RoleAssignmentPolicy:
+        return RoleAssignmentPolicy(
+            role=role,
+            preferred_model=binding.model,
+            preferred_effort=binding.effort,
+            allowed_fallbacks=tuple(
+                ModelFallback(model=item.model, effort=item.effort)
+                for item in binding.allowed_fallbacks
+            ),
+        )
+
+    def prepare(
+        self,
+        project_id: str,
+        *,
+        source_request: str,
+        candidate_count: int | None = None,
+    ) -> EnginePreparationResult:
+        """raw request를 실제 Goal 역할과 Planning 역할로 준비해 승인 후보를 만든다."""
+
+        if not source_request.strip():
+            raise EngineApplicationError("SOURCE_REQUEST_REQUIRED")
+        runtime, roles, base_runner = self._execution_components()
+        inventory = runtime.list_models()
+        roles.validate_inventory(inventory)
+        profile = self.service.load_active_profile(project_id)
+        goal_id = new_id("goal")
+
+        from .budget import BudgetManager, BudgetedRoleRunner
+        from .goal import GoalNormalizerAdapter, GoalPreparationPipeline, GoalReviewerAdapter
+
+        goal_runner = BudgetedRoleRunner(
+            base_runner,
+            self.service,
+            project_id=project_id,
+            goal_id=goal_id,
+        )
+        root = Path(self.service.status(project_id)["project"]["root"])
+        goal_preparation = GoalPreparationPipeline(
+            GoalNormalizerAdapter(
+                goal_runner,
+                model=roles.normalizer.model,
+                effort=roles.normalizer.effort,
+                inventory_digest=inventory.inventory_digest,
+                inventory=inventory,
+                allowed_fallbacks=roles.normalizer.allowed_fallbacks,
+                cwd=root,
+            ),
+            GoalReviewerAdapter(
+                goal_runner,
+                model=roles.critical_reviewer.model,
+                effort=roles.critical_reviewer.effort,
+                inventory_digest=inventory.inventory_digest,
+                inventory=inventory,
+                allowed_fallbacks=roles.critical_reviewer.allowed_fallbacks,
+                cwd=root,
+            ),
+        ).prepare(
+            project_id=project_id,
+            goal_id=goal_id,
+            profile=profile,
+            source_request=source_request,
+            observed_facts=self.service.observe_goal_inputs(project_id, source_request),
+        )
+        goal = goal_preparation.goal_contract
+        self.service.register_goal(goal, activate=goal.status is RevisionStatus.READY)
+        BudgetManager(self.service).attach_goal(project_id, goal_id, goal.definition_digest)
+        if goal.status is not RevisionStatus.READY:
+            return EnginePreparationResult(
+                status="needs_user_input",
+                project_id=project_id,
+                goal_preparation=goal_preparation,
+            )
+
+        active_goal = self.service.load_active_goal(project_id)
+        project_map, state = self.service.reobserve_project(project_id)
+        planning_runner = BudgetedRoleRunner(
+            base_runner,
+            self.service,
+            project_id=project_id,
+            goal_id=goal_id,
+            goal_digest=goal.definition_digest,
+        )
+        assignment = ModelAssignmentContract(
+            executor=self._assignment(roles.executor, role="executor"),
+            validator=self._assignment(roles.validator, role="validator"),
+            independence_required=True,
+        )
+
+        from .models import AssignmentResolver
+        from .plan_inspection_provider import PLAN_INSPECTION_PROVIDER_V2
+        from .planner_roles import (
+            PlanExpanderAdapter,
+            PlanReviewerAdapter,
+            RuleBasedTaskAssigner,
+            SkeletonGeneratorAdapter,
+            SkeletonReviewerAdapter,
+        )
+        from .planning import PlanningRecoveryPolicy, SkeletonFirstPlanner
+
+        AssignmentResolver().resolve_contract(assignment, inventory)
+        assigner = RuleBasedTaskAssigner(assignment, assignment, assignment)
+        common = {
+            "inventory_digest": inventory.inventory_digest,
+            "inventory": inventory,
+            "cwd": root,
+        }
+        planning = SkeletonFirstPlanner(
+            SkeletonGeneratorAdapter(
+                planning_runner,
+                model=roles.skeleton_generator.model,
+                effort=roles.skeleton_generator.effort,
+                allowed_fallbacks=roles.skeleton_generator.allowed_fallbacks,
+                **common,
+            ),
+            SkeletonReviewerAdapter(
+                planning_runner,
+                model=roles.general_reviewer.model,
+                effort=roles.general_reviewer.effort,
+                allowed_fallbacks=roles.general_reviewer.allowed_fallbacks,
+                **common,
+            ),
+            PlanExpanderAdapter(
+                planning_runner,
+                assigner,
+                model=roles.plan_expander.model,
+                effort=roles.plan_expander.effort,
+                allowed_fallbacks=roles.plan_expander.allowed_fallbacks,
+                inspection_provider_contract=self.inspection_contract,
+                **common,
+            ),
+            PlanReviewerAdapter(
+                planning_runner,
+                model=roles.general_reviewer.model,
+                effort=roles.general_reviewer.effort,
+                allowed_fallbacks=roles.general_reviewer.allowed_fallbacks,
+                critical_model=roles.critical_reviewer.model,
+                critical_effort=roles.critical_reviewer.effort,
+                critical_allowed_fallbacks=roles.critical_reviewer.allowed_fallbacks,
+                inspection_provider_contract=self.inspection_contract,
+                **common,
+            ),
+        ).search(
+            goal=active_goal,
+            state=state,
+            project_map=project_map,
+            candidate_count=candidate_count,
+            recovery_policy=(
+                PlanningRecoveryPolicy()
+                if self.inspection_contract == PLAN_INSPECTION_PROVIDER_V2
+                else None
+            ),
+        )
+        for evaluation in planning.skeleton_evaluations:
+            self.service.record_skeleton_evaluation(evaluation)
+        for evaluation in planning.plan_evaluations:
+            self.service.register_plan_evaluation(evaluation)
+        search_id = self.service.record_planning_search(planning)
+        return EnginePreparationResult(
+            status=(
+                "ready_for_authorization"
+                if planning.selected_activation_digest is not None
+                else "planning_blocked"
+            ),
+            project_id=project_id,
+            goal_preparation=goal_preparation,
+            planning=planning,
+            planning_search_id=search_id,
+        )
+
+    def authorize(
+        self,
+        project_id: str,
+        *,
+        source: str,
+        operating_policy: GoalOperatingPolicy | None = None,
+    ) -> EngineAuthorizationResult:
+        """사용자 승인 경계를 기록하고 Core 선택 Plan을 자동 활성화한다."""
+
+        authorization = self.service.authorize_goal(
+            project_id=project_id,
+            source=source,
+            operating_policy=operating_policy,
+        )
+        activation_id = self.service.activate_selected_plan(project_id=project_id)
+        return EngineAuthorizationResult(
+            project_id=project_id,
+            authorization=authorization,
+            activation_id=activation_id,
+        )
+
+    def _dispatcher(self):
+        if self.runtime is None:
+            raise EngineApplicationError("RUNTIME_REQUIRED")
+        from .runtime import EngineDispatcher
+
+        provider = None
+        if self.role_configuration is not None:
+            _runtime, roles, runner = self._execution_components()
+            from .execution import ExecutionProposalAdapter
+
+            provider = ExecutionProposalAdapter(self.service, runner, roles)
+        return EngineDispatcher(
+            self.service,
+            self.runtime,
+            proposal_provider=provider,
+            supervisor=self.supervisor,
+        )
+
+    def run_once(
+        self,
+        project_id: str,
+        *,
+        resume: bool = False,
+        proposal: ExecutionSpecProposal | None = None,
+        goal_validation_step: ValidationExecutionStep | None = None,
+        goal_validation_retry: GoalValidationRetryRequest | None = None,
+    ) -> RunOnceResult:
+        """한 scheduler tick만 수행하며 중복 호출은 Core checkpoint로 수렴한다."""
+
+        control = self.service.workflow_control_state(project_id)
+        if control == "cancelled":
+            return RunOnceResult(
+                action=RunOnceAction.BLOCKED,
+                project_id=project_id,
+                blocker_code="WORKFLOW_CANCELLED",
+                detail="현재 Goal workflow가 사용자 요청으로 취소됐습니다.",
+            )
+        if control == "paused":
+            if not resume:
+                return RunOnceResult(
+                    action=RunOnceAction.BLOCKED,
+                    project_id=project_id,
+                    blocker_code="WORKFLOW_PAUSED",
+                    detail="현재 Goal workflow가 일시정지됐습니다. 명시적으로 resume하십시오.",
+                )
+            self.service.set_workflow_control(
+                project_id,
+                state="running",
+                reason="명시적 run_once resume",
+            )
+        return self._dispatcher().run_once(
+            project_id,
+            proposal=proposal,
+            goal_validation_step=goal_validation_step,
+            goal_validation_retry=goal_validation_retry,
+        )
+
+    def observe(self, project_id: str) -> dict[str, Any]:
+        """active job을 최대 한 번 관측하되 Core 완료 판정을 대신하지 않는다."""
+
+        if self.supervisor is None:
+            raise EngineApplicationError("RUNTIME_REQUIRED")
+        job = self.service.active_runtime_job(project_id)
+        if job is not None:
+            if job.status is RuntimeJobStatus.COLLECTOR_LOST and job.thread_id is not None:
+                job = self.supervisor.reattach(job.job_id)
+            else:
+                job = self.supervisor.tick(job.job_id)
+        return {
+            "project_id": project_id,
+            "runtime_job": None if job is None else job.model_dump(mode="json"),
+            "status": self.status(project_id),
+        }
+
+    def pause(self, project_id: str, *, reason: str = "사용자 요청") -> dict[str, Any]:
+        """현재 Goal의 후속 tick을 멈추고 active provider job에는 bounded interrupt를 요청한다."""
+
+        job = self.service.active_runtime_job(project_id)
+        if job is not None and self.supervisor is None:
+            raise EngineApplicationError("RUNTIME_REQUIRED")
+        state = self.service.set_workflow_control(project_id, state="paused", reason=reason)
+        if job is not None:
+            job = self.supervisor.request_interrupt(job.job_id)
+        return {
+            "project_id": project_id,
+            "control_state": state,
+            "runtime_job": None if job is None else job.model_dump(mode="json"),
+        }
+
+    def cancel(self, project_id: str, *, reason: str = "사용자 요청") -> dict[str, Any]:
+        """현재 Goal을 취소하고 active job을 취소하되 terminal 관측을 발명하지 않는다."""
+
+        job = self.service.active_runtime_job(project_id)
+        if job is not None and self.supervisor is None:
+            raise EngineApplicationError("RUNTIME_REQUIRED")
+        state = self.service.set_workflow_control(project_id, state="cancelled", reason=reason)
+        if job is not None:
+            job = self.supervisor.cancel(job.job_id, reason=reason)
+        return {
+            "project_id": project_id,
+            "control_state": state,
+            "runtime_job": None if job is None else job.model_dump(mode="json"),
+        }
+
+    def status(self, project_id: str) -> dict[str, Any]:
+        """Core snapshot과 facade 제어/job 상태를 한 응답으로 표시한다."""
+
+        snapshot = self.service.status(project_id)
+        counts: dict[str, int] = {}
+        for task in snapshot["tasks"]:
+            counts[task["status"]] = counts.get(task["status"], 0) + 1
+        active_job = self.service.active_runtime_job(project_id)
+        return snapshot | {
+            "control_state": self.service.workflow_control_state(project_id),
+            "active_runtime_job": (
+                None if active_job is None else active_job.model_dump(mode="json")
+            ),
+            "task_status_counts": counts,
+        }
 
     def _project_row(self, project_id: str):
         with self.service.ledger.read() as connection:
@@ -757,11 +1144,113 @@ class EngineApplication:
              EntityRef(entity_type="goal_revision", entity_id=goal.goal_revision_id,
                        revision_no=goal.revision_no, digest=goal.definition_digest)),
         )
+        read_only_verification = (
+            self._read_only_report_verification(project_id, goal=goal, plan=plan, verdict=verdict)
+            if goal.definition.effect_policy.mutation_policy is MutationPolicy.READ_ONLY
+            else None
+        )
         return FinalReport(
             project_id=project_id, goal=goal, plan=plan, verdict=verdict, usage=usage,
             ledger_history_valid=self.service.ledger.verify_history(project_id),
             entity_refs=presentation.entity_refs, history_cursor=presentation.history_cursor,
-            error_code=usage.error_code, next_action=usage.next_action,
+            read_only_verification=read_only_verification,
+            error_code=(
+                "READ_ONLY_REPORT_VERIFICATION_FAILED"
+                if read_only_verification is not None and not (
+                    read_only_verification.criteria_complete
+                    and read_only_verification.evidence_grounded
+                    and read_only_verification.source_unchanged
+                )
+                else usage.error_code
+            ),
+            next_action=(
+                "read_only 응답의 AC/evidence 또는 source 불변성 검사를 확인하십시오."
+                if read_only_verification is not None and not (
+                    read_only_verification.criteria_complete
+                    and read_only_verification.evidence_grounded
+                    and read_only_verification.source_unchanged
+                )
+                else usage.next_action
+            ),
+        )
+
+    def _read_only_report_verification(
+        self,
+        project_id: str,
+        *,
+        goal: GoalContractRevision,
+        plan: PlanContractRevision,
+        verdict: GoalVerdict,
+    ) -> ReadOnlyReportVerification:
+        from .context import ProjectMapper
+
+        with self.service.ledger.read() as connection:
+            baseline_row = connection.execute(
+                "SELECT payload_json FROM project_map_revisions "
+                "WHERE project_id=? AND revision_digest=?",
+                (project_id, plan.definition.project_map_digest),
+            ).fetchone()
+            project = connection.execute(
+                "SELECT root FROM projects WHERE id=?", (project_id,)
+            ).fetchone()
+        if baseline_row is None or project is None:
+            raise EngineApplicationError("READ_ONLY_BASELINE_NOT_FOUND")
+        from .domain import ProjectMapRevision
+
+        baseline = ProjectMapRevision.model_validate_json(baseline_row["payload_json"])
+        sources = self.service.list_context_sources(project_id)
+        observed = ProjectMapper().build(
+            project_id=project_id,
+            root=project["root"],
+            revision_no=baseline.revision_no + 1,
+            registered_references=(
+                item.path
+                for item in sources
+                if item.kind is ContextSourceRegistrationKind.REFERENCE
+            ),
+            instruction_sources=(
+                item.path
+                for item in sources
+                if item.kind is ContextSourceRegistrationKind.INSTRUCTION
+            ),
+            excluded_paths=(self.service.ledger.artifact_root.resolve(),),
+        )
+        required = tuple(item.criterion_id for item in goal.definition.hard_acceptance)
+        reported = tuple(item.criterion_id for item in verdict.criteria)
+        evidence_ids = tuple(sorted({
+            evidence_id
+            for criterion in verdict.criteria
+            for evidence_id in criterion.evidence_ids
+        }))
+        with self.service.ledger.read() as connection:
+            if evidence_ids:
+                placeholders = ",".join("?" for _ in evidence_ids)
+                rows = connection.execute(
+                    f"SELECT id FROM evidence_records WHERE project_id=? "
+                    f"AND id IN ({placeholders})",
+                    (project_id, *evidence_ids),
+                ).fetchall()
+            else:
+                rows = ()
+        found = {row["id"] for row in rows}
+        missing = tuple(item for item in evidence_ids if item not in found)
+        terminal_without_evidence = any(
+            criterion.status.value in {"pass", "fail"} and not criterion.evidence_ids
+            for criterion in verdict.criteria
+        )
+        return ReadOnlyReportVerification(
+            required_criterion_ids=required,
+            reported_criterion_ids=reported,
+            evidence_ids=evidence_ids,
+            missing_evidence_ids=missing,
+            criteria_complete=(
+                len(reported) == len(set(reported))
+                and set(reported) == set(required)
+            ),
+            evidence_grounded=not missing and not terminal_without_evidence,
+            source_unchanged=observed.semantic_digest == baseline.semantic_digest,
+            baseline_project_map_semantic_digest=baseline.semantic_digest,
+            observed_project_map_semantic_digest=observed.semantic_digest,
         )
 
     def attempt_detail(self, attempt_id: str) -> AttemptDetail:

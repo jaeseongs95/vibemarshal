@@ -1559,6 +1559,109 @@ class EngineService:
             tx.history(row["project_id"], "runtime_job.consumed", "runtime_job", job_id, payload)
             return None if row["result_json"] is None else json.loads(row["result_json"])
 
+    def cancel_runtime_job(self, job_id: str, *, reason: str) -> RuntimeJob:
+        """job을 취소하되 interrupt receipt를 provider terminal로 승격하지 않는다."""
+
+        if not reason.strip():
+            raise EngineServiceError("runtime job 취소 이유가 필요합니다.")
+        with self.ledger.transaction() as tx:
+            row = tx.one("SELECT * FROM runtime_jobs WHERE id = ?", (job_id,))
+            if row["status"] in {
+                RuntimeJobStatus.PROVIDER_TERMINAL.value,
+                RuntimeJobStatus.CONSUMED.value,
+                RuntimeJobStatus.CANCELLED.value,
+            }:
+                return self._runtime_job_from_row(row)
+            payload = {"reason": reason, "prior_status": row["status"]}
+            tx.connection.execute(
+                "UPDATE runtime_jobs SET status='cancelled',ended_at=?,updated_at=? WHERE id=?",
+                (tx.now, tx.now, job_id),
+            )
+            self._append_runtime_job_observation(
+                tx,
+                job_id=job_id,
+                project_id=row["project_id"],
+                kind=RuntimeJobObservationKind.CANCELLED,
+                payload=payload,
+            )
+            tx.history(
+                row["project_id"],
+                "runtime_job.cancelled",
+                "runtime_job",
+                job_id,
+                payload,
+            )
+            return self._runtime_job_from_row(
+                tx.one("SELECT * FROM runtime_jobs WHERE id=?", (job_id,))
+            )
+
+    def workflow_control_state(self, project_id: str) -> str:
+        """현재 active Goal revision에 결속된 facade 제어 상태를 읽는다."""
+
+        with self.ledger.read() as connection:
+            project = connection.execute(
+                "SELECT active_goal_revision_id FROM projects WHERE id=?", (project_id,)
+            ).fetchone()
+            if project is None:
+                raise EngineServiceError("PROJECT_NOT_FOUND")
+            goal_revision_id = project["active_goal_revision_id"]
+            if goal_revision_id is None:
+                return "running"
+            rows = connection.execute(
+                "SELECT event_type,payload_json FROM history_events "
+                "WHERE project_id=? AND event_type IN "
+                "('workflow.paused','workflow.resumed','workflow.cancelled') "
+                "ORDER BY sequence DESC",
+                (project_id,),
+            ).fetchall()
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            if payload.get("goal_revision_id") != goal_revision_id:
+                continue
+            return {
+                "workflow.paused": "paused",
+                "workflow.resumed": "running",
+                "workflow.cancelled": "cancelled",
+            }[row["event_type"]]
+        return "running"
+
+    def set_workflow_control(
+        self, project_id: str, *, state: str, reason: str,
+    ) -> str:
+        """현재 Goal의 사용자 pause/resume/cancel 의도를 멱등 기록한다."""
+
+        if state not in {"paused", "running", "cancelled"}:
+            raise EngineServiceError("workflow control 상태가 유효하지 않습니다.")
+        if not reason.strip():
+            raise EngineServiceError("workflow control 이유가 필요합니다.")
+        current = self.workflow_control_state(project_id)
+        if current == "cancelled" and state != "cancelled":
+            raise EngineServiceError("WORKFLOW_CANCELLED: 취소한 Goal은 재개할 수 없습니다.")
+        if current == state:
+            return current
+        with self.ledger.transaction() as tx:
+            project = tx.one(
+                "SELECT active_goal_revision_id FROM projects WHERE id=?", (project_id,)
+            )
+            if project["active_goal_revision_id"] is None:
+                raise EngineServiceError("active GoalContract가 없습니다.")
+            event_type = {
+                "paused": "workflow.paused",
+                "running": "workflow.resumed",
+                "cancelled": "workflow.cancelled",
+            }[state]
+            tx.history(
+                project_id,
+                event_type,
+                "project",
+                project_id,
+                {
+                    "goal_revision_id": project["active_goal_revision_id"],
+                    "reason": reason,
+                },
+            )
+        return state
+
     @staticmethod
     def _insert_review(tx: Any, project_id: str, artifact_kind: str, review: Any) -> None:
         tx.connection.execute(

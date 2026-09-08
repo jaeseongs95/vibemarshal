@@ -111,6 +111,21 @@ def _role_configuration(arguments: argparse.Namespace) -> EngineRoleConfiguratio
     return EngineRoleConfiguration.model_validate(_json(path))
 
 
+def _application(
+    arguments: argparse.Namespace,
+    *,
+    runtime: CodexAppServerRuntime | None = None,
+) -> EngineApplication:
+    return EngineApplication(
+        _service(arguments),
+        runtime=runtime,
+        role_configuration=_role_configuration(arguments),
+        inspection_contract=getattr(
+            arguments, "inspection_contract", PLAN_INSPECTION_PROVIDER_V1
+        ),
+    )
+
+
 def _active_profile_digest(service: EngineService, project_id: str) -> str:
     with service.ledger.read() as connection:
         row = connection.execute(
@@ -701,14 +716,14 @@ def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
 
 def _cmd_goal_authorize(arguments: argparse.Namespace) -> None:
     from .domain import GoalOperatingPolicy
-    service = _service(arguments)
     policy = None if arguments.policy_file is None else GoalOperatingPolicy.model_validate(_json(arguments.policy_file))
-    authorization = service.authorize_goal(project_id=arguments.project_id, source=arguments.source, operating_policy=policy)
-    with service.ledger.read() as connection:
-        candidate = connection.execute("SELECT id FROM plan_revisions WHERE project_id = ? AND status = 'ready'",
-                                       (arguments.project_id,)).fetchone()
-    activation_id = None if candidate is None else service.activate_selected_plan(project_id=arguments.project_id)
-    _emit({"authorization": authorization.model_dump(mode="json"), "activation_id": activation_id})
+    _emit(
+        _application(arguments).authorize(
+            arguments.project_id,
+            source=arguments.source,
+            operating_policy=policy,
+        )
+    )
 
 
 def _activate_search_if_authorized(service: EngineService, project_id: str, outcome: PlanningSearchOutcome) -> None:
@@ -797,22 +812,16 @@ def _wait_dispatched_turn(
 
 
 def _cmd_run_once(arguments: argparse.Namespace) -> None:
-    service = _service(arguments)
-    BudgetManager(service).require_policy(arguments.project_id, service.load_active_goal(arguments.project_id).goal_id)
     proposal = (
         None
         if arguments.proposal_file is None
         else ExecutionSpecProposal.model_validate(_json(arguments.proposal_file))
     )
     with _runtime(arguments) as runtime:
-        from .execution import ExecutionProposalAdapter
-        role_configuration = _role_configuration(arguments)
-        provider = None if role_configuration is None else ExecutionProposalAdapter(
-            service, CodexStructuredRoleRunner(runtime, max_schema_recovery_attempts=0, ephemeral_threads=False), role_configuration,
-        )
-        outcome = EngineDispatcher(service, runtime, proposal_provider=provider).run_once(
+        outcome = _application(arguments, runtime=runtime).run_once(
             arguments.project_id,
             proposal=proposal,
+            resume=getattr(arguments, "resume", False),
             goal_validation_step=(None if arguments.goal_validation_file is None
                                   else ValidationExecutionStep.model_validate(_json(arguments.goal_validation_file))),
             goal_validation_retry=(
@@ -820,14 +829,11 @@ def _cmd_run_once(arguments: argparse.Namespace) -> None:
                 else GoalValidationRetryRequest.model_validate(_json(arguments.goal_validation_retry_file))
             ),
         )
-        # 이 CLI 프로세스가 App Server의 소유자다. dispatch 단계만 전이한 뒤
-        # 현재 turn 종료까지 연결을 유지하고 결과 판정은 다음 호출에 맡긴다.
-        _wait_dispatched_turn(service, runtime, outcome.attempt_id)
     _emit(outcome)
 
 
 def _cmd_run_status(arguments: argparse.Namespace) -> None:
-    _emit(_service(arguments).status(arguments.project_id))
+    _emit(_application(arguments).status(arguments.project_id))
 
 
 def _cmd_attempt_show(arguments: argparse.Namespace) -> None:
@@ -965,15 +971,15 @@ def _progress_report(service: EngineService, project_id: str) -> dict[str, Any]:
 
 
 def _cmd_report_progress(arguments: argparse.Namespace) -> None:
-    _emit(_progress_report(_service(arguments), arguments.project_id))
+    _emit(_application(arguments).status(arguments.project_id))
 
 
 def _cmd_report_final(arguments: argparse.Namespace) -> None:
-    from .application import EngineApplication
     report = EngineApplication(_service(arguments)).final_report(arguments.project_id, goal_verdict_id=arguments.goal_verdict_id)
     if arguments.format == "markdown":
         print(render_final(goal=report.goal, plan=report.plan, verdict=report.verdict,
-                           usage=report.usage.usage_records, usage_summary=report.usage), end="")
+                           usage=report.usage.usage_records, usage_summary=report.usage,
+                           read_only_verification=report.read_only_verification), end="")
         return
     _emit(report)
 
@@ -1025,6 +1031,48 @@ def _cmd_budget_observe(arguments: argparse.Namespace) -> None:
     _emit({"call_id": arguments.call_id, "observation": observation})
 
 
+def _cmd_prepare(arguments: argparse.Namespace) -> None:
+    if arguments.role_config is None:
+        raise EngineApplicationError("ROLE_CONFIGURATION_REQUIRED")
+    with _runtime(arguments) as runtime:
+        result = _application(arguments, runtime=runtime).prepare(
+            arguments.project_id,
+            source_request=arguments.request,
+            candidate_count=arguments.candidate_count,
+        )
+    _emit(result)
+
+
+def _cmd_observe(arguments: argparse.Namespace) -> None:
+    with _runtime(arguments) as runtime:
+        result = _application(arguments, runtime=runtime).observe(arguments.project_id)
+    _emit(result)
+
+
+def _cmd_pause(arguments: argparse.Namespace) -> None:
+    service = _service(arguments)
+    if service.active_runtime_job(arguments.project_id) is None:
+        result = EngineApplication(service).pause(arguments.project_id, reason=arguments.reason)
+    else:
+        with _runtime(arguments) as runtime:
+            result = EngineApplication(service, runtime=runtime).pause(
+                arguments.project_id, reason=arguments.reason
+            )
+    _emit(result)
+
+
+def _cmd_cancel(arguments: argparse.Namespace) -> None:
+    service = _service(arguments)
+    if service.active_runtime_job(arguments.project_id) is None:
+        result = EngineApplication(service).cancel(arguments.project_id, reason=arguments.reason)
+    else:
+        with _runtime(arguments) as runtime:
+            result = EngineApplication(service, runtime=runtime).cancel(
+                arguments.project_id, reason=arguments.reason
+            )
+    _emit(result)
+
+
 def _add_goal_arguments(parser: argparse.ArgumentParser, *, revise: bool = False) -> None:
     parser.add_argument("--project-id", required=True)
     if revise:
@@ -1055,6 +1103,70 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--db", default=str(Path.cwd() / ".flowmarshal-engine" / DEFAULT_DB_NAME))
     parser.add_argument("--artifacts", default=str(Path.cwd() / ".flowmarshal-engine" / DEFAULT_ARTIFACT_DIRECTORY))
     commands = parser.add_subparsers(dest="command", required=True)
+
+    prepare = commands.add_parser(
+        "prepare",
+        help="raw request를 실제 Goal 정규화·독립 review·Planning으로 준비",
+    )
+    prepare.add_argument("--project-id", required=True)
+    prepare.add_argument("--request", required=True)
+    prepare.add_argument("--role-config", required=True)
+    prepare.add_argument("--codex-bin")
+    prepare.add_argument("--candidate-count", type=int, choices=(1, 2, 3))
+    prepare.add_argument(
+        "--inspection-contract",
+        choices=(PLAN_INSPECTION_PROVIDER_V1, PLAN_INSPECTION_PROVIDER_V2),
+        default=PLAN_INSPECTION_PROVIDER_V1,
+    )
+    prepare.set_defaults(handler=_cmd_prepare)
+
+    authorize_facade = commands.add_parser(
+        "authorize", help="목표·범위·효과·운영 정책을 승인하고 선택 Plan을 활성화"
+    )
+    authorize_facade.add_argument("--project-id", required=True)
+    authorize_facade.add_argument("--source", default="cli-user")
+    authorize_facade.add_argument("--policy-file")
+    authorize_facade.set_defaults(handler=_cmd_goal_authorize)
+
+    run_once_facade = commands.add_parser("run-once", help="bounded scheduler tick 한 번 실행")
+    run_once_facade.add_argument("--project-id", required=True)
+    run_once_facade.add_argument("--codex-bin")
+    run_once_facade.add_argument("--proposal-file")
+    run_once_facade.add_argument("--role-config")
+    run_once_facade.add_argument("--resume", action="store_true")
+    facade_goal_validation = run_once_facade.add_mutually_exclusive_group()
+    facade_goal_validation.add_argument("--goal-validation-file")
+    facade_goal_validation.add_argument("--goal-validation-retry-file")
+    run_once_facade.set_defaults(handler=_cmd_run_once)
+
+    observe_facade = commands.add_parser("observe", help="active provider job을 한 번 관측")
+    observe_facade.add_argument("--project-id", required=True)
+    observe_facade.add_argument("--codex-bin")
+    observe_facade.set_defaults(handler=_cmd_observe)
+
+    pause_facade = commands.add_parser("pause", help="현재 Goal workflow 일시정지")
+    pause_facade.add_argument("--project-id", required=True)
+    pause_facade.add_argument("--reason", default="사용자 요청")
+    pause_facade.add_argument("--codex-bin")
+    pause_facade.set_defaults(handler=_cmd_pause)
+
+    cancel_facade = commands.add_parser("cancel", help="현재 Goal workflow 취소")
+    cancel_facade.add_argument("--project-id", required=True)
+    cancel_facade.add_argument("--reason", default="사용자 요청")
+    cancel_facade.add_argument("--codex-bin")
+    cancel_facade.set_defaults(handler=_cmd_cancel)
+
+    status_facade = commands.add_parser("status", help="Core·control·job 상태 표시")
+    status_facade.add_argument("--project-id", required=True)
+    status_facade.set_defaults(handler=_cmd_run_status)
+
+    final_report_facade = commands.add_parser(
+        "final-report", help="GoalVerdict에 결속된 최종 보고 표시"
+    )
+    final_report_facade.add_argument("--project-id", required=True)
+    final_report_facade.add_argument("--format", choices=("json", "markdown"), default="json")
+    final_report_facade.add_argument("--goal-verdict-id")
+    final_report_facade.set_defaults(handler=_cmd_report_final)
 
     project = commands.add_parser("project")
     project_commands = project.add_subparsers(dest="project_command", required=True)
@@ -1196,6 +1308,7 @@ def build_parser() -> argparse.ArgumentParser:
     run_once.add_argument("--codex-bin")
     run_once.add_argument("--proposal-file")
     run_once.add_argument("--role-config")
+    run_once.add_argument("--resume", action="store_true")
     goal_validation_input = run_once.add_mutually_exclusive_group()
     goal_validation_input.add_argument("--goal-validation-file")
     goal_validation_input.add_argument("--goal-validation-retry-file")

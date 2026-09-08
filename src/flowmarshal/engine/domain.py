@@ -1750,6 +1750,7 @@ class RuntimeJobObservationKind(StrEnum):
     COLLECTOR_LOST = "collector_lost"
     COLLECTOR_REATTACHED = "collector_reattached"
     CONSUMED = "consumed"
+    CANCELLED = "cancelled"
 
 
 class RuntimeJob(EngineModel):
