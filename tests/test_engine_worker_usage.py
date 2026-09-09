@@ -216,6 +216,63 @@ class WorkerUsageTests(unittest.TestCase):
         ))
         self.assertEqual("PROVIDER_USAGE_UNAVAILABLE", missing.unavailable_reason)
 
+    def test_late_worker_usage_appends_observation_without_changing_execution_state(self):
+        prepared, _, _, attempt_id = self.dispatched("late-worker-usage")
+        thread_id, turn_id, request = self.turn(prepared.service, attempt_id)
+        first = prepared.service.record_worker_usage(
+            attempt_id=attempt_id,
+            thread_id=thread_id,
+            turn_id=turn_id,
+            terminal_status="completed",
+            provider_payload=self.payload(
+                thread_id, turn_id, request, usage_scope="unavailable"
+            ),
+        )
+        assert first is not None
+        with prepared.service.ledger.read() as connection:
+            call_before = dict(connection.execute(
+                "SELECT * FROM provider_calls WHERE attempt_id=?", (attempt_id,)
+            ).fetchone())
+            attempt_before = dict(connection.execute(
+                "SELECT * FROM attempts WHERE id=?", (attempt_id,)
+            ).fetchone())
+
+        same_usage = prepared.service.record_worker_usage(
+            attempt_id=attempt_id,
+            thread_id=thread_id,
+            turn_id=turn_id,
+            terminal_status="completed",
+            provider_payload=self.payload(
+                thread_id, turn_id, request, usage=self.usage()
+            ),
+        )
+
+        self.assertEqual(first.usage_id, same_usage.usage_id)
+        with prepared.service.ledger.read() as connection:
+            call_after = dict(connection.execute(
+                "SELECT * FROM provider_calls WHERE attempt_id=?", (attempt_id,)
+            ).fetchone())
+            attempt_after = dict(connection.execute(
+                "SELECT * FROM attempts WHERE id=?", (attempt_id,)
+            ).fetchone())
+            observations = [json.loads(row["payload_json"]) for row in connection.execute(
+                "SELECT payload_json FROM usage_observations WHERE provider_call_id=? ORDER BY rowid",
+                (call_after["id"],),
+            )]
+        for key in (
+            "execution_status", "effect_status", "result_status", "new_turn_count",
+            "completed_at", "receipt_json", "raw_receipt_digest", "usage_id",
+        ):
+            self.assertEqual(call_before[key], call_after[key], key)
+        self.assertEqual(attempt_before, attempt_after)
+        self.assertEqual(("unavailable", "measured"), tuple(
+            item["measurement_status"] for item in observations
+        ))
+        self.assertTrue(observations[-1]["late"])
+        self.assertEqual(observations[0]["observation_id"], observations[-1]["previous_observation_id"])
+        self.assertEqual(170, call_after["actual_tokens"])
+        self.assertEqual("settled", call_after["status"])
+
     def test_first_empty_thread_total_is_attributed_once_from_actual_receipts(self):
         prepared, _, _, attempt_id = self.dispatched("first-empty-thread")
         thread_id, turn_id, request = self.turn(prepared.service, attempt_id)

@@ -375,6 +375,45 @@ class EngineBudgetIntegrationTests(unittest.TestCase):
         self.assertIsNone(status.remaining_total_tokens)
         self.assertIn("실행을 차단하지 않습니다", status.next_action or "")
 
+    def test_late_validator_usage_appends_observation_without_changing_effect_state(self) -> None:
+        prepared, attempt_id, observation = self.validator_observation("validator-late-usage")
+        unavailable_payload = dict(observation.payload)
+        unavailable_payload.pop("usage", None)
+        unavailable = observation.model_copy(update={"payload": unavailable_payload})
+        first = record_validator_usage(prepared.service, attempt_id, unavailable)
+        self.assertFalse(first.usage_available)
+        with prepared.service.ledger.read() as connection:
+            before = dict(connection.execute(
+                "SELECT * FROM provider_calls WHERE attempt_id=?", (attempt_id,)
+            ).fetchone())
+            attempt_before = dict(connection.execute(
+                "SELECT * FROM attempts WHERE id=?", (attempt_id,)
+            ).fetchone())
+
+        repeated = record_validator_usage(prepared.service, attempt_id, observation)
+
+        self.assertEqual(first.usage_id, repeated.usage_id)
+        with prepared.service.ledger.read() as connection:
+            after = dict(connection.execute(
+                "SELECT * FROM provider_calls WHERE attempt_id=?", (attempt_id,)
+            ).fetchone())
+            attempt_after = dict(connection.execute(
+                "SELECT * FROM attempts WHERE id=?", (attempt_id,)
+            ).fetchone())
+            observations = connection.execute(
+                "SELECT payload_json FROM usage_observations WHERE provider_call_id=? ORDER BY rowid",
+                (after["id"],),
+            ).fetchall()
+        for key in (
+            "execution_status", "effect_status", "result_status", "new_turn_count",
+            "completed_at", "receipt_json", "raw_receipt_digest", "usage_id",
+        ):
+            self.assertEqual(before[key], after[key], key)
+        self.assertEqual(attempt_before, attempt_after)
+        self.assertEqual(2, len(observations))
+        self.assertEqual("settled", after["status"])
+        self.assertIsNotNone(after["actual_tokens"])
+
     def test_budget_rejects_unregistered_goal_lineage_before_reserving(self) -> None:
         prepared = self.prepared("wrong-goal-lineage")
         manager = self.configure_small_policy(prepared)

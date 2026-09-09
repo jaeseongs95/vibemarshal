@@ -1232,6 +1232,18 @@ class TaskContract(EngineModel):
             and not any(item.external for item in self.expected_effects)
         ):
             raise ValueError("execution checkpoint는 외부 효과가 있는 Task에만 사용합니다.")
+        external_identity_digests = tuple(
+            item.identity.identity_digest
+            for item in self.expected_effects
+            if item.external and item.identity is not None
+        )
+        _unique(external_identity_digests, "TaskContract external effect identity")
+        if any(item.method == "semantic" for item in self.validations) and (
+            not self.assignment.independence_required or self.assignment.validator is None
+        ):
+            raise ValueError(
+                "semantic Task validation에는 분리된 validator와 independence_required가 필요합니다."
+            )
         return self
 
     @property
@@ -1391,6 +1403,12 @@ class PlanContractDefinition(EngineModel):
 
         coverage_ids = [item.criterion_id for item in self.goal_coverage]
         _unique(tuple(coverage_ids), "Plan goal coverage")
+        task_validation_sequence = tuple(
+            validation.validation_id
+            for task in self.tasks
+            for validation in task.validations
+        )
+        _unique(task_validation_sequence, "Plan Task validation")
         task_validation_ids = {
             validation.validation_id
             for task in self.tasks
@@ -1401,6 +1419,8 @@ class PlanContractDefinition(EngineModel):
         }
         if len(integration_ids) != len(self.integration_validations):
             raise ValueError("Plan integration validation ID가 중복됐습니다.")
+        if task_validation_ids & integration_ids:
+            raise ValueError("Task와 integration validation ID를 재사용할 수 없습니다.")
         known_validations = task_validation_ids | integration_ids
         for coverage in self.goal_coverage:
             if not set(coverage.task_ids).issubset(known_tasks):

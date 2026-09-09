@@ -9,7 +9,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from flowmarshal.canonical import canonical_json, sha256_digest
-from flowmarshal.engine.budget import BudgetBlocked, BudgetManager, GoalBudgetPolicy
+from flowmarshal.engine.budget import (
+    BudgetBlocked, BudgetManager, GoalBudgetPolicy, receipt_usage,
+)
 from flowmarshal.engine.benchmark import _legacy_hard_timeout_contract
 from flowmarshal.engine.domain import GoalAuthorization, GoalOperatingPolicy, UsageObservation, utc_now
 from flowmarshal.engine.evaluation_budget import EvaluationPolicies
@@ -46,10 +48,6 @@ class ExecutionUsageSeparationTests(unittest.TestCase):
         self.goal = goal(self.project_id, self.profile.definition_digest)
         self.service.register_goal(self.goal)
         self.manager = BudgetManager(self.service)
-        self.manager.configure(
-            self.project_id,
-            GoalBudgetPolicy(total_tokens=100, call_reservation_tokens=10),
-        )
 
     def tearDown(self) -> None:
         self.temp.cleanup()
@@ -114,6 +112,7 @@ class ExecutionUsageSeparationTests(unittest.TestCase):
             ),
         )
         status = self.manager.status(self.project_id, goal_id=self.goal.goal_id)
+        self.assertIsNone(status.policy)
         self.assertEqual((), status.unresolved_call_ids)
         self.assertIsNone(status.error_code)
         self.assertIsNone(status.remaining_total_tokens)
@@ -130,10 +129,6 @@ class ExecutionUsageSeparationTests(unittest.TestCase):
         independent = goal(independent_project, independent_profile.definition_digest)
         self.service.register_goal(independent)
         independent_manager = BudgetManager(self.service)
-        independent_manager.configure(
-            independent_project,
-            GoalBudgetPolicy(total_tokens=100, call_reservation_tokens=10),
-        )
         other_goal = independent_manager.reserve(
             project_id=independent_project,
             goal_id=independent.goal_id,
@@ -245,6 +240,33 @@ class ExecutionUsageSeparationTests(unittest.TestCase):
                     },
                 ),
             )
+
+    def test_role_receipt_model_echo_is_not_stored_as_observed_model(self) -> None:
+        receipt = self._receipt("model-echo", usage_available=True).model_copy(update={
+            "binding_provenance_version": "2.0",
+            "requested_model": "test-model",
+            "requested_effort": "medium",
+            "observed_model": "echo-model",
+            "observed_effort": "high",
+            "provider_inventory_digest": _digest("provider-inventory"),
+            "adapter_capability_digest": _digest("adapter-capability"),
+            "binding_provenance": {
+                "requested": "role_request",
+                "observed": "request_echo",
+                "provider_inventory": "model/list",
+                "adapter_capability": "local_operational_binding",
+            },
+        })
+
+        usage = receipt_usage(
+            receipt,
+            project_id=self.project_id,
+            goal_digest=self.goal.definition_digest,
+        )
+
+        self.assertIsNone(usage.observed_model)
+        self.assertIsNone(usage.observed_effort)
+        self.assertIsNone(usage.binding_provenance["observed"])
 
     def test_fm_02_c2_pending_effect_is_observe_first(self) -> None:
         """terminal 실행이어도 effect pending이면 프로젝트 전체 admission을 차단한다."""

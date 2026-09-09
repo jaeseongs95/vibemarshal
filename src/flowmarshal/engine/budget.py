@@ -21,6 +21,7 @@ from .service import EngineService, EngineServiceError
 from .model_observation import (
     PROVIDER_RAW_MODEL_OBSERVATION_SOURCE,
     authoritative_model_observation,
+    authoritative_receipt_model_observation,
 )
 
 
@@ -90,15 +91,27 @@ def receipt_usage(receipt: Any, *, project_id: str, goal_digest: str,
     complete = available and receipt.usage_complete
     provenance = {}
     if getattr(receipt, "binding_provenance_version", None) == "2.0":
+        observed_model, observed_effort = authoritative_receipt_model_observation(
+            observed_model=receipt.observed_model,
+            observed_effort=receipt.observed_effort,
+            binding_provenance=receipt.binding_provenance,
+        )
         provenance = {
             "binding_provenance_version": "2.0",
             "requested_model": receipt.requested_model,
             "requested_effort": receipt.requested_effort,
-            "observed_model": receipt.observed_model,
-            "observed_effort": receipt.observed_effort,
+            "observed_model": observed_model,
+            "observed_effort": observed_effort,
             "provider_inventory_digest": receipt.provider_inventory_digest,
             "adapter_capability_digest": receipt.adapter_capability_digest,
-            "binding_provenance": receipt.binding_provenance,
+            "binding_provenance": {
+                **(receipt.binding_provenance or {}),
+                "observed": (
+                    (receipt.binding_provenance or {}).get("observed")
+                    if observed_model is not None and observed_effort is not None
+                    else None
+                ),
+            },
         }
     return BudgetUsageRecord(
         usage_id=new_id("usage"), project_id=project_id, goal_contract_digest=goal_digest,
@@ -712,6 +725,11 @@ def record_validator_usage(service: EngineService, attempt_id: str, observation:
         key = f"validator:{observation.thread_id}:{observation.turn_id}"
         prior = tx.maybe_one("SELECT payload_json FROM budget_usage WHERE project_id=? AND logical_call_ref=?",
                              (attempt["project_id"], key))
+        call = tx.one(
+            "SELECT * FROM provider_calls WHERE attempt_id=? AND role='semantic_validator' "
+            "ORDER BY created_at DESC,rowid DESC LIMIT 1",
+            (attempt_id,),
+        )
         raw = observation.payload.get("usage")
         scope = observation.payload.get("usage_scope")
         start = receipt.response_payload or {}
@@ -766,17 +784,61 @@ def record_validator_usage(service: EngineService, attempt_id: str, observation:
         available = any(value is not None for value in values)
         complete = all(value is not None for value in values)
         complete_total = values[0] is not None and values[2] is not None
-        if prior:
-            existing = BudgetUsageRecord.model_validate_json(prior["payload_json"])
-            if available and (not existing.usage_available or values != (
-                    existing.input_tokens, existing.cached_input_tokens, existing.output_tokens, existing.reasoning_tokens)):
-                raise EngineServiceError("VALIDATOR_USAGE_CONFLICT: 같은 turn의 실측은 명시적 재관측 없이 변경하지 않습니다.")
-            return existing
-        call = tx.one("SELECT * FROM provider_calls WHERE attempt_id=? AND status='reserved' ORDER BY created_at DESC LIMIT 1", (attempt_id,))
-        spec = TaskExecutionSpecRevision.model_validate_json(tx.one("SELECT payload_json FROM execution_spec_revisions WHERE definition_digest=?",
-                                                                   (attempt["execution_spec_digest"],))["payload_json"])
         payload = {"thread_id": observation.thread_id, "turn_id": observation.turn_id,
                    "terminal_status": observation.terminal_status, "payload": observation.payload}
+        if prior:
+            existing = BudgetUsageRecord.model_validate_json(prior["payload_json"])
+            prior_values = (
+                existing.input_tokens,
+                existing.cached_input_tokens,
+                existing.output_tokens,
+                existing.reasoning_tokens,
+            )
+            for name, old, new in zip(keys, prior_values, values):
+                if old is not None and new is not None and old != new:
+                    raise EngineServiceError(
+                        f"VALIDATOR_USAGE_CONFLICT: 기존 {name}={old}와 late observation {new}가 다릅니다."
+                    )
+            observation_digest = sha256_digest(payload)
+            if tx.maybe_one(
+                "SELECT id FROM usage_observations WHERE provider_call_id=? "
+                "AND raw_observation_digest=?",
+                (call["id"], observation_digest),
+            ) is not None:
+                return existing
+            _insert_usage_observation(
+                tx,
+                call=call,
+                source="validator_terminal",
+                raw_document=payload,
+                known=available,
+                values=values,
+                usage_scope=scope if scope in {"turn", "thread"} else "unavailable",
+                attribution_basis=(
+                    "provider_turn" if scope == "turn"
+                    else "first_empty_thread" if scope == "thread" and first_empty
+                    else "unavailable"
+                ),
+                unavailable_reason=(
+                    None if complete else "PROVIDER_USAGE_PARTIAL" if available
+                    else "PROVIDER_USAGE_UNAVAILABLE_OR_UNATTRIBUTABLE"
+                ),
+                late=True,
+            )
+            if complete_total:
+                tx.connection.execute(
+                    "UPDATE provider_calls SET status='settled',actual_tokens=? WHERE id=?",
+                    (values[0] + values[2], call["id"]),
+                )
+            tx.history(
+                attempt["project_id"], "budget.usage_reobserved", "provider_call", call["id"],
+                {"source": "validator_terminal", "observation_digest": observation_digest,
+                 "usage_available": available, "usage_complete": complete,
+                 "actual_tokens": values[0] + values[2] if complete_total else None},
+            )
+            return existing
+        spec = TaskExecutionSpecRevision.model_validate_json(tx.one("SELECT payload_json FROM execution_spec_revisions WHERE definition_digest=?",
+                                                                   (attempt["execution_spec_digest"],))["payload_json"])
         duration = observation.payload.get("duration_ms")
         from .model_lock import OperationalBinding
         model_observation = OperationalBinding.model_validate(request["model_observation"])

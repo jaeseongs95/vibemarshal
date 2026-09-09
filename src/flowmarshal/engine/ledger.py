@@ -577,6 +577,13 @@ WHEN NEW.task_id <> OLD.task_id
   OR NEW.created_at <> OLD.created_at
 BEGIN SELECT RAISE(ABORT, 'ENGINE_SPEC_CONTENT_IMMUTABLE'); END;
 
+CREATE TRIGGER tr_engine_effect_checkpoint_no_update
+BEFORE UPDATE ON effect_checkpoints
+BEGIN SELECT RAISE(ABORT, 'ENGINE_EFFECT_CHECKPOINT_APPEND_ONLY'); END;
+CREATE TRIGGER tr_engine_effect_checkpoint_no_delete
+BEFORE DELETE ON effect_checkpoints
+BEGIN SELECT RAISE(ABORT, 'ENGINE_EFFECT_CHECKPOINT_APPEND_ONLY'); END;
+
 CREATE TRIGGER tr_engine_history_no_update BEFORE UPDATE ON history_events
 BEGIN SELECT RAISE(ABORT, 'ENGINE_HISTORY_APPEND_ONLY'); END;
 CREATE TRIGGER tr_engine_history_no_delete BEFORE DELETE ON history_events

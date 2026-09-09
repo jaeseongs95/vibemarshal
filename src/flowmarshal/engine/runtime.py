@@ -4130,6 +4130,12 @@ class EngineDispatcher:
             ),
             "resume_notice": True,
         }
+        if row["kind"] == AttemptKind.EXECUTION.value:
+            task_contract = json.loads(row["task_json"])
+            resume_request["effect_identities"] = [
+                item["identity"] for item in task_contract["expected_effects"]
+                if item["external"] and item.get("identity_version") == "2.0"
+            ]
         resume_intent = self.service.prepare_runtime_intent(
             attempt_id=row["id"],
             kind=RuntimeIntentKind.RESUME_TURN,
@@ -4918,6 +4924,12 @@ class EngineDispatcher:
             ),
             "resume_notice": False,
         }
+        if row["kind"] == AttemptKind.EXECUTION.value:
+            task_contract = json.loads(row["task_json"])
+            request["effect_identities"] = [
+                item["identity"] for item in task_contract["expected_effects"]
+                if item["external"] and item.get("identity_version") == "2.0"
+            ]
         attempt_key = (
             f"{spec.definition.idempotency_key}:attempt:{row['attempt_no']}:{row['kind']}"
         )

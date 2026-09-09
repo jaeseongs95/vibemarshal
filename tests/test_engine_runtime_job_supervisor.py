@@ -1088,6 +1088,25 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
         self.assertEqual(RuntimeJobStatus.RUNNING, job.status)
         self.assertEqual(baseline, self._core_completion_snapshot())
 
+        with self.assertRaisesRegex(
+            EngineServiceError, "RUNTIME_JOB_TERMINAL_OBSERVATION_KIND_MISMATCH",
+        ):
+            self.prepared.service.record_runtime_job_observation(
+                job.job_id,
+                kind=RuntimeJobObservationKind.PROVIDER_PROGRESS,
+                payload={"result": {"status": "forged-terminal"}},
+                provider_terminal=True,
+                terminal_status="completed",
+            )
+        with self.assertRaisesRegex(
+            EngineServiceError, "RUNTIME_JOB_TERMINAL_OBSERVATION_KIND_MISMATCH",
+        ):
+            self.prepared.service.record_runtime_job_observation(
+                job.job_id,
+                kind=RuntimeJobObservationKind.PROVIDER_TERMINAL,
+                payload={"result": {"status": "missing-terminal-flag"}},
+            )
+
         self.prepared.service.record_runtime_job_observation(
             job.job_id,
             kind=RuntimeJobObservationKind.PROVIDER_PROGRESS,

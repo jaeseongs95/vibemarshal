@@ -1,15 +1,18 @@
 from __future__ import annotations
 
+import sqlite3
 import unittest
+
+from pydantic import ValidationError
 
 from flowmarshal.canonical import canonical_json, sha256_digest
 from flowmarshal.engine.authorization import authorization_changes
 from flowmarshal.engine.budget import BudgetManager
 from flowmarshal.engine.domain import (
-    BudgetStage, CriterionVerdict, EffectContract, EffectIdentity, EvidenceKind,
+    ApprovalClass, BudgetStage, CriterionVerdict, EffectContract, EffectIdentity, EvidenceKind,
     EvidenceRecord, ExternalValidationObservation, GoalContractRevision, GoalVerdict,
     GoalVerdictStatus, MutationPolicy, RevisionStatus, TaskKind, ValidationResult,
-    ValidationStatus, RuntimeIntentKind, ThreadBinding,
+    ValidationStatus, RuntimeIntentKind, ThreadBinding, ExecutionAction,
     derive_candidate_decision, new_id, utc_now,
 )
 from flowmarshal.engine.planning import (
@@ -17,6 +20,7 @@ from flowmarshal.engine.planning import (
     plan_gate, skeleton_gate, skeleton_review_evidence_catalog,
 )
 from flowmarshal.engine.service import EngineServiceError
+from flowmarshal.engine.worker_prompt import assemble_worker_prompt
 from tests import engine_helpers as fixtures
 from tests.test_engine_ledger_service import EngineServiceFixture
 
@@ -163,6 +167,45 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
             {finding.finding_code for finding in findings},
         )
 
+    def test_semantic_task_and_validation_ids_are_independently_bound_at_admission(self):
+        semantic = self.task.validations[0].model_copy(update={
+            "method": "semantic",
+            "required_evidence_kinds": ("model_review",),
+        })
+        task_payload = self.task.model_dump(mode="python")
+        task_payload["validations"] = (semantic,)
+        task_payload["assignment"] = self.task.assignment.model_copy(update={
+            "validator": None,
+            "independence_required": False,
+        })
+        with self.assertRaisesRegex(ValidationError, "분리된 validator"):
+            type(self.task).model_validate(task_payload)
+
+        duplicate_identity = self.effect_identity()
+        duplicate_payload = self.task.model_dump(mode="python")
+        duplicate_payload["expected_effects"] = (
+            EffectContract(
+                effect_id="publish_one", external=True, reversible=True,
+                statement="publish one", identity_version="2.0",
+                identity=duplicate_identity,
+            ),
+            EffectContract(
+                effect_id="publish_two", external=True, reversible=True,
+                statement="publish two", identity_version="2.0",
+                identity=duplicate_identity,
+            ),
+        )
+        with self.assertRaisesRegex(ValidationError, "external effect identity"):
+            type(self.task).model_validate(duplicate_payload)
+
+        duplicate_integration = self.plan.definition.integration_validations[0].model_copy(
+            update={"validation_id": self.task.validations[0].validation_id}
+        )
+        definition_payload = self.plan.definition.model_dump(mode="python")
+        definition_payload["integration_validations"] = (duplicate_integration,)
+        with self.assertRaisesRegex(ValidationError, "재사용"):
+            type(self.plan.definition).model_validate(definition_payload)
+
     def test_external_target_observation_binds_identity_and_receipt(self):
         identity = self.effect_identity()
         target_document = {
@@ -191,7 +234,9 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
             )
 
     def test_external_effect_requires_every_typed_receipt_and_target_observation(self):
-        first = self.effect_identity()
+        first = self.effect_identity().model_copy(update={
+            "checkpoint_policy": "before_irreversible",
+        })
         second = first.model_copy(update={
             "operation": "publish-assets",
             "scope": "release-assets:v1",
@@ -199,7 +244,7 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
         })
         effects = tuple(
             EffectContract(
-                effect_id=f"publish_{index}", external=True, reversible=True,
+                effect_id=f"publish_{index}", external=True, reversible=False,
                 statement=f"publish_{index}",
                 identity_version="2.0", identity=identity,
             )
@@ -234,7 +279,10 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
             self.project_id, self.goal, self.state, self.map.revision_digest,
             self.skeleton, self.inventory,
         )
-        task = task.model_copy(update={"expected_effects": effects})
+        task = task.model_copy(update={
+            "expected_effects": effects,
+            "approval_class": ApprovalClass.EXECUTION_CHECKPOINT,
+        })
         definition = self.plan.definition.model_copy(update={"tasks": (task,)})
         self.plan = self.plan.model_copy(update={
             "definition": definition,
@@ -257,7 +305,76 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
             ),
         ))
         spec = self.spec()
+        local_action = ExecutionAction(
+            action_ref="local_command",
+            kind="command",
+            description="local command must be split",
+            command=("echo", "local"),
+        )
+        spec_definition = spec.definition.model_copy(update={
+            "actions": tuple(
+                ExecutionAction(
+                    action_ref=f"external_{index}",
+                    kind="external_effect",
+                    description=effect.statement,
+                    effect_id=effect.effect_id,
+                )
+                for index, effect in enumerate(effects, start=1)
+            ),
+        })
+        bundle = assemble_worker_prompt(
+            task=self.task,
+            definition=spec_definition,
+            profile=self.profile.definition,
+            root=self.root,
+        )
+        spec_definition = spec_definition.model_copy(update={
+            "context_manifest": spec_definition.context_manifest.model_copy(update={
+                "prompt_binding": bundle.binding,
+            }),
+        })
+        spec = spec.model_copy(update={
+            "definition": spec_definition,
+            "definition_digest": spec_definition.definition_digest,
+        })
+        missing_definition = spec_definition.model_copy(update={
+            "actions": spec_definition.actions[:1],
+        })
+        missing = spec.model_copy(update={
+            "definition": missing_definition,
+            "definition_digest": missing_definition.definition_digest,
+        })
+        with self.assertRaisesRegex(EngineServiceError, "정확히 대응"):
+            self.service.materialize_execution_spec(missing, inventory=self.inventory)
+        mixed_definition = spec_definition.model_copy(update={
+            "actions": (*spec_definition.actions, local_action),
+        })
+        mixed = spec.model_copy(update={
+            "definition": mixed_definition,
+            "definition_digest": mixed_definition.definition_digest,
+        })
+        with self.assertRaisesRegex(
+            EngineServiceError, "MIXED_EFFECT_EXECUTION_SPEC_REQUIRES_TASK_SPLIT",
+        ):
+            self.service.materialize_execution_spec(mixed, inventory=self.inventory)
         self.service.materialize_execution_spec(spec, inventory=self.inventory)
+        with self.assertRaisesRegex(EngineServiceError, "checkpoint"):
+            self.service.reserve_attempt(task_id=self.task.task_id)
+        checkpoint_ids = tuple(
+            self.service.record_effect_checkpoint(
+                task_id=self.task.task_id,
+                effect_id=effect.effect_id,
+                execution_spec_digest=spec.definition_digest,
+                approved_by="FM-02 test",
+            )
+            for effect in effects
+        )
+        with self.assertRaisesRegex(sqlite3.IntegrityError, "APPEND_ONLY"):
+            with self.ledger.transaction() as tx:
+                tx.connection.execute(
+                    "UPDATE effect_checkpoints SET effect_id='mutated' WHERE id=?",
+                    (checkpoint_ids[0],),
+                )
         attempt = self.service.reserve_attempt(task_id=self.task.task_id)
         call_id = BudgetManager(self.service).reserve(
             project_id=self.project_id,
@@ -271,11 +388,42 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
         )
         thread_id = "typed-effect-thread"
         turn_id = "typed-effect-turn"
+        effect_identities = [
+            identity.model_dump(mode="json") for identity in (first, second)
+        ]
+        for field, value in (
+            ("provider", "other-provider"),
+            ("system", "other-system"),
+            ("target", "repo:other/name"),
+            ("account", "account:other"),
+            ("operation", "other-operation"),
+            ("scope", "release:other"),
+            ("idempotency_key", "other-idempotency-key"),
+            ("checkpoint_policy", "always"),
+        ):
+            changed = first.model_copy(update={field: value}).model_dump(mode="json")
+            with self.subTest(runtime_intent_identity_field=field), self.assertRaisesRegex(
+                EngineServiceError, "EFFECT_RUNTIME_INTENT_IDENTITY_MISMATCH",
+            ):
+                self.service.prepare_runtime_intent(
+                    attempt_id=attempt.attempt_id,
+                    kind=RuntimeIntentKind.START_TURN,
+                    idempotency_key=f"typed-effect-mutated-{field}",
+                    request={
+                        "thread_id": thread_id,
+                        "turn_id": turn_id,
+                        "effect_identities": [changed, effect_identities[1]],
+                    },
+                )
         runtime_intent = self.service.prepare_runtime_intent(
             attempt_id=attempt.attempt_id,
             kind=RuntimeIntentKind.START_TURN,
             idempotency_key="typed-effect-runtime-turn",
-            request={"thread_id": thread_id, "turn_id": turn_id},
+            request={
+                "thread_id": thread_id,
+                "turn_id": turn_id,
+                "effect_identities": effect_identities,
+            },
         )
         runtime_receipt = self.service.record_runtime_receipt(
             intent_id=runtime_intent.intent_id,
@@ -345,6 +493,20 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
                 rationale="deterministic task validation passed", evaluated_at=utc_now(),
             ),
         )
+        with self.ledger.transaction() as tx:
+            tx.connection.execute(
+                "UPDATE provider_calls SET effect_status='terminal' WHERE id=?",
+                (call_id,),
+            )
+        with self.assertRaisesRegex(
+            EngineServiceError, "EXTERNAL_EFFECT_CONFIRMATION_EVIDENCE_INVALID",
+        ):
+            self.service.complete_task(self.task.task_id)
+        with self.ledger.transaction() as tx:
+            tx.connection.execute(
+                "UPDATE provider_calls SET effect_status='unknown' WHERE id=?",
+                (call_id,),
+            )
         with self.assertRaisesRegex(
             EngineServiceError, "TASK_PROVIDER_EXECUTION_OR_EFFECT_UNRESOLVED",
         ):
@@ -506,7 +668,11 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
         retry_binding = ThreadBinding(
             thread_id=retry_thread_id, turn_id=retry_turn_id, bound_at=utc_now(),
         )
-        retry_request = {"thread_id": retry_thread_id, "turn_id": retry_turn_id}
+        retry_request = {
+            "thread_id": retry_thread_id,
+            "turn_id": retry_turn_id,
+            "effect_identities": effect_identities,
+        }
         with self.ledger.transaction() as tx:
             tx.connection.execute(
                 "UPDATE attempts SET binding_json=?,updated_at=? WHERE id=?",
