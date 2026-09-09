@@ -306,6 +306,7 @@ def source_manifest_files(root: Path) -> dict[str, str]:
         root / "pyproject.toml",
         root / "requirements.lock",
         root / "setup.py",
+        root / "scripts" / "installed_candidate_qualification.py",
         root / "config" / "legacy-freeze-manifest.json",
         root / "config" / "pre-1.0-performance-thresholds.json",
         root / "config" / "qualification-roles.json",
@@ -449,6 +450,7 @@ def build_qualification_reproduction_bundle(
         model_inventory_document=inventory.model_dump(mode="json"),
         model_lock_document=roles.operational_binding(inventory).model_dump(mode="json"),
         evaluator_files=(
+            "scripts/installed_candidate_qualification.py",
             "src/flowmarshal/engine/evaluation.py",
             "src/flowmarshal/engine/qualification.py",
             "src/flowmarshal/engine/qualification_manifest.py",

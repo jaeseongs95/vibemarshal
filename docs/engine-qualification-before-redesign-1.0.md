@@ -1,6 +1,6 @@
 # FlowMarshal Engine 1.0 qualification
 
-이 문서는 개발용 `flowmarshal-engine-eval`의 실행 계약을 설명한다. 네 기능 scope와 token/latency Gate를 모두 실제로 통과하기 전까지 판정은 `NO-GO`이며 package와 기본 CLI는 `flowmarshal-engine` pre-1.0 상태를 유지한다.
+이 문서는 개발 전용 qualification harness의 실행 계약을 설명한다. harness는 user wheel에 포함하지 않고 `scripts/installed_candidate_qualification.py`로 명시 source root에서 읽는다. 제품 `flowmarshal` module은 candidate wheel이 non-editable로 설치된 격리 Python에서만 import한다. 네 기능 scope와 token/latency Gate를 모두 실제로 통과하기 전까지 판정은 `NO-GO`이며 package와 기본 CLI는 `flowmarshal-engine` pre-1.0 상태를 유지한다.
 
 2026-09-06 최초 v9 source의 [실제 역할 48건](role-fixture-48-qualification.md)은 정상 요청 오차단 1건·schema failure 1건으로 FAIL이었다. 전달 schema/사후 validator 불일치와 의미 문맥 검토를 보완한 v12는 실제 48/48 PASS와 전체 정산 감사를 완료했다. E2E 완료 observer까지 보완한 v13은 결정적 Gate 5/5·842개 테스트, 역할 48/48 PASS 뒤 Planning 18/18 완료·FAIL을 기록했다. 출력 안내와 사용량·재시작·선행 Gate 조회 보완은 후속 source에서 다시 검증한다. 현재 source별 판정은 [반복 검증 기록](pre-1.0-iterative-validation.md)을 따른다. 이전 같은 Goal의 `satisfied`는 여러 source와 운영 보정의 진단·복구 결과로 구분한다.
 
@@ -51,7 +51,7 @@ synthetic lifecycle의 프로젝트 입력은 `tests/fixtures/engine/synthetic-l
 완료 cell만 `cells/seed-*/`에 배타적으로 생성되고 다른 결과로 덮어쓸 수 없다. 재개 가능한 사용량 제한만 `run-state.json`의 `PAUSED_RATE_LIMIT`으로 기록한다. Full Planning은 provider 호출이 시작된 미완료 cell에 중간 역할 checkpoint가 없어 자동 재개하지 않는다. Benchmark도 완료 checkpoint 없는 기존 attempt를 새 attempt·Goal 예산으로 반복하지 않는다. 이 경우 `FAILED`와 관련 원장·호출·다음 조치를 보존하고, 기존 provider 상태와 예산을 먼저 대조한다. E2E는 복구를 구현한 정상 완료 cell만 재개 대상으로 안내한다.
 
 ```powershell
-flowmarshal-engine-eval resume --run-root D:\path\to\existing-run
+<candidate-python> scripts/installed_candidate_qualification.py --source-root <고정-source> --candidate-wheel <절대-wheel> eval resume --run-root D:\path\to\existing-run
 ```
 
 prompt, schema, oracle, threshold, source manifest, 역할 설정 또는 model inventory가 달라지면 기존 호출을 대조한 뒤 새 run root를 사용한다. `project-e2e`의 재개 가능한 `normal-completion` cell은 digest-bound `cell-state.json`, 기존 Engine 원장과 workspace를 같은 run root에서 다시 열어 관측한다. 중단·재시작 자체를 검사하는 다른 cell은 중간 실행을 자동 반복하지 않는다. 완료되지 않은 cell을 결과 checkpoint로 간주하거나 새 프로젝트·thread로 재생성하지 않는다.
@@ -65,8 +65,8 @@ R3.1 비교 subprocess는 동결 source 밖의 `legacy_budget_proxy`에서 역�
 수집 범위는 계획 시작부터 최종 선택 또는 질문·차단까지다. token은 실제 uncached input과 output의 합이며 usage가 없으면 0으로 추정하지 않고 수집을 중단한다. 최초 feasible 시각은 Core의 결정적 admission 직후 관측한다. 상세 Task는 파일·명령을 확정한 운영 실행 명세를 뜻하며 목적·DAG만 있는 semantic TaskContract를 포함하지 않는다. 활성화 전 ExecutionSpec을 만들지 않는 Engine 경로는 운영 상세 생성 수가 0이다. 폐기 후보 출력은 후보별 expander/refiner의 실제 receipt로 계산하고, 여러 Skeleton이 한 응답에 담긴 출력 token을 임의로 후보별 배분하지 않는다.
 
 ```powershell
-flowmarshal-engine-eval benchmark --codex-bin C:\path\to\codex.exe --budget-policy config/pre-1.0-validation-budget.json --role-timeout-policy config/pre-1.0-role-timeouts.json --scope-report <deterministic-report> --scope-report <role-report> --scope-report <planning-report> --scope-report <e2e-report>
-flowmarshal-engine-eval resume --run-root D:\path\to\benchmark-run
+<candidate-python> scripts/installed_candidate_qualification.py --source-root <고정-source> --candidate-wheel <절대-wheel> eval benchmark --codex-bin C:\path\to\codex.exe --budget-policy config/pre-1.0-validation-budget.json --role-timeout-policy config/pre-1.0-role-timeouts.json --scope-report <deterministic-report> --scope-report <role-report> --scope-report <planning-report> --scope-report <e2e-report>
+<candidate-python> scripts/installed_candidate_qualification.py --source-root <고정-source> --candidate-wheel <절대-wheel> eval resume --run-root D:\path\to\benchmark-run
 ```
 
 완료된 cell은 재개 시 호출하지 않는다. 부분 호출 진단과 실패 원인은 별도 보존하며 미완료 cell을 immutable 완료 checkpoint로 표시하지 않는다. 실제 모델 Gate를 다른 모델 작업과 동시에 실행하면 latency 비교에 영향을 줄 수 있으므로 성능 측정은 다른 qualification 호출을 마친 뒤 수행한다.
@@ -80,7 +80,7 @@ flowmarshal-engine-eval resume --run-root D:\path\to\benchmark-run
 Engine benchmark cell은 `selected-plan.json`, `execution-checkpoint.json`, 동일 Goal의 `budget-state` 원장을 보존한다. 사용자가 정확한 Plan을 활성화하고 Core 실행·검증이 완료되면 다음 명령으로 provider 호출 없이 lifecycle을 재관측한다.
 
 ```powershell
-flowmarshal-engine-eval observe-benchmark-lifecycle --project-root <고정-source> --run-root <benchmark-run> --scope-report <deterministic-report> --scope-report <role-report> --scope-report <planning-report> --scope-report <e2e-report>
+<candidate-python> scripts/installed_candidate_qualification.py --source-root <고정-source> --candidate-wheel <절대-wheel> eval observe-benchmark-lifecycle --project-root <고정-source> --run-root <benchmark-run> --scope-report <deterministic-report> --scope-report <role-report> --scope-report <planning-report> --scope-report <e2e-report>
 ```
 
 이 명령은 원래 checkpoint·raw·실패 보고서를 유지하고 `lifecycle-observations`와 `lifecycle-assessments` 아래에 digest로 구분한 불변 근거를 추가한다. 미완료 원장, 누락 cell, 다른 source·계약·receipt는 PASS가 아니다. 새 assessment의 `token-latency-report.json`은 같은 source의 네 기능 보고서와 함께 cutover에 전달할 수 있다.

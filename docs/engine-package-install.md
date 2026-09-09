@@ -58,14 +58,25 @@ qualification에서 사용한 candidate wheel bytes가 바뀌면 clean 설치 �
 
 ## 개발 평가와 재현 입력
 
-qualification, benchmark와 fixture 도구는 사용자 설치 표면이 아니다. 이를 실행할 때는 재현 bundle이 있는 checkout을 명시적으로 결속한다. wheel 위치, `Path(__file__)`의 상위 디렉터리나 형제 prototype 경로를 자동으로 사용하지 않는다.
+qualification, benchmark와 fixture 도구는 사용자 설치 표면이 아니다. 이를 실행할 때는 재현 bundle이 있는 checkout과 candidate wheel이 설치된 격리 Python을 각각 명시한다. launcher는 개발 전용 module만 checkout에서 읽고, `flowmarshal` 제품 module은 격리 Python에 설치된 wheel에서 import한다. wheel 위치, `Path(__file__)`의 상위 디렉터리나 형제 prototype 경로를 자동으로 사용하지 않는다.
 
 ```powershell
-$env:FLOWMARSHAL_ENGINE_SOURCE_ROOT = (Resolve-Path <승인된-source-root>).Path
-$env:PYTHONPATH = "$env:FLOWMARSHAL_ENGINE_SOURCE_ROOT/src"
-python -m flowmarshal.engine.eval_cli run --scope deterministic `
-  --project-root $env:FLOWMARSHAL_ENGINE_SOURCE_ROOT
+$SourceRoot = (Resolve-Path <승인된-source-root>).Path
+$CandidatePython = "C:\absolute\candidate-venv\Scripts\python.exe"
+
+& $CandidatePython "$SourceRoot\scripts\installed_candidate_qualification.py" `
+  --source-root $SourceRoot `
+  --candidate-wheel C:\absolute\dist\flowmarshal_engine-0.2.0a1-py3-none-any.whl `
+  probe
+
+& $CandidatePython "$SourceRoot\scripts\installed_candidate_qualification.py" `
+  --source-root $SourceRoot `
+  --candidate-wheel C:\absolute\dist\flowmarshal_engine-0.2.0a1-py3-none-any.whl `
+  eval run --scope deterministic `
+  --project-root $SourceRoot
 ```
+
+`probe`는 실제 evaluation을 시작하지 않고 developer harness import와 현재 non-editable wheel의 distribution·version·import root·package bytes 결속만 검사한다. release `project-e2e`는 같은 launcher의 candidate wheel 경로를 내부 eval 명령에 결속해 evaluation contract·run metadata·evidence에 저장한다. source Python에서 직접 `flowmarshal.engine.eval_cli`를 실행한 결과는 진단에는 사용할 수 있지만 candidate wheel의 release PASS가 아니다.
 
 재현 bundle은 해당 source root의 `config/qualification-roles.json`, `config/qualification-finding-taxonomy.json`, `config/legacy-freeze-manifest.json`, `tests/fixtures/`, 진단 script와 source manifest 전체다. 실행 전에 `source_manifest_files()`와 `source_manifest_digest()`가 입력 bytes digest를 기록한다. 누락된 fixture/config를 wheel에서 보완하지 않으며, 별도 bundle을 명시적으로 제공해야 한다.
 

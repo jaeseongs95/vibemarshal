@@ -570,6 +570,7 @@ class EngineQualificationTests(unittest.TestCase):
             "pyproject.toml",
             "requirements.lock",
             "setup.py",
+            "scripts/installed_candidate_qualification.py",
             "config/pre-1.0-performance-thresholds.json",
             "config/qualification-suite.json",
             "docs/engine-package-install.md",
