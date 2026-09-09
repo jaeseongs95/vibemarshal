@@ -70,6 +70,14 @@ class _RequestEchoFakeRuntime(FakeCodexRuntime):
         )
 
 
+class _PartialCreateObservationFakeRuntime(FakeCodexRuntime):
+    def create_thread(self, **arguments):
+        receipt = super().create_thread(**arguments)
+        return receipt.model_copy(
+            update={"payload": receipt.payload | {"model": arguments["model"]}}
+        )
+
+
 class _CompletionCallbackFakeRuntime(_RequestEchoFakeRuntime):
     def __init__(self, inventory: ModelInventory) -> None:
         super().__init__(inventory)
@@ -124,6 +132,51 @@ class EngineE2EQualificationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.roles = default_role_configuration(ROOT)
         self.inventory = _inventory()
+
+    def test_release_project_e2e_requires_absolute_candidate_wheel_before_provider(self) -> None:
+        policies = load_evaluation_policies(
+            budget_policy_path=ROOT / "config" / "pre-1.0-validation-budget.json",
+            role_timeout_policy_path=ROOT / "config" / "pre-1.0-role-timeouts.json",
+        )
+        with patch(
+            "flowmarshal.engine.e2e_qualification.CodexAppServerRuntime"
+        ) as runtime:
+            with self.assertRaisesRegex(QualificationRunError, "CANDIDATE_WHEEL_REQUIRED"):
+                run_project_e2e(root=ROOT, evaluation_policies=policies)
+            with self.assertRaisesRegex(
+                QualificationRunError, "CANDIDATE_WHEEL_ABSOLUTE_PATH_REQUIRED"
+            ):
+                run_project_e2e(
+                    root=ROOT,
+                    evaluation_policies=policies,
+                    candidate_wheel=Path("candidate.whl"),
+                )
+        runtime.assert_not_called()
+
+    def test_candidate_wheel_binding_changes_project_e2e_contract(self) -> None:
+        fixture_root = ROOT / "tests" / "fixtures" / "engine" / "project-e2e"
+        source_digest = sha256_digest(
+            {
+                path.relative_to(fixture_root).as_posix(): path.read_bytes().hex()
+                for path in sorted(fixture_root.rglob("*"))
+                if path.is_file() and "__pycache__" not in path.parts
+            }
+        )
+        first = _contract(
+            ROOT,
+            self.inventory,
+            self.roles,
+            source_digest,
+            candidate_wheel_binding_digest="sha256:" + "a" * 64,
+        )
+        second = _contract(
+            ROOT,
+            self.inventory,
+            self.roles,
+            source_digest,
+            candidate_wheel_binding_digest="sha256:" + "b" * 64,
+        )
+        self.assertNotEqual(first.contract_digest, second.contract_digest)
 
     def test_runtime_journal_separates_request_binding_from_observed_response(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
@@ -194,6 +247,29 @@ class EngineE2EQualificationTests(unittest.TestCase):
                 _RequestEchoFakeRuntime(self.inventory), journal=root / "runtime.json"
             )
             self.assertEqual(self.inventory.inventory_digest, restored.inventory.inventory_digest)
+
+    def test_runtime_journal_discards_partial_raw_model_observation(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            runtime = RecordedRuntime(
+                _PartialCreateObservationFakeRuntime(self.inventory),
+                journal=root / "runtime.json",
+            )
+            runtime.create_thread(
+                cwd=root,
+                title="E2E",
+                model=self.roles.executor.model,
+                developer_instructions="고정 지침",
+                ephemeral=False,
+            )
+            event = runtime.events[-1]
+            self.assertIsNone(event["observed_model"])
+            self.assertIsNone(event["observed_effort"])
+            self.assertIsNone(event["model_observation_source"])
+            self.assertEqual(
+                "PROVIDER_RAW_RESPONSE_MODEL_OR_EFFORT_NOT_REPORTED",
+                event["model_observation_reason"],
+            )
 
     def test_checkpoint_never_substitutes_config_for_missing_or_mixed_observation(self) -> None:
         self.assertEqual(

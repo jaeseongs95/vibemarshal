@@ -51,6 +51,7 @@ from .domain import (
     RuntimeJobObservationKind,
     RuntimeJobStatus,
     RuntimeReceipt,
+    SemanticValidationObservation,
     StateFact,
     StateSnapshot,
     TaskExecutionSpecRevision,
@@ -78,6 +79,10 @@ from .planning import (
     skeleton_review_evidence_catalog,
 )
 from .planning_feedback import skeleton_semantic_digest
+from .model_observation import (
+    PROVIDER_RAW_MODEL_OBSERVATION_SOURCE,
+    authoritative_model_observation,
+)
 
 if TYPE_CHECKING:
     from .runtime import RuntimeObservation
@@ -3743,6 +3748,19 @@ class EngineService:
                 raise EngineServiceError("성공 Attempt에는 failure_class를 기록할 수 없습니다.")
             if not succeeded and failure_class is None:
                 raise EngineServiceError("실패 Attempt에는 failure_class가 필요합니다.")
+            if succeeded:
+                external_blockers = self._external_effect_execution_call_blockers(
+                    tx,
+                    task_id=attempt["task_id"],
+                    attempt_id=attempt_id,
+                    require_attempt_succeeded=False,
+                    require_effect_confirmation=False,
+                )
+                if external_blockers:
+                    raise EngineServiceError(
+                        "EXTERNAL_EFFECT_EXECUTION_BINDING_REQUIRED: "
+                        + ", ".join(external_blockers)
+                    )
             status = "succeeded" if succeeded else "failed"
             task_status = "validating" if succeeded else "failed"
             now = tx.now
@@ -3995,44 +4013,65 @@ class EngineService:
 
     @staticmethod
     def _verify_semantic_validation_independence(
-        tx: Any, *, task_id: str, evidence_ids: tuple[str, ...]
+        tx: Any,
+        *,
+        task_id: str,
+        validation_id: str,
+        status: ValidationStatus,
+        evidence_ids: tuple[str, ...],
     ) -> None:
         """독립성은 model 이름이 아니라 별도 Attempt/job/turn/evidence provenance로 확인한다."""
         if not evidence_ids:
             raise EngineServiceError("INDEPENDENT_VALIDATION_EVIDENCE_REQUIRED")
         placeholders = ",".join("?" for _ in evidence_ids)
         rows = tx.all(
-            f"SELECT e.id,e.kind,e.attempt_id,a.kind AS attempt_kind FROM evidence_records e "
+            f"SELECT e.id,e.kind,e.attempt_id,e.source_ref,e.observation,e.content_digest,"
+            f"a.kind AS attempt_kind FROM evidence_records e "
             f"LEFT JOIN attempts a ON a.id=e.attempt_id WHERE e.id IN ({placeholders})",
             tuple(evidence_ids),
         )
-        validator_attempt_ids = {
-            row["attempt_id"] for row in rows
+        if len(rows) != len(evidence_ids):
+            raise EngineServiceError("INDEPENDENT_VALIDATION_EVIDENCE_REQUIRED")
+        model_review_rows = [
+            row for row in rows
             if row["kind"] == EvidenceKind.MODEL_REVIEW.value
-            and row["attempt_kind"] == AttemptKind.VALIDATION.value
+        ]
+        validator_attempt_ids = {
+            row["attempt_id"] for row in model_review_rows
+            if row["attempt_kind"] == AttemptKind.VALIDATION.value
         }
-        if len(validator_attempt_ids) != 1:
+        if len(model_review_rows) != 1 or len(validator_attempt_ids) != 1:
             raise EngineServiceError("INDEPENDENT_VALIDATION_ATTEMPT_REQUIRED")
         validator_attempt_id = next(iter(validator_attempt_ids))
         validator_attempt = tx.one(
-            "SELECT task_id,binding_json FROM attempts WHERE id=?", (validator_attempt_id,),
+            "SELECT task_id,binding_json,execution_spec_digest FROM attempts WHERE id=?",
+            (validator_attempt_id,),
         )
-        worker = tx.one(
-            "SELECT id FROM attempts WHERE task_id=? AND kind='execution' "
-            "ORDER BY attempt_no DESC,rowid DESC LIMIT 1", (task_id,),
+        current_spec = tx.maybe_one(
+            "SELECT definition_digest FROM execution_spec_revisions "
+            "WHERE task_id=? AND is_current=1", (task_id,),
+        )
+        worker = (
+            None if current_spec is None else EngineService.resolve_task_validation_worker(
+                tx.connection,
+                task_id=task_id,
+                current_spec_digest=current_spec["definition_digest"],
+            )
         )
         job = tx.maybe_one(
-            "SELECT thread_id,turn_id,status FROM runtime_jobs WHERE attempt_id=? "
+            "SELECT id,thread_id,turn_id,status FROM runtime_jobs WHERE attempt_id=? "
             "AND kind='task_semantic_validate' ORDER BY rowid DESC LIMIT 1",
             (validator_attempt_id,),
         )
         receipt = tx.maybe_one(
-            "SELECT r.binding_json FROM runtime_receipts r JOIN runtime_intents i ON i.id=r.intent_id "
+            "SELECT r.id,r.provider_operation_id,r.binding_json FROM runtime_receipts r "
+            "JOIN runtime_intents i ON i.id=r.intent_id "
             "WHERE i.attempt_id=? AND i.kind='start_turn' ORDER BY i.rowid DESC LIMIT 1",
             (validator_attempt_id,),
         )
         if (
             validator_attempt["task_id"] != task_id
+            or worker is None
             or validator_attempt_id == worker["id"]
             or job is None
             or job["status"] not in {"provider_terminal", "consumed"}
@@ -4042,9 +4081,107 @@ class EngineService:
             or receipt["binding_json"] is None
         ):
             raise EngineServiceError("INDEPENDENT_VALIDATION_PROVENANCE_MISSING")
+        worker_attempt = tx.one(
+            "SELECT binding_json FROM attempts WHERE id=?", (worker["id"],),
+        )
+        worker_job = tx.maybe_one(
+            "SELECT id,thread_id,turn_id,status FROM runtime_jobs WHERE attempt_id=? "
+            "AND kind='worker_turn' ORDER BY rowid DESC LIMIT 1",
+            (worker["id"],),
+        )
         binding = json.loads(receipt["binding_json"])
-        if (binding.get("thread_id"), binding.get("turn_id")) != (job["thread_id"], job["turn_id"]):
+        attempt_binding = (
+            None if validator_attempt["binding_json"] is None
+            else json.loads(validator_attempt["binding_json"])
+        )
+        if (
+            (binding.get("thread_id"), binding.get("turn_id"))
+            != (job["thread_id"], job["turn_id"])
+            or receipt["provider_operation_id"] != job["turn_id"]
+            or attempt_binding is None
+            or attempt_binding.get("thread_id") != job["thread_id"]
+            or attempt_binding.get("turn_id") not in {None, job["turn_id"]}
+        ):
             raise EngineServiceError("INDEPENDENT_VALIDATION_TURN_BINDING_MISMATCH")
+        worker_binding = (
+            None if worker_attempt["binding_json"] is None
+            else json.loads(worker_attempt["binding_json"])
+        )
+        if (
+            worker_binding is None
+            or not isinstance(worker_binding.get("thread_id"), str)
+            or worker_job is None
+            or worker_job["status"] not in {"provider_terminal", "consumed"}
+            or worker_job["thread_id"] != worker_binding.get("thread_id")
+            or worker_job["turn_id"] != worker_binding.get("turn_id")
+        ):
+            raise EngineServiceError("INDEPENDENT_VALIDATION_WORKER_PROVENANCE_MISSING")
+        if worker_job["id"] == job["id"] or worker_binding["thread_id"] == job["thread_id"]:
+            raise EngineServiceError("INDEPENDENT_VALIDATION_WORKER_THREAD_REUSED")
+        provider_calls = tx.all(
+            "SELECT id,receipt_json FROM provider_calls WHERE attempt_id=? "
+            "AND role='semantic_validator' AND execution_status='terminal' "
+            "AND result_status='valid' ORDER BY rowid",
+            (validator_attempt_id,),
+        )
+        if len(provider_calls) != 1 or provider_calls[0]["receipt_json"] is None:
+            raise EngineServiceError("INDEPENDENT_VALIDATION_PROVIDER_CALL_REQUIRED")
+        try:
+            provider_receipt = json.loads(provider_calls[0]["receipt_json"])
+        except json.JSONDecodeError as error:
+            raise EngineServiceError(
+                "INDEPENDENT_VALIDATION_PROVIDER_CALL_REQUIRED"
+            ) from error
+        if (
+            provider_receipt.get("thread_id") != job["thread_id"]
+            or provider_receipt.get("turn_id") != job["turn_id"]
+            or provider_receipt.get("terminal_status")
+            not in PROVIDER_TERMINAL_STATUSES
+        ):
+            raise EngineServiceError("INDEPENDENT_VALIDATION_PROVIDER_CALL_BINDING_MISMATCH")
+        review = model_review_rows[0]
+        if review["source_ref"] != f"codex-validator:{job['thread_id']}":
+            raise EngineServiceError("INDEPENDENT_VALIDATION_EVIDENCE_SOURCE_MISMATCH")
+        try:
+            semantic = SemanticValidationObservation.model_validate_json(
+                review["observation"]
+            )
+        except ValueError as error:
+            raise EngineServiceError(
+                "INDEPENDENT_VALIDATION_EVIDENCE_SOURCE_MISMATCH"
+            ) from error
+        if (
+            semantic.task_id != task_id
+            or semantic.validation_id != validation_id
+        ):
+            raise EngineServiceError("INDEPENDENT_VALIDATION_EVIDENCE_SOURCE_MISMATCH")
+        if review["content_digest"] != sha256_digest(semantic):
+            raise EngineServiceError("INDEPENDENT_VALIDATION_EVIDENCE_DIGEST_MISMATCH")
+        if semantic.passed != (status is ValidationStatus.PASS):
+            raise EngineServiceError("INDEPENDENT_VALIDATION_STATUS_MISMATCH")
+        reused = tx.all(
+            "SELECT id,payload_json FROM validation_results WHERE project_id=?",
+            (tx.one("SELECT project_id FROM task_contracts WHERE id=?", (task_id,))["project_id"],),
+        )
+        used_evidence_ids = {
+            evidence_id
+            for item in reused
+            for evidence_id in json.loads(item["payload_json"]).get("evidence_ids", [])
+            if isinstance(evidence_id, str)
+        }
+        used_validator_attempt = False
+        if used_evidence_ids:
+            used_placeholders = ",".join("?" for _ in used_evidence_ids)
+            used_validator_attempt = any(
+                item["attempt_id"] == validator_attempt_id
+                for item in tx.all(
+                    f"SELECT attempt_id FROM evidence_records "
+                    f"WHERE kind=? AND id IN ({used_placeholders})",
+                    (EvidenceKind.MODEL_REVIEW.value, *sorted(used_evidence_ids)),
+                )
+            )
+        if review["id"] in used_evidence_ids or used_validator_attempt:
+            raise EngineServiceError("INDEPENDENT_VALIDATION_EVIDENCE_REUSED")
 
     def record_validation(
         self,
@@ -4089,23 +4226,16 @@ class EngineService:
                     item for item in plan.definition.tasks if item.task_id == result.task_id
                 )
                 validation_contract = validation_contracts[result.validation_id]
-                submitted_kinds: set[str] = set()
-                if result.evidence_ids:
-                    placeholders = ",".join("?" for _ in result.evidence_ids)
-                    submitted_kinds = {
-                        row["kind"] for row in tx.all(
-                            f"SELECT kind FROM evidence_records WHERE id IN ({placeholders})",
-                            tuple(result.evidence_ids),
-                        )
-                    }
                 if (
                     task_contract.assignment.independence_required
                     and validation_contract.method == "semantic"
-                    and EvidenceKind.MODEL_REVIEW.value in submitted_kinds
                     and result.status in {ValidationStatus.PASS, ValidationStatus.FAIL}
                 ):
                     self._verify_semantic_validation_independence(
-                        tx, task_id=result.task_id, evidence_ids=result.evidence_ids,
+                        tx, task_id=result.task_id,
+                        validation_id=result.validation_id,
+                        status=result.status,
+                        evidence_ids=result.evidence_ids,
                     )
             if result.evidence_ids:
                 placeholders = ",".join("?" for _ in result.evidence_ids)
@@ -4323,8 +4453,8 @@ class EngineService:
     def _confirm_external_effect_observation(
         self, observation: ExternalValidationObservation,
     ) -> None:
-        """typed target observation을 같은 Task의 미확정 Worker 호출에 결속한다."""
-        if observation.effect_identity is None:
+        """Confirm only the conjunction of adapter receipt and target observation."""
+        if observation.effect_identity is None or observation.passed is not True:
             return
         with self.ledger.transaction() as tx:
             task = tx.one("SELECT project_id,payload_json FROM task_contracts WHERE id=?",
@@ -4343,6 +4473,8 @@ class EngineService:
             }
             if observation.effect_identity_digest not in expected:
                 raise EngineServiceError("EFFECT_TARGET_OBSERVATION_IDENTITY_MISMATCH")
+            if observation.provider != observation.effect_identity.provider:
+                raise EngineServiceError("EFFECT_TARGET_OBSERVATION_PROVIDER_MISMATCH")
             call = tx.maybe_one(
                 "SELECT c.* FROM provider_calls c JOIN attempts a ON a.id=c.attempt_id "
                 "WHERE a.task_id=? AND a.kind='execution' AND c.execution_status='terminal' "
@@ -4373,6 +4505,18 @@ class EngineService:
                 "target_observation_digest": observation.target_observation_digest,
                 "provider_receipt_digest": observation.receipt_digest,
             }
+            prior_confirmations = tx.all(
+                "SELECT payload_json FROM history_events WHERE project_id=? "
+                "AND entity_type='provider_call' AND entity_id=? "
+                "AND event_type='provider_effect.confirmed' ORDER BY sequence",
+                (task["project_id"], call["id"]),
+            )
+            if any(
+                json.loads(item["payload_json"]).get("binding_digest")
+                == sha256_digest(binding)
+                for item in prior_confirmations
+            ):
+                return
             tx.history(
                 task["project_id"], "provider_effect.confirmed", "provider_call", call["id"],
                 {**binding, "binding_digest": sha256_digest(binding)},
@@ -4442,6 +4586,7 @@ class EngineService:
                 or call["attempt_id"] != attempt_id
                 or call["role"] != "worker"
                 or call["execution_status"] != "terminal"
+                or call["result_status"] != "valid"
                 or intent["attempt_id"] != attempt_id
                 or intent["kind"] not in {
                     RuntimeIntentKind.START_TURN.value,
@@ -4457,7 +4602,7 @@ class EngineService:
             attempt_binding = (
                 None if attempt["binding_json"] is None else json.loads(attempt["binding_json"])
             )
-            if attempt_binding is not None and (
+            if attempt_binding is None or (
                 attempt_binding.get("thread_id") != thread_id
                 or attempt_binding.get("turn_id") not in {None, turn_id}
             ):
@@ -4484,6 +4629,27 @@ class EngineService:
                 "target_observation_digest": target_observation_digest,
             }
             receipt_digest = sha256_digest(body)
+            replay_rows = tx.all(
+                "SELECT payload_json FROM history_events "
+                "WHERE event_type='effect.receipt_recorded' ORDER BY sequence",
+            )
+            for replay_row in replay_rows:
+                replay = json.loads(replay_row["payload_json"])
+                replay_identity = replay.get("effect_identity")
+                if (
+                    isinstance(replay_identity, dict)
+                    and replay_identity.get("provider") == effect_identity.provider
+                    and replay_identity.get("system") == effect_identity.system
+                    and replay.get("provider_operation_id") == provider_operation_id
+                ):
+                    if (
+                        replay.get("attempt_id") == attempt_id
+                        and replay.get("receipt_digest") == receipt_digest
+                    ):
+                        return receipt_digest
+                    if replay.get("attempt_id") != attempt_id:
+                        raise EngineServiceError("EFFECT_ADAPTER_OPERATION_REPLAY_CONFLICT")
+                    raise EngineServiceError("EFFECT_ADAPTER_RECEIPT_CONFLICT")
             prior_rows = tx.all(
                 "SELECT payload_json FROM history_events WHERE project_id=? "
                 "AND entity_type='provider_call' AND entity_id=? "
@@ -4547,6 +4713,110 @@ class EngineService:
         )
         return tuple(row["id"] for row in rows)
 
+    @staticmethod
+    def _external_effect_execution_call_blockers(
+        tx: Any,
+        *,
+        task_id: str,
+        attempt_id: str | None = None,
+        require_attempt_succeeded: bool,
+        require_effect_confirmation: bool,
+    ) -> tuple[str, ...]:
+        """Verify the 1.0 external-effect execution/receipt/turn invariant."""
+
+        task = tx.one("SELECT payload_json FROM task_contracts WHERE id=?", (task_id,))
+        contract = json.loads(task["payload_json"])
+        external_effects = [item for item in contract["expected_effects"] if item["external"]]
+        if not external_effects:
+            return ()
+        if len(external_effects) != len(contract["expected_effects"]):
+            return ("MIXED_EFFECT_CONTRACT_REQUIRES_TASK_SPLIT",)
+        if attempt_id is None:
+            spec = tx.maybe_one(
+                "SELECT definition_digest FROM execution_spec_revisions "
+                "WHERE task_id=? AND is_current=1", (task_id,),
+            )
+            worker = (
+                None if spec is None else EngineService.resolve_task_validation_worker(
+                    tx.connection,
+                    task_id=task_id,
+                    current_spec_digest=spec["definition_digest"],
+                )
+            )
+            if worker is None:
+                return ("EXTERNAL_EFFECT_SUCCESSFUL_EXECUTION_ATTEMPT_MISSING",)
+            attempt_id = worker["id"]
+        attempt = tx.maybe_one(
+            "SELECT id,task_id,kind,status,binding_json FROM attempts WHERE id=?",
+            (attempt_id,),
+        )
+        if (
+            attempt is None
+            or attempt["task_id"] != task_id
+            or attempt["kind"] != AttemptKind.EXECUTION.value
+            or (require_attempt_succeeded and attempt["status"] != AttemptStatus.SUCCEEDED.value)
+        ):
+            return ("EXTERNAL_EFFECT_SUCCESSFUL_EXECUTION_ATTEMPT_MISSING",)
+        calls = tx.all(
+            "SELECT * FROM provider_calls WHERE attempt_id=? AND role='worker' "
+            "AND execution_status='terminal' AND result_status='valid' ORDER BY rowid",
+            (attempt_id,),
+        )
+        if len(calls) != 1:
+            return ("EXTERNAL_EFFECT_TERMINAL_VALID_PROVIDER_CALL_REQUIRED",)
+        call = calls[0]
+        if require_effect_confirmation and call["effect_status"] != "terminal":
+            return (f"EXTERNAL_EFFECT_CONFIRMATION_REQUIRED:{call['id']}",)
+        turn_receipts = tx.all(
+            "SELECT i.id AS intent_id,i.kind,i.status,r.id AS receipt_id,"
+            "r.provider_operation_id,r.binding_json FROM runtime_intents i "
+            "JOIN runtime_receipts r ON r.intent_id=i.id "
+            "WHERE i.attempt_id=? AND i.kind IN ('start_turn','resume_turn') "
+            "AND i.status='received' ORDER BY i.rowid",
+            (attempt_id,),
+        )
+        bound_turns: list[tuple[str, str, Any]] = []
+        for receipt in turn_receipts:
+            if receipt["binding_json"] is None:
+                continue
+            binding = json.loads(receipt["binding_json"])
+            if (
+                isinstance(binding.get("thread_id"), str)
+                and isinstance(binding.get("turn_id"), str)
+                and receipt["provider_operation_id"] == binding["turn_id"]
+            ):
+                bound_turns.append((binding["thread_id"], binding["turn_id"], receipt))
+        if not bound_turns:
+            return ("EXTERNAL_EFFECT_RUNTIME_TURN_RECEIPT_REQUIRED",)
+        provider_receipt = None
+        if call["receipt_json"] is not None:
+            try:
+                provider_receipt = json.loads(call["receipt_json"])
+            except json.JSONDecodeError:
+                return ("EXTERNAL_EFFECT_PROVIDER_RECEIPT_INVALID",)
+        if provider_receipt is not None:
+            expected_turn = (
+                provider_receipt.get("thread_id"), provider_receipt.get("turn_id")
+            )
+            if (
+                expected_turn not in {(thread, turn) for thread, turn, _ in bound_turns}
+                or provider_receipt.get("terminal_status")
+                not in PROVIDER_TERMINAL_STATUSES
+            ):
+                return ("EXTERNAL_EFFECT_PROVIDER_RUNTIME_BINDING_MISMATCH",)
+        else:
+            expected_turn = bound_turns[-1][:2]
+        attempt_binding = (
+            None if attempt["binding_json"] is None else json.loads(attempt["binding_json"])
+        )
+        if (
+            attempt_binding is None
+            or attempt_binding.get("thread_id") != expected_turn[0]
+            or attempt_binding.get("turn_id") not in {None, expected_turn[1]}
+        ):
+            return ("EXTERNAL_EFFECT_ATTEMPT_RUNTIME_BINDING_MISMATCH",)
+        return ()
+
     def complete_task(self, task_id: str) -> tuple[str, ...]:
         with self.ledger.transaction() as tx:
             task = tx.one("SELECT * FROM task_contracts WHERE id = ?", (task_id,))
@@ -4556,6 +4826,17 @@ class EngineService:
             if unresolved:
                 raise EngineServiceError(
                     "TASK_PROVIDER_EXECUTION_OR_EFFECT_UNRESOLVED: " + ", ".join(unresolved)
+                )
+            external_blockers = self._external_effect_execution_call_blockers(
+                tx,
+                task_id=task_id,
+                require_attempt_succeeded=True,
+                require_effect_confirmation=True,
+            )
+            if external_blockers:
+                raise EngineServiceError(
+                    "TASK_EXTERNAL_EFFECT_EXECUTION_UNVERIFIED: "
+                    + ", ".join(external_blockers)
                 )
             contract = json.loads(task["payload_json"])
             expected = {item["validation_id"] for item in contract["validations"]}
@@ -4609,6 +4890,24 @@ class EngineService:
                     raise EngineServiceError(
                         "GOAL_PROVIDER_EXECUTION_OR_EFFECT_UNRESOLVED: "
                         + ", ".join(unresolved)
+                    )
+                external_blockers: list[str] = []
+                for task_row in tx.all(
+                    "SELECT id FROM task_contracts WHERE plan_revision_id=? ORDER BY rowid",
+                    (plan_revision_id,),
+                ):
+                    external_blockers.extend(
+                        self._external_effect_execution_call_blockers(
+                            tx,
+                            task_id=task_row["id"],
+                            require_attempt_succeeded=True,
+                            require_effect_confirmation=True,
+                        )
+                    )
+                if external_blockers:
+                    raise EngineServiceError(
+                        "GOAL_EXTERNAL_EFFECT_EXECUTION_UNVERIFIED: "
+                        + ", ".join(external_blockers)
                     )
                 expected_integrations = {
                     item.validation_id for item in plan.definition.integration_validations
@@ -4812,8 +5111,7 @@ class EngineService:
                            "output_digest": output_digest, "payload": provider_payload}
             from .model_lock import OperationalBinding
             model_observation = OperationalBinding.model_validate(request["model_observation"])
-            observed_model = provider_payload.get("observed_model")
-            observed_effort = provider_payload.get("observed_effort")
+            observed_model, observed_effort = authoritative_model_observation(provider_payload)
             usage = BudgetUsageRecord(
                 usage_id=new_id("usage"), project_id=attempt["project_id"],
                 goal_contract_digest=plan.definition.goal_contract_digest, stage=BudgetStage.EXECUTION,
@@ -4821,15 +5119,17 @@ class EngineService:
                 model=request["model"], effort=request["effort"],
                 binding_provenance_version="2.0",
                 requested_model=request["model"], requested_effort=request["effort"],
-                observed_model=observed_model if isinstance(observed_model, str) else None,
-                observed_effort=observed_effort if isinstance(observed_effort, str) else None,
+                observed_model=observed_model,
+                observed_effort=observed_effort,
                 provider_inventory_digest=model_observation.inventory.provider_inventory_digest,
                 adapter_capability_digest=model_observation.inventory.adapter_capability_digest,
                 binding_provenance={
                     "requested": "runtime_intent",
-                    "observed": "provider_terminal" if (
-                        isinstance(observed_model, str) or isinstance(observed_effort, str)
-                    ) else None,
+                    "observed": (
+                        PROVIDER_RAW_MODEL_OBSERVATION_SOURCE
+                        if observed_model is not None and observed_effort is not None
+                        else None
+                    ),
                     "provider_inventory": "model/list",
                     "adapter_capability": "local_operational_binding",
                 },

@@ -18,6 +18,10 @@ from .domain import (
     utc_now,
 )
 from .service import EngineService, EngineServiceError
+from .model_observation import (
+    PROVIDER_RAW_MODEL_OBSERVATION_SOURCE,
+    authoritative_model_observation,
+)
 
 
 class GoalBudgetPolicy(EngineModel):
@@ -29,7 +33,12 @@ class GoalBudgetPolicy(EngineModel):
 
     schema_version: Literal["1.0"] = "1.0"
     total_tokens: int = Field(gt=0, strict=True)
-    call_reservation_tokens: int = Field(gt=0, strict=True)
+    call_reservation_tokens: int | None = Field(
+        default=None,
+        gt=0,
+        strict=True,
+        deprecated="호환용 legacy 입력이며 신규 admission·요금·구독 한도 계산에 사용하지 않습니다.",
+    )
     replan_reserve_percent: int = Field(default=25, ge=0, le=90, strict=True)
 
 
@@ -771,23 +780,26 @@ def record_validator_usage(service: EngineService, attempt_id: str, observation:
         duration = observation.payload.get("duration_ms")
         from .model_lock import OperationalBinding
         model_observation = OperationalBinding.model_validate(request["model_observation"])
-        observed_model = observation.payload.get("observed_model")
-        observed_effort = observation.payload.get("observed_effort")
+        observed_model, observed_effort = authoritative_model_observation(
+            observation.payload
+        )
         usage = BudgetUsageRecord(usage_id=new_id("usage"), project_id=attempt["project_id"],
             goal_contract_digest=call["goal_contract_digest"], stage=BudgetStage.VALIDATION,
             logical_call_ref=key, role="semantic_validator", call_status=observation.terminal_status,
             model=request["model"], effort=request["effort"], permission_profile=receipt.response_payload["permission_profile"],
             binding_provenance_version="2.0",
             requested_model=request["model"], requested_effort=request["effort"],
-            observed_model=observed_model if isinstance(observed_model, str) else None,
-            observed_effort=observed_effort if isinstance(observed_effort, str) else None,
+            observed_model=observed_model,
+            observed_effort=observed_effort,
             provider_inventory_digest=model_observation.inventory.provider_inventory_digest,
             adapter_capability_digest=model_observation.inventory.adapter_capability_digest,
             binding_provenance={
                 "requested": "runtime_intent",
-                "observed": "provider_terminal" if (
-                    isinstance(observed_model, str) or isinstance(observed_effort, str)
-                ) else None,
+                "observed": (
+                    PROVIDER_RAW_MODEL_OBSERVATION_SOURCE
+                    if observed_model is not None and observed_effort is not None
+                    else None
+                ),
                 "provider_inventory": "model/list",
                 "adapter_capability": "local_operational_binding",
             },

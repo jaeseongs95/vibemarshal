@@ -333,7 +333,7 @@ class ValidationOperationBindingTests(unittest.TestCase):
 
 
 class ValidatorRebindDeterministicBindingTests(ModelRebindingFixture):
-    def test_validator_only_rebind_distinguishes_validation_and_worker_specs(self) -> None:
+    def test_semantic_contract_rejects_deterministic_evidence_after_validator_rebind(self) -> None:
         worker, _ = self.complete_worker_with_evidence()
         rebound = self.rebinding.rebind_and_reserve(
             self.request(
@@ -365,38 +365,15 @@ class ValidatorRebindDeterministicBindingTests(ModelRebindingFixture):
         with patch(
             "flowmarshal.engine.validation_execution.subprocess.run",
             return_value=subprocess.CompletedProcess([], 0, b"passed", b""),
+        ), self.assertRaisesRegex(
+            EngineServiceError, "INDEPENDENT_VALIDATION_ATTEMPT_REQUIRED",
         ):
-            outcome = run_command_validation(self.service, task, deterministic)
-
+            run_command_validation(self.service, task, deterministic)
         with self.ledger.read() as connection:
-            history = connection.execute(
-                "SELECT payload_json FROM history_events WHERE entity_id = ? "
-                "AND event_type = 'validation.recorded'",
-                (outcome.validation_result_id,),
-            ).fetchone()
-            binding = json.loads(history["payload_json"])["operation_binding"]
-            prepared = json.loads(connection.execute(
-                "SELECT payload_json FROM history_events WHERE entity_id = ? "
-                "AND event_type = 'operation.prepared'",
-                (binding["operation_id"],),
-            ).fetchone()["payload_json"])["request"]
-            effective = self.service.effective_task_validation_results(
-                connection, self.task.task_id
-            )
-        self.assertEqual(
-            rebound.execution_spec.definition_digest,
-            binding["validation_execution_spec_digest"],
-        )
-        self.assertEqual(
-            worker.execution_spec_digest,
-            binding["source_worker_execution_spec_digest"],
-        )
-        self.assertEqual(
-            rebound.execution_spec.definition_digest,
-            prepared["execution_spec_digest"],
-        )
-        self.assertEqual(worker.execution_spec_digest, prepared["source_worker_execution_spec_digest"])
-        self.assertEqual([outcome.validation_result_id], [row["id"] for row in effective])
+            self.assertEqual(0, connection.execute(
+                "SELECT COUNT(*) FROM validation_results WHERE task_id=?",
+                (self.task.task_id,),
+            ).fetchone()[0])
 
 
 if __name__ == "__main__":

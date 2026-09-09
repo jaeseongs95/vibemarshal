@@ -115,6 +115,7 @@ from .qualification_manifest import (
     QualificationSuiteManifest,
     classify_qualification_failure,
     evaluate_qualification_responsibilities,
+    verify_candidate_wheel_metadata,
     verify_qualification_reproduction_bundle,
     write_qualification_reproduction_bundle,
 )
@@ -1959,6 +1960,11 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
             metadata = load_run_metadata(destination)
             if metadata.get("scope") != "deterministic":
                 policies_from_metadata(metadata)
+            if metadata.get("scope") == "project-e2e":
+                try:
+                    verify_candidate_wheel_metadata(metadata)
+                except QualificationManifestError as error:
+                    raise QualificationRunError(str(error)) from error
             contract = EvaluationContract.model_validate_json(
                 (destination / "evaluation-contract.json").read_text(encoding="utf-8")
             )
@@ -1999,11 +2005,17 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
     if scope == "project-e2e":
         from .e2e_qualification import run_project_e2e
 
+        try:
+            candidate_binding = verify_candidate_wheel_metadata(metadata)
+        except QualificationManifestError as error:
+            raise QualificationRunError(str(error)) from error
+
         return run_project_e2e(
             root=base,
             run_root=destination,
             role_configuration=roles,
             codex_bin=codex_bin,
             evaluation_policies=policies,
+            candidate_wheel=candidate_binding.wheel_path,
         )
     raise QualificationRunError(f"지원하지 않는 resume scope입니다: {scope}")

@@ -1121,6 +1121,15 @@ class ValidationContract(EngineModel):
     def evidence_kinds_are_unique(cls, value: tuple[str, ...]) -> tuple[str, ...]:
         return _unique(value, "validation evidence kind")
 
+    @model_validator(mode="after")
+    def semantic_validation_requires_model_review(self) -> "ValidationContract":
+        if (
+            self.method == "semantic"
+            and EvidenceKind.MODEL_REVIEW.value not in self.required_evidence_kinds
+        ):
+            raise ValueError("semantic validation에는 model_review evidence가 필요합니다.")
+        return self
+
 
 class RecoveryEnvelope(EngineModel):
     max_same_failure_replans: int = Field(default=2, ge=0, le=10)
@@ -1276,6 +1285,11 @@ class IntegrationValidationContract(EngineModel):
 
     @model_validator(mode="after")
     def aggregation_is_deterministic(self):
+        if (
+            self.method == "semantic"
+            and EvidenceKind.MODEL_REVIEW.value not in self.required_evidence_kinds
+        ):
+            raise ValueError("semantic integration validation에는 model_review evidence가 필요합니다.")
         if self.evidence_mode == "task_aggregate" and self.method != "deterministic":
             raise ValueError("Task evidence 집계는 deterministic Goal Test만 허용합니다.")
         return self
@@ -2221,6 +2235,8 @@ class ExternalValidationObservation(EngineModel):
             return self
         if self.effect_identity_digest != self.effect_identity.identity_digest:
             raise ValueError("effect identity digest가 본문과 다릅니다.")
+        if self.provider != self.effect_identity.provider:
+            raise ValueError("target observation provider가 effect identity provider와 다릅니다.")
         document = {
             "provider": self.provider,
             "selector": self.selector,

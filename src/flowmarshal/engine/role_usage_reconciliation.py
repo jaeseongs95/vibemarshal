@@ -8,6 +8,7 @@ from typing import Any
 from ..canonical import canonical_json, sha256_digest
 from .domain import PROVIDER_TERMINAL_STATUSES, BudgetStage, BudgetUsageRecord, new_id
 from .roles import RoleCallReceipt
+from .model_observation import authoritative_receipt_model_observation
 
 
 # 기존 diagnostic import 계약을 유지하되 단일 공통 정의를 참조한다.
@@ -177,23 +178,27 @@ def usage_from_observation(
     observed_scope = (document.get("payload") or {}).get("usage_scope")
     provenance = {}
     if receipt.binding_provenance_version == "2.0":
+        observed_model, observed_effort = authoritative_receipt_model_observation(
+            observed_model=receipt.observed_model,
+            observed_effort=receipt.observed_effort,
+            binding_provenance=receipt.binding_provenance,
+        )
         provenance = {
             "binding_provenance_version": "2.0",
             "requested_model": receipt.requested_model,
             "requested_effort": receipt.requested_effort,
-            "observed_model": (
-                (document.get("payload") or {}).get("observed_model")
-                if isinstance((document.get("payload") or {}).get("observed_model"), str)
-                else receipt.observed_model
-            ),
-            "observed_effort": (
-                (document.get("payload") or {}).get("observed_effort")
-                if isinstance((document.get("payload") or {}).get("observed_effort"), str)
-                else receipt.observed_effort
-            ),
+            "observed_model": observed_model,
+            "observed_effort": observed_effort,
             "provider_inventory_digest": receipt.provider_inventory_digest,
             "adapter_capability_digest": receipt.adapter_capability_digest,
-            "binding_provenance": receipt.binding_provenance,
+            "binding_provenance": {
+                **(receipt.binding_provenance or {}),
+                "observed": (
+                    (receipt.binding_provenance or {}).get("observed")
+                    if observed_model is not None and observed_effort is not None
+                    else None
+                ),
+            },
         }
     return BudgetUsageRecord(
         usage_id=new_id("usage"), project_id=call["project_id"], goal_contract_digest=goal_digest,

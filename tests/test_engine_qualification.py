@@ -38,13 +38,20 @@ from flowmarshal.engine.e2e_qualification import (
     _unknown_receipt,
     _write_prepared_state,
 )
-from flowmarshal.engine.eval_cli import _bound_scope_reports, build_parser, validate_benchmark_matrix
+from flowmarshal.engine.eval_cli import (
+    _bound_scope_reports,
+    _run,
+    build_parser,
+    validate_benchmark_matrix,
+)
 from flowmarshal.engine.evaluation import (
     BenchmarkCell,
     BenchmarkLifecycleObservation,
     BenchmarkTaskLifecycleObservation,
     EvaluationCellCheckpoint,
+    EvaluationContract,
     EvaluationRunStatus,
+    EvaluationScope,
     ImmutableCheckpointStore,
     RegressionCatalog,
 )
@@ -55,6 +62,7 @@ from flowmarshal.engine.evaluation_budget import (
 from flowmarshal.engine.freeze import LegacyFreezeManifest, verify_legacy_freeze
 from flowmarshal.engine.ledger import ENGINE_SCHEMA_REVISION, EngineLedgerError, SQLiteEngineLedger
 from flowmarshal.engine.models import ModelCapability, ModelInventory
+from flowmarshal.engine.qualification_manifest import QualificationManifestError
 from flowmarshal.engine.qualification import (
     GenericFixtureReviewDraft,
     PlanningScenarioCatalog,
@@ -134,6 +142,62 @@ def qualification_inventory() -> ModelInventory:
 
 
 class EngineQualificationTests(unittest.TestCase):
+    def test_completed_project_e2e_resume_rejects_changed_candidate_wheel(self) -> None:
+        policies = EvaluationPolicies(
+            budget=GoalBudgetPolicy(
+                total_tokens=1_000_000, call_reservation_tokens=100_000
+            ),
+            role_timeouts=RoleTimeoutPolicy(),
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            destination = Path(raw)
+            contract = EvaluationContract(
+                model_lock_format="flowmarshal-model-lock-v2",
+                scope=EvaluationScope.PROJECT_E2E,
+                fixture_digests=("sha256:" + "1" * 64,),
+                scenario_set_digest="sha256:" + "2" * 64,
+                order_seeds=(0,),
+                expected_cell_count=1,
+                role_configuration_digest="sha256:" + "3" * 64,
+                source_manifest_digest=source_manifest_digest(ROOT),
+                rules_digest="sha256:" + "4" * 64,
+                threshold_digest="sha256:" + "5" * 64,
+                taxonomy_digest="sha256:" + "6" * 64,
+                prompt_digest="sha256:" + "7" * 64,
+                output_schema_digest="sha256:" + "8" * 64,
+                model_lock_digest="sha256:" + "9" * 64,
+            )
+            report = ScopeQualificationReport(
+                scope=EvaluationScope.PROJECT_E2E,
+                contract_digest=contract.contract_digest,
+                status=EvaluationRunStatus.COMPLETED,
+                passed=True,
+                metrics={"actual_codex_cell_count": 4},
+                generated_at=utc_now(),
+            )
+            _write_json(destination / "qualification-report.json", report)
+            _write_json(destination / "evaluation-contract.json", contract)
+            write_immutable_run_metadata(
+                destination / "run-metadata.json",
+                {
+                    "scope": "project-e2e",
+                    "project_root": str(ROOT),
+                    "evaluation_contract_digest": report.contract_digest,
+                    "candidate_wheel_binding": {"stale": True},
+                    "candidate_wheel_binding_digest": "sha256:" + "b" * 64,
+                },
+                policies,
+            )
+            with patch(
+                "flowmarshal.engine.qualification.verify_candidate_wheel_metadata",
+                side_effect=QualificationManifestError(
+                    "CANDIDATE_WHEEL_BINDING_CHANGED"
+                ),
+            ), self.assertRaisesRegex(
+                QualificationRunError, "CANDIDATE_WHEEL_BINDING_CHANGED"
+            ):
+                resume_run(destination)
+
     def setUp(self) -> None:
         self.roles = default_role_configuration(ROOT)
         self.inventory = qualification_inventory()
@@ -406,6 +470,35 @@ class EngineQualificationTests(unittest.TestCase):
         ):
             arguments = parser.parse_args(["run", "--scope", scope])
             self.assertEqual(scope, arguments.scope)
+        candidate = str((ROOT / "dist" / "candidate.whl").resolve())
+        arguments = parser.parse_args(
+            [
+                "run",
+                "--scope",
+                "project-e2e",
+                "--candidate-wheel",
+                candidate,
+            ]
+        )
+        self.assertEqual(candidate, arguments.candidate_wheel)
+        missing = parser.parse_args(
+            ["run", "--scope", "project-e2e", "--project-root", str(ROOT)]
+        )
+        with self.assertRaisesRegex(QualificationRunError, "--candidate-wheel"):
+            _run(missing)
+        relative = parser.parse_args(
+            [
+                "run",
+                "--scope",
+                "project-e2e",
+                "--project-root",
+                str(ROOT),
+                "--candidate-wheel",
+                "candidate.whl",
+            ]
+        )
+        with self.assertRaisesRegex(QualificationRunError, "절대경로"):
+            _run(relative)
 
     def test_benchmark_project_binding_changes_only_legacy_thread_persistence(self) -> None:
         policies = EvaluationPolicies(

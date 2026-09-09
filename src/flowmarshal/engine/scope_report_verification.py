@@ -16,6 +16,7 @@ from .evaluation import (
     ImmutableCheckpointStore,
     evaluate_role_fixtures,
 )
+from .evaluation_budget import verify_metadata_digest
 from .role_observations import RoleCallReceipt
 from .qualification import (
     ORDER_SEEDS,
@@ -30,6 +31,8 @@ from .qualification import (
 from .qualification_manifest import (
     QualificationCellOutcome,
     evaluate_qualification_responsibilities,
+    verify_candidate_wheel_metadata,
+    verify_qualification_reproduction_bundle,
 )
 
 
@@ -205,12 +208,14 @@ def _planning(
 def _project_e2e(
     *,
     root: Path,
+    run_root: Path,
     contract: EvaluationContract,
     cells: tuple[EvaluationCellCheckpoint, ...],
     errors: list[str],
 ) -> tuple[dict[str, Any], tuple[str, ...]]:
     raws: list[dict[str, Any]] = []
     outcomes: list[QualificationCellOutcome] = []
+    expected_cell_bindings: dict[str, tuple[str, int]] = {}
     for checkpoint, scenario in zip(cells, E2E_SCENARIOS, strict=False):
         raw = checkpoint.raw_structured_assessment
         if raw.get("scenario") != scenario or raw.get("order_seed") != 0 or not isinstance(raw.get("passed"), bool):
@@ -221,8 +226,15 @@ def _project_e2e(
         if not isinstance(events, list) or receipt.get("events_digest") != sha256_digest(events):
             _error(errors, "SCOPE_REPORT_E2E_RECEIPT_BINDING_MISMATCH")
         try:
-            outcomes.append(
-                QualificationCellOutcome.model_validate(raw["qualification_outcome"])
+            outcome = QualificationCellOutcome.model_validate(
+                raw["qualification_outcome"]
+            )
+            if outcome.cell_id != scenario:
+                _error(errors, "SCOPE_REPORT_E2E_EVIDENCE_CELL_MISMATCH")
+            outcomes.append(outcome)
+            expected_cell_bindings[outcome.cell_id] = (
+                checkpoint.fixture_digest,
+                checkpoint.order_seed,
             )
         except Exception:
             _error(errors, "SCOPE_REPORT_E2E_RESPONSIBILITY_EVIDENCE_MISSING")
@@ -231,10 +243,41 @@ def _project_e2e(
         f"{item['scenario']}: {item.get('failure') or item.get('error') or 'FAIL'}"
         for item in raws if not item["passed"]
     )
+    try:
+        freeze_bundle_digest = verify_qualification_reproduction_bundle(
+            run_root / "reproduction-bundle"
+        ).bundle_digest
+    except Exception:
+        freeze_bundle_digest = None
+        _error(errors, "SCOPE_REPORT_E2E_FREEZE_BUNDLE_INVALID")
+    candidate_binding = None
+    try:
+        metadata = json.loads(
+            (run_root / "run-metadata.json").read_text(encoding="utf-8")
+        )
+        verify_metadata_digest(metadata)
+        candidate_binding = verify_candidate_wheel_metadata(metadata)
+        candidate_wheel_digest = candidate_binding.wheel_digest
+    except Exception:
+        candidate_wheel_digest = None
+        _error(errors, "SCOPE_REPORT_E2E_CANDIDATE_WHEEL_INVALID")
     responsibility_report = evaluate_qualification_responsibilities(
         qualification_suite_manifest(root),
         tuple(outcomes),
         evaluation_contract_digest=contract.contract_digest,
+        run_root=run_root,
+        expected_cell_bindings=expected_cell_bindings,
+        expected_freeze_bundle_digest=freeze_bundle_digest,
+        expected_candidate_wheel_digest=candidate_wheel_digest,
+        expected_candidate_wheel_binding_digest=(
+            None if candidate_binding is None else candidate_binding.binding_digest
+        ),
+        expected_candidate_distribution_name=(
+            None if candidate_binding is None else candidate_binding.distribution_name
+        ),
+        expected_candidate_distribution_version=(
+            None if candidate_binding is None else candidate_binding.distribution_version
+        ),
     )
     failures = tuple((*cell_failures, *responsibility_report.failures))
     metrics = {
@@ -288,6 +331,7 @@ def verify_scope_report(
     elif report.scope.value == "activation_execution_validation_restart_e2e":
         metrics, failures = _project_e2e(
             root=base,
+            run_root=destination,
             contract=contract,
             cells=cells,
             errors=errors,

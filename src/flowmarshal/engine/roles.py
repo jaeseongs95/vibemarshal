@@ -33,6 +33,10 @@ from .model_lock import (
 
 from .role_observations import RoleCallReceipt, RoleInputContractError, StructuredRoleError
 from .operation_trace import OperationTrace, current_operation_trace_scope
+from .model_observation import (
+    PROVIDER_RAW_MODEL_OBSERVATION_SOURCE,
+    authoritative_model_observation,
+)
 
 
 class RoleCallRequest(EngineModel):
@@ -813,6 +817,9 @@ class CodexStructuredRoleRunner:
         if trace is not None:
             pending = trace.snapshot()["manifest"]["pending_operation_ids"]
             trace_body = trace.snapshot() if pending else trace.seal()
+        observed_model, observed_effort = authoritative_model_observation(
+            observation_payload
+        )
         receipt = RoleCallReceipt(
             call_id=call_id,
             role=request.role,
@@ -822,24 +829,15 @@ class CodexStructuredRoleRunner:
             binding_provenance_version="2.0",
             requested_model=request.model,
             requested_effort=request.effort,
-            observed_model=(
-                observation_payload.get("observed_model")
-                if isinstance(observation_payload.get("observed_model"), str)
-                else None
-            ),
-            observed_effort=(
-                observation_payload.get("observed_effort")
-                if isinstance(observation_payload.get("observed_effort"), str)
-                else None
-            ),
+            observed_model=observed_model,
+            observed_effort=observed_effort,
             provider_inventory_digest=observed_binding.inventory.provider_inventory_digest,
             adapter_capability_digest=observed_binding.inventory.adapter_capability_digest,
             binding_provenance={
                 "requested": "role_request",
                 "observed": (
-                    "provider_terminal"
-                    if isinstance(observation_payload.get("observed_model"), str)
-                    or isinstance(observation_payload.get("observed_effort"), str)
+                    PROVIDER_RAW_MODEL_OBSERVATION_SOURCE
+                    if observed_model is not None and observed_effort is not None
                     else None
                 ),
                 "provider_inventory": "model/list",

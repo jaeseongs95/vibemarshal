@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from flowmarshal.canonical import sha256_digest
+from flowmarshal.canonical import canonical_json, sha256_digest
 from flowmarshal.engine.authorization import authorization_changes
 from flowmarshal.engine.budget import BudgetManager
 from flowmarshal.engine.domain import (
@@ -184,6 +184,10 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
                 observation.model_dump(mode="python") | {
                     "target_observation_digest": sha256_digest("다른 관측")
                 }
+            )
+        with self.assertRaisesRegex(ValueError, "effect identity provider"):
+            ExternalValidationObservation.model_validate(
+                observation.model_dump(mode="python") | {"provider": "other-provider"}
             )
 
     def test_external_effect_requires_every_typed_receipt_and_target_observation(self):
@@ -454,8 +458,8 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
         with self.ledger.transaction() as tx:
             tx.connection.execute(
                 "INSERT INTO attempts (id,project_id,plan_revision_id,task_id,"
-                "execution_spec_digest,attempt_no,kind,status,created_at,ended_at,updated_at) "
-                "VALUES (?,?,?,?,?,2,'execution','succeeded',?,?,?)",
+                "execution_spec_digest,attempt_no,kind,status,created_at,started_at,updated_at) "
+                "VALUES (?,?,?,?,?,2,'execution','running',?,?,?)",
                 (retry_attempt_id, self.project_id, self.plan.plan_revision_id,
                  self.task.task_id, spec.definition_digest, tx.now, tx.now, tx.now),
             )
@@ -494,6 +498,106 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
                 "AND event_type='effect.receipt_recorded'", (retry_call_id,),
             ).fetchone()[0]
         self.assertEqual(("unknown", 0), (retry_status, retry_receipts))
+
+        retry_thread_id = "typed-effect-retry-thread"
+        retry_turn_id = "typed-effect-retry-turn"
+        retry_intent_id = new_id("runtime_intent")
+        retry_runtime_receipt_id = new_id("runtime_receipt")
+        retry_binding = ThreadBinding(
+            thread_id=retry_thread_id, turn_id=retry_turn_id, bound_at=utc_now(),
+        )
+        retry_request = {"thread_id": retry_thread_id, "turn_id": retry_turn_id}
+        with self.ledger.transaction() as tx:
+            tx.connection.execute(
+                "UPDATE attempts SET binding_json=?,updated_at=? WHERE id=?",
+                (canonical_json(retry_binding), tx.now, retry_attempt_id),
+            )
+            tx.connection.execute(
+                "INSERT INTO runtime_intents (id,attempt_id,kind,idempotency_key,"
+                "request_digest,request_json,status,prepared_at,updated_at) "
+                "VALUES (?,?,'start_turn',?,?,?,'received',?,?)",
+                (retry_intent_id, retry_attempt_id, "typed-effect-retry-runtime-turn",
+                 sha256_digest(retry_request), canonical_json(retry_request), tx.now, tx.now),
+            )
+            tx.connection.execute(
+                "INSERT INTO runtime_receipts (id,intent_id,provider_operation_id,"
+                "response_digest,payload_json,binding_json,received_at) VALUES (?,?,?,?,?,?,?)",
+                (retry_runtime_receipt_id, retry_intent_id, retry_turn_id,
+                 sha256_digest({"accepted": True}), "{}", canonical_json(retry_binding), tx.now),
+            )
+        self.service.finish_attempt(attempt_id=retry_attempt_id, succeeded=True)
+        with self.assertRaisesRegex(
+            EngineServiceError, "EFFECT_ADAPTER_OPERATION_REPLAY_CONFLICT",
+        ):
+            self.service.record_effect_receipt(
+                task_id=self.task.task_id,
+                attempt_id=retry_attempt_id,
+                provider_call_id=retry_call_id,
+                runtime_intent_id=retry_intent_id,
+                runtime_receipt_id=retry_runtime_receipt_id,
+                thread_id=retry_thread_id,
+                turn_id=retry_turn_id,
+                effect_identity=first,
+                provider_operation_id="operation-release:v1",
+                response_digest=sha256_digest({"operation": "release:v1"}),
+                target_observation_digest=sha256_digest({
+                    "provider": "github",
+                    "selector": "release:v1",
+                    "observation": "release:v1 exists",
+                    "effect_identity_digest": first.identity_digest,
+                }),
+            )
+
+        other_root = self.base / "other-project"
+        other_root.mkdir()
+        other_project_id = self.service.create_project(
+            name="교차 프로젝트", root=other_root,
+        )
+        with self.ledger.transaction() as tx:
+            tx.history(
+                other_project_id,
+                "effect.receipt_recorded",
+                "provider_call",
+                new_id("provider_call"),
+                {
+                    "attempt_id": new_id("attempt"),
+                    "effect_identity": first.model_dump(mode="json"),
+                    "provider_operation_id": "cross-project-operation",
+                    "receipt_digest": sha256_digest("other-project-receipt"),
+                },
+            )
+        with self.assertRaisesRegex(
+            EngineServiceError, "EFFECT_ADAPTER_OPERATION_REPLAY_CONFLICT",
+        ):
+            self.service.record_effect_receipt(
+                task_id=self.task.task_id,
+                attempt_id=retry_attempt_id,
+                provider_call_id=retry_call_id,
+                runtime_intent_id=retry_intent_id,
+                runtime_receipt_id=retry_runtime_receipt_id,
+                thread_id=retry_thread_id,
+                turn_id=retry_turn_id,
+                effect_identity=first,
+                provider_operation_id="cross-project-operation",
+                response_digest=sha256_digest({"operation": "cross-project"}),
+                target_observation_digest=sha256_digest("cross-project-target"),
+            )
+
+        zero_call_attempt_id = new_id("attempt")
+        with self.ledger.transaction() as tx:
+            tx.connection.execute(
+                "INSERT INTO attempts (id,project_id,plan_revision_id,task_id,"
+                "execution_spec_digest,attempt_no,kind,status,created_at,started_at,updated_at) "
+                "VALUES (?,?,?,?,?,3,'execution','running',?,?,?)",
+                (zero_call_attempt_id, self.project_id, self.plan.plan_revision_id,
+                 self.task.task_id, spec.definition_digest, tx.now, tx.now, tx.now),
+            )
+        with self.assertRaisesRegex(
+            EngineServiceError, "EXTERNAL_EFFECT_EXECUTION_BINDING_REQUIRED",
+        ):
+            self.service.finish_attempt(
+                attempt_id=zero_call_attempt_id, succeeded=True,
+            )
 
         with self.assertRaisesRegex(EngineServiceError, "EFFECT_ADAPTER_RESPONSE_DIGEST_INVALID"):
             self.service.record_effect_receipt(

@@ -15,6 +15,8 @@ from flowmarshal.engine.cli import _cmd_run_once, _run_once_owned, _runtime, bui
 from flowmarshal.engine.domain import RuntimeJobStatus
 from flowmarshal.engine.domain import new_id, utc_now
 from flowmarshal.engine.ledger import SQLiteEngineLedger
+from flowmarshal.engine.model_lock import ModelCapability, ModelInventory
+from flowmarshal.engine.models import EngineRoleConfiguration
 from flowmarshal.engine.roles import RoleCallReceipt, RoleCallRequest, strict_json_output_schema
 from flowmarshal.engine.service import EngineService
 from flowmarshal.engine.runtime import CodexProjectBinding
@@ -22,6 +24,152 @@ from tests.engine_helpers import profile
 
 
 class EngineCliTests(unittest.TestCase):
+    @staticmethod
+    def _inventory_runtime(*choices: tuple[str, tuple[str, ...]]):
+        inventory = ModelInventory(
+            source="test:model/list",
+            models=tuple(
+                ModelCapability(model=model, supported_efforts=efforts)
+                for model, efforts in choices
+            ),
+        )
+
+        class Runtime:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *_args):
+                return None
+
+            def list_models(self):
+                return inventory
+
+        return Runtime()
+
+    def test_config_init_writes_user_owned_inventory_validated_roles(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_path = Path(temp) / "state" / "roles.json"
+            output = io.StringIO()
+            runtime = self._inventory_runtime(
+                ("general-model", ("high",)),
+                ("validation-model", ("xhigh",)),
+            )
+            with (
+                patch("flowmarshal.engine.cli._runtime", return_value=runtime),
+                redirect_stdout(output),
+            ):
+                code = main(
+                    [
+                        "config",
+                        "init",
+                        "--output",
+                        str(output_path),
+                        "--model",
+                        "general-model",
+                        "--effort",
+                        "high",
+                        "--role",
+                        "validator=validation-model:xhigh",
+                    ]
+                )
+
+            self.assertEqual(0, code, output.getvalue())
+            shown = json.loads(output.getvalue())
+            self.assertTrue(shown["inventory_validated"])
+            self.assertEqual(str(output_path.resolve()), shown["role_config"])
+            configuration = EngineRoleConfiguration.model_validate_json(
+                output_path.read_text(encoding="utf-8")
+            )
+            self.assertEqual("general-model", configuration.executor.model)
+            self.assertEqual("validation-model", configuration.validator.model)
+            self.assertEqual("xhigh", configuration.validator.effort)
+            self.assertEqual(configuration.configuration_digest, shown["configuration_digest"])
+
+    def test_config_init_rejects_unsupported_binding_without_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_path = Path(temp) / "roles.json"
+            output = io.StringIO()
+            runtime = self._inventory_runtime(("available-model", ("high",)))
+            with (
+                patch("flowmarshal.engine.cli._runtime", return_value=runtime),
+                redirect_stdout(output),
+            ):
+                code = main(
+                    [
+                        "config",
+                        "init",
+                        "--output",
+                        str(output_path),
+                        "--model",
+                        "missing-model",
+                        "--effort",
+                        "high",
+                    ]
+                )
+
+            self.assertEqual(2, code)
+            self.assertFalse(output_path.exists())
+            self.assertEqual("AssignmentResolutionError", json.loads(output.getvalue())["error"])
+
+    def test_config_init_does_not_overwrite_existing_file(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_path = Path(temp) / "roles.json"
+            output_path.write_text("user-data", encoding="utf-8")
+            output = io.StringIO()
+            with (
+                patch("flowmarshal.engine.cli._runtime") as runtime,
+                redirect_stdout(output),
+            ):
+                code = main(
+                    [
+                        "config",
+                        "init",
+                        "--output",
+                        str(output_path),
+                        "--model",
+                        "any-model",
+                        "--effort",
+                        "high",
+                    ]
+                )
+
+            self.assertEqual(2, code)
+            self.assertEqual("user-data", output_path.read_text(encoding="utf-8"))
+            runtime.assert_not_called()
+
+    def test_config_init_rejects_duplicate_role_without_writing(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            output_path = Path(temp) / "roles.json"
+            output = io.StringIO()
+            with (
+                patch("flowmarshal.engine.cli._runtime") as runtime,
+                redirect_stdout(output),
+            ):
+                code = main(
+                    [
+                        "config",
+                        "init",
+                        "--output",
+                        str(output_path),
+                        "--model",
+                        "general-model",
+                        "--effort",
+                        "high",
+                        "--role",
+                        "validator=validation-model:xhigh",
+                        "--role",
+                        "validator=second-model:high",
+                    ]
+                )
+
+            self.assertEqual(2, code)
+            self.assertFalse(output_path.exists())
+            self.assertIn(
+                "ROLE_CONFIGURATION_OVERRIDE_DUPLICATE",
+                json.loads(output.getvalue())["message"],
+            )
+            runtime.assert_not_called()
+
     def test_run_once_spawns_owner_before_emitting(self) -> None:
         events = []
         outcome = SimpleNamespace(runtime_job_id="runtime_job_" + "a" * 32)
@@ -166,7 +314,7 @@ class EngineCliTests(unittest.TestCase):
     def test_public_command_surface_is_present(self) -> None:
         parser = build_parser()
         help_text = parser.format_help()
-        for command in ("project", "goal", "plan", "task", "run", "attempt", "validate", "recover", "report"):
+        for command in ("config", "project", "goal", "plan", "task", "run", "attempt", "validate", "recover", "report"):
             self.assertIn(command, help_text)
         for command in (
             "prepare",

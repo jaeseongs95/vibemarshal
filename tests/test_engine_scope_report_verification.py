@@ -4,8 +4,9 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from flowmarshal.canonical import sha256_digest
+from flowmarshal.canonical import sha256_bytes, sha256_digest
 from flowmarshal.engine.e2e_qualification import E2E_SCENARIOS
 from flowmarshal.engine.evaluation import (
     EvaluationCellCheckpoint,
@@ -23,7 +24,15 @@ from flowmarshal.engine.qualification import (
     _combined_role_catalog,
     _deterministic_contract,
     _write_json,
+    qualification_suite_manifest,
     source_manifest_digest,
+)
+from flowmarshal.engine.qualification_manifest import (
+    CandidateWheelBinding,
+    QualificationCellOutcome,
+    QualificationCellStatus,
+    build_qualification_evidence_record,
+    write_qualification_reproduction_bundle,
 )
 from flowmarshal.engine.scope_report_verification import verify_scope_report
 from flowmarshal.engine.domain import utc_now
@@ -71,6 +80,164 @@ def _report(contract: EvaluationContract, *, passed: bool, metrics: dict, failur
 
 
 class ScopeReportVerificationTests(unittest.TestCase):
+    def _typed_e2e_run(
+        self, run: Path, contract: EvaluationContract
+    ) -> tuple[ScopeQualificationReport, Path, CandidateWheelBinding]:
+        suite = qualification_suite_manifest(ROOT)
+        source_root = run / "bundle-source"
+        source_root.mkdir()
+        evaluator = source_root / "evaluator.py"
+        evaluator.write_text("value = 1\n", encoding="utf-8")
+        freeze = write_qualification_reproduction_bundle(
+            source_root=source_root,
+            destination=run / "reproduction-bundle",
+            suite=suite,
+            source_files={"evaluator.py": sha256_bytes(evaluator.read_bytes())},
+            source_manifest_digest=DIGEST,
+            fixture_documents={"fixtures": list(contract.fixture_digests)},
+            prompt_documents={"prompt": contract.prompt_digest},
+            schema_documents={"schema": contract.output_schema_digest},
+            threshold_documents={"threshold": contract.threshold_digest},
+            taxonomy_documents={"taxonomy": contract.taxonomy_digest},
+            model_inventory_document={"digest": contract.model_lock_digest},
+            model_lock_document={"digest": contract.model_lock_digest},
+            evaluator_files=("evaluator.py",),
+        )
+        wheel_path = run / "candidate.whl"
+        wheel_path.write_bytes(b"candidate-wheel")
+        distribution_root = run / "site-packages"
+        import_root = distribution_root / "flowmarshal"
+        import_root.mkdir(parents=True)
+        package_digests = {
+            "flowmarshal/__init__.py": sha256_bytes(b"package")
+        }
+        binding = CandidateWheelBinding(
+            wheel_path=str(wheel_path.resolve()),
+            wheel_digest=sha256_bytes(wheel_path.read_bytes()),
+            distribution_name="flowmarshal-engine",
+            distribution_version="0.2.0a1",
+            distribution_root=str(distribution_root.resolve()),
+            import_root=str(import_root.resolve()),
+            package_file_digests=package_digests,
+            wheel_package_digest=sha256_digest(package_digests),
+            installed_package_digest=sha256_digest(package_digests),
+        )
+        metadata = {
+            "scope": "project-e2e",
+            "candidate_wheel_binding": binding.model_dump(mode="json"),
+            "candidate_wheel_binding_digest": binding.binding_digest,
+        }
+        metadata["metadata_digest"] = sha256_digest(metadata)
+        (run / "run-metadata.json").write_text(
+            json.dumps(metadata), encoding="utf-8"
+        )
+        mapping = {
+            "normal-completion": "E2E-01",
+            "stale-after-materialization": "E2E-11",
+            "stored-turn-restart-resume": "E2E-07",
+            "unknown-receipt-no-duplicate": "E2E-08",
+        }
+        cells: list[EvaluationCellCheckpoint] = []
+        first_evidence_path: Path | None = None
+        for digest, scenario in zip(
+            contract.fixture_digests, E2E_SCENARIOS, strict=True
+        ):
+            responsibility_id = mapping[scenario]
+            requirement = next(
+                item
+                for item in suite.e2e_responsibilities
+                if item.responsibility_id == responsibility_id
+            )
+            cell_root = run / "work" / scenario
+            records = []
+            for kind in requirement.required_evidence_kinds:
+                evidence_path = cell_root / "evidence" / f"{kind}.json"
+                evidence_path.parent.mkdir(parents=True, exist_ok=True)
+                evidence_path.write_text(
+                    json.dumps({"cell_id": scenario, "kind": kind}),
+                    encoding="utf-8",
+                )
+                first_evidence_path = first_evidence_path or evidence_path
+                records.append(
+                    build_qualification_evidence_record(
+                        run_root=run,
+                        path=evidence_path,
+                        kind=kind,
+                        cell_id=scenario,
+                        evaluation_contract_digest=contract.contract_digest,
+                        fixture_digest=digest,
+                        order_seed=0,
+                        freeze_bundle_digest=freeze.bundle_digest,
+                        candidate_wheel_digest=binding.wheel_digest,
+                        candidate_wheel_binding_digest=binding.binding_digest,
+                        candidate_distribution_name=binding.distribution_name,
+                        candidate_distribution_version=binding.distribution_version,
+                    )
+                )
+            provenance = requirement.required_provenance or (
+                requirement.allowed_provenance[0],
+            )
+            outcome = QualificationCellOutcome(
+                cell_id=scenario,
+                evaluation_contract_digest=contract.contract_digest,
+                responsibility_ids=(responsibility_id,),
+                status=QualificationCellStatus.PASSED,
+                provenance=provenance,
+                pipeline_stages=requirement.required_pipeline_stages,
+                evidence_kinds=requirement.required_evidence_kinds,
+                evidence_refs=tuple(item.relative_path for item in records),
+                evidence_records=tuple(records),
+            )
+            events = [{"scenario": scenario, "event": "stored"}]
+            cells.append(
+                EvaluationCellCheckpoint(
+                    model_lock_format="flowmarshal-model-lock-v2",
+                    contract_digest=contract.contract_digest,
+                    fixture_digest=digest,
+                    order_seed=0,
+                    raw_structured_assessment={
+                        "scenario": scenario,
+                        "order_seed": 0,
+                        "passed": True,
+                        "thread_create_count": 1,
+                        "qualification_outcome": outcome.model_dump(mode="json"),
+                    },
+                    runner_receipts=(
+                        {"events": events, "events_digest": sha256_digest(events)},
+                    ),
+                )
+            )
+        _store(run, contract, cells)
+        with patch(
+            "flowmarshal.engine.scope_report_verification.verify_candidate_wheel_metadata",
+            return_value=binding,
+        ), patch(
+            "flowmarshal.engine.scope_report_verification.source_manifest_digest",
+            return_value=contract.source_manifest_digest,
+        ):
+            draft = verify_scope_report(
+                root=ROOT,
+                run_root=run,
+                report=_report(contract, passed=False, metrics={}, failures=()),
+            )
+        report = _report(
+            contract,
+            passed=draft.recalculated_passed,
+            metrics=draft.recalculated_metrics,
+            failures=draft.recalculated_failures,
+        )
+        with patch(
+            "flowmarshal.engine.scope_report_verification.verify_candidate_wheel_metadata",
+            return_value=binding,
+        ), patch(
+            "flowmarshal.engine.scope_report_verification.source_manifest_digest",
+            return_value=contract.source_manifest_digest,
+        ):
+            baseline = verify_scope_report(root=ROOT, run_root=run, report=report)
+        self.assertTrue(baseline.valid, baseline.errors)
+        assert first_evidence_path is not None
+        return report, first_evidence_path, binding
+
     def test_deterministic_reaggregates_five_exit_and_freeze_observations(self) -> None:
         contract = _deterministic_contract(ROOT)
         names = ("compileall", "full-test-suite", "pip-check", "synthetic-lifecycle", "legacy-freeze-manifest")
@@ -204,6 +371,136 @@ class ScopeReportVerificationTests(unittest.TestCase):
             result = verify_scope_report(root=ROOT, run_root=run, report=report)
         self.assertFalse(result.valid)
         self.assertIn("SCOPE_REPORT_E2E_RECEIPT_BINDING_MISMATCH", result.errors)
+
+    def test_project_e2e_final_verifier_rechecks_typed_evidence(self) -> None:
+        fixtures = tuple(
+            sha256_digest({"e2e": scenario}) for scenario in E2E_SCENARIOS
+        )
+        contract = _contract(
+            scope=EvaluationScope.PROJECT_E2E, fixtures=fixtures, seeds=(0,)
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            run = Path(raw)
+            report, evidence_path, binding = self._typed_e2e_run(run, contract)
+            original_evidence = evidence_path.read_bytes()
+
+            invalid_wheel = verify_scope_report(
+                root=ROOT, run_root=run, report=report
+            )
+            self.assertFalse(invalid_wheel.valid)
+            self.assertIn(
+                "SCOPE_REPORT_E2E_CANDIDATE_WHEEL_INVALID",
+                invalid_wheel.errors,
+            )
+
+            evidence_path.write_text("tampered", encoding="utf-8")
+            with patch(
+                "flowmarshal.engine.scope_report_verification.verify_candidate_wheel_metadata",
+                return_value=binding,
+            ), patch(
+                "flowmarshal.engine.scope_report_verification.source_manifest_digest",
+                return_value=contract.source_manifest_digest,
+            ):
+                tampered = verify_scope_report(root=ROOT, run_root=run, report=report)
+            self.assertFalse(tampered.valid)
+            self.assertTrue(
+                any(
+                    "EVIDENCE_DIGEST_MISMATCH" in item
+                    for item in tampered.recalculated_failures
+                )
+            )
+            evidence_path.write_bytes(original_evidence)
+
+            evidence_path.unlink()
+            with patch(
+                "flowmarshal.engine.scope_report_verification.verify_candidate_wheel_metadata",
+                return_value=binding,
+            ), patch(
+                "flowmarshal.engine.scope_report_verification.source_manifest_digest",
+                return_value=contract.source_manifest_digest,
+            ):
+                deleted = verify_scope_report(root=ROOT, run_root=run, report=report)
+            self.assertFalse(deleted.valid)
+            self.assertTrue(
+                any(
+                    "EVIDENCE_FILE_MISSING" in item
+                    for item in deleted.recalculated_failures
+                )
+            )
+            evidence_path.write_bytes(original_evidence)
+
+            checkpoint_path = next((run / "cells" / "seed-0").glob("*.json"))
+            checkpoint_text = checkpoint_path.read_text(encoding="utf-8")
+            mutations = {
+                "path-escape": (
+                    "relative_path",
+                    "../outside.json",
+                    "RESPONSIBILITY_EVIDENCE_MISSING",
+                ),
+                "wrong-cell": (
+                    "cell_id",
+                    "other-cell",
+                    "EVIDENCE_CELL_MISMATCH",
+                ),
+                "wrong-contract": (
+                    "evaluation_contract_digest",
+                    "sha256:" + "b" * 64,
+                    "EVIDENCE_CONTRACT_MISMATCH",
+                ),
+                "wrong-fixture": (
+                    "fixture_digest",
+                    "sha256:" + "b" * 64,
+                    "EVIDENCE_FIXTURE_MISMATCH",
+                ),
+                "wrong-seed": (
+                    "order_seed",
+                    1,
+                    "EVIDENCE_ORDER_SEED_MISMATCH",
+                ),
+                "wrong-freeze": (
+                    "freeze_bundle_digest",
+                    "sha256:" + "b" * 64,
+                    "EVIDENCE_FREEZE_MISMATCH",
+                ),
+                "wrong-kind": (
+                    "kind",
+                    "unrelated",
+                    "REQUIRED_EVIDENCE_MISSING",
+                ),
+                "wrong-wheel": (
+                    "candidate_wheel_digest",
+                    "sha256:" + "b" * 64,
+                    "EVIDENCE_WHEEL_MISMATCH",
+                ),
+                "wrong-distribution-version": (
+                    "candidate_distribution_version",
+                    "9.9.9",
+                    "EVIDENCE_DISTRIBUTION_VERSION_MISMATCH",
+                ),
+            }
+            for name, (field, value, expected) in mutations.items():
+                with self.subTest(name=name):
+                    payload = json.loads(checkpoint_text)
+                    payload["raw_structured_assessment"]["qualification_outcome"][
+                        "evidence_records"
+                    ][0][field] = value
+                    checkpoint_path.write_text(json.dumps(payload), encoding="utf-8")
+                    with patch(
+                        "flowmarshal.engine.scope_report_verification.verify_candidate_wheel_metadata",
+                        return_value=binding,
+                    ), patch(
+                        "flowmarshal.engine.scope_report_verification.source_manifest_digest",
+                        return_value=contract.source_manifest_digest,
+                    ):
+                        changed = verify_scope_report(
+                            root=ROOT, run_root=run, report=report
+                        )
+                    self.assertFalse(changed.valid)
+                    joined = "\n".join(
+                        (*changed.errors, *changed.recalculated_failures)
+                    )
+                    self.assertIn(expected, joined)
+                    checkpoint_path.write_text(checkpoint_text, encoding="utf-8")
 
 
 if __name__ == "__main__":

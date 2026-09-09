@@ -61,7 +61,7 @@ from .ledger import (
     SQLiteEngineLedger,
 )
 from .models import AssignmentResolutionError, AssignmentResolver, ModelInventory
-from .models import EngineRoleConfiguration
+from .models import EngineRoleConfiguration, RoleModelBinding
 from .goal import (
     GoalNormalizerAdapter,
     GoalPreparationError,
@@ -116,6 +116,63 @@ def _role_configuration(arguments: argparse.Namespace) -> EngineRoleConfiguratio
     if path is None:
         return None
     return EngineRoleConfiguration.model_validate(_json(path))
+
+
+def _role_override(value: str) -> tuple[str, RoleModelBinding]:
+    try:
+        role, choice = value.split("=", 1)
+        model, effort = choice.rsplit(":", 1)
+    except ValueError as error:
+        raise EngineServiceError(
+            "ROLE_CONFIGURATION_OVERRIDE_INVALID: --role은 ROLE=MODEL:EFFORT 형식이어야 합니다."
+        ) from error
+    if role not in EngineRoleConfiguration.model_fields:
+        raise EngineServiceError(
+            f"ROLE_CONFIGURATION_OVERRIDE_INVALID: 알 수 없는 역할입니다: {role}"
+        )
+    try:
+        return role, RoleModelBinding(model=model, effort=effort)
+    except ValidationError as error:
+        raise EngineServiceError(
+            f"ROLE_CONFIGURATION_OVERRIDE_INVALID: {role} binding이 유효하지 않습니다."
+        ) from error
+
+
+def _cmd_config_init(arguments: argparse.Namespace) -> None:
+    """명시 입력을 현재 inventory에 대조한 뒤 user-owned 역할 설정을 만든다."""
+
+    output = Path(arguments.output).resolve()
+    if output.exists():
+        raise EngineServiceError(
+            f"ROLE_CONFIGURATION_ALREADY_EXISTS: 기존 파일을 덮어쓰지 않습니다: {output}"
+        )
+    common = RoleModelBinding(model=arguments.model, effort=arguments.effort)
+    bindings = {role: common for role in EngineRoleConfiguration.model_fields}
+    seen: set[str] = set()
+    for raw_override in arguments.role or ():
+        role, binding = _role_override(raw_override)
+        if role in seen:
+            raise EngineServiceError(
+                f"ROLE_CONFIGURATION_OVERRIDE_DUPLICATE: 역할 override가 중복됐습니다: {role}"
+            )
+        seen.add(role)
+        bindings[role] = binding
+    configuration = EngineRoleConfiguration.model_validate(bindings)
+    with _runtime(arguments) as runtime:
+        inventory = runtime.list_models()
+        configuration.validate_inventory(inventory)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with output.open("x", encoding="utf-8", newline="\n") as stream:
+        stream.write(json.dumps(configuration.model_dump(mode="json"), ensure_ascii=False, indent=2))
+        stream.write("\n")
+    _emit(
+        {
+            "role_config": str(output),
+            "configuration_digest": configuration.configuration_digest,
+            "inventory_digest": inventory.inventory_digest,
+            "inventory_validated": True,
+        }
+    )
 
 
 def _application(
@@ -1193,6 +1250,30 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--db", default=str(Path.cwd() / ".flowmarshal-engine" / DEFAULT_DB_NAME))
     parser.add_argument("--artifacts", default=str(Path.cwd() / ".flowmarshal-engine" / DEFAULT_ARTIFACT_DIRECTORY))
     commands = parser.add_subparsers(dest="command", required=True)
+
+    config = commands.add_parser(
+        "config", help="user-owned Engine 설정 생성"
+    )
+    config_commands = config.add_subparsers(dest="config_command", required=True)
+    config_init = config_commands.add_parser(
+        "init",
+        help="명시한 model/effort를 현재 model inventory에 대조하고 역할 설정 생성",
+    )
+    config_init.add_argument("--output", required=True)
+    config_init.add_argument("--model", required=True)
+    config_init.add_argument(
+        "--effort",
+        choices=("none", "minimal", "low", "medium", "high", "xhigh", "max", "ultra"),
+        required=True,
+    )
+    config_init.add_argument(
+        "--role",
+        action="append",
+        metavar="ROLE=MODEL:EFFORT",
+        help="특정 역할만 다른 binding으로 설정합니다. 역할별로 한 번씩 지정할 수 있습니다.",
+    )
+    config_init.add_argument("--codex-bin")
+    config_init.set_defaults(handler=_cmd_config_init)
 
     prepare = commands.add_parser(
         "prepare",

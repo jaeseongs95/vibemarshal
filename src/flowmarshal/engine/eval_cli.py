@@ -87,6 +87,13 @@ def _evaluation_policies(arguments: argparse.Namespace) -> EvaluationPolicies:
 def _run(arguments: argparse.Namespace) -> int:
     root = Path(arguments.project_root).resolve(strict=True)
     destination = None if arguments.run_root is None else Path(arguments.run_root).resolve()
+    if arguments.scope == "project-e2e":
+        if not arguments.candidate_wheel:
+            raise QualificationRunError(
+                "project-e2e에는 절대경로 --candidate-wheel이 필요합니다."
+            )
+        if not Path(arguments.candidate_wheel).is_absolute():
+            raise QualificationRunError("--candidate-wheel은 절대경로여야 합니다.")
     if arguments.scope == "deterministic":
         run_root, report = run_deterministic(root=root, run_root=destination)
     else:
@@ -116,6 +123,7 @@ def _run(arguments: argparse.Namespace) -> int:
                 role_configuration=roles,
                 codex_bin=arguments.codex_bin,
                 evaluation_policies=policies,
+                candidate_wheel=arguments.candidate_wheel,
             )
     _emit(
         {
@@ -476,6 +484,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--run-root")
     run.add_argument("--role-config")
     run.add_argument("--codex-bin")
+    run.add_argument(
+        "--candidate-wheel",
+        help="project-e2e에서 검증할 non-editable 설치 candidate wheel의 절대경로",
+    )
     run.add_argument("--codex-project-binding", help="App Server 프로젝트 ID·예상 root 결속 JSON")
     run.add_argument("--budget-policy")
     run.add_argument("--role-timeout-policy")

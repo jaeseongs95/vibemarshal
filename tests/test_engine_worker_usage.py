@@ -148,6 +148,46 @@ class WorkerUsageTests(unittest.TestCase):
         self.assertEqual(projection["requested_model"], stored["requested_model"])
         self.assertIn("observed_model", stored)
 
+    def test_observed_model_requires_complete_raw_provider_provenance(self):
+        cases = (
+            ("marker-missing", {"observed_model": "echo-model", "observed_effort": "high"}, (None, None)),
+            ("request-echo", {
+                "model_observation_source": "request_echo",
+                "observed_model": "echo-model", "observed_effort": "high",
+            }, (None, None)),
+            ("partial", {
+                "model_observation_source": "provider_raw_response",
+                "observed_model": "provider-model",
+            }, (None, None)),
+            ("provider-raw", {
+                "model_observation_source": "provider_raw_response",
+                "observed_model": "provider-model", "observed_effort": "high",
+            }, ("provider-model", "high")),
+        )
+        for name, model_fields, expected in cases:
+            with self.subTest(name=name):
+                prepared, _, _, attempt_id = self.dispatched("model-observation-" + name)
+                thread_id, turn_id, request = self.turn(prepared.service, attempt_id)
+                recorded = prepared.service.record_worker_usage(
+                    attempt_id=attempt_id,
+                    thread_id=thread_id,
+                    turn_id=turn_id,
+                    terminal_status="completed",
+                    provider_payload=self.payload(
+                        thread_id,
+                        turn_id,
+                        request,
+                        usage=self.usage(),
+                        **model_fields,
+                    ),
+                )
+                assert recorded is not None
+                self.assertEqual(expected, (recorded.observed_model, recorded.observed_effort))
+                self.assertEqual(
+                    "provider_raw_response" if expected[0] is not None else None,
+                    recorded.binding_provenance["observed"],
+                )
+
     def test_measured_zero_and_unavailable_usage_remain_distinct(self):
         measured, _, _, measured_attempt = self.dispatched("measured-zero")
         thread_id, turn_id, request = self.turn(measured.service, measured_attempt)

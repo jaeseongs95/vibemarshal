@@ -5,15 +5,18 @@ import copy
 import subprocess
 import tempfile
 import unittest
+from datetime import timedelta
 from pathlib import Path
 from unittest.mock import patch
 
 from flowmarshal.engine.domain import (
-    DeterministicValidationObservation, EvidenceKind, EvidenceRecord, ExecutionContextNeed,
+    AttemptKind, DeterministicValidationObservation, EvidenceKind, EvidenceRecord, ExecutionContextNeed,
     ExternalValidationObservation, FailureClass, IntegrationValidationContract, ManualValidationObservation,
-    RunOnceAction, ThreadBinding, ValidationExecutionStep, ValidationResult, ValidationStatus, new_id, utc_now,
+    RunOnceAction, RuntimeIntentKind, RuntimeJobKind, RuntimeJobObservationKind,
+    SemanticValidationObservation, ThreadBinding, ValidationExecutionStep, ValidationResult,
+    ValidationStatus, new_id, utc_now,
 )
-from flowmarshal.canonical import sha256_bytes, sha256_digest
+from flowmarshal.canonical import canonical_json, sha256_bytes, sha256_digest
 from flowmarshal.engine.context import AdditionalContextRequest, ContextSelector, PromptAssembler, read_context_fragment
 from flowmarshal.engine.service import EngineServiceError
 from flowmarshal.engine.e2e_qualification import _copy_fixture, _prepare
@@ -809,6 +812,294 @@ class ExecutionAutomationTests(unittest.TestCase):
                                                                 "evidence_refs": provided}))
         self.assertEqual(RunOnceAction.OBSERVED, dispatcher.run_once(prepared.project_id).action)
         self.assertEqual(RunOnceAction.COMPLETED, dispatcher.run_once(prepared.project_id).action)
+
+    def test_independent_semantic_terminal_claim_cannot_skip_model_review(self):
+        prepared, runtime = self.prepared(semantic_task_validation=True)
+        dispatcher = self.validating(prepared, runtime)
+        dispatcher.run_once(prepared.project_id)
+        dispatched = dispatcher.run_once(prepared.project_id)
+        self.assertEqual(RunOnceAction.DISPATCHED, dispatched.action)
+        with prepared.service.ledger.read() as connection:
+            intent = connection.execute(
+                "SELECT request_json FROM runtime_intents WHERE attempt_id=? "
+                "AND kind='create_thread'", (dispatched.attempt_id,),
+            ).fetchone()
+        direct_ids = tuple(json.loads(intent["request_json"])["semantic_evidence_ids"])
+        with self.assertRaisesRegex(
+            EngineServiceError, "INDEPENDENT_VALIDATION_ATTEMPT_REQUIRED",
+        ):
+            prepared.service.record_validation(
+                project_id=prepared.project_id,
+                plan_revision_id=prepared.plan_revision_id,
+                result=ValidationResult(
+                    validation_result_id=new_id("validation_result"),
+                    validation_id="validation_public_contract",
+                    task_id=prepared.task_id,
+                    status=ValidationStatus.PASS,
+                    evidence_ids=direct_ids,
+                    rationale="model_review 없이 terminal PASS를 제출한다.",
+                    evaluated_at=utc_now(),
+                ),
+            )
+
+    def test_independent_semantic_evidence_cannot_be_reused_or_rebound(self):
+        prepared, runtime = self.prepared(semantic_task_validation=True)
+        dispatcher = self.validating(prepared, runtime)
+        dispatcher.run_once(prepared.project_id)
+        dispatched = dispatcher.run_once(prepared.project_id)
+        with prepared.service.ledger.read() as connection:
+            binding = ThreadBinding.model_validate_json(connection.execute(
+                "SELECT binding_json FROM attempts WHERE id=?", (dispatched.attempt_id,),
+            ).fetchone()["binding_json"])
+            intent = connection.execute(
+                "SELECT request_json FROM runtime_intents WHERE attempt_id=? "
+                "AND kind='create_thread'", (dispatched.attempt_id,),
+            ).fetchone()
+        refs = json.loads(intent["request_json"])["semantic_evidence_ids"]
+        runtime.complete(binding.thread_id, response=json.dumps({
+            "passed": True,
+            "rationale": "직접 evidence 확인",
+            "evidence_refs": refs,
+        }))
+        self.assertEqual(RunOnceAction.OBSERVED, dispatcher.run_once(prepared.project_id).action)
+        with prepared.service.ledger.read() as connection:
+            stored = connection.execute(
+                "SELECT payload_json FROM validation_results WHERE task_id=? "
+                "AND validation_id='validation_public_contract' ORDER BY rowid DESC LIMIT 1",
+                (prepared.task_id,),
+            ).fetchone()
+            review = connection.execute(
+                "SELECT * FROM evidence_records WHERE attempt_id=? AND kind='model_review'",
+                (dispatched.attempt_id,),
+            ).fetchone()
+            worker_id = connection.execute(
+                "SELECT id FROM attempts WHERE task_id=? AND kind='execution' AND status='succeeded'",
+                (prepared.task_id,),
+            ).fetchone()["id"]
+        original = ValidationResult.model_validate_json(stored["payload_json"])
+        with self.assertRaisesRegex(
+            EngineServiceError, "INDEPENDENT_VALIDATION_EVIDENCE_REUSED",
+        ):
+            prepared.service.record_validation(
+                project_id=prepared.project_id,
+                plan_revision_id=prepared.plan_revision_id,
+                result=original.model_copy(update={
+                    "validation_result_id": new_id("validation_result"),
+                    "evaluated_at": utc_now(),
+                }),
+            )
+
+        rebound = EvidenceRecord(
+            evidence_id=new_id("evidence"),
+            project_id=prepared.project_id,
+            task_id=prepared.task_id,
+            attempt_id=worker_id,
+            kind=EvidenceKind.MODEL_REVIEW,
+            source_ref=review["source_ref"],
+            observation=review["observation"],
+            content_digest=review["content_digest"],
+            observed_at=utc_now(),
+        )
+        prepared.service.record_evidence(rebound)
+        rebound_ids = tuple(
+            rebound.evidence_id if item == review["id"] else item
+            for item in original.evidence_ids
+        )
+        with self.assertRaisesRegex(
+            EngineServiceError, "INDEPENDENT_VALIDATION_ATTEMPT_REQUIRED",
+        ):
+            prepared.service.record_validation(
+                project_id=prepared.project_id,
+                plan_revision_id=prepared.plan_revision_id,
+                result=original.model_copy(update={
+                    "validation_result_id": new_id("validation_result"),
+                    "evidence_ids": rebound_ids,
+                    "evaluated_at": utc_now(),
+                }),
+            )
+
+        def copied_review(*, digest=None, source_ref=None) -> EvidenceRecord:
+            evidence = EvidenceRecord(
+                evidence_id=new_id("evidence"),
+                project_id=prepared.project_id,
+                task_id=prepared.task_id,
+                attempt_id=dispatched.attempt_id,
+                kind=EvidenceKind.MODEL_REVIEW,
+                source_ref=source_ref or review["source_ref"],
+                observation=review["observation"],
+                content_digest=digest or review["content_digest"],
+                observed_at=utc_now(),
+            )
+            prepared.service.record_evidence(evidence)
+            return evidence
+
+        exact_copy = copied_review()
+        with self.assertRaisesRegex(
+            EngineServiceError, "INDEPENDENT_VALIDATION_EVIDENCE_REUSED",
+        ):
+            prepared.service.record_validation(
+                project_id=prepared.project_id,
+                plan_revision_id=prepared.plan_revision_id,
+                result=original.model_copy(update={
+                    "validation_result_id": new_id("validation_result"),
+                    "evidence_ids": tuple(
+                        exact_copy.evidence_id if item == review["id"] else item
+                        for item in original.evidence_ids
+                    ),
+                    "evaluated_at": utc_now(),
+                }),
+            )
+
+        status_mismatch = copied_review()
+        with self.assertRaisesRegex(
+            EngineServiceError, "INDEPENDENT_VALIDATION_STATUS_MISMATCH",
+        ):
+            prepared.service.record_validation(
+                project_id=prepared.project_id,
+                plan_revision_id=prepared.plan_revision_id,
+                result=original.model_copy(update={
+                    "validation_result_id": new_id("validation_result"),
+                    "status": ValidationStatus.FAIL,
+                    "evidence_ids": tuple(
+                        status_mismatch.evidence_id if item == review["id"] else item
+                        for item in original.evidence_ids
+                    ),
+                    "evaluated_at": utc_now(),
+                }),
+            )
+
+        digest_mismatch = copied_review(digest=sha256_digest("tampered-review"))
+        with self.assertRaisesRegex(
+            EngineServiceError, "INDEPENDENT_VALIDATION_EVIDENCE_DIGEST_MISMATCH",
+        ):
+            prepared.service.record_validation(
+                project_id=prepared.project_id,
+                plan_revision_id=prepared.plan_revision_id,
+                result=original.model_copy(update={
+                    "validation_result_id": new_id("validation_result"),
+                    "evidence_ids": tuple(
+                        digest_mismatch.evidence_id if item == review["id"] else item
+                        for item in original.evidence_ids
+                    ),
+                    "evaluated_at": utc_now(),
+                }),
+            )
+
+
+    def test_independent_semantic_validator_cannot_reuse_worker_thread(self):
+        prepared, runtime = self.prepared(semantic_task_validation=True)
+        dispatcher = self.validating(prepared, runtime)
+        dispatcher.run_once(prepared.project_id)
+        with prepared.service.ledger.read() as connection:
+            worker = connection.execute(
+                "SELECT id,binding_json FROM attempts WHERE task_id=? "
+                "AND kind='execution' AND status='succeeded'", (prepared.task_id,),
+            ).fetchone()
+            direct = connection.execute(
+                "SELECT id FROM evidence_records WHERE attempt_id=? "
+                "AND kind IN ('file','test') ORDER BY rowid", (worker["id"],),
+            ).fetchall()
+            active_goal = connection.execute(
+                "SELECT goal_id,definition_digest FROM goal_revisions "
+                "WHERE project_id=? AND status='active'", (prepared.project_id,),
+            ).fetchone()
+        worker_binding = ThreadBinding.model_validate_json(worker["binding_json"])
+        validator = prepared.service.reserve_attempt(
+            task_id=prepared.task_id, kind=AttemptKind.VALIDATION,
+        )
+        turn_id = "validator-turn-on-worker-thread"
+        job = prepared.service.schedule_runtime_job(
+            project_id=prepared.project_id,
+            kind=RuntimeJobKind.TASK_SEMANTIC_VALIDATE,
+            checkpoint_key="validator-same-worker-thread",
+            request={"attempt_id": validator.attempt_id},
+            absolute_deadline_at=utc_now() + timedelta(minutes=1),
+            attempt_id=validator.attempt_id,
+            task_id=prepared.task_id,
+        )
+        prepared.service.start_runtime_job(
+            job.job_id, thread_id=worker_binding.thread_id, turn_id=turn_id,
+        )
+        intent = prepared.service.prepare_runtime_intent(
+            attempt_id=validator.attempt_id,
+            kind=RuntimeIntentKind.START_TURN,
+            idempotency_key="validator-same-worker-thread-turn",
+            request={"thread_id": worker_binding.thread_id, "turn_id": turn_id},
+        )
+        prepared.service.record_runtime_receipt(
+            intent_id=intent.intent_id,
+            provider_operation_id=turn_id,
+            response={"accepted": True},
+            binding=ThreadBinding(
+                thread_id=worker_binding.thread_id, turn_id=turn_id, bound_at=utc_now(),
+            ),
+        )
+        prepared.service.record_runtime_job_observation(
+            job.job_id,
+            kind=RuntimeJobObservationKind.PROVIDER_TERMINAL,
+            payload={"result": {"passed": True}},
+            provider_terminal=True,
+            terminal_status="completed",
+        )
+        with prepared.service.ledger.transaction() as tx:
+            provider_receipt = {
+                "thread_id": worker_binding.thread_id,
+                "turn_id": turn_id,
+                "terminal_status": "completed",
+            }
+            tx.connection.execute(
+                "INSERT INTO provider_calls (id,project_id,goal_id,goal_contract_digest,"
+                "call_key,role,stage,request_digest,request_json,estimated_tokens,"
+                "execution_status,effect_status,result_status,status,attempt_id,"
+                "receipt_json,created_at,completed_at) VALUES (?,?,?,?,?,"
+                "'semantic_validator','validation',?,?,0,'terminal','none','valid',"
+                "'usage_unknown',?,?,?,?)",
+                (new_id("provider_call"), prepared.project_id, active_goal["goal_id"],
+                 active_goal["definition_digest"],
+                 "validator-same-worker-thread-call",
+                 sha256_digest({"attempt_id": validator.attempt_id}), "{}",
+                 validator.attempt_id, canonical_json(provider_receipt), tx.now, tx.now),
+            )
+        direct_ids = tuple(item["id"] for item in direct)
+        semantic = SemanticValidationObservation(
+            validation_id="validation_public_contract",
+            task_id=prepared.task_id,
+            reviewer_role="validator",
+            model="validator",
+            effort="high",
+            passed=True,
+            rationale="동일 worker thread를 재사용한 잘못된 검증",
+            evidence_refs=direct_ids,
+            observed_at=utc_now(),
+        )
+        review = EvidenceRecord(
+            evidence_id=new_id("evidence"),
+            project_id=prepared.project_id,
+            task_id=prepared.task_id,
+            attempt_id=validator.attempt_id,
+            kind=EvidenceKind.MODEL_REVIEW,
+            source_ref=f"codex-validator:{worker_binding.thread_id}",
+            observation=semantic.model_dump_json(),
+            content_digest=sha256_digest(semantic),
+            observed_at=semantic.observed_at,
+        )
+        prepared.service.record_evidence(review)
+        with self.assertRaisesRegex(
+            EngineServiceError, "INDEPENDENT_VALIDATION_WORKER_THREAD_REUSED",
+        ):
+            prepared.service.record_validation(
+                project_id=prepared.project_id,
+                plan_revision_id=prepared.plan_revision_id,
+                result=ValidationResult(
+                    validation_result_id=new_id("validation_result"),
+                    validation_id="validation_public_contract",
+                    task_id=prepared.task_id,
+                    status=ValidationStatus.PASS,
+                    evidence_ids=(review.evidence_id, *direct_ids),
+                    rationale=semantic.rationale,
+                    evaluated_at=utc_now(),
+                ),
+            )
 
     def test_task_semantic_catalog_includes_only_current_core_worker_report_when_required(self):
         prepared, runtime = self.prepared(semantic_task_validation=True)

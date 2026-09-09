@@ -65,6 +65,7 @@ from .evaluation_budget import (
     budgeted_role_runner,
     evaluation_cell_provider_calls,
     policy_contract_fragment,
+    verify_metadata_digest,
     verify_service_budget_policy,
     write_immutable_run_metadata,
 )
@@ -97,8 +98,11 @@ from .qualification_manifest import (
     QualificationCellOutcome,
     QualificationCellStatus,
     QualificationFailureClass,
+    build_qualification_evidence_record,
     classify_qualification_failure,
     evaluate_qualification_responsibilities,
+    verify_candidate_wheel_installation,
+    verify_candidate_wheel_metadata,
 )
 from .runtime import (
     CodexAppServerRuntime,
@@ -196,9 +200,17 @@ class RecordedRuntime:
         # start_turn의 model/effort는 SDK 요청 인자를 receipt에 다시 쓴 값이므로
         # provider 관측으로 승격하지 않는다.
         provider_raw = operation == "create_thread" and isinstance(payload, dict)
-        observed_model = payload.get("model") if provider_raw else None
-        observed_effort = payload.get("effort") if provider_raw else None
-        observation_source = "provider_raw_response" if provider_raw else None
+        raw_model = payload.get("model") if provider_raw else None
+        raw_effort = payload.get("effort") if provider_raw else None
+        complete_provider_pair = (
+            isinstance(raw_model, str)
+            and bool(raw_model)
+            and isinstance(raw_effort, str)
+            and bool(raw_effort)
+        )
+        observed_model = raw_model if complete_provider_pair else None
+        observed_effort = raw_effort if complete_provider_pair else None
+        observation_source = "provider_raw_response" if complete_provider_pair else None
         if operation == "start_turn":
             observation_reason = "START_TURN_RECEIPT_MODEL_EFFORT_ARE_REQUEST_ECHO"
         elif observed_model is None or observed_effort is None:
@@ -1678,6 +1690,13 @@ def _responsibility_outcome(
     cell: dict[str, Any],
     contract: EvaluationContract,
     cell_root: Path,
+    run_root: Path,
+    fixture_digest: str,
+    freeze_bundle_digest: str,
+    candidate_wheel_digest: str,
+    candidate_wheel_binding_digest: str,
+    candidate_distribution_name: str,
+    candidate_distribution_version: str,
 ) -> QualificationCellOutcome:
     """기존 4개 실행 cell이 실제로 증명한 책임만 명시적으로 투영한다."""
 
@@ -1715,12 +1734,40 @@ def _responsibility_outcome(
         ),
     }
     responsibility_id, suffix, evidence_kinds, provenance = mapping[scenario]
-    evidence_refs = (
-        *prepared.preparation_evidence_refs,
-        str((cell_root / "runtime-receipts.json").resolve()),
-        str((cell_root / "cell-state.json").resolve()),
-        str((cell_root / "state" / "flowmarshal-engine.sqlite3").resolve()),
+    artifact_by_kind = {
+        "raw_request": cell_root / "raw-request.json",
+        "role_receipt": cell_root / "state" / "flowmarshal-engine.sqlite3",
+        "ledger": cell_root / "state" / "flowmarshal-engine.sqlite3",
+        "activation_receipt": cell_root / "plan-activation-receipt.json",
+        "execution_spec": cell_root / "qualification-observation.json",
+        "source_digest": cell_root / "qualification-observation.json",
+        "error": cell_root / "qualification-observation.json",
+        "effect_count": cell_root / "qualification-observation.json",
+        "runtime_receipt": cell_root / "runtime-receipts.json",
+        "binding": cell_root / "state" / "flowmarshal-engine.sqlite3",
+        "restart_journal": cell_root / "runtime-receipts.json",
+        "validation": cell_root / "state" / "flowmarshal-engine.sqlite3",
+        "intent": cell_root / "state" / "flowmarshal-engine.sqlite3",
+        "operation_journal": cell_root / "runtime-receipts.json",
+    }
+    evidence_records = tuple(
+        build_qualification_evidence_record(
+            run_root=run_root,
+            path=artifact_by_kind[kind],
+            kind=kind,
+            cell_id=scenario,
+            evaluation_contract_digest=contract.contract_digest,
+            fixture_digest=fixture_digest,
+            order_seed=0,
+            freeze_bundle_digest=freeze_bundle_digest,
+            candidate_wheel_digest=candidate_wheel_digest,
+            candidate_wheel_binding_digest=candidate_wheel_binding_digest,
+            candidate_distribution_name=candidate_distribution_name,
+            candidate_distribution_version=candidate_distribution_version,
+        )
+        for kind in evidence_kinds
     )
+    evidence_refs = tuple(item.relative_path for item in evidence_records)
     if cell.get("passed"):
         return QualificationCellOutcome(
             cell_id=scenario,
@@ -1731,6 +1778,7 @@ def _responsibility_outcome(
             pipeline_stages=prepared.pipeline_stages + suffix,
             evidence_kinds=evidence_kinds,
             evidence_refs=evidence_refs,
+            evidence_records=evidence_records,
         )
     return QualificationCellOutcome(
         cell_id=scenario,
@@ -1741,6 +1789,7 @@ def _responsibility_outcome(
         pipeline_stages=prepared.pipeline_stages + suffix,
         evidence_kinds=evidence_kinds,
         evidence_refs=evidence_refs,
+        evidence_records=evidence_records,
         failure_class=QualificationFailureClass.PRODUCT,
         failure_code=str(cell.get("failure") or cell.get("error") or "E2E_FAILED")[:500],
     )
@@ -1752,6 +1801,7 @@ def _contract(
     roles: EngineRoleConfiguration,
     source_digest: str,
     policies: EvaluationPolicies | None = None,
+    candidate_wheel_binding_digest: str | None = None,
 ) -> EvaluationContract:
     import inspect
     from .execution import ProviderExecutionPreparation, GoalTestPreparation, EXECUTION_PREPARATION_INSTRUCTIONS, GOAL_TEST_PREPARATION_INSTRUCTIONS
@@ -1779,6 +1829,7 @@ def _contract(
                 "restart": "new-app-server-and-core",
                 "raw_request_pipeline": "EngineApplication.prepare+authorize",
                 "responsibility_manifest_digest": suite.manifest_digest,
+                "candidate_wheel_binding_digest": candidate_wheel_binding_digest,
             }
             | (
                 policy_contract_fragment(policies)
@@ -1819,12 +1870,32 @@ def run_project_e2e(
     role_configuration: EngineRoleConfiguration | None = None,
     codex_bin: Path | str | None = None,
     evaluation_policies: EvaluationPolicies | None = None,
+    candidate_wheel: Path | str | None = None,
 ) -> tuple[Path, ScopeQualificationReport]:
     if evaluation_policies is None:
         raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
     base = (root or project_root()).resolve(strict=True)
     if run_root is not None:
         _guard_e2e_partial_resume(Path(run_root).resolve())
+    if candidate_wheel is None:
+        raise QualificationRunError("CANDIDATE_WHEEL_REQUIRED")
+    try:
+        candidate_binding = verify_candidate_wheel_installation(candidate_wheel)
+    except Exception as error:
+        raise QualificationRunError(str(error)) from error
+    if run_root is not None:
+        metadata_path = Path(run_root).resolve() / "run-metadata.json"
+        if metadata_path.is_file():
+            try:
+                saved_metadata = json.loads(
+                    metadata_path.read_text(encoding="utf-8")
+                )
+                verify_metadata_digest(saved_metadata)
+                saved_binding = verify_candidate_wheel_metadata(saved_metadata)
+            except Exception as error:
+                raise QualificationRunError(str(error)) from error
+            if saved_binding != candidate_binding:
+                raise QualificationRunError("CANDIDATE_WHEEL_BINDING_CHANGED")
     preflight_failures = _preflight(base)
     if preflight_failures:
         raise QualificationRunError("; ".join(preflight_failures))
@@ -1842,13 +1913,20 @@ def run_project_e2e(
     ) as real_runtime:
         inventory = real_runtime.list_models()
         roles.validate_inventory(inventory)
-        contract = _contract(base, inventory, roles, source_digest, evaluation_policies)
+        contract = _contract(
+            base,
+            inventory,
+            roles,
+            source_digest,
+            evaluation_policies,
+            candidate_binding.binding_digest,
+        )
         destination = (
             run_root or _default_run_root(base, "project-e2e", contract.contract_digest[7:15])
         ).resolve()
         store = ImmutableCheckpointStore(destination, contract)
         store.initialize()
-        build_qualification_reproduction_bundle(
+        freeze_manifest = build_qualification_reproduction_bundle(
             root=base,
             destination=destination / "reproduction-bundle",
             inventory=inventory,
@@ -1870,6 +1948,8 @@ def run_project_e2e(
                 "project_root": str(base),
                 "role_configuration": roles.model_dump(mode="json"),
                 "codex_bin": None if codex_bin is None else str(Path(codex_bin).resolve()),
+                "candidate_wheel_binding": candidate_binding.model_dump(mode="json"),
+                "candidate_wheel_binding_digest": candidate_binding.binding_digest,
             },
             evaluation_policies,
         )
@@ -1969,12 +2049,30 @@ def run_project_e2e(
                 }
                 generated_plan = cell_root / "generated-plan.json"
                 activation_receipt = cell_root / "plan-activation-receipt.json"
+                _write_json(
+                    cell_root / "qualification-observation.json",
+                    {
+                        "schema": "flowmarshal.project-e2e.qualification-observation.v1",
+                        "evaluation_contract_digest": contract.contract_digest,
+                        "fixture_digest": digest,
+                        "cell_id": scenario,
+                        "order_seed": 0,
+                        "observation": cell,
+                    },
+                )
                 responsibility_outcome = _responsibility_outcome(
                     scenario=scenario,
                     prepared=prepared,
                     cell=cell,
                     contract=contract,
                     cell_root=cell_root,
+                    run_root=destination,
+                    fixture_digest=digest,
+                    freeze_bundle_digest=freeze_manifest.bundle_digest,
+                    candidate_wheel_digest=candidate_binding.wheel_digest,
+                    candidate_wheel_binding_digest=candidate_binding.binding_digest,
+                    candidate_distribution_name=candidate_binding.distribution_name,
+                    candidate_distribution_version=candidate_binding.distribution_version,
                 )
                 cell.update({
                     "scenario": scenario,
@@ -2047,6 +2145,18 @@ def run_project_e2e(
                 for item in cells
             ),
             evaluation_contract_digest=contract.contract_digest,
+            run_root=destination,
+            expected_cell_bindings={
+                scenario: (digest, 0)
+                for scenario, digest in zip(
+                    E2E_SCENARIOS, contract.fixture_digests, strict=True
+                )
+            },
+            expected_freeze_bundle_digest=freeze_manifest.bundle_digest,
+            expected_candidate_wheel_digest=candidate_binding.wheel_digest,
+            expected_candidate_wheel_binding_digest=candidate_binding.binding_digest,
+            expected_candidate_distribution_name=candidate_binding.distribution_name,
+            expected_candidate_distribution_version=candidate_binding.distribution_version,
         )
         _write_json(
             destination / "responsibility-qualification-report.json",

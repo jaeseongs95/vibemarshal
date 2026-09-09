@@ -108,6 +108,26 @@ class BudgetFixture(unittest.TestCase):
             ).fetchall()
         self.assertEqual([( "", 1), (self.goal.goal_id, 1)], [(item["scope_key"], item["revision_no"]) for item in revisions])
 
+    def test_legacy_call_reservation_tokens_is_optional_and_has_no_admission_effect(self) -> None:
+        current = GoalBudgetPolicy.model_validate_json('{"total_tokens":100}')
+        legacy = GoalBudgetPolicy.model_validate_json(
+            '{"total_tokens":100,"call_reservation_tokens":99}'
+        )
+        self.assertIsNone(current.model_dump()["call_reservation_tokens"])
+        self.assertEqual(99, legacy.model_dump()["call_reservation_tokens"])
+
+        self.manager.configure(self.project_id, current)
+        current_call = self.reserve("current-without-reservation-field")
+        self.assertEqual(0, self.provider_call(current_call)["estimated_tokens"])
+        self.manager.release_before_effect(current_call, reason="정책 비교")
+
+        self.manager.configure(self.project_id, legacy)
+        legacy_call = self.reserve("legacy-reservation-field")
+        self.assertEqual(0, self.provider_call(legacy_call)["estimated_tokens"])
+        self.assertEqual(0, self.manager.status(
+            self.project_id, goal_id=self.goal.goal_id,
+        ).reserved_tokens)
+
     def test_default_policy_applies_when_goal_override_is_absent(self) -> None:
         policy = GoalBudgetPolicy(total_tokens=100, call_reservation_tokens=11)
         self.manager.configure(self.project_id, policy)

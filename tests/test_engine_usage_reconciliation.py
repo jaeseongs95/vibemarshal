@@ -103,6 +103,30 @@ class RoleUsageReconciliationTests(unittest.TestCase):
         self.assertEqual((effective.usage_id,), tuple(item.usage_id for item in summary.usage_records))
         self.assertIsNone(summary.latency_ms.total)
 
+    def test_late_reconciliation_cannot_promote_model_echo_to_observation(self) -> None:
+        call_id, receipt = self._reserve_timeout("late-model-echo")
+        effective = self.manager.observe_role_terminal(
+            call_id,
+            self._terminal(receipt, payload={
+                "usage_scope": "turn",
+                "usage": {
+                    "inputTokens": 0, "cachedInputTokens": 0,
+                    "outputTokens": 0, "reasoningOutputTokens": 0,
+                    "totalTokens": 0,
+                },
+                "model_observation_source": "provider_raw_response",
+                "observed_model": "late-model",
+                "observed_effort": "high",
+            }),
+        )
+        self.assertIsNone(effective.observed_model)
+        self.assertIsNone(effective.observed_effort)
+        summary = EngineApplication(self.service).usage_summary(
+            self.project_id, goal_id=self.goal.goal_id,
+        )
+        self.assertIsNone(summary.usage_records[0].observed_model)
+        self.assertIsNone(summary.usage_records[0].observed_effort)
+
     def test_same_observation_is_idempotent_and_different_observation_conflicts(self) -> None:
         call_id, receipt = self._reserve_timeout("reconcile-idempotent")
         observation = self._terminal(receipt)

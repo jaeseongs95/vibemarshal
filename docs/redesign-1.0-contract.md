@@ -2,7 +2,7 @@
 
 상태: **승인된 설계 / planned**. 이 문서는 FM-01의 문서 계약이며 제품 구현·qualification·1.0 전환 완료 증거가 아니다. 기존 Domain Core·revision·DAG·binding·evidence·validation을 유지하며 전면 재작성하지 않는다. 세부 기존 계약은 [제품 설계](orchestration-redesign.md), 릴리스 결정은 [ADR](engine-cutover-adr.md)을 함께 따른다.
 
-권위 출처는 [승인 계획](D:/codex/fm-inspection-runtime/performance-release-floor-20260907/redesign-1.0/approved-plan.md)이며 SHA-256은 `a24eb860c8b603f8edc43a71370c6d8638cc53d3c5c49b8a568c44fc9f5b1742`다. 시스템·개발자 지침 안에서 현재 사용자의 최신 명시 승인은 사용자 제공 지침·프로젝트 AGENTS·과거 문서의 상충하는 조항보다 우선한다. 아래 항목 번호는 승인 계획의 제품 설계 1~12와 일치한다. planned는 이 문서에서 구현·검증 완료를 판정하지 않았다는 뜻이다. 코드 존재만으로 완료로 올리지 않으며, 미구현·미검증 책임은 근거가 확인될 때까지 planned로 유지한다. 다른 작업의 완료 상태는 이 문서에서 변경하지 않는다.
+권위 계보는 [기본 승인 계획](D:/codex/fm-inspection-runtime/performance-release-floor-20260907/redesign-1.0/approved-plan.md) SHA-256 `a24eb860c8b603f8edc43a71370c6d8638cc53d3c5c49b8a568c44fc9f5b1742`, [revision 4 교정 계획](D:/codex/fm-inspection-runtime/performance-release-floor-20260907/redesign-1.0/approved-plan-revision-4.md) SHA-256 `72be4b60e51bfb46268d36fd34bbc62a60e25c5cf3a67bc013b40eb8653afc58`, [revision 5 독립 패널 교정 계획](D:/codex/fm-inspection-runtime/performance-release-floor-20260907/redesign-1.0/approved-plan-revision-5.md) SHA-256 `a98150634cdd50450514f2fd819178ad36169bd4ad0462c860bf243648b36748` 순이다. 기본 계획의 제품 설계 1~12를 기준선으로 유지하고, 충돌하는 provider/effect/usage·검증 순서·범위 조항은 뒤의 revision이 앞의 revision을 supersede한다. 시스템·개발자 지침 안에서 현재 사용자의 최신 명시 승인은 이 계보와 과거 프로젝트 조항보다 우선한다. planned는 이 문서에서 구현·검증 완료를 판정하지 않았다는 뜻이다. 코드 존재만으로 완료로 올리지 않으며, 미구현·미검증 책임은 근거가 확인될 때까지 planned로 유지한다. 다른 작업의 완료 상태는 이 문서에서 변경하지 않는다.
 
 ## D01. 목표 단위 승인과 내부 Plan — planned
 
@@ -32,21 +32,21 @@
 
 다음 역할 호출은 모두 `RuntimeJob`과 영속 checkpoint에 포함한다: `execution_spec_prepare`, `worker_turn`, `task_semantic_validate`, `goal_test_prepare`, `goal_semantic_validate`, 활성화 후 자동 recovery/replanning의 역할 호출. Worker만 비동기화하고 준비·검사를 tick 안에서 동기 대기하는 구현은 이 책임을 충족하지 못한다. 승인 전 명시적인 대화형 준비는 동기 `PlanningCoordinator/RoleRunner`를 유지할 수 있다.
 
-Validator의 독립성은 Worker와 다른 model/effort 문자열만으로 충족되지 않는다. Validator는 Worker와 분리된 RuntimeJob·thread 또는 결정적 검사 프로세스에서 원자료를 새로 관측하고, 자신의 request·receipt·evidence binding을 남겨야 한다. Worker의 자연어 설명이나 Worker가 제안한 evidence를 재관측 없이 독립 evidence로 채택하지 않는다. 같은 provider를 쓰더라도 실행 경로·입력·관측 출처가 분리되어 있으면 독립 검사가 될 수 있다.
+Validator의 독립성은 Worker와 다른 model/effort 문자열만으로 충족되지 않는다. semantic validation은 `model_review` evidence를 필수로 요구하고 terminal PASS/FAIL에서 제출 종류와 무관하게 독립성 검사를 실행한다. Validator는 Worker와 다른 Attempt·RuntimeJob·thread/turn에서 원자료를 새로 관측하고, 자신의 terminal provider receipt와 evidence binding을 남겨야 한다. `SemanticValidationObservation`의 PASS/FAIL, validation/task ID와 content digest는 `ValidationResult`와 정확히 일치해야 한다. 사용한 model-review evidence를 다른 검사에 재사용하거나 재결속하지 않는다. Worker의 자연어 설명이나 Worker가 제안한 evidence를 재관측 없이 독립 evidence로 채택하지 않는다.
 
 ## D05. 실행·효과와 usage 관측 분리 — planned
 
-실행 admission·예약·슬롯, provider turn 상태, 외부 효과 상태와 사용량 회계 관측을 별도 축으로 유지한다. provider terminal 및 유효 결과가 확인되면 usage 누락만으로 후속 실행을 막지 않는다. provider turn의 terminal은 파일·배포·외부 API 효과의 완료 증거가 아니다. 외부 효과는 provider/system, target·account, operation, scope, idempotency key와 checkpoint policy를 가진 typed identity로 승인·intent·receipt·재관측을 결속한다. 1.0에서는 내부 파일·명령 효과와 외부 효과를 같은 Task에 섞지 않고 별도 Task와 dependency로 분리한다. typed adapter receipt, 파일 diff/hash 또는 대상 시스템 재관측으로 별도 확인하고, 직접 근거가 없으면 `external_unknown`을 유지한다. 필수 evidence·validation·효과 안전 검사는 그대로 적용한다.
+실행 admission·예약·슬롯, provider turn 상태, 외부 효과 상태와 사용량 회계 관측을 별도 축으로 유지한다. provider terminal 및 유효 결과가 확인되면 usage 누락만으로 후속 실행을 막지 않는다. provider turn의 terminal은 파일·배포·외부 API 효과의 완료 증거가 아니다. 외부 효과는 provider/system, target·account, operation, scope, idempotency key와 checkpoint policy를 가진 typed identity로 승인·intent·receipt·재관측을 결속한다. 1.0에서는 내부 파일·명령 효과와 외부 효과를 같은 Task에 섞지 않고 별도 Task와 dependency로 분리한다. 현재 1.0의 외부 효과 완료는 같은 실행 Attempt의 terminal·valid provider call과 thread/turn 결속, 같은 identity의 typed adapter receipt, identity와 provider가 일치하는 대상 시스템 재관측을 모두 요구한다. `(provider, system, provider_operation_id)`는 프로젝트 경계와 무관하게 원장 전체에서 한 Attempt에만 결속하며, 같은 Attempt의 완전히 같은 receipt 재기록만 멱등 허용한다. 직접 근거가 하나라도 없으면 `external_unknown`을 유지한다. 필수 evidence·validation·효과 안전 검사는 그대로 적용한다.
 
 외부 생성·실행 효과가 미확정이면 기존 intent·thread/turn binding·receipt를 먼저 관측하며 무조건 재실행하지 않는다. 늦은 usage는 원본 receipt를 보존한 회계 관측만 멱등 추가한다. 늦은 사용량으로 실행 슬롯 환불·재차감·재실행을 유발하지 않는다. Goal 등록 전 호출도 원래 프로젝트·Goal 계보·요청·receipt에 결속하고 가짜 Goal/Profile을 만들지 않는다.
 
-원장과 receipt의 사실은 `provider_observed`, `client_requested`, `local_derived`, `model_reported` provenance를 구분한다. thread/turn·provider status·provider가 반환한 usage는 원문 관측, 요청 model/effort·GoalAuthorization은 client 요청, latency·합계·Core 판정은 로컬 파생, 역할의 finding·error 주장·rating은 모델 제출로 기록한다. requested/observed model·effort, provider inventory digest, adapter capability digest와 provenance는 receipt·DB·API projection에 명시적으로 직렬화한다. provider가 turn별 model/effort를 명시적으로 echo하지 않으면 observed 값은 null이고 `model/list` 지원 여부와 요청값만 보존하며 실제 적용 model/effort로 표기하지 않는다.
+원장과 receipt의 사실은 `provider_observed`, `client_requested`, `local_derived`, `model_reported` provenance를 구분한다. thread/turn·provider status·provider가 반환한 usage는 원문 관측, 요청 model/effort·GoalAuthorization은 client 요청, latency·합계·Core 판정은 로컬 파생, 역할의 finding·error 주장·rating은 모델 제출로 기록한다. requested/observed model·effort, provider inventory digest, adapter capability digest와 provenance는 receipt·DB·API projection에 명시적으로 직렬화한다. `observed_model`·`observed_effort`는 `model_observation_source=provider_raw_response`로 식별된 원문 응답에서 provider가 명시적으로 제공한 경우에만 기록한다. 요청 echo·표식 없는 payload·부분 관측은 authoritative 관측값으로 승격하지 않는다. provider가 turn별 값을 명시적으로 echo하지 않으면 observed 값은 null이고 `model/list` 지원 여부와 요청값만 보존하며 실제 적용 model/effort로 표기하지 않는다.
 
 ## D06. 관측값과 운영 한도의 의미 — planned
 
 실제 관측 token은 유효한 근거이며 관측 소계·미확인 호출·불완전 총량을 구분한다. input·cached·output·reasoning·total 중 provider가 준 구성요소만 기록하고, 누락된 각 항목은 서로 독립적인 `null/unknown`과 사유로 남긴다. 일부 구성요소가 없다는 이유로 제공된 다른 구성요소를 폐기하거나 0·예약량·추정치로 채우지 않는다. token·API 가격·계정 사용률 %를 구독 한도 차감량이나 특정 작업의 정확한 요금으로 환산하지 않는다. 총 필요 호출 수·시간·token을 계산할 수 있다고 약속하지 않는다.
 
-모든 활성 실행은 immutable `max_provider_calls`와 `absolute_deadline`을 결정적 hard stop으로 결속한다. token stop은 사용자가 명시적으로 선택한 경우에만 provider가 관측해 준 token 소계에 적용하는 best-effort 중단 정책이다. usage 결측이 있으면 정확한 잔여 token이나 strict cap을 주장하지 않고, 결측 자체만으로 terminal 결과·후속 실행을 차단하지 않는다. 호출·시간·token stop은 소요량 예측·요금 상한·완료 보장이 아니다. 미제공 실시간 지원이나 exact usage backfill은 필수 의존성이 아니다. 과거 token budget·잠정 차감은 역사 reader에서 원래 의미로 읽으며 새 실행 한도로 재해석하지 않는다.
+모든 활성 실행은 immutable `max_provider_calls`와 `absolute_deadline`을 결정적 hard stop으로 결속한다. token stop은 사용자가 명시적으로 선택한 경우에만 provider가 관측해 준 token 소계에 적용하는 best-effort 중단 정책이다. 신규 정책의 `call_reservation_tokens`는 선택적인 deprecated 호환 필드이며 admission·요금·구독 한도 계산에 쓰지 않는다. usage 결측이 있으면 정확한 잔여 token이나 strict cap을 주장하지 않고, 결측 자체만으로 terminal 결과·후속 실행을 차단하지 않는다. 호출·시간·token stop은 소요량 예측·요금 상한·완료 보장이 아니다. 미제공 실시간 지원이나 exact usage backfill은 필수 의존성이 아니다. 과거 token budget·잠정 차감과 숫자 필드는 역사 reader에서 원래 의미로 읽으며 새 실행 한도로 재해석하지 않는다.
 
 ## D07. 유효 운영 제한 보존 — planned
 
@@ -101,7 +101,7 @@ Engine schema 4는 별도의 새 DB로 만든다. schema 3/raw receipt/history �
 
 | 검증 | 필수 수용 기준 | 담당 |
 |---|---|---|
-| 결정적·호환·설치 | schema/DAG/원장/정책/검사 Gate, 변경 영향 회귀, schema 3 최소 read-only inspector와 schema 4 신규 DB, candidate wheel의 깨끗한 non-editable 설치 | FM-11 harness, FM-12 검증 |
+| 결정적·호환·설치 | schema/DAG/원장/정책/검사 Gate, 변경 영향 회귀, schema 3 최소 read-only inspector와 schema 4 신규 DB, candidate wheel의 깨끗한 non-editable 설치. 모든 qualification evidence는 허용 root·파일 SHA-256·cell/fixture/seed/freeze에 결속한다. release project E2E는 절대 경로 candidate wheel과 그 SHA-256·배포판 이름/버전·non-editable 설치·import 경로·wheel 내부 package bytes까지 harness와 최종 scope verifier에서 재확인한다. source 기반 진단은 release PASS로 승격하지 않는다 | FM-11 harness, FM-12 검증 |
 | 실제 역할 48회 | Plan 8 + Goal 8 fixture × 3 seed 전 cell 완료; required finding recall ≥90%, precision ≥85%, critical false admission 0, clean false block 0, schema failure 0, critical admission seed instability 0 | FM-11, FM-13 |
 | 실제 Planning 18회 | 6 fixture × 3 seed 전 cell 완료; 정상 4종은 선택, 실제 정보 부족 2종은 의미 있는 blocking question; 일반 오류를 정상 blocked로 계산하지 않음; 준비 포함 역할 호출 ≤14, 후보 version ≤5, 선택 후보 deterministic finding 0 | FM-11, FM-13 |
 | 실제 요청 E2E | 실제 요청 → Goal 정규화 → 독립 review → Plan 선택 → 한 번의 승인 → Task 실행 → 독립 검사 → 최종 결과를 실제 provider로 연결 | FM-11, FM-14 |
@@ -139,15 +139,15 @@ Engine schema 4는 별도의 새 DB로 만든다. schema 3/raw receipt/history �
 
 R3.1 대비 token/speed, performance 36, 비교 lifecycle 최적화와 v2 static 11/qualification 13은 별도 비차단 보고 또는 해당 provider 채택 Gate다. 원래 결과·fixture·보고서를 수정하거나 당시 판정을 PASS로 바꾸지 않는다. GUI, Localizer/번역 최적화, MCTS/광범위 그래프, 동일 프로젝트 병렬, remote/multiOS hardening은 1.0 이후다. 활성 job 동안의 supervisor는 필수 구현이며 후속 GUI나 전역 daemon과 혼동하지 않는다.
 
-FM-09의 개발 조율·dispatch·원장 자동화는 제품 runtime 기능이나 1.0 품질 Gate가 아니다. 재현 가능한 release evidence를 수집하는 delivery 보조 도구로 유지하되, 그 자체의 확장·완성도를 제품 critical path에 넣지 않는다. 제품 scheduler의 `run_once` 의미와 supervisor 결속은 FM-04·FM-08·FM-14에서 직접 검증한다.
+FM-09의 개발 조율·dispatch·원장 자동화는 제품 runtime 기능이나 1.0 품질 Gate가 아니다. 재현 가능한 release evidence를 수집하는 delivery 보조 도구로 유지하되, 그 자체의 확장·완성도와 사용자의 실제 Codex 예약 `ACTIVE`/`PAUSED` 상태를 제품 critical path에 넣지 않는다. 제품 scheduler의 `run_once` 의미와 supervisor 결속은 동결 wheel·격리 Engine DB에서 연속·동시·재시작 subprocess tick으로 FM-04·FM-08·FM-14에서 직접 검증한다. 실제 Codex 예약 연동은 사용자 opt-in 비차단 운영 검사다.
 
-깨끗한 non-editable 설치는 동결 candidate wheel digest에 대해 한 번 완전 검증한다. FM-14는 그 설치 환경에서 실제 요청 E2E를 검증하고, FM-16은 같은 wheel·lock·환경 provenance를 확인한 뒤 cutover로 달라진 entrypoint·package name·설정·smoke만 delta 검증한다. wheel digest나 필수 환경이 바뀌면 이전 설치 근거를 재사용하지 않는다.
+최종 1.0 package name·version·entrypoint·사용자 설정 표면을 release freeze 전에 확정한다. 깨끗한 non-editable 설치는 그 최종 candidate wheel digest에 대해 한 번 완전 검증하고 FM-14는 같은 설치 환경에서 실제 요청 E2E를 수행한다. FM-16은 검증된 동일 wheel·lock·환경 provenance를 확인해 로컬 활성화와 표면 smoke만 수행하며 package metadata를 다시 바꾸지 않는다. wheel digest나 필수 환경이 바뀌면 이전 설치·E2E 근거를 재사용하지 않는다.
 
 ## V04. 1.0 실행 순서와 병렬 경계 — planned / 미실행
 
-필수 기능 구현 뒤 얇은 수직 canary와 대표 effect-unknown fault를 먼저 통과시킨다. 이어 candidate wheel·최소 harness·결정적/설치 검증을 끝내고 release input을 freeze한다. freeze 뒤 Role 48, Planning 18과 서로 독립인 FM-14 lane을 가능한 범위에서 병렬 실행한다. 같은 프로젝트를 변경하는 제품 Task는 기존 직렬 원칙을 따르지만, immutable fixture를 읽고 별도 artifact를 쓰는 qualification shard에는 그 원칙을 적용하지 않는다.
+필수 기능 구현 중에는 결정적/fake canary로 계약 우회를 조기에 차단한다. 최종 package identity를 포함한 candidate wheel·최소 harness·결정적/설치 검증을 끝내고 release input을 freeze한 뒤, 같은 freeze의 얇은 실제 요청 수직 canary와 대표 effect-unknown fault를 먼저 통과시킨다. 그 canary cell을 최종 수량에 포함하고 나서 Role 48, Planning 18과 서로 독립인 FM-14 lane을 가능한 범위에서 병렬 실행한다. 같은 프로젝트를 변경하는 제품 Task는 기존 직렬 원칙을 따르지만, immutable fixture를 읽고 별도 artifact를 쓰는 qualification shard에는 그 원칙을 적용하지 않는다.
 
-두 FM-15 감사는 서로의 중간 결론을 보지 않고 병렬 수행한다. Core는 두 제출물의 evidence ref·finding code·affected Task를 원장 catalog에 대조해 결정적으로 join하며, 충돌이나 누락을 다수결로 숨기지 않는다. 모든 필수 finding을 처리한 뒤에만 FM-16 preflight와 cutover를 진행하고, postverify는 같은 candidate wheel에 대한 delta 검증으로 제한한다.
+두 FM-15 감사는 서로의 중간 결론을 보지 않고 병렬 수행한다. Core는 두 제출물의 evidence ref·finding code·affected Task를 원장 catalog에 대조해 결정적으로 join하며, 충돌이나 누락을 다수결로 숨기지 않는다. 모든 필수 finding을 처리한 뒤에만 FM-16 preflight와 로컬 활성화를 진행하고, postverify는 이미 검증한 동일 candidate wheel과 최종 identity가 바뀌지 않았는지 확인한다.
 
 현재 변경 대상은 최신 명시 지시에 따른 `D:/codex/flowmarshal`의 `main` 브랜치 main checkout이다. FlowMarshal 1.0 릴리스 완료까지 파일 변경과 커밋은 이 위치에서만 수행한다. 승인 계획에 남은 `D:/codex/fm-performance-floor`와 해당 브랜치는 필수 입력의 출처로 보존하며 현재 쓰기 대상으로 사용하지 않는다. FM-16의 필수 감사 후 1.0 전환 조건은 유지한다. 원격 push·공개 배포·PyPI 업로드·외부 메시지·삭제·인증/권한 변경·크레딧 구매/사용은 포함하지 않는다. main checkout의 무관한 상태와 `D:/codex/fm-recovery`의 기존 변경은 보존한다. 적용 지침의 경로·효과 충돌 처리와 한시 규칙 만료 조건은 [현재 인계](pre-1.0-handoff.md)에 기록한다.
 

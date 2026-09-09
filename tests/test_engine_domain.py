@@ -13,6 +13,7 @@ from flowmarshal.engine.domain import (
     GateName,
     GoalCoverage,
     GoalOperatingPolicy,
+    IntegrationValidationContract,
     PlanContractDefinition,
     PlanSkeletonCandidate,
     ReviewFinding,
@@ -22,6 +23,7 @@ from flowmarshal.engine.domain import (
     TaskKind,
     TaskSkeleton,
     ValidationResult,
+    ValidationContract,
     ValidationStatus,
     derive_candidate_decision,
     new_id,
@@ -86,6 +88,39 @@ def _skeleton(*, cycle: bool = False) -> PlanSkeletonCandidate:
 
 
 class EngineDomainTests(unittest.TestCase):
+    def test_semantic_validation_requires_model_review_evidence_kind(self) -> None:
+        with self.assertRaisesRegex(ValidationError, "model_review"):
+            ValidationContract(
+                validation_id="semantic_review",
+                statement="독립 의미 검토",
+                method="semantic",
+                required_evidence_kinds=("file",),
+            )
+        accepted = ValidationContract(
+            validation_id="semantic_review",
+            statement="독립 의미 검토",
+            method="semantic",
+            required_evidence_kinds=("model_review", "file"),
+        )
+        self.assertEqual("semantic", accepted.method)
+
+        with self.assertRaisesRegex(ValidationError, "model_review"):
+            IntegrationValidationContract(
+                validation_id="semantic_goal_review",
+                statement="독립 목표 의미 검토",
+                criterion_refs=("ac_one",),
+                method="semantic",
+                required_evidence_kinds=("file",),
+            )
+        integration = IntegrationValidationContract(
+            validation_id="semantic_goal_review",
+            statement="독립 목표 의미 검토",
+            criterion_refs=("ac_one",),
+            method="semantic",
+            required_evidence_kinds=("model_review", "file"),
+        )
+        self.assertEqual("semantic", integration.method)
+
     def test_cycle_is_rejected_by_frozen_schema(self) -> None:
         with self.assertRaisesRegex(ValidationError, "cycle"):
             _skeleton(cycle=True)

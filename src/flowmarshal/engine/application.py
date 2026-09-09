@@ -68,6 +68,7 @@ from .roles import (
 )
 from .service import EngineService
 from .validation_execution import GoalValidationRetryRequest
+from .model_observation import authoritative_receipt_model_observation
 
 
 class EnginePreparationResult(EngineModel):
@@ -588,6 +589,11 @@ def _provider_receipt_projection(
         if row["status"] != expected_status or row["actual_tokens"] != actual:
             return None, ("PROVIDER_RECEIPT_SETTLEMENT_CONFLICT",
                           "provider call 상태·actual_tokens가 최신 유효 관측과 다릅니다.")
+        observed_model, observed_effort = authoritative_receipt_model_observation(
+            observed_model=receipt.observed_model,
+            observed_effort=receipt.observed_effort,
+            binding_provenance=receipt.binding_provenance,
+        )
         return ProviderReceiptUsage(
             projection_source=projection_source, runtime_observation_digest=runtime_digest,
             usage_scope=usage_scope, attribution_basis=attribution_basis,
@@ -596,16 +602,8 @@ def _provider_receipt_projection(
             call_status=call_status, model=receipt.model, effort=receipt.effort,
             requested_model=receipt.requested_model or receipt.model,
             requested_effort=receipt.requested_effort or receipt.effort,
-            observed_model=(
-                (document.get("payload") or {}).get("observed_model")
-                if runtime_events and isinstance((document.get("payload") or {}).get("observed_model"), str)
-                else receipt.observed_model
-            ),
-            observed_effort=(
-                (document.get("payload") or {}).get("observed_effort")
-                if runtime_events and isinstance((document.get("payload") or {}).get("observed_effort"), str)
-                else receipt.observed_effort
-            ),
+            observed_model=observed_model,
+            observed_effort=observed_effort,
             provider_inventory_digest=(
                 receipt.provider_inventory_digest
                 or (receipt.observed_binding.inventory.provider_inventory_digest
@@ -618,11 +616,11 @@ def _provider_receipt_projection(
             ),
             binding_provenance={
                 "requested": "role_request",
+                # 늦은 회계 관측은 model provenance를 승격하지 않는다.
                 "observed": (
-                    "runtime_observation" if runtime_events and (
-                        isinstance((document.get("payload") or {}).get("observed_model"), str)
-                        or isinstance((document.get("payload") or {}).get("observed_effort"), str)
-                    ) else (receipt.binding_provenance or {}).get("observed")
+                    (receipt.binding_provenance or {}).get("observed")
+                    if observed_model is not None and observed_effort is not None
+                    else None
                 ),
                 "provider_inventory": "model/list" if receipt.observed_binding is not None else None,
                 "adapter_capability": "local_operational_binding" if receipt.observed_binding is not None else None,

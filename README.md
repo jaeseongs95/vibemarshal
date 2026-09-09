@@ -1,8 +1,8 @@
 # VibeMarshal
 
-VibeMarshal은 큰 개발 요청을 검증 가능한 목표와 Task DAG로 정리하고, Codex 작업의 실행·관측·검사·복구를 하나의 로컬 원장에서 추적하는 Workflow Orchestrator다. 사용자에게 보이는 제품명은 **VibeMarshal**, Python 패키지와 CLI의 기술 식별자는 `FlowMarshal`과 `flowmarshal-engine`이다.
+VibeMarshal은 큰 개발 요청을 검증 가능한 목표와 Task DAG로 정리하고, Codex 작업의 실행·관측·검사·복구를 로컬 원장 하나에서 추적하는 Workflow Orchestrator다. 제품명은 **VibeMarshal**이며 Python 패키지와 CLI의 기술 식별자는 `FlowMarshal`, `flowmarshal-engine`이다.
 
-> **개발 상태:** 현재 버전은 `0.2.0a1` 프리릴리스다. 사용자 façade, schema 4 원장과 RuntimeJob 구현이 존재하지만 1.0 필수 qualification과 독립 최종 감사가 완료되지 않아 1.0 판정은 **NO-GO**다. `apps/desktop`의 GUI도 실제 Engine에 연결되지 않은 UX 프로토타입이다.
+> **개발 상태:** 현재 버전은 `0.2.0a1` 프리릴리스다. 사용자 façade, schema 4 원장, RuntimeJob은 구현돼 있다. 다만 1.0 필수 qualification과 독립 최종 감사가 끝나지 않았으므로 1.0 판정은 **NO-GO**다. `apps/desktop` GUI는 아직 실제 Engine에 연결되지 않은 UX 프로토타입이다.
 
 ## 무엇을 해결하나
 
@@ -22,69 +22,75 @@ VibeMarshal은 큰 개발 요청을 검증 가능한 목표와 Task DAG로 정�
 
 ## 설치
 
-Python 3.10 이상이 필요하다. 현재는 릴리스 전 소스 설치를 제공한다.
+Python 3.10 이상이 필요하다. 프리릴리스 wheel은 source checkout과 분리된 가상환경에 절대 경로로 설치한다.
 
 ```powershell
-git clone https://github.com/jaeseongs95/vibemarshal.git
-cd vibemarshal
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install .
-.\.venv\Scripts\flowmarshal-engine.exe --help
+python -m venv C:\absolute\flowmarshal-venv
+C:\absolute\flowmarshal-venv\Scripts\python.exe -m pip install `
+  C:\absolute\dist\flowmarshal_engine-0.2.0a1-py3-none-any.whl
+C:\absolute\flowmarshal-venv\Scripts\flowmarshal-engine.exe --help
 ```
 
-위 명령은 현재 프리릴리스를 소스에서 설치하는 방법이다. 1.0의 깨끗한 non-editable 설치 qualification이 완료됐다는 뜻은 아니다. wheel 경계와 고정 의존성은 [Engine 설치 계약](docs/engine-package-install.md)에서 확인할 수 있다.
+이 예시는 1.0 qualification 완료를 뜻하지 않는다. wheel 경계와 고정 의존성은 [Engine 설치 계약](docs/engine-package-install.md)에서 확인할 수 있다.
 
 ## 기본 워크플로
 
-먼저 관리할 프로젝트를 등록한다.
+wheel만 설치한 환경에서도 저장소의 `config/` 파일 없이 시작할 수 있다. 상태 경로와 관리할 프로젝트 경로를 절대 경로로 정한 뒤, 현재 Codex의 `model/list`에 있는 model/effort로 역할 설정을 만든다.
 
 ```powershell
-.\.venv\Scripts\flowmarshal-engine.exe project init `
+$ProjectRoot = (Resolve-Path "C:\path\to\my-project").Path
+$StateRoot = (New-Item -ItemType Directory -Force (Join-Path $ProjectRoot ".flowmarshal-engine")).FullName
+$Database = Join-Path $StateRoot "flowmarshal-engine.sqlite3"
+$Artifacts = Join-Path $StateRoot "artifacts"
+$RoleConfig = Join-Path $StateRoot "roles.json"
+$FlowMarshal = "C:\absolute\flowmarshal-venv\Scripts\flowmarshal-engine.exe"
+
+& $FlowMarshal config init `
+  --output $RoleConfig `
+  --model "<model-id>" `
+  --effort high
+
+& $FlowMarshal --db $Database --artifacts $Artifacts project init `
   --name "my-project" `
-  --root <project-root>
+  --root $ProjectRoot
 ```
 
-현재 프리릴리스의 역할 설정 예시는 `config/qualification-roles.json`에 있다. 일곱 역할의 model/effort를 고정하며 `executor`와 `validator`를 서로 다른 binding으로 둔다. 아래 Quickstart에서는 이 파일을 그대로 사용하지만, 이는 qualification용 시작값이지 모든 계정과 프로젝트에 맞는 범용 기본값은 아니다. Engine은 실제 호출 전에 현재 model inventory와 대조하고 지원되지 않는 binding을 임의로 바꾸지 않는다.
+`config init`은 지정한 값을 일곱 역할에 적용하고, 파일을 쓰기 전에 현재 model inventory와 대조한다. 역할 하나만 바꾸려면 `--role "validator=<model-id>:<effort>"`를 덧붙인다. 기존 파일은 덮어쓰지 않는다. 생성된 JSON은 사용자 소유 설정이며, 패키지는 특정 모델을 범용 기본값으로 정하지 않는다.
 
-역할 호출 전에 프로젝트의 검증 예산 정책도 등록해야 한다. 아래 파일은 현재 저장소의 개발 시작값이며 요금 상한이나 구독 한도 환산값이 아니다.
-
-```powershell
-.\.venv\Scripts\flowmarshal-engine.exe project budget set `
-  --project-id <project-id> `
-  --policy-file config/pre-1.0-validation-budget.json
-```
-
-이제 요청을 준비하고 승인한 뒤 첫 scheduler tick을 실행한다.
+`project init`이 출력한 `project_id`로 요청을 준비하고 승인한 뒤 첫 scheduler tick을 실행한다.
 
 ```powershell
-.\.venv\Scripts\flowmarshal-engine.exe prepare `
+& $FlowMarshal --db $Database --artifacts $Artifacts prepare `
   --project-id <project-id> `
   --request "두 모듈을 수정하고 회귀 테스트까지 실행해 주세요." `
-  --role-config config/qualification-roles.json
+  --role-config $RoleConfig
 
-.\.venv\Scripts\flowmarshal-engine.exe authorize `
+& $FlowMarshal --db $Database --artifacts $Artifacts authorize `
   --project-id <project-id>
 
-.\.venv\Scripts\flowmarshal-engine.exe run-once `
+& $FlowMarshal --db $Database --artifacts $Artifacts run-once `
   --project-id <project-id> `
-  --role-config config/qualification-roles.json
+  --role-config $RoleConfig
 ```
 
-`run-once`는 한 번의 상태 전이 또는 RuntimeJob 예약·관측만 수행하고 반환한다. `status`를 확인하면서 `run-once`를 반복하고, 활성 provider job이 있으면 `observe`로 관측한다. `observe`만으로 Task나 Goal이 완료되지는 않는다.
+`run-once`는 한 번의 상태 전이 또는 RuntimeJob 예약·관측만 수행하고 반환한다. 다음 tick은 `status`부터 확인하고, 활성 provider job이 있으면 `observe`를 호출한다.
 
 ```powershell
-.\.venv\Scripts\flowmarshal-engine.exe status --project-id <project-id>
-.\.venv\Scripts\flowmarshal-engine.exe observe --project-id <project-id>
-.\.venv\Scripts\flowmarshal-engine.exe run-once --project-id <project-id> --role-config config/qualification-roles.json
-.\.venv\Scripts\flowmarshal-engine.exe final-report --project-id <project-id> --format markdown
+& $FlowMarshal --db $Database --artifacts $Artifacts status --project-id <project-id>
+& $FlowMarshal --db $Database --artifacts $Artifacts observe --project-id <project-id>
+& $FlowMarshal --db $Database --artifacts $Artifacts run-once --project-id <project-id> --role-config $RoleConfig
+& $FlowMarshal --db $Database --artifacts $Artifacts final-report --project-id <project-id> --format markdown
 ```
 
-GoalVerdict가 확정될 때까지 필요한 tick 수는 Plan과 원장 상태에 따라 달라진다. 사용자는 내부 Plan ID나 digest를 승인 입력으로 복사할 필요가 없다.
+GoalVerdict가 확정될 때까지 필요한 tick 수는 Plan과 원장 상태에 따라 달라진다. 사용자는 내부 Plan ID나 digest를 승인 입력으로 복사할 필요가 없다. 반복 실행과 observe-first 복구는 [Engine 사용자 workflow](docs/engine-user-workflow.md)를 따른다.
+
+관측 token 정책은 선택 사항이다. `project budget set`에 넘기는 정책은 사용자가 별도 파일로 관리하며, 측정된 token을 기준으로 한 best-effort 중단 정책일 뿐 요금이나 구독 한도 상한이 아니다. `call_reservation_tokens`는 deprecated 호환 필드이며 admission 계산에 쓰지 않는다.
 
 ## 사용자 CLI
 
 | 명령 | 역할 |
 |---|---|
+| `config init` | 명시한 model/effort를 inventory에 대조하고 user-owned 역할 설정 생성 |
 | `prepare` | 요청 정규화, 독립 review와 Planning 준비 |
 | `authorize` | 목표 범위와 운영 정책 승인, 적합한 Plan 활성화 |
 | `run-once` | bounded scheduler tick 한 번 수행 |
@@ -94,7 +100,7 @@ GoalVerdict가 확정될 때까지 필요한 tick 수는 Plan과 원장 상태�
 | `status` | Core, control, job 상태 조회 |
 | `final-report` | GoalVerdict에 근거한 최종 보고 출력 |
 
-`project`, `model`, `goal`, `plan`, `task`, `run`, `attempt`, `validate`, `recover`, `report` 아래에는 진단과 세부 운영을 위한 중첩 명령이 있다. 전체 목록은 `flowmarshal-engine --help`와 각 명령의 `--help`에서 확인할 수 있다.
+`project`, `model`, `goal`, `plan`, `task`, `run`, `attempt`, `validate`, `recover`, `report` 아래에는 진단과 세부 운영을 위한 중첩 명령이 있다. 전체 목록은 `flowmarshal-engine --help`와 각 명령의 `--help`에서 확인할 수 있다. 반복 실행과 재시작·receipt 복구 절차는 [Engine 사용자 workflow](docs/engine-user-workflow.md)에 정리되어 있다.
 
 ## 데이터와 안전 경계
 

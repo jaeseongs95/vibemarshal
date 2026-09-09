@@ -6,6 +6,7 @@ import unittest
 from datetime import timedelta
 from pathlib import Path
 
+from flowmarshal.canonical import sha256_digest
 from flowmarshal.engine.benchmark_lifecycle import _successful_worker_for_current_spec
 from flowmarshal.engine.context import ProjectMapper
 from flowmarshal.engine.domain import (
@@ -22,6 +23,7 @@ from flowmarshal.engine.domain import (
     RuntimeIntentKind,
     RuntimeJobKind,
     RuntimeJobObservationKind,
+    SemanticValidationObservation,
     ThreadBinding,
     ValidationResult,
     ValidationStatus,
@@ -120,6 +122,7 @@ class ModelRebindingFixture(EngineServiceFixture):
             update={
                 "method": "semantic",
                 "statement": "Worker 직접 evidence를 독립적으로 검사한다.",
+                "required_evidence_kinds": ("model_review",),
             }
         )
         self.task = original_task.model_copy(
@@ -229,6 +232,37 @@ class ModelRebindingFixture(EngineServiceFixture):
 
     def complete_worker_with_evidence(self) -> tuple[object, EvidenceRecord]:
         attempt = self.service.reserve_attempt(task_id=self.task.task_id)
+        thread_id = f"worker-thread-{attempt.attempt_id}"
+        turn_id = f"worker-turn-{attempt.attempt_id}"
+        job = self.service.schedule_runtime_job(
+            project_id=self.project_id,
+            kind=RuntimeJobKind.WORKER_TURN,
+            checkpoint_key=f"worker-provenance-{attempt.attempt_id}",
+            request={"attempt_id": attempt.attempt_id},
+            absolute_deadline_at=utc_now() + timedelta(minutes=1),
+            attempt_id=attempt.attempt_id,
+            task_id=self.task.task_id,
+        )
+        self.service.start_runtime_job(job.job_id, thread_id=thread_id, turn_id=turn_id)
+        intent = self.service.prepare_runtime_intent(
+            attempt_id=attempt.attempt_id,
+            kind=RuntimeIntentKind.START_TURN,
+            idempotency_key=f"worker-provenance-turn-{attempt.attempt_id}",
+            request={"thread_id": thread_id, "turn_id": turn_id},
+        )
+        self.service.record_runtime_receipt(
+            intent_id=intent.intent_id,
+            provider_operation_id=turn_id,
+            response={"accepted": True},
+            binding=ThreadBinding(thread_id=thread_id, turn_id=turn_id, bound_at=utc_now()),
+        )
+        self.service.record_runtime_job_observation(
+            job.job_id,
+            kind=RuntimeJobObservationKind.PROVIDER_TERMINAL,
+            payload={"result": {"completed": True}},
+            provider_terminal=True,
+            terminal_status="completed",
+        )
         evidence = EvidenceRecord(
             evidence_id=new_id("evidence"),
             project_id=self.project_id,
@@ -514,16 +548,27 @@ class ModelRebindingTests(ModelRebindingFixture):
             task_id=self.task.task_id,
             kind=AttemptKind.VALIDATION,
         )
+        semantic_observation = SemanticValidationObservation(
+            validation_id=self.task.validations[0].validation_id,
+            task_id=self.task.task_id,
+            reviewer_role="validator",
+            model="validator",
+            effort="high",
+            passed=False,
+            rationale="독립 validator가 직접 evidence에서 결함을 확인함",
+            evidence_refs=(evidence.evidence_id,),
+            observed_at=utc_now(),
+        )
         review_evidence = EvidenceRecord(
             evidence_id=new_id("evidence"),
             project_id=self.project_id,
             task_id=self.task.task_id,
             attempt_id=validator_attempt.attempt_id,
             kind=EvidenceKind.MODEL_REVIEW,
-            source_ref="synthetic-validator-review",
-            observation=json.dumps({"passed": False}),
-            content_digest="sha256:" + "7" * 64,
-            observed_at=utc_now(),
+            source_ref="codex-validator:validator-thread-rebind",
+            observation=semantic_observation.model_dump_json(),
+            content_digest=sha256_digest(semantic_observation),
+            observed_at=semantic_observation.observed_at,
         )
         self.service.record_evidence(review_evidence)
         thread_id = "validator-thread-rebind"
@@ -557,6 +602,24 @@ class ModelRebindingTests(ModelRebindingFixture):
             provider_terminal=True,
             terminal_status="completed",
         )
+        with self.ledger.transaction() as tx:
+            provider_receipt = {
+                "thread_id": thread_id,
+                "turn_id": turn_id,
+                "terminal_status": "completed",
+            }
+            tx.connection.execute(
+                "INSERT INTO provider_calls (id,project_id,goal_id,goal_contract_digest,"
+                "call_key,role,stage,request_digest,request_json,estimated_tokens,"
+                "execution_status,effect_status,result_status,status,attempt_id,"
+                "receipt_json,created_at,completed_at) VALUES (?,?,?,?,?,"
+                "'semantic_validator','validation',?,?,0,'terminal','none','valid',"
+                "'usage_unknown',?,?,?,?)",
+                (new_id("provider_call"), self.project_id, self.goal.goal_id,
+                 self.goal.definition_digest, "validator-rebind-provider-call",
+                 sha256_digest({"validator": validator_attempt.attempt_id}), "{}",
+                 validator_attempt.attempt_id, json.dumps(provider_receipt), tx.now, tx.now),
+            )
         self.service.finish_attempt(attempt_id=validator_attempt.attempt_id, succeeded=True)
         self.service.record_validation(
             project_id=self.project_id,
