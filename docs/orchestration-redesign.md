@@ -422,7 +422,7 @@ recover inspect|resume|abandon
 report progress|final
 ```
 
-`flowmarshal` 이름으로의 CLI·package 승격은 cutover Gate가 통과한 뒤에만 한다. 기존 prototype CLI는 감사 재현 도구로 남기고 새 제품 엔진에서 import하지 않는다.
+최종 1.0 package name·version·entrypoint·사용자 설정 표면은 release freeze 전에 확정한다. cutover Gate 뒤에는 이미 검증된 동일 wheel을 로컬 활성화하며 CLI·package 이름이나 metadata를 다시 바꾸지 않는다. 기존 prototype CLI는 감사 재현 도구로 남기고 새 제품 엔진에서 import하지 않는다.
 
 ## 11. Qualification과 cutover Gate
 

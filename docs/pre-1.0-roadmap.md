@@ -10,12 +10,13 @@
 | 실행·승인 | FM-02, FM-03 | 실행/usage 분리·schema 4, GoalAuthorization 및 내부 Plan 자동 활성화 |
 | 비동기 운영·안전 | FM-04, FM-05 | RuntimeJobSupervisor·짧은 tick, 효과 직전 재검증·재시작·Attempt 보호 |
 | 복구·계획 | FM-06, FM-07 | 근거 기반 복구·로컬 Context 해결, canonical dedupe·CommitHorizon·ProjectMap 정합성 |
-| 제품 연결 | FM-08, FM-09, FM-10 | EngineApplication/사용자 CLI, 배정 조율 강화, Engine-only 패키지·입력 bundle |
+| 제품 연결 | FM-08, FM-10 | EngineApplication/사용자 CLI, 최종 package identity·사용자 config bootstrap |
+| 개발 조율 보조 | FM-09 | release evidence 수집을 돕는 delivery 도구; 제품 critical path 밖 |
 | 검증 도구 | FM-11 | 필수 책임과 provenance를 보존하는 qualification harness |
 | 독립 검증 | FM-12, FM-13, FM-14 | 결정적·호환·설치, 실제 역할48/Planning18, 실제 요청 E2E·스케줄러 |
 | 최종 감사·전환 | FM-15, FM-16 | 필수 근거 독립 감사 후 main의 검증된 변경 확인·1.0 전환과 조율 종료 |
 
-승인 순서는 FM-00 → FM-01 → FM-02 → FM-03/FM-04 → FM-05 → FM-06이며 FM-07은 FM-01 이후다. 이후 FM-08 → FM-09/FM-10 → FM-11 → FM-12 → FM-13 → FM-14 → FM-15 → FM-16으로 연결한다. 실제 ready 선택은 등록된 dependency·order_index로만 결정한다. 이 문서에서 다음 앱 작업을 생성하거나 원장의 완료 상태를 변경하지 않는다.
+revision 5의 제품 실행 순서는 FM-00 → FM-01 → FM-02 → FM-03 → FM-04 → FM-05 → FM-06 → FM-07 → FM-08 → FM-10 → FM-11 → FM-12 → release freeze → live canary와 대표 effect-unknown fault다. canary 통과 뒤 Role 48·Planning 18·독립 E2E lane을 병렬 실행하고 aggregate → 두 독립 최종 감사 → FM-16 동일 wheel 로컬 활성화·postverify로 연결한다. shard는 공통 immutable 입력과 각자 배정된 fixture slice를 읽고 별도 artifact root에 기록하며 sibling 결과를 소비하지 않는다. FM-09 개발 조율과 실제 Codex 예약 연동은 비차단 보조 검사다. 실제 ready 선택은 등록된 dependency·order_index로만 결정하며 이 문서에서 다음 앱 작업을 생성하거나 원장의 완료 상태를 변경하지 않는다.
 
 FM-02~FM-16 계약은 이 문서에서 **planned**로 유지한다. 이는 코드 부재나 다른 태스크 상태를 판정한 결과가 아니다. 각 태스크의 완료는 실제 source/계약/검증 입력 digest·receipt·필수 검사 evidence를 확인한 원장 판정이 필요하다. 과거 51개 재검증과 1,056개 결과는 시점·대상이 다른 provenance이며 이번 새 실행이 아니다.
 

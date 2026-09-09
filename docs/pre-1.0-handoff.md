@@ -6,7 +6,7 @@
 
 - 현재 변경 대상: `D:/codex/flowmarshal`의 `main` 브랜치 main checkout. 1.0 릴리스 완료까지 모든 파일 변경·커밋을 이 위치에서만 수행한다. 다른 브랜치·worktree·detached HEAD에서는 작업하거나 커밋하지 않는다. 릴리스 완료가 확인되면 이 한시 규칙은 만료되고 당시 Git 작업 지침을 따른다.
 - 필수 입력의 과거 source: `D:/codex/fm-performance-floor`, 승인 당시 기준 `a5bf2bf7a21a0dfe7ffe2e4bb34e8ae67808da08` / `codex/performance-release-floor`. 현재 쓰기 대상이 아니며 최신 명시 지시에 따라 main 상태와 직접 대조한다.
-- 승인 원문: `D:/codex/fm-inspection-runtime/performance-release-floor-20260907/redesign-1.0/approved-plan.md`, SHA-256 `a24eb860c8b603f8edc43a71370c6d8638cc53d3c5c49b8a568c44fc9f5b1742`.
+- 승인 기준선: `D:/codex/fm-inspection-runtime/performance-release-floor-20260907/redesign-1.0/approved-plan.md`, SHA-256 `a24eb860c8b603f8edc43a71370c6d8638cc53d3c5c49b8a568c44fc9f5b1742`. 같은 디렉터리의 `approved-plan-revision-4.md` SHA-256 `72be4b60e51bfb46268d36fd34bbc62a60e25c5cf3a67bc013b40eb8653afc58`, `approved-plan-revision-5.md` SHA-256 `7a34a45bad290d96f3b7ce93543dd0f9e51351a4793f7561945896b4e8a037e0`을 순서 있는 superseding delta로 적용한다. 충돌하는 계약은 뒤 revision이 우선하며 상세 계보는 [승인 계약](redesign-1.0-contract.md)에 결속한다.
 - 구현 조율 원장: `D:/codex/fm-inspection-runtime/performance-release-floor-20260907/orchestration-status.sqlite3`. 제품 Engine 원장과 별개다.
 - 조회 helper: `D:/codex/자동화템플릿/scripts/flowmarshal_implementation_workflow.py --db <조율 원장> task --task-id <ID>`는 read-only다. worker는 완료 상태를 직접 변경하거나 다음 앱 task를 생성하지 않는다.
 - 역할 cwd나 자료 저장 위치만으로 source를 추정하지 않는다. 이번 main 지정은 사용자의 최신 명시 승인에 근거한다. main의 무관한 상태, `D:/codex/fm-recovery`, 동결 source·실제 DB·receipt·History는 보존한다.
