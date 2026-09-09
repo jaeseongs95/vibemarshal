@@ -37,6 +37,7 @@ from flowmarshal.engine.planning import (
 )
 from tests.engine_inspection_helpers import InspectionScriptedRunner as ScriptedStructuredRoleRunner
 from flowmarshal.engine.service import EngineService, EngineServiceError
+from tests.test_engine_ledger_service import TrustedTestEngineService
 
 from tests.engine_helpers import assignment, goal, inventory, profile, state
 
@@ -256,7 +257,7 @@ class PlanValidationScopeRegressionTests(unittest.TestCase):
         workspace = base / "workspace"
         shutil.copytree(PROJECT_FIXTURE, workspace)
 
-        service = EngineService(SQLiteEngineLedger(base / "state.sqlite3"))
+        service = TrustedTestEngineService(SQLiteEngineLedger(base / "state.sqlite3"))
         service.initialize()
         project_id = service.create_project(name="검사 phase 회귀", root=workspace)
         project_profile = profile(project_id)

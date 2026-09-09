@@ -48,7 +48,7 @@ from flowmarshal.engine.service import EngineService
 from flowmarshal.engine.worker_prompt import PromptArtifactStore, assemble_worker_prompt
 
 from tests.engine_helpers import clean_review, goal, plan, profile, skeleton, state
-from tests.test_engine_ledger_service import EngineServiceFixture
+from tests.test_engine_ledger_service import EngineServiceFixture, TrustedTestEngineService
 
 
 def _inventory(*models: str) -> ModelInventory:
@@ -82,7 +82,7 @@ class ModelRebindingFixture(EngineServiceFixture):
             self.base / "state" / "flowmarshal-engine.sqlite3",
             artifact_root=self.base / "engine-artifacts",
         )
-        self.service = EngineService(self.ledger)
+        self.service = TrustedTestEngineService(self.ledger)
         self.service.initialize()
         self.project_id = self.service.create_project(name="재결속 합성", root=self.root)
         self.profile = profile(self.project_id)

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
+from .capabilities import role_execution_scope
+
 import json
 import hashlib
 import inspect
@@ -2187,7 +2190,9 @@ class EngineDispatcher:
                 rpc_method=(f"port.{kind}" if category == "rpc" else None),
             )
             try:
-                with trace.operation_scope(token):
+                with trace.operation_scope(token), (
+                    role_execution_scope("worker_or_validator") if kind in {"create", "start", "resume"} else nullcontext()
+                ):
                     result = invoke()
             except Exception as error:
                 trace.finish(

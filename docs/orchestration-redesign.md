@@ -70,6 +70,8 @@ FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하
 
 사용자는 GoalAuthorization의 목표·범위·효과·운영 정책을 한 번 승인한다. Core는 프로젝트 root·알려진 효과·정책을 결정적으로 대조하고 의미 범위의 근거 있는 review를 거쳐 Plan revision·digest를 authorization에 결속해 자동 활성화한다. 사용자가 정확한 ID·digest를 직접 입력하는 절차는 필수가 아니다. 목표·범위·효과·정책 확장에만 추가 판단을 요청한다. 파일별 승인·HMAC proof·이중 승인 장부는 요구하지 않는다. 이 결속은 OS sandbox나 의미 안전성의 수학적 보장이 아니다.
 
+현재 console 승인 경계는 설치 entrypoint의 `TrustedConsoleHost`가 정확한 Goal revision/digest, project root, Core가 실제 활성화할 eligible selected Plan의 ID·revision·definition/activation digest, 효과·운영·budget 정책과 전체 target digest를 먼저 표시하고, 대화형 사용자가 그 digest 전체를 확인한 경우에만 같은 process의 `ApplicationAuthority`를 호출한다. `ApplicationAuthority`는 `EngineApplication`에 Core issuer를 한 번 결속하고, `EngineApplication`이 표시 target 전용 Goal capability를 발급한다. Core는 authorization transaction 안에서 capability를 첫 시도에 소모한 뒤 selected Plan을 포함한 최신 target을 다시 계산해 타입·원장·프로젝트·digest를 검사한다. 거절·EOF·비대화형 입력·Goal/root/policy/Plan 선택의 stale target·wrong type/binding·replay와 capability 없는 내부 CLI 호출은 원장을 바꾸지 않고 거부한다. 효과 checkpoint는 별도 타입의 capability에 결속한다. 이는 process-local Python application-authority 경계이며 hostile same-process 코드나 같은 OS 사용자의 raw SQLite 직접 접근을 격리하지 않는다. raw SQLite 직접 접근은 1.0 known limitation이다.
+
 `PlanContractRevision`은 다음을 고정한다.
 
 - Goal Contract digest와 기준 State Snapshot

@@ -5,6 +5,8 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from flowmarshal.canonical import sha256_digest
 from flowmarshal.engine.context import PromptAssembler
@@ -60,6 +62,7 @@ from flowmarshal.engine.planning import (
     skeleton_review_evidence_catalog,
 )
 from flowmarshal.engine.service import EngineService, EngineServiceError
+from flowmarshal.engine.capabilities import CoreActionAuthority
 
 from tests.engine_helpers import (
     clean_review,
@@ -71,6 +74,72 @@ from tests.engine_helpers import (
     state,
     skeleton,
 )
+
+
+class TrustedTestEngineService(EngineService):
+    """합성 fixture의 사용자 승인을 명시 host capability로 표현한다."""
+
+    def __init__(self, ledger, **kwargs):
+        self.test_authority = CoreActionAuthority()
+        super().__init__(ledger, action_authority=self.test_authority, **kwargs)
+
+    def authorize_goal(self, **kwargs):
+        if kwargs.get("capability") is None:
+            try:
+                target = self.goal_authorization_target(
+                    project_id=kwargs["project_id"],
+                    operating_policy=kwargs.get("operating_policy"),
+                )
+            except EngineServiceError as error:
+                if not str(error).startswith("PLAN_SELECTION_REQUIRED:"):
+                    raise
+                # 일부 하위 계층 회귀는 Plan을 만들기 전의 GoalAuthorization만
+                # fixture로 준비한다. 실제 Application/console 경계는 이 우회를
+                # 사용하지 않으며 언제나 원장의 eligible selected Plan을 요구한다.
+                synthetic = SimpleNamespace(
+                    plan_id="plan_test_authorization_boundary",
+                    plan_revision_id="plan_revision_test_authorization_boundary",
+                    revision_no=1,
+                    definition_digest=sha256_digest(
+                        f"test-authorization-plan:{kwargs['project_id']}:definition"
+                    ),
+                    activation_digest=sha256_digest(
+                        f"test-authorization-plan:{kwargs['project_id']}:activation"
+                    ),
+                )
+                with patch.object(
+                    EngineService,
+                    "_selected_plan_for_activation",
+                    return_value=synthetic,
+                ):
+                    target = self.goal_authorization_target(
+                        project_id=kwargs["project_id"],
+                        operating_policy=kwargs.get("operating_policy"),
+                    )
+                    kwargs["capability"] = self.test_authority.issue_goal_authorization(
+                        ledger_path=self.ledger.path,
+                        target=target,
+                    )
+                    kwargs["authorization_target"] = target
+                    return super().authorize_goal(**kwargs)
+            kwargs["capability"] = self.test_authority.issue_goal_authorization(
+                ledger_path=self.ledger.path,
+                target=target,
+            )
+        return super().authorize_goal(**kwargs)
+
+    def record_effect_checkpoint(self, **kwargs):
+        if kwargs.get("capability") is None:
+            target = self.effect_checkpoint_target(
+                task_id=kwargs["task_id"],
+                effect_id=kwargs["effect_id"],
+                execution_spec_digest=kwargs["execution_spec_digest"],
+            )
+            kwargs["capability"] = self.test_authority.issue_effect_checkpoint(
+                ledger_path=self.ledger.path,
+                target=target,
+            )
+        return super().record_effect_checkpoint(**kwargs)
 
 
 class EngineServiceFixture(unittest.TestCase):
@@ -85,7 +154,7 @@ class EngineServiceFixture(unittest.TestCase):
             self.base / "state" / "flowmarshal-engine.sqlite3",
             artifact_root=self.base / "engine-artifacts",
         )
-        self.service = EngineService(self.ledger)
+        self.service = TrustedTestEngineService(self.ledger)
         self.service.initialize()
         self.project_id = self.service.create_project(name="합성", root=self.root)
         self.profile = profile(self.project_id)

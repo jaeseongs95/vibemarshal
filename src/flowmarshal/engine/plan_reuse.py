@@ -7,7 +7,10 @@ from typing import Any
 
 from ..canonical import canonical_json, sha256_bytes, sha256_digest
 from .context import ProjectMapper
-from .domain import PlanContractRevision, TaskExecutionSpecRevision, ValidationResult
+from .domain import (
+    DeterministicValidationObservation, EvidenceRecord, PlanContractRevision,
+    TaskExecutionSpecRevision, ValidationResult,
+)
 
 
 def observation_checkpoint(service: Any, connection: Any, task_id: str) -> dict[str, Any] | None:
@@ -84,6 +87,63 @@ def _incoming(plan: PlanContractRevision, task_id: str) -> tuple[Any, ...]:
                         for item in plan.definition.dependencies if item.consumer_task_id == task_id))
 
 
+def _verified_local_evidence(connection: Any, row: Any, checkpoint: dict[str, Any]) -> bool:
+    """원장 결속과 관측 본문을 재검사한다. 해석할 수 없는 근거는 재사용하지 않는다."""
+    try:
+        record = EvidenceRecord.model_validate_json(row["payload_json"])
+        if any(row[column] != getattr(record, field) for column, field in (
+            ("id", "evidence_id"), ("project_id", "project_id"), ("task_id", "task_id"),
+            ("attempt_id", "attempt_id"), ("kind", "kind"), ("source_ref", "source_ref"),
+            ("observation", "observation"), ("content_digest", "content_digest"),
+        )):
+            return False
+        history = connection.execute(
+            "SELECT payload_json FROM history_events WHERE project_id = ? "
+            "AND entity_id = ? AND event_type = 'evidence.recorded'",
+            (record.project_id, record.evidence_id),
+        ).fetchone()
+        if history is None:
+            return False
+        event = json.loads(history["payload_json"])
+        if any(event.get(key) != row[key] for key in ("task_id", "kind", "content_digest")):
+            return False
+        if row["kind"] in {"command", "test", "build"}:
+            observed = DeterministicValidationObservation.model_validate_json(record.observation)
+            return (observed.task_id == record.task_id and observed.passed
+                    and record.content_digest == sha256_digest({"kind": row["kind"], "observation": observed}))
+        if row["kind"] in {"file", "diff"}:
+            observed = json.loads(record.observation)
+            path = str((Path(checkpoint["root"]) / record.source_ref).resolve())
+            if (observed.get("path") != record.source_ref or path not in checkpoint["files"]
+                    or observed.get("after_digest") != checkpoint["files"][path]):
+                return False
+            return record.content_digest in {
+                sha256_digest(observed), sha256_digest({"diff": observed}),
+                sha256_digest({"kind": row["kind"], "direct_file_observation": observed}),
+            }
+        # 외부 관측·사용자 판단·semantic review는 별도 freshness 검증 없이 옮기지 않는다.
+        return False
+    except (ValueError, TypeError, KeyError, OSError):
+        return False
+
+
+def _verified_worker_files(service: Any, connection: Any, task_id: str,
+                           checkpoint: dict[str, Any]) -> set[str]:
+    spec = connection.execute(
+        "SELECT definition_digest FROM execution_spec_revisions WHERE task_id = ? AND is_current = 1",
+        (task_id,),
+    ).fetchone()
+    worker = None if spec is None else service.resolve_task_validation_worker(
+        connection, task_id=task_id, current_spec_digest=spec["definition_digest"],
+    )
+    if worker is None:
+        return set()
+    return {row["id"] for row in connection.execute(
+        "SELECT * FROM evidence_records WHERE task_id = ? AND attempt_id = ? AND kind = 'file'",
+        (task_id, worker["id"]),
+    ) if _verified_local_evidence(connection, row, checkpoint)}
+
+
 def reuse_completed_tasks(service: Any, tx: Any, plan: PlanContractRevision, previous_id: str) -> tuple[str, ...]:
     previous = PlanContractRevision.model_validate_json(tx.one("SELECT payload_json FROM plan_revisions WHERE id = ?",
                                                               (previous_id,))["payload_json"])
@@ -138,15 +198,15 @@ def reuse_completed_tasks(service: Any, tx: Any, plan: PlanContractRevision, pre
                     break
                 evidence = [tx.maybe_one("SELECT * FROM evidence_records WHERE id = ?", (item,)) for item in result.evidence_ids]
                 if (any(item is None or item["project_id"] != task.project_id or item["task_id"] != source_task_id
-                        or item["kind"] in {"external_observation", "user_decision"} for item in evidence)
+                        or not _verified_local_evidence(tx.connection, item, checkpoint) for item in evidence)
                         or not set(contract.required_evidence_kinds).issubset({item["kind"] for item in evidence if item})):
                     valid = False
                     break
                 evidence_ids.update(result.evidence_ids)
             if not valid:
                 continue
-            # Worker 산출물도 원래 ID/Attempt로 연결해 후속 Task의 입력에서 유실하지 않는다.
-            evidence_ids.update(row["id"] for row in service.task_evidence_rows(tx.connection, source_task_id))
+            # 후속 Task에 필요한 현재 Worker 파일만 연결한다. 실패 시도·미검증 보고서는 제외한다.
+            evidence_ids.update(_verified_worker_files(service, tx.connection, source_task_id, checkpoint))
             tx.connection.execute("INSERT INTO task_completion_reuse "
                                   "(task_id,source_task_id,validation_ids_json,evidence_ids_json,checkpoint_json,created_at) "
                                   "VALUES (?,?,?,?,?,?)", (task.task_id, source_task_id,

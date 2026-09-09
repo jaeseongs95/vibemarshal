@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-flowmarshal-engine = "flowmarshal.engine.cli:main"
+flowmarshal-engine = "flowmarshal.engine.console_host:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]

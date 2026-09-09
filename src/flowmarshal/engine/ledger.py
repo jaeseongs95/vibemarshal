@@ -8,6 +8,7 @@ from typing import Any, Iterator
 
 from ..canonical import canonical_json, sha256_digest
 from ..time import SystemClock
+from .capabilities import require_host_execution
 
 
 ENGINE_SCHEMA_ID = "flowmarshal.engine"
@@ -706,6 +707,8 @@ class SQLiteEngineLedger:
         self.clock = clock or SystemClock()
 
     def _connect(self, *, readonly: bool = False) -> sqlite3.Connection:
+        # 역할에는 직렬화된 context만 제공한다. raw read handle도 ATTACH 등으로 확장될 수 있다.
+        require_host_execution()
         if readonly:
             connection = sqlite3.connect(
                 self.path.resolve().as_uri() + "?mode=ro",
@@ -718,6 +721,8 @@ class SQLiteEngineLedger:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA busy_timeout = 10000")
+        if readonly:
+            connection.execute("PRAGMA query_only = ON")
         if not readonly:
             connection.execute("PRAGMA journal_mode = WAL")
             connection.execute("PRAGMA synchronous = FULL")

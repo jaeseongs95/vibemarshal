@@ -16,7 +16,7 @@ class EnginePackagingContractTests(unittest.TestCase):
         document = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         self.assertEqual(
             document["project"]["scripts"],
-            {"flowmarshal-engine": "flowmarshal.engine.cli:main"},
+            {"flowmarshal-engine": "flowmarshal.engine.console_host:main"},
         )
         self.assertEqual(
             document["tool"]["setuptools"]["packages"]["find"]["include"],

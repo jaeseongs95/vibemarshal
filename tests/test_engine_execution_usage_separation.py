@@ -26,6 +26,7 @@ from flowmarshal.engine.roles import RoleCallReceipt
 from flowmarshal.engine.role_execution import RoleTimeoutPolicy
 from flowmarshal.engine.runtime import RuntimeObservation
 from flowmarshal.engine.service import EngineService
+from tests.test_engine_ledger_service import TrustedTestEngineService
 from tests.engine_helpers import goal, profile
 
 
@@ -40,7 +41,7 @@ class ExecutionUsageSeparationTests(unittest.TestCase):
         self.root = base / "project"
         self.root.mkdir()
         self.ledger = SQLiteEngineLedger(base / "engine.sqlite3")
-        self.service = EngineService(self.ledger)
+        self.service = TrustedTestEngineService(self.ledger)
         self.service.initialize()
         self.project_id = self.service.create_project(name="FM-02", root=self.root)
         self.profile = profile(self.project_id)

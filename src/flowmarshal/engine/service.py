@@ -1,5 +1,17 @@
 from __future__ import annotations
 
+from .capabilities import (
+    CoreActionAuthority,
+    CoreCapabilityError,
+    EffectCheckpointCapability,
+    EffectCheckpointTarget,
+    GoalAuthorizationCapability,
+    GoalAuthorizationTarget,
+    consume_effect_checkpoint,
+    consume_goal_authorization,
+    require_host_execution,
+)
+
 import json
 import re
 from datetime import datetime, timedelta
@@ -138,9 +150,20 @@ class EngineService:
         ledger: SQLiteEngineLedger,
         *,
         assignment_resolver: AssignmentResolver | None = None,
+        action_authority: CoreActionAuthority | None = None,
     ) -> None:
         self.ledger = ledger
         self.assignment_resolver = assignment_resolver or AssignmentResolver()
+        self._action_authority = action_authority
+
+    def _bind_action_authority(self, authority: CoreActionAuthority) -> None:
+        """ApplicationAuthority가 process-local Core issuer를 한 번만 설치한다."""
+        require_host_execution()
+        if type(authority) is not CoreActionAuthority:
+            raise CoreCapabilityError("CORE_CAPABILITY_INVALID: Core authority 타입이 잘못됐습니다.")
+        if self._action_authority is not None:
+            raise CoreCapabilityError("CORE_CAPABILITY_ALREADY_BOUND: Core authority가 이미 결속됐습니다.")
+        self._action_authority = authority
 
     def initialize(self) -> None:
         self.ledger.initialize()
@@ -1853,12 +1876,174 @@ class EngineService:
             ),
         )
 
+    def goal_authorization_target(
+        self,
+        *,
+        project_id: str,
+        operating_policy: GoalOperatingPolicy | None = None,
+    ) -> GoalAuthorizationTarget:
+        """사용자에게 표시한 실제 승인 요청을 host capability에 결속한다."""
+        with self.ledger.read() as connection:
+            return self._goal_authorization_target(connection, project_id, operating_policy)
+
+    @staticmethod
+    def _selected_plan_for_activation(connection: Any, project_id: str) -> PlanContractRevision:
+        """activate_selected_plan과 승인 preview가 공유하는 단일 eligible 선택 판정."""
+        selection = connection.execute(
+            "SELECT payload_json FROM history_events WHERE project_id = ? "
+            "AND event_type = 'planning.search_recorded' ORDER BY sequence DESC LIMIT 1",
+            (project_id,),
+        ).fetchone()
+        selected_digest = (
+            None
+            if selection is None
+            else json.loads(selection["payload_json"])["outcome"].get(
+                "selected_activation_digest"
+            )
+        )
+        selected = None
+        if selected_digest is not None:
+            selected = connection.execute(
+                "SELECT * FROM plan_revisions WHERE project_id = ? AND activation_digest = ?",
+                (project_id, selected_digest),
+            ).fetchone()
+        if selected is None:
+            candidates = connection.execute(
+                "SELECT * FROM plan_revisions WHERE project_id = ? AND status = 'ready'",
+                (project_id,),
+            ).fetchall()
+            if len(candidates) == 1:
+                selected = candidates[0]
+            elif len(candidates) == 0:
+                project = connection.execute(
+                    "SELECT active_plan_revision_id FROM projects WHERE id = ?",
+                    (project_id,),
+                ).fetchone()
+                active_plan_id = (
+                    None if project is None else project["active_plan_revision_id"]
+                )
+                selected = (
+                    None
+                    if active_plan_id is None
+                    else connection.execute(
+                        "SELECT * FROM plan_revisions WHERE id = ?",
+                        (active_plan_id,),
+                    ).fetchone()
+                )
+            if selected is None or len(candidates) > 1:
+                raise EngineServiceError(
+                    "PLAN_SELECTION_REQUIRED: Core의 단일 선택 후보가 필요합니다."
+                )
+        if selected["status"] not in {
+            RevisionStatus.READY.value,
+            RevisionStatus.ACTIVE.value,
+        }:
+            raise EngineServiceError(
+                "PLAN_SELECTION_STALE: 선택된 Plan이 더 이상 ready 상태가 아닙니다."
+            )
+        decision = connection.execute(
+            "SELECT status FROM candidate_decisions WHERE artifact_kind = 'plan' "
+            "AND artifact_digest = ?",
+            (selected["activation_digest"],),
+        ).fetchone()
+        if decision is None or decision["status"] != CandidateStatus.ADMISSIBLE.value:
+            raise EngineServiceError(
+                "PLAN_SELECTION_INELIGIBLE: 선택된 Plan의 admissible 결정이 없습니다."
+            )
+        plan = PlanContractRevision.model_validate_json(selected["payload_json"])
+        if (
+            plan.plan_revision_id != selected["id"]
+            or plan.plan_id != selected["plan_id"]
+            or plan.revision_no != selected["revision_no"]
+            or plan.definition_digest != selected["definition_digest"]
+            or plan.activation_digest != selected["activation_digest"]
+        ):
+            raise EngineServiceError("선택된 Plan revision의 저장 결속이 다릅니다.")
+        return plan
+
+    @staticmethod
+    def _goal_authorization_target(
+        connection, project_id, operating_policy,
+    ) -> GoalAuthorizationTarget:
+        from .authorization import current_budget_policies, _operating_budget
+
+        project = connection.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
+        if project is None:
+            raise EngineServiceError("프로젝트를 찾을 수 없습니다.")
+        goal_row = connection.execute(
+            "SELECT payload_json FROM goal_revisions WHERE id=? AND status='active'",
+            (project["active_goal_revision_id"],),
+        ).fetchone()
+        if goal_row is None:
+            raise EngineServiceError("active Goal revision을 찾을 수 없습니다.")
+        goal = GoalContractRevision.model_validate_json(goal_row["payload_json"])
+        profile = connection.execute("SELECT definition_digest FROM profile_revisions WHERE id=?",
+                                     (project["active_profile_revision_id"],)).fetchone()
+        if profile is None:
+            raise EngineServiceError("active ProjectProfile revision을 찾을 수 없습니다.")
+        policy = (operating_policy or GoalOperatingPolicy()).model_copy(update={"execution_guard_version": "2.0"})
+        plan = EngineService._selected_plan_for_activation(connection, project_id)
+        budget_policies = tuple(
+            canonical_json({
+                "scope_key": item["scope_key"],
+                "policy": _operating_budget(item["policy"]),
+            })
+            for item in map(json.loads, current_budget_policies(connection, project_id))
+        )
+        return GoalAuthorizationTarget(
+            project_id=project_id,
+            project_root=str(Path(project["root"]).resolve()),
+            goal_id=goal.goal_id,
+            goal_revision_id=goal.goal_revision_id,
+            goal_contract_digest=goal.definition_digest,
+            profile_definition_digest=profile["definition_digest"],
+            plan_id=plan.plan_id,
+            plan_revision_id=plan.plan_revision_id,
+            plan_revision_no=plan.revision_no,
+            plan_definition_digest=plan.definition_digest,
+            plan_activation_digest=plan.activation_digest,
+            effect_policy=goal.definition.effect_policy,
+            operating_policy=policy,
+            budget_policies=budget_policies,
+        )
+
     def authorize_goal(self, *, project_id: str, source: str,
-                       operating_policy: GoalOperatingPolicy | None = None) -> GoalAuthorization:
+                       operating_policy: GoalOperatingPolicy | None = None,
+                       capability: GoalAuthorizationCapability | None = None,
+                       authorization_target: GoalAuthorizationTarget | None = None) -> GoalAuthorization:
         """호출자는 실제 사용자 승인을 받은 명령 경계여야 한다. 후보 제출 권한과 분리한다."""
         from .authorization import current_budget_policies
 
         with self.ledger.transaction() as tx:
+            if authorization_target is not None:
+                if type(authorization_target) is not GoalAuthorizationTarget:
+                    raise CoreCapabilityError(
+                        "CORE_CAPABILITY_INVALID: Goal 승인 target 타입이 잘못됐습니다."
+                    )
+                # 표시 뒤 selection이 사라지거나 모호해져도 handle은 첫 시도에 소모한다.
+                consume_goal_authorization(
+                    self._action_authority,
+                    capability,
+                    ledger_path=self.ledger.path,
+                    target=authorization_target,
+                )
+                target = self._goal_authorization_target(
+                    tx.connection, project_id, operating_policy,
+                )
+                if target != authorization_target:
+                    raise CoreCapabilityError(
+                        "CORE_CAPABILITY_DENIED: 표시 후 승인 target이 변경됐습니다."
+                    )
+            else:
+                target = self._goal_authorization_target(
+                    tx.connection, project_id, operating_policy,
+                )
+                consume_goal_authorization(
+                    self._action_authority,
+                    capability,
+                    ledger_path=self.ledger.path,
+                    target=target,
+                )
             project = tx.one("SELECT * FROM projects WHERE id = ?", (project_id,))
             goal = GoalContractRevision.model_validate_json(tx.one(
                 "SELECT payload_json FROM goal_revisions WHERE id = ? AND status = 'active'",
@@ -1918,26 +2103,35 @@ class EngineService:
         self.register_plan_evaluation(evaluation)
         return self.activate_authorized_plan(plan_revision_id=evaluation.plan.plan_revision_id)
 
-    def activate_selected_plan(self, *, project_id: str) -> str:
+    def activate_selected_plan(
+        self, *, project_id: str, expected_plan_revision_id: str | None = None,
+    ) -> str:
         """Core가 기록한 선택 후보를 활성화한다. 선택 이력이 없으면 단일 ready 후보만 허용한다."""
         with self.ledger.read() as connection:
-            selection = connection.execute(
-                "SELECT payload_json FROM history_events WHERE project_id = ? "
-                "AND event_type = 'planning.search_recorded' ORDER BY sequence DESC LIMIT 1", (project_id,),
-            ).fetchone()
-            selected_digest = None if selection is None else json.loads(selection["payload_json"])["outcome"].get("selected_activation_digest")
-            selected_row = None if selected_digest is None else connection.execute(
-                "SELECT id FROM plan_revisions WHERE project_id = ? AND activation_digest = ?",
-                (project_id, selected_digest),
-            ).fetchone()
-            selected = None if selected_row is None else selected_row["id"]
-            if selected is None:
-                candidates = connection.execute("SELECT id FROM plan_revisions WHERE project_id = ? AND status = 'ready'",
-                                                (project_id,)).fetchall()
-                if len(candidates) != 1:
-                    raise EngineServiceError("PLAN_SELECTION_REQUIRED: Core의 단일 선택 후보가 필요합니다.")
-                selected = candidates[0]["id"]
-        return self.activate_authorized_plan(plan_revision_id=selected)
+            selected = self._selected_plan_for_activation(connection, project_id)
+            if (
+                expected_plan_revision_id is not None
+                and selected.plan_revision_id != expected_plan_revision_id
+            ):
+                raise CoreCapabilityError(
+                    "CORE_CAPABILITY_DENIED: 승인한 Plan 선택이 변경됐습니다."
+                )
+            status = connection.execute(
+                "SELECT status FROM plan_revisions WHERE id = ?",
+                (selected.plan_revision_id,),
+            ).fetchone()["status"]
+            if status == RevisionStatus.ACTIVE.value:
+                activation = connection.execute(
+                    "SELECT id FROM plan_activations WHERE plan_revision_id = ? "
+                    "ORDER BY activated_at DESC LIMIT 1",
+                    (selected.plan_revision_id,),
+                ).fetchone()
+                if activation is None:
+                    raise EngineServiceError(
+                        "active Plan의 activation record를 찾을 수 없습니다."
+                    )
+                return activation["id"]
+        return self.activate_authorized_plan(plan_revision_id=selected.plan_revision_id)
 
     def _plan_authorization(self, tx: Any, project: Any, payload: PlanContractRevision) -> GoalAuthorization:
         from .authorization import authorization_changes, current_budget_policies
@@ -3237,27 +3431,23 @@ class EngineService:
         effect_id: str,
         execution_spec_digest: str,
         approved_by: str,
+        capability: EffectCheckpointCapability | None = None,
     ) -> str:
         with self.ledger.transaction() as tx:
-            task = tx.one("SELECT * FROM task_contracts WHERE id = ?", (task_id,))
-            contract = json.loads(task["payload_json"])
-            matching = [
-                item
-                for item in contract["expected_effects"]
-                if item["effect_id"] == effect_id and item["external"] and not item["reversible"]
-                and item.get("identity_version") == "2.0" and isinstance(item.get("identity"), dict)
-            ]
-            if contract["approval_class"] != ApprovalClass.EXECUTION_CHECKPOINT.value or not matching:
-                raise EngineServiceError("checkpoint 대상인 비가역 외부 효과가 아닙니다.")
-            spec = tx.one(
-                "SELECT definition_digest FROM execution_spec_revisions WHERE task_id = ? "
-                "AND is_current = 1",
-                (task_id,),
+            target = self._effect_checkpoint_target(
+                tx.connection,
+                task_id=task_id,
+                effect_id=effect_id,
+                execution_spec_digest=execution_spec_digest,
             )
-            if spec["definition_digest"] != execution_spec_digest:
-                raise EngineServiceError("checkpoint가 현재 ExecutionSpec과 다릅니다.")
+            consume_effect_checkpoint(
+                self._action_authority,
+                capability,
+                ledger_path=self.ledger.path,
+                target=target,
+            )
             checkpoint_id = new_id("checkpoint")
-            identity = matching[0]["identity"]
+            identity = target.effect_identity
             identity_digest = sha256_digest(identity)
             tx.connection.execute(
                 "INSERT INTO effect_checkpoints "
@@ -3266,7 +3456,7 @@ class EngineService:
                 (checkpoint_id, task_id, effect_id, execution_spec_digest, approved_by, tx.now),
             )
             tx.history(
-                task["project_id"],
+                target.project_id,
                 "effect.checkpointed",
                 "effect_checkpoint",
                 checkpoint_id,
@@ -3277,6 +3467,63 @@ class EngineService:
                  "checkpoint_policy": identity["checkpoint_policy"]},
             )
             return checkpoint_id
+
+    def effect_checkpoint_target(
+        self,
+        *,
+        task_id: str,
+        effect_id: str,
+        execution_spec_digest: str,
+    ) -> EffectCheckpointTarget:
+        with self.ledger.read() as connection:
+            return self._effect_checkpoint_target(
+                connection,
+                task_id=task_id,
+                effect_id=effect_id,
+                execution_spec_digest=execution_spec_digest,
+            )
+
+    @staticmethod
+    def _effect_checkpoint_target(
+        connection,
+        *,
+        task_id: str,
+        effect_id: str,
+        execution_spec_digest: str,
+    ) -> EffectCheckpointTarget:
+        task = connection.execute(
+            "SELECT * FROM task_contracts WHERE id = ?", (task_id,),
+        ).fetchone()
+        if task is None:
+            raise EngineServiceError("Task를 찾을 수 없습니다.")
+        contract = json.loads(task["payload_json"])
+        matching = [
+            item
+            for item in contract["expected_effects"]
+            if item["effect_id"] == effect_id
+            and item["external"]
+            and not item["reversible"]
+            and item.get("identity_version") == "2.0"
+            and isinstance(item.get("identity"), dict)
+        ]
+        if contract["approval_class"] != ApprovalClass.EXECUTION_CHECKPOINT.value or not matching:
+            raise EngineServiceError("checkpoint 대상인 비가역 외부 효과가 아닙니다.")
+        spec = connection.execute(
+            "SELECT definition_digest FROM execution_spec_revisions WHERE task_id = ? "
+            "AND is_current = 1",
+            (task_id,),
+        ).fetchone()
+        if spec is None:
+            raise EngineServiceError("현재 ExecutionSpec을 찾을 수 없습니다.")
+        if spec["definition_digest"] != execution_spec_digest:
+            raise EngineServiceError("checkpoint가 현재 ExecutionSpec과 다릅니다.")
+        return EffectCheckpointTarget(
+            project_id=task["project_id"],
+            task_id=task_id,
+            effect_id=effect_id,
+            execution_spec_digest=execution_spec_digest,
+            effect_identity=matching[0]["identity"],
+        )
 
     @staticmethod
     def _effect_checkpoint_bindings(

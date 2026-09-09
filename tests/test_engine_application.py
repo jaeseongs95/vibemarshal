@@ -32,6 +32,7 @@ from flowmarshal.engine.read_models import (
     ReadPresentation,
 )
 from flowmarshal.engine.service import EngineService
+from tests.test_engine_ledger_service import TrustedTestEngineService
 from flowmarshal.engine.roles import RoleCallReceipt, RoleCallRequest, strict_json_output_schema
 from tests.engine_helpers import (
     clean_review, goal, inventory, plan, profile, project_map, skeleton, state,
@@ -73,7 +74,7 @@ class EngineApplicationTests(unittest.TestCase):
         root = Path(self.temp.name) / "project"
         root.mkdir()
         (root / "app.py").write_text("value = 1\n", encoding="utf-8")
-        self.service = EngineService(SQLiteEngineLedger(Path(self.temp.name) / "engine.sqlite3"))
+        self.service = TrustedTestEngineService(SQLiteEngineLedger(Path(self.temp.name) / "engine.sqlite3"))
         self.service.initialize()
         self.project_id = self.service.create_project(name="조회", root=root)
         self.profile = profile(self.project_id)
@@ -413,7 +414,7 @@ class PreGoalUsageSummaryTests(unittest.TestCase):
         self.root = Path(self.temp.name) / "project"
         self.root.mkdir()
         self.ledger = SQLiteEngineLedger(Path(self.temp.name) / "engine.sqlite3")
-        self.service = EngineService(self.ledger)
+        self.service = TrustedTestEngineService(self.ledger)
         self.service.initialize()
         self.project_id = self.service.create_project(name="Goal 준비 사용량", root=self.root)
         self.profile = profile(self.project_id)

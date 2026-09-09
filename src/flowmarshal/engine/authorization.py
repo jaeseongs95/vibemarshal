@@ -39,6 +39,13 @@ def current_budget_policies(connection: Any, project_id: str) -> tuple[str, ...]
                  for row in rows)
 
 
+def _operating_budget(policy: dict[str, Any] | None) -> dict[str, Any] | None:
+    if policy is None:
+        return None
+    # 원본 정책/승인 payload는 보존하고, 미사용 역사 필드만 경계 비교에서 제외한다.
+    return {key: value for key, value in policy.items() if key != "call_reservation_tokens"}
+
+
 def authorization_changes(authorization: GoalAuthorization, *, project: Any,
                           goal: GoalContractRevision, profile_digest: str,
                           plan: PlanContractRevision, budget_policies: tuple[str, ...]) -> tuple[dict[str, Any], ...]:
@@ -96,8 +103,8 @@ def authorization_changes(authorization: GoalAuthorization, *, project: Any,
     approved_budgets = {item["scope_key"]: item["policy"] for item in map(json.loads, authorization.budget_policies)}
     requested_budgets = {item["scope_key"]: item["policy"] for item in map(json.loads, budget_policies)}
     # Goal override는 project 기본값보다 우선한다. scope 추가로 effective 상한을 우회할 수 없다.
-    approved = approved_budgets.get(authorization.goal_id, approved_budgets.get(""))
-    requested = requested_budgets.get(authorization.goal_id, requested_budgets.get(""))
+    approved = _operating_budget(approved_budgets.get(authorization.goal_id, approved_budgets.get("")))
+    requested = _operating_budget(requested_budgets.get(authorization.goal_id, requested_budgets.get("")))
     if approved is not None:
         # 명시 token 중단 상한의 축소만 자동 허용한다. 누락/0/추정 보충은 하지 않는다.
         if requested is None or any(

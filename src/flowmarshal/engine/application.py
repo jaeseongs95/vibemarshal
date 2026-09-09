@@ -8,6 +8,13 @@ from pathlib import Path
 from typing import Any
 
 from ..canonical import canonical_json, sha256_digest
+from .capabilities import (
+    CoreActionAuthority,
+    CoreCapabilityError,
+    GoalAuthorizationCapability,
+    GoalAuthorizationTarget,
+    require_host_execution,
+)
 from .domain import (
     AttemptRecord,
     BudgetStage,
@@ -636,6 +643,53 @@ def _provider_receipt_projection(
         )
 
 
+class ApplicationAuthority:
+    """신뢰 host와 EngineApplication 사이의 process-local 승인 권위 경계.
+
+    역할 scope 재진입을 막지만 hostile same-process 코드나 같은 OS 사용자를
+    격리하는 보안 sandbox는 아니다.
+    """
+
+    def __init__(self, application: "EngineApplication") -> None:
+        require_host_execution()
+        self._application = application
+        self._authorization_attempted = False
+        application._install_core_action_authority()
+
+    def authorization_target(
+        self,
+        project_id: str,
+        *,
+        operating_policy: GoalOperatingPolicy | None = None,
+    ) -> GoalAuthorizationTarget:
+        require_host_execution()
+        return self._application.authorization_target(
+            project_id,
+            operating_policy=operating_policy,
+        )
+
+    def authorize(
+        self,
+        project_id: str,
+        *,
+        target: GoalAuthorizationTarget,
+        source: str,
+        operating_policy: GoalOperatingPolicy | None = None,
+    ) -> EngineAuthorizationResult:
+        require_host_execution()
+        if self._authorization_attempted:
+            raise CoreCapabilityError(
+                "CORE_CAPABILITY_DENIED: Application 승인 요청은 이미 소모됐습니다."
+            )
+        self._authorization_attempted = True
+        return self._application._authorize_with_application_authority(
+            project_id,
+            target=target,
+            source=source,
+            operating_policy=operating_policy,
+        )
+
+
 class EngineApplication:
     """준비부터 최종 보고까지 Core 권위를 유지하는 단일 facade."""
 
@@ -654,6 +708,7 @@ class EngineApplication:
         self.role_configuration = role_configuration
         self.inspection_contract = inspection_contract
         self._structured_runner = structured_runner
+        self._core_action_authority: CoreActionAuthority | None = None
         if supervisor is not None:
             self.supervisor = supervisor
         elif runtime is not None:
@@ -662,6 +717,44 @@ class EngineApplication:
             self.supervisor = RuntimeJobSupervisor(service, runtime)
         else:
             self.supervisor = None
+
+    def _install_core_action_authority(self) -> None:
+        """ApplicationAuthority 생성 시에만 Core issuer를 한 번 설치한다."""
+        require_host_execution()
+        if self._core_action_authority is not None:
+            raise CoreCapabilityError(
+                "CORE_CAPABILITY_ALREADY_BOUND: ApplicationAuthority가 이미 결속됐습니다."
+            )
+        authority = CoreActionAuthority()
+        self.service._bind_action_authority(authority)
+        self._core_action_authority = authority
+
+    def _authorize_with_application_authority(
+        self,
+        project_id: str,
+        *,
+        target: GoalAuthorizationTarget,
+        source: str,
+        operating_policy: GoalOperatingPolicy | None = None,
+    ) -> EngineAuthorizationResult:
+        require_host_execution()
+        authority = self._core_action_authority
+        if authority is None:
+            raise CoreCapabilityError(
+                "CORE_CAPABILITY_REQUIRED: ApplicationAuthority가 필요합니다."
+            )
+        capability = authority.issue_goal_authorization(
+            ledger_path=self.service.ledger.path,
+            target=target,
+        )
+        return self.authorize(
+            project_id,
+            source=source,
+            operating_policy=operating_policy,
+            capability=capability,
+            authorization_target=target,
+            selected_plan_revision_id=target.plan_revision_id,
+        )
 
     def _execution_components(self) -> tuple[Any, EngineRoleConfiguration, StructuredRolePort]:
         if self.runtime is None:
@@ -855,6 +948,9 @@ class EngineApplication:
         *,
         source: str,
         operating_policy: GoalOperatingPolicy | None = None,
+        capability: GoalAuthorizationCapability | None = None,
+        authorization_target: GoalAuthorizationTarget | None = None,
+        selected_plan_revision_id: str | None = None,
     ) -> EngineAuthorizationResult:
         """사용자 승인 경계를 기록하고 Core 선택 Plan을 자동 활성화한다."""
 
@@ -862,12 +958,34 @@ class EngineApplication:
             project_id=project_id,
             source=source,
             operating_policy=operating_policy,
+            capability=capability,
+            authorization_target=authorization_target,
         )
-        activation_id = self.service.activate_selected_plan(project_id=project_id)
+        activation_id = (
+            self.service.activate_selected_plan(project_id=project_id)
+            if selected_plan_revision_id is None
+            else self.service.activate_selected_plan(
+                project_id=project_id,
+                expected_plan_revision_id=selected_plan_revision_id,
+            )
+        )
         return EngineAuthorizationResult(
             project_id=project_id,
             authorization=authorization,
             activation_id=activation_id,
+        )
+
+    def authorization_target(
+        self,
+        project_id: str,
+        *,
+        operating_policy: GoalOperatingPolicy | None = None,
+    ) -> GoalAuthorizationTarget:
+        """현재 사용자 승인 대상 전체를 상태 변경 없이 반환한다."""
+
+        return self.service.goal_authorization_target(
+            project_id=project_id,
+            operating_policy=operating_policy,
         )
 
     def _dispatcher(self):

@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from contextlib import nullcontext
+from .capabilities import role_execution_scope
+
 import copy
 import json
 import time
@@ -300,7 +303,9 @@ class CodexStructuredRoleRunner:
             rpc_method=(f"port.{kind}" if category == "rpc" else None),
         )
         try:
-            with trace.operation_scope(token):
+            with trace.operation_scope(token), (
+                role_execution_scope("structured_role") if kind in {"create", "start", "resume"} else nullcontext()
+            ):
                 result = invoke()
         except Exception as error:
             trace.finish(token, error=error, thread_id=thread_id, turn_id=turn_id)

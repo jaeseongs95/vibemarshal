@@ -72,6 +72,7 @@ from .planning import (
 )
 from .runtime import EngineDispatcher, FakeCodexRuntime
 from .service import EngineService
+from .capabilities import CoreActionAuthority
 
 
 def run_synthetic_lifecycle(
@@ -82,7 +83,8 @@ def run_synthetic_lifecycle(
 ) -> dict[str, Any]:
     root = Path(project_root).resolve()
     ledger = SQLiteEngineLedger(database_path, artifact_root=artifact_root)
-    service = EngineService(ledger)
+    authority = CoreActionAuthority()
+    service = EngineService(ledger, action_authority=authority)
     service.initialize()
     project_id = service.create_project(name="FlowMarshal Engine synthetic E2E", root=root)
 
@@ -333,7 +335,13 @@ def run_synthetic_lifecycle(
             decision=plan_decision,
         )
     )
-    service.authorize_goal(project_id=project_id, source="합성 사용자 승인")
+    service.authorize_goal(
+        project_id=project_id, source="합성 사용자 승인",
+        capability=authority.issue_goal_authorization(
+            ledger_path=ledger.path,
+            target=service.goal_authorization_target(project_id=project_id),
+        ),
+    )
     service.activate_plan(
         plan_revision_id=plan.plan_revision_id,
         activation_digest=plan.activation_digest,

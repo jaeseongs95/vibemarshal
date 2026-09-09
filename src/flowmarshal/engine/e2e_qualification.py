@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from .capabilities import CoreActionAuthority
+
 from .domain import ModelFallback
 
 import json
@@ -630,7 +632,8 @@ def _prepare_from_raw_request(
         state_root / "flowmarshal-engine.sqlite3",
         artifact_root=state_root / "artifacts",
     )
-    service = EngineService(ledger)
+    authority = CoreActionAuthority()
+    service = EngineService(ledger, action_authority=authority)
     service.initialize()
     project_id = service.create_project(name="Engine raw-request E2E", root=workspace)
     service.register_profile(_profile(project_id))
@@ -667,6 +670,10 @@ def _prepare_from_raw_request(
     authorization = application.authorize(
         project_id,
         source="qualification user authorization",
+        capability=authority.issue_goal_authorization(
+            ledger_path=ledger.path,
+            target=service.goal_authorization_target(project_id=project_id),
+        ),
     )
     evidence_root = state_root.parent
     raw_request_path = evidence_root / "raw-request.json"
@@ -784,7 +791,8 @@ def _prepare(
         state_root / "flowmarshal-engine.sqlite3",
         artifact_root=state_root / "artifacts",
     )
-    service = EngineService(ledger)
+    authority = CoreActionAuthority()
+    service = EngineService(ledger, action_authority=authority)
     service.initialize()
     project_id = service.create_project(name="Engine project E2E", root=workspace)
     profile = _profile(project_id)
@@ -995,7 +1003,13 @@ def _prepare(
             "activation_digest": plan.activation_digest,
         },
     )
-    service.authorize_goal(project_id=project_id, source="합성 qualification 승인")
+    service.authorize_goal(
+        project_id=project_id, source="합성 qualification 승인",
+        capability=authority.issue_goal_authorization(
+            ledger_path=ledger.path,
+            target=service.goal_authorization_target(project_id=project_id),
+        ),
+    )
     service.activate_plan(
         plan_revision_id=plan.plan_revision_id,
         activation_digest=plan.activation_digest,

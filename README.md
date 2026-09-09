@@ -59,6 +59,8 @@ $FlowMarshal = "C:\absolute\flowmarshal-venv\Scripts\flowmarshal-engine.exe"
 
 `project init`이 출력한 `project_id`로 요청을 준비하고 승인한 뒤 첫 scheduler tick을 실행한다.
 
+설치된 `flowmarshal-engine` 명령은 `TrustedConsoleHost`를 통해 승인 대상을 표시한다. `authorize`는 현재 Goal과 project root, Core가 실제 활성화할 선택 Plan의 identity·revision·definition/activation digest, 효과 정책, 운영 정책, budget 정책 및 전체 `target_digest`를 보여 주며, 대화형 console에서 그 digest 전체를 그대로 입력해야만 같은 host process의 `ApplicationAuthority`가 일회성 capability를 발급한다. Core는 쓰기 전에 선택 Plan을 포함한 최신 target을 다시 계산하므로 다른 입력·EOF·비대화형 실행·표시 후 Goal/root/policy/Plan 선택 변경은 승인 기록 없이 중단된다. `--source`는 감사 표식일 뿐 승인 권한이 아니다. 이 process-local 경계는 hostile same-process 코드를 격리하지 않으며, OS 또는 broker 격리가 없는 같은 사용자 subprocess의 raw SQLite 접근도 1.0 known limitation이다. 상세 경계는 [승인 계약 D02](docs/redesign-1.0-contract.md)를 따른다.
+
 ```powershell
 & $FlowMarshal --db $Database --artifacts $Artifacts prepare `
   --project-id <project-id> `

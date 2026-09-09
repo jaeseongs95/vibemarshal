@@ -26,6 +26,7 @@ from .domain import (
     GoalContractDefinition,
     GoalContractRevision,
     GoalCriterion,
+    GoalOperatingPolicy,
     LifecycleStage,
     MissionClass,
     MutationPolicy,
@@ -92,6 +93,7 @@ from .budget import BudgetManager, BudgetedRoleRunner, GoalBudgetPolicy, receipt
 from .application import EngineApplication, EngineApplicationError
 from .model_rebinding import ModelRebindRequest, ModelRebindingError
 from .role_execution import RoleTimeoutPolicy, use_role_timeout_policy
+from .capabilities import require_host_execution
 
 
 def _json(path: str | Path) -> Any:
@@ -776,14 +778,21 @@ def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
 
 
 def _cmd_goal_authorize(arguments: argparse.Namespace) -> None:
-    from .domain import GoalOperatingPolicy
-    policy = None if arguments.policy_file is None else GoalOperatingPolicy.model_validate(_json(arguments.policy_file))
+    policy = _goal_authorization_policy(arguments)
     _emit(
         _application(arguments).authorize(
             arguments.project_id,
             source=arguments.source,
             operating_policy=policy,
         )
+    )
+
+
+def _goal_authorization_policy(arguments: argparse.Namespace) -> GoalOperatingPolicy | None:
+    return (
+        None
+        if arguments.policy_file is None
+        else GoalOperatingPolicy.model_validate(_json(arguments.policy_file))
     )
 
 
@@ -1297,7 +1306,10 @@ def build_parser() -> argparse.ArgumentParser:
     authorize_facade.add_argument("--project-id", required=True)
     authorize_facade.add_argument("--source", default="cli-user")
     authorize_facade.add_argument("--policy-file")
-    authorize_facade.set_defaults(handler=_cmd_goal_authorize)
+    authorize_facade.set_defaults(
+        handler=_cmd_goal_authorize,
+        trusted_action="goal.authorize",
+    )
 
     run_once_facade = commands.add_parser("run-once", help="bounded scheduler tick 한 번 실행")
     run_once_facade.add_argument("--project-id", required=True)
@@ -1419,7 +1431,10 @@ def build_parser() -> argparse.ArgumentParser:
     authorize.add_argument("--project-id", required=True)
     authorize.add_argument("--source", default="cli-user")
     authorize.add_argument("--policy-file")
-    authorize.set_defaults(handler=_cmd_goal_authorize)
+    authorize.set_defaults(
+        handler=_cmd_goal_authorize,
+        trusted_action="goal.authorize",
+    )
 
     plan = commands.add_parser("plan")
     plan_commands = plan.add_subparsers(dest="plan_command", required=True)
@@ -1559,12 +1574,14 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def main(argv: list[str] | None = None) -> int:
-    parser = build_parser()
-    raw_argv = list(sys.argv[1:] if argv is None else argv)
-    arguments = parser.parse_args(raw_argv)
+def _execute_parsed(
+    arguments: argparse.Namespace,
+    *,
+    raw_argv: list[str],
+) -> int:
     arguments._raw_argv = raw_argv
     try:
+        require_host_execution()
         policy = (RoleTimeoutPolicy() if arguments.role_timeout_policy is None else
                   RoleTimeoutPolicy.model_validate(_json(arguments.role_timeout_policy)))
         with use_role_timeout_policy(policy):
@@ -1598,6 +1615,12 @@ def main(argv: list[str] | None = None) -> int:
         _emit({"error": type(error).__name__, "error_code": code, "message": str(error)})
         return 2
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    raw_argv = list(sys.argv[1:] if argv is None else argv)
+    arguments = build_parser().parse_args(raw_argv)
+    return _execute_parsed(arguments, raw_argv=raw_argv)
 
 
 if __name__ == "__main__":

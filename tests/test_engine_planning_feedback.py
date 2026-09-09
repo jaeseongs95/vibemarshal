@@ -28,6 +28,7 @@ from flowmarshal.engine.planning import (
 from flowmarshal.engine.planning_feedback import PlanRefinementProposal
 from flowmarshal.engine.ledger import SQLiteEngineLedger
 from flowmarshal.engine.service import EngineService, EngineServiceError
+from tests.test_engine_ledger_service import TrustedTestEngineService
 
 from tests.engine_helpers import goal, inventory, plan, profile, project_map, state, skeleton
 
@@ -577,7 +578,7 @@ class PlanningFeedbackTests(unittest.TestCase):
             ledger_root / "flowmarshal-engine.sqlite3",
             artifact_root=self.root / "engine-artifacts",
         )
-        service = EngineService(ledger)
+        service = TrustedTestEngineService(ledger)
         service.initialize()
         project_id = service.create_project(name="계획 피드백", root=self.root)
         profile_revision = profile(project_id)

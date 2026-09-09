@@ -18,6 +18,7 @@ from flowmarshal.engine.planner_roles import (
 from flowmarshal.engine.planning import SkeletonFirstPlanner
 from tests.engine_inspection_helpers import InspectionScriptedRunner as ScriptedStructuredRoleRunner
 from flowmarshal.engine.service import EngineService, EngineServiceError
+from tests.test_engine_ledger_service import TrustedTestEngineService
 
 from tests.engine_helpers import assignment, goal, inventory, profile, state
 
@@ -191,7 +192,7 @@ class PlanResultBoundaryRegressionTests(unittest.TestCase):
         (workspace / "test_app.py").write_text("# 합성 테스트 자료\n", encoding="utf-8")
         (workspace / "AGENTS.md").write_text("# 합성 회귀 자료\n", encoding="utf-8")
 
-        service = EngineService(SQLiteEngineLedger(root / "state.sqlite3"))
+        service = TrustedTestEngineService(SQLiteEngineLedger(root / "state.sqlite3"))
         service.initialize()
         project_id = service.create_project(name="합성 경계 회귀", root=workspace)
         project_profile = profile(project_id)

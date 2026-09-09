@@ -27,6 +27,7 @@ from flowmarshal.engine.ledger import SQLiteEngineLedger
 from flowmarshal.engine.models import EngineRoleConfiguration, RoleModelBinding
 from flowmarshal.engine.runtime import FakeCodexRuntime
 from flowmarshal.engine.service import EngineService
+from tests.test_engine_ledger_service import TrustedTestEngineService
 from tests.engine_helpers import goal, inventory, plan, profile, project_map, skeleton, state
 from tests.engine_inspection_helpers import InspectionScriptedRunner
 from flowmarshal.engine.e2e_qualification import _copy_fixture, _prepare
@@ -220,7 +221,7 @@ class EngineUserFacadeTests(unittest.TestCase):
         (self.root / "app.py").write_text("value = 1\n", encoding="utf-8")
         self.db = base / "state" / "engine.sqlite3"
         self.artifacts = base / "artifacts"
-        self.service = EngineService(SQLiteEngineLedger(self.db, artifact_root=self.artifacts))
+        self.service = TrustedTestEngineService(SQLiteEngineLedger(self.db, artifact_root=self.artifacts))
         self.service.initialize()
         self.project_id = self.service.create_project(name="facade", root=self.root)
         self.service.register_profile(profile(self.project_id))
