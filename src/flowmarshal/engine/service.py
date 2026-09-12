@@ -540,7 +540,11 @@ class EngineService:
     ) -> tuple[ProjectMapRevision, StateSnapshot]:
         """등록 source를 포함해 Project Map과 Goal 관련 파일 상태를 다시 관측한다."""
 
-        from .context import ProjectMapper, state_scope_fingerprint
+        from .context import (
+            ProjectMapper,
+            state_scope_fingerprint,
+            workspace_path_inventory_digest,
+        )
 
         goal = self.load_active_goal(project_id)
         profile = self.load_active_profile(project_id)
@@ -558,6 +562,10 @@ class EngineService:
         sources = self.validate_context_sources(
             project_id,
             required_refs=profile.definition.context_source_refs,
+        )
+        excluded_paths = (self.ledger.artifact_root.resolve(),)
+        workspace_inventory = workspace_path_inventory_digest(
+            project["root"], excluded_paths=excluded_paths,
         )
         current_map = (
             None
@@ -589,7 +597,7 @@ class EngineService:
                 if item.symbols and not Path(item.path).is_absolute()
             },
             source_requests=(goal.definition.source_request,),
-            excluded_paths=(self.ledger.artifact_root.resolve(),),
+            excluded_paths=excluded_paths,
         )
         if current_map is None or observed_map.semantic_digest != current_map.semantic_digest:
             project_map = observed_map
@@ -602,6 +610,7 @@ class EngineService:
         except EngineServiceError:
             current_state = None
         map_bound = None
+        workspace_inventory_bound = None
         if current_state is not None:
             map_bound = next(
                 (
@@ -611,10 +620,19 @@ class EngineService:
                 ),
                 None,
             )
+            workspace_inventory_bound = next(
+                (
+                    item.value
+                    for item in current_state.facts
+                    if item.fact_id == "fact_workspace_path_inventory"
+                ),
+                None,
+            )
         if (
             current_state is not None
             and not force_state_revision
             and map_bound == project_map.revision_digest
+            and workspace_inventory_bound == workspace_inventory
         ):
             return project_map, current_state
 
@@ -639,7 +657,15 @@ class EngineService:
                 source_ref="project-map",
                 evidence_digest=project_map.revision_digest,
                 invalidates_on=("project file content changes",),
-            )
+            ),
+            StateFact(
+                fact_id="fact_workspace_path_inventory",
+                predicate="current project file path inventory",
+                value=workspace_inventory,
+                source_ref="project-workspace:path-inventory",
+                evidence_digest=workspace_inventory,
+                invalidates_on=("project file path set changes",),
+            ),
         ]
         for path in sorted(relevant_paths):
             entry = entries_by_path.get(path)
@@ -665,6 +691,7 @@ class EngineService:
                 goal_digest=goal.definition_digest,
                 project_map_digest=project_map.revision_digest,
                 refs=relevant_paths,
+                workspace_inventory_digest=workspace_inventory,
             ),
             facts=tuple(facts),
             observed_at=utc_now(),

@@ -17,6 +17,7 @@ from .context import (
     ProjectMapper,
     goal_context_observations,
     resolve_additional_context_request,
+    workspace_path_inventory_digest,
 )
 from .domain import (
     BudgetStage, BudgetUsageRecord, EngineModel, ExecutionSpecProposal, GoalContractRevision, PlanContractRevision,
@@ -154,6 +155,22 @@ def execution_context(service: EngineService, project_id: str) -> dict[str, Any]
     if observed_map.semantic_digest != project_map.semantic_digest:
         raise EngineServiceError("STALE_EXECUTION_INPUT: Project Map과 현재 파일 관찰이 다릅니다.")
     state = service.load_current_state(project_id, goal.definition_digest)
+    expected_inventory = next(
+        (
+            item.value
+            for item in state.facts
+            if item.fact_id == "fact_workspace_path_inventory"
+        ),
+        None,
+    )
+    observed_inventory = workspace_path_inventory_digest(
+        project_map.root,
+        excluded_paths=(service.ledger.artifact_root.resolve(),),
+    )
+    if expected_inventory is None or observed_inventory != expected_inventory:
+        raise EngineServiceError(
+            "STALE_EXECUTION_INPUT: 프로젝트 파일 경로 inventory가 준비 뒤 바뀌었습니다."
+        )
     return values | {
         "project_map": project_map.model_dump(mode="json"),
         "state": state.model_dump(mode="json"),

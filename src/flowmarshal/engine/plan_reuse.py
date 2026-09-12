@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from ..canonical import canonical_json, sha256_bytes, sha256_digest
-from .context import ProjectMapper
+from .context import ProjectMapper, workspace_path_inventory_digest
 from .domain import (
     DeterministicValidationObservation, EvidenceRecord, PlanContractRevision,
     TaskExecutionSpecRevision, ValidationResult,
@@ -53,10 +53,20 @@ def observation_checkpoint(service: Any, connection: Any, task_id: str) -> dict[
         if map_row is None:
             return None
         mapped_paths = {item["path"]: item["content_digest"] for item in json.loads(map_row["payload_json"])["entries"]}
+        workspace_inventory = workspace_path_inventory_digest(
+            root,
+            excluded_paths=(service.ledger.artifact_root.resolve(),),
+        )
 
         def derived_file_fact(fact: dict[str, Any]) -> bool:
             if fact["source_ref"] == "project-map":
                 return fact["value"] == fact["evidence_digest"] == map_row["revision_digest"]
+            if fact["source_ref"] == "project-workspace:path-inventory":
+                return (
+                    fact["fact_id"] == "fact_workspace_path_inventory"
+                    and fact["predicate"] == "current project file path inventory"
+                    and fact["value"] == fact["evidence_digest"] == workspace_inventory
+                )
             path = fact["source_ref"]
             digest = mapped_paths.get(path)
             return (fact["fact_id"] == "fact_target_" + sha256_digest(path).split(":", 1)[1][:20]

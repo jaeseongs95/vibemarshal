@@ -402,6 +402,45 @@ class ProjectMapper:
         )
 
 
+def workspace_path_inventory_digest(
+    root: Path | str,
+    *,
+    excluded_paths: Iterable[Path | str] = (),
+    ignored_directories: frozenset[str] = DEFAULT_IGNORED_DIRECTORIES,
+) -> str:
+    """ProjectMap을 넓히지 않고 프로젝트 파일 경로 집합만 결속한다.
+
+    lazy ProjectMap은 Goal에 실제로 필요한 파일만 담는다. 하지만 그 map만 다시
+    읽으면 준비 뒤 추가된 파일을 관측할 수 없으므로, 파일 내용·symbol·관계와
+    분리한 bounded inventory digest를 freshness checkpoint에 사용한다.
+    """
+
+    resolved_root = Path(root).resolve()
+    excluded = tuple(
+        (resolved_root / item).resolve() if not Path(item).is_absolute() else Path(item).resolve()
+        for item in excluded_paths
+    )
+
+    def is_excluded(path: Path) -> bool:
+        resolved = path.resolve()
+        return any(resolved == item or item in resolved.parents for item in excluded)
+
+    paths: list[str] = []
+    for directory, directories, filenames in os.walk(resolved_root):
+        current = Path(directory)
+        directories[:] = sorted(
+            name
+            for name in directories
+            if name.casefold() not in ignored_directories
+            and not is_excluded(current / name)
+        )
+        for name in sorted(filenames):
+            path = current / name
+            if path.is_file() and not is_excluded(path):
+                paths.append(path.relative_to(resolved_root).as_posix())
+    return sha256_digest({"root": str(resolved_root), "paths": paths})
+
+
 def goal_context_observations(
     project_map: ProjectMapRevision,
     source_request: str,
@@ -913,11 +952,18 @@ class PromptAssembler:
         )
 
 
-def state_scope_fingerprint(*, goal_digest: str, project_map_digest: str, refs: Iterable[str]) -> str:
+def state_scope_fingerprint(
+    *,
+    goal_digest: str,
+    project_map_digest: str,
+    refs: Iterable[str],
+    workspace_inventory_digest: str,
+) -> str:
     return sha256_digest(
         {
             "goal_digest": goal_digest,
             "project_map_digest": project_map_digest,
             "refs": sorted(set(refs)),
+            "workspace_inventory_digest": workspace_inventory_digest,
         }
     )

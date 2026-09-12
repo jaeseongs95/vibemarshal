@@ -11,6 +11,7 @@ from flowmarshal.engine.context import (
     ContextSelector,
     ProjectMapper,
     PromptAssembler,
+    workspace_path_inventory_digest,
 )
 from flowmarshal.engine.domain import ProjectMapEntryKind, ProjectMapRevision
 
@@ -296,6 +297,26 @@ class EngineContextTests(unittest.TestCase):
             project_id=self.project_id, root=self.root, revision_no=2, observed_paths=(),
         )
         self.assertEqual({"AGENTS.md"}, {entry.path for entry in default_map.entries})
+
+    def test_workspace_path_inventory_tracks_new_files_without_expanding_lazy_map(self) -> None:
+        project_map = ProjectMapper().build(
+            project_id=self.project_id,
+            root=self.root,
+            revision_no=1,
+            observed_paths=("service.py",),
+        )
+        before = workspace_path_inventory_digest(self.root)
+        (self.root / "new-input.txt").write_text("new", encoding="utf-8")
+        after = workspace_path_inventory_digest(self.root)
+        self.assertNotEqual(before, after)
+        self.assertNotIn("new-input.txt", {entry.path for entry in project_map.entries})
+
+    def test_workspace_path_inventory_excludes_runtime_artifacts(self) -> None:
+        artifact_root = self.root / ".flowmarshal-engine" / "runs"
+        before = workspace_path_inventory_digest(self.root)
+        artifact_root.mkdir(parents=True)
+        (artifact_root / "receipt.json").write_text("{}", encoding="utf-8")
+        self.assertEqual(before, workspace_path_inventory_digest(self.root))
 
     def test_missing_required_context_returns_structured_request(self) -> None:
         project_map = self.project_map()
