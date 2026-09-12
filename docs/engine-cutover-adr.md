@@ -23,6 +23,8 @@ R1~R3.1 prototype은 유용한 transport·원장·Planner 실험 자산이자 �
 11. semantic Validator는 Worker와 다른 Attempt·RuntimeJob·thread/turn에서 원자료를 새로 관측하고 자체 terminal provider receipt와 `model_review` evidence binding을 남긴다. `SemanticValidationObservation`과 `ValidationResult`의 PASS/FAIL, validation/task ID와 content digest가 정확히 일치해야 하며, 사용한 evidence를 재사용하거나 재결속하지 않는다. 다른 model/effort 표기만으로 독립성을 충족했다고 보지 않는다.
 12. ProjectMap은 Goal 범위의 파일·지침·등록 자료에서 시작해 필요한 symbol·검증된 연결만 lazy 관측한다. 1.0 복구는 로컬 Context 해소·effect unknown observe-first와 직접 evidence에 결속한 실제 repair/replan 한 경로를 입증하되 범용 자율 복구기나 전체 symbol/module graph를 포함하지 않는다.
 
+승인 경계는 `TrustedConsoleHost → ApplicationAuthority → EngineApplication → EngineService / CoreActionAuthority → SQLite Core ledger`다. Console의 전체 `target_digest` 확인 뒤에만 Goal 전용 일회성 capability를 발급하고, effect checkpoint는 별도 target·capability 타입을 사용한다. Worker·Validator의 역할 scope에서는 권위 객체와 DB handle을 제공하거나 host에 재진입할 수 없다. 이 Application 권위 보장은 같은 OS 사용자의 raw SQLite 직접 쓰기나 hostile same-process 코드 격리를 포함하지 않는다. 두 경계는 1.0 known limitation이며 후속 broker/process identity/ACL hardening의 대상이다.
+
 ## Cutover 조건 — planned / 미실행
 
 다음 책임을 모두 충족해야 한다. 정확한 임계값·책임별 evidence와 구현 task 연결은 [V01·V02](redesign-1.0-contract.md)를 따른다.

@@ -954,20 +954,13 @@ class EngineApplication:
     ) -> EngineAuthorizationResult:
         """사용자 승인 경계를 기록하고 Core 선택 Plan을 자동 활성화한다."""
 
-        authorization = self.service.authorize_goal(
+        authorization, activation_id = self.service.authorize_goal_and_activate_plan(
             project_id=project_id,
             source=source,
             operating_policy=operating_policy,
             capability=capability,
             authorization_target=authorization_target,
-        )
-        activation_id = (
-            self.service.activate_selected_plan(project_id=project_id)
-            if selected_plan_revision_id is None
-            else self.service.activate_selected_plan(
-                project_id=project_id,
-                expected_plan_revision_id=selected_plan_revision_id,
-            )
+            expected_plan_revision_id=selected_plan_revision_id,
         )
         return EngineAuthorizationResult(
             project_id=project_id,

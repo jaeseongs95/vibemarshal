@@ -67,7 +67,8 @@ class TrustedConsoleHost:
             })
             return 2
         confirmation = self.input_stream.readline()
-        if confirmation == "" or confirmation.strip() != target.target_digest:
+        # Enter의 줄바꿈만 제외한다. 공백이나 다른 문자를 정규화해 승인하지 않는다.
+        if confirmation == "" or confirmation.removesuffix("\n").removesuffix("\r") != target.target_digest:
             cli._emit({
                 "status": "declined",
                 "error_code": "AUTHORIZATION_DECLINED",

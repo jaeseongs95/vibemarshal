@@ -128,6 +128,18 @@ class TrustedTestEngineService(EngineService):
             )
         return super().authorize_goal(**kwargs)
 
+    def authorize_goal_and_activate_plan(self, **kwargs):
+        # facade 합성 회귀도 production의 원자적 승인·활성화 경로를 사용한다.
+        if kwargs.get("capability") is None:
+            target = self.goal_authorization_target(
+                project_id=kwargs["project_id"], operating_policy=kwargs.get("operating_policy"),
+            )
+            kwargs["capability"] = self.test_authority.issue_goal_authorization(
+                ledger_path=self.ledger.path, target=target,
+            )
+            kwargs["authorization_target"] = target
+        return super().authorize_goal_and_activate_plan(**kwargs)
+
     def record_effect_checkpoint(self, **kwargs):
         if kwargs.get("capability") is None:
             target = self.effect_checkpoint_target(

@@ -2011,82 +2011,131 @@ class EngineService:
                        operating_policy: GoalOperatingPolicy | None = None,
                        capability: GoalAuthorizationCapability | None = None,
                        authorization_target: GoalAuthorizationTarget | None = None) -> GoalAuthorization:
-        """호출자는 실제 사용자 승인을 받은 명령 경계여야 한다. 후보 제출 권한과 분리한다."""
+        """단일 Goal 승인 API. Application의 승인·활성화는 결합 API를 사용한다."""
+        with self.ledger.transaction() as tx:
+            return self._authorize_goal_in_transaction(
+                tx, project_id=project_id, source=source, operating_policy=operating_policy,
+                capability=capability, authorization_target=authorization_target,
+            )
+
+    def _authorize_goal_in_transaction(
+        self, tx: Any, *, project_id: str, source: str,
+        operating_policy: GoalOperatingPolicy | None = None,
+        capability: GoalAuthorizationCapability | None = None,
+        authorization_target: GoalAuthorizationTarget | None = None,
+        validate_selected_plan: bool = False,
+    ) -> GoalAuthorization:
+        require_host_execution()
         from .authorization import current_budget_policies
 
+        if authorization_target is not None:
+            if type(authorization_target) is not GoalAuthorizationTarget:
+                raise CoreCapabilityError(
+                    "CORE_CAPABILITY_INVALID: Goal 승인 target 타입이 잘못됐습니다."
+                )
+            # 표시 뒤 selection이 사라지거나 모호해져도 handle은 첫 시도에 소모한다.
+            consume_goal_authorization(
+                self._action_authority,
+                capability,
+                ledger_path=self.ledger.path,
+                target=authorization_target,
+            )
+            target = self._goal_authorization_target(
+                tx.connection, project_id, operating_policy,
+            )
+            if target != authorization_target:
+                raise CoreCapabilityError(
+                    "CORE_CAPABILITY_DENIED: 표시 후 승인 target이 변경됐습니다."
+                )
+        else:
+            target = self._goal_authorization_target(
+                tx.connection, project_id, operating_policy,
+            )
+            consume_goal_authorization(
+                self._action_authority,
+                capability,
+                ledger_path=self.ledger.path,
+                target=target,
+            )
+        project = tx.one("SELECT * FROM projects WHERE id = ?", (project_id,))
+        if validate_selected_plan:
+            selected = self._selected_plan_for_activation(tx.connection, project_id)
+            self._assert_plan_inputs_current(tx, project, selected)
+        goal = GoalContractRevision.model_validate_json(tx.one(
+            "SELECT payload_json FROM goal_revisions WHERE id = ? AND status = 'active'",
+            (project["active_goal_revision_id"],),
+        )["payload_json"])
+        profile = tx.one("SELECT definition_digest FROM profile_revisions WHERE id = ?",
+                         (project["active_profile_revision_id"],))
+        if goal.definition.profile_definition_digest != profile["definition_digest"]:
+            raise EngineServiceError("Goal의 Profile 결속이 최신 운영 정책과 다릅니다.")
+        previous = tx.maybe_one(
+            "SELECT * FROM goal_authorizations WHERE project_id = ? ORDER BY revision_no DESC LIMIT 1",
+            (project_id,),
+        )
+        policy = (operating_policy or GoalOperatingPolicy()).model_copy(update={
+            "execution_guard_version": "2.0",
+        })
+        approved_at = _dt(tx.now)
+        authorization = GoalAuthorization(
+            authorization_id=new_id("goal_authorization"),
+            revision_no=1 if previous is None else previous["revision_no"] + 1,
+            supersedes_authorization_id=None if previous is None else previous["id"],
+            project_id=project_id, project_root=str(Path(project["root"]).resolve()),
+            goal_id=goal.goal_id, goal_revision_id=goal.goal_revision_id,
+            goal_contract_digest=goal.definition_digest,
+            profile_definition_digest=profile["definition_digest"], effect_policy=goal.definition.effect_policy,
+            operating_policy=policy,
+            budget_policies=current_budget_policies(tx.connection, project_id),
+            source=source, approved_at=approved_at,
+            absolute_deadline_at=(
+                approved_at + timedelta(seconds=policy.absolute_deadline_seconds)
+            ),
+        )
+        authorization = GoalAuthorization.model_validate_json(authorization.model_dump_json())
+        tx.connection.execute(
+            "INSERT INTO goal_authorizations (id,project_id,revision_no,authorization_digest,payload_json,created_at) "
+            "VALUES (?,?,?,?,?,?)", (authorization.authorization_id, project_id, authorization.revision_no,
+            authorization.authorization_digest, canonical_json(authorization), tx.now),
+        )
+        tx.history(project_id, "goal.authorized", "goal_authorization", authorization.authorization_id,
+                   {"authorization_digest": authorization.authorization_digest, "source": source,
+                    "max_provider_calls": policy.max_provider_calls,
+                    "absolute_deadline_at": authorization.absolute_deadline_at.isoformat()})
+        return authorization
+
+    def authorize_goal_and_activate_plan(
+        self, *, project_id: str, source: str,
+        operating_policy: GoalOperatingPolicy | None = None,
+        capability: GoalAuthorizationCapability | None = None,
+        authorization_target: GoalAuthorizationTarget | None = None,
+        expected_plan_revision_id: str | None = None,
+    ) -> tuple[GoalAuthorization, str]:
+        """승인과 선택 Plan 활성화를 함께 commit하거나 함께 rollback한다."""
         with self.ledger.transaction() as tx:
-            if authorization_target is not None:
-                if type(authorization_target) is not GoalAuthorizationTarget:
-                    raise CoreCapabilityError(
-                        "CORE_CAPABILITY_INVALID: Goal 승인 target 타입이 잘못됐습니다."
-                    )
-                # 표시 뒤 selection이 사라지거나 모호해져도 handle은 첫 시도에 소모한다.
-                consume_goal_authorization(
-                    self._action_authority,
-                    capability,
-                    ledger_path=self.ledger.path,
-                    target=authorization_target,
-                )
-                target = self._goal_authorization_target(
-                    tx.connection, project_id, operating_policy,
-                )
-                if target != authorization_target:
-                    raise CoreCapabilityError(
-                        "CORE_CAPABILITY_DENIED: 표시 후 승인 target이 변경됐습니다."
-                    )
-            else:
-                target = self._goal_authorization_target(
-                    tx.connection, project_id, operating_policy,
-                )
-                consume_goal_authorization(
-                    self._action_authority,
-                    capability,
-                    ledger_path=self.ledger.path,
-                    target=target,
-                )
-            project = tx.one("SELECT * FROM projects WHERE id = ?", (project_id,))
-            goal = GoalContractRevision.model_validate_json(tx.one(
-                "SELECT payload_json FROM goal_revisions WHERE id = ? AND status = 'active'",
-                (project["active_goal_revision_id"],),
-            )["payload_json"])
-            profile = tx.one("SELECT definition_digest FROM profile_revisions WHERE id = ?",
-                             (project["active_profile_revision_id"],))
-            if goal.definition.profile_definition_digest != profile["definition_digest"]:
-                raise EngineServiceError("Goal의 Profile 결속이 최신 운영 정책과 다릅니다.")
-            previous = tx.maybe_one(
-                "SELECT * FROM goal_authorizations WHERE project_id = ? ORDER BY revision_no DESC LIMIT 1",
-                (project_id,),
+            authorization = self._authorize_goal_in_transaction(
+                tx, project_id=project_id, source=source, operating_policy=operating_policy,
+                capability=capability, authorization_target=authorization_target,
+                validate_selected_plan=True,
             )
-            policy = (operating_policy or GoalOperatingPolicy()).model_copy(update={
-                "execution_guard_version": "2.0",
-            })
-            approved_at = _dt(tx.now)
-            authorization = GoalAuthorization(
-                authorization_id=new_id("goal_authorization"),
-                revision_no=1 if previous is None else previous["revision_no"] + 1,
-                supersedes_authorization_id=None if previous is None else previous["id"],
-                project_id=project_id, project_root=str(Path(project["root"]).resolve()),
-                goal_id=goal.goal_id, goal_revision_id=goal.goal_revision_id,
-                goal_contract_digest=goal.definition_digest,
-                profile_definition_digest=profile["definition_digest"], effect_policy=goal.definition.effect_policy,
-                operating_policy=policy,
-                budget_policies=current_budget_policies(tx.connection, project_id),
-                source=source, approved_at=approved_at,
-                absolute_deadline_at=(
-                    approved_at + timedelta(seconds=policy.absolute_deadline_seconds)
-                ),
+            selected = self._selected_plan_for_activation(tx.connection, project_id)
+            if expected_plan_revision_id is not None and selected.plan_revision_id != expected_plan_revision_id:
+                raise CoreCapabilityError("CORE_CAPABILITY_DENIED: 승인한 Plan 선택이 변경됐습니다.")
+            plan_row = tx.one("SELECT status FROM plan_revisions WHERE id = ?", (selected.plan_revision_id,))
+            if plan_row["status"] == RevisionStatus.ACTIVE.value:
+                # 재승인도 새 Goal/정책이 현재 active Plan과 호환되는지 확인한다.
+                project = tx.one("SELECT * FROM projects WHERE id = ?", (project_id,))
+                self._plan_authorization(tx, project, selected)
+                activation = tx.one(
+                    "SELECT id FROM plan_activations WHERE plan_revision_id = ? "
+                    "ORDER BY activated_at DESC LIMIT 1", (selected.plan_revision_id,),
+                )
+                return authorization, activation["id"]
+            activation_id = self._activate_plan_in_transaction(
+                tx, plan_revision_id=selected.plan_revision_id,
+                activation_digest=selected.activation_digest, source="goal_authorization",
             )
-            authorization = GoalAuthorization.model_validate_json(authorization.model_dump_json())
-            tx.connection.execute(
-                "INSERT INTO goal_authorizations (id,project_id,revision_no,authorization_digest,payload_json,created_at) "
-                "VALUES (?,?,?,?,?,?)", (authorization.authorization_id, project_id, authorization.revision_no,
-                authorization.authorization_digest, canonical_json(authorization), tx.now),
-            )
-            tx.history(project_id, "goal.authorized", "goal_authorization", authorization.authorization_id,
-                       {"authorization_digest": authorization.authorization_digest, "source": source,
-                        "max_provider_calls": policy.max_provider_calls,
-                        "absolute_deadline_at": authorization.absolute_deadline_at.isoformat()})
-            return authorization
+            return authorization, activation_id
 
     def activate_authorized_plan(self, *, plan_revision_id: str) -> str:
         """내부 후보 식별자를 사용하며 사용자에게 Plan ID/digest 입력을 요구하지 않는다."""
@@ -2216,98 +2265,112 @@ class EngineService:
         source: str,
     ) -> str:
         with self.ledger.transaction() as tx:
-            plan = tx.one("SELECT * FROM plan_revisions WHERE id = ?", (plan_revision_id,))
-            if plan["activation_digest"] != activation_digest:
-                raise EngineServiceError("지정한 activation digest가 PlanContract와 다릅니다.")
-            if plan["status"] != "ready":
-                raise EngineServiceError("admissible이며 ready인 PlanContract만 활성화할 수 있습니다.")
-            decision = tx.one(
-                "SELECT status FROM candidate_decisions WHERE artifact_kind = 'plan' "
-                "AND artifact_digest = ?",
-                (activation_digest,),
+            return self._activate_plan_in_transaction(
+                tx, plan_revision_id=plan_revision_id, activation_digest=activation_digest, source=source,
             )
-            if decision["status"] != CandidateStatus.ADMISSIBLE.value:
-                raise EngineServiceError("Core decision이 admissible인 Plan만 활성화할 수 있습니다.")
-            project = tx.one("SELECT * FROM projects WHERE id = ?", (plan["project_id"],))
-            payload = PlanContractRevision.model_validate_json(plan["payload_json"])
-            if payload.activation_digest != activation_digest:
-                raise EngineServiceError("저장된 Plan payload의 activation digest가 다릅니다.")
-            authorization = self._plan_authorization(tx, project, payload)
-            active_plan_id = project["active_plan_revision_id"]
-            if active_plan_id is not None:
-                self._assert_plan_replacement_quiescent(tx, project["id"])
-                active_plan = tx.one(
-                    "SELECT id, plan_id, status FROM plan_revisions WHERE id = ?",
-                    (active_plan_id,),
+
+    @staticmethod
+    def _assert_plan_inputs_current(tx: Any, project: Any, payload: PlanContractRevision) -> None:
+        """승인 쓰기 전과 활성화 직전에 같은 Goal·State·Map freshness를 검사한다."""
+        require_host_execution()
+        goal = tx.one(
+            "SELECT definition_digest FROM goal_revisions WHERE id = ? AND status = 'active'",
+            (project["active_goal_revision_id"],),
+        )
+        if goal["definition_digest"] != payload.definition.goal_contract_digest:
+            raise EngineServiceError("active GoalContract가 Plan의 승인 기준과 달라졌습니다.")
+        state = tx.one(
+            "SELECT is_current FROM state_snapshots WHERE snapshot_digest = ?",
+            (payload.definition.base_state_snapshot_digest,),
+        )
+        if state["is_current"] != 1:
+            raise EngineServiceError("Plan의 기준 StateSnapshot이 stale입니다. 재검토가 필요합니다.")
+        project_map = tx.one(
+            "SELECT is_current FROM project_map_revisions WHERE revision_digest = ?",
+            (payload.definition.project_map_digest,),
+        )
+        if project_map["is_current"] != 1:
+            raise EngineServiceError("Plan의 Project Map이 최신 revision이 아닙니다.")
+
+    def _activate_plan_in_transaction(
+        self, tx: Any, *, plan_revision_id: str, activation_digest: str, source: str,
+    ) -> str:
+        require_host_execution()
+        plan = tx.one("SELECT * FROM plan_revisions WHERE id = ?", (plan_revision_id,))
+        if plan["activation_digest"] != activation_digest:
+            raise EngineServiceError("지정한 activation digest가 PlanContract와 다릅니다.")
+        if plan["status"] != "ready":
+            raise EngineServiceError("admissible이며 ready인 PlanContract만 활성화할 수 있습니다.")
+        decision = tx.one(
+            "SELECT status FROM candidate_decisions WHERE artifact_kind = 'plan' "
+            "AND artifact_digest = ?",
+            (activation_digest,),
+        )
+        if decision["status"] != CandidateStatus.ADMISSIBLE.value:
+            raise EngineServiceError("Core decision이 admissible인 Plan만 활성화할 수 있습니다.")
+        project = tx.one("SELECT * FROM projects WHERE id = ?", (plan["project_id"],))
+        payload = PlanContractRevision.model_validate_json(plan["payload_json"])
+        if payload.activation_digest != activation_digest:
+            raise EngineServiceError("저장된 Plan payload의 activation digest가 다릅니다.")
+        authorization = self._plan_authorization(tx, project, payload)
+        active_plan_id = project["active_plan_revision_id"]
+        if active_plan_id is not None:
+            self._assert_plan_replacement_quiescent(tx, project["id"])
+            active_plan = tx.one(
+                "SELECT id, plan_id, status FROM plan_revisions WHERE id = ?",
+                (active_plan_id,),
+            )
+            ancestor = payload.supersedes_plan_revision_id
+            while ancestor is not None and ancestor != active_plan_id:
+                prior = tx.one("SELECT plan_id, supersedes_id FROM plan_revisions WHERE id = ?", (ancestor,))
+                if prior["plan_id"] != payload.plan_id:
+                    break
+                ancestor = prior["supersedes_id"]
+            if ancestor != active_plan_id or payload.plan_id != active_plan["plan_id"]:
+                raise EngineServiceError(
+                    "active Plan을 교체하려면 같은 plan_id의 immutable supersedes 계보가 현재 revision으로 이어져야 합니다."
                 )
-                ancestor = payload.supersedes_plan_revision_id
-                while ancestor is not None and ancestor != active_plan_id:
-                    prior = tx.one("SELECT plan_id, supersedes_id FROM plan_revisions WHERE id = ?", (ancestor,))
-                    if prior["plan_id"] != payload.plan_id:
-                        break
-                    ancestor = prior["supersedes_id"]
-                if ancestor != active_plan_id or payload.plan_id != active_plan["plan_id"]:
-                    raise EngineServiceError(
-                        "active Plan을 교체하려면 같은 plan_id의 immutable supersedes 계보가 현재 revision으로 이어져야 합니다."
-                    )
-            goal = tx.one(
-                "SELECT definition_digest FROM goal_revisions WHERE id = ? AND status = 'active'",
-                (project["active_goal_revision_id"],),
-            )
-            if goal["definition_digest"] != payload.definition.goal_contract_digest:
-                raise EngineServiceError("active GoalContract가 Plan의 승인 기준과 달라졌습니다.")
-            state = tx.one(
-                "SELECT is_current FROM state_snapshots WHERE snapshot_digest = ?",
-                (payload.definition.base_state_snapshot_digest,),
-            )
-            if state["is_current"] != 1:
-                raise EngineServiceError("Plan의 기준 StateSnapshot이 stale입니다. 재검토가 필요합니다.")
-            project_map = tx.one(
-                "SELECT is_current FROM project_map_revisions WHERE revision_digest = ?",
-                (payload.definition.project_map_digest,),
-            )
-            if project_map["is_current"] != 1:
-                raise EngineServiceError("Plan의 Project Map이 최신 revision이 아닙니다.")
-            now = tx.now
-            reused = self._reuse_completed_tasks(tx, payload, active_plan_id) if active_plan_id else ()
-            if active_plan_id is not None:
-                tx.connection.execute(
-                    "UPDATE plan_revisions SET status = 'superseded' WHERE id = ?",
-                    (active_plan_id,),
-                )
-                tx.connection.execute(
-                    "UPDATE task_contracts SET status = 'superseded', updated_at = ? "
-                    "WHERE plan_revision_id = ? AND status <> 'completed'",
-                    (now, active_plan_id),
-                )
+        self._assert_plan_inputs_current(tx, project, payload)
+        now = tx.now
+        reused = self._reuse_completed_tasks(tx, payload, active_plan_id) if active_plan_id else ()
+        if active_plan_id is not None:
             tx.connection.execute(
-                "UPDATE plan_revisions SET status = 'active', activated_at = ?, activation_source = ? "
-                "WHERE id = ?",
-                (now, source, plan_revision_id),
+                "UPDATE plan_revisions SET status = 'superseded' WHERE id = ?",
+                (active_plan_id,),
             )
             tx.connection.execute(
-                "UPDATE projects SET active_plan_revision_id = ?, run_state = 'active', "
-                "recovery_reason = NULL, updated_at = ? WHERE id = ?",
-                (plan_revision_id, now, plan["project_id"]),
+                "UPDATE task_contracts SET status = 'superseded', updated_at = ? "
+                "WHERE plan_revision_id = ? AND status <> 'completed'",
+                (now, active_plan_id),
             )
-            activation_id = new_id("activation")
-            tx.connection.execute(
-                "INSERT INTO plan_activations "
-                "(id, project_id, plan_revision_id, activation_digest, authorization_id, source, activated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (activation_id, plan["project_id"], plan_revision_id, activation_digest,
-                 authorization.authorization_id, source, now),
-            )
-            self._refresh_ready(tx, plan_revision_id)
-            tx.history(
-                plan["project_id"],
-                "plan.activated",
-                "plan_revision",
-                plan_revision_id,
-                {"activation_digest": activation_digest, "source": source,
-                 "authorization_id": authorization.authorization_id, "reused_task_ids": reused},
-            )
-            return activation_id
+        tx.connection.execute(
+            "UPDATE plan_revisions SET status = 'active', activated_at = ?, activation_source = ? "
+            "WHERE id = ?",
+            (now, source, plan_revision_id),
+        )
+        tx.connection.execute(
+            "UPDATE projects SET active_plan_revision_id = ?, run_state = 'active', "
+            "recovery_reason = NULL, updated_at = ? WHERE id = ?",
+            (plan_revision_id, now, plan["project_id"]),
+        )
+        activation_id = new_id("activation")
+        tx.connection.execute(
+            "INSERT INTO plan_activations "
+            "(id, project_id, plan_revision_id, activation_digest, authorization_id, source, activated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (activation_id, plan["project_id"], plan_revision_id, activation_digest,
+             authorization.authorization_id, source, now),
+        )
+        self._refresh_ready(tx, plan_revision_id)
+        tx.history(
+            plan["project_id"],
+            "plan.activated",
+            "plan_revision",
+            plan_revision_id,
+            {"activation_digest": activation_digest, "source": source,
+             "authorization_id": authorization.authorization_id, "reused_task_ids": reused},
+        )
+        return activation_id
 
     def retry_task(
         self,
