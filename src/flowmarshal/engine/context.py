@@ -5,7 +5,7 @@ import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 from pydantic import Field, model_validator
 
@@ -79,6 +79,7 @@ TEXT_EXTENSIONS = frozenset(
 _JS_SYMBOL = re.compile(
     r"(?:class|function|interface|type|enum|const|let|var)\s+([A-Za-z_$][\w$]*)"
 )
+_PATH_TOKEN = re.compile(r"(?<![A-Za-z0-9_.-])(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_-]+\.[A-Za-z0-9]{1,16}(?![A-Za-z0-9_.-])")
 
 
 class ContextNeed(ExecutionContextNeed):
@@ -226,39 +227,111 @@ class ProjectMapper:
         revision_no: int,
         registered_references: Iterable[Path | str] = (),
         instruction_sources: Iterable[Path | str] = (),
+        observed_paths: Iterable[Path | str] | None = None,
+        validation_targets: Iterable[Path | str] = (),
+        requested_symbols: Mapping[Path | str, Iterable[str]] | None = None,
+        observed_links: Iterable[tuple[Path | str, Path | str]] = (),
+        source_requests: Iterable[str] = (),
         excluded_paths: Iterable[Path | str] = (),
     ) -> ProjectMapRevision:
+        """Goal에 필요한 관측만 Project Map에 기록한다.
+
+        ``observed_paths``는 Goal, Task 준비 또는 validation이 실제로 요청한
+        파일이다. 이 mapper는 저장소 전체의 파일·symbol·module 관계를 발견하지
+        않으며, 명시한 path에 적용되는 ``AGENTS.md``와 등록한 자료만 보강한다.
+        ``observed_links``도 caller가 직접 관측한 관계만 허용한다.
+        """
         resolved_root = Path(root).resolve()
         explicit_instructions = {Path(item).resolve() for item in instruction_sources}
         references = {Path(item).resolve() for item in registered_references}
         excluded = tuple((resolved_root / item).resolve() for item in excluded_paths)
 
+        def is_within_root(path: Path) -> bool:
+            return path == resolved_root or resolved_root in path.parents
+
+        def observed_path(value: Path | str) -> Path:
+            path = Path(value)
+            path = (resolved_root / path).resolve() if not path.is_absolute() else path.resolve()
+            if not is_within_root(path):
+                raise ValueError(f"Project Map 관측 path가 project root 밖입니다: {path}")
+            return path
+
+        legacy_full_discovery = observed_paths is None
+        requested_paths = {observed_path(item) for item in (observed_paths or ())}
+        validation_paths = {observed_path(item) for item in validation_targets}
+        requested_paths.update(validation_paths)
+        symbol_requests: dict[Path, tuple[str, ...]] = {}
+        for path, symbols in (requested_symbols or {}).items():
+            resolved = observed_path(path)
+            requested_paths.add(resolved)
+            symbol_requests[resolved] = tuple(sorted(set(symbols)))
+
+        requested_links = tuple((observed_path(source), observed_path(target))
+                                for source, target in observed_links)
+
         def is_excluded(path: Path) -> bool:
             resolved = path.resolve()
             return any(resolved == item or item in resolved.parents for item in excluded)
 
-        candidates: list[tuple[Path, bool]] = []
-        # 운영 디렉터리는 탐색 자체를 가지치기하고 명시적으로 등록한 입력만 별도로 추가한다.
-        for directory, directories, filenames in os.walk(resolved_root):
-            current = Path(directory)
-            directories[:] = sorted(name for name in directories
-                                    if name.casefold() not in self.ignored_directories
-                                    and not is_excluded(current / name))
-            for name in filenames:
-                path = current / name
-                if path.is_file() and not is_excluded(path):
-                    candidates.append((path, False))
-        candidates.sort(key=lambda item: item[0].as_posix())
-        known_paths = {item[0] for item in candidates}
-        for path in sorted(references | explicit_instructions, key=lambda item: item.as_posix()):
-            if path not in known_paths:
-                candidates.append((path, path in references))
+        if legacy_full_discovery:
+            # 호출자가 아직 Goal 범위 입력을 전달하지 않는 구버전 API의 읽기
+            # 호환이다. Engine의 Goal/ready-time 경로는 항상 명시 관측을 넘긴다.
+            for directory, directories, filenames in os.walk(resolved_root):
+                current = Path(directory)
+                directories[:] = [
+                    name for name in directories
+                    if name.casefold() not in self.ignored_directories
+                    and not is_excluded(current / name)
+                ]
+                requested_paths.update(
+                    (current / name).resolve()
+                    for name in filenames
+                    if (current / name).is_file() and not is_excluded(current / name)
+                )
 
-        entries: list[ProjectMapEntry] = []
+        requested_tokens = {
+            token.casefold()
+            for request in source_requests
+            for token in _PATH_TOKEN.findall(request)
+        }
+        if requested_tokens:
+            # 파일명만 비교하는 bounded discovery다. 파일 본문·symbol·관계는 이
+            # 단계에서 읽거나 추론하지 않으며, Goal이 명시한 후보만 관측한다.
+            for directory, directories, filenames in os.walk(resolved_root):
+                current = Path(directory)
+                directories[:] = [
+                    name for name in directories
+                    if name.casefold() not in self.ignored_directories
+                    and not is_excluded(current / name)
+                ]
+                for name in filenames:
+                    path = current / name
+                    relative = path.relative_to(resolved_root).as_posix().casefold()
+                    if (relative in requested_tokens or path.name.casefold() in requested_tokens) and not is_excluded(path):
+                        requested_paths.add(path.resolve())
+
+        candidates = set(requested_paths) | references | explicit_instructions
+        root_instruction = resolved_root / "AGENTS.md"
+        if root_instruction.is_file():
+            candidates.add(root_instruction)
+        for path in tuple(requested_paths):
+            current = path.parent
+            while is_within_root(current):
+                instruction = current / "AGENTS.md"
+                if instruction.is_file():
+                    candidates.add(instruction)
+                if current == resolved_root:
+                    break
+                current = current.parent
+
+        entries_by_path: dict[Path, ProjectMapEntry] = {}
         instruction_refs: list[str] = []
-        for path, external_reference in candidates:
+        paths_to_ids: dict[Path, str] = {}
+        for path in sorted(candidates, key=lambda item: item.as_posix().casefold()):
             instruction = path.name.casefold() == "agents.md" or path in explicit_instructions
             if not path.is_file() or (not instruction and path.stat().st_size > self.max_file_bytes):
+                continue
+            if is_within_root(path) and is_excluded(path):
                 continue
             content = path.read_bytes()
             if not _is_probably_text(path, content):
@@ -267,7 +340,7 @@ class ProjectMapper:
                 text = content.decode("utf-8")
             except UnicodeDecodeError:
                 continue
-            is_reference = external_reference or path in references
+            is_reference = path in references
             try:
                 display_path = path.relative_to(resolved_root).as_posix()
             except ValueError:
@@ -278,7 +351,14 @@ class ProjectMapper:
                 tags.append("instruction_source")
             if is_reference:
                 tags.append("registered_reference")
-            symbols = _symbols(path, text)
+            if path in validation_paths:
+                tags.append("validation_target")
+            available_symbols = _symbols(path, text)
+            symbols = (
+                available_symbols
+                if legacy_full_discovery
+                else tuple(symbol for symbol in available_symbols if symbol in symbol_requests.get(path, ()))
+            )
             if symbols:
                 tags.append("symbol_indexed")
             entry = ProjectMapEntry(
@@ -289,9 +369,27 @@ class ProjectMapper:
                 symbols=symbols,
                 tags=tuple(sorted(set(tags))),
             )
-            entries.append(entry)
+            entries_by_path[path] = entry
+            paths_to_ids[path] = entry_id
             if instruction:
                 instruction_refs.append(entry_id)
+
+        links_by_path: dict[Path, tuple[str, ...]] = {}
+        for source, target in requested_links:
+            if source not in paths_to_ids or target not in paths_to_ids:
+                raise ValueError("Project Map observed link의 양 끝은 관측 entry여야 합니다.")
+            links_by_path[source] = tuple(sorted({
+                *links_by_path.get(source, ()), paths_to_ids[target],
+            }))
+        entries = [
+            (
+                entry
+                if path not in links_by_path
+                else entry.model_copy(update={"observed_link_refs": links_by_path[path]})
+            )
+            for path, entry in entries_by_path.items()
+        ]
+        entries.sort(key=lambda item: item.entry_id)
 
         return ProjectMapRevision(
             project_map_revision_id=new_id("project_map"),
@@ -438,7 +536,7 @@ def resolve_additional_context_request(
                 hint.casefold() == symbol.casefold()
                 for hint in need.symbol_hints
                 for symbol in entry.symbols
-            )
+            ) or (bool(need.symbol_hints) and entry.kind is ProjectMapEntryKind.FILE)
             tag_match = any(
                 hint.casefold() == tag.casefold()
                 for hint in need.tag_hints
@@ -463,6 +561,13 @@ def resolve_additional_context_request(
                 ]
                 if selected:
                     ranges = _merge_ranges(selected)
+                else:
+                    continue
+            elif need.symbol_hints:
+                available = _symbols(Path(entry.path), text)
+                if not any(symbol.casefold() == hint.casefold()
+                           for hint in need.symbol_hints for symbol in available):
+                    continue
             selector = _range_selector(ranges)
             content = _range_content(text, ranges)
             estimate = max(1, (len(content.encode("utf-8")) + 3) // 4)
@@ -477,6 +582,64 @@ def resolve_additional_context_request(
             ))
             used += estimate
             need_resolved = True
+        if not need_resolved:
+            # ContextRequest는 initial ProjectMap sample 밖의 로컬 source를
+            # 필요할 때만 읽는다. 이는 전체 graph 구축이 아니라 해당 need의
+            # source/selector 관측이며, 결과 본문과 digest는 다음 role 입력에
+            # 직접 결속된다.
+            mapped_paths = {
+                Path(entry.path).resolve()
+                if Path(entry.path).is_absolute()
+                else (root / entry.path).resolve()
+                for entry in project_map.entries
+            }
+            for directory, directories, filenames in os.walk(root):
+                current = Path(directory)
+                directories[:] = [
+                    name for name in directories
+                    if name.casefold() not in DEFAULT_IGNORED_DIRECTORIES
+                ]
+                for name in sorted(filenames):
+                    path = current / name
+                    if path.resolve() in mapped_paths or not path.is_file():
+                        continue
+                    relative = path.relative_to(root).as_posix()
+                    path_match = any(hint.casefold() in relative.casefold() for hint in need.path_hints)
+                    if not path_match and not (need.symbol_hints and path.suffix.casefold() == ".py"):
+                        continue
+                    try:
+                        content_bytes = path.read_bytes()
+                        if not _is_probably_text(path, content_bytes):
+                            continue
+                        text = content_bytes.decode("utf-8")
+                    except (OSError, UnicodeDecodeError):
+                        continue
+                    ranges = None
+                    if need.symbol_hints and path.suffix.casefold() == ".py":
+                        symbols = _python_symbol_ranges(text) or {}
+                        selected = [
+                            span for symbol, spans in symbols.items()
+                            if any(symbol.casefold() == hint.casefold() for hint in need.symbol_hints)
+                            for span in spans
+                        ]
+                        if selected:
+                            ranges = _merge_ranges(selected)
+                        elif not path_match:
+                            continue
+                    selector = _range_selector(ranges)
+                    selected_content = _range_content(text, ranges)
+                    estimate = max(1, (len(selected_content.encode("utf-8")) + 3) // 4)
+                    if used + estimate > token_budget:
+                        continue
+                    resolved.append(ResolvedAdditionalContext(
+                        source_ref=relative,
+                        selector=selector,
+                        reason=f"{need.need_id}: {need.description}",
+                        content_digest=sha256_bytes(content_bytes),
+                        content=selected_content,
+                    ))
+                    used += estimate
+                    need_resolved = True
         if not need_resolved:
             unresolved.append(ContextNeed(**need.model_dump()))
 
@@ -536,7 +699,12 @@ class ContextSelector:
         entries = {entry.entry_id: entry for entry in project_map.entries}
         sources: dict[str, tuple[str, dict[str, tuple[tuple[int, int], ...]] | None]] = {}
 
-        def candidate(entry: ProjectMapEntry, need: ExecutionContextNeed) -> tuple[_ContextCandidate | None, set[str]]:
+        def candidate(
+            entry: ProjectMapEntry,
+            need: ExecutionContextNeed,
+            *,
+            allow_unparsed_python: bool = False,
+        ) -> tuple[_ContextCandidate | None, set[str]]:
             if entry.entry_id not in sources:
                 text = _read_context_source(project_map.root, entry.path, entry.content_digest)
                 symbols = _python_symbol_ranges(text) if Path(entry.path).suffix.casefold() == ".py" else None
@@ -552,6 +720,19 @@ class ContextSelector:
                                        for span in spans)
                 if not ranges:
                     return None, set()
+            elif need.symbol_hints and Path(entry.path).suffix.casefold() == ".py":
+                # 구문 오류가 난 Python은 symbol 선택을 주장하지 않고, caller가
+                # path를 명시한 경우에만 전체 파일을 Context로 보존한다.
+                if not allow_unparsed_python:
+                    return None, set()
+            elif need.symbol_hints:
+                represented = {
+                    hint for hint in need.symbol_hints
+                    if any(hint.casefold() == symbol.casefold()
+                           for symbol in _symbols(Path(entry.path), text))
+                }
+                if not represented:
+                    return None, set()
             if entry.kind is ProjectMapEntryKind.INSTRUCTION:
                 ranges = None
             return _ContextCandidate(entry, text, ranges, frozenset((need.need_id,))), represented
@@ -564,11 +745,18 @@ class ContextSelector:
                 path_match = any(hint.casefold() in entry.path.casefold() for hint in need.path_hints)
                 symbol_match = any(hint.casefold() == symbol.casefold()
                                    for hint in need.symbol_hints for symbol in entry.symbols)
+                symbol_match = symbol_match or (
+                    bool(need.symbol_hints) and entry.kind is ProjectMapEntryKind.FILE
+                )
                 tag_match = any(hint.casefold() == tag.casefold() for hint in need.tag_hints for tag in entry.tags)
                 if not (explicit_ref or path_match or symbol_match or tag_match):
                     continue
                 try:
-                    selected, found = candidate(entry, need)
+                    selected, found = candidate(
+                        entry,
+                        need,
+                        allow_unparsed_python=path_match,
+                    )
                 except (OSError, UnicodeError):
                     unreadable.append(entry.path)
                     continue

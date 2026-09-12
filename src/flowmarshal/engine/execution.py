@@ -143,6 +143,12 @@ def execution_context(service: EngineService, project_id: str) -> dict[str, Any]
         project_id=project_id, root=project_map.root, revision_no=project_map.revision_no,
         registered_references=(item.path for item in sources if item.kind.value == "reference"),
         instruction_sources=(item.path for item in sources if item.kind.value == "instruction"),
+        observed_paths=(item.path for item in project_map.entries if not Path(item.path).is_absolute()),
+        requested_symbols={
+            item.path: item.symbols
+            for item in project_map.entries
+            if item.symbols and not Path(item.path).is_absolute()
+        },
         excluded_paths=(service.ledger.artifact_root.resolve(),),
     )
     if observed_map.semantic_digest != project_map.semantic_digest:

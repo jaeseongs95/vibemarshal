@@ -527,6 +527,7 @@ class EngineService:
             revision_no=1,
             registered_references=(item.path for item in sources if item.kind is ContextSourceRegistrationKind.REFERENCE),
             instruction_sources=(item.path for item in sources if item.kind is ContextSourceRegistrationKind.INSTRUCTION),
+            source_requests=(source_request,),
             excluded_paths=(self.ledger.artifact_root.resolve(),),
         )
         return goal_context_observations(project_map, source_request)
@@ -577,6 +578,17 @@ class EngineService:
                 for item in sources
                 if item.kind is ContextSourceRegistrationKind.INSTRUCTION
             ),
+            observed_paths=(
+                item.path
+                for item in (() if current_map is None else current_map.entries)
+                if not Path(item.path).is_absolute()
+            ),
+            requested_symbols={
+                item.path: item.symbols
+                for item in (() if current_map is None else current_map.entries)
+                if item.symbols and not Path(item.path).is_absolute()
+            },
+            source_requests=(goal.definition.source_request,),
             excluded_paths=(self.ledger.artifact_root.resolve(),),
         )
         if current_map is None or observed_map.semantic_digest != current_map.semantic_digest:

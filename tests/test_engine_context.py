@@ -41,8 +41,23 @@ class EngineContextTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.temp.cleanup()
 
+    def project_map(self, mapper: ProjectMapper | None = None, *, revision_no: int = 1, **kwargs):
+        observed = tuple(
+            path.relative_to(self.root)
+            for path in self.root.rglob("*")
+            if path.is_file()
+            and not any(part.startswith(".flowmarshal-engine") for part in path.relative_to(self.root).parts)
+        )
+        return (mapper or ProjectMapper()).build(
+            project_id=self.project_id,
+            root=self.root,
+            revision_no=revision_no,
+            observed_paths=observed,
+            **kwargs,
+        )
+
     def select(self, *needs, budget=None):
-        project_map = ProjectMapper().build(project_id=self.project_id, root=self.root, revision_no=1)
+        project_map = self.project_map()
         snapshot = state(self.project_id, self.goal.definition_digest, project_map.revision_digest)
         _, task, _ = plan(self.project_id, self.goal, snapshot, project_map.revision_digest,
                           skeleton(self.goal, snapshot), inventory())
@@ -182,29 +197,29 @@ class EngineContextTests(unittest.TestCase):
         directory.mkdir()
         reference = directory / "report.md"
         reference.write_text("등록한 이전 결과", encoding="utf-8")
-        project_map = ProjectMapper().build(project_id=self.project_id, root=self.root, revision_no=1,
-                                             registered_references=(reference,))
+        project_map = self.project_map(registered_references=(reference,))
         entry = next(item for item in project_map.entries if item.path == ".flowmarshal-engine-eval/report.md")
         self.assertEqual(ProjectMapEntryKind.REFERENCE, entry.kind)
 
     def test_policy_is_not_silently_omitted_by_the_mapper_file_size_limit(self):
-        project_map = ProjectMapper(max_file_bytes=1).build(project_id=self.project_id, root=self.root, revision_no=1,
-                                                          instruction_sources=(self.reference,))
+        project_map = self.project_map(
+            ProjectMapper(max_file_bytes=1), instruction_sources=(self.reference,),
+        )
         by_id = {entry.entry_id: entry for entry in project_map.entries}
         self.assertEqual({"AGENTS.md", str(self.reference.resolve())},
                          {by_id[ref].path for ref in project_map.instruction_source_refs})
 
     def test_runtime_directories_do_not_change_map_but_source_does(self):
-        first = ProjectMapper().build(project_id=self.project_id, root=self.root, revision_no=1)
+        first = self.project_map()
         for name in (".flowmarshal-engine", ".flowmarshal-engine-eval"):
             directory = self.root / name / "runs"
             directory.mkdir(parents=True)
             (directory / "result.json").write_text('{"status": "running"}', encoding="utf-8")
             (directory / "AGENTS.md").write_text("운영 복사본", encoding="utf-8")
-        second = ProjectMapper().build(project_id=self.project_id, root=self.root, revision_no=2)
+        second = self.project_map(revision_no=2)
         self.assertEqual(first.semantic_digest, second.semantic_digest)
         (self.root / "service.py").write_text("changed = True\n", encoding="utf-8")
-        third = ProjectMapper().build(project_id=self.project_id, root=self.root, revision_no=3)
+        third = self.project_map(revision_no=3)
         self.assertNotEqual(second.semantic_digest, third.semantic_digest)
 
     def test_custom_artifact_path_is_excluded_without_excluding_similarly_named_source(self):
@@ -212,33 +227,27 @@ class EngineContextTests(unittest.TestCase):
         artifact_root.mkdir()
         (artifact_root / "result.json").write_text("{}", encoding="utf-8")
         (self.root / "custom-runs-source.py").write_text("source = True", encoding="utf-8")
-        project_map = ProjectMapper().build(project_id=self.project_id, root=self.root, revision_no=1,
-                                             excluded_paths=("custom-runs",))
+        project_map = self.project_map(excluded_paths=("custom-runs",))
         paths = {entry.path for entry in project_map.entries}
         self.assertNotIn("custom-runs/result.json", paths)
         self.assertIn("custom-runs-source.py", paths)
 
     def test_agents_and_registered_reference_are_normal_inputs(self) -> None:
-        project_map = ProjectMapper().build(
-            project_id=self.project_id,
-            root=self.root,
-            revision_no=1,
-            registered_references=(self.reference,),
-        )
+        project_map = self.project_map(registered_references=(self.reference,))
         by_path = {item.path: item for item in project_map.entries}
         self.assertIn("AGENTS.md", by_path)
         self.assertIn(str(self.reference.resolve()), by_path)
         self.assertEqual(ProjectMapEntryKind.INSTRUCTION, by_path["AGENTS.md"].kind)
         self.assertEqual(ProjectMapEntryKind.REFERENCE, by_path[str(self.reference.resolve())].kind)
         self.assertIn(by_path["AGENTS.md"].entry_id, project_map.instruction_source_refs)
-        self.assertIn("execute_task", by_path["service.py"].symbols)
+        self.assertEqual((), by_path["service.py"].symbols)
 
     def test_map_keeps_only_explicitly_observed_entry_links(self) -> None:
         tests = self.root / "tests"
         tests.mkdir()
         (tests / "test_service.py").write_text("from service import execute_task\n", encoding="utf-8")
         (self.root / "pyproject.toml").write_text("[project]\nname = 'example'\n", encoding="utf-8")
-        project_map = ProjectMapper().build(project_id=self.project_id, root=self.root, revision_no=1)
+        project_map = self.project_map()
         service = next(entry for entry in project_map.entries if entry.path == "service.py")
         policy = next(entry for entry in project_map.entries if entry.path == "AGENTS.md")
         test_file = next(entry for entry in project_map.entries if entry.path == "tests/test_service.py")
@@ -263,12 +272,33 @@ class EngineContextTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "observed link"):
             ProjectMapRevision.model_validate(raw)
 
-    def test_missing_required_context_returns_structured_request(self) -> None:
+    def test_mapper_keeps_goal_observations_lazy_and_links_explicit(self) -> None:
+        tests = self.root / "tests"
+        tests.mkdir()
+        (tests / "test_service.py").write_text("from service import execute_task\n", encoding="utf-8")
+        (self.root / "unrelated.py").write_text("def unrelated(): pass\n", encoding="utf-8")
         project_map = ProjectMapper().build(
             project_id=self.project_id,
             root=self.root,
             revision_no=1,
+            observed_paths=("service.py",),
+            validation_targets=("tests/test_service.py",),
+            requested_symbols={"service.py": ("execute_task",)},
+            observed_links=(("tests/test_service.py", "service.py"),),
         )
+        by_path = {entry.path: entry for entry in project_map.entries}
+        self.assertEqual({"AGENTS.md", "service.py", "tests/test_service.py"}, set(by_path))
+        self.assertEqual(("execute_task",), by_path["service.py"].symbols)
+        self.assertIn("validation_target", by_path["tests/test_service.py"].tags)
+        self.assertEqual((by_path["service.py"].entry_id,), by_path["tests/test_service.py"].observed_link_refs)
+
+        default_map = ProjectMapper().build(
+            project_id=self.project_id, root=self.root, revision_no=2, observed_paths=(),
+        )
+        self.assertEqual({"AGENTS.md"}, {entry.path for entry in default_map.entries})
+
+    def test_missing_required_context_returns_structured_request(self) -> None:
+        project_map = self.project_map()
         snapshot = state(self.project_id, self.goal.definition_digest, project_map.revision_digest)
         source = skeleton(self.goal, snapshot)
         _, task, _ = plan(
@@ -320,15 +350,15 @@ class EngineContextTests(unittest.TestCase):
         self.assertTrue(bundle.binding.binding_digest.startswith("sha256:"))
 
     def test_project_map_digest_changes_when_file_changes(self) -> None:
-        first = ProjectMapper().build(project_id=self.project_id, root=self.root, revision_no=1)
+        first = self.project_map()
         (self.root / "service.py").write_text("def execute_task():\n    return False\n", encoding="utf-8")
-        second = ProjectMapper().build(project_id=self.project_id, root=self.root, revision_no=2)
+        second = self.project_map(revision_no=2)
         self.assertNotEqual(first.revision_digest, second.revision_digest)
         self.assertNotEqual(first.semantic_digest, second.semantic_digest)
 
     def test_semantic_map_digest_is_stable_across_identical_scans(self) -> None:
-        first = ProjectMapper().build(project_id=self.project_id, root=self.root, revision_no=1)
-        second = ProjectMapper().build(project_id=self.project_id, root=self.root, revision_no=2)
+        first = self.project_map()
+        second = self.project_map(revision_no=2)
         self.assertNotEqual(first.revision_digest, second.revision_digest)
         self.assertEqual(first.semantic_digest, second.semantic_digest)
 

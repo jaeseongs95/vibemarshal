@@ -110,7 +110,17 @@ def goal(project_id: str, profile_digest: str, *, read_only: bool = False) -> Go
 
 
 def project_map(project_id: str, root: Path):
-    return ProjectMapper().build(project_id=project_id, root=root, revision_no=1)
+    return ProjectMapper().build(
+        project_id=project_id,
+        root=root,
+        revision_no=1,
+        observed_paths=tuple(
+            path.relative_to(root)
+            for path in root.rglob("*")
+            if path.is_file()
+            and not any(part.startswith(".flowmarshal-engine") for part in path.relative_to(root).parts)
+        ),
+    )
 
 
 def state(project_id: str, goal_digest: str, map_digest: str) -> StateSnapshot:
