@@ -42,6 +42,48 @@ class EngineEffectCheckpointRecoveryTests(unittest.TestCase):
             ).fetchone()
         return prepared, selected_runtime, json.loads(row["payload_json"])
 
+    def _change_effect_input(self, case, prepared, runtime, spec):
+        if case == "target":
+            (prepared.workspace / "app.py").write_text(
+                "def add(left, right): return left + right\n", encoding="utf-8"
+            )
+        elif case == "context":
+            (prepared.workspace / "AGENTS.md").write_text(
+                "예약 뒤 바뀐 프로젝트 지침", encoding="utf-8"
+            )
+        elif case == "state":
+            current = prepared.service.load_current_state(
+                prepared.project_id,
+                prepared.service.load_active_goal(prepared.project_id).definition_digest,
+            )
+            prepared.service.record_state_snapshot(
+                current.model_copy(
+                    update={
+                        "snapshot_id": new_id("snapshot"),
+                        "version": current.version + 1,
+                        "observed_at": utc_now(),
+                    }
+                )
+            )
+        elif case == "prompt":
+            binding = spec["definition"]["context_manifest"]["prompt_binding"]
+            from flowmarshal.engine.domain import PromptBinding
+
+            PromptArtifactStore(prepared.service.ledger.artifact_root).path_for(
+                PromptBinding.model_validate(binding)
+            ).write_bytes(b"broken-after-intent")
+        elif case == "model":
+            selected = spec["definition"]["executor"]["model"]
+            runtime.inventory = runtime.inventory.model_copy(
+                update={
+                    "models": tuple(
+                        item for item in runtime.inventory.models if item.model != selected
+                    )
+                }
+            )
+        else:
+            runtime.policy_changed = True
+
     def test_each_effect_time_binding_change_blocks_before_create(self):
         cases = ("target", "context", "state", "prompt", "model", "policy")
         for case in cases:
@@ -57,46 +99,7 @@ class EngineEffectCheckpointRecoveryTests(unittest.TestCase):
                     if point != "after_thread_intent" or changed:
                         return
                     changed = True
-                    if case == "target":
-                        (prepared.workspace / "app.py").write_text(
-                            "def add(left, right): return left + right\n", encoding="utf-8"
-                        )
-                    elif case == "context":
-                        (prepared.workspace / "AGENTS.md").write_text(
-                            "예약 뒤 바뀐 프로젝트 지침", encoding="utf-8"
-                        )
-                    elif case == "state":
-                        current = prepared.service.load_current_state(
-                            prepared.project_id,
-                            prepared.service.load_active_goal(prepared.project_id).definition_digest,
-                        )
-                        prepared.service.record_state_snapshot(
-                            current.model_copy(
-                                update={
-                                    "snapshot_id": new_id("snapshot"),
-                                    "version": current.version + 1,
-                                    "observed_at": utc_now(),
-                                }
-                            )
-                        )
-                    elif case == "prompt":
-                        binding = spec["definition"]["context_manifest"]["prompt_binding"]
-                        from flowmarshal.engine.domain import PromptBinding
-
-                        PromptArtifactStore(prepared.service.ledger.artifact_root).path_for(
-                            PromptBinding.model_validate(binding)
-                        ).write_bytes(b"broken-after-intent")
-                    elif case == "model":
-                        selected = spec["definition"]["executor"]["model"]
-                        runtime.inventory = runtime.inventory.model_copy(
-                            update={
-                                "models": tuple(
-                                    item for item in runtime.inventory.models if item.model != selected
-                                )
-                            }
-                        )
-                    else:
-                        runtime.policy_changed = True
+                    self._change_effect_input(case, prepared, runtime, spec)
 
                 with self.assertRaises((EngineServiceError, RuntimePolicyError)):
                     EngineDispatcher(
@@ -107,6 +110,42 @@ class EngineEffectCheckpointRecoveryTests(unittest.TestCase):
                 with prepared.service.ledger.read() as connection:
                     intent = connection.execute(
                         "SELECT id,status FROM runtime_intents WHERE kind = 'create_thread'"
+                    ).fetchone()
+                    marker_count = connection.execute(
+                        "SELECT COUNT(*) FROM history_events WHERE entity_id = ? "
+                        "AND event_type = 'runtime.effect_not_started'",
+                        (intent["id"],),
+                    ).fetchone()[0]
+                self.assertEqual("prepared", intent["status"])
+                self.assertEqual(1, marker_count)
+
+    def test_each_effect_time_binding_change_blocks_before_start(self):
+        cases = ("target", "context", "state", "prompt", "model", "policy")
+        for case in cases:
+            with self.subTest(case=case):
+                runtime_factory = _MutablePolicyRuntime if case == "policy" else None
+                prepared, runtime, spec = self._materialized(
+                    f"start-preflight-{case}", runtime=runtime_factory
+                )
+                changed = False
+
+                def mutate(point: str) -> None:
+                    nonlocal changed
+                    if point != "after_turn_intent" or changed:
+                        return
+                    changed = True
+                    self._change_effect_input(case, prepared, runtime, spec)
+
+                with self.assertRaises((EngineServiceError, RuntimePolicyError)):
+                    EngineDispatcher(
+                        prepared.service, runtime, fault_hook=mutate
+                    ).run_once(prepared.project_id)
+                self.assertTrue(changed)
+                self.assertEqual(1, runtime.create_calls)
+                self.assertEqual(0, runtime.turn_calls)
+                with prepared.service.ledger.read() as connection:
+                    intent = connection.execute(
+                        "SELECT id,status FROM runtime_intents WHERE kind = 'start_turn'"
                     ).fetchone()
                     marker_count = connection.execute(
                         "SELECT COUNT(*) FROM history_events WHERE entity_id = ? "
