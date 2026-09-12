@@ -656,14 +656,23 @@ class ExecutionAutomationTests(unittest.TestCase):
                 (review["attempt_id"],),
             ).fetchone()
             job = connection.execute(
-                "SELECT status,attempt_id,task_id,thread_id,turn_id FROM runtime_jobs "
+                "SELECT status,attempt_id,task_id,thread_id,turn_id,request_json FROM runtime_jobs "
                 "WHERE attempt_id=? AND kind='goal_semantic_validate'",
                 (review["attempt_id"],),
             ).fetchone()
             provider_call = connection.execute(
-                "SELECT role,execution_status,result_status FROM provider_calls WHERE attempt_id=?",
+                "SELECT role,execution_status,result_status,request_json FROM provider_calls WHERE attempt_id=?",
                 (review["attempt_id"],),
             ).fetchone()
+            intent_request = json.loads(connection.execute(
+                "SELECT i.request_json FROM runtime_intents i JOIN runtime_receipts r ON r.intent_id=i.id "
+                "WHERE i.attempt_id=? AND i.kind='start_turn'",
+                (review["attempt_id"],),
+            ).fetchone()[0])
+            stored_result = ValidationResult.model_validate_json(connection.execute(
+                "SELECT payload_json FROM validation_results WHERE id=?",
+                (observed.validation_result_id,),
+            ).fetchone()[0])
             turn_receipts = connection.execute(
                 "SELECT COUNT(*) FROM runtime_receipts r JOIN runtime_intents i ON i.id=r.intent_id "
                 "WHERE i.attempt_id=? AND i.kind='start_turn'",
@@ -674,8 +683,30 @@ class ExecutionAutomationTests(unittest.TestCase):
         self.assertEqual(review["attempt_id"], job["attempt_id"])
         self.assertIsNone(job["task_id"])
         self.assertEqual("consumed", job["status"])
-        self.assertEqual(("goal_validator", "terminal", "valid"), tuple(provider_call))
+        self.assertEqual(
+            ("goal_validator", "terminal", "valid"),
+            tuple(provider_call)[:3],
+        )
         self.assertEqual(1, turn_receipts)
+        job_request = json.loads(job["request_json"])
+        provider_request = json.loads(provider_call["request_json"])
+        self.assertEqual("validation_goal", job_request["validation_id"])
+        self.assertEqual("validation_goal", intent_request["validation_id"])
+        self.assertEqual(
+            "validation_goal", provider_request["payload"]["step"]["validation_id"]
+        )
+        self.assertEqual(
+            stored_result.goal_validation_binding_digest,
+            job_request["binding_digest"],
+        )
+        self.assertEqual(
+            stored_result.goal_validation_binding_digest,
+            intent_request["goal_validation_binding_digest"],
+        )
+        self.assertEqual(
+            stored_result.goal_validation_binding_digest,
+            provider_request["payload"]["goal_validation_binding_digest"],
+        )
         self.assertEqual(
             (job["thread_id"], job["turn_id"]),
             (
@@ -691,6 +722,60 @@ class ExecutionAutomationTests(unittest.TestCase):
         self.assertIn("goal_test", goal_request.payload)
         self.assertIn("독립 통합 검사", goal_request.instructions)
         self.assertEqual(RunOnceAction.COMPLETED, dispatcher.run_once(prepared.project_id).action)
+
+    def test_semantic_goal_rejects_stale_or_null_binding_reassignment(self):
+        contract = IntegrationValidationContract(
+            validation_id="validation_goal",
+            statement="독립적으로 공개 계약 유지 여부를 검토한다.",
+            criterion_refs=("ac_fix",),
+            method="semantic",
+            required_evidence_kinds=("model_review",),
+        )
+        prepared, runtime = self.prepared(goal_validation=contract)
+        self.task_completed(prepared, runtime)
+        with prepared.service.ledger.read() as connection:
+            evidence_id = connection.execute(
+                "SELECT id FROM evidence_records WHERE task_id=? AND kind='test'",
+                (prepared.task_id,),
+            ).fetchone()[0]
+        runner = ScriptedStructuredRoleRunner({
+            "goal_test_preparation": [{"step": {
+                "validation_id": "validation_goal",
+                "method": "semantic",
+                "semantic_instruction": "직접 근거로 공개 계약을 검토한다.",
+                "required_evidence_kinds": ["model_review"],
+            }}],
+            "goal_validator": [{
+                "passed": True,
+                "rationale": "직접 근거를 확인했다.",
+                "evidence_refs": [evidence_id],
+            }],
+        })
+        dispatcher = EngineDispatcher(
+            prepared.service,
+            runtime,
+            proposal_provider=ExecutionProposalAdapter(prepared.service, runner, self.roles),
+        )
+        self.assertEqual(RunOnceAction.MATERIALIZED, dispatcher.run_once(prepared.project_id).action)
+        observed = dispatcher.run_once(prepared.project_id)
+        with prepared.service.ledger.read() as connection:
+            original = ValidationResult.model_validate_json(connection.execute(
+                "SELECT payload_json FROM validation_results WHERE id=?",
+                (observed.validation_result_id,),
+            ).fetchone()[0])
+        for rebound_digest in (None, sha256_digest({"unexecuted": "new-binding"})):
+            with self.subTest(rebound_digest=rebound_digest), self.assertRaisesRegex(
+                EngineServiceError, "INDEPENDENT_VALIDATION_BINDING_MISMATCH",
+            ):
+                prepared.service.record_validation(
+                    project_id=prepared.project_id,
+                    plan_revision_id=prepared.plan_revision_id,
+                    result=original.model_copy(update={
+                        "validation_result_id": new_id("validation_result"),
+                        "goal_validation_binding_digest": rebound_digest,
+                        "evaluated_at": utc_now(),
+                    }),
+                )
 
     def test_independent_semantic_goal_rejects_unbound_model_review(self):
         contract = IntegrationValidationContract(
@@ -1068,6 +1153,54 @@ class ExecutionAutomationTests(unittest.TestCase):
                 }),
             )
 
+    def test_task_semantic_rejects_cross_validation_job_rebinding(self):
+        prepared, runtime = self.prepared(semantic_task_validation=True)
+        dispatcher = self.validating(prepared, runtime)
+        dispatcher.run_once(prepared.project_id)
+        dispatched = dispatcher.run_once(prepared.project_id)
+        with prepared.service.ledger.read() as connection:
+            binding = ThreadBinding.model_validate_json(connection.execute(
+                "SELECT binding_json FROM attempts WHERE id=?", (dispatched.attempt_id,),
+            ).fetchone()[0])
+            request = json.loads(connection.execute(
+                "SELECT request_json FROM runtime_intents WHERE attempt_id=? "
+                "AND kind='create_thread'", (dispatched.attempt_id,),
+            ).fetchone()[0])
+        runtime.complete(binding.thread_id, response=json.dumps({
+            "passed": True,
+            "rationale": "직접 evidence 확인",
+            "evidence_refs": request["semantic_evidence_ids"],
+        }))
+        self.assertEqual(RunOnceAction.OBSERVED, dispatcher.run_once(prepared.project_id).action)
+        with prepared.service.ledger.read() as connection:
+            original = ValidationResult.model_validate_json(connection.execute(
+                "SELECT payload_json FROM validation_results WHERE task_id=? "
+                "AND validation_id='validation_public_contract' ORDER BY rowid DESC LIMIT 1",
+                (prepared.task_id,),
+            ).fetchone()[0])
+            job = connection.execute(
+                "SELECT id,request_json FROM runtime_jobs WHERE attempt_id=? "
+                "AND kind='task_semantic_validate'", (dispatched.attempt_id,),
+            ).fetchone()
+        rebound_request = json.loads(job["request_json"])
+        rebound_request["validation_id"] = "validation_other"
+        with prepared.service.ledger.transaction() as tx:
+            tx.connection.execute(
+                "UPDATE runtime_jobs SET request_json=?,request_digest=? WHERE id=?",
+                (canonical_json(rebound_request), sha256_digest(rebound_request), job["id"]),
+            )
+        with self.assertRaisesRegex(
+            EngineServiceError, "INDEPENDENT_VALIDATION_BINDING_MISMATCH",
+        ):
+            prepared.service.record_validation(
+                project_id=prepared.project_id,
+                plan_revision_id=prepared.plan_revision_id,
+                result=original.model_copy(update={
+                    "validation_result_id": new_id("validation_result"),
+                    "evaluated_at": utc_now(),
+                }),
+            )
+
 
     def test_independent_semantic_validator_cannot_reuse_worker_thread(self):
         prepared, runtime = self.prepared(semantic_task_validation=True)
@@ -1095,7 +1228,10 @@ class ExecutionAutomationTests(unittest.TestCase):
             project_id=prepared.project_id,
             kind=RuntimeJobKind.TASK_SEMANTIC_VALIDATE,
             checkpoint_key="validator-same-worker-thread",
-            request={"attempt_id": validator.attempt_id},
+            request={
+                "attempt_id": validator.attempt_id,
+                "validation_id": "validation_public_contract",
+            },
             absolute_deadline_at=utc_now() + timedelta(minutes=1),
             attempt_id=validator.attempt_id,
             task_id=prepared.task_id,
@@ -1107,7 +1243,11 @@ class ExecutionAutomationTests(unittest.TestCase):
             attempt_id=validator.attempt_id,
             kind=RuntimeIntentKind.START_TURN,
             idempotency_key="validator-same-worker-thread-turn",
-            request={"thread_id": worker_binding.thread_id, "turn_id": turn_id},
+            request={
+                "thread_id": worker_binding.thread_id,
+                "turn_id": turn_id,
+                "validation_id": "validation_public_contract",
+            },
         )
         prepared.service.record_runtime_receipt(
             intent_id=intent.intent_id,
@@ -1140,7 +1280,8 @@ class ExecutionAutomationTests(unittest.TestCase):
                 (new_id("provider_call"), prepared.project_id, active_goal["goal_id"],
                  active_goal["definition_digest"],
                  "validator-same-worker-thread-call",
-                 sha256_digest({"attempt_id": validator.attempt_id}), "{}",
+                 sha256_digest({"validation_id": "validation_public_contract"}),
+                 canonical_json({"validation_id": "validation_public_contract"}),
                  validator.attempt_id, canonical_json(provider_receipt), tx.now, tx.now),
             )
         direct_ids = tuple(item["id"] for item in direct)

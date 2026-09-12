@@ -4482,6 +4482,7 @@ class EngineService:
         validation_id: str,
         status: ValidationStatus,
         evidence_ids: tuple[str, ...],
+        goal_validation_binding_digest: str | None,
     ) -> None:
         """독립성은 model 이름이 아니라 별도 Attempt/job/turn/evidence provenance로 확인한다."""
         if not evidence_ids:
@@ -4532,12 +4533,15 @@ class EngineService:
             else RuntimeJobKind.GOAL_SEMANTIC_VALIDATE.value
         )
         job = tx.maybe_one(
-            "SELECT id,project_id,task_id,thread_id,turn_id,status FROM runtime_jobs WHERE attempt_id=? "
+            "SELECT id,project_id,task_id,thread_id,turn_id,status,request_digest,request_json "
+            "FROM runtime_jobs WHERE attempt_id=? "
             "AND kind=? ORDER BY rowid DESC LIMIT 1",
             (validator_attempt_id, expected_job_kind),
         )
         receipt = tx.maybe_one(
-            "SELECT r.id,r.provider_operation_id,r.binding_json FROM runtime_receipts r "
+            "SELECT r.id,r.provider_operation_id,r.binding_json,"
+            "i.request_digest AS intent_request_digest,i.request_json AS intent_request_json "
+            "FROM runtime_receipts r "
             "JOIN runtime_intents i ON i.id=r.intent_id "
             "WHERE i.attempt_id=? AND i.kind='start_turn' ORDER BY i.rowid DESC LIMIT 1",
             (validator_attempt_id,),
@@ -4570,6 +4574,50 @@ class EngineService:
             or receipt["binding_json"] is None
         ):
             raise EngineServiceError("INDEPENDENT_VALIDATION_PROVENANCE_MISSING")
+        try:
+            job_request = json.loads(job["request_json"])
+            intent_request = json.loads(receipt["intent_request_json"])
+        except (json.JSONDecodeError, TypeError) as error:
+            raise EngineServiceError("INDEPENDENT_VALIDATION_BINDING_MISMATCH") from error
+        if (
+            job["request_digest"] != sha256_digest(job_request)
+            or receipt["intent_request_digest"] != sha256_digest(intent_request)
+            or job_request.get("validation_id") != validation_id
+            or intent_request.get("validation_id") != validation_id
+        ):
+            raise EngineServiceError("INDEPENDENT_VALIDATION_BINDING_MISMATCH")
+        if task_id is None:
+            if goal_validation_binding_digest is None:
+                raise EngineServiceError("INDEPENDENT_VALIDATION_BINDING_MISMATCH")
+            current_binding_digest = None
+            binding_rows = tx.all(
+                "SELECT payload_json FROM history_events WHERE project_id=? "
+                "AND event_type IN ('goal_test.bound','goal_test.retry_bound') "
+                "ORDER BY sequence DESC",
+                (project_id,),
+            )
+            for binding_row in binding_rows:
+                try:
+                    binding_document = json.loads(binding_row["payload_json"])
+                except (json.JSONDecodeError, TypeError):
+                    continue
+                step_document = binding_document.get("step")
+                if (
+                    binding_document.get("plan_revision_id") == validator_attempt["plan_revision_id"]
+                    and isinstance(step_document, dict)
+                    and step_document.get("validation_id") == validation_id
+                ):
+                    current_binding_digest = sha256_digest(binding_document)
+                    break
+            if (
+                current_binding_digest != goal_validation_binding_digest
+                or job_request.get("binding_digest") != goal_validation_binding_digest
+                or job_request.get("attempt_id") != validator_attempt_id
+                or intent_request.get("goal_validation_binding_digest")
+                != goal_validation_binding_digest
+                or intent_request.get("goal_validation_contract") != 1
+            ):
+                raise EngineServiceError("INDEPENDENT_VALIDATION_BINDING_MISMATCH")
         terminal_observation = tx.maybe_one(
             "SELECT id,terminal_status FROM runtime_job_observations WHERE job_id=? "
             "AND kind='provider_terminal' AND provider_terminal=1 "
@@ -4644,7 +4692,7 @@ class EngineService:
                 raise EngineServiceError("INDEPENDENT_VALIDATION_WORKER_THREAD_REUSED")
         expected_provider_role = "semantic_validator" if task_id is not None else "goal_validator"
         provider_calls = tx.all(
-            "SELECT id,receipt_json FROM provider_calls WHERE attempt_id=? "
+            "SELECT id,request_digest,request_json,receipt_json FROM provider_calls WHERE attempt_id=? "
             "AND role=? AND execution_status='terminal' "
             "AND result_status='valid' ORDER BY rowid",
             (validator_attempt_id, expected_provider_role),
@@ -4652,11 +4700,32 @@ class EngineService:
         if len(provider_calls) != 1 or provider_calls[0]["receipt_json"] is None:
             raise EngineServiceError("INDEPENDENT_VALIDATION_PROVIDER_CALL_REQUIRED")
         try:
+            provider_request = json.loads(provider_calls[0]["request_json"])
             provider_receipt = json.loads(provider_calls[0]["receipt_json"])
-        except json.JSONDecodeError as error:
+        except (json.JSONDecodeError, TypeError) as error:
             raise EngineServiceError(
                 "INDEPENDENT_VALIDATION_PROVIDER_CALL_REQUIRED"
             ) from error
+        provider_validation_id = provider_request.get("validation_id")
+        provider_binding_digest = None
+        if task_id is None:
+            provider_payload = provider_request.get("payload")
+            if isinstance(provider_payload, dict):
+                provider_binding_digest = provider_payload.get(
+                    "goal_validation_binding_digest"
+                )
+                provider_step = provider_payload.get("step")
+                if isinstance(provider_step, dict):
+                    provider_validation_id = provider_step.get("validation_id")
+        if (
+            provider_calls[0]["request_digest"] != sha256_digest(provider_request)
+            or provider_validation_id != validation_id
+            or (
+                task_id is None
+                and provider_binding_digest != goal_validation_binding_digest
+            )
+        ):
+            raise EngineServiceError("INDEPENDENT_VALIDATION_BINDING_MISMATCH")
         provider_turn_ids = provider_receipt.get("turn_ids")
         provider_turn_id = provider_receipt.get("turn_id")
         if provider_turn_id is None and isinstance(provider_turn_ids, list) and len(provider_turn_ids) == 1:
@@ -4767,6 +4836,7 @@ class EngineService:
                         validation_id=result.validation_id,
                         status=result.status,
                         evidence_ids=result.evidence_ids,
+                        goal_validation_binding_digest=result.goal_validation_binding_digest,
                     )
             elif (
                 validation_contract.method == "semantic"
@@ -4780,6 +4850,7 @@ class EngineService:
                     validation_id=result.validation_id,
                     status=result.status,
                     evidence_ids=result.evidence_ids,
+                    goal_validation_binding_digest=result.goal_validation_binding_digest,
                 )
             if result.evidence_ids:
                 placeholders = ",".join("?" for _ in result.evidence_ids)

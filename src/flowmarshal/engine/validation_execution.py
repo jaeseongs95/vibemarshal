@@ -473,6 +473,7 @@ def _run_goal_semantic_validation_job(
             context=context,
             evidence_catalog=catalog,
             step=binding.step,
+            goal_validation_binding_digest=binding.binding_digest,
         )
     receipt = RoleCallReceipt.model_validate(validation_result["receipt"])
     if (

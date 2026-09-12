@@ -577,7 +577,10 @@ class ModelRebindingTests(ModelRebindingFixture):
             project_id=self.project_id,
             kind=RuntimeJobKind.TASK_SEMANTIC_VALIDATE,
             checkpoint_key="validator-rebind-independent-review",
-            request={"attempt_id": validator_attempt.attempt_id},
+            request={
+                "attempt_id": validator_attempt.attempt_id,
+                "validation_id": self.task.validations[0].validation_id,
+            },
             absolute_deadline_at=utc_now() + timedelta(minutes=1),
             attempt_id=validator_attempt.attempt_id,
             task_id=self.task.task_id,
@@ -587,7 +590,11 @@ class ModelRebindingTests(ModelRebindingFixture):
             attempt_id=validator_attempt.attempt_id,
             kind=RuntimeIntentKind.START_TURN,
             idempotency_key="validator-rebind-independent-turn",
-            request={"thread_id": thread_id, "turn_id": turn_id},
+            request={
+                "thread_id": thread_id,
+                "turn_id": turn_id,
+                "validation_id": self.task.validations[0].validation_id,
+            },
         )
         self.service.record_runtime_receipt(
             intent_id=intent.intent_id,
@@ -603,6 +610,9 @@ class ModelRebindingTests(ModelRebindingFixture):
             terminal_status="completed",
         )
         with self.ledger.transaction() as tx:
+            provider_request = {
+                "validation_id": self.task.validations[0].validation_id,
+            }
             provider_receipt = {
                 "thread_id": thread_id,
                 "turn_id": turn_id,
@@ -617,7 +627,7 @@ class ModelRebindingTests(ModelRebindingFixture):
                 "'usage_unknown',?,?,?,?)",
                 (new_id("provider_call"), self.project_id, self.goal.goal_id,
                  self.goal.definition_digest, "validator-rebind-provider-call",
-                 sha256_digest({"validator": validator_attempt.attempt_id}), "{}",
+                 sha256_digest(provider_request), json.dumps(provider_request),
                  validator_attempt.attempt_id, json.dumps(provider_receipt), tx.now, tx.now),
             )
         self.service.finish_attempt(attempt_id=validator_attempt.attempt_id, succeeded=True)

@@ -4655,10 +4655,20 @@ class EngineDispatcher:
                             or result.goal_validation_binding_digest == current_binding.retry.prior_binding_digest
                         )
                     )
-                    if result.goal_validation_binding_digest is not None and (not retry_pending and (
-                        current_binding is None
-                        or current_binding.binding_digest != result.goal_validation_binding_digest
-                    )):
+                    semantic_binding_missing = (
+                        contract.method == "semantic"
+                        and result.goal_validation_binding_digest is None
+                    )
+                    binding_mismatch = (
+                        result.goal_validation_binding_digest is not None
+                        and not retry_pending
+                        and (
+                            current_binding is None
+                            or current_binding.binding_digest
+                            != result.goal_validation_binding_digest
+                        )
+                    )
+                    if semantic_binding_missing or binding_mismatch:
                         return RunOnceOutcome(
                             action=RunOnceAction.BLOCKED, project_id=project_id,
                             validation_result_id=result.validation_result_id,

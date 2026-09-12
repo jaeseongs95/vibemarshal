@@ -378,7 +378,8 @@ class ExecutionProposalAdapter:
 
     def validate_goal(self, *, project_id: str, inventory: ModelInventory,
                       context: dict[str, Any], evidence_catalog: dict[str, Any],
-                      step: ValidationExecutionStep) -> dict[str, Any]:
+                      step: ValidationExecutionStep,
+                      goal_validation_binding_digest: str) -> dict[str, Any]:
         self.roles.validate_inventory(inventory)
         binding = self.roles.validator
         request = make_role_request(
@@ -389,7 +390,12 @@ class ExecutionProposalAdapter:
                           "Worker 응답의 완료 주장은 검증 근거가 아니다. 보고 내용 자체가 검사 대상이면 "
                           "응답 관측을 원본 파일 등 직접 근거와 대조하고 관련 evidence를 함께 참조한다. "
                           "Task나 Goal 상태를 결정하지 않는다. evidence_refs에는 제공된 evidence ID만 사용한다."),
-            payload={"context": context, "step": step.model_dump(mode="json"), "evidence_catalog": evidence_catalog},
+            payload={
+                "context": context,
+                "step": step.model_dump(mode="json"),
+                "goal_validation_binding_digest": goal_validation_binding_digest,
+                "evidence_catalog": evidence_catalog,
+            },
             output_schema=SemanticJudgement.model_json_schema(),
             model=binding.model, effort=binding.effort, inventory_digest=inventory.inventory_digest,
             cwd=context["project_map"]["root"],
