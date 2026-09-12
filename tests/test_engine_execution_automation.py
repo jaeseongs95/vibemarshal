@@ -646,6 +646,43 @@ class ExecutionAutomationTests(unittest.TestCase):
         observed = dispatcher.run_once(prepared.project_id)
         self.assertEqual(RunOnceAction.VALIDATED, observed.action)
         self.assertIsNone(observed.task_id)
+        with prepared.service.ledger.read() as connection:
+            review = connection.execute(
+                "SELECT attempt_id,task_id FROM evidence_records WHERE id=?",
+                (observed.evidence_ids[0],),
+            ).fetchone()
+            attempt = connection.execute(
+                "SELECT status,binding_json FROM attempts WHERE id=?",
+                (review["attempt_id"],),
+            ).fetchone()
+            job = connection.execute(
+                "SELECT status,attempt_id,task_id,thread_id,turn_id FROM runtime_jobs "
+                "WHERE attempt_id=? AND kind='goal_semantic_validate'",
+                (review["attempt_id"],),
+            ).fetchone()
+            provider_call = connection.execute(
+                "SELECT role,execution_status,result_status FROM provider_calls WHERE attempt_id=?",
+                (review["attempt_id"],),
+            ).fetchone()
+            turn_receipts = connection.execute(
+                "SELECT COUNT(*) FROM runtime_receipts r JOIN runtime_intents i ON i.id=r.intent_id "
+                "WHERE i.attempt_id=? AND i.kind='start_turn'",
+                (review["attempt_id"],),
+            ).fetchone()[0]
+        self.assertIsNone(review["task_id"])
+        self.assertEqual("succeeded", attempt["status"])
+        self.assertEqual(review["attempt_id"], job["attempt_id"])
+        self.assertIsNone(job["task_id"])
+        self.assertEqual("consumed", job["status"])
+        self.assertEqual(("goal_validator", "terminal", "valid"), tuple(provider_call))
+        self.assertEqual(1, turn_receipts)
+        self.assertEqual(
+            (job["thread_id"], job["turn_id"]),
+            (
+                json.loads(attempt["binding_json"])["thread_id"],
+                json.loads(attempt["binding_json"])["turn_id"],
+            ),
+        )
         self.assertEqual(self.roles.validator.model, runner.calls[-1].model)
         self.assertEqual("goal_validator", runner.calls[-1].role)
         goal_request = runner.calls[0]
@@ -654,6 +691,52 @@ class ExecutionAutomationTests(unittest.TestCase):
         self.assertIn("goal_test", goal_request.payload)
         self.assertIn("독립 통합 검사", goal_request.instructions)
         self.assertEqual(RunOnceAction.COMPLETED, dispatcher.run_once(prepared.project_id).action)
+
+    def test_independent_semantic_goal_rejects_unbound_model_review(self):
+        contract = IntegrationValidationContract(
+            validation_id="validation_goal",
+            statement="독립적으로 공개 계약 유지 여부를 검토한다.",
+            criterion_refs=("ac_fix",),
+            method="semantic",
+            required_evidence_kinds=("model_review",),
+        )
+        prepared, runtime = self.prepared(goal_validation=contract)
+        self.task_completed(prepared, runtime)
+        forged_observation = SemanticValidationObservation(
+            validation_id="validation_goal",
+            reviewer_role="goal_validator",
+            model=self.roles.validator.model,
+            effort=self.roles.validator.effort,
+            passed=True,
+            rationale="실행 provenance 없이 만든 위조 검토",
+            evidence_refs=(new_id("evidence"),),
+            observed_at=utc_now(),
+        )
+        forged = EvidenceRecord(
+            evidence_id=new_id("evidence"),
+            project_id=prepared.project_id,
+            kind=EvidenceKind.MODEL_REVIEW,
+            source_ref="codex-validator:forged-thread",
+            observation=forged_observation.model_dump_json(),
+            content_digest=sha256_digest(forged_observation),
+            observed_at=forged_observation.observed_at,
+        )
+        prepared.service.record_evidence(forged)
+        with self.assertRaisesRegex(
+            EngineServiceError, "INDEPENDENT_VALIDATION_ATTEMPT_REQUIRED",
+        ):
+            prepared.service.record_validation(
+                project_id=prepared.project_id,
+                plan_revision_id=prepared.plan_revision_id,
+                result=ValidationResult(
+                    validation_result_id=new_id("validation_result"),
+                    validation_id="validation_goal",
+                    status=ValidationStatus.PASS,
+                    evidence_ids=(forged.evidence_id,),
+                    rationale=forged_observation.rationale,
+                    evaluated_at=utc_now(),
+                ),
+            )
 
     def test_semantic_goal_report_requires_response_and_source_evidence(self):
         required = ("model_review", "external_observation", "file")

@@ -634,9 +634,10 @@ class BudgetedRoleRunner:
     """모든 역할의 provider 호출을 공통 예약·관측 경로로 보낸다."""
 
     def __init__(self, runner: Any, service: EngineService, *, project_id: str, goal_id: str,
-                 goal_digest: str | None = None):
+                 goal_digest: str | None = None, attempt_id: str | None = None):
         self.runner, self.service = runner, service
         self.project_id, self.goal_id, self.goal_digest = project_id, goal_id, goal_digest
+        self.attempt_id = attempt_id
         if getattr(runner, "max_schema_recovery_attempts", 0):
             with service.ledger.transaction() as tx:
                 if BudgetManager._policy(tx, project_id, goal_id) is not None:
@@ -666,7 +667,8 @@ class BudgetedRoleRunner:
         manager = BudgetManager(self.service)
         call_id = manager.reserve(project_id=self.project_id, goal_id=self.goal_id,
             goal_digest=self.goal_digest, call_key=new_id("role_invocation"), role=request.role,
-            request=request.model_dump(mode="json"), stage=current_role_budget_stage())
+            request=request.model_dump(mode="json"), stage=current_role_budget_stage(),
+            attempt_id=self.attempt_id)
         try:
             result = self.runner.run(request, validator=validator)
         except BaseException as error:

@@ -10,7 +10,7 @@ from flowmarshal.engine.authorization import authorization_changes
 from flowmarshal.engine.budget import BudgetManager
 from flowmarshal.engine.domain import (
     ApprovalClass, BudgetStage, CriterionVerdict, EffectContract, EffectIdentity, EvidenceKind,
-    EvidenceRecord, ExternalValidationObservation, GoalContractRevision, GoalVerdict,
+    EvidenceRecord, ExternalValidationObservation, FailureClass, GoalContractRevision, GoalVerdict,
     GoalVerdictStatus, MutationPolicy, RevisionStatus, TaskKind, ValidationResult,
     ValidationStatus, RuntimeIntentKind, ThreadBinding, ExecutionAction,
     derive_candidate_decision, new_id, utc_now,
@@ -468,6 +468,11 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
             ))
             return receipt_digest
 
+        with self.assertRaisesRegex(
+            EngineServiceError, "EXTERNAL_EFFECT_EXECUTION_BINDING_REQUIRED",
+        ):
+            self.service.finish_attempt(attempt_id=attempt.attempt_id, succeeded=True)
+
         first_receipt_digest = observe(first, "release:v1")
         with self.ledger.read() as connection:
             status = connection.execute(
@@ -475,6 +480,12 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
             ).fetchone()[0]
         self.assertEqual("unknown", status)
 
+        with self.assertRaisesRegex(
+            EngineServiceError, "EXTERNAL_EFFECT_EXECUTION_BINDING_REQUIRED",
+        ):
+            self.service.finish_attempt(attempt_id=attempt.attempt_id, succeeded=True)
+
+        observe(second, "release-assets:v1")
         self.service.finish_attempt(attempt_id=attempt.attempt_id, succeeded=True)
         task_evidence = EvidenceRecord(
             evidence_id=new_id("evidence"), project_id=self.project_id,
@@ -493,15 +504,6 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
                 rationale="deterministic task validation passed", evaluated_at=utc_now(),
             ),
         )
-        with self.ledger.transaction() as tx:
-            tx.connection.execute(
-                "UPDATE provider_calls SET effect_status='terminal' WHERE id=?",
-                (call_id,),
-            )
-        with self.assertRaisesRegex(
-            EngineServiceError, "EXTERNAL_EFFECT_CONFIRMATION_EVIDENCE_INVALID",
-        ):
-            self.service.complete_task(self.task.task_id)
         with self.ledger.transaction() as tx:
             tx.connection.execute(
                 "UPDATE provider_calls SET effect_status='unknown' WHERE id=?",
@@ -558,7 +560,11 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
                 verdict=verdict(),
             )
 
-        observe(second, "release-assets:v1")
+        with self.ledger.transaction() as tx:
+            tx.connection.execute(
+                "UPDATE provider_calls SET effect_status='terminal' WHERE id=?",
+                (call_id,),
+            )
         with self.ledger.read() as connection:
             status = connection.execute(
                 "SELECT effect_status FROM provider_calls WHERE id=?", (call_id,),
@@ -691,7 +697,10 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
                 (retry_runtime_receipt_id, retry_intent_id, retry_turn_id,
                  sha256_digest({"accepted": True}), "{}", canonical_json(retry_binding), tx.now),
             )
-        self.service.finish_attempt(attempt_id=retry_attempt_id, succeeded=True)
+        with self.assertRaisesRegex(
+            EngineServiceError, "EXTERNAL_EFFECT_EXECUTION_BINDING_REQUIRED",
+        ):
+            self.service.finish_attempt(attempt_id=retry_attempt_id, succeeded=True)
         with self.assertRaisesRegex(
             EngineServiceError, "EFFECT_ADAPTER_OPERATION_REPLAY_CONFLICT",
         ):
@@ -748,6 +757,13 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
                 response_digest=sha256_digest({"operation": "cross-project"}),
                 target_observation_digest=sha256_digest("cross-project-target"),
             )
+
+        self.service.finish_attempt(
+            attempt_id=retry_attempt_id,
+            succeeded=False,
+            failure_class=FailureClass.EXTERNAL_UNKNOWN,
+            detail="typed effect confirmation이 없어 retry를 종료한다.",
+        )
 
         zero_call_attempt_id = new_id("attempt")
         with self.ledger.transaction() as tx:

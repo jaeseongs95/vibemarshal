@@ -2358,6 +2358,8 @@ class EngineDispatcher:
             active_attempt = connection.execute(
                 "SELECT a.* FROM attempts a WHERE a.project_id = ? "
                 "AND a.status IN ('reserved','starting','running') "
+                "AND NOT EXISTS (SELECT 1 FROM runtime_jobs gj WHERE gj.attempt_id=a.id "
+                "AND gj.kind='goal_semantic_validate') "
                 "ORDER BY a.created_at, a.rowid LIMIT 1",
                 (project_id,),
             ).fetchone()

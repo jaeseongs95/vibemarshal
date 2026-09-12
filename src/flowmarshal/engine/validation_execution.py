@@ -4,6 +4,7 @@ from .model_lock import OperationalBinding, verify_binding
 
 import json
 import subprocess
+from datetime import timedelta
 from pathlib import Path
 from typing import Any, Callable
 
@@ -13,13 +14,14 @@ from ..canonical import sha256_bytes, sha256_digest
 from .domain import (
     DeterministicValidationObservation, EngineModel, EvidenceKind, EvidenceRecord,
     FailureClass, PlanContractRevision, RepairAction, RunOnceAction, RunOnceOutcome,
-    RuntimeJobKind, RuntimeJobStatus,
+    RuntimeIntentKind, RuntimeJobKind, RuntimeJobObservationKind, RuntimeJobStatus, ThreadBinding,
     SemanticValidationObservation, ValidationExecutionStep, ValidationResult, ValidationStatus, new_id, utc_now,
     TaskExecutionSpecRevision,
 )
-from .execution import execution_context
+from .execution import execution_context, goal_validation_attempt_scope
 from .operations import CoreOperations, ExternalOperationUnknown
 from .models import AssignmentResolutionError
+from .role_observations import RoleCallReceipt
 from .service import EngineService, EngineServiceError
 
 
@@ -425,10 +427,12 @@ def _prepare_goal_test_job(
 
 
 def _run_goal_semantic_validation_job(
+    service: EngineService,
     runtime: Any,
     provider: Any,
     *,
     project_id: str,
+    attempt_id: str,
     binding: GoalValidationBinding,
     context: dict[str, Any],
     catalog: dict[str, Any],
@@ -451,15 +455,59 @@ def _run_goal_semantic_validation_job(
             raise ValueError("MODEL_LOCK_ROLE_BINDING_MISMATCH")
     except (AttributeError, ValueError) as error:
         return {"model_binding_error": f"{type(error).__name__}: {error}"}
-    return {
-        "validation_result": provider.validate_goal(
+    intent = service.prepare_runtime_intent(
+        attempt_id=attempt_id,
+        kind=RuntimeIntentKind.START_TURN,
+        idempotency_key=f"goal-semantic-validator:{attempt_id}:turn",
+        request={
+            "goal_validation_contract": 1,
+            "validation_id": binding.step.validation_id,
+            "goal_validation_binding_digest": binding.binding_digest,
+            "semantic_evidence_ids": sorted(catalog),
+        },
+    )
+    with goal_validation_attempt_scope(attempt_id):
+        validation_result = provider.validate_goal(
             project_id=project_id,
             inventory=inventory,
             context=context,
             evidence_catalog=catalog,
             step=binding.step,
         )
-    }
+    receipt = RoleCallReceipt.model_validate(validation_result["receipt"])
+    if (
+        receipt.status != "succeeded"
+        or receipt.thread_id is None
+        or len(receipt.turn_ids) != 1
+    ):
+        raise EngineServiceError("Goal semantic validator에는 terminal exact thread/turn receipt가 필요합니다.")
+    turn_id = receipt.turn_ids[0]
+    from .runtime import active_runtime_job_id
+    job_id = active_runtime_job_id()
+    if job_id is None:
+        with service.ledger.read() as connection:
+            row = connection.execute(
+                "SELECT id FROM runtime_jobs WHERE attempt_id=? "
+                "AND kind='goal_semantic_validate' ORDER BY rowid DESC LIMIT 1",
+                (attempt_id,),
+            ).fetchone()
+        job_id = None if row is None else row["id"]
+    if job_id is None:
+        raise EngineServiceError("Goal semantic validator RuntimeJob binding이 없습니다.")
+    service.bind_runtime_job_provider(
+        job_id, thread_id=receipt.thread_id, turn_id=turn_id,
+    )
+    service.record_runtime_receipt(
+        intent_id=intent.intent_id,
+        provider_operation_id=turn_id,
+        response={"role_receipt": receipt.model_dump(mode="json")},
+        binding=ThreadBinding(
+            thread_id=receipt.thread_id,
+            turn_id=turn_id,
+            bound_at=receipt.recorded_at,
+        ),
+    )
+    return {"validation_result": validation_result}
 
 
 def advance_independent_goal_test(
@@ -636,76 +684,112 @@ def advance_independent_goal_test(
         }
         if not catalog:
             return blocked(project_id, "GOAL_TEST_INPUT_INCOMPLETE", "독립 검사에 필요한 직접 evidence가 없습니다.")
+        checkpoint = (
+            f"goal_semantic_validate:{plan.plan_revision_id}:"
+            f"{contract.validation_id}:{binding.binding_digest}"
+        )
         try:
             service.assert_project_authorized(project_id)
-            if supervisor is None:
-                inventory = runtime.list_models()
-                try:
-                    if (binding.operational_binding is not None
-                            and binding.model_inventory_digest != binding.operational_binding.inventory_digest):
-                        raise ValueError("MODEL_LOCK_EVIDENCE_DIGEST_MISMATCH")
-                    verify_binding(binding.operational_binding, inventory)
-                    if provider.roles.operational_binding(inventory).lock_digest != binding.operational_binding.lock_digest:
-                        raise ValueError("MODEL_LOCK_ROLE_BINDING_MISMATCH")
-                except ValueError as error:
-                    return blocked(project_id, "MODEL_BINDING_CHANGED", str(error))
-                result = provider.validate_goal(
-                    project_id=project_id, inventory=inventory, context=context,
-                    evidence_catalog=catalog, step=binding.step,
+            with service.ledger.read() as connection:
+                row = connection.execute(
+                    "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
+                    (project_id, checkpoint),
+                ).fetchone()
+            if row is None:
+                attempt = service.reserve_goal_validation_attempt(
+                    project_id=project_id, plan_revision_id=plan.plan_revision_id,
                 )
-            else:
-                checkpoint = (
-                    f"goal_semantic_validate:{plan.plan_revision_id}:"
-                    f"{contract.validation_id}:{binding.binding_digest}"
-                )
-                with service.ledger.read() as connection:
-                    row = connection.execute(
-                        "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
-                        (project_id, checkpoint),
-                    ).fetchone()
-                if row is None:
-                    job = supervisor.schedule(
-                        project_id=project_id, kind=RuntimeJobKind.GOAL_SEMANTIC_VALIDATE,
+                attempt_id = attempt.attempt_id
+                request = {
+                    "validation_id": contract.validation_id,
+                    "binding_digest": binding.binding_digest,
+                    "context_digest": sha256_digest(context),
+                    "evidence_catalog_digest": sha256_digest(catalog),
+                    "expected_inventory_digest": binding.model_inventory_digest,
+                    "expected_lock_digest": (
+                        None
+                        if binding.operational_binding is None
+                        else binding.operational_binding.lock_digest
+                    ),
+                    "inventory_observation": "runtime_job_owned",
+                    "attempt_id": attempt_id,
+                }
+                if supervisor is None:
+                    job = service.schedule_runtime_job(
+                        project_id=project_id,
+                        kind=RuntimeJobKind.GOAL_SEMANTIC_VALIDATE,
                         checkpoint_key=checkpoint,
-                        request={"validation_id": contract.validation_id,
-                                 "binding_digest": binding.binding_digest,
-                                 "context_digest": sha256_digest(context),
-                                 "evidence_catalog_digest": sha256_digest(catalog),
-                                 "expected_inventory_digest": binding.model_inventory_digest,
-                                 "expected_lock_digest": (
-                                     None
-                                     if binding.operational_binding is None
-                                     else binding.operational_binding.lock_digest
-                                 ),
-                                 "inventory_observation": "runtime_job_owned"},
+                        request=request,
+                        absolute_deadline_at=utc_now() + timedelta(seconds=900),
+                        attempt_id=attempt_id,
+                        task_id=None,
+                    )
+                    job = service.start_runtime_job(job.job_id)
+                    job_result = _run_goal_semantic_validation_job(
+                        service,
+                        runtime,
+                        provider,
+                        project_id=project_id,
+                        attempt_id=attempt_id,
+                        binding=binding,
+                        context=context,
+                        catalog=catalog,
+                    )
+                    service.record_runtime_job_observation(
+                        job.job_id,
+                        kind=RuntimeJobObservationKind.PROVIDER_TERMINAL,
+                        payload={"result": job_result},
+                        provider_terminal=True,
+                        terminal_status="completed",
+                    )
+                    job = service.load_runtime_job(job.job_id)
+                else:
+                    job = supervisor.schedule(
+                        project_id=project_id,
+                        kind=RuntimeJobKind.GOAL_SEMANTIC_VALIDATE,
+                        checkpoint_key=checkpoint,
+                        request=request,
                         timeout_seconds=900,
                         target=lambda: _run_goal_semantic_validation_job(
+                            service,
                             runtime,
                             provider,
                             project_id=project_id,
+                            attempt_id=attempt_id,
                             binding=binding,
                             context=context,
                             catalog=catalog,
                         ),
+                        attempt_id=attempt_id,
+                        task_id=None,
                     )
-                else:
-                    job = service._runtime_job_from_row(row)
-                    if job.status in {RuntimeJobStatus.SCHEDULED, RuntimeJobStatus.RUNNING}:
-                        job = supervisor.tick(job.job_id)
-                if job.status not in {RuntimeJobStatus.PROVIDER_TERMINAL,
-                                      RuntimeJobStatus.CONSUMED}:
-                    return RunOnceOutcome(
-                        action=RunOnceAction.DISPATCHED, project_id=project_id,
-                        detail=f"Goal semantic validation job을 예약·관측했습니다: {job.job_id}",
-                    )
-                job_result = service.consume_runtime_job_required_result(job.job_id)
-                if "model_binding_error" in job_result:
-                    return blocked(
-                        project_id,
-                        "MODEL_BINDING_CHANGED",
-                        job_result["model_binding_error"],
-                    )
-                result = job_result["validation_result"]
+            else:
+                job = service._runtime_job_from_row(row)
+                attempt_id = job.attempt_id
+                if attempt_id is None:
+                    raise EngineServiceError("Goal semantic RuntimeJob에 validation Attempt가 없습니다.")
+                if supervisor is not None and job.status in {
+                    RuntimeJobStatus.SCHEDULED, RuntimeJobStatus.RUNNING,
+                }:
+                    job = supervisor.tick(job.job_id)
+            if job.status not in {
+                RuntimeJobStatus.PROVIDER_TERMINAL,
+                RuntimeJobStatus.CONSUMED,
+            }:
+                return RunOnceOutcome(
+                    action=RunOnceAction.DISPATCHED,
+                    project_id=project_id,
+                    attempt_id=attempt_id,
+                    detail=f"Goal semantic validation job을 예약·관측했습니다: {job.job_id}",
+                )
+            job_result = service.consume_runtime_job_required_result(job.job_id)
+            if "model_binding_error" in job_result:
+                return blocked(
+                    project_id,
+                    "MODEL_BINDING_CHANGED",
+                    job_result["model_binding_error"],
+                )
+            result = job_result["validation_result"]
         except ExternalOperationUnknown as error:
             return blocked(project_id, "EXTERNAL_EFFECT_UNKNOWN", str(error))
         if sha256_digest(execution_context(service, project_id)) != binding.context_digest:
@@ -718,8 +802,9 @@ def advance_independent_goal_test(
         )
         evidence = EvidenceRecord(
             evidence_id=new_id("evidence"), project_id=project_id, kind=EvidenceKind.MODEL_REVIEW,
+            attempt_id=attempt_id,
             source_ref=f"codex-validator:{receipt['thread_id']}", observation=observed.model_dump_json()[:10_000],
-            content_digest=sha256_digest({"observation": observed, "receipt": receipt}),
+            content_digest=sha256_digest(observed),
             observed_at=observed.observed_at,
         )
         service.record_evidence(evidence)
@@ -727,8 +812,15 @@ def advance_independent_goal_test(
         validation = ValidationResult(
             validation_result_id=new_id("validation_result"), validation_id=contract.validation_id,
             status=ValidationStatus.PASS if observed.passed else ValidationStatus.FAIL,
+            goal_validation_binding_digest=binding.binding_digest,
             evidence_ids=evidence_ids, rationale=observed.rationale, evaluated_at=observed.observed_at,
         )
+        with service.ledger.read() as connection:
+            attempt_status = connection.execute(
+                "SELECT status FROM attempts WHERE id=?", (attempt_id,),
+            ).fetchone()["status"]
+        if attempt_status != "succeeded":
+            service.finish_goal_validation_attempt(attempt_id=attempt_id, succeeded=True)
         service.record_validation(project_id=project_id, plan_revision_id=plan.plan_revision_id, result=validation)
         return RunOnceOutcome(action=RunOnceAction.VALIDATED, project_id=project_id,
                               validation_result_id=validation.validation_result_id, evidence_ids=evidence_ids,

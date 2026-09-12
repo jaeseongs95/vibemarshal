@@ -4,6 +4,8 @@ from .roles import make_role_request, verify_role_receipt, RoleCallResult
 
 import json
 import sys
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Callable
 
@@ -25,6 +27,20 @@ from .models import EngineRoleConfiguration, ModelInventory
 from .operations import CoreOperations
 from .roles import RoleCallReceipt, RoleCallRequest, StructuredRolePort
 from .service import EngineService, EngineServiceError
+
+
+_GOAL_VALIDATION_ATTEMPT_ID: ContextVar[str | None] = ContextVar(
+    "flowmarshal_goal_validation_attempt_id", default=None,
+)
+
+
+@contextmanager
+def goal_validation_attempt_scope(attempt_id: str):
+    token = _GOAL_VALIDATION_ATTEMPT_ID.set(attempt_id)
+    try:
+        yield
+    finally:
+        _GOAL_VALIDATION_ATTEMPT_ID.reset(token)
 
 
 class ExecutionPreparation(EngineModel):
@@ -192,7 +208,8 @@ class ExecutionProposalAdapter:
         from .budget import BudgetedRoleRunner
         return BudgetedRoleRunner(self.runner, self.service, project_id=project_id,
                                   goal_id=context["goal"]["goal_id"],
-                                  goal_digest=context["goal"]["definition_digest"])
+                                  goal_digest=context["goal"]["definition_digest"],
+                                  attempt_id=_GOAL_VALIDATION_ATTEMPT_ID.get())
 
     def _predecessor_outputs(self, plan: PlanContractRevision, task: TaskContract) -> list[dict[str, Any]]:
         outputs = []

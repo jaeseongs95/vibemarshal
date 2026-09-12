@@ -921,8 +921,9 @@ class ScriptedStructuredRoleRunner:
                     "adapter_capability": "local_operational_binding",
                 },
             }
+        call_id = new_id("model_call")
         receipt = RoleCallReceipt(
-            call_id=new_id("model_call"),
+            call_id=call_id,
             role=request.role,
             status="succeeded",
             model=request.model,
@@ -931,6 +932,8 @@ class ScriptedStructuredRoleRunner:
             inventory_digest=request.inventory_digest,
             permission_profile=REQUIRED_PERMISSION_PROFILE,
             approval_policy=REQUIRED_APPROVAL_POLICY,
+            thread_id=f"scripted-thread-{call_id}",
+            turn_ids=(f"scripted-turn-{call_id}",),
             input_digest=request.request_digest,
             output_digest=sha256_digest(payload),
             output_schema_digest=sha256_digest(strict_json_output_schema(request.output_schema)),

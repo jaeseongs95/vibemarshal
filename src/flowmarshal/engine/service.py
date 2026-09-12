@@ -3662,6 +3662,82 @@ class EngineService:
                 status=AttemptStatus.RESERVED,
             )
 
+    def reserve_goal_validation_attempt(
+        self, *, project_id: str, plan_revision_id: str,
+    ) -> AttemptRecord:
+        """완료 Task 상태를 바꾸지 않는 독립 Goal semantic validation Attempt를 예약한다."""
+
+        with self.ledger.transaction() as tx:
+            project = tx.one("SELECT * FROM projects WHERE id=?", (project_id,))
+            if project["active_plan_revision_id"] != plan_revision_id:
+                raise EngineServiceError("Goal validation Attempt는 현재 active Plan에만 결속할 수 있습니다.")
+            plan_row = tx.one(
+                "SELECT * FROM plan_revisions WHERE id=? AND project_id=?",
+                (plan_revision_id, project_id),
+            )
+            if plan_row["status"] != "active":
+                raise EngineServiceError("active Plan에서만 Goal validation Attempt를 예약할 수 있습니다.")
+            plan = PlanContractRevision.model_validate_json(plan_row["payload_json"])
+            self._plan_authorization(tx, project, plan)
+            if project["run_state"] == "recovery_required":
+                raise EngineServiceError("crash recovery가 끝나기 전에는 새 Attempt를 만들 수 없습니다.")
+            task_ids = tuple(item.task_id for item in plan.definition.tasks)
+            if not task_ids:
+                raise EngineServiceError("Goal validation Attempt를 결속할 Plan Task가 없습니다.")
+            placeholders = ",".join("?" for _ in task_ids)
+            tasks = tx.all(
+                f"SELECT id,status FROM task_contracts WHERE project_id=? "
+                f"AND plan_revision_id=? AND id IN ({placeholders})",
+                (project_id, plan_revision_id, *task_ids),
+            )
+            if len(tasks) != len(task_ids) or any(row["status"] != "completed" for row in tasks):
+                raise EngineServiceError("모든 Plan Task 완료 뒤에만 Goal validation Attempt를 예약할 수 있습니다.")
+            # Attempt schema의 Task FK는 유지하되 Plan 순서의 마지막 완료 Task를
+            # Goal 검증의 provenance anchor로만 사용한다. Task runtime 상태는 바꾸지 않는다.
+            task_id = task_ids[-1]
+            spec_row = tx.one(
+                "SELECT definition_digest FROM execution_spec_revisions "
+                "WHERE task_id=? AND is_current=1",
+                (task_id,),
+            )
+            attempt_no = int(tx.connection.execute(
+                "SELECT COALESCE(MAX(attempt_no),0)+1 FROM attempts WHERE task_id=? AND kind='validation'",
+                (task_id,),
+            ).fetchone()[0])
+            attempt_id = new_id("attempt")
+            try:
+                tx.connection.execute(
+                    "INSERT INTO attempts "
+                    "(id,project_id,plan_revision_id,task_id,execution_spec_digest,attempt_no,"
+                    "kind,status,created_at,updated_at) VALUES (?,?,?,?,?,?,'validation','reserved',?,?)",
+                    (attempt_id, project_id, plan_revision_id, task_id,
+                     spec_row["definition_digest"], attempt_no, tx.now, tx.now),
+                )
+            except Exception as error:
+                if "uq_engine_one_active_attempt_per_project" in str(error) or "UNIQUE constraint" in str(error):
+                    raise EngineServiceError("동일 프로젝트에서는 한 Attempt만 직렬 실행할 수 있습니다.") from error
+                raise
+            tx.history(
+                project_id,
+                "goal_validation.attempt_reserved",
+                "attempt",
+                attempt_id,
+                {
+                    "plan_revision_id": plan_revision_id,
+                    "provenance_anchor_task_id": task_id,
+                    "attempt_no": attempt_no,
+                    "kind": AttemptKind.VALIDATION.value,
+                },
+            )
+            return AttemptRecord(
+                attempt_id=attempt_id,
+                task_id=task_id,
+                execution_spec_digest=spec_row["definition_digest"],
+                attempt_no=attempt_no,
+                kind=AttemptKind.VALIDATION,
+                status=AttemptStatus.RESERVED,
+            )
+
     @staticmethod
     def _verify_execution_inputs(
         tx: Any,
@@ -3958,10 +4034,15 @@ class EngineService:
                 "UPDATE attempts SET status = 'starting', updated_at = ? WHERE id = ?",
                 (now, attempt_id),
             )
-            tx.connection.execute(
-                "UPDATE task_contracts SET status = 'running', updated_at = ? WHERE id = ?",
-                (now, attempt["task_id"]),
+            goal_validation_job = tx.maybe_one(
+                "SELECT id FROM runtime_jobs WHERE attempt_id=? AND kind='goal_semantic_validate'",
+                (attempt_id,),
             )
+            if goal_validation_job is None:
+                tx.connection.execute(
+                    "UPDATE task_contracts SET status = 'running', updated_at = ? WHERE id = ?",
+                    (now, attempt["task_id"]),
+                )
             tx.history(
                 attempt["project_id"],
                 "runtime.intent_prepared",
@@ -4088,7 +4169,7 @@ class EngineService:
                     task_id=attempt["task_id"],
                     attempt_id=attempt_id,
                     require_attempt_succeeded=False,
-                    require_effect_confirmation=False,
+                    require_effect_confirmation=True,
                 )
                 if external_blockers:
                     raise EngineServiceError(
@@ -4113,6 +4194,53 @@ class EngineService:
                 "attempt",
                 attempt_id,
                 {"task_id": attempt["task_id"], "failure_class": failure_class.value if failure_class else None},
+            )
+
+    def finish_goal_validation_attempt(
+        self,
+        *,
+        attempt_id: str,
+        succeeded: bool,
+        failure_class: FailureClass | None = None,
+        detail: str | None = None,
+    ) -> None:
+        """Goal semantic validator Attempt를 anchor Task 상태 변경 없이 종료한다."""
+
+        with self.ledger.transaction() as tx:
+            attempt = tx.one("SELECT * FROM attempts WHERE id=?", (attempt_id,))
+            if attempt["kind"] != AttemptKind.VALIDATION.value:
+                raise EngineServiceError("Goal validation 종료에는 validation Attempt가 필요합니다.")
+            job = tx.maybe_one(
+                "SELECT id,status FROM runtime_jobs WHERE attempt_id=? "
+                "AND kind='goal_semantic_validate' ORDER BY rowid DESC LIMIT 1",
+                (attempt_id,),
+            )
+            if attempt["status"] not in {"reserved", "starting", "running"}:
+                raise EngineServiceError("active Attempt만 종료할 수 있습니다.")
+            unreceipted = tx.connection.execute(
+                "SELECT COUNT(*) FROM runtime_intents WHERE attempt_id=? AND status='prepared'",
+                (attempt_id,),
+            ).fetchone()[0]
+            if unreceipted:
+                raise EngineServiceError("receipt 없는 Goal validator turn이 있어 종료할 수 없습니다.")
+            if succeeded and failure_class is not None:
+                raise EngineServiceError("성공 Attempt에는 failure_class를 기록할 수 없습니다.")
+            if not succeeded and failure_class is None:
+                raise EngineServiceError("실패 Attempt에는 failure_class가 필요합니다.")
+            if succeeded and (job is None or job["status"] not in {"provider_terminal", "consumed"}):
+                raise EngineServiceError("Goal validation provider terminal RuntimeJob이 필요합니다.")
+            status = "succeeded" if succeeded else "failed"
+            tx.connection.execute(
+                "UPDATE attempts SET status=?,failure_class=?,failure_detail=?,ended_at=?,updated_at=? "
+                "WHERE id=?",
+                (status, failure_class.value if failure_class else None, detail, tx.now, tx.now, attempt_id),
+            )
+            tx.history(
+                attempt["project_id"],
+                f"goal_validation.attempt_{status}",
+                "attempt",
+                attempt_id,
+                {"task_id": attempt["task_id"], "runtime_job_id": None if job is None else job["id"]},
             )
 
     def record_evidence(self, evidence: EvidenceRecord) -> None:
@@ -4349,7 +4477,8 @@ class EngineService:
     def _verify_semantic_validation_independence(
         tx: Any,
         *,
-        task_id: str,
+        project_id: str,
+        task_id: str | None,
         validation_id: str,
         status: ValidationStatus,
         evidence_ids: tuple[str, ...],
@@ -4382,24 +4511,30 @@ class EngineService:
             raise EngineServiceError("INDEPENDENT_VALIDATION_ATTEMPT_REQUIRED")
         validator_attempt_id = next(iter(validator_attempt_ids))
         validator_attempt = tx.one(
-            "SELECT task_id,binding_json,execution_spec_digest FROM attempts WHERE id=?",
+            "SELECT project_id,plan_revision_id,task_id,status,binding_json,execution_spec_digest "
+            "FROM attempts WHERE id=?",
             (validator_attempt_id,),
         )
         current_spec = tx.maybe_one(
             "SELECT definition_digest FROM execution_spec_revisions "
-            "WHERE task_id=? AND is_current=1", (task_id,),
+            "WHERE task_id=? AND is_current=1", (validator_attempt["task_id"],),
         )
         worker = (
-            None if current_spec is None else EngineService.resolve_task_validation_worker(
+            None if task_id is None or current_spec is None else EngineService.resolve_task_validation_worker(
                 tx.connection,
                 task_id=task_id,
                 current_spec_digest=current_spec["definition_digest"],
             )
         )
+        expected_job_kind = (
+            RuntimeJobKind.TASK_SEMANTIC_VALIDATE.value
+            if task_id is not None
+            else RuntimeJobKind.GOAL_SEMANTIC_VALIDATE.value
+        )
         job = tx.maybe_one(
             "SELECT id,project_id,task_id,thread_id,turn_id,status FROM runtime_jobs WHERE attempt_id=? "
-            "AND kind='task_semantic_validate' ORDER BY rowid DESC LIMIT 1",
-            (validator_attempt_id,),
+            "AND kind=? ORDER BY rowid DESC LIMIT 1",
+            (validator_attempt_id, expected_job_kind),
         )
         receipt = tx.maybe_one(
             "SELECT r.id,r.provider_operation_id,r.binding_json FROM runtime_receipts r "
@@ -4408,12 +4543,25 @@ class EngineService:
             (validator_attempt_id,),
         )
         if (
-            validator_attempt["task_id"] != task_id
-            or worker is None
-            or validator_attempt_id == worker["id"]
+            validator_attempt["project_id"] != project_id
+            or (
+                task_id is None
+                and validator_attempt["status"] != AttemptStatus.SUCCEEDED.value
+            )
+            or (
+                task_id is not None
+                and validator_attempt["status"] not in {
+                    AttemptStatus.RUNNING.value,
+                    AttemptStatus.SUCCEEDED.value,
+                }
+            )
+            or current_spec is None
+            or validator_attempt["execution_spec_digest"] != current_spec["definition_digest"]
+            or (task_id is not None and validator_attempt["task_id"] != task_id)
+            or (task_id is not None and worker is None)
+            or (worker is not None and validator_attempt_id == worker["id"])
             or job is None
-            or job["project_id"]
-            != tx.one("SELECT project_id FROM task_contracts WHERE id=?", (task_id,))["project_id"]
+            or job["project_id"] != project_id
             or job["task_id"] != task_id
             or job["status"] not in {"provider_terminal", "consumed"}
             or job["thread_id"] is None
@@ -4433,14 +4581,6 @@ class EngineService:
             or terminal_observation["terminal_status"] not in PROVIDER_TERMINAL_STATUSES
         ):
             raise EngineServiceError("INDEPENDENT_VALIDATION_PROVENANCE_MISSING")
-        worker_attempt = tx.one(
-            "SELECT binding_json FROM attempts WHERE id=?", (worker["id"],),
-        )
-        worker_job = tx.maybe_one(
-            "SELECT id,project_id,task_id,thread_id,turn_id,status FROM runtime_jobs WHERE attempt_id=? "
-            "AND kind='worker_turn' ORDER BY rowid DESC LIMIT 1",
-            (worker["id"],),
-        )
         binding = json.loads(receipt["binding_json"])
         attempt_binding = (
             None if validator_attempt["binding_json"] is None
@@ -4455,40 +4595,59 @@ class EngineService:
             or attempt_binding.get("turn_id") not in {None, job["turn_id"]}
         ):
             raise EngineServiceError("INDEPENDENT_VALIDATION_TURN_BINDING_MISMATCH")
-        worker_binding = (
-            None if worker_attempt["binding_json"] is None
-            else json.loads(worker_attempt["binding_json"])
-        )
-        if (
-            worker_binding is None
-            or not isinstance(worker_binding.get("thread_id"), str)
-            or worker_job is None
-            or worker_job["project_id"] != job["project_id"]
-            or worker_job["task_id"] != task_id
-            or worker_job["status"] not in {"provider_terminal", "consumed"}
-            or worker_job["thread_id"] != worker_binding.get("thread_id")
-            or worker_job["turn_id"] != worker_binding.get("turn_id")
-        ):
-            raise EngineServiceError("INDEPENDENT_VALIDATION_WORKER_PROVENANCE_MISSING")
-        worker_terminal_observation = tx.maybe_one(
-            "SELECT terminal_status FROM runtime_job_observations WHERE job_id=? "
-            "AND kind='provider_terminal' AND provider_terminal=1 "
-            "ORDER BY rowid DESC LIMIT 1",
-            (worker_job["id"],),
-        )
-        if (
-            worker_terminal_observation is None
-            or worker_terminal_observation["terminal_status"]
-            not in PROVIDER_TERMINAL_STATUSES
-        ):
-            raise EngineServiceError("INDEPENDENT_VALIDATION_WORKER_PROVENANCE_MISSING")
-        if worker_job["id"] == job["id"] or worker_binding["thread_id"] == job["thread_id"]:
-            raise EngineServiceError("INDEPENDENT_VALIDATION_WORKER_THREAD_REUSED")
+        if task_id is not None:
+            worker_attempt = tx.one(
+                "SELECT binding_json FROM attempts WHERE id=?", (worker["id"],),
+            )
+            worker_job = tx.maybe_one(
+                "SELECT id,project_id,task_id,thread_id,turn_id,status FROM runtime_jobs WHERE attempt_id=? "
+                "AND kind='worker_turn' ORDER BY rowid DESC LIMIT 1",
+                (worker["id"],),
+            )
+            worker_binding = (
+                None if worker_attempt["binding_json"] is None
+                else json.loads(worker_attempt["binding_json"])
+            )
+            if (
+                worker_binding is None
+                or not isinstance(worker_binding.get("thread_id"), str)
+                or worker_job is None
+                or worker_job["project_id"] != job["project_id"]
+                or worker_job["task_id"] != task_id
+                or worker_job["status"] not in {"provider_terminal", "consumed"}
+                or worker_job["thread_id"] != worker_binding.get("thread_id")
+                or worker_job["turn_id"] != worker_binding.get("turn_id")
+            ):
+                raise EngineServiceError("INDEPENDENT_VALIDATION_WORKER_PROVENANCE_MISSING")
+            worker_terminal_observation = tx.maybe_one(
+                "SELECT terminal_status FROM runtime_job_observations WHERE job_id=? "
+                "AND kind='provider_terminal' AND provider_terminal=1 "
+                "ORDER BY rowid DESC LIMIT 1",
+                (worker_job["id"],),
+            )
+            if (
+                worker_terminal_observation is None
+                or worker_terminal_observation["terminal_status"]
+                not in PROVIDER_TERMINAL_STATUSES
+            ):
+                raise EngineServiceError("INDEPENDENT_VALIDATION_WORKER_PROVENANCE_MISSING")
+            if worker_job["id"] == job["id"] or worker_binding["thread_id"] == job["thread_id"]:
+                raise EngineServiceError("INDEPENDENT_VALIDATION_WORKER_THREAD_REUSED")
+        else:
+            reused_worker_thread = tx.maybe_one(
+                "SELECT a.id FROM attempts a JOIN runtime_jobs w ON w.attempt_id=a.id "
+                "WHERE a.project_id=? AND a.kind='execution' AND w.kind='worker_turn' "
+                "AND w.thread_id=? LIMIT 1",
+                (project_id, job["thread_id"]),
+            )
+            if reused_worker_thread is not None:
+                raise EngineServiceError("INDEPENDENT_VALIDATION_WORKER_THREAD_REUSED")
+        expected_provider_role = "semantic_validator" if task_id is not None else "goal_validator"
         provider_calls = tx.all(
             "SELECT id,receipt_json FROM provider_calls WHERE attempt_id=? "
-            "AND role='semantic_validator' AND execution_status='terminal' "
+            "AND role=? AND execution_status='terminal' "
             "AND result_status='valid' ORDER BY rowid",
-            (validator_attempt_id,),
+            (validator_attempt_id, expected_provider_role),
         )
         if len(provider_calls) != 1 or provider_calls[0]["receipt_json"] is None:
             raise EngineServiceError("INDEPENDENT_VALIDATION_PROVIDER_CALL_REQUIRED")
@@ -4498,11 +4657,17 @@ class EngineService:
             raise EngineServiceError(
                 "INDEPENDENT_VALIDATION_PROVIDER_CALL_REQUIRED"
             ) from error
+        provider_turn_ids = provider_receipt.get("turn_ids")
+        provider_turn_id = provider_receipt.get("turn_id")
+        if provider_turn_id is None and isinstance(provider_turn_ids, list) and len(provider_turn_ids) == 1:
+            provider_turn_id = provider_turn_ids[0]
+        provider_terminal_status = provider_receipt.get("terminal_status")
+        if provider_terminal_status is None and provider_receipt.get("status") == "succeeded":
+            provider_terminal_status = "completed"
         if (
             provider_receipt.get("thread_id") != job["thread_id"]
-            or provider_receipt.get("turn_id") != job["turn_id"]
-            or provider_receipt.get("terminal_status")
-            not in PROVIDER_TERMINAL_STATUSES
+            or provider_turn_id != job["turn_id"]
+            or provider_terminal_status not in PROVIDER_TERMINAL_STATUSES
         ):
             raise EngineServiceError("INDEPENDENT_VALIDATION_PROVIDER_CALL_BINDING_MISMATCH")
         review = model_review_rows[0]
@@ -4527,7 +4692,7 @@ class EngineService:
             raise EngineServiceError("INDEPENDENT_VALIDATION_STATUS_MISMATCH")
         reused = tx.all(
             "SELECT id,payload_json FROM validation_results WHERE project_id=?",
-            (tx.one("SELECT project_id FROM task_contracts WHERE id=?", (task_id,))["project_id"],),
+            (project_id,),
         )
         used_evidence_ids = {
             evidence_id
@@ -4587,22 +4752,35 @@ class EngineService:
             expected_task = task_validation_ids.get(result.validation_id)
             if expected_task != result.task_id:
                 raise EngineServiceError("validation의 Task binding이 계약과 다릅니다.")
+            validation_contract = validation_contracts[result.validation_id]
             if result.task_id is not None:
                 task_contract = next(
                     item for item in plan.definition.tasks if item.task_id == result.task_id
                 )
-                validation_contract = validation_contracts[result.validation_id]
                 if (
                     task_contract.assignment.independence_required
                     and validation_contract.method == "semantic"
                     and result.status in {ValidationStatus.PASS, ValidationStatus.FAIL}
                 ):
                     self._verify_semantic_validation_independence(
-                        tx, task_id=result.task_id,
+                        tx, project_id=project_id, task_id=result.task_id,
                         validation_id=result.validation_id,
                         status=result.status,
                         evidence_ids=result.evidence_ids,
                     )
+            elif (
+                validation_contract.method == "semantic"
+                and validation_contract.evidence_mode == "independent"
+                and result.status in {ValidationStatus.PASS, ValidationStatus.FAIL}
+            ):
+                self._verify_semantic_validation_independence(
+                    tx,
+                    project_id=project_id,
+                    task_id=None,
+                    validation_id=result.validation_id,
+                    status=result.status,
+                    evidence_ids=result.evidence_ids,
+                )
             if result.evidence_ids:
                 placeholders = ",".join("?" for _ in result.evidence_ids)
                 rows = tx.all(
