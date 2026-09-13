@@ -7,6 +7,7 @@ import unittest
 from datetime import timedelta
 from pathlib import Path
 
+from flowmarshal.engine.application import EngineApplication
 from flowmarshal.engine.domain import (
     IntegrationValidationContract,
     RunOnceAction,
@@ -18,7 +19,6 @@ from flowmarshal.engine.domain import (
 )
 from flowmarshal.engine.e2e_qualification import _copy_fixture, _prepare
 from flowmarshal.engine.execution import ExecutionPreparation, ExecutionProposalAdapter
-from flowmarshal.engine.operations import ExternalOperationUnknown
 from flowmarshal.engine.qualification import default_role_configuration
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime, RuntimeJobSupervisor
 from flowmarshal.engine.models import AssignmentResolutionError
@@ -203,6 +203,51 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
             time.sleep(0.005)
         self.assertEqual(RunOnceAction.MATERIALIZED, result.action)
         self.assertEqual(RuntimeJobStatus.CONSUMED, result.runtime_job_status)
+
+    def test_engine_application_restart_consumes_checkpoint_without_model_recall(self) -> None:
+        class CountingRuntime(FakeCodexRuntime):
+            def __init__(inner, inventory):
+                super().__init__(inventory)
+                inner.list_model_calls = 0
+
+            def list_models(inner):
+                inner.list_model_calls += 1
+                return super(CountingRuntime, inner).list_models()
+
+        runtime = CountingRuntime(self.inventory)
+        first_supervisor = RuntimeJobSupervisor(
+            self.prepared.service,
+            runtime,
+            handoff_wait_seconds=0.002,
+        )
+        first_application = EngineApplication(
+            self.prepared.service,
+            runtime=runtime,
+            supervisor=first_supervisor,
+        )
+
+        first = first_application.run_once(
+            self.prepared.project_id,
+            proposal=self.prepared.proposal,
+        )
+        self.assertEqual(RunOnceAction.DISPATCHED, first.action)
+        first_supervisor._workers[first.runtime_job_id].join(1)
+        self.assertFalse(first_supervisor._workers[first.runtime_job_id].is_alive())
+        calls_after_target = runtime.list_model_calls
+
+        restarted = EngineApplication(
+            self.prepared.service,
+            runtime=runtime,
+            supervisor=RuntimeJobSupervisor(self.prepared.service, runtime),
+        )
+        observed = restarted.run_once(self.prepared.project_id)
+        materialized = restarted.run_once(self.prepared.project_id)
+
+        self.assertEqual(RunOnceAction.OBSERVED, observed.action)
+        self.assertEqual(RuntimeJobStatus.PROVIDER_TERMINAL, observed.runtime_job_status)
+        self.assertEqual(RunOnceAction.MATERIALIZED, materialized.action)
+        self.assertEqual(RuntimeJobStatus.CONSUMED, materialized.runtime_job_status)
+        self.assertEqual(calls_after_target, runtime.list_model_calls)
 
     def test_slow_inventory_lookup_does_not_block_execution_spec_prepare_tick(self) -> None:
         runtime = self._slow_inventory_runtime()
@@ -513,36 +558,89 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
         self.assertIn("collector_reattached", kinds)
         self.assertIn("provider_terminal", kinds)
 
-    def test_restart_terminal_for_typed_job_requires_explicit_recovery(self) -> None:
-        thread = self.runtime.create_thread(
-            cwd=self.prepared.workspace, title="typed-restart", model="gpt-5.6-sol",
-            developer_instructions="test",
+    def test_restart_restores_raw_terminal_result_for_every_typed_job_kind(self) -> None:
+        typed_kinds = tuple(
+            kind for kind in RuntimeJobKind
+            if kind not in {
+                RuntimeJobKind.WORKER_TURN,
+                RuntimeJobKind.TASK_SEMANTIC_VALIDATE,
+            }
         )
-        turn = self.runtime.start_turn(
-            thread_id=thread.binding.thread_id, cwd=self.prepared.workspace,
-            prompt="test", model="gpt-5.6-sol", effort="high",
-        )
-        job = self.prepared.service.schedule_runtime_job(
-            project_id=self.prepared.project_id,
-            kind=RuntimeJobKind.EXECUTION_SPEC_PREPARE,
-            checkpoint_key="typed-result-restart",
-            request={"task_id": self.prepared.task_id},
-            absolute_deadline_at=utc_now() + timedelta(seconds=5),
-            task_id=self.prepared.task_id,
-        )
-        self.prepared.service.start_runtime_job(
-            job.job_id,
-            thread_id=thread.binding.thread_id,
-            turn_id=turn.binding.turn_id,
-        )
-        self.runtime.complete(thread.binding.thread_id, response='{"proposal":null}')
+        for index, kind in enumerate(typed_kinds):
+            with self.subTest(kind=kind.value):
+                thread = self.runtime.create_thread(
+                    cwd=self.prepared.workspace,
+                    title=f"typed-restart-{kind.value}",
+                    model="gpt-5.6-sol",
+                    developer_instructions="test",
+                )
+                turn = self.runtime.start_turn(
+                    thread_id=thread.binding.thread_id,
+                    cwd=self.prepared.workspace,
+                    prompt="test",
+                    model="gpt-5.6-sol",
+                    effort="high",
+                )
+                job = self.prepared.service.schedule_runtime_job(
+                    project_id=self.prepared.project_id,
+                    kind=kind,
+                    checkpoint_key=f"typed-result-restart:{index}:{kind.value}",
+                    request={"kind": kind.value},
+                    absolute_deadline_at=utc_now() + timedelta(seconds=5),
+                    task_id=self.prepared.task_id,
+                )
+                self.prepared.service.start_runtime_job(
+                    job.job_id,
+                    thread_id=thread.binding.thread_id,
+                    turn_id=turn.binding.turn_id,
+                )
+                expected = {"kind": kind.value, "restored": True}
+                self.runtime.complete(
+                    thread.binding.thread_id,
+                    response=(
+                        '{"kind":"' + kind.value + '","restored":true}'
+                    ),
+                )
 
-        terminal = RuntimeJobSupervisor(
-            self.prepared.service, self.runtime,
-        ).reattach(job.job_id)
-        self.assertEqual(RuntimeJobStatus.PROVIDER_TERMINAL, terminal.status)
-        with self.assertRaises(ExternalOperationUnknown):
-            self.prepared.service.consume_runtime_job_required_result(job.job_id)
+                terminal = RuntimeJobSupervisor(
+                    self.prepared.service, self.runtime,
+                ).reattach(job.job_id)
+
+                self.assertEqual(RuntimeJobStatus.PROVIDER_TERMINAL, terminal.status)
+                self.assertEqual(
+                    expected,
+                    self.prepared.service.consume_runtime_job_required_result(job.job_id),
+                )
+
+    def test_restart_restores_durable_target_result_for_every_job_kind(self) -> None:
+        supervisor = RuntimeJobSupervisor(
+            self.prepared.service,
+            self.runtime,
+            handoff_wait_seconds=0.002,
+        )
+        for index, kind in enumerate(RuntimeJobKind):
+            with self.subTest(kind=kind.value):
+                expected = {"kind": kind.value, "checkpointed": True}
+                job = supervisor.schedule(
+                    project_id=self.prepared.project_id,
+                    kind=kind,
+                    checkpoint_key=f"durable-result-restart:{index}:{kind.value}",
+                    request={"kind": kind.value},
+                    timeout_seconds=5,
+                    target=lambda value=expected: value,
+                    task_id=self.prepared.task_id,
+                )
+                supervisor._workers[job.job_id].join(1)
+                self.assertFalse(supervisor._workers[job.job_id].is_alive())
+
+                restarted = RuntimeJobSupervisor(self.prepared.service, self.runtime)
+                terminal = restarted.reattach(job.job_id)
+
+                self.assertEqual(RuntimeJobStatus.PROVIDER_TERMINAL, terminal.status)
+                self.assertEqual(
+                    expected,
+                    self.prepared.service.consume_runtime_job_required_result(job.job_id),
+                )
 
     def test_deadline_interrupt_is_bounded_and_not_terminal(self) -> None:
         class SlowInterruptRuntime(FakeCodexRuntime):
@@ -696,6 +794,8 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
                 ).fetchone()[0],
             )
         release.set()
+        supervisor._workers[job.job_id].join(1)
+        self.assertFalse(supervisor._workers[job.job_id].is_alive())
 
     def test_restarted_supervisor_close_marks_and_interrupts_bound_job(self) -> None:
         thread = self.runtime.create_thread(

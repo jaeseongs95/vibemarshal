@@ -1660,6 +1660,31 @@ class RuntimeJobSupervisor:
                     outcome = (False, {"error_type": type(error).__name__, "error": str(error)})
                 finally:
                     _ACTIVE_RUNTIME_JOB.reset(token)
+                if outcome[0] and complete_on_return:
+                    try:
+                        current = self.service.load_runtime_job(job.job_id)
+                        self.service.record_runtime_job_observation(
+                            job.job_id,
+                            kind=RuntimeJobObservationKind.PROVIDER_PROGRESS,
+                            payload={
+                                "target_result_checkpoint_version": "1.0",
+                                "target_result": outcome[1],
+                                "target_result_digest": sha256_digest(outcome[1]),
+                                "job_request_digest": current.request_digest,
+                                "attempt_id": current.attempt_id,
+                                "thread_id": current.thread_id,
+                                "turn_id": current.turn_id,
+                            },
+                        )
+                    except BaseException as error:
+                        outcome = (
+                            False,
+                            {
+                                "error_type": type(error).__name__,
+                                "error": str(error),
+                                "stage": "target_result_checkpoint",
+                            },
+                        )
                 with self._lock:
                     if not outcome[0] or complete_on_return:
                         self._results[job.job_id] = outcome
@@ -1698,6 +1723,61 @@ class RuntimeJobSupervisor:
             with self._lock:
                 self._terminal_progress[job_id] = event
 
+    def _durable_target_result(self, job_id: str) -> tuple[bool, Any]:
+        """background target의 반환값을 append-only checkpoint에서 검증해 읽는다."""
+
+        job = self.service.load_runtime_job(job_id)
+        with self.service.ledger.read() as connection:
+            rows = connection.execute(
+                "SELECT payload_json FROM runtime_job_observations "
+                "WHERE job_id=? AND kind=? ORDER BY rowid DESC",
+                (job_id, RuntimeJobObservationKind.PROVIDER_PROGRESS.value),
+            ).fetchall()
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            if payload.get("target_result_checkpoint_version") != "1.0":
+                continue
+            result = payload.get("target_result")
+            if payload.get("target_result_digest") != sha256_digest(result):
+                raise RuntimePolicyError(
+                    "RUNTIME_JOB_RESULT_CHECKPOINT_MISMATCH: 저장 결과 digest가 다릅니다."
+                )
+            if (
+                payload.get("job_request_digest") != job.request_digest
+                or payload.get("attempt_id") != job.attempt_id
+                or payload.get("thread_id") != job.thread_id
+                or payload.get("turn_id") != job.turn_id
+            ):
+                raise RuntimePolicyError(
+                    "RUNTIME_JOB_RESULT_CHECKPOINT_BINDING_MISMATCH: "
+                    "저장 결과가 현재 job/Attempt/exact turn과 다릅니다."
+                )
+            return True, result
+        return False, None
+
+    def _terminal_result_from_observation(
+        self,
+        job: RuntimeJob,
+        observation: RuntimeObservation,
+    ) -> Any:
+        """exact provider raw 응답만 사용해 재시작 결과를 결정적으로 복원한다."""
+
+        if job.kind in {
+            RuntimeJobKind.WORKER_TURN,
+            RuntimeJobKind.TASK_SEMANTIC_VALIDATE,
+        }:
+            return self._json_value(observation)
+        try:
+            result = json.loads(observation.final_response or "")
+        except (TypeError, ValueError):
+            result = None
+        if isinstance(result, dict):
+            return result
+        return {
+            "runtime_job_result_unavailable": True,
+            "provider_observation": self._json_value(observation),
+        }
+
     def tick(self, job_id: str, *, wait_seconds: float = 0.0) -> RuntimeJob:
         """최대 한 관측을 저장하고 긴 role turn을 기다리지 않고 반환한다."""
         if wait_seconds < 0:
@@ -1735,6 +1815,9 @@ class RuntimeJobSupervisor:
                 self.service.record_runtime_job_observation(
                     job_id, kind=RuntimeJobObservationKind.COLLECTOR_LOST, payload=value)
             return self.service.load_runtime_job(job_id)
+        checkpointed, _checkpoint_result = self._durable_target_result(job_id)
+        if checkpointed:
+            return self.reattach(job_id)
         if datetime.now(timezone.utc) >= job.absolute_deadline_at:
             self._request_bounded_interrupt(job)
             job = self.service.load_runtime_job(job_id)
@@ -1851,6 +1934,19 @@ class RuntimeJobSupervisor:
             RuntimeJobStatus.INTERRUPTING,
         }:
             return job
+        checkpointed, checkpoint_result = self._durable_target_result(job_id)
+        if checkpointed:
+            self.service.record_runtime_job_observation(
+                job_id,
+                kind=RuntimeJobObservationKind.PROVIDER_TERMINAL,
+                payload={
+                    "result": checkpoint_result,
+                    "result_source": "durable_target_checkpoint",
+                },
+                provider_terminal=True,
+                terminal_status="completed",
+            )
+            return self.service.load_runtime_job(job_id)
         if job.thread_id is None:
             return job
         if (
@@ -1889,18 +1985,7 @@ class RuntimeJobSupervisor:
             )
         payload = {"observation": self._json_value(observation)}
         if not observation.active and observation.terminal_status is not None:
-            if job.kind in {
-                RuntimeJobKind.WORKER_TURN,
-                RuntimeJobKind.TASK_SEMANTIC_VALIDATE,
-            }:
-                payload["result"] = self._json_value(observation)
-            else:
-                # 재시작 뒤에는 provider terminal은 입증할 수 있어도, 종료 뒤
-                # 이어지는 local compile/receipt 결속 결과까지 복원했다고 볼 수 없다.
-                payload["result"] = {
-                    "runtime_job_result_unavailable": True,
-                    "provider_observation": self._json_value(observation),
-                }
+            payload["result"] = self._terminal_result_from_observation(job, observation)
             self.service.record_runtime_job_observation(
                 job_id, kind=RuntimeJobObservationKind.PROVIDER_TERMINAL, payload=payload,
                 provider_terminal=True, terminal_status=observation.terminal_status)
