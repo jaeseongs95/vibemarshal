@@ -518,7 +518,54 @@ def advance_independent_goal_test(
     fault_hook: Callable[[str], None] | None = None,
     supervisor: Any | None = None,
 ) -> RunOnceOutcome:
-    service.assert_project_authorized(project_id)
+    bootstrap_bindings: list[tuple[GoalValidationBinding, Any]] | None = None
+    bootstrap_job_row = None
+    if (
+        supervisor is not None
+        and provider is not None
+        and supplied_step is None
+        and retry_request is None
+    ):
+        # 최초 prepare tick은 provider 입력을 예약하는 데 필요한 최소 상태만 읽는다.
+        # workspace context 구축과 binding 정규화는 결과를 소비하는 다음 tick으로
+        # 이연해 느린 local storage 변동이 scheduler 상한에 겹치지 않게 한다.
+        bootstrap_bindings = _goal_bindings(
+            service, project_id, plan.plan_revision_id, contract.validation_id,
+        )
+        if not bootstrap_bindings:
+            checkpoint = (
+                f"goal_test_prepare:{plan.plan_revision_id}:{contract.validation_id}:0"
+            )
+            with service.ledger.read() as connection:
+                bootstrap_job_row = connection.execute(
+                    "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
+                    (project_id, checkpoint),
+                ).fetchone()
+            if bootstrap_job_row is None:
+                job = supervisor.schedule(
+                    project_id=project_id,
+                    kind=RuntimeJobKind.GOAL_TEST_PREPARE,
+                    checkpoint_key=checkpoint,
+                    request={
+                        "validation_id": contract.validation_id,
+                        "supplied_step_digest": None,
+                        "inventory_observation": "runtime_job_owned",
+                        "role_configuration_digest": provider.roles.configuration_digest,
+                    },
+                    timeout_seconds=900,
+                    target=lambda: _prepare_goal_test_job(
+                        runtime,
+                        provider,
+                        project_id=project_id,
+                        validation_id=contract.validation_id,
+                        supplied_step=None,
+                    ),
+                )
+                return RunOnceOutcome(
+                    action=RunOnceAction.DISPATCHED,
+                    project_id=project_id,
+                    detail=f"Goal Test 준비 job을 예약·관측했습니다: {job.job_id}",
+                )
     try:
         context = execution_context(service, project_id)
     except EngineServiceError as error:
@@ -531,7 +578,11 @@ def advance_independent_goal_test(
         if connection.execute("SELECT COUNT(*) FROM task_contracts WHERE plan_revision_id = ? AND status <> 'completed'",
                               (plan.plan_revision_id,)).fetchone()[0]:
             return blocked(project_id, "GOAL_TEST_INPUT_INCOMPLETE", "모든 Task 완료 후 Goal Test를 준비합니다.")
-    bindings = _goal_bindings(service, project_id, plan.plan_revision_id, contract.validation_id)
+    bindings = (
+        bootstrap_bindings
+        if bootstrap_bindings is not None
+        else _goal_bindings(service, project_id, plan.plan_revision_id, contract.validation_id)
+    )
     binding, binding_row = (bindings[0] if bindings else (None, None))
     if retry_request is not None:
         supplied_step = retry_request.step
@@ -553,8 +604,8 @@ def advance_independent_goal_test(
         inventory_digest = None
         if provider is not None and (step is None or step.method == "semantic"):
             try:
-                service.assert_project_authorized(project_id)
                 if supervisor is None:
+                    service.assert_project_authorized(project_id)
                     inventory = runtime.list_models()
                     if step is None:
                         step = provider.prepare_goal(
@@ -565,15 +616,20 @@ def advance_independent_goal_test(
                     if step.method == "semantic":
                         model_binding = provider.roles.operational_binding(inventory)
                 else:
+                    # schedule_runtime_job가 같은 write transaction에서 authorization과
+                    # deadline을 다시 검사하므로 별도 사전 transaction을 반복하지 않는다.
                     checkpoint = (
                         f"goal_test_prepare:{plan.plan_revision_id}:{contract.validation_id}:"
                         f"{0 if retry_request is None else retry_request.failed_validation_result_id}"
                     )
-                    with service.ledger.read() as connection:
-                        row = connection.execute(
-                            "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
-                            (project_id, checkpoint),
-                        ).fetchone()
+                    if bootstrap_job_row is not None:
+                        row = bootstrap_job_row
+                    else:
+                        with service.ledger.read() as connection:
+                            row = connection.execute(
+                                "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
+                                (project_id, checkpoint),
+                            ).fetchone()
                     if row is None:
                         job = supervisor.schedule(
                             project_id=project_id,
@@ -656,6 +712,9 @@ def advance_independent_goal_test(
                                         operational_binding=model_binding,
                                         role_configuration_digest=(None if provider is None else provider.roles.configuration_digest),
                                         retry=retry)
+        # 새 job 예약은 schedule_runtime_job가 원자적으로 승인 상태를 검사한다.
+        # 준비 결과를 binding으로 쓰는 후속 tick에서는 mutation 직전에 다시 검사한다.
+        service.assert_project_authorized(project_id)
         with service.ledger.transaction() as tx:
             tx.history(project_id, "goal_test.retry_bound" if retry is not None else "goal_test.bound",
                        "goal_validation_binding", binding.goal_validation_binding_id,

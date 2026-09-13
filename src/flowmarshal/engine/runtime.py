@@ -1629,13 +1629,10 @@ class RuntimeJobSupervisor:
         )
         self._owned_job_ids.add(job.job_id)
         if job.status is RuntimeJobStatus.SCHEDULED:
-            self._start_worker(job, target, complete_on_return=complete_on_return)
-        event = self._result_events.get(job.job_id)
-        if event is not None and self.handoff_wait_seconds:
-            event.wait(self.handoff_wait_seconds)
+            job = self._start_worker(job, target, complete_on_return=complete_on_return)
         # 예약/시작 tick에서는 빠른 target의 결과도 소비하지 않는다. 다음 tick이
         # 정확히 한 관측을 durable 상태로 옮긴다.
-        return self.service.load_runtime_job(job.job_id)
+        return job
 
     def _start_worker(
         self,
@@ -1643,11 +1640,11 @@ class RuntimeJobSupervisor:
         target: Callable[[], Any],
         *,
         complete_on_return: bool,
-    ) -> None:
+    ) -> RuntimeJob:
         with self._lock:
             current = self._workers.get(job.job_id)
             if current is not None and current.is_alive():
-                return
+                return job
             event = threading.Event()
             self._result_events[job.job_id] = event
             self._complete_on_return[job.job_id] = complete_on_return
@@ -1690,11 +1687,12 @@ class RuntimeJobSupervisor:
                         self._results[job.job_id] = outcome
                     event.set()
 
-            self.service.start_runtime_job(job.job_id)
+            job = self.service.start_runtime_job(job.job_id)
             worker = threading.Thread(target=execute,
                 name=f"flowmarshal-{job.kind.value}-{job.job_id[-8:]}", daemon=True)
             self._workers[job.job_id] = worker
             worker.start()
+            return job
 
     def record_role_progress(self, job_id: str, event: dict[str, Any]) -> None:
         """현재 role call의 exact provider binding과 lifecycle을 durable하게 남긴다."""
