@@ -1,8 +1,10 @@
 # 목표 승인과 Plan revision
 
-`EngineService.authorize_goal(project_id, source, operating_policy)`는 활성 Goal의 원문·목표·Hard AC·비목표를 포함하는 digest, Goal 계보, 프로젝트의 실제 root, Profile, 효과 정책과 운영 상한을 `GoalAuthorization`에 결속한다. 승인 기록은 strict/frozen 모델이며 schema 4의 append-only 테이블에 저장한다. 기존 schema 3 및 운영 DB는 변환하지 않는다. `source`는 호출자가 전달하는 승인 출처이며 암호학적 신원 증명이 아니다. 이 API는 실제 사용자 승인을 받은 명령 경계에서만 호출한다.
+`GoalAuthorization`은 활성 Goal의 원문·목표·Hard AC·비목표를 포함하는 digest, Goal 계보, 프로젝트의 실제 root, Profile, 효과 정책과 운영 상한을 결속한다. 승인 기록은 strict/frozen 모델이며 schema 4의 append-only 테이블에 저장한다. 기존 schema 3 및 운영 DB는 변환하지 않는다. 사용자 승인과 선택 Plan 활성화는 `EngineApplication`이 `EngineService.authorize_goal_and_activate_plan`을 호출해 하나의 Core transaction으로 기록한다. 단일 승인 API `EngineService.authorize_goal`도 같은 권위 검사를 요구한다. `source`는 감사 표식이며 승인 권한이나 암호학적 신원 증명이 아니다.
 
-사용자 CLI는 `goal authorize --project-id <project>`로 승인하고 이미 선택된 Plan을 자동 활성화한다. 준비가 끝나기 전에 승인했으면 이후 `plan search`가 선택한 후보를 자동 활성화한다. `activate_selected_plan(project_id)`는 저장된 Core 선택을 사용하며 선택 이력이 없는 경우에는 단일 ready 후보만 허용한다. 사용자는 Plan ID나 digest를 입력하지 않는다. 진단용 `plan activate --plan-revision-id ... --digest ...` 경로도 기존 GoalAuthorization을 요구하므로 승인을 우회하지 못한다.
+설치된 사용자 CLI의 `authorize --project-id <project>`는 `TrustedConsoleHost`에서 현재 Goal·프로젝트·효과·운영 정책과 Core가 선택한 Plan을 포함한 전체 승인 대상을 표시한다. 사용자가 표시된 전체 `target_digest`를 그대로 입력해야 `ApplicationAuthority → EngineApplication → CoreActionAuthority` 경로로 일회성 capability를 소비한다. 사용자는 내부 Plan ID나 Plan digest를 별도로 복사하지 않는다. 거절·EOF·비대화형 입력, 표시 후 대상 변경, 잘못된 capability와 replay는 승인·활성화 쓰기 없이 거부한다. capability를 제공하지 않는 내부 `goal authorize` 경로는 사용자 승인 절차를 대신하지 못한다. 승인된 범위 안의 후속 Plan revision은 Core가 검토·Gate를 확인해 활성화하며, 진단용 `plan activate --plan-revision-id ... --digest ...`도 기존 GoalAuthorization을 요구한다.
+
+Worker·Validator에는 host·authority·service·DB handle·capability를 전달하지 않으며 역할 scope의 host 재진입도 거부한다. 이 Application 권위 경계는 같은 OS 사용자의 raw SQLite 직접 쓰기나 hostile same-process 코드 격리를 보장하지 않는다. 상세 보장 범위와 known limitation은 [승인 계약 D02](redesign-1.0-contract.md)를 따른다.
 
 내부 재계획은 `register_authorized_plan_revision(evaluation)`으로 review·결정적 Gate를 검증하고 후보를 저장한 뒤 승인 경계 안에서 활성화한다. Task 분할·검사 의미·DAG 변경에는 새 Plan과 review가 필요하며, 같은 의미의 경로·명령·Context 수정에는 기존 ExecutionSpec revision 경계를 사용한다. Goal 변경, root·Profile 변경, 허용 외부 효과와 운영 상한 확장은 `GOAL_AUTHORIZATION_REQUIRED`와 승인값·요청값·근거 ref를 반환한다. 명시 token 중단 상한과 planning 호출 상한을 줄이는 변경은 재승인을 요구하지 않는다. 자연어 범위와 효과 설명의 적합성은 근거를 결속한 독립 review의 책임이며 OS sandbox나 의미 안전성의 수학적 보장이 아니다.
 
