@@ -6,14 +6,28 @@ from datetime import datetime
 from typing import Any
 
 from ..canonical import canonical_json, sha256_digest
-from .domain import PROVIDER_TERMINAL_STATUSES, BudgetStage, BudgetUsageRecord, new_id
+from .domain import (
+    PROVIDER_TERMINAL_STATUSES,
+    BudgetStage,
+    BudgetUsageRecord,
+    ParsedProviderUsage,
+    USAGE_COMPONENT_FIELDS,
+    USAGE_COMPONENT_MISSING,
+    USAGE_CONTRACT_VERSION,
+    new_id,
+    parse_provider_usage,
+    unavailable_provider_usage,
+)
 from .roles import RoleCallReceipt
 from .model_observation import authoritative_receipt_model_observation
 
 
 # 기존 diagnostic import 계약을 유지하되 단일 공통 정의를 참조한다.
 TERMINAL_STATUSES = PROVIDER_TERMINAL_STATUSES
-_USAGE_KEYS = ("inputTokens", "cachedInputTokens", "outputTokens", "reasoningOutputTokens")
+_USAGE_KEYS = (
+    "inputTokens", "cachedInputTokens", "outputTokens",
+    "reasoningOutputTokens", "totalTokens",
+)
 
 
 def _blocked(code: str, detail: str) -> Exception:
@@ -78,26 +92,18 @@ def observation_usage_values(
     payload: dict[str, Any], receipt: RoleCallReceipt | None = None,
 ) -> tuple[bool, tuple[int | None, ...]]:
     """turn usage 또는 원시 receipt로 증명된 빈 thread 첫 turn usage만 인정한다."""
+    parsed = observation_usage_components(payload, receipt)
+    return parsed.available, parsed.values[:4]
+
+
+def observation_usage_components(
+    payload: dict[str, Any], receipt: RoleCallReceipt | None = None,
+) -> ParsedProviderUsage:
+    """귀속 가능한 provider usage를 다섯 구성요소별로 독립 검증한다."""
     raw = _usage_source(payload, receipt)
     if raw is None:
-        return False, (None,) * len(_USAGE_KEYS)
-    values = tuple(
-        value if type(value) is int and value >= 0 else None
-        for value in (raw.get(key) for key in _USAGE_KEYS)
-    )
-    if values[0] is not None and values[1] is not None and values[1] > values[0]:
-        values = (values[0], None, values[2], values[3])
-    if values[2] is not None and values[3] is not None and values[3] > values[2]:
-        values = (values[0], values[1], values[2], None)
-    if (
-        values[0] is not None and values[2] is not None and "totalTokens" in raw
-        and not (
-            type(raw["totalTokens"]) is int
-            and raw["totalTokens"] == values[0] + values[2]
-        )
-    ):
-        return False, (None,) * len(_USAGE_KEYS)
-    return any(value is not None for value in values), values
+        return unavailable_provider_usage("PROVIDER_USAGE_UNAVAILABLE_OR_UNATTRIBUTABLE")
+    return parse_provider_usage(raw)
 
 
 def runtime_observation_events(tx: Any, call_id: str) -> tuple[dict[str, Any], ...]:
@@ -168,11 +174,12 @@ def usage_from_observation(
         not document.get("active", True)
         and document.get("terminal_status") in PROVIDER_TERMINAL_STATUSES
     )
-    available, values = observation_usage_values(document.get("payload") or {}, receipt)
-    available = terminal and available
-    if not available:
-        values = (None,) * len(_USAGE_KEYS)
-    complete = all(value is not None for value in values)
+    parsed = observation_usage_components(document.get("payload") or {}, receipt)
+    available = terminal and parsed.available
+    if not terminal:
+        parsed = unavailable_provider_usage("PROVIDER_TERMINAL_UNOBSERVED")
+    values = parsed.values
+    complete = parsed.complete
     duration = (document.get("payload") or {}).get("duration_ms")
     latency = duration if type(duration) is int and duration >= 0 and terminal else None
     observed_scope = (document.get("payload") or {}).get("usage_scope")
@@ -212,6 +219,8 @@ def usage_from_observation(
         output_schema_digest=receipt.output_schema_digest,
         runner_receipt_digest=event["observation_digest"], input_tokens=values[0],
         cached_input_tokens=values[1], output_tokens=values[2], reasoning_tokens=values[3],
+        usage_contract_version=USAGE_CONTRACT_VERSION,
+        total_tokens=values[4], usage_component_reasons=parsed.component_reasons,
         latency_ms=latency, usage_available=available,
         usage_scope=observed_scope if available else "unavailable",
         usage_source="runtime.read.reconciliation",
@@ -262,21 +271,22 @@ def reconcile_role_usage_terminal(service: Any, call_id: str, observation: Any) 
             not document.get("active", True)
             and document.get("terminal_status") in PROVIDER_TERMINAL_STATUSES
         )
-        available, values = observation_usage_values(document.get("payload") or {}, receipt)
-        available = terminal and available
-        if not available:
-            values = (None,) * len(_USAGE_KEYS)
-        complete = all(value is not None for value in values)
-        complete_total = values[0] is not None and values[2] is not None
+        parsed = observation_usage_components(document.get("payload") or {}, receipt)
+        available = terminal and parsed.available
+        if not terminal:
+            parsed = unavailable_provider_usage("PROVIDER_TERMINAL_UNOBSERVED")
+        values = parsed.values
+        complete = parsed.complete
+        complete_total = available and values[4] is not None
         prior_event_values: tuple[int | None, ...] | None = None
         for prior_event in reversed(events):
             if prior_event.get("usage_available") is not True:
                 continue
-            prior_available, candidate = observation_usage_values(
+            prior_parsed = observation_usage_components(
                 (prior_event["observation"].get("payload") or {}), receipt,
             )
-            if prior_available:
-                prior_event_values = candidate
+            if prior_parsed.available:
+                prior_event_values = prior_parsed.values
                 break
         if prior_event_values is not None:
             for name, old, new in zip(_USAGE_KEYS, prior_event_values, values):
@@ -288,7 +298,7 @@ def reconcile_role_usage_terminal(service: Any, call_id: str, observation: Any) 
         if not terminal and any(item.get("terminal_observed") is True for item in events):
             raise _blocked("BUDGET_OBSERVATION_REGRESSION", "이미 확인한 terminal 상태를 active 관측으로 되돌릴 수 없습니다.")
 
-        actual = values[0] + values[2] if complete_total else None
+        actual = parsed.observed_token_subtotal if available else None
         event_payload = {
             "observation_kind": "runtime_observation", "observation": document,
             "observation_digest": observation_digest,
@@ -301,6 +311,8 @@ def reconcile_role_usage_terminal(service: Any, call_id: str, observation: Any) 
         _insert_usage_observation(
             tx, call=call, source="runtime_observation", raw_document=document,
             known=available, values=values,
+            usage_contract_version=USAGE_CONTRACT_VERSION,
+            usage_component_reasons=parsed.component_reasons,
             usage_scope=(document.get("payload") or {}).get("usage_scope", "unavailable"),
             attribution_basis=(
                 "first_empty_thread" if available and (document.get("payload") or {}).get("usage_scope") == "thread"
@@ -347,6 +359,7 @@ def reconcile_role_usage_terminal(service: Any, call_id: str, observation: Any) 
         prior_values = (
             prior_usage.input_tokens, prior_usage.cached_input_tokens,
             prior_usage.output_tokens, prior_usage.reasoning_tokens,
+            prior_usage.total_tokens,
         )
         for name, old, new in zip(_USAGE_KEYS, prior_values, values):
             if old is not None and new is not None and old != new:
@@ -357,13 +370,31 @@ def reconcile_role_usage_terminal(service: Any, call_id: str, observation: Any) 
         merged_values = tuple(
             old if old is not None else new for old, new in zip(prior_values, values)
         )
+        prior_reasons = prior_usage.usage_component_reasons or {
+            field: None if value is not None else USAGE_COMPONENT_MISSING
+            for field, value in zip(USAGE_COMPONENT_FIELDS, prior_values)
+        }
+        merged_reasons = {
+            field: None if value is not None else (
+                parsed.component_reasons.get(field)
+                or prior_reasons.get(field)
+                or USAGE_COMPONENT_MISSING
+            )
+            for field, value in zip(USAGE_COMPONENT_FIELDS, merged_values)
+        }
+        merged_parsed = ParsedProviderUsage(
+            values=merged_values,  # type: ignore[arg-type]
+            component_reasons=merged_reasons,
+        )
         merged_available = any(value is not None for value in merged_values)
         merged_complete = all(value is not None for value in merged_values)
-        merged_complete_total = merged_values[0] is not None and merged_values[2] is not None
-        merged_actual = (
-            merged_values[0] + merged_values[2] if merged_complete_total else None
-        )
-        if call["actual_tokens"] is not None and merged_actual != call["actual_tokens"]:
+        merged_complete_total = merged_values[4] is not None
+        merged_actual = merged_parsed.observed_token_subtotal if merged_available else None
+        if (
+            call["status"] == "settled"
+            and call["actual_tokens"] is not None
+            and merged_actual != call["actual_tokens"]
+        ):
             raise _blocked(
                 "BUDGET_RECONCILIATION_CONFLICT",
                 "late observation은 기존 actual_tokens를 변경할 수 없습니다.",
@@ -375,6 +406,9 @@ def reconcile_role_usage_terminal(service: Any, call_id: str, observation: Any) 
             "cached_input_tokens": merged_values[1],
             "output_tokens": merged_values[2],
             "reasoning_tokens": merged_values[3],
+            "usage_contract_version": USAGE_CONTRACT_VERSION,
+            "total_tokens": merged_values[4],
+            "usage_component_reasons": merged_reasons,
             "usage_available": merged_available,
             "unavailable_reason": (
                 None if merged_complete else "PROVIDER_USAGE_PARTIAL"

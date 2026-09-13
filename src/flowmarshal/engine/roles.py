@@ -17,7 +17,12 @@ from .domain import (
     PROVIDER_SUCCESS_TERMINAL_STATUSES,
     PROVIDER_TERMINAL_STATUSES,
     EngineModel,
+    ParsedProviderUsage,
+    USAGE_COMPONENT_INVALID,
+    USAGE_CONTRACT_VERSION,
     new_id,
+    parse_provider_usage,
+    unavailable_provider_usage,
     utc_now,
 )
 from .runtime import (
@@ -177,7 +182,7 @@ def strict_json_output_schema(schema: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def _usage(
+def _parsed_usage(
     payload: dict[str, Any],
     *,
     thread_id: str | None = None,
@@ -187,7 +192,7 @@ def _usage(
     turn_binding_proven: bool = False,
     empty_thread_creation_proven: bool = False,
     first_empty_turn_proven: bool = False,
-) -> tuple[int | None, int | None, int | None, int | None, bool]:
+) -> ParsedProviderUsage:
     usage = payload.get("usage")
     usage_scope = payload.get("usage_scope")
     single_turn_bound = (
@@ -198,7 +203,7 @@ def _usage(
         and turn_binding_proven
     )
     if not isinstance(usage, dict) or not single_turn_bound:
-        return (None, None, None, None, False)
+        return unavailable_provider_usage("PROVIDER_USAGE_UNAVAILABLE_OR_UNATTRIBUTABLE")
     if usage_scope == "turn":
         source = usage
     elif (
@@ -209,26 +214,23 @@ def _usage(
     ):
         source = usage["total"]
     else:
-        return (None, None, None, None, False)
+        return unavailable_provider_usage("PROVIDER_USAGE_UNAVAILABLE_OR_UNATTRIBUTABLE")
+    return parse_provider_usage(source)
 
-    keys = ("inputTokens", "cachedInputTokens", "outputTokens", "reasoningOutputTokens")
-    values = tuple(
-        value if type(value) is int and value >= 0 else None
-        for value in (source.get(key) for key in keys)
-    )
-    if values[0] is not None and values[1] is not None and values[1] > values[0]:
-        values = (values[0], None, values[2], values[3])
-    if values[2] is not None and values[3] is not None and values[3] > values[2]:
-        values = (values[0], values[1], values[2], None)
-    if values[0] is not None and values[2] is not None and "totalTokens" in source:
-        total_tokens = source["totalTokens"]
-        if not (
-            type(total_tokens) is int
-            and total_tokens >= 0
-            and total_tokens == values[0] + values[2]
-        ):
-            return (None, None, None, None, False)
-    return (*values, any(value is not None for value in values))
+
+def _usage(
+    payload: dict[str, Any],
+    **proof: Any,
+) -> tuple[int | None, int | None, int | None, int | None, bool]:
+    """기존 diagnostic 호출 계약을 유지한다. 신규 receipt는 `_parsed_usage`를 쓴다."""
+    parsed = _parsed_usage(payload, **proof)
+    if (
+        parsed.values[0] is not None
+        and parsed.values[2] is not None
+        and parsed.component_reasons["total_tokens"] == USAGE_COMPONENT_INVALID
+    ):
+        return (None, None, None, None, False)
+    return (*parsed.values[:4], parsed.available)
 
 
 class CodexStructuredRoleRunner:
@@ -802,7 +804,7 @@ class CodexStructuredRoleRunner:
         terminal_observation_digest: str | None = None,
         terminal_status_after_interrupt: str | None = None,
     ) -> RoleCallReceipt:
-        input_tokens, cached_tokens, output_tokens, reasoning_tokens, usage_available = _usage(
+        parsed_usage = _parsed_usage(
             observation_payload,
             thread_id=thread_id,
             turn_ids=turn_ids,
@@ -815,8 +817,11 @@ class CodexStructuredRoleRunner:
         if (status not in {"succeeded", "failed", "schema_failed", "input_contract_failed"}
                 and terminal_status_after_interrupt not in PROVIDER_TERMINAL_STATUSES):
             # 수집기 종료나 interrupt ACK는 provider 종료를 증명하지 않는다.
-            input_tokens = cached_tokens = output_tokens = reasoning_tokens = None
-            usage_available = False
+            parsed_usage = unavailable_provider_usage("PROVIDER_TERMINAL_UNOBSERVED")
+        input_tokens, cached_tokens, output_tokens, reasoning_tokens, total_tokens = (
+            parsed_usage.values
+        )
+        usage_available = parsed_usage.available
         trace = self.operation_traces.get(call_id)
         trace_body = None
         if trace is not None:
@@ -866,6 +871,9 @@ class CodexStructuredRoleRunner:
             cached_input_tokens=cached_tokens,
             output_tokens=output_tokens,
             reasoning_tokens=reasoning_tokens,
+            usage_contract_version=USAGE_CONTRACT_VERSION,
+            total_tokens=total_tokens,
+            usage_component_reasons=parsed_usage.component_reasons,
             usage_available=usage_available,
             latency_ms=round((time.monotonic() - started) * 1000),
             schema_recovery_attempts=recovery_attempts,

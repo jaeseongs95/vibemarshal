@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import Field, model_serializer, model_validator
 
 from ..canonical import sha256_digest
 
-from .domain import EngineModel
+from .domain import EngineModel, validate_usage_component_contract
 from .model_lock import OperationalBinding
 
 
@@ -77,6 +78,9 @@ class RoleCallReceipt(EngineModel):
     cached_input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
     reasoning_tokens: int | None = Field(default=None, ge=0)
+    usage_contract_version: Literal["2.0"] | None = None
+    total_tokens: int | None = Field(default=None, ge=0)
+    usage_component_reasons: dict[str, str | None] | None = None
     usage_available: bool = False
     latency_ms: int = Field(ge=0)
     schema_recovery_attempts: int = Field(default=0, ge=0, le=1)
@@ -91,6 +95,17 @@ class RoleCallReceipt(EngineModel):
 
     @property
     def usage_complete(self) -> bool:
+        if self.usage_contract_version is not None:
+            return self.usage_available and all(
+                value is not None
+                for value in (
+                    self.input_tokens,
+                    self.cached_input_tokens,
+                    self.output_tokens,
+                    self.reasoning_tokens,
+                    self.total_tokens,
+                )
+            )
         return self.usage_available and all(
             value is not None
             for value in (
@@ -101,8 +116,43 @@ class RoleCallReceipt(EngineModel):
             )
         )
 
+    @property
+    def observed_token_subtotal(self) -> int | None:
+        if self.usage_contract_version is not None and self.total_tokens is not None:
+            return self.total_tokens
+        values = tuple(
+            value for value in (self.input_tokens, self.output_tokens) if value is not None
+        )
+        return sum(values) if values else None
+
+    @property
+    def usage_total_complete(self) -> bool:
+        if not self.usage_available:
+            return False
+        if self.usage_contract_version is not None:
+            return self.total_tokens is not None
+        return self.input_tokens is not None and self.output_tokens is not None
+
     @model_validator(mode="after")
     def operation_trace_is_bound(self):
+        values = (
+            self.input_tokens,
+            self.cached_input_tokens,
+            self.output_tokens,
+            self.reasoning_tokens,
+            self.total_tokens,
+        )
+        validate_usage_component_contract(
+            version=self.usage_contract_version,
+            values=values,
+            component_reasons=self.usage_component_reasons,
+        )
+        effective_values = values if self.usage_contract_version is not None else values[:4]
+        if (
+            self.usage_contract_version is not None
+            and self.usage_available != any(value is not None for value in effective_values)
+        ):
+            raise ValueError("usage_available은 관측된 token 구성요소와 일치해야 합니다.")
         if self.binding_provenance_version is not None:
             if self.binding_provenance_version != "2.0":
                 raise ValueError("지원하지 않는 model provenance projection입니다.")
@@ -137,6 +187,11 @@ class RoleCallReceipt(EngineModel):
                 "binding_provenance_version", "requested_model", "requested_effort",
                 "observed_model", "observed_effort", "provider_inventory_digest",
                 "adapter_capability_digest", "binding_provenance",
+            ):
+                value.pop(field_name, None)
+        if self.usage_contract_version is None:
+            for field_name in (
+                "usage_contract_version", "total_tokens", "usage_component_reasons",
             ):
                 value.pop(field_name, None)
         return value

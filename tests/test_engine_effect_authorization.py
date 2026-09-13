@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 import unittest
+from datetime import timedelta
 
 from pydantic import ValidationError
 
@@ -467,6 +468,38 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
                 target_observation_digest=target_digest, observed_at=utc_now(),
             ))
             return receipt_digest
+
+        stale_observation_at = utc_now() - timedelta(days=1)
+        stale_target_document = {
+            "provider": "github",
+            "selector": "release:v1",
+            "observation": "release:v1 existed before the adapter receipt",
+            "effect_identity_digest": first.identity_digest,
+        }
+        stale_receipt_digest = self.service.record_effect_receipt(
+            task_id=self.task.task_id,
+            attempt_id=attempt.attempt_id,
+            provider_call_id=call_id,
+            runtime_intent_id=runtime_intent.intent_id,
+            runtime_receipt_id=runtime_receipt.receipt_id,
+            thread_id=thread_id,
+            turn_id=turn_id,
+            effect_identity=first,
+            provider_operation_id="operation-release:v1",
+            response_digest=sha256_digest({"operation": "release:v1"}),
+        )
+        with self.assertRaisesRegex(
+            EngineServiceError, "EFFECT_TARGET_OBSERVATION_PRECEDES_RECEIPT",
+        ):
+            self.service._confirm_external_effect_observation(ExternalValidationObservation(
+                validation_id="observe_release", task_id=self.task.task_id,
+                provider="github", selector="release:v1", passed=True,
+                observation="release:v1 existed before the adapter receipt",
+                receipt_digest=stale_receipt_digest,
+                effect_identity=first, effect_identity_digest=first.identity_digest,
+                target_observation_digest=sha256_digest(stale_target_document),
+                observed_at=stale_observation_at,
+            ))
 
         with self.assertRaisesRegex(
             EngineServiceError, "EXTERNAL_EFFECT_EXECUTION_BINDING_REQUIRED",

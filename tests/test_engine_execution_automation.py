@@ -1045,6 +1045,26 @@ class ExecutionAutomationTests(unittest.TestCase):
                 (prepared.task_id,),
             ).fetchone()["id"]
         original = ValidationResult.model_validate_json(stored["payload_json"])
+        with prepared.service.ledger.read() as connection:
+            extra = connection.execute(
+                "SELECT id FROM evidence_records WHERE task_id=? AND id NOT IN ("
+                + ",".join("?" for _ in original.evidence_ids)
+                + ") ORDER BY rowid LIMIT 1",
+                (prepared.task_id, *original.evidence_ids),
+            ).fetchone()
+        assert extra is not None
+        with self.assertRaisesRegex(
+            EngineServiceError, "INDEPENDENT_VALIDATION_EVIDENCE_SET_MISMATCH",
+        ):
+            prepared.service.record_validation(
+                project_id=prepared.project_id,
+                plan_revision_id=prepared.plan_revision_id,
+                result=original.model_copy(update={
+                    "validation_result_id": new_id("validation_result"),
+                    "evidence_ids": (*original.evidence_ids, extra["id"]),
+                    "evaluated_at": utc_now(),
+                }),
+            )
         with self.assertRaisesRegex(
             EngineServiceError, "INDEPENDENT_VALIDATION_EVIDENCE_REUSED",
         ):

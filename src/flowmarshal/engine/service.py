@@ -70,12 +70,15 @@ from .domain import (
     TaskExecutionSpecDefinition,
     TaskRuntimeStatus,
     ThreadBinding,
+    USAGE_CONTRACT_VERSION,
     ValidationResult,
     ValidationStatus,
     ValidationExecutionStep,
     ResolvedTarget,
     derive_candidate_decision,
     new_id,
+    parse_provider_usage,
+    unavailable_provider_usage,
     utc_now,
     validate_reviewer_submission_evidence,
 )
@@ -4420,6 +4423,7 @@ class EngineService:
             if not target_evidence:
                 raise EngineServiceError("EFFECT_TARGET_OBSERVATION_BINDING_MISMATCH")
             binding = {
+                "confirmation_contract_version": "2.1",
                 "status": "confirmed",
                 "source": "target_reobservation",
                 "attempt_id": attempt_id,
@@ -4861,6 +4865,8 @@ class EngineService:
             raise EngineServiceError("INDEPENDENT_VALIDATION_EVIDENCE_DIGEST_MISMATCH")
         if semantic.passed != (status is ValidationStatus.PASS):
             raise EngineServiceError("INDEPENDENT_VALIDATION_STATUS_MISMATCH")
+        if set(evidence_ids) - {review["id"]} != set(semantic.evidence_refs):
+            raise EngineServiceError("INDEPENDENT_VALIDATION_EVIDENCE_SET_MISMATCH")
         reused = tx.all(
             "SELECT id,payload_json FROM validation_results WHERE project_id=?",
             (project_id,),
@@ -5199,10 +5205,10 @@ class EngineService:
                 "AND c.effect_status='unknown' ORDER BY c.rowid",
                 (observation.task_id,),
             )
-            matches: list[tuple[Any, dict[str, Any]]] = []
+            matches: list[tuple[Any, dict[str, Any], datetime]] = []
             for candidate in candidates:
                 receipts = tx.all(
-                    "SELECT payload_json FROM history_events WHERE project_id=? "
+                    "SELECT payload_json,created_at FROM history_events WHERE project_id=? "
                     "AND entity_type='provider_call' AND entity_id=? "
                     "AND event_type='effect.receipt_recorded' ORDER BY sequence",
                     (task["project_id"], candidate["id"]),
@@ -5213,22 +5219,28 @@ class EngineService:
                         item.get("receipt_digest") == observation.receipt_digest
                         and item.get("effect_identity_digest")
                         == observation.effect_identity_digest
-                        and item.get("target_observation_digest")
-                        == observation.target_observation_digest
                         and item.get("attempt_id") == candidate["attempt_id"]
                         and item.get("provider_call_id") == candidate["id"]
                     ):
-                        matches.append((candidate, item))
+                        receipt_recorded_at = datetime.fromisoformat(row["created_at"])
+                        if observation.observed_at < receipt_recorded_at:
+                            raise EngineServiceError(
+                                "EFFECT_TARGET_OBSERVATION_PRECEDES_RECEIPT"
+                            )
+                        matches.append((candidate, item, receipt_recorded_at))
             if len(matches) != 1:
                 raise EngineServiceError("EFFECT_ADAPTER_RECEIPT_BINDING_MISMATCH")
-            call, receipt = matches[0]
+            call, receipt, receipt_recorded_at = matches[0]
             binding = {
+                "confirmation_contract_version": "2.1",
                 "status": "confirmed",
                 "source": "external_target_observation",
                 "effect_identity": observation.effect_identity.model_dump(mode="json"),
                 "effect_identity_digest": observation.effect_identity_digest,
                 "target_observation_digest": observation.target_observation_digest,
                 "provider_receipt_digest": observation.receipt_digest,
+                "receipt_recorded_at": receipt_recorded_at.isoformat(),
+                "target_observed_at": observation.observed_at.isoformat(),
             }
             prior_confirmations = tx.all(
                 "SELECT payload_json FROM history_events WHERE project_id=? "
@@ -5275,14 +5287,21 @@ class EngineService:
         effect_identity: EffectIdentity,
         provider_operation_id: str,
         response_digest: str,
-        target_observation_digest: str,
+        target_observation_digest: str | None = None,
     ) -> str:
-        """typed adapter가 제공한 효과 receipt를 target 관측 전에 append-only로 기록한다."""
+        """typed adapter receipt를 target 재관측과 독립적으로 append-only 기록한다.
+
+        ``target_observation_digest``는 기존 caller 호환 입력일 뿐 receipt 본문에는
+        포함하지 않는다. 대상 관측은 receipt 기록 뒤 별도 typed observation으로
+        제출되어야 하며 Core가 두 사건의 순서를 검증한다.
+        """
         if not provider_operation_id.strip():
             raise EngineServiceError("EFFECT_ADAPTER_OPERATION_ID_REQUIRED")
         if not re.fullmatch(r"sha256:[0-9a-f]{64}", response_digest):
             raise EngineServiceError("EFFECT_ADAPTER_RESPONSE_DIGEST_INVALID")
-        if not re.fullmatch(r"sha256:[0-9a-f]{64}", target_observation_digest):
+        if target_observation_digest is not None and not re.fullmatch(
+            r"sha256:[0-9a-f]{64}", target_observation_digest
+        ):
             raise EngineServiceError("EFFECT_TARGET_OBSERVATION_DIGEST_INVALID")
         with self.ledger.transaction() as tx:
             task = tx.one("SELECT project_id,payload_json FROM task_contracts WHERE id=?", (task_id,))
@@ -5352,6 +5371,7 @@ class EngineService:
                 ):
                     raise EngineServiceError("EFFECT_ADAPTER_PROVIDER_CALL_BINDING_MISMATCH")
             body = {
+                "receipt_contract_version": "2.1",
                 "task_id": task_id,
                 "attempt_id": attempt_id,
                 "provider_call_id": provider_call_id,
@@ -5363,7 +5383,6 @@ class EngineService:
                 "effect_identity_digest": effect_identity.identity_digest,
                 "provider_operation_id": provider_operation_id,
                 "response_digest": response_digest,
-                "target_observation_digest": target_observation_digest,
             }
             receipt_digest = sha256_digest(body)
             replay_rows = tx.all(
@@ -5538,11 +5557,25 @@ class EngineService:
                     if receipt.get("receipt_digest")
                     == confirmation.get("provider_receipt_digest")
                     and receipt.get("effect_identity_digest") == identity_digest
-                    and receipt.get("target_observation_digest")
-                    == confirmation.get("target_observation_digest")
                     and receipt.get("attempt_id") == attempt_id
                     and receipt.get("provider_call_id") == call["id"]
                 ]
+                new_contract = (
+                    confirmation.get("confirmation_contract_version") == "2.1"
+                    and len(matching_receipts) == 1
+                    and matching_receipts[0].get("receipt_contract_version") == "2.1"
+                    and isinstance(confirmation.get("receipt_recorded_at"), str)
+                    and isinstance(confirmation.get("target_observed_at"), str)
+                    and datetime.fromisoformat(confirmation["target_observed_at"])
+                    >= datetime.fromisoformat(confirmation["receipt_recorded_at"])
+                )
+                legacy_contract = (
+                    confirmation.get("confirmation_contract_version") is None
+                    and len(matching_receipts) == 1
+                    and matching_receipts[0].get("receipt_contract_version") is None
+                    and matching_receipts[0].get("target_observation_digest")
+                    == confirmation.get("target_observation_digest")
+                )
                 if (
                     confirmation.get("status") == "confirmed"
                     and confirmation.get("source") == "external_target_observation"
@@ -5550,7 +5583,7 @@ class EngineService:
                     and sha256_digest(identity) == identity_digest
                     and identity_digest in expected_identity_digests
                     and confirmation.get("binding_digest") == sha256_digest(binding)
-                    and len(matching_receipts) == 1
+                    and (new_contract or legacy_contract)
                 ):
                     confirmed.add(identity_digest)
             if confirmed != expected_identity_digests:
@@ -5858,34 +5891,22 @@ class EngineService:
                     reason = "CUMULATIVE_USAGE_NOT_ATTRIBUTABLE_TO_TURN"
             elif raw is not None:
                 reason = "PROVIDER_USAGE_SCOPE_UNDETERMINED"
-            keys = ("inputTokens", "cachedInputTokens", "outputTokens", "reasoningOutputTokens")
-            values = tuple(
-                value if type(value) is int and value >= 0 else None
-                for value in (
-                    (counts.get(key) for key in keys)
-                    if isinstance(counts, dict) else (None,) * 4
-                )
+            keys = (
+                "inputTokens", "cachedInputTokens", "outputTokens",
+                "reasoningOutputTokens", "totalTokens",
             )
-            if values[0] is not None and values[1] is not None and values[1] > values[0]:
-                values = (values[0], None, values[2], values[3])
-            if values[2] is not None and values[3] is not None and values[3] > values[2]:
-                values = (values[0], values[1], values[2], None)
-            if (
-                isinstance(counts, dict)
-                and values[0] is not None and values[2] is not None
-                and "totalTokens" in counts
-                and not (
-                    type(counts["totalTokens"]) is int
-                    and counts["totalTokens"] == values[0] + values[2]
-                )
-            ):
-                values = (None,) * 4
-            available = basis != "unavailable" and any(value is not None for value in values)
-            complete = all(value is not None for value in values)
+            parsed = (
+                parse_provider_usage(counts)
+                if basis != "unavailable" and isinstance(counts, dict)
+                else unavailable_provider_usage(reason)
+            )
+            values = parsed.values
+            available = basis != "unavailable" and parsed.available
+            complete = parsed.complete
             if basis != "unavailable" and not complete:
                 reason = "PROVIDER_USAGE_FIELDS_INCOMPLETE_OR_INVALID"
             if not available:
-                values, basis = (None,) * 4, "unavailable"
+                values, basis = parsed.values, "unavailable"
             duration = provider_payload.get("duration_ms")
             observation = {"thread_id": thread_id, "turn_id": turn_id, "terminal_status": terminal_status,
                            "output_digest": output_digest, "payload": provider_payload}
@@ -5895,6 +5916,7 @@ class EngineService:
                     existing.cached_input_tokens,
                     existing.output_tokens,
                     existing.reasoning_tokens,
+                    existing.total_tokens,
                 )
                 for name, old, new in zip(keys, prior_values, values):
                     if old is not None and new is not None and old != new:
@@ -5922,6 +5944,8 @@ class EngineService:
                         raw_document=observation,
                         known=available,
                         values=values,
+                        usage_contract_version=USAGE_CONTRACT_VERSION,
+                        usage_component_reasons=parsed.component_reasons,
                         usage_scope=scope if scope in {"turn", "thread"} else "unavailable",
                         attribution_basis=basis,
                         unavailable_reason=(
@@ -5929,11 +5953,12 @@ class EngineService:
                         ),
                         late=True,
                     )
-                    complete_total = values[0] is not None and values[2] is not None
-                    if complete_total:
+                    complete_total = values[4] is not None
+                    actual = parsed.observed_token_subtotal if available else None
+                    if actual is not None:
                         tx.connection.execute(
-                            "UPDATE provider_calls SET status='settled',actual_tokens=? WHERE id=?",
-                            (values[0] + values[2], call["id"]),
+                            "UPDATE provider_calls SET status=?,actual_tokens=? WHERE id=?",
+                            ("settled" if complete_total else "usage_unknown", actual, call["id"]),
                         )
                     tx.history(
                         attempt["project_id"],
@@ -5945,9 +5970,7 @@ class EngineService:
                             "observation_digest": observation_digest,
                             "usage_available": available,
                             "usage_complete": complete,
-                            "actual_tokens": (
-                                values[0] + values[2] if complete_total else None
-                            ),
+                            "actual_tokens": actual,
                         },
                     )
                 return existing
@@ -5980,6 +6003,8 @@ class EngineService:
                 output_digest=output_digest, output_schema_digest=sha256_digest(None),
                 runner_receipt_digest=sha256_digest(observation),
                 input_tokens=values[0], cached_input_tokens=values[1], output_tokens=values[2], reasoning_tokens=values[3],
+                usage_contract_version=USAGE_CONTRACT_VERSION,
+                total_tokens=values[4], usage_component_reasons=parsed.component_reasons,
                 latency_ms=duration if type(duration) is int and duration >= 0 else None,
                 usage_available=available, attempt_id=attempt_id, runtime_intent_id=intent["id"],
                 runtime_receipt_id=receipt.receipt_id, execution_spec_digest=spec.definition_digest,

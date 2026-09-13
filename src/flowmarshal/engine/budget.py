@@ -13,8 +13,13 @@ from .domain import (
     BudgetUsageRecord,
     EngineModel,
     GoalAuthorization,
+    USAGE_COMPONENT_FIELDS,
+    USAGE_COMPONENT_MISSING,
+    USAGE_CONTRACT_VERSION,
     UsageObservation,
     new_id,
+    parse_provider_usage,
+    unavailable_provider_usage,
     utc_now,
 )
 from .service import EngineService, EngineServiceError
@@ -89,6 +94,11 @@ def receipt_usage(receipt: Any, *, project_id: str, goal_digest: str,
     terminal = _terminal_receipt(receipt)
     available = terminal and receipt.usage_available and receipt.schema_recovery_attempts == 0
     complete = available and receipt.usage_complete
+    unavailable_reason = (
+        None if complete else "PROVIDER_TERMINAL_UNOBSERVED" if not terminal
+        else "PROVIDER_USAGE_PARTIAL" if available
+        else "PROVIDER_USAGE_UNAVAILABLE_OR_RECOVERY_UNATTRIBUTABLE"
+    )
     provenance = {}
     if getattr(receipt, "binding_provenance_version", None) == "2.0":
         observed_model, observed_effort = authoritative_receipt_model_observation(
@@ -126,10 +136,16 @@ def receipt_usage(receipt: Any, *, project_id: str, goal_digest: str,
         cached_input_tokens=receipt.cached_input_tokens if available else None,
         output_tokens=receipt.output_tokens if available else None,
         reasoning_tokens=receipt.reasoning_tokens if available else None,
+        usage_contract_version=getattr(receipt, "usage_contract_version", None),
+        total_tokens=receipt.total_tokens if available else None,
+        usage_component_reasons=(
+            receipt.usage_component_reasons if available
+            else unavailable_provider_usage(unavailable_reason or "PROVIDER_USAGE_UNAVAILABLE").component_reasons
+            if getattr(receipt, "usage_contract_version", None) is not None
+            else None
+        ),
         latency_ms=receipt.latency_ms, usage_available=available,
-        unavailable_reason=(None if complete else "PROVIDER_TERMINAL_UNOBSERVED" if not terminal
-                            else "PROVIDER_USAGE_PARTIAL" if available
-                            else "PROVIDER_USAGE_UNAVAILABLE_OR_RECOVERY_UNATTRIBUTABLE"),
+        unavailable_reason=unavailable_reason,
         retry_count=receipt.schema_recovery_attempts, recorded_at=receipt.recorded_at,
         **provenance,
     )
@@ -164,12 +180,28 @@ def _insert_usage_observation(
     source: str,
     raw_document: Any,
     known: bool,
-    values: tuple[int | None, int | None, int | None, int | None],
+    values: tuple[int | None, ...],
+    usage_contract_version: str | None = None,
+    usage_component_reasons: dict[str, str | None] | None = None,
     usage_scope: str = "unavailable",
     attribution_basis: str = "unavailable",
     unavailable_reason: str | None = None,
     late: bool = False,
 ) -> UsageObservation:
+    if len(values) == 4:
+        normalized_values = (*values, None)
+    elif len(values) == 5:
+        normalized_values = values
+    else:
+        raise ValueError("usage observation에는 네 개의 legacy 값 또는 다섯 개의 v2 값이 필요합니다.")
+    if usage_contract_version is not None and usage_component_reasons is None:
+        usage_component_reasons = {
+            field: None if value is not None else USAGE_COMPONENT_MISSING
+            for field, value in zip(USAGE_COMPONENT_FIELDS, normalized_values)
+        }
+    completeness_values = (
+        normalized_values if usage_contract_version is not None else normalized_values[:4]
+    )
     raw_digest = sha256_digest(raw_document)
     existing = tx.maybe_one(
         "SELECT payload_json FROM usage_observations WHERE provider_call_id=? "
@@ -185,13 +217,16 @@ def _insert_usage_observation(
         observation_id=new_id("usage_observation"), provider_call_id=call["id"],
         project_id=call["project_id"], source=source,
         measurement_status="measured" if known else "unavailable",
-        input_tokens=values[0] if known else None,
-        cached_input_tokens=values[1] if known else None,
-        output_tokens=values[2] if known else None,
-        reasoning_tokens=values[3] if known else None,
+        input_tokens=normalized_values[0] if known else None,
+        cached_input_tokens=normalized_values[1] if known else None,
+        output_tokens=normalized_values[2] if known else None,
+        reasoning_tokens=normalized_values[3] if known else None,
+        usage_contract_version=usage_contract_version,
+        total_tokens=normalized_values[4] if known else None,
+        usage_component_reasons=usage_component_reasons,
         usage_scope=usage_scope if known else "unavailable",
         attribution_basis=attribution_basis if known else "unavailable",
-        unavailable_reason=(None if known and all(value is not None for value in values)
+        unavailable_reason=(None if known and all(value is not None for value in completeness_values)
                             else unavailable_reason or (
                                 "PROVIDER_USAGE_PARTIAL" if known
                                 else "PROVIDER_USAGE_UNAVAILABLE"
@@ -449,10 +484,8 @@ class BudgetManager:
                     raise BudgetBlocked("BUDGET_RECEIPT_BINDING_MISMATCH", "예약한 역할 요청과 다른 receipt는 정산하지 않습니다.")
             terminal = _terminal_receipt(receipt)
             available = terminal and receipt.usage_available and receipt.schema_recovery_attempts == 0
-            complete_total = (
-                available and receipt.input_tokens is not None and receipt.output_tokens is not None
-            )
-            actual = receipt.input_tokens + receipt.output_tokens if complete_total else None
+            complete_total = available and receipt.usage_total_complete
+            actual = receipt.observed_token_subtotal if available else None
             execution_status, effect_status, result_status = _provider_states(
                 receipt, effect_capable=call["role"] == "worker",
             )
@@ -476,7 +509,16 @@ class BudgetManager:
                     tx, call=refreshed, source="role_receipt", raw_document=receipt,
                     known=available,
                     values=(receipt.input_tokens, receipt.cached_input_tokens,
-                            receipt.output_tokens, receipt.reasoning_tokens),
+                            receipt.output_tokens, receipt.reasoning_tokens,
+                            receipt.total_tokens),
+                    usage_contract_version=receipt.usage_contract_version,
+                    usage_component_reasons=(
+                        receipt.usage_component_reasons if available else
+                        unavailable_provider_usage(
+                            "PROVIDER_TERMINAL_UNOBSERVED" if not terminal else
+                            "PROVIDER_USAGE_UNAVAILABLE_OR_RECOVERY_UNATTRIBUTABLE"
+                        ).component_reasons
+                    ) if receipt.usage_contract_version is not None else None,
                     usage_scope="turn", attribution_basis="provider_turn",
                     unavailable_reason=(None if available and receipt.usage_complete else
                         "PROVIDER_USAGE_PARTIAL" if available else
@@ -761,31 +803,20 @@ def record_validator_usage(service: EngineService, attempt_id: str, observation:
                 for created in creations)
             first_empty = first_empty and len(matching) == 1 and len(rows) == 1
         values_source = raw if scope == "turn" else raw.get("total") if isinstance(raw, dict) and scope == "thread" and first_empty else None
-        keys = ("inputTokens", "cachedInputTokens", "outputTokens", "reasoningOutputTokens")
-        values = tuple(
-            value if type(value) is int and value >= 0 else None
-            for value in (
-                (values_source.get(k) for k in keys)
-                if isinstance(values_source, dict) else (None,) * 4
-            )
+        keys = (
+            "inputTokens", "cachedInputTokens", "outputTokens",
+            "reasoningOutputTokens", "totalTokens",
         )
-        if values[0] is not None and values[1] is not None and values[1] > values[0]:
-            values = (values[0], None, values[2], values[3])
-        if values[2] is not None and values[3] is not None and values[3] > values[2]:
-            values = (values[0], values[1], values[2], None)
-        if (
-            isinstance(values_source, dict)
-            and values[0] is not None and values[2] is not None
-            and "totalTokens" in values_source
-            and not (
-                type(values_source["totalTokens"]) is int
-                and values_source["totalTokens"] == values[0] + values[2]
-            )
-        ):
-            values = (None,) * 4
-        available = any(value is not None for value in values)
-        complete = all(value is not None for value in values)
-        complete_total = values[0] is not None and values[2] is not None
+        parsed = (
+            parse_provider_usage(values_source)
+            if isinstance(values_source, dict)
+            else unavailable_provider_usage("PROVIDER_USAGE_UNAVAILABLE_OR_UNATTRIBUTABLE")
+        )
+        values = parsed.values
+        available = parsed.available
+        complete = parsed.complete
+        complete_total = available and values[4] is not None
+        actual = parsed.observed_token_subtotal if available else None
         payload = {"thread_id": observation.thread_id, "turn_id": observation.turn_id,
                    "terminal_status": observation.terminal_status, "payload": observation.payload}
         if prior:
@@ -795,6 +826,7 @@ def record_validator_usage(service: EngineService, attempt_id: str, observation:
                 existing.cached_input_tokens,
                 existing.output_tokens,
                 existing.reasoning_tokens,
+                existing.total_tokens,
             )
             for name, old, new in zip(keys, prior_values, values):
                 if old is not None and new is not None and old != new:
@@ -815,6 +847,8 @@ def record_validator_usage(service: EngineService, attempt_id: str, observation:
                 raw_document=payload,
                 known=available,
                 values=values,
+                usage_contract_version=USAGE_CONTRACT_VERSION,
+                usage_component_reasons=parsed.component_reasons,
                 usage_scope=scope if scope in {"turn", "thread"} else "unavailable",
                 attribution_basis=(
                     "provider_turn" if scope == "turn"
@@ -827,16 +861,16 @@ def record_validator_usage(service: EngineService, attempt_id: str, observation:
                 ),
                 late=True,
             )
-            if complete_total:
+            if actual is not None:
                 tx.connection.execute(
-                    "UPDATE provider_calls SET status='settled',actual_tokens=? WHERE id=?",
-                    (values[0] + values[2], call["id"]),
+                    "UPDATE provider_calls SET status=?,actual_tokens=? WHERE id=?",
+                    ("settled" if complete_total else "usage_unknown", actual, call["id"]),
                 )
             tx.history(
                 attempt["project_id"], "budget.usage_reobserved", "provider_call", call["id"],
                 {"source": "validator_terminal", "observation_digest": observation_digest,
                  "usage_available": available, "usage_complete": complete,
-                 "actual_tokens": values[0] + values[2] if complete_total else None},
+                 "actual_tokens": actual},
             )
             return existing
         spec = TaskExecutionSpecRevision.model_validate_json(tx.one("SELECT payload_json FROM execution_spec_revisions WHERE definition_digest=?",
@@ -872,6 +906,8 @@ def record_validator_usage(service: EngineService, attempt_id: str, observation:
             output_digest=None if observation.final_response is None else sha256_digest(observation.final_response),
             output_schema_digest=request["output_schema_digest"], runner_receipt_digest=sha256_digest(payload),
             input_tokens=values[0], cached_input_tokens=values[1], output_tokens=values[2], reasoning_tokens=values[3],
+            usage_contract_version=USAGE_CONTRACT_VERSION,
+            total_tokens=values[4], usage_component_reasons=parsed.component_reasons,
             latency_ms=duration if type(duration) is int and duration >= 0 else None, usage_available=available,
             usage_scope=scope if scope in {"turn", "thread"} else "unavailable",
             usage_source=observation.payload.get("usage_source", "runtime.read"),
@@ -886,18 +922,20 @@ def record_validator_usage(service: EngineService, attempt_id: str, observation:
             "result_status=?,new_turn_count=1,status=?,actual_tokens=?,receipt_json=?,raw_receipt_digest=?,usage_id=?,completed_at=? WHERE id=?",
             ("valid" if observation.terminal_status in {"completed", "success", "succeeded"} else "invalid",
              "settled" if complete_total else "usage_unknown",
-             values[0] + values[2] if complete_total else None,
+             actual,
              canonical_json(payload), raw_digest, usage.usage_id, tx.now, call["id"]))
         refreshed = tx.one("SELECT * FROM provider_calls WHERE id=?", (call["id"],))
         _insert_usage_observation(
             tx, call=refreshed, source="validator_terminal", raw_document=payload, known=available,
             values=values, usage_scope=scope if scope in {"turn", "thread"} else "unavailable",
+            usage_contract_version=USAGE_CONTRACT_VERSION,
+            usage_component_reasons=parsed.component_reasons,
             attribution_basis=("provider_turn" if scope == "turn" else "first_empty_thread") if available else "unavailable",
             unavailable_reason=(None if complete else "PROVIDER_USAGE_PARTIAL" if available
                                 else "PROVIDER_USAGE_UNAVAILABLE_OR_UNATTRIBUTABLE"),
         )
         tx.history(attempt["project_id"], "budget.call_settled", "provider_call", call["id"],
-                   {"actual_tokens": values[0] + values[2] if complete_total else None,
+                   {"actual_tokens": actual,
                     "usage_available": available, "usage_complete": complete})
         return usage
 
@@ -909,8 +947,8 @@ def settle_worker_in_transaction(tx: Any, usage: BudgetUsageRecord) -> None:
                         (usage.attempt_id,))
     if call is None:
         return
-    complete_total = usage.input_tokens is not None and usage.output_tokens is not None
-    actual = usage.input_tokens + usage.output_tokens if complete_total else None
+    complete_total = usage.usage_total_complete
+    actual = usage.observed_token_subtotal
     raw_document = usage.provider_observation
     raw_digest = sha256_digest(raw_document)
     task = tx.one("SELECT payload_json FROM task_contracts WHERE id=(SELECT task_id FROM attempts WHERE id=?)",
@@ -929,7 +967,9 @@ def settle_worker_in_transaction(tx: Any, usage: BudgetUsageRecord) -> None:
         tx, call=refreshed, source="worker_terminal", raw_document=raw_document,
         known=usage.usage_available,
         values=(usage.input_tokens, usage.cached_input_tokens,
-                usage.output_tokens, usage.reasoning_tokens),
+                usage.output_tokens, usage.reasoning_tokens, usage.total_tokens),
+        usage_contract_version=usage.usage_contract_version,
+        usage_component_reasons=usage.usage_component_reasons,
         usage_scope=usage.usage_scope,
         attribution_basis=usage.attribution_basis or "unavailable",
         unavailable_reason=usage.unavailable_reason,

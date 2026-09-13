@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from .model_lock import OperationalBinding
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from enum import StrEnum
 from typing import Annotated, Any, Literal
@@ -2328,6 +2329,124 @@ class BudgetStage(StrEnum):
     REPLAN = "replan"
 
 
+USAGE_CONTRACT_VERSION = "2.0"
+USAGE_COMPONENT_FIELDS = (
+    "input_tokens",
+    "cached_input_tokens",
+    "output_tokens",
+    "reasoning_tokens",
+    "total_tokens",
+)
+_PROVIDER_USAGE_KEYS = (
+    "inputTokens",
+    "cachedInputTokens",
+    "outputTokens",
+    "reasoningOutputTokens",
+    "totalTokens",
+)
+USAGE_COMPONENT_MISSING = "PROVIDER_USAGE_COMPONENT_MISSING"
+USAGE_COMPONENT_INVALID = "PROVIDER_USAGE_COMPONENT_INVALID"
+
+
+@dataclass(frozen=True)
+class ParsedProviderUsage:
+    values: tuple[int | None, int | None, int | None, int | None, int | None]
+    component_reasons: dict[str, str | None]
+
+    @property
+    def available(self) -> bool:
+        return any(value is not None for value in self.values)
+
+    @property
+    def complete(self) -> bool:
+        return all(value is not None for value in self.values)
+
+    @property
+    def observed_token_subtotal(self) -> int | None:
+        if self.values[4] is not None:
+            return self.values[4]
+        non_overlapping = tuple(
+            value for value in (self.values[0], self.values[2]) if value is not None
+        )
+        return sum(non_overlapping) if non_overlapping else None
+
+
+def unavailable_provider_usage(reason: str) -> ParsedProviderUsage:
+    """관측 scope 자체가 불명확하면 값을 만들지 않고 항목별 사유만 남긴다."""
+    return ParsedProviderUsage(
+        values=(None, None, None, None, None),
+        component_reasons={field: reason for field in USAGE_COMPONENT_FIELDS},
+    )
+
+
+def parse_provider_usage(source: Any) -> ParsedProviderUsage:
+    """provider usage의 다섯 구성요소를 서로 독립적으로 검증한다."""
+    if not isinstance(source, dict):
+        return unavailable_provider_usage("PROVIDER_USAGE_UNAVAILABLE")
+    values: list[int | None] = []
+    reasons: dict[str, str | None] = {}
+    for field, key in zip(USAGE_COMPONENT_FIELDS, _PROVIDER_USAGE_KEYS):
+        if key not in source:
+            values.append(None)
+            reasons[field] = USAGE_COMPONENT_MISSING
+            continue
+        value = source[key]
+        if type(value) is int and value >= 0:
+            values.append(value)
+            reasons[field] = None
+        else:
+            values.append(None)
+            reasons[field] = USAGE_COMPONENT_INVALID
+    if values[0] is not None and values[1] is not None and values[1] > values[0]:
+        values[1] = None
+        reasons["cached_input_tokens"] = USAGE_COMPONENT_INVALID
+    if values[2] is not None and values[3] is not None and values[3] > values[2]:
+        values[3] = None
+        reasons["reasoning_tokens"] = USAGE_COMPONENT_INVALID
+    if (
+        values[0] is not None
+        and values[2] is not None
+        and values[4] is not None
+        and values[4] != values[0] + values[2]
+    ):
+        # 잘못된 provider total은 total만 무효화하고 나머지 실측은 보존한다.
+        values[4] = None
+        reasons["total_tokens"] = USAGE_COMPONENT_INVALID
+    return ParsedProviderUsage(
+        values=tuple(values),  # type: ignore[arg-type]
+        component_reasons=reasons,
+    )
+
+
+def validate_usage_component_contract(
+    *,
+    version: str | None,
+    values: tuple[int | None, int | None, int | None, int | None, int | None],
+    component_reasons: dict[str, str | None] | None,
+) -> None:
+    if version is None:
+        if values[4] is not None or component_reasons is not None:
+            raise ValueError("version 없는 usage에 v2 구성요소를 혼합할 수 없습니다.")
+        return
+    if version != USAGE_CONTRACT_VERSION:
+        raise ValueError("지원하지 않는 usage contract version입니다.")
+    if component_reasons is None or set(component_reasons) != set(USAGE_COMPONENT_FIELDS):
+        raise ValueError("v2 usage에는 다섯 구성요소의 사유가 모두 필요합니다.")
+    for field, value in zip(USAGE_COMPONENT_FIELDS, values):
+        reason = component_reasons[field]
+        if reason is not None and (not isinstance(reason, str) or not reason.strip()):
+            raise ValueError("usage 구성요소 사유는 비어 있지 않은 문자열이어야 합니다.")
+        if (value is None) != (reason is not None):
+            raise ValueError("usage 값과 구성요소 사유가 서로 모순됩니다.")
+    if (
+        values[0] is not None
+        and values[2] is not None
+        and values[4] is not None
+        and values[4] != values[0] + values[2]
+    ):
+        raise ValueError("total token은 input+output token과 일치해야 합니다.")
+
+
 class UsageObservation(EngineModel):
     """provider 실행 상태와 분리된 append-only 사용량 관측.
 
@@ -2345,6 +2464,9 @@ class UsageObservation(EngineModel):
     cached_input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
     reasoning_tokens: int | None = Field(default=None, ge=0)
+    usage_contract_version: Literal["2.0"] | None = None
+    total_tokens: int | None = Field(default=None, ge=0)
+    usage_component_reasons: dict[str, str | None] | None = None
     usage_scope: Literal["unspecified", "turn", "thread", "unavailable"] = "unavailable"
     attribution_basis: Literal["provider_turn", "first_empty_thread", "unavailable"] = "unavailable"
     unavailable_reason: str | None = Field(default=None, min_length=1, max_length=500)
@@ -2363,8 +2485,16 @@ class UsageObservation(EngineModel):
             self.cached_input_tokens,
             self.output_tokens,
             self.reasoning_tokens,
+            self.total_tokens,
         )
-        present = tuple(value is not None for value in counts)
+        validate_usage_component_contract(
+            version=self.usage_contract_version,
+            values=counts,
+            component_reasons=self.usage_component_reasons,
+        )
+        legacy_counts = counts[:4]
+        effective_counts = counts if self.usage_contract_version is not None else legacy_counts
+        present = tuple(value is not None for value in effective_counts)
         if self.measurement_status == "measured":
             if not any(present):
                 raise ValueError("실측 UsageObservation에는 하나 이상의 token 필드가 필요합니다.")
@@ -2391,6 +2521,16 @@ class UsageObservation(EngineModel):
         if self.late and self.previous_observation_id is None:
             raise ValueError("late UsageObservation에는 직전 관측 연결이 필요합니다.")
         return self
+
+    @model_serializer(mode="wrap")
+    def versioned_usage_components(self, handler):
+        value = handler(self)
+        if self.usage_contract_version is None:
+            for field_name in (
+                "usage_contract_version", "total_tokens", "usage_component_reasons",
+            ):
+                value.pop(field_name, None)
+        return value
 
 
 class BudgetUsageRecord(EngineModel):
@@ -2423,6 +2563,9 @@ class BudgetUsageRecord(EngineModel):
     cached_input_tokens: int | None = Field(default=None, ge=0)
     output_tokens: int | None = Field(default=None, ge=0)
     reasoning_tokens: int | None = Field(default=None, ge=0)
+    usage_contract_version: Literal["2.0"] | None = None
+    total_tokens: int | None = Field(default=None, ge=0)
+    usage_component_reasons: dict[str, str | None] | None = None
     latency_ms: int | None = Field(default=None, ge=0)
     usage_available: bool = True
     attempt_id: str | None = Field(default=None, pattern=_ENTITY_ID_PATTERN)
@@ -2454,15 +2597,24 @@ class BudgetUsageRecord(EngineModel):
                 self.binding_provenance,
             )):
                 raise ValueError("v2 model provenance 필드가 완전하지 않습니다.")
-        counts = (self.input_tokens, self.cached_input_tokens, self.output_tokens, self.reasoning_tokens)
-        present = tuple(value is not None for value in counts)
+        counts = (
+            self.input_tokens, self.cached_input_tokens, self.output_tokens,
+            self.reasoning_tokens, self.total_tokens,
+        )
+        validate_usage_component_contract(
+            version=self.usage_contract_version,
+            values=counts,
+            component_reasons=self.usage_component_reasons,
+        )
+        effective_counts = counts if self.usage_contract_version is not None else counts[:4]
+        present = tuple(value is not None for value in effective_counts)
         if self.usage_available and not any(present):
             raise ValueError("관측된 usage에는 하나 이상의 token 필드가 필요합니다.")
         if self.cached_input_tokens is not None and self.input_tokens is not None and self.cached_input_tokens > self.input_tokens:
             raise ValueError("cached input token은 input token보다 클 수 없습니다.")
         if self.reasoning_tokens is not None and self.output_tokens is not None and self.reasoning_tokens > self.output_tokens:
             raise ValueError("reasoning token은 output token보다 클 수 없습니다.")
-        if not self.usage_available and any(value not in (None, 0) for value in counts):
+        if not self.usage_available and any(value not in (None, 0) for value in effective_counts):
             raise ValueError("usage unavailable 레코드에는 token 수를 추정해 넣지 않습니다.")
         if self.attempt_id is not None:
             if self.stage is not BudgetStage.EXECUTION or len(self.turn_ids) != 1 or not self.thread_id:
@@ -2473,7 +2625,7 @@ class BudgetUsageRecord(EngineModel):
                 self.attribution_basis, self.provider_observation,
             )):
                 raise ValueError("Worker usage의 Prompt/receipt 근거가 누락됐습니다.")
-            if not self.usage_available and (any(value is not None for value in counts) or not self.unavailable_reason):
+            if not self.usage_available and (any(value is not None for value in effective_counts) or not self.unavailable_reason):
                 raise ValueError("새 Worker unavailable은 null token과 명시적 이유로 보존합니다.")
             if self.usage_available and self.attribution_basis == "unavailable":
                 raise ValueError("관측된 usage에는 귀속 근거가 필요합니다.")
@@ -2502,7 +2654,29 @@ class BudgetUsageRecord(EngineModel):
                 "adapter_capability_digest", "binding_provenance",
             ):
                 value.pop(field_name, None)
+        if self.usage_contract_version is None:
+            for field_name in (
+                "usage_contract_version", "total_tokens", "usage_component_reasons",
+            ):
+                value.pop(field_name, None)
         return value
+
+    @property
+    def observed_token_subtotal(self) -> int | None:
+        if self.usage_contract_version is not None and self.total_tokens is not None:
+            return self.total_tokens
+        values = tuple(
+            value for value in (self.input_tokens, self.output_tokens) if value is not None
+        )
+        return sum(values) if values else None
+
+    @property
+    def usage_total_complete(self) -> bool:
+        if not self.usage_available:
+            return False
+        if self.usage_contract_version is not None:
+            return self.total_tokens is not None
+        return self.input_tokens is not None and self.output_tokens is not None
 
     @property
     def uncached_input_tokens(self) -> int | None:

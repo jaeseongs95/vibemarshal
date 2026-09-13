@@ -6,7 +6,7 @@ from concurrent.futures import Future
 from types import SimpleNamespace
 
 from flowmarshal.canonical import canonical_json, sha256_digest
-from flowmarshal.engine.domain import RunOnceAction, ThreadBinding
+from flowmarshal.engine.domain import BudgetUsageRecord, RunOnceAction, ThreadBinding
 from flowmarshal.engine.runtime import CodexAppServerRuntime, EngineDispatcher
 from flowmarshal.engine.service import EngineService, EngineServiceError
 from tests import test_engine_execution_automation as fixtures
@@ -147,6 +147,16 @@ class WorkerUsageTests(unittest.TestCase):
             ).fetchone()["payload_json"])
         self.assertEqual(projection["requested_model"], stored["requested_model"])
         self.assertIn("observed_model", stored)
+
+        legacy_projection = dict(projection)
+        for field in (
+            "usage_contract_version", "total_tokens", "usage_component_reasons",
+        ):
+            legacy_projection.pop(field)
+        legacy = BudgetUsageRecord.model_validate(legacy_projection).model_dump(mode="json")
+        self.assertNotIn("usage_contract_version", legacy)
+        self.assertNotIn("total_tokens", legacy)
+        self.assertNotIn("usage_component_reasons", legacy)
 
     def test_observed_model_requires_complete_raw_provider_provenance(self):
         cases = (
@@ -391,27 +401,58 @@ class WorkerUsageTests(unittest.TestCase):
                 )
         self.assertEqual([], self.worker_rows(prepared.service))
 
-    def test_partial_usage_preserves_components_and_invalid_total_is_unavailable(self):
+    def test_usage_components_preserve_total_and_independent_missing_invalid_reasons(self):
         cases = {
             "partial": (
                 {"inputTokens": 10, "cachedInputTokens": 1},
-                True, (10, 1, None, None), "PROVIDER_USAGE_PARTIAL",
+                True, (10, 1, None, None, None), "PROVIDER_USAGE_PARTIAL",
+                {
+                    "input_tokens": None, "cached_input_tokens": None,
+                    "output_tokens": "PROVIDER_USAGE_COMPONENT_MISSING",
+                    "reasoning_tokens": "PROVIDER_USAGE_COMPONENT_MISSING",
+                    "total_tokens": "PROVIDER_USAGE_COMPONENT_MISSING",
+                },
             ),
             "negative": (
                 self.usage(input_tokens=-1),
-                True, (None, 20, 50, 10), "PROVIDER_USAGE_PARTIAL",
+                True, (None, 20, 50, 10, 49), "PROVIDER_USAGE_PARTIAL",
+                {
+                    "input_tokens": "PROVIDER_USAGE_COMPONENT_INVALID",
+                    "cached_input_tokens": None, "output_tokens": None,
+                    "reasoning_tokens": None, "total_tokens": None,
+                },
             ),
             "invalid-total": (
                 self.usage() | {"totalTokens": 1},
-                False, (None, None, None, None),
-                "PROVIDER_USAGE_FIELDS_INCOMPLETE_OR_INVALID",
+                True, (120, 20, 50, 10, None), "PROVIDER_USAGE_PARTIAL",
+                {
+                    "input_tokens": None, "cached_input_tokens": None,
+                    "output_tokens": None, "reasoning_tokens": None,
+                    "total_tokens": "PROVIDER_USAGE_COMPONENT_INVALID",
+                },
             ),
             "wrong-type": (
                 self.usage() | {"outputTokens": "50"},
-                True, (120, 20, None, 10), "PROVIDER_USAGE_PARTIAL",
+                True, (120, 20, None, 10, 170), "PROVIDER_USAGE_PARTIAL",
+                {
+                    "input_tokens": None, "cached_input_tokens": None,
+                    "output_tokens": "PROVIDER_USAGE_COMPONENT_INVALID",
+                    "reasoning_tokens": None, "total_tokens": None,
+                },
+            ),
+            "total-only": (
+                {"totalTokens": 23},
+                True, (None, None, None, None, 23), "PROVIDER_USAGE_PARTIAL",
+                {
+                    "input_tokens": "PROVIDER_USAGE_COMPONENT_MISSING",
+                    "cached_input_tokens": "PROVIDER_USAGE_COMPONENT_MISSING",
+                    "output_tokens": "PROVIDER_USAGE_COMPONENT_MISSING",
+                    "reasoning_tokens": "PROVIDER_USAGE_COMPONENT_MISSING",
+                    "total_tokens": None,
+                },
             ),
         }
-        for name, (raw, available, values, reason) in cases.items():
+        for name, (raw, available, values, reason, component_reasons) in cases.items():
             with self.subTest(name=name):
                 prepared, _, _, attempt_id = self.dispatched("malformed-" + name)
                 thread_id, turn_id, request = self.turn(prepared.service, attempt_id)
@@ -425,9 +466,28 @@ class WorkerUsageTests(unittest.TestCase):
                 self.assertEqual(reason, result.unavailable_reason)
                 self.assertEqual(values, (
                     result.input_tokens, result.cached_input_tokens,
-                    result.output_tokens, result.reasoning_tokens,
+                    result.output_tokens, result.reasoning_tokens, result.total_tokens,
                 ))
+                self.assertEqual("2.0", result.usage_contract_version)
+                self.assertEqual(component_reasons, result.usage_component_reasons)
                 self.assertEqual(raw, result.provider_observation["payload"]["usage"])
+                if name in {"invalid-total", "total-only"}:
+                    with prepared.service.ledger.read() as connection:
+                        call = connection.execute(
+                            "SELECT status,actual_tokens FROM provider_calls WHERE attempt_id=?",
+                            (attempt_id,),
+                        ).fetchone()
+                    self.assertEqual(
+                        ("usage_unknown", 170) if name == "invalid-total" else ("settled", 23),
+                        tuple(call),
+                    )
+
+        invalid_projection = result.model_dump(mode="json")
+        invalid_reasons = dict(invalid_projection["usage_component_reasons"])
+        invalid_reasons["input_tokens"] = None
+        invalid_projection["usage_component_reasons"] = invalid_reasons
+        with self.assertRaisesRegex(ValueError, "usage 값과 구성요소 사유"):
+            BudgetUsageRecord.model_validate(invalid_projection)
 
     def test_usage_is_recorded_before_terminal_attempt_state_and_legacy_intent_is_not_backfilled(self):
         prepared, _, _, attempt_id = self.dispatched("before-finish")

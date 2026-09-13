@@ -171,6 +171,35 @@ class BudgetFixture(unittest.TestCase):
         following = self.reserve("after-unavailable")
         self.assertEqual("reserved", self.provider_call(following)["execution_status"])
 
+    def test_v2_known_non_overlapping_subtotal_drives_best_effort_token_stop(self) -> None:
+        self.manager.configure(
+            self.project_id,
+            GoalBudgetPolicy(total_tokens=15, call_reservation_tokens=10),
+        )
+        call = self.reserve("known-subtotal")
+        payload = self.receipt("known-subtotal").model_dump(mode="json")
+        payload.update({
+            "input_tokens": 15,
+            "cached_input_tokens": None,
+            "output_tokens": None,
+            "reasoning_tokens": None,
+            "usage_contract_version": "2.0",
+            "total_tokens": None,
+            "usage_component_reasons": {
+                "input_tokens": None,
+                "cached_input_tokens": "PROVIDER_USAGE_COMPONENT_MISSING",
+                "output_tokens": "PROVIDER_USAGE_COMPONENT_MISSING",
+                "reasoning_tokens": "PROVIDER_USAGE_COMPONENT_MISSING",
+                "total_tokens": "PROVIDER_USAGE_COMPONENT_MISSING",
+            },
+        })
+        self.manager.settle(call, RoleCallReceipt.model_validate(payload))
+
+        row = self.provider_call(call)
+        self.assertEqual(("usage_unknown", 15), (row["status"], row["actual_tokens"]))
+        with self.assertRaisesRegex(BudgetBlocked, "BUDGET_BLOCKED"):
+            self.reserve("blocked-by-known-subtotal")
+
     def test_timeout_without_receipt_stays_reserved_across_service_reopen(self) -> None:
         self.manager.configure(self.project_id, GoalBudgetPolicy(total_tokens=100, call_reservation_tokens=10))
         pending = self.reserve("timeout")
