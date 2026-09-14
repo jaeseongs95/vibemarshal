@@ -1343,7 +1343,7 @@ class EngineApplication:
         plan: PlanContractRevision,
         verdict: GoalVerdict,
     ) -> ReadOnlyReportVerification:
-        from .context import ProjectMapper
+        from .context import ProjectMapper, project_map_reobservation_scope
 
         with self.service.ledger.read() as connection:
             baseline_row = connection.execute(
@@ -1375,6 +1375,7 @@ class EngineApplication:
                 if item.kind is ContextSourceRegistrationKind.INSTRUCTION
             ),
             excluded_paths=(self.service.ledger.artifact_root.resolve(),),
+            **project_map_reobservation_scope(baseline),
         )
         required = tuple(item.criterion_id for item in goal.definition.hard_acceptance)
         reported = tuple(item.criterion_id for item in verdict.criteria)

@@ -545,6 +545,7 @@ class EngineService:
 
         from .context import (
             ProjectMapper,
+            project_map_reobservation_scope,
             state_scope_fingerprint,
             workspace_path_inventory_digest,
         )
@@ -589,18 +590,9 @@ class EngineService:
                 for item in sources
                 if item.kind is ContextSourceRegistrationKind.INSTRUCTION
             ),
-            observed_paths=(
-                item.path
-                for item in (() if current_map is None else current_map.entries)
-                if not Path(item.path).is_absolute()
-            ),
-            requested_symbols={
-                item.path: item.symbols
-                for item in (() if current_map is None else current_map.entries)
-                if item.symbols and not Path(item.path).is_absolute()
-            },
             source_requests=(goal.definition.source_request,),
             excluded_paths=excluded_paths,
+            **project_map_reobservation_scope(current_map),
         )
         if current_map is None or observed_map.semantic_digest != current_map.semantic_digest:
             project_map = observed_map

@@ -6,10 +6,14 @@ from pathlib import Path
 from typing import Any
 
 from ..canonical import canonical_json, sha256_bytes, sha256_digest
-from .context import ProjectMapper, workspace_path_inventory_digest
+from .context import (
+    ProjectMapper,
+    project_map_reobservation_scope,
+    workspace_path_inventory_digest,
+)
 from .domain import (
     DeterministicValidationObservation, EvidenceRecord, PlanContractRevision,
-    TaskExecutionSpecRevision, ValidationResult,
+    ProjectMapRevision, TaskExecutionSpecRevision, ValidationResult,
 )
 
 
@@ -25,13 +29,27 @@ def observation_checkpoint(service: Any, connection: Any, task_id: str) -> dict[
     if spec_row is None:
         return None
     spec = TaskExecutionSpecRevision.model_validate_json(spec_row["payload_json"])
-    sources = connection.execute("SELECT path FROM context_source_registrations WHERE project_id = ?",
+    sources = connection.execute("SELECT kind, path FROM context_source_registrations WHERE project_id = ?",
                                  (task["project_id"],)).fetchall()
     root = Path(project["root"]).resolve()
     try:
-        observed = ProjectMapper().build(project_id=task["project_id"], root=root, revision_no=1,
-                                          registered_references=(row["path"] for row in sources),
-                                          excluded_paths=(service.ledger.artifact_root.resolve(),))
+        map_row = connection.execute(
+            "SELECT revision_digest, payload_json FROM project_map_revisions "
+            "WHERE project_id = ? AND is_current = 1",
+            (task["project_id"],),
+        ).fetchone()
+        if map_row is None:
+            return None
+        mapped = ProjectMapRevision.model_validate_json(map_row["payload_json"])
+        observed = ProjectMapper().build(
+            project_id=task["project_id"],
+            root=root,
+            revision_no=mapped.revision_no + 1,
+            registered_references=(row["path"] for row in sources if row["kind"] == "reference"),
+            instruction_sources=(row["path"] for row in sources if row["kind"] == "instruction"),
+            excluded_paths=(service.ledger.artifact_root.resolve(),),
+            **project_map_reobservation_scope(mapped),
+        )
         paths = {item.path for item in spec.definition.resolved_targets}
         paths.update(item.source_ref for item in spec.definition.context_manifest.fragments)
         paths.update(path for step in spec.definition.validation_steps for path in step.artifact_paths)
@@ -48,11 +66,7 @@ def observation_checkpoint(service: Any, connection: Any, task_id: str) -> dict[
         state = json.loads(state_row["payload_json"])
         if any(fact["freshness"] != "current" for fact in state["facts"]):
             return None
-        map_row = connection.execute("SELECT revision_digest, payload_json FROM project_map_revisions "
-                                     "WHERE project_id = ? AND is_current = 1", (task["project_id"],)).fetchone()
-        if map_row is None:
-            return None
-        mapped_paths = {item["path"]: item["content_digest"] for item in json.loads(map_row["payload_json"])["entries"]}
+        mapped_paths = {item.path: item.content_digest for item in mapped.entries}
         workspace_inventory = workspace_path_inventory_digest(
             root,
             excluded_paths=(service.ledger.artifact_root.resolve(),),

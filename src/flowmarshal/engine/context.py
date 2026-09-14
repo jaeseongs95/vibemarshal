@@ -383,6 +383,39 @@ class ProjectMapper:
         )
 
 
+def project_map_reobservation_scope(
+    project_map: ProjectMapRevision | None,
+) -> dict[str, Any]:
+    """기존 Map이 직접 관측한 범위만 다음 재관측 입력으로 투영한다."""
+
+    if project_map is None:
+        return {
+            "observed_paths": (),
+            "requested_symbols": {},
+            "observed_links": (),
+        }
+    entries_by_id = {entry.entry_id: entry for entry in project_map.entries}
+    relative_entries = tuple(
+        entry for entry in project_map.entries if not Path(entry.path).is_absolute()
+    )
+    observed_links = {
+        (entry.path, entries_by_id[target_ref].path)
+        for entry in relative_entries
+        for target_ref in entry.observed_link_refs
+        if target_ref in entries_by_id
+        and not Path(entries_by_id[target_ref].path).is_absolute()
+    }
+    return {
+        "observed_paths": tuple(sorted(entry.path for entry in relative_entries)),
+        "requested_symbols": {
+            entry.path: entry.symbols
+            for entry in sorted(relative_entries, key=lambda item: item.path)
+            if entry.symbols
+        },
+        "observed_links": tuple(sorted(observed_links)),
+    }
+
+
 def workspace_path_inventory_digest(
     root: Path | str,
     *,
