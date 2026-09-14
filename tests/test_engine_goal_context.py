@@ -40,7 +40,12 @@ class GoalContextTests(unittest.TestCase):
             source = root / "app.py"
             source.write_text("value = 1\n" * 1000, encoding="utf-8")
             (root / "other.py").write_text("other = 2", encoding="utf-8")
-            project_map = ProjectMapper().build(project_id="project_" + "a" * 32, root=root, revision_no=1)
+            project_map = ProjectMapper().build(
+                project_id="project_" + "a" * 32,
+                root=root,
+                revision_no=1,
+                observed_paths=("app.py", "other.py"),
+            )
             facts = goal_context_observations(project_map, "app.py", max_files=1, excerpt_chars=20)
             self.assertFalse(facts[0]["inventory_complete"])
             self.assertFalse(facts[1]["content_complete"])

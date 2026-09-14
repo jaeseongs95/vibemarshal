@@ -1425,7 +1425,12 @@ def _planning_cell(
                 "profile_revision_id": _qualification_entity("profile_revision", cell_ref)
             }
         )
-        project_map = ProjectMapper().build(project_id=project_id, root=workspace, revision_no=1)
+        project_map = ProjectMapper().build(
+            project_id=project_id,
+            root=workspace,
+            revision_no=1,
+            source_requests=(scenario.source_request,),
+        )
         goal_id = _qualification_entity("goal", cell_ref)
         service = manager = None
         if evaluation_policies is None:

@@ -227,7 +227,7 @@ class ProjectMapper:
         revision_no: int,
         registered_references: Iterable[Path | str] = (),
         instruction_sources: Iterable[Path | str] = (),
-        observed_paths: Iterable[Path | str] | None = None,
+        observed_paths: Iterable[Path | str] = (),
         validation_targets: Iterable[Path | str] = (),
         requested_symbols: Mapping[Path | str, Iterable[str]] | None = None,
         observed_links: Iterable[tuple[Path | str, Path | str]] = (),
@@ -256,8 +256,7 @@ class ProjectMapper:
                 raise ValueError(f"Project Map 관측 path가 project root 밖입니다: {path}")
             return path
 
-        legacy_full_discovery = observed_paths is None
-        requested_paths = {observed_path(item) for item in (observed_paths or ())}
+        requested_paths = {observed_path(item) for item in observed_paths}
         validation_paths = {observed_path(item) for item in validation_targets}
         requested_paths.update(validation_paths)
         symbol_requests: dict[Path, tuple[str, ...]] = {}
@@ -272,22 +271,6 @@ class ProjectMapper:
         def is_excluded(path: Path) -> bool:
             resolved = path.resolve()
             return any(resolved == item or item in resolved.parents for item in excluded)
-
-        if legacy_full_discovery:
-            # 호출자가 아직 Goal 범위 입력을 전달하지 않는 구버전 API의 읽기
-            # 호환이다. Engine의 Goal/ready-time 경로는 항상 명시 관측을 넘긴다.
-            for directory, directories, filenames in os.walk(resolved_root):
-                current = Path(directory)
-                directories[:] = [
-                    name for name in directories
-                    if name.casefold() not in self.ignored_directories
-                    and not is_excluded(current / name)
-                ]
-                requested_paths.update(
-                    (current / name).resolve()
-                    for name in filenames
-                    if (current / name).is_file() and not is_excluded(current / name)
-                )
 
         requested_tokens = {
             token.casefold()
@@ -354,10 +337,8 @@ class ProjectMapper:
             if path in validation_paths:
                 tags.append("validation_target")
             available_symbols = _symbols(path, text)
-            symbols = (
-                available_symbols
-                if legacy_full_discovery
-                else tuple(symbol for symbol in available_symbols if symbol in symbol_requests.get(path, ()))
+            symbols = tuple(
+                symbol for symbol in available_symbols if symbol in symbol_requests.get(path, ())
             )
             if symbols:
                 tags.append("symbol_indexed")

@@ -298,6 +298,20 @@ class EngineContextTests(unittest.TestCase):
         )
         self.assertEqual({"AGENTS.md"}, {entry.path for entry in default_map.entries})
 
+    def test_mapper_without_observations_never_discovers_the_repository(self) -> None:
+        (self.root / "unrequested.py").write_text("def hidden(): pass\n", encoding="utf-8")
+        (self.root / "tests").mkdir()
+        (self.root / "tests" / "test_unrequested.py").write_text("pass\n", encoding="utf-8")
+        (self.root / "pyproject.toml").write_text("[project]\nname = 'hidden'\n", encoding="utf-8")
+
+        project_map = ProjectMapper().build(
+            project_id=self.project_id,
+            root=self.root,
+            revision_no=1,
+        )
+
+        self.assertEqual({"AGENTS.md"}, {entry.path for entry in project_map.entries})
+
     def test_workspace_path_inventory_tracks_new_files_without_expanding_lazy_map(self) -> None:
         project_map = ProjectMapper().build(
             project_id=self.project_id,
