@@ -54,7 +54,39 @@ flowmarshal-engine --db $Database --artifacts $Artifacts observe `
   --project-id <project-id>
 ```
 
-`status`의 `active_runtime_job`이 있으면 `observe`로 기존 job을 먼저 확인한다. active job이 없을 때 다음 `run-once`를 호출한다. `observe`는 provider 상태만 관측하며 Task나 Goal을 직접 완료하지 않는다. 각 명령이 0이 아닌 exit code를 반환하면 다음 tick을 자동 실행하지 말고 출력된 `error_code`, `status`와 원장 상태를 확인한다.
+`status`의 `current_stage`, 한 줄 `reason`, `next_action`을 먼저 읽는다. `drill_down`은 Task·파일·검사·evidence의 원장 기록 보존 여부와 현재 입력에 대한 `validity`를 나눠 보여 준다. `record_status=preserved`이면서 `validity=invalidated`일 수 있으며, 이는 과거 근거를 삭제하지 않았지만 현재 Plan 입력으로 재사용할 수 없다는 뜻이다. `active_runtime_job`이 있으면 `observe`로 기존 job을 먼저 확인하고, active job이 없을 때만 다음 `run-once`를 호출한다. `observe`는 provider 상태만 관측하며 Task나 Goal을 직접 완료하지 않는다. 각 명령이 0이 아닌 exit code를 반환하면 다음 tick을 자동 실행하지 말고 출력된 `error_code`, `status`와 원장 상태를 확인한다.
+
+```json
+{
+  "current_stage": "task_ready",
+  "reason": "dependency를 만족한 Task 하나가 실행 준비 상태입니다.",
+  "next_action": "run-once로 Task 실행 명세 준비를 시작하십시오.",
+  "authorization_state": "authorized",
+  "drill_down": {
+    "tasks": [],
+    "files": [],
+    "checks": [],
+    "evidence": []
+  },
+  "execution_summary": {
+    "model_observations": [
+      {
+        "requested_model": "<requested-model>",
+        "requested_effort": "high",
+        "observed_model": null,
+        "observed_effort": null,
+        "observed_source": null
+      }
+    ],
+    "usage_status": "missing",
+    "usage_missing_components": ["input_tokens", "cached_input_tokens", "output_tokens", "reasoning_tokens"],
+    "external_effect_status": "none",
+    "external_effect_unknown": false
+  }
+}
+```
+
+`requested_*`는 client 요청값이고 `observed_*`는 provider 원문 응답이 turn별 값을 명시한 경우에만 채워진다. `model/list` 지원 확인이나 요청 echo를 observed 값으로 복사하지 않는다. `usage_status=missing`은 token을 0이나 예약량으로 보충하지 않으며, `external_effect_status=unknown`은 기존 intent·receipt·대상 관측을 먼저 대조하고 자동 재실행하지 않는다는 뜻이다.
 
 ```powershell
 flowmarshal-engine --db $Database --artifacts $Artifacts pause `
@@ -135,4 +167,4 @@ flowmarshal-engine --db $Database --artifacts $Artifacts final-report `
   --format markdown
 ```
 
-`read_only` Goal의 `final-report`는 Hard AC별 Core 판정과 evidence ID, evidence의 원장 존재 여부, Planning 시점과 보고 시점의 Project Map semantic digest를 구분해 표시한다. 채팅·표준 출력 응답의 완전성과 프로젝트 source 무변경도 별도로 확인한다.
+`final-report`는 Hard AC별 Core 판정과 evidence ID에 더해 `execution_summary`를 포함한다. 이 요약은 requested/observed model·effort, usage 결측, 외부 effect 상태를 서로 다른 축으로 표시한다. `read_only` Goal에서는 evidence의 원장 존재 여부, Planning 시점과 보고 시점의 Project Map semantic digest, 채팅·표준 출력 응답의 완전성과 프로젝트 source 무변경도 별도로 확인한다.

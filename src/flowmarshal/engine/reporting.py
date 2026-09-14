@@ -11,6 +11,7 @@ from .domain import (
 )
 from .application import summarize_usage_records
 from .read_models import (
+    ExecutionObservationSummary,
     HistoryCursor,
     ReadOnlyReportVerification,
     ReadPresentation,
@@ -74,6 +75,7 @@ def render_final(
     verdict: GoalVerdict,
     usage: tuple[BudgetUsageRecord, ...],
     usage_summary: UsageSummary | None = None,
+    execution_summary: ExecutionObservationSummary | None = None,
     read_only_verification: ReadOnlyReportVerification | None = None,
 ) -> str:
     if usage_summary is None:
@@ -141,6 +143,29 @@ def render_final(
         "",
     ])
     lines.extend(f"- {item.value}: {item.logical_call_count}회" for item in usage_summary.by_stage)
+    if execution_summary is not None:
+        lines.extend(("", "## 실행 관측 축", ""))
+        if execution_summary.model_observations:
+            for item in execution_summary.model_observations:
+                observed = (
+                    "미관측"
+                    if item.observed_model is None or item.observed_effort is None
+                    else f"{item.observed_model}/{item.observed_effort}"
+                )
+                lines.append(
+                    f"- `{item.logical_call_ref}` {item.role}: requested="
+                    f"`{item.requested_model}/{item.requested_effort}`, observed=`{observed}`"
+                )
+        else:
+            lines.append("- model binding: provider 호출 미관측")
+        missing = ", ".join(execution_summary.usage_missing_components) or "없음"
+        lines.append(
+            f"- usage: `{execution_summary.usage_status}`; 누락 구성요소: {missing}"
+        )
+        lines.append(
+            f"- external effect: `{execution_summary.external_effect_status}`; "
+            f"{execution_summary.external_effect_reason}"
+        )
     if usage_summary.incomplete_reasons:
         lines.extend(("", "## 미확인 사용량", ""))
         lines.extend(

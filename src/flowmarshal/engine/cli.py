@@ -1135,6 +1135,7 @@ def _cmd_report_final(arguments: argparse.Namespace) -> None:
     if arguments.format == "markdown":
         print(render_final(goal=report.goal, plan=report.plan, verdict=report.verdict,
                            usage=report.usage.usage_records, usage_summary=report.usage,
+                           execution_summary=report.execution_summary,
                            read_only_verification=report.read_only_verification), end="")
         return
     _emit(report)

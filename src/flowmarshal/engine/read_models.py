@@ -210,6 +210,32 @@ class UsageSummary(ReadPresentation):
     provider_receipt_usage: tuple[ProviderReceiptUsage, ...] = ()
 
 
+class ModelObservationItem(EngineModel):
+    """요청 binding과 provider가 직접 반환한 관측값을 분리한 표시 항목."""
+
+    logical_call_ref: str = Field(min_length=1, max_length=300)
+    role: str = Field(min_length=1, max_length=100)
+    stage: str = Field(min_length=1, max_length=100)
+    requested_model: str = Field(min_length=1, max_length=200)
+    requested_effort: str = Field(min_length=1, max_length=50)
+    observed_model: str | None = Field(default=None, min_length=1, max_length=200)
+    observed_effort: str | None = Field(default=None, min_length=1, max_length=50)
+    observed_source: str | None = Field(default=None, max_length=300)
+
+
+class ExecutionObservationSummary(EngineModel):
+    """사용자 보고에서 model, usage, 외부 effect 축을 섞지 않는 요약."""
+
+    model_observations: tuple[ModelObservationItem, ...] = ()
+    usage_status: Literal["not_observed", "complete", "partial", "missing"]
+    usage_missing_components: tuple[str, ...] = ()
+    usage_incomplete_reasons: tuple[UsageIncompleteReason, ...] = ()
+    external_effect_status: Literal["none", "pending", "confirmed", "unknown"]
+    external_effect_unknown: bool
+    external_effect_refs: tuple[str, ...] = ()
+    external_effect_reason: str = Field(min_length=1, max_length=1000)
+
+
 class ReadOnlyReportVerification(EngineModel):
     """read_only 응답의 AC/evidence 완전성과 source 불변성을 분리한 검사 결과."""
 
@@ -230,6 +256,7 @@ class FinalReport(ReadPresentation):
     plan: PlanContractRevision
     verdict: GoalVerdict
     usage: UsageSummary
+    execution_summary: ExecutionObservationSummary
     ledger_history_valid: bool
     read_only_verification: ReadOnlyReportVerification | None = None
 

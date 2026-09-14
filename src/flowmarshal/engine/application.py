@@ -7,7 +7,7 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
-from ..canonical import canonical_json, sha256_digest
+from ..canonical import canonical_json, sha256_bytes, sha256_digest
 from .capabilities import (
     CoreActionAuthority,
     CoreCapabilityError,
@@ -49,11 +49,13 @@ from .read_models import (
     AttemptDetail,
     DuplicateLogicalCall,
     EntityRef,
+    ExecutionObservationSummary,
     FinalReport,
     HistoryCursor,
     IntentDetail,
     ModelBindingItem,
     ModelBindingStatus,
+    ModelObservationItem,
     ProviderCallExpectation,
     ProviderReceiptUsage,
     ReadPresentation,
@@ -1085,20 +1087,533 @@ class EngineApplication:
             "runtime_job": None if job is None else job.model_dump(mode="json"),
         }
 
+    @staticmethod
+    def _status_target_plan(connection: Any, project: dict[str, Any]) -> PlanContractRevision | None:
+        plan_revision_id = project.get("active_plan_revision_id")
+        row = None
+        if plan_revision_id is not None:
+            row = connection.execute(
+                "SELECT payload_json FROM plan_revisions WHERE id=? AND project_id=?",
+                (plan_revision_id, project["id"]),
+            ).fetchone()
+        else:
+            selection = connection.execute(
+                "SELECT payload_json FROM history_events WHERE project_id=? "
+                "AND event_type='planning.search_recorded' ORDER BY sequence DESC LIMIT 1",
+                (project["id"],),
+            ).fetchone()
+            selected_digest = None
+            if selection is not None:
+                try:
+                    selected_digest = json.loads(selection["payload_json"])["outcome"].get(
+                        "selected_activation_digest"
+                    )
+                except (KeyError, TypeError, ValueError):
+                    selected_digest = None
+            if selected_digest is not None:
+                row = connection.execute(
+                    "SELECT payload_json FROM plan_revisions WHERE project_id=? "
+                    "AND activation_digest=? AND status='ready'",
+                    (project["id"], selected_digest),
+                ).fetchone()
+            if row is None:
+                ready = connection.execute(
+                    "SELECT payload_json FROM plan_revisions WHERE project_id=? AND status='ready'",
+                    (project["id"],),
+                ).fetchall()
+                row = ready[0] if len(ready) == 1 else None
+        return None if row is None else PlanContractRevision.model_validate_json(row["payload_json"])
+
+    def _execution_observation_summary(
+        self,
+        project_id: str,
+        *,
+        usage: UsageSummary | None,
+        goal_id: str | None = None,
+    ) -> ExecutionObservationSummary:
+        records: tuple[UsageReadRecord, ...] = (
+            ()
+            if usage is None
+            else (*usage.usage_records, *usage.provider_receipt_usage)
+        )
+        model_observations = []
+        for item in records:
+            provenance = getattr(item, "binding_provenance", None) or {}
+            model_observations.append(
+                ModelObservationItem(
+                    logical_call_ref=item.logical_call_ref,
+                    role=item.role,
+                    stage=item.stage.value,
+                    requested_model=getattr(item, "requested_model", None) or item.model,
+                    requested_effort=getattr(item, "requested_effort", None) or item.effort,
+                    observed_model=getattr(item, "observed_model", None),
+                    observed_effort=getattr(item, "observed_effort", None),
+                    observed_source=(
+                        provenance.get("observed")
+                        if isinstance(provenance, dict)
+                        else None
+                    ),
+                )
+            )
+
+        metrics = (
+            ()
+            if usage is None
+            else (
+                ("input_tokens", usage.input_tokens),
+                ("cached_input_tokens", usage.cached_input_tokens),
+                ("output_tokens", usage.output_tokens),
+                ("reasoning_tokens", usage.reasoning_tokens),
+            )
+        )
+        missing_components = tuple(name for name, metric in metrics if metric.total is None)
+        has_calls = bool(model_observations) or (
+            usage is not None and usage.provider_call_count not in {None, 0}
+        )
+        has_observed_usage = any(item.usage_available for item in records)
+        incomplete = (
+            usage is not None
+            and bool(
+                missing_components
+                or usage.incomplete_reasons
+                or usage.provider_calls_without_usage
+                or usage.missing_expected_logical_call_refs
+            )
+        )
+        if not has_calls:
+            usage_status = "not_observed"
+        elif incomplete:
+            usage_status = "partial" if has_observed_usage else "missing"
+        else:
+            usage_status = "complete"
+
+        parameters: tuple[Any, ...] = (project_id,)
+        goal_filter = ""
+        if goal_id is not None:
+            goal_filter = " AND goal_id=?"
+            parameters = (project_id, goal_id)
+        with self.service.ledger.read() as connection:
+            effect_rows = connection.execute(
+                "SELECT id,effect_status FROM provider_calls WHERE project_id=?"
+                + goal_filter
+                + " ORDER BY created_at,rowid",
+                parameters,
+            ).fetchall()
+            unknown_attempts = connection.execute(
+                "SELECT id FROM attempts WHERE project_id=? AND failure_class='external_unknown' "
+                "AND plan_revision_id=(SELECT active_plan_revision_id FROM projects WHERE id=?) "
+                "ORDER BY created_at,rowid",
+                (project_id, project_id),
+            ).fetchall()
+            unknown_intents = connection.execute(
+                "SELECT i.id FROM runtime_intents i JOIN attempts a ON a.id=i.attempt_id "
+                "WHERE a.project_id=? AND a.plan_revision_id="
+                "(SELECT active_plan_revision_id FROM projects WHERE id=?) "
+                "AND i.status='unknown' ORDER BY i.prepared_at,i.rowid",
+                (project_id, project_id),
+            ).fetchall()
+        unknown_refs = tuple(
+            sorted(
+                {
+                    *(row["id"] for row in effect_rows if row["effect_status"] == "unknown"),
+                    *(row["id"] for row in unknown_attempts),
+                    *(row["id"] for row in unknown_intents),
+                }
+            )
+        )
+        pending_refs = tuple(
+            row["id"] for row in effect_rows if row["effect_status"] == "pending"
+        )
+        confirmed_refs = tuple(
+            row["id"] for row in effect_rows if row["effect_status"] == "terminal"
+        )
+        if unknown_refs:
+            effect_status = "unknown"
+            effect_refs = unknown_refs
+            effect_reason = (
+                "원장에 외부 효과 완료를 확정할 직접 관측이 없어 자동 재실행하지 않습니다."
+            )
+        elif pending_refs:
+            effect_status = "pending"
+            effect_refs = pending_refs
+            effect_reason = "외부 효과 intent가 terminal confirmation을 기다리고 있습니다."
+        elif confirmed_refs:
+            effect_status = "confirmed"
+            effect_refs = confirmed_refs
+            effect_reason = "typed receipt와 대상 재관측에 결속된 외부 효과가 있습니다."
+        else:
+            effect_status = "none"
+            effect_refs = ()
+            effect_reason = "현재 Goal 범위에 미확정 외부 효과가 없습니다."
+        return ExecutionObservationSummary(
+            model_observations=tuple(model_observations),
+            usage_status=usage_status,
+            usage_missing_components=missing_components,
+            usage_incomplete_reasons=() if usage is None else usage.incomplete_reasons,
+            external_effect_status=effect_status,
+            external_effect_unknown=effect_status == "unknown",
+            external_effect_refs=effect_refs,
+            external_effect_reason=effect_reason,
+        )
+
+    def _status_drill_down(
+        self,
+        project_id: str,
+        *,
+        snapshot: dict[str, Any],
+        plan: PlanContractRevision | None,
+    ) -> tuple[dict[str, Any], bool]:
+        plan_revision_id = None if plan is None else plan.plan_revision_id
+        target_task_ids = set() if plan is None else {
+            item.task_id for item in plan.definition.tasks
+        }
+        target_task_statuses = tuple(
+            task["status"] for task in snapshot["tasks"] if task["id"] in target_task_ids
+        )
+        execution_started = any(
+            status in {"reserved", "running", "validating", "completed", "failed", "blocked"}
+            for status in target_task_statuses
+        )
+        all_tasks_completed = bool(target_task_statuses) and all(
+            status == "completed" for status in target_task_statuses
+        )
+        project_map = None
+        validation_rows = ()
+        evidence_rows = ()
+        reuse_rows = ()
+        with self.service.ledger.read() as connection:
+            if plan is not None:
+                row = connection.execute(
+                    "SELECT payload_json FROM project_map_revisions WHERE project_id=? "
+                    "AND revision_digest=?",
+                    (project_id, plan.definition.project_map_digest),
+                ).fetchone()
+                if row is not None:
+                    from .domain import ProjectMapRevision
+
+                    project_map = ProjectMapRevision.model_validate_json(row["payload_json"])
+                validation_rows = connection.execute(
+                    "SELECT task_id,validation_id,status,payload_json,evaluated_at,rowid "
+                    "FROM validation_results WHERE project_id=? AND plan_revision_id=? "
+                    "ORDER BY evaluated_at,rowid",
+                    (project_id, plan_revision_id),
+                ).fetchall()
+                task_ids = tuple(item.task_id for item in plan.definition.tasks)
+                if task_ids:
+                    placeholders = ",".join("?" for _ in task_ids)
+                    reuse_rows = connection.execute(
+                        f"SELECT task_id,source_task_id,evidence_ids_json FROM task_completion_reuse "
+                        f"WHERE task_id IN ({placeholders})",
+                        task_ids,
+                    ).fetchall()
+            if project_map is None:
+                row = connection.execute(
+                    "SELECT payload_json FROM project_map_revisions WHERE project_id=? "
+                    "AND is_current=1",
+                    (project_id,),
+                ).fetchone()
+                if row is not None:
+                    from .domain import ProjectMapRevision
+
+                    project_map = ProjectMapRevision.model_validate_json(row["payload_json"])
+            elif all_tasks_completed:
+                current_row = connection.execute(
+                    "SELECT payload_json FROM project_map_revisions WHERE project_id=? "
+                    "AND is_current=1",
+                    (project_id,),
+                ).fetchone()
+                if current_row is not None:
+                    from .domain import ProjectMapRevision
+
+                    project_map = ProjectMapRevision.model_validate_json(
+                        current_row["payload_json"]
+                    )
+            evidence_rows = connection.execute(
+                "SELECT e.id,e.task_id,e.attempt_id,e.kind,e.source_ref,e.content_digest,"
+                "t.plan_revision_id FROM evidence_records e LEFT JOIN task_contracts t "
+                "ON t.id=e.task_id WHERE e.project_id=? ORDER BY e.observed_at,e.rowid",
+                (project_id,),
+            ).fetchall()
+
+        files = []
+        if project_map is not None:
+            root = Path(project_map.root)
+            for entry in project_map.entries:
+                path = Path(entry.path)
+                resolved = path if path.is_absolute() else root / path
+                try:
+                    observed_digest = sha256_bytes(resolved.read_bytes())
+                except OSError:
+                    observed_digest = None
+                valid = observed_digest == entry.content_digest
+                validity = (
+                    "current"
+                    if valid
+                    else ("pending" if execution_started else "invalidated")
+                )
+                files.append(
+                    {
+                        "entry_id": entry.entry_id,
+                        "path": entry.path,
+                        "kind": entry.kind.value,
+                        "record_status": "preserved",
+                        "validity": validity,
+                        "expected_digest": entry.content_digest,
+                        "observed_digest": observed_digest,
+                        "reason": (
+                            "ProjectMap에 결속된 파일 digest와 현재 파일이 일치합니다."
+                            if valid
+                            else (
+                                "실행이 시작된 뒤 파일이 바뀌어 validation 또는 State 재관측을 기다립니다."
+                                if execution_started
+                                else "ProjectMap에 결속된 파일이 없거나 현재 digest가 달라졌습니다."
+                            )
+                        ),
+                    }
+                )
+        stale = any(item["validity"] == "invalidated" for item in files)
+
+        reused_evidence_ids = {
+            evidence_id
+            for row in reuse_rows
+            for evidence_id in json.loads(row["evidence_ids_json"])
+        }
+        tasks = []
+        for task in snapshot["tasks"]:
+            current = (
+                task["id"] in target_task_ids
+                and task["status"] != "superseded"
+                and not stale
+            )
+            tasks.append(
+                {
+                    "task_id": task["id"],
+                    "task_ref": task["task_ref"],
+                    "plan_revision_id": task["plan_revision_id"],
+                    "status": task["status"],
+                    "record_status": "preserved",
+                    "validity": "current" if current else "invalidated",
+                    "reason": (
+                        "현재 선택/활성 Plan과 파일 baseline에 결속된 Task입니다."
+                        if current
+                        else (
+                            "현재 파일이 Plan baseline과 달라 Task 입력 결속이 무효화됐습니다."
+                            if task["id"] in target_task_ids and stale
+                            else "현재 선택/활성 Plan 밖의 Task 이력으로 보존됩니다."
+                        )
+                    ),
+                }
+            )
+
+        latest_results: dict[tuple[str | None, str], Any] = {}
+        for row in validation_rows:
+            latest_results[(row["task_id"], row["validation_id"])] = row
+        checks = []
+        referenced_evidence_ids: set[str] = set(reused_evidence_ids)
+        if plan is not None:
+            contracts = [
+                ("task", task.task_id, contract)
+                for task in plan.definition.tasks
+                for contract in task.validations
+            ] + [
+                ("goal", None, contract)
+                for contract in plan.definition.integration_validations
+            ]
+            for scope, task_id, contract in contracts:
+                row = latest_results.get((task_id, contract.validation_id))
+                payload = None if row is None else json.loads(row["payload_json"])
+                evidence_ids = tuple(() if payload is None else payload.get("evidence_ids", ()))
+                referenced_evidence_ids.update(evidence_ids)
+                checks.append(
+                    {
+                        "validation_id": contract.validation_id,
+                        "scope": scope,
+                        "task_id": task_id,
+                        "method": contract.method,
+                        "status": "not_run" if row is None else row["status"],
+                        "record_status": "not_recorded" if row is None else "preserved",
+                        "validity": (
+                            "invalidated" if stale else ("pending" if row is None else "current")
+                        ),
+                        "evidence_ids": evidence_ids,
+                        "reason": (
+                            "현재 파일이 Plan baseline과 달라 검사 결속이 무효화됐습니다."
+                            if stale
+                            else (
+                                "아직 Core에 검사 결과가 기록되지 않았습니다."
+                                if row is None
+                                else "현재 Plan에 결속된 최신 검사 결과입니다."
+                            )
+                        ),
+                    }
+                )
+
+        evidence = []
+        for row in evidence_rows:
+            current_plan_evidence = (
+                row["plan_revision_id"] == plan_revision_id
+                or row["id"] in referenced_evidence_ids
+            )
+            valid = current_plan_evidence and not stale
+            evidence.append(
+                {
+                    "evidence_id": row["id"],
+                    "task_id": row["task_id"],
+                    "attempt_id": row["attempt_id"],
+                    "kind": row["kind"],
+                    "source_ref": row["source_ref"],
+                    "content_digest": row["content_digest"],
+                    "record_status": "preserved",
+                    "validity": "current" if valid else "invalidated",
+                    "reason": (
+                        "현재 Plan의 검사 또는 completion reuse에 결속된 evidence입니다."
+                        if valid
+                        else (
+                            "현재 파일이 Plan baseline과 달라 evidence의 현재 적용이 무효화됐습니다."
+                            if current_plan_evidence and stale
+                            else "현재 선택/활성 Plan 밖의 historical evidence로 보존됩니다."
+                        )
+                    ),
+                }
+            )
+        return {
+            "tasks": tasks,
+            "files": files,
+            "checks": checks,
+            "evidence": evidence,
+        }, stale
+
+    @staticmethod
+    def _status_stage(
+        *,
+        project: dict[str, Any],
+        control_state: str,
+        active_job: RuntimeJob | None,
+        plan: PlanContractRevision | None,
+        task_counts: dict[str, int],
+        stale: bool,
+        external_unknown: bool,
+        has_goal_verdict: bool,
+    ) -> tuple[str, str, str]:
+        if control_state == "cancelled":
+            return "cancelled", "현재 Goal workflow가 사용자 요청으로 취소됐습니다.", "새 Goal을 prepare하십시오."
+        if control_state == "paused":
+            return "paused", "현재 Goal workflow의 후속 tick이 일시정지됐습니다.", "run-once --resume을 명시적으로 호출하십시오."
+        if external_unknown or project.get("run_state") == "recovery_required":
+            return (
+                "external_effect_unknown",
+                "완료가 확인되지 않은 외부 effect가 있어 새 실행을 시작할 수 없습니다.",
+                "recover inspect로 기존 intent와 receipt를 먼저 대조하십시오.",
+            )
+        if stale:
+            return (
+                "stale_execution_input",
+                "Plan에 결속된 파일 baseline과 현재 파일이 달라 실행 입력이 stale입니다.",
+                "변경 파일을 검토하고 Execution Spec 또는 Plan revision을 다시 준비하십시오.",
+            )
+        if active_job is not None:
+            stages = {
+                "execution_spec_prepare": "preparing_execution",
+                "worker_turn": "executing_task",
+                "task_semantic_validate": "validating_task",
+                "goal_test_prepare": "preparing_goal_validation",
+                "goal_semantic_validate": "validating_goal",
+                "recovery": "recovering",
+                "replanning": "replanning",
+            }
+            return (
+                stages.get(active_job.kind.value, "observing_runtime_job"),
+                f"{active_job.kind.value} RuntimeJob이 {active_job.status.value} 상태입니다.",
+                "observe로 같은 RuntimeJob을 먼저 관측하십시오.",
+            )
+        if project.get("run_state") == "completed" or has_goal_verdict:
+            return "completed", "Core가 GoalVerdict를 기록해 workflow가 terminal 상태입니다.", "final-report를 확인하십시오."
+        if project.get("active_goal_revision_id") is None:
+            return "preparation_required", "활성 GoalContract가 아직 없습니다.", "raw request를 prepare하십시오."
+        if project.get("active_plan_revision_id") is None:
+            if plan is not None:
+                return (
+                    "authorization_required",
+                    "검토를 통과한 선택 Plan이 있지만 GoalAuthorization이 아직 없습니다.",
+                    "authorize에서 표시된 전체 target digest를 확인하십시오.",
+                )
+            return "planning_required", "활성 Goal에 실행 가능한 선택 Plan이 없습니다.", "prepare 결과의 질문·planning finding을 해소하십시오."
+        if task_counts.get("failed", 0) or task_counts.get("blocked", 0):
+            return "recovery_required", "현재 Plan의 Task가 실패 또는 차단 상태입니다.", "status 근거를 확인하고 허용된 recovery 경로를 선택하십시오."
+        if task_counts.get("validating", 0):
+            return "validating_task", "Worker 결과 뒤 Task validation이 남아 있습니다.", "run-once로 다음 validation 단계를 수행하십시오."
+        if task_counts.get("materialized", 0):
+            return "task_ready_to_dispatch", "한 Task의 Execution Spec이 current 입력에 결속됐습니다.", "run-once로 그 Task 하나를 dispatch하십시오."
+        if task_counts.get("reserved", 0) or task_counts.get("running", 0):
+            return "executing_task", "실행 Attempt가 진행 중이며 후속 관측이 필요합니다.", "run-once로 기존 Attempt를 먼저 관측하십시오."
+        if task_counts.get("ready", 0):
+            return "task_ready", "dependency를 만족한 Task 하나가 실행 준비 상태입니다.", "run-once로 Task 실행 명세 준비를 시작하십시오."
+        if plan is not None and task_counts and task_counts.get("completed", 0) == sum(task_counts.values()):
+            return "goal_validation_ready", "모든 Task가 완료되어 독립 Goal validation이 남아 있습니다.", "run-once로 Goal Test를 준비·실행하십시오."
+        return "waiting", "Core 원장은 다음 결정적 전이를 기다리고 있습니다.", "status drill_down의 Task와 검사를 확인하십시오."
+
     def status(self, project_id: str) -> dict[str, Any]:
-        """Core snapshot과 facade 제어/job 상태를 한 응답으로 표시한다."""
+        """Core snapshot과 현재 단계·근거·다음 동작을 읽기 전용으로 설명한다."""
 
         snapshot = self.service.status(project_id)
         counts: dict[str, int] = {}
         for task in snapshot["tasks"]:
             counts[task["status"]] = counts.get(task["status"], 0) + 1
+        project = snapshot["project"]
+        control_state = self.service.workflow_control_state(project_id)
         active_job = self.service.active_runtime_job(project_id)
+        with self.service.ledger.read() as connection:
+            plan = self._status_target_plan(connection, project)
+            goal_row = connection.execute(
+                "SELECT goal_id FROM goal_revisions WHERE id=?",
+                (project["active_goal_revision_id"],),
+            ).fetchone() if project["active_goal_revision_id"] is not None else None
+            verdict_row = connection.execute(
+                "SELECT id FROM goal_verdicts WHERE project_id=? "
+                "AND (? IS NULL OR plan_revision_id=?) ORDER BY evaluated_at DESC,rowid DESC LIMIT 1",
+                (project_id, project["active_plan_revision_id"], project["active_plan_revision_id"]),
+            ).fetchone()
+        drill_down, stale = self._status_drill_down(
+            project_id, snapshot=snapshot, plan=plan,
+        )
+        usage = None
+        if goal_row is not None:
+            try:
+                usage = self.usage_summary(project_id, goal_id=goal_row["goal_id"])
+            except EngineApplicationError as error:
+                if str(error) != "GOAL_NOT_FOUND":
+                    raise
+        execution_summary = self._execution_observation_summary(
+            project_id,
+            usage=usage,
+            goal_id=None if goal_row is None else goal_row["goal_id"],
+        )
+        stage, reason, next_action = self._status_stage(
+            project=project,
+            control_state=control_state,
+            active_job=active_job,
+            plan=plan,
+            task_counts=counts,
+            stale=stale,
+            external_unknown=execution_summary.external_effect_unknown,
+            has_goal_verdict=verdict_row is not None,
+        )
         return snapshot | {
-            "control_state": self.service.workflow_control_state(project_id),
+            "current_stage": stage,
+            "reason": reason,
+            "next_action": next_action,
+            "authorization_state": (
+                "authorized"
+                if project["active_plan_revision_id"] is not None
+                else ("required" if plan is not None else "not_ready")
+            ),
+            "control_state": control_state,
             "active_runtime_job": (
                 None if active_job is None else active_job.model_dump(mode="json")
             ),
             "task_status_counts": counts,
+            "drill_down": drill_down,
+            "execution_summary": execution_summary.model_dump(mode="json"),
         }
 
     def _project_row(self, project_id: str):
@@ -1296,6 +1811,11 @@ class EngineApplication:
         if plan.definition.goal_contract_digest != goal.definition_digest or verdict.goal_contract_digest != goal.definition_digest:
             raise EngineApplicationError("VERDICT_GOAL_BINDING_MISMATCH")
         usage = self.usage_summary(project_id, goal_id=goal.goal_id)
+        execution_summary = self._execution_observation_summary(
+            project_id,
+            usage=usage,
+            goal_id=goal.goal_id,
+        )
         presentation = self._presentation(
             project_id,
             (EntityRef(entity_type="project", entity_id=project_id),
@@ -1312,6 +1832,7 @@ class EngineApplication:
         )
         return FinalReport(
             project_id=project_id, goal=goal, plan=plan, verdict=verdict, usage=usage,
+            execution_summary=execution_summary,
             ledger_history_valid=self.service.ledger.verify_history(project_id),
             entity_refs=presentation.entity_refs, history_cursor=presentation.history_cursor,
             read_only_verification=read_only_verification,
