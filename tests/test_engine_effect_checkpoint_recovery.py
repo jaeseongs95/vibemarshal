@@ -155,6 +155,62 @@ class EngineEffectCheckpointRecoveryTests(unittest.TestCase):
                 self.assertEqual("prepared", intent["status"])
                 self.assertEqual(1, marker_count)
 
+    def test_each_immutable_effect_time_binding_change_blocks_before_resume(self):
+        cases = ("context", "state", "prompt", "model", "policy")
+        for case in cases:
+            with self.subTest(case=case):
+                runtime_factory = _MutablePolicyRuntime if case == "policy" else None
+                prepared, runtime, spec = self._materialized(
+                    f"resume-preflight-{case}", runtime=runtime_factory
+                )
+                dispatcher = EngineDispatcher(prepared.service, runtime)
+                dispatched = dispatcher.run_once(prepared.project_id)
+                with prepared.service.ledger.read() as connection:
+                    binding = ThreadBinding.model_validate_json(
+                        connection.execute(
+                            "SELECT binding_json FROM attempts WHERE id = ?",
+                            (dispatched.attempt_id,),
+                        ).fetchone()[0]
+                    )
+                runtime.interrupt(
+                    thread_id=binding.thread_id, turn_id=binding.turn_id
+                )
+                changed = False
+
+                def mutate(point: str) -> None:
+                    nonlocal changed
+                    if point != "after_resume_intent" or changed:
+                        return
+                    changed = True
+                    self._change_effect_input(case, prepared, runtime, spec)
+
+                blocked = None
+                try:
+                    blocked = EngineDispatcher(
+                        EngineService(prepared.service.ledger),
+                        runtime,
+                        fault_hook=mutate,
+                    ).run_once(prepared.project_id)
+                except (EngineServiceError, RuntimePolicyError):
+                    pass
+                if blocked is not None:
+                    self.assertEqual(RunOnceAction.BLOCKED, blocked.action)
+                self.assertTrue(changed)
+                self.assertEqual(0, runtime.resume_calls)
+                self.assertEqual(1, runtime.turn_calls)
+                with prepared.service.ledger.read() as connection:
+                    intent = connection.execute(
+                        "SELECT id,status FROM runtime_intents "
+                        "WHERE kind = 'resume_turn'"
+                    ).fetchone()
+                    marker_count = connection.execute(
+                        "SELECT COUNT(*) FROM history_events WHERE entity_id = ? "
+                        "AND event_type = 'runtime.effect_not_started'",
+                        (intent["id"],),
+                    ).fetchone()[0]
+                self.assertEqual("prepared", intent["status"])
+                self.assertEqual(1, marker_count)
+
     def test_lost_receipt_is_recovered_from_exact_trace_without_blind_effect(self):
         for point, expected_create, expected_turn in (
             ("after_thread_effect", 1, 0),
