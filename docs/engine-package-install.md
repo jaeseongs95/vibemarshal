@@ -81,3 +81,19 @@ $CandidatePython = "C:\absolute\candidate-venv\Scripts\python.exe"
 재현 bundle은 해당 source root의 `config/qualification-roles.json`, `config/qualification-finding-taxonomy.json`, `config/legacy-freeze-manifest.json`, `tests/fixtures/`, 진단 script와 source manifest 전체다. 실행 전에 `source_manifest_files()`와 `source_manifest_digest()`가 입력 bytes digest를 기록한다. 누락된 fixture/config를 wheel에서 보완하지 않으며, 별도 bundle을 명시적으로 제공해야 한다.
 
 사용자 bootstrap 설정과 qualification 설정은 역할이 다르다. 전자는 현재 사용자가 선택하고 inventory로 검증한 운영 입력이고, 후자는 동결된 평가를 재현하는 source-bound 입력이다.
+
+## clean 설치 cell(E2E-18) harness
+
+위 smoke 항목은 `flowmarshal.engine.clean_install_qualification`이 typed evidence로 수행한다. 이 harness는 빈 venv 생성(`clean_environment`), non-editable 설치와 `pip check`(`wheel_install`), 설치본 import origin 확인(`import_origin_check`), 사용자 CLI 도움말(`user_cli_smoke`), launcher probe와 project-e2e pre-provider dry invocation(`qualification_input_check`)을 차례로 관측한다.
+
+```powershell
+& $DeveloperPython -m flowmarshal.engine.eval_cli clean-install `
+  --project-root $SourceRoot `
+  --run-root C:\absolute\runs\clean-install `
+  --candidate-wheel C:\absolute\dist\flowmarshal_engine-0.2.0a1-py3-none-any.whl `
+  --reproduction-bundle C:\absolute\runs\<동결 run>\reproduction-bundle
+```
+
+각 단계의 실제 산출물(wheel 사본, 설치 log, import origin, CLI 출력, 동결 bundle, probe·dry-run 관측)은 run root 상대경로·SHA-256·kind·cell·evaluation 계약과 fixture/seed/freeze/wheel binding을 가진 `QualificationEvidenceRecord`로 남는다. harness 생성 시와 `verify_clean_install_report()`의 최종 재검증에서 경로 confinement·존재·digest·결속을 각각 검사하며, 한 축이라도 바뀌면 이전 cell을 재사용하지 않는다.
+
+`eval run --scope project-e2e --pre-provider-dry-run`은 실제 실행과 같은 candidate wheel 결속 함수를 쓰되 provider 연결 전에 멈추는 명시적 fake 경계다. 출력의 `release_pass`는 항상 `false`이고 `stages_not_run`에 실행하지 않은 단계를 남기므로, 이 결과를 release PASS나 책임 evidence로 승격하지 않는다.

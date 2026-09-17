@@ -14,7 +14,12 @@ from .benchmark_observation import (
     BenchmarkObservationError,
     observe_benchmark_execution_checkpoint,
 )
-from .e2e_qualification import run_project_e2e
+from .clean_install_qualification import (
+    CleanInstallError,
+    run_clean_install,
+    verify_clean_install_report,
+)
+from .e2e_qualification import dry_run_project_e2e_pre_provider, run_project_e2e
 from .evaluation import (
     BenchmarkCell,
     EvaluationContract,
@@ -94,6 +99,23 @@ def _run(arguments: argparse.Namespace) -> int:
             )
         if not Path(arguments.candidate_wheel).is_absolute():
             raise QualificationRunError("--candidate-wheel은 절대경로여야 합니다.")
+    if getattr(arguments, "pre_provider_dry_run", False):
+        if arguments.scope != "project-e2e":
+            raise QualificationRunError(
+                "--pre-provider-dry-run은 project-e2e scope에서만 쓸 수 있습니다."
+            )
+        # provider 호출 없이 결속만 확인하는 fake 경계다. release PASS가 아니다.
+        _emit(
+            dry_run_project_e2e_pre_provider(
+                root=root,
+                run_root=destination,
+                role_configuration=(
+                    None if arguments.role_config is None else _roles(arguments.role_config, root)
+                ),
+                candidate_wheel=arguments.candidate_wheel,
+            )
+        )
+        return 0
     if arguments.scope == "deterministic":
         run_root, report = run_deterministic(root=root, run_root=destination)
     else:
@@ -133,6 +155,35 @@ def _run(arguments: argparse.Namespace) -> int:
         }
     )
     return 0 if report.passed else 1
+
+
+def _clean_install(arguments: argparse.Namespace) -> int:
+    """E2E-18 clean 설치 cell을 실행하고 같은 산출물로 즉시 재검증한다."""
+
+    root = Path(arguments.project_root).resolve(strict=True)
+    run_root, report = run_clean_install(
+        root=root,
+        run_root=None if arguments.run_root is None else Path(arguments.run_root).resolve(),
+        candidate_wheel=Path(arguments.candidate_wheel),
+        reproduction_bundle=Path(arguments.reproduction_bundle),
+        base_python=arguments.base_python,
+        pip_install_arguments=tuple(arguments.pip_install_arg or ()),
+    )
+    verification = verify_clean_install_report(
+        root=root, run_root=run_root, report=report
+    )
+    _emit(
+        {
+            "run_root": str(run_root),
+            "report_digest": report.report_digest,
+            "report": report.model_dump(mode="json"),
+            "verification": {
+                "valid": verification.valid,
+                "errors": list(verification.errors),
+            },
+        }
+    )
+    return 0 if report.passed and verification.valid else 1
 
 
 def _resume(arguments: argparse.Namespace) -> int:
@@ -497,7 +548,33 @@ def build_parser() -> argparse.ArgumentParser:
         default=PLAN_INSPECTION_PROVIDER_V1,
         help="full-planning-pipeline의 Plan inspection provider. 기본값은 v1입니다.",
     )
+    run.add_argument(
+        "--pre-provider-dry-run",
+        action="store_true",
+        help="project-e2e의 provider 호출 전 결속만 확인한다. release PASS가 아니다.",
+    )
     run.set_defaults(handler=_run)
+
+    clean_install = commands.add_parser("clean-install")
+    clean_install.add_argument("--project-root", default=str(project_root()))
+    clean_install.add_argument("--run-root")
+    clean_install.add_argument(
+        "--candidate-wheel", required=True, help="설치할 candidate wheel의 절대경로"
+    )
+    clean_install.add_argument(
+        "--reproduction-bundle",
+        required=True,
+        help="동결된 qualification 재현 bundle 디렉터리의 절대경로",
+    )
+    clean_install.add_argument(
+        "--base-python", help="빈 venv를 만들 기준 Python. 생략하면 현재 실행 Python이다."
+    )
+    clean_install.add_argument(
+        "--pip-install-arg",
+        action="append",
+        help="pip install에 전달할 추가 인자(예: --no-index, --find-links <dir>)",
+    )
+    clean_install.set_defaults(handler=_clean_install)
 
     resume = commands.add_parser("resume")
     resume.add_argument("--run-root", required=True)
@@ -548,6 +625,7 @@ def main(argv: list[str] | None = None) -> int:
         return int(arguments.handler(arguments))
     except (
         QualificationRunError,
+        CleanInstallError,
         BenchmarkObservationError,
         CheckpointContractError,
         StructuredRoleError,

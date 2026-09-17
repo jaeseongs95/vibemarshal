@@ -96,6 +96,7 @@ from .qualification import (
     source_manifest_digest,
 )
 from .qualification_manifest import (
+    CandidateWheelBinding,
     EvidenceProvenance,
     QualificationCellOutcome,
     QualificationCellStatus,
@@ -1877,20 +1878,14 @@ def _contract(
     )
 
 
-def run_project_e2e(
-    *,
-    root: Path | None = None,
-    run_root: Path | None = None,
-    role_configuration: EngineRoleConfiguration | None = None,
-    codex_bin: Path | str | None = None,
-    evaluation_policies: EvaluationPolicies | None = None,
-    candidate_wheel: Path | str | None = None,
-) -> tuple[Path, ScopeQualificationReport]:
-    if evaluation_policies is None:
-        raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
-    base = (root or project_root()).resolve(strict=True)
-    if run_root is not None:
-        _guard_e2e_partial_resume(Path(run_root).resolve())
+def _bind_project_e2e_candidate_wheel(
+    *, run_root: Path | None, candidate_wheel: Path | str | None
+) -> CandidateWheelBinding:
+    """release project E2E가 요구하는 candidate wheel 결속만 수행한다.
+
+    실제 실행과 pre-provider dry invocation이 같은 결속을 쓰도록 분리했다.
+    """
+
     if candidate_wheel is None:
         raise QualificationRunError("CANDIDATE_WHEEL_REQUIRED")
     try:
@@ -1910,18 +1905,87 @@ def run_project_e2e(
                 raise QualificationRunError(str(error)) from error
             if saved_binding != candidate_binding:
                 raise QualificationRunError("CANDIDATE_WHEEL_BINDING_CHANGED")
-    preflight_failures = _preflight(base)
-    if preflight_failures:
-        raise QualificationRunError("; ".join(preflight_failures))
-    roles = role_configuration or default_role_configuration(base)
+    return candidate_binding
+
+
+def _project_e2e_fixture_source_digest(base: Path) -> str:
     fixture_source = base / "tests" / "fixtures" / "engine" / "project-e2e"
-    source_digest = sha256_digest(
+    return sha256_digest(
         {
             path.relative_to(fixture_source).as_posix(): sha256_bytes(path.read_bytes())
             for path in sorted(fixture_source.rglob("*"))
             if path.is_file() and "__pycache__" not in path.parts
         }
     )
+
+
+def dry_run_project_e2e_pre_provider(
+    *,
+    root: Path | None = None,
+    run_root: Path | None = None,
+    role_configuration: EngineRoleConfiguration | None = None,
+    candidate_wheel: Path | str | None = None,
+) -> dict[str, Any]:
+    """provider 연결 전까지의 결속만 실제 실행 경로로 확인하는 dry 관측이다.
+
+    provider turn, evaluation 계약, checkpoint와 cell 실행은 하지 않는다. 이
+    결과는 명시적 fake 경계이며 어떤 책임의 release PASS도 만들지 않는다.
+    """
+
+    base = (root or project_root()).resolve(strict=True)
+    resolved_run_root = None if run_root is None else Path(run_root).resolve()
+    if resolved_run_root is not None:
+        _guard_e2e_partial_resume(resolved_run_root)
+    candidate_binding = _bind_project_e2e_candidate_wheel(
+        run_root=resolved_run_root, candidate_wheel=candidate_wheel
+    )
+    roles = role_configuration or default_role_configuration(base)
+    suite = qualification_suite_manifest(base)
+    return {
+        "mode": "pre_provider_dry_run",
+        "release_pass": False,
+        "provenance": EvidenceProvenance.FAKE.value,
+        "project_root": str(base),
+        "scenarios": list(E2E_SCENARIOS),
+        "suite_manifest_digest": suite.manifest_digest,
+        "source_manifest_digest": source_manifest_digest(base),
+        "role_configuration_digest": roles.configuration_digest,
+        "project_e2e_fixture_source_digest": _project_e2e_fixture_source_digest(base),
+        "candidate_wheel_binding": candidate_binding.model_dump(mode="json"),
+        "candidate_wheel_binding_digest": candidate_binding.binding_digest,
+        "stages_not_run": [
+            "deterministic_preflight",
+            "provider_model_list",
+            "evaluation_contract",
+            "checkpoint_store",
+            "cell_execution",
+        ],
+    }
+
+
+def run_project_e2e(
+    *,
+    root: Path | None = None,
+    run_root: Path | None = None,
+    role_configuration: EngineRoleConfiguration | None = None,
+    codex_bin: Path | str | None = None,
+    evaluation_policies: EvaluationPolicies | None = None,
+    candidate_wheel: Path | str | None = None,
+) -> tuple[Path, ScopeQualificationReport]:
+    if evaluation_policies is None:
+        raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
+    base = (root or project_root()).resolve(strict=True)
+    if run_root is not None:
+        _guard_e2e_partial_resume(Path(run_root).resolve())
+    candidate_binding = _bind_project_e2e_candidate_wheel(
+        run_root=None if run_root is None else Path(run_root).resolve(),
+        candidate_wheel=candidate_wheel,
+    )
+    preflight_failures = _preflight(base)
+    if preflight_failures:
+        raise QualificationRunError("; ".join(preflight_failures))
+    roles = role_configuration or default_role_configuration(base)
+    source_digest = _project_e2e_fixture_source_digest(base)
     with CodexAppServerRuntime(
         codex_bin=codex_bin, project_binding=evaluation_policies.codex_project
     ) as real_runtime:

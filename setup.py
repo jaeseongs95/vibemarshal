@@ -19,6 +19,7 @@ ENGINE_DEVELOPER_MODULES = {
     "benchmark_lifecycle",
     "benchmark_observation",
     "benchmark_safety",
+    "clean_install_qualification",
     "e2e_qualification",
     "eval_cli",
     "evaluation",
