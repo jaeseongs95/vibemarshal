@@ -292,6 +292,85 @@ class RecoveryStatus(ReadPresentation):
     task_validation_recovery: TaskValidationRecovery | None = None
 
 
+class RecoveryCodeObservation(EngineModel):
+    """복구 분류에 쓰인 code 하나와 그 출처 provenance."""
+
+    values: tuple[str, ...] = ()
+    provenance: Literal[
+        "provider_observed", "local_derived", "model_reported", "client_requested"
+    ]
+    authoritative: bool
+    note: str | None = Field(default=None, max_length=500)
+
+
+class RecoveryClassification(EngineModel):
+    """현재 미해결 실패의 원장 분류와 그 직접 근거."""
+
+    task_id: str | None = Field(default=None, max_length=500)
+    attempt_id: str | None = Field(default=None, max_length=500)
+    validation_result_id: str | None = Field(default=None, max_length=500)
+    failure_class: str | None = Field(default=None, max_length=100)
+    basis: str = Field(min_length=1, max_length=100)
+    rationale: str | None = Field(default=None, max_length=5000)
+    transient: bool = False
+    evidence_ids: tuple[str, ...] = ()
+    codes: tuple[RecoveryCodeObservation, ...] = ()
+
+
+class RecoveryScope(EngineModel):
+    """복구 전후로 보존한 기록과 새 revision이 대체한 범위."""
+
+    preserved_attempt_ids: tuple[str, ...] = ()
+    preserved_evidence_ids: tuple[str, ...] = ()
+    preserved_assessment_ids: tuple[str, ...] = ()
+    preserved_receipt_intent_ids: tuple[str, ...] = ()
+    superseded_plan_revision_ids: tuple[str, ...] = ()
+    superseded_task_ids: tuple[str, ...] = ()
+    active_plan_revision_id: str | None = Field(default=None, max_length=500)
+
+
+class RecoveryLimitStatus(EngineModel):
+    """원장에서 직접 센 복구 한도와 새 evidence 요구 상태."""
+
+    assessment_id: str | None = Field(default=None, max_length=200)
+    assessment_recorded: bool = False
+    failure_class_retryable: bool = True
+    task_recovery_count: int = Field(default=0, ge=0)
+    max_task_recovery: int = Field(default=0, ge=0)
+    same_failure_replan_count: int = Field(default=0, ge=0)
+    max_same_failure_replans: int = Field(default=0, ge=0)
+    goal_replan_count: int = Field(default=0, ge=0)
+    max_goal_replans: int = Field(default=0, ge=0)
+    requires_new_evidence: bool = True
+    has_new_evidence: bool = True
+    limit_code: str | None = Field(default=None, max_length=100)
+    detail: str | None = Field(default=None, max_length=2000)
+
+
+class RecoveryNextAction(EngineModel):
+    """Core가 이어서 할 일 또는 사용자 판단이 필요한 이유."""
+
+    mode: Literal["automatic", "user_decision", "observe_first", "none"]
+    blocker_code: str | None = Field(default=None, max_length=100)
+    suggested_repair_action: str | None = Field(default=None, max_length=100)
+    checkpoint_required: bool = False
+    detail: str = Field(min_length=1, max_length=2000)
+
+
+class RecoveryExplanation(EngineModel):
+    """분류 근거·보존/폐기 범위·다음 동작을 한 화면에 모은 설명."""
+
+    state: Literal[
+        "none", "automatic_pending", "user_decision_required",
+        "observe_first_required", "recovered",
+    ]
+    classification: RecoveryClassification | None = None
+    limits: RecoveryLimitStatus | None = None
+    scope: RecoveryScope = RecoveryScope()
+    assessments: tuple[RecoveryAssessment, ...] = ()
+    next_action: RecoveryNextAction
+
+
 class ModelBindingItem(EngineModel):
     task_id: str | None = None
     execution_spec_digest: str | None = None

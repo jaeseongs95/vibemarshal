@@ -84,7 +84,7 @@ $FlowMarshal = "C:\absolute\flowmarshal-venv\Scripts\flowmarshal-engine.exe"
 & $FlowMarshal --db $Database --artifacts $Artifacts final-report --project-id <project-id> --format markdown
 ```
 
-GoalVerdict가 확정될 때까지 필요한 tick 수는 Plan과 원장 상태에 따라 달라진다. 사용자는 내부 Plan ID나 digest를 승인 입력으로 복사할 필요가 없다. 반복 실행과 observe-first 복구는 [Engine 사용자 workflow](docs/engine-user-workflow.md)를 따른다.
+GoalVerdict가 확정될 때까지 필요한 tick 수는 Plan과 원장 상태에 따라 달라진다. 사용자는 내부 Plan ID나 digest를 승인 입력으로 복사할 필요가 없다. 반복 실행과 observe-first 복구는 [Engine 사용자 workflow](docs/engine-user-workflow.md)를 따르며, 실패 뒤 자동 복구 범위와 `status`의 `recovery` 읽는 법은 같은 문서의 [자동 복구 읽기](docs/engine-user-workflow.md#자동-복구-읽기)에 있다.
 
 관측 token 정책은 선택 사항이다. `project budget set`에 넘기는 정책은 사용자가 별도 파일로 관리하며, 측정된 token을 기준으로 한 best-effort 중단 정책일 뿐 요금이나 구독 한도 상한이 아니다. `call_reservation_tokens`는 deprecated 호환 필드이며 admission 계산에 쓰지 않는다.
 

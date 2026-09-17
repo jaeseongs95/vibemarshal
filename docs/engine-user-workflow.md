@@ -111,6 +111,104 @@ Engine에 전역 daemon은 없다. Windows Task Scheduler, cron, CI 같은 외�
 
 `run-once`가 반환됐다는 사실은 provider job 완료를 뜻하지 않는다. 다음 schedule은 다시 `status`부터 읽으며, scheduler나 PC가 재시작돼도 아래 observe-first 복구 순서를 따른다. 사용자의 Codex 예약 상태나 특정 Windows Task Scheduler wrapper는 제품 Gate가 아니다.
 
+## 자동 복구 읽기
+
+Task 실행이 실패하면 Core는 원장에 남은 직접 근거로만 원인을 분류하고, 승인 경계 안에서 두 가지 최소 복구만 자동으로 수행한다. 복구는 항상 `run-once`의 한 tick 안에서 일어나며 별도 명령이 필요하지 않다.
+
+| 자동 경로 | 시작 근거 | Core가 하는 일 |
+|---|---|---|
+| bounded repair | provider/local이 명시한 구현 실패 code 또는 직접 test·diff·file 실패 evidence | 같은 Task·같은 Execution Spec으로 새 Attempt 하나를 허용하고 Task validation을 다시 실행 |
+| Context 복구 | `CONTEXT_REQUIRED` 계열 명시 code | 같은 Task 의미로 새 Execution Spec 준비를 활성화 |
+| subgraph replan | `TASK_CONTRACT_INVALID`·`DEPENDENCY_*` 계열 명시 code | 실패 Task와 그 후행 Task만 교체한 새 Plan revision을 만들고 복구 전용 독립 Reviewer 검토와 결정적 Gate를 통과한 경우에만 자동 활성화 |
+
+자동 복구는 `run-once`에 역할 설정(`--role-config`)이 있을 때만 연결된다. 설정이 없으면 subgraph replan은 `REPLAN_PROVIDER_REQUIRED`로 명시적으로 멈춘다.
+
+### 보존되는 것과 대체되는 것
+
+복구는 기존 기록을 지우지 않는다.
+
+- 보존: 원 Attempt와 그 failure_class, provider receipt와 intent, 실패 관측 evidence, 기록된 `RecoveryAssessment`. 새 Attempt는 다른 `attempt_no`와 다른 provider thread를 받는다.
+- 대체: subgraph replan에서만 직전 Plan revision이 `superseded`가 되고, 그 revision의 미완료 Task가 `superseded`로 남는다. 완료된 Task의 검증된 로컬 근거는 같은 `task_ref` 기준으로 새 revision에 재사용되며 원본 Attempt·receipt는 이동하지 않는다.
+- 실패 Task 밖의 Task 계약·Goal coverage·독립 Goal Test는 직전 revision의 의미를 그대로 유지한다.
+
+### status 읽는 법
+
+`status`의 `recovery`는 분류 근거, 보존·폐기 범위, 필요한 다음 동작을 나눠 보여 준다.
+
+```json
+{
+  "current_stage": "recovery_required",
+  "recovery": {
+    "state": "automatic_pending",
+    "classification": {
+      "task_id": "<task-id>",
+      "attempt_id": "<attempt-id>",
+      "failure_class": "implementation",
+      "basis": "direct_evidence",
+      "transient": false,
+      "evidence_ids": ["<evidence-id>"],
+      "codes": [
+        {
+          "values": ["IMPLEMENTATION_ERROR"],
+          "provenance": "provider_observed",
+          "authoritative": true,
+          "note": "provider payload가 직접 반환한 error code입니다."
+        },
+        {
+          "values": ["TASK_CONTRACT_INVALID"],
+          "provenance": "model_reported",
+          "authoritative": false,
+          "note": "모델 자기보고 code는 진단 가설이며 자동 복구를 시작하는 근거가 아닙니다."
+        }
+      ]
+    },
+    "limits": {
+      "task_recovery_count": 0,
+      "max_task_recovery": 2,
+      "same_failure_replan_count": 0,
+      "max_same_failure_replans": 2,
+      "goal_replan_count": 0,
+      "max_goal_replans": 5,
+      "requires_new_evidence": true,
+      "has_new_evidence": true,
+      "limit_code": null
+    },
+    "scope": {
+      "preserved_attempt_ids": ["<attempt-id>"],
+      "preserved_evidence_ids": ["<evidence-id>"],
+      "preserved_assessment_ids": [],
+      "superseded_plan_revision_ids": [],
+      "superseded_task_ids": [],
+      "active_plan_revision_id": "<plan-revision-id>"
+    },
+    "next_action": {
+      "mode": "automatic",
+      "blocker_code": null,
+      "suggested_repair_action": "task_repair",
+      "checkpoint_required": false,
+      "detail": "run-once가 원장 한도 안에서 task_repair 자동 복구를 이어서 수행합니다. ..."
+    }
+  }
+}
+```
+
+- `state`가 `automatic_pending`이면 다음 `run-once`가 복구를 이어서 수행한다. 사용자가 할 일은 없다.
+- `state`가 `recovered`면 미해결 실패가 없고 `scope`로 무엇이 보존됐고 무엇이 superseded인지 확인할 수 있다.
+- `state`가 `observe_first_required`면 효과가 확정되지 않았다는 뜻이다. `recover inspect`로 기존 intent·receipt를 먼저 대조하고 자동 재실행하지 않는다.
+- `state`가 `user_decision_required`면 `next_action.blocker_code`가 필요한 판단을 가리킨다.
+
+| `blocker_code` | 뜻과 다음 동작 |
+|---|---|
+| `RECOVERY_DIAGNOSIS_REQUIRED` | 직접 근거로 원인을 분류하지 못했다. provider code·직접 evidence를 확인하고 원인을 결정한 뒤 진행한다 |
+| `ENVIRONMENT_RECOVERY_REQUIRED` | 다시 시도로 풀리지 않는 환경 실패다. 환경 복구를 직접 관측한 뒤 진행한다 |
+| `AUTHORIZATION_EXPANSION_REQUIRED` | 목표·범위·효과·정책 확장이 필요하다. 새 Goal revision과 승인이 필요하다 |
+| `SAME_FAILURE_RECOVERY_LIMIT` / `SAME_FAILURE_REPLAN_LIMIT` / `GOAL_REPLAN_LIMIT` | 원장에서 센 복구 한도에 도달했다. `limits`의 실제 횟수와 상한을 확인한다 |
+| `NEW_RECOVERY_EVIDENCE_REQUIRED` | 첫 복구 이후 새 근거 없이 같은 복구를 반복할 수 없다 |
+| `TASK_VALIDATION_RECOVERY_REQUIRED` | 성공한 Worker 뒤 Task validation이 FAIL이다. 실패 결과와 직접 evidence로 원인을 분류한 `RecoveryAssessment`를 명시해 재시도한다 |
+| `REPLAN_PROVIDER_REQUIRED` | 현재 호출에 역할 설정이 없어 재계획 후보와 독립 검토를 만들 수 없다. `--role-config`를 지정한다 |
+
+`codes`의 `provenance`는 값의 출처를 구분한다. `provider_observed`와 `local_derived`만 `authoritative=true`이며 자동 복구를 시작할 수 있다. 모델 응답 본문이 `IMPLEMENTATION_ERROR: ...`처럼 스스로 코드를 보고해도 provider payload에 error code가 없으면 `model_reported`로만 남고 복구는 시작되지 않는다. Worker가 완료를 자칭해도 Task는 검사 결과로만 완료된다.
+
 ## 재시작과 receipt 복구
 
 | 관측 상태 | 조치 | 금지 사항 |

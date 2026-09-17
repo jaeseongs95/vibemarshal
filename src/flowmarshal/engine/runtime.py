@@ -62,10 +62,15 @@ from .operation_trace import (
 )
 from .service import ContextRequiredError, EngineService, EngineServiceError
 from .recovery import (
+    FAILURE_DIAGNOSIS_PROVENANCE,
     FAILURE_REPAIR_ACTIONS,
     EvidenceFirstFailureClassifier,
     FailureDiagnosis,
     FailureSignal,
+    recovery_limit_decision,
+    recovery_route,
+    stable_recovery_assessment_id,
+    terminal_failure_diagnosis,
 )
 
 
@@ -2069,7 +2074,7 @@ class RuntimeJobSupervisor:
 #: `EvidenceRecord.observation`의 최대 길이. 실패 관측 문서는 이 한도 안에서 항상 유효한 JSON이어야 한다.
 _FAILURE_OBSERVATION_LIMIT = 10_000
 #: 실패 기록 시점에 Engine이 계산한 분류 projection의 provenance 표식.
-_FAILURE_DIAGNOSIS_PROVENANCE = "local_derived"
+_FAILURE_DIAGNOSIS_PROVENANCE = FAILURE_DIAGNOSIS_PROVENANCE
 
 
 class EngineDispatcher:
@@ -2908,61 +2913,9 @@ class EngineDispatcher:
     def _terminal_failure_diagnosis(
         self, documents: tuple[dict[str, Any], ...]
     ) -> FailureDiagnosis | None:
-        """원장에 보존한 failed terminal evidence에서 code 출처와 일시 실패 표시를 읽는다.
+        """보존된 failed terminal evidence의 분류 projection을 읽는 공유 구현이다."""
 
-        Attempt 행에는 `failure_class`만 남으므로 provider/local code 출처와 일시
-        실패 표시는 실패 관측 evidence에서만 복원할 수 있다. 기록 시점에 남긴
-        `failure_diagnosis` projection(`local_derived`)을 우선 읽고, projection이 없는
-        이전 형식 문서만 보존된 `provider_payload`를 같은 분류기로 다시 관측한다.
-        실패 판정 자체는 바꾸지 않으며 호출자가 원장 분류와 일치할 때만 사용한다.
-        """
-
-        for document in documents:
-            observation = document.get("observation")
-            if isinstance(observation, str):
-                try:
-                    observation = json.loads(observation)
-                except ValueError:
-                    continue
-            if not isinstance(observation, dict):
-                continue
-            projection = observation.get("failure_diagnosis")
-            if (
-                isinstance(projection, dict)
-                and projection.get("provenance") == _FAILURE_DIAGNOSIS_PROVENANCE
-            ):
-                failure_class = projection.get("failure_class")
-                try:
-                    parsed_class = (
-                        None if failure_class is None else FailureClass(failure_class)
-                    )
-                    return FailureDiagnosis(
-                        failure_class=parsed_class,
-                        repair_action=(
-                            None if parsed_class is None
-                            else FAILURE_REPAIR_ACTIONS[parsed_class]
-                        ),
-                        error_code=projection.get("error_code"),
-                        provider_error_code=projection.get("provider_error_code"),
-                        local_engine_code=projection.get("local_engine_code"),
-                        rationale="실패 기록 시점의 local_derived 분류 projection",
-                        source=projection.get("source") or "unclassified",
-                        model_reported_codes=tuple(
-                            projection.get("model_reported_codes") or ()
-                        ),
-                        transient=bool(projection.get("transient")),
-                    )
-                except (ValueError, ValidationError):
-                    continue
-            if "provider_payload" not in observation:
-                continue
-            payload = observation.get("provider_payload")
-            return self.failure_classifier.classify(FailureSignal(
-                terminal_status=observation.get("terminal_status"),
-                final_response=observation.get("final_response"),
-                provider_payload=payload if isinstance(payload, dict) else {},
-            ))
-        return None
+        return terminal_failure_diagnosis(documents, classifier=self.failure_classifier)
 
     @staticmethod
     def _bounded_failure_document(document: dict[str, Any]) -> dict[str, Any]:
@@ -3042,10 +2995,7 @@ class EngineDispatcher:
 
     @staticmethod
     def _stable_recovery_id(attempt_id: str, failure_fingerprint: str) -> str:
-        digest = hashlib.sha256(
-            f"{attempt_id}:{failure_fingerprint}".encode("utf-8")
-        ).hexdigest()
-        return f"recovery_assessment_{digest[:32]}"
+        return stable_recovery_assessment_id(attempt_id, failure_fingerprint)
 
     def _recovery_assessment(
         self,
@@ -3110,49 +3060,26 @@ class EngineDispatcher:
     ) -> RunOnceOutcome | None:
         from .operations import ExternalOperationUnknown
 
-        failure = diagnosis.failure_class
-        if failure is None or failure is FailureClass.UNCLASSIFIED:
-            if validation_result_id is not None:
-                return None
-            return RunOnceOutcome(
-                action=RunOnceAction.BLOCKED,
-                project_id=project_id,
-                task_id=task_id,
-                attempt_id=attempt_id,
-                validation_result_id=validation_result_id,
-                evidence_ids=diagnosis.evidence_ids,
-                blocker_code="RECOVERY_DIAGNOSIS_REQUIRED",
-                detail=diagnosis.rationale,
-            )
-        if failure is FailureClass.EXTERNAL_UNKNOWN:
+        # 분류 → 경로 결정은 status 표시와 같은 공유 구현을 쓴다.
+        route = recovery_route(diagnosis, validation_result_id=validation_result_id)
+        if route.mode in {"unrouted", "observe_first"}:
             return None
-        if failure is FailureClass.REQUIREMENT_CHANGE:
-            return RunOnceOutcome(
-                action=RunOnceAction.BLOCKED,
-                project_id=project_id,
-                task_id=task_id,
-                attempt_id=attempt_id,
-                evidence_ids=diagnosis.evidence_ids,
-                blocker_code="AUTHORIZATION_EXPANSION_REQUIRED",
-                failure_class=failure,
-                suggested_repair_action=RepairAction.GOAL_REVISION,
-                checkpoint_required=True,
-                detail="목표·범위·효과·운영 정책 확장은 사용자 승인이 필요합니다.",
+        if route.mode == "user_decision":
+            classified = (
+                diagnosis.failure_class is not None
+                and diagnosis.failure_class is not FailureClass.UNCLASSIFIED
             )
-        if failure is FailureClass.ENVIRONMENT and not diagnosis.transient:
-            # provider/local code가 "다시 시도 가능"을 직접 말하지 않는 환경 실패는
-            # 사람이 환경 복구를 관측하기 전까지 같은 실행을 반복하지 않는다.
             return RunOnceOutcome(
                 action=RunOnceAction.BLOCKED,
                 project_id=project_id,
                 task_id=task_id,
                 attempt_id=attempt_id,
                 evidence_ids=diagnosis.evidence_ids,
-                blocker_code="ENVIRONMENT_RECOVERY_REQUIRED",
-                failure_class=failure,
-                suggested_repair_action=RepairAction.CONTINUE,
-                checkpoint_required=True,
-                detail="환경 복구를 직접 관측하기 전에는 같은 실행을 반복하지 않습니다.",
+                blocker_code=route.blocker_code,
+                failure_class=diagnosis.failure_class if classified else None,
+                suggested_repair_action=route.suggested_repair_action,
+                checkpoint_required=route.checkpoint_required,
+                detail=route.detail,
             )
 
         limit = self._recovery_limit_blocker(
@@ -3291,108 +3218,17 @@ class EngineDispatcher:
         diagnosis: FailureDiagnosis,
         validation_result_id: str | None,
     ) -> RunOnceOutcome | None:
-        action = diagnosis.repair_action
-        if action is None:
-            return None
+        """원장에서 계산한 복구 한도 관측을 그대로 typed 차단으로 바꾼다."""
+
         with self.service.ledger.read() as connection:
-            task = connection.execute(
-                "SELECT payload_json FROM task_contracts WHERE id=?", (task_id,)
-            ).fetchone()
-            authorization = connection.execute(
-                "SELECT payload_json FROM goal_authorizations WHERE project_id=? "
-                "ORDER BY revision_no DESC LIMIT 1",
-                (project_id,),
-            ).fetchone()
-            task_recovery = json.loads(task["payload_json"])["recovery"]
-            existing_assessment = connection.execute(
-                "SELECT 1 FROM recovery_assessments WHERE id=?",
-                (self._stable_recovery_id(attempt_id, diagnosis.failure_fingerprint),),
-            ).fetchone()
-            operating = (
-                {
-                    "max_same_failure_replans": 2,
-                    "max_goal_replans": 5,
-                    "requires_new_evidence": True,
-                }
-                if authorization is None
-                else json.loads(authorization["payload_json"])["operating_policy"]
+            limit = recovery_limit_decision(
+                connection,
+                project_id=project_id,
+                task_id=task_id,
+                attempt_id=attempt_id,
+                diagnosis=diagnosis,
             )
-            task_attempts = connection.execute(
-                "SELECT COUNT(*) FROM history_events WHERE project_id=? AND entity_id=? "
-                "AND event_type IN ('task.retry_enabled','task.execution_spec_recovery_enabled')",
-                (project_id, task_id),
-            ).fetchone()[0]
-            same_replans = connection.execute(
-                "SELECT COUNT(*) FROM recovery_assessments WHERE project_id=? "
-                "AND action='subgraph_replan' "
-                "AND json_extract(payload_json,'$.failure_fingerprint')=?",
-                (project_id, diagnosis.failure_fingerprint),
-            ).fetchone()[0]
-            goal_replans = connection.execute(
-                "SELECT COUNT(*) FROM recovery_assessments WHERE project_id=? "
-                "AND action IN ('subgraph_replan','goal_revision')",
-                (project_id,),
-            ).fetchone()[0]
-            last_recovery = connection.execute(
-                "SELECT MAX(sequence) FROM history_events WHERE project_id=? AND ("
-                "event_type='recovery.assessed' OR (entity_id=? AND event_type IN "
-                "('task.retry_enabled','task.execution_spec_recovery_enabled')))",
-                (project_id, task_id),
-            ).fetchone()[0]
-            if diagnosis.evidence_ids:
-                placeholders = ",".join("?" for _ in diagnosis.evidence_ids)
-                newest_evidence = connection.execute(
-                    "SELECT MAX(sequence) FROM history_events WHERE project_id=? "
-                    "AND event_type='evidence.recorded' "
-                    f"AND entity_id IN ({placeholders})",
-                    (project_id, *diagnosis.evidence_ids),
-                ).fetchone()[0]
-            else:
-                newest_evidence = None
-
-        # 같은 assessment의 다음 checkpoint(replan/activation)는 반복 복구가 아니다.
-        if existing_assessment is not None:
-            return None
-
-        limit_code = None
-        detail = None
-        if action in {
-            RepairAction.TASK_REPAIR,
-            RepairAction.EXECUTION_SPEC_REVISION,
-            RepairAction.CONTINUE,
-        }:
-            maximum = int(task_recovery["max_same_failure_replans"])
-            if diagnosis.failure_class.value not in set(
-                task_recovery["retryable_failure_classes"]
-            ):
-                limit_code = "RECOVERY_NOT_AUTHORIZED"
-                detail = (
-                    f"TaskContract가 {diagnosis.failure_class.value} 자동 복구를 허용하지 않습니다."
-                )
-            elif int(task_attempts) >= maximum:
-                limit_code = "SAME_FAILURE_RECOVERY_LIMIT"
-                detail = f"동일 Task recovery 상한 {maximum}회에 도달했습니다."
-        elif action is RepairAction.SUBGRAPH_REPLAN:
-            maximum = int(operating["max_same_failure_replans"])
-            if int(same_replans) >= maximum:
-                limit_code = "SAME_FAILURE_REPLAN_LIMIT"
-                detail = f"동일 실패 재계획 상한 {maximum}회에 도달했습니다."
-        if (
-            limit_code is None
-            and action in {RepairAction.SUBGRAPH_REPLAN, RepairAction.GOAL_REVISION}
-            and int(goal_replans) >= int(operating["max_goal_replans"])
-        ):
-            limit_code = "GOAL_REPLAN_LIMIT"
-            detail = f"Goal 전체 재계획 상한 {operating['max_goal_replans']}회에 도달했습니다."
-        if (
-            limit_code is None
-            and operating.get("requires_new_evidence", True)
-            and last_recovery is not None
-            and (newest_evidence is None or int(newest_evidence) <= int(last_recovery))
-        ):
-            limit_code = "NEW_RECOVERY_EVIDENCE_REQUIRED"
-            detail = "첫 복구 이후에는 이전 checkpoint 뒤에 기록된 새 evidence가 필요합니다."
-        if limit_code is None:
+        if limit.limit_code is None:
             return None
         return RunOnceOutcome(
             action=RunOnceAction.BLOCKED,
@@ -3401,11 +3237,11 @@ class EngineDispatcher:
             attempt_id=attempt_id,
             validation_result_id=validation_result_id,
             evidence_ids=diagnosis.evidence_ids,
-            blocker_code=limit_code,
+            blocker_code=limit.limit_code,
             failure_class=diagnosis.failure_class,
-            suggested_repair_action=action,
+            suggested_repair_action=diagnosis.repair_action,
             checkpoint_required=True,
-            detail=detail,
+            detail=limit.detail,
         )
 
     def _automatic_subgraph_replan(

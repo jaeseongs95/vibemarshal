@@ -6,13 +6,14 @@ terminal을 구현 오류로 추정하지 않는다.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Iterable, Mapping
 
-from pydantic import Field
+from pydantic import Field, ValidationError
 
 from ..canonical import sha256_digest
 from .domain import EngineModel, FailureClass, RepairAction
@@ -263,3 +264,302 @@ class EvidenceFirstFailureClassifier:
             source="unclassified",
             model_reported_codes=model_reported_codes,
         )
+
+
+#: 실패 기록 시점에 남기는 분류 projection의 provenance 표식.
+FAILURE_DIAGNOSIS_PROVENANCE = "local_derived"
+
+
+def stable_recovery_assessment_id(attempt_id: str, failure_fingerprint: str) -> str:
+    """같은 Attempt·실패 지문에는 언제나 같은 assessment ID를 만든다."""
+
+    digest = hashlib.sha256(
+        f"{attempt_id}:{failure_fingerprint}".encode("utf-8")
+    ).hexdigest()
+    return f"recovery_assessment_{digest[:32]}"
+
+
+def terminal_failure_diagnosis(
+    documents: tuple[dict[str, Any], ...],
+    *,
+    classifier: "EvidenceFirstFailureClassifier",
+) -> FailureDiagnosis | None:
+    """보존된 failed terminal evidence에서 code 출처와 일시 실패 표시를 읽는다.
+
+    Attempt 행에는 `failure_class`만 남으므로 provider/local code 출처와 일시 실패
+    표시는 실패 관측 evidence에서만 복원할 수 있다. 기록 시점에 남긴
+    `failure_diagnosis` projection(`local_derived`)을 우선 읽고, projection이 없는
+    이전 형식 문서만 보존된 `provider_payload`를 같은 분류기로 다시 관측한다.
+    실패 판정 자체는 바꾸지 않으며 호출자가 원장 분류와 일치할 때만 사용한다.
+    """
+
+    for document in documents:
+        observation = document.get("observation")
+        if isinstance(observation, str):
+            try:
+                observation = json.loads(observation)
+            except ValueError:
+                continue
+        if not isinstance(observation, dict):
+            continue
+        projection = observation.get("failure_diagnosis")
+        if (
+            isinstance(projection, dict)
+            and projection.get("provenance") == FAILURE_DIAGNOSIS_PROVENANCE
+        ):
+            failure_class = projection.get("failure_class")
+            try:
+                parsed_class = (
+                    None if failure_class is None else FailureClass(failure_class)
+                )
+                return FailureDiagnosis(
+                    failure_class=parsed_class,
+                    repair_action=(
+                        None if parsed_class is None
+                        else FAILURE_REPAIR_ACTIONS[parsed_class]
+                    ),
+                    error_code=projection.get("error_code"),
+                    provider_error_code=projection.get("provider_error_code"),
+                    local_engine_code=projection.get("local_engine_code"),
+                    rationale="실패 기록 시점의 local_derived 분류 projection",
+                    source=projection.get("source") or "unclassified",
+                    model_reported_codes=tuple(
+                        projection.get("model_reported_codes") or ()
+                    ),
+                    transient=bool(projection.get("transient")),
+                )
+            except (ValueError, ValidationError):
+                continue
+        if "provider_payload" not in observation:
+            continue
+        payload = observation.get("provider_payload")
+        return classifier.classify(FailureSignal(
+            terminal_status=observation.get("terminal_status"),
+            final_response=observation.get("final_response"),
+            provider_payload=payload if isinstance(payload, dict) else {},
+        ))
+    return None
+
+
+class RecoveryRoute(EngineModel):
+    """분류 하나가 결정하는 자동 복구 경로. 원장 한도 검사 이전 단계다."""
+
+    mode: str = Field(pattern=r"^(automatic|user_decision|observe_first|unrouted)$")
+    blocker_code: str | None = Field(default=None, max_length=100)
+    suggested_repair_action: RepairAction | None = None
+    checkpoint_required: bool = False
+    detail: str = Field(min_length=1, max_length=2000)
+
+
+def recovery_route(
+    diagnosis: FailureDiagnosis,
+    *,
+    validation_result_id: str | None = None,
+) -> RecoveryRoute:
+    """직접 근거로 분류된 실패만 자동 경로로 보내고 나머지는 사용자 판단에 남긴다.
+
+    model-reported code는 진단 가설일 뿐이므로 `unclassified`를 자동 복구로 승격하지
+    않는다. 이 함수는 원장을 읽지 않으며 한도·evidence 검사는 별도 단계다.
+    """
+
+    failure = diagnosis.failure_class
+    if failure is None or failure is FailureClass.UNCLASSIFIED:
+        if validation_result_id is not None:
+            return RecoveryRoute(
+                mode="unrouted",
+                detail=(
+                    "직접 근거가 없는 validation 실패는 기존 validation recovery 경계로 넘깁니다."
+                ),
+            )
+        return RecoveryRoute(
+            mode="user_decision",
+            blocker_code="RECOVERY_DIAGNOSIS_REQUIRED",
+            detail=diagnosis.rationale,
+        )
+    if failure is FailureClass.EXTERNAL_UNKNOWN:
+        return RecoveryRoute(
+            mode="observe_first",
+            suggested_repair_action=RepairAction.WAIT_EXTERNAL,
+            checkpoint_required=True,
+            detail=(
+                "효과가 확인되지 않아 기존 intent·receipt와 대상을 먼저 관측하고 "
+                "자동 재실행하지 않습니다."
+            ),
+        )
+    if failure is FailureClass.REQUIREMENT_CHANGE:
+        return RecoveryRoute(
+            mode="user_decision",
+            blocker_code="AUTHORIZATION_EXPANSION_REQUIRED",
+            suggested_repair_action=RepairAction.GOAL_REVISION,
+            checkpoint_required=True,
+            detail="목표·범위·효과·운영 정책 확장은 사용자 승인이 필요합니다.",
+        )
+    if failure is FailureClass.ENVIRONMENT and not diagnosis.transient:
+        # provider/local code가 "다시 시도 가능"을 직접 말하지 않는 환경 실패는
+        # 사람이 환경 복구를 관측하기 전까지 같은 실행을 반복하지 않는다.
+        return RecoveryRoute(
+            mode="user_decision",
+            blocker_code="ENVIRONMENT_RECOVERY_REQUIRED",
+            suggested_repair_action=RepairAction.CONTINUE,
+            checkpoint_required=True,
+            detail="환경 복구를 직접 관측하기 전에는 같은 실행을 반복하지 않습니다.",
+        )
+    return RecoveryRoute(
+        mode="automatic",
+        suggested_repair_action=diagnosis.repair_action,
+        detail="직접 근거로 분류된 실패에 원장 한도 안의 자동 복구를 적용합니다.",
+    )
+
+
+class RecoveryLimitObservation(EngineModel):
+    """원장에서 직접 센 복구 한도 관측과 그 결과 차단 code."""
+
+    assessment_id: str = Field(min_length=1, max_length=200)
+    assessment_recorded: bool = False
+    failure_class_retryable: bool = True
+    task_recovery_count: int = Field(ge=0)
+    max_task_recovery: int = Field(ge=0)
+    same_failure_replan_count: int = Field(ge=0)
+    max_same_failure_replans: int = Field(ge=0)
+    goal_replan_count: int = Field(ge=0)
+    max_goal_replans: int = Field(ge=0)
+    requires_new_evidence: bool = True
+    has_new_evidence: bool = True
+    limit_code: str | None = Field(default=None, max_length=100)
+    detail: str | None = Field(default=None, max_length=2000)
+
+
+_DEFAULT_OPERATING_LIMITS = {
+    "max_same_failure_replans": 2,
+    "max_goal_replans": 5,
+    "requires_new_evidence": True,
+}
+
+
+def recovery_limit_decision(
+    connection: Any,
+    *,
+    project_id: str,
+    task_id: str,
+    attempt_id: str,
+    diagnosis: FailureDiagnosis,
+) -> RecoveryLimitObservation:
+    """TaskContract·GoalAuthorization 한도와 새 evidence 요구를 원장에서 계산한다.
+
+    읽기 전용이며 실행 경로와 사용자 status 표시가 같은 결과를 쓰도록 한 곳에 둔다.
+    """
+
+    action = diagnosis.repair_action
+    assessment_id = stable_recovery_assessment_id(
+        attempt_id, diagnosis.failure_fingerprint
+    )
+    task = connection.execute(
+        "SELECT payload_json FROM task_contracts WHERE id=?", (task_id,)
+    ).fetchone()
+    authorization = connection.execute(
+        "SELECT payload_json FROM goal_authorizations WHERE project_id=? "
+        "ORDER BY revision_no DESC LIMIT 1",
+        (project_id,),
+    ).fetchone()
+    task_recovery = json.loads(task["payload_json"])["recovery"]
+    existing_assessment = connection.execute(
+        "SELECT 1 FROM recovery_assessments WHERE id=?", (assessment_id,)
+    ).fetchone()
+    operating = (
+        dict(_DEFAULT_OPERATING_LIMITS)
+        if authorization is None
+        else json.loads(authorization["payload_json"])["operating_policy"]
+    )
+    task_attempts = connection.execute(
+        "SELECT COUNT(*) FROM history_events WHERE project_id=? AND entity_id=? "
+        "AND event_type IN ('task.retry_enabled','task.execution_spec_recovery_enabled')",
+        (project_id, task_id),
+    ).fetchone()[0]
+    same_replans = connection.execute(
+        "SELECT COUNT(*) FROM recovery_assessments WHERE project_id=? "
+        "AND action='subgraph_replan' "
+        "AND json_extract(payload_json,'$.failure_fingerprint')=?",
+        (project_id, diagnosis.failure_fingerprint),
+    ).fetchone()[0]
+    goal_replans = connection.execute(
+        "SELECT COUNT(*) FROM recovery_assessments WHERE project_id=? "
+        "AND action IN ('subgraph_replan','goal_revision')",
+        (project_id,),
+    ).fetchone()[0]
+    last_recovery = connection.execute(
+        "SELECT MAX(sequence) FROM history_events WHERE project_id=? AND ("
+        "event_type='recovery.assessed' OR (entity_id=? AND event_type IN "
+        "('task.retry_enabled','task.execution_spec_recovery_enabled')))",
+        (project_id, task_id),
+    ).fetchone()[0]
+    if diagnosis.evidence_ids:
+        placeholders = ",".join("?" for _ in diagnosis.evidence_ids)
+        newest_evidence = connection.execute(
+            "SELECT MAX(sequence) FROM history_events WHERE project_id=? "
+            "AND event_type='evidence.recorded' "
+            f"AND entity_id IN ({placeholders})",
+            (project_id, *diagnosis.evidence_ids),
+        ).fetchone()[0]
+    else:
+        newest_evidence = None
+
+    retryable = (
+        diagnosis.failure_class is not None
+        and diagnosis.failure_class.value
+        in set(task_recovery["retryable_failure_classes"])
+    )
+    has_new_evidence = not (
+        last_recovery is not None
+        and (newest_evidence is None or int(newest_evidence) <= int(last_recovery))
+    )
+    observation = {
+        "assessment_id": assessment_id,
+        "assessment_recorded": existing_assessment is not None,
+        "failure_class_retryable": retryable,
+        "task_recovery_count": int(task_attempts),
+        "max_task_recovery": int(task_recovery["max_same_failure_replans"]),
+        "same_failure_replan_count": int(same_replans),
+        "max_same_failure_replans": int(operating["max_same_failure_replans"]),
+        "goal_replan_count": int(goal_replans),
+        "max_goal_replans": int(operating["max_goal_replans"]),
+        "requires_new_evidence": bool(operating.get("requires_new_evidence", True)),
+        "has_new_evidence": has_new_evidence,
+    }
+    # 같은 assessment의 다음 checkpoint(replan/activation)는 반복 복구가 아니다.
+    if action is None or existing_assessment is not None:
+        return RecoveryLimitObservation.model_validate(observation)
+
+    limit_code = None
+    detail = None
+    if action in {
+        RepairAction.TASK_REPAIR,
+        RepairAction.EXECUTION_SPEC_REVISION,
+        RepairAction.CONTINUE,
+    }:
+        maximum = observation["max_task_recovery"]
+        if not retryable:
+            limit_code = "RECOVERY_NOT_AUTHORIZED"
+            detail = (
+                f"TaskContract가 {diagnosis.failure_class.value} 자동 복구를 허용하지 않습니다."
+            )
+        elif observation["task_recovery_count"] >= maximum:
+            limit_code = "SAME_FAILURE_RECOVERY_LIMIT"
+            detail = f"동일 Task recovery 상한 {maximum}회에 도달했습니다."
+    elif action is RepairAction.SUBGRAPH_REPLAN:
+        maximum = observation["max_same_failure_replans"]
+        if observation["same_failure_replan_count"] >= maximum:
+            limit_code = "SAME_FAILURE_REPLAN_LIMIT"
+            detail = f"동일 실패 재계획 상한 {maximum}회에 도달했습니다."
+    if (
+        limit_code is None
+        and action in {RepairAction.SUBGRAPH_REPLAN, RepairAction.GOAL_REVISION}
+        and observation["goal_replan_count"] >= observation["max_goal_replans"]
+    ):
+        limit_code = "GOAL_REPLAN_LIMIT"
+        detail = f"Goal 전체 재계획 상한 {observation['max_goal_replans']}회에 도달했습니다."
+    if limit_code is None and observation["requires_new_evidence"] and not has_new_evidence:
+        limit_code = "NEW_RECOVERY_EVIDENCE_REQUIRED"
+        detail = "첫 복구 이후에는 이전 checkpoint 뒤에 기록된 새 evidence가 필요합니다."
+    return RecoveryLimitObservation.model_validate(
+        observation | {"limit_code": limit_code, "detail": detail}
+    )

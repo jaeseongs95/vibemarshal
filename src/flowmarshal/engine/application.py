@@ -21,6 +21,7 @@ from .domain import (
     BudgetUsageRecord,
     ContextSourceRegistrationKind,
     EngineModel,
+    FailureClass,
     GoalAuthorization,
     GoalContractRevision,
     GoalOperatingPolicy,
@@ -45,6 +46,14 @@ from .domain import (
 from .models import EngineRoleConfiguration, ModelInventory
 from .goal import GoalPreparationOutcome
 from .planning import PlanningSearchOutcome
+from .recovery import (
+    EvidenceFirstFailureClassifier,
+    FailureDiagnosis,
+    FailureSignal,
+    recovery_limit_decision,
+    recovery_route,
+    terminal_failure_diagnosis,
+)
 from .read_models import (
     AttemptDetail,
     DuplicateLogicalCall,
@@ -60,6 +69,12 @@ from .read_models import (
     ProviderReceiptUsage,
     ReadPresentation,
     ReadOnlyReportVerification,
+    RecoveryClassification,
+    RecoveryCodeObservation,
+    RecoveryExplanation,
+    RecoveryLimitStatus,
+    RecoveryNextAction,
+    RecoveryScope,
     RecoveryStatus,
     TaskValidationRecovery,
     UsageBreakdown,
@@ -989,16 +1004,27 @@ class EngineApplication:
         from .runtime import EngineDispatcher
 
         provider = None
+        recovery_provider = None
         if self.role_configuration is not None:
             _runtime, roles, runner = self._execution_components()
             from .execution import ExecutionProposalAdapter
+            from .recovery_planning import RecoveryPlanProvider
 
             provider = ExecutionProposalAdapter(self.service, runner, roles)
+            # 역할 설정이 있을 때만 실제 Plan subgraph 재계획·독립 검토를 연결한다.
+            # 설정이 없으면 Core는 REPLAN_PROVIDER_REQUIRED로 명시 정지한다.
+            recovery_provider = RecoveryPlanProvider(
+                self.service,
+                runner,
+                roles,
+                inspection_contract=self.inspection_contract,
+            )
         return EngineDispatcher(
             self.service,
             self.runtime,
             proposal_provider=provider,
             supervisor=self.supervisor,
+            recovery_provider=recovery_provider,
         )
 
     def run_once(
@@ -1552,6 +1578,314 @@ class EngineApplication:
             return "goal_validation_ready", "모든 Task가 완료되어 독립 Goal validation이 남아 있습니다.", "run-once로 Goal Test를 준비·실행하십시오."
         return "waiting", "Core 원장은 다음 결정적 전이를 기다리고 있습니다.", "status drill_down의 Task와 검사를 확인하십시오."
 
+    _MODEL_REPORTED_NOTE = (
+        "모델 자기보고 code는 진단 가설이며 자동 복구를 시작하는 근거가 아닙니다."
+    )
+
+    def _recovery_evidence_documents(
+        self, attempt_id: str, *, evidence_ids: tuple[str, ...] = (),
+    ) -> tuple[tuple[str, ...], tuple[dict[str, Any], ...]]:
+        """실패 evidence 원문을 읽기 전용으로 읽는다. 실행 경로와 같은 순서를 쓴다."""
+
+        with self.service.ledger.read() as connection:
+            if evidence_ids:
+                placeholders = ",".join("?" for _ in evidence_ids)
+                rows = connection.execute(
+                    f"SELECT id,payload_json FROM evidence_records WHERE id IN ({placeholders}) "
+                    "ORDER BY observed_at,rowid",
+                    tuple(evidence_ids),
+                ).fetchall()
+            else:
+                rows = connection.execute(
+                    "SELECT id,payload_json FROM evidence_records WHERE attempt_id=? "
+                    "ORDER BY observed_at,rowid",
+                    (attempt_id,),
+                ).fetchall()
+        return (
+            tuple(row["id"] for row in rows),
+            tuple(json.loads(row["payload_json"]) for row in rows),
+        )
+
+    def _recovery_failure(
+        self, project_id: str, *, plan_revision_id: str | None,
+    ) -> tuple[dict[str, Any], FailureDiagnosis] | None:
+        """현재 미해결 실패 하나와 그 원장 분류를 실행 경로와 같은 규칙으로 읽는다."""
+
+        if plan_revision_id is None:
+            return None
+        classifier = EvidenceFirstFailureClassifier()
+        with self.service.ledger.read() as connection:
+            failed = connection.execute(
+                "SELECT t.id AS task_id, a.id AS attempt_id, a.failure_class, a.failure_detail "
+                "FROM task_contracts t JOIN attempts a ON a.id = ("
+                "SELECT latest.id FROM attempts latest WHERE latest.task_id = t.id "
+                "AND latest.kind = 'execution' "
+                "ORDER BY latest.attempt_no DESC, latest.rowid DESC LIMIT 1"
+                ") WHERE t.plan_revision_id = ? AND t.status IN ('failed','blocked') "
+                "AND a.failure_class IS NOT NULL "
+                "ORDER BY t.position LIMIT 1",
+                (plan_revision_id,),
+            ).fetchone()
+        if failed is not None:
+            failure_class = FailureClass(failed["failure_class"])
+            evidence_ids, documents = self._recovery_evidence_documents(failed["attempt_id"])
+            observed = terminal_failure_diagnosis(documents, classifier=classifier)
+            matched = observed is not None and observed.failure_class is failure_class
+            diagnosis = FailureDiagnosis(
+                failure_class=failure_class,
+                repair_action=self.service.repair_action_for(failure_class),
+                provider_error_code=observed.provider_error_code if matched else None,
+                local_engine_code=observed.local_engine_code if matched else None,
+                evidence_ids=evidence_ids,
+                rationale=failed["failure_detail"] or "원장에 기록된 Attempt 실패",
+                source=(
+                    "unclassified"
+                    if failure_class is FailureClass.UNCLASSIFIED
+                    else "direct_evidence"
+                ),
+                model_reported_codes=(
+                    () if observed is None else observed.model_reported_codes
+                ),
+                transient=bool(matched and observed.transient),
+            )
+            return (
+                {
+                    "task_id": failed["task_id"],
+                    "attempt_id": failed["attempt_id"],
+                    "validation_result_id": None,
+                },
+                diagnosis,
+            )
+        validation_failure = self.service.task_validation_recovery_blocker(
+            project_id, plan_revision_id=plan_revision_id
+        )
+        if validation_failure is None:
+            return None
+        evidence_ids, documents = self._recovery_evidence_documents(
+            validation_failure["attempt_id"],
+            evidence_ids=tuple(validation_failure["evidence_ids"]),
+        )
+        diagnosis = classifier.classify(FailureSignal(
+            terminal_status="validation_failed",
+            final_response=None,
+            provider_payload={
+                "validation_result_id": validation_failure["validation_result_id"]
+            },
+            evidence_ids=evidence_ids,
+            evidence_documents=documents,
+        ))
+        return (
+            {
+                "task_id": validation_failure["task_id"],
+                "attempt_id": validation_failure["attempt_id"],
+                "validation_result_id": validation_failure["validation_result_id"],
+            },
+            diagnosis,
+        )
+
+    def _recovery_scope(self, project_id: str, *, active_plan_revision_id: str | None) -> RecoveryScope:
+        """원장이 보존한 기록과 새 revision이 대체한 범위를 나눠 읽는다."""
+
+        with self.service.ledger.read() as connection:
+            attempts = connection.execute(
+                "SELECT id FROM attempts WHERE project_id=? ORDER BY rowid", (project_id,)
+            ).fetchall()
+            evidence = connection.execute(
+                "SELECT id FROM evidence_records WHERE project_id=? ORDER BY observed_at,rowid",
+                (project_id,),
+            ).fetchall()
+            assessments = connection.execute(
+                "SELECT id FROM recovery_assessments WHERE project_id=? ORDER BY created_at,rowid",
+                (project_id,),
+            ).fetchall()
+            receipts = connection.execute(
+                "SELECT i.id FROM runtime_intents i JOIN runtime_receipts r ON r.intent_id=i.id "
+                "JOIN attempts a ON a.id=i.attempt_id WHERE a.project_id=? ORDER BY i.rowid",
+                (project_id,),
+            ).fetchall()
+            superseded_plans = connection.execute(
+                "SELECT id FROM plan_revisions WHERE project_id=? AND status='superseded' "
+                "ORDER BY revision_no",
+                (project_id,),
+            ).fetchall()
+            superseded_tasks = connection.execute(
+                "SELECT id FROM task_contracts WHERE project_id=? AND status='superseded' "
+                "ORDER BY rowid",
+                (project_id,),
+            ).fetchall()
+        return RecoveryScope(
+            preserved_attempt_ids=tuple(row["id"] for row in attempts),
+            preserved_evidence_ids=tuple(row["id"] for row in evidence),
+            preserved_assessment_ids=tuple(row["id"] for row in assessments),
+            preserved_receipt_intent_ids=tuple(row["id"] for row in receipts),
+            superseded_plan_revision_ids=tuple(row["id"] for row in superseded_plans),
+            superseded_task_ids=tuple(row["id"] for row in superseded_tasks),
+            active_plan_revision_id=active_plan_revision_id,
+        )
+
+    @staticmethod
+    def _recovery_codes(diagnosis: FailureDiagnosis) -> tuple[RecoveryCodeObservation, ...]:
+        codes: list[RecoveryCodeObservation] = []
+        if diagnosis.provider_error_code is not None:
+            codes.append(RecoveryCodeObservation(
+                values=(diagnosis.provider_error_code,),
+                provenance="provider_observed",
+                authoritative=True,
+                note="provider payload가 직접 반환한 error code입니다.",
+            ))
+        if diagnosis.local_engine_code is not None:
+            codes.append(RecoveryCodeObservation(
+                values=(diagnosis.local_engine_code,),
+                provenance="local_derived",
+                authoritative=True,
+                note="로컬 Engine이 직접 관측해 만든 code입니다.",
+            ))
+        if diagnosis.model_reported_codes:
+            codes.append(RecoveryCodeObservation(
+                values=diagnosis.model_reported_codes,
+                provenance="model_reported",
+                authoritative=False,
+                note=EngineApplication._MODEL_REPORTED_NOTE,
+            ))
+        return tuple(codes)
+
+    def recovery_explanation(self, project_id: str) -> RecoveryExplanation:
+        """분류 근거·보존/폐기 범위·다음 동작을 원장에서 읽기 전용으로 설명한다.
+
+        실행 경로(`EngineDispatcher`)와 같은 `recovery_route`·`recovery_limit_decision`을
+        사용하므로 표시된 다음 동작과 실제 다음 `run_once` 결과가 갈라지지 않는다.
+        """
+
+        project = self._project_row(project_id)
+        plan_revision_id = project["active_plan_revision_id"]
+        scope = self._recovery_scope(project_id, active_plan_revision_id=plan_revision_id)
+        with self.service.ledger.read() as connection:
+            assessments = tuple(
+                RecoveryAssessment.model_validate_json(row["payload_json"])
+                for row in connection.execute(
+                    "SELECT payload_json FROM recovery_assessments WHERE project_id=? "
+                    "ORDER BY created_at,rowid",
+                    (project_id,),
+                )
+            )
+        failure = self._recovery_failure(project_id, plan_revision_id=plan_revision_id)
+        if failure is None:
+            recovered = bool(assessments) or bool(scope.superseded_plan_revision_ids)
+            return RecoveryExplanation(
+                state="recovered" if recovered else "none",
+                scope=scope,
+                assessments=assessments,
+                next_action=RecoveryNextAction(
+                    mode="none",
+                    detail=(
+                        "미해결 실패가 없습니다. 기존 Attempt·receipt·evidence는 보존되고 "
+                        "대체된 Plan revision과 Task만 superseded로 남습니다."
+                        if recovered
+                        else "현재 자동 복구가 필요한 실패가 없습니다."
+                    ),
+                ),
+            )
+        target, diagnosis = failure
+        route = recovery_route(
+            diagnosis, validation_result_id=target["validation_result_id"]
+        )
+        limits = None
+        limit_detail = None
+        if route.mode == "automatic":
+            with self.service.ledger.read() as connection:
+                observation = recovery_limit_decision(
+                    connection,
+                    project_id=project_id,
+                    task_id=target["task_id"],
+                    attempt_id=target["attempt_id"],
+                    diagnosis=diagnosis,
+                )
+            limits = RecoveryLimitStatus.model_validate(
+                observation.model_dump(mode="json")
+            )
+            limit_detail = observation.detail
+        classification = RecoveryClassification(
+            task_id=target["task_id"],
+            attempt_id=target["attempt_id"],
+            validation_result_id=target["validation_result_id"],
+            failure_class=(
+                None if diagnosis.failure_class is None else diagnosis.failure_class.value
+            ),
+            basis=diagnosis.source,
+            rationale=diagnosis.rationale,
+            transient=diagnosis.transient,
+            evidence_ids=diagnosis.evidence_ids,
+            codes=self._recovery_codes(diagnosis),
+        )
+        if route.mode == "unrouted":
+            next_action = RecoveryNextAction(
+                mode="user_decision",
+                blocker_code="TASK_VALIDATION_RECOVERY_REQUIRED",
+                detail=(
+                    "직접 근거로 원인을 분류하지 못했습니다. 실패 validation과 현재 Worker "
+                    "evidence를 근거로 RecoveryAssessment를 명시해 재시도하십시오."
+                ),
+            )
+            state = "user_decision_required"
+        elif route.mode == "observe_first":
+            next_action = RecoveryNextAction(
+                mode="observe_first",
+                blocker_code="EXTERNAL_EFFECT_UNKNOWN",
+                suggested_repair_action=(
+                    None if route.suggested_repair_action is None
+                    else route.suggested_repair_action.value
+                ),
+                checkpoint_required=route.checkpoint_required,
+                detail=route.detail,
+            )
+            state = "observe_first_required"
+        elif route.mode == "user_decision":
+            next_action = RecoveryNextAction(
+                mode="user_decision",
+                blocker_code=route.blocker_code,
+                suggested_repair_action=(
+                    None if route.suggested_repair_action is None
+                    else route.suggested_repair_action.value
+                ),
+                checkpoint_required=route.checkpoint_required,
+                detail=route.detail,
+            )
+            state = "user_decision_required"
+        elif limits is not None and limits.limit_code is not None:
+            next_action = RecoveryNextAction(
+                mode="user_decision",
+                blocker_code=limits.limit_code,
+                suggested_repair_action=(
+                    None if diagnosis.repair_action is None
+                    else diagnosis.repair_action.value
+                ),
+                checkpoint_required=True,
+                detail=limit_detail or "원장 복구 한도에 도달했습니다.",
+            )
+            state = "user_decision_required"
+        else:
+            next_action = RecoveryNextAction(
+                mode="automatic",
+                suggested_repair_action=(
+                    None if diagnosis.repair_action is None
+                    else diagnosis.repair_action.value
+                ),
+                detail=(
+                    "run-once가 원장 한도 안에서 "
+                    f"{'' if diagnosis.repair_action is None else diagnosis.repair_action.value}"
+                    " 자동 복구를 이어서 수행합니다. 기존 Attempt·receipt·evidence는 보존됩니다."
+                ),
+            )
+            state = "automatic_pending"
+        return RecoveryExplanation(
+            state=state,
+            classification=classification,
+            limits=limits,
+            scope=scope,
+            assessments=assessments,
+            next_action=next_action,
+        )
+
     def status(self, project_id: str) -> dict[str, Any]:
         """Core snapshot과 현재 단계·근거·다음 동작을 읽기 전용으로 설명한다."""
 
@@ -1598,6 +1932,15 @@ class EngineApplication:
             external_unknown=execution_summary.external_effect_unknown,
             has_goal_verdict=verdict_row is not None,
         )
+        recovery = self.recovery_explanation(project_id)
+        if stage == "recovery_required" and recovery.classification is not None:
+            # 일반 문구 대신 원장 분류 근거와 실제 다음 동작을 그대로 노출한다.
+            reason = (
+                f"failure_class={recovery.classification.failure_class}; "
+                f"근거={recovery.classification.basis}. "
+                f"{recovery.classification.rationale or ''}"
+            ).strip()
+            next_action = recovery.next_action.detail
         return snapshot | {
             "current_stage": stage,
             "reason": reason,
@@ -1614,6 +1957,7 @@ class EngineApplication:
             "task_status_counts": counts,
             "drill_down": drill_down,
             "execution_summary": execution_summary.model_dump(mode="json"),
+            "recovery": recovery.model_dump(mode="json"),
         }
 
     def _project_row(self, project_id: str):

@@ -70,7 +70,7 @@ class InspectionScriptedRunner(ScriptedStructuredRoleRunner):
             raw = deepcopy(responses[0])
             if request.role == "plan_expander" and "inspection" not in raw:
                 responses[0] = {"plan": raw, "inspection": inspection_fixture(raw, request.payload["goal"])}
-            elif request.role in {"compact_plan_reviewer", "critical_effect_reviewer", "high_risk_reviewer", "external_effect_reviewer"} and "inspection" not in raw:
+            elif request.role in {"compact_plan_reviewer", "critical_effect_reviewer", "high_risk_reviewer", "external_effect_reviewer", "recovery_plan_reviewer"} and "inspection" not in raw:
                 catalog = request.payload["evidence_catalog"]
                 responses[0] = {"review": raw, "inspection": inspection_fixture(
                     catalog["artifact:plan_contract"], catalog["source:goal"], revision=True, review=raw)}
