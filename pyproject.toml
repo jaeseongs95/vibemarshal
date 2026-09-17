@@ -7,6 +7,7 @@ name = "flowmarshal-engine"
 version = "0.2.0a1"
 description = "검증 가능한 계획·분배·추적을 위한 FlowMarshal 개발 엔진"
 readme = "README.md"
+license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
   "openai-codex==0.147.0",
