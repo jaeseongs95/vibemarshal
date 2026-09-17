@@ -37,12 +37,15 @@ from flowmarshal.engine.planning import (
     plan_review_evidence_catalog,
 )
 from flowmarshal.engine.recovery import (
+    FAILURE_REPAIR_ACTIONS,
+    TRANSIENT_LOCAL_CODES,
     EvidenceFirstFailureClassifier,
+    FailureDiagnosis,
     FailureSignal,
 )
 from flowmarshal.engine.roles import ScriptedStructuredRoleRunner
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime
-from flowmarshal.engine.service import EngineServiceError
+from flowmarshal.engine.service import EngineService, EngineServiceError
 from tests.test_engine_qualification import qualification_inventory
 from tests.engine_helpers import clean_review
 
@@ -96,6 +99,128 @@ class EvidenceFirstClassifierTests(unittest.TestCase):
         ))
         self.assertIsNone(diagnosis.failure_class)
         self.assertEqual("unclassified", diagnosis.source)
+
+    def test_three_code_sources_are_stored_separately(self) -> None:
+        """provider code·local engine code·model 자칭 code를 각각 다른 필드에 남긴다."""
+
+        diagnosis = EvidenceFirstFailureClassifier().classify(FailureSignal(
+            terminal_status="failed",
+            final_response="IMPLEMENTATION_ERROR: 모델이 자칭한 원인",
+            provider_payload={"thread_id": "thread", "error_code": "RATE_LIMITED"},
+            local_engine_codes=("STALE_EXECUTION_INPUT",),
+        ))
+        self.assertEqual("RATE_LIMITED", diagnosis.provider_error_code)
+        self.assertIsNone(diagnosis.local_engine_code)
+        self.assertEqual(("IMPLEMENTATION_ERROR",), diagnosis.model_reported_codes)
+        self.assertEqual(FailureClass.ENVIRONMENT, diagnosis.failure_class)
+
+    def test_local_engine_code_is_attributed_to_the_engine_not_the_provider(self) -> None:
+        diagnosis = EvidenceFirstFailureClassifier().classify(FailureSignal(
+            terminal_status="failed",
+            final_response=None,
+            provider_payload={"thread_id": "thread"},
+            local_engine_codes=("STALE_EXECUTION_INPUT",),
+        ))
+        self.assertEqual("STALE_EXECUTION_INPUT", diagnosis.local_engine_code)
+        self.assertIsNone(diagnosis.provider_error_code)
+        self.assertEqual(FailureClass.CONTEXT, diagnosis.failure_class)
+
+    def test_model_reported_code_alone_selects_no_repair_action(self) -> None:
+        """모델 자칭 code만 있으면 retry·replan·effect recovery를 고르지 않는다."""
+
+        for reported in (
+            "IMPLEMENTATION_ERROR", "TASK_CONTRACT_INVALID", "EXTERNAL_EFFECT_UNKNOWN",
+        ):
+            with self.subTest(reported=reported):
+                diagnosis = EvidenceFirstFailureClassifier().classify(FailureSignal(
+                    terminal_status="failed",
+                    final_response=f"{reported}: 모델이 적은 진단",
+                    provider_payload={"thread_id": "thread"},
+                ))
+                self.assertIsNone(diagnosis.failure_class)
+                self.assertIsNone(diagnosis.repair_action)
+                self.assertIsNone(diagnosis.provider_error_code)
+                self.assertIsNone(diagnosis.local_engine_code)
+                self.assertEqual((reported,), diagnosis.model_reported_codes)
+
+    def test_context_environment_transport_and_unknown_are_not_implementation(self) -> None:
+        """C2: 네 종류의 비구현 실패가 각각 implementation으로 오분류되지 않는다."""
+
+        classifier = EvidenceFirstFailureClassifier()
+        context = classifier.classify(FailureSignal(
+            terminal_status="failed",
+            final_response="구현 실패",
+            provider_payload={"error_code": "CONTEXT_REQUIRED"},
+        ))
+        self.assertEqual(FailureClass.CONTEXT, context.failure_class)
+        self.assertNotEqual(FailureClass.IMPLEMENTATION, context.failure_class)
+
+        environment = classifier.classify(FailureSignal(
+            terminal_status="failed",
+            final_response="테스트가 실패했습니다",
+            provider_payload={"error_code": "PERMISSION_POLICY_MISMATCH"},
+        ))
+        self.assertEqual(FailureClass.ENVIRONMENT, environment.failure_class)
+        self.assertNotEqual(FailureClass.IMPLEMENTATION, environment.failure_class)
+
+        transport = classifier.classify(FailureSignal(
+            terminal_status="failed",
+            final_response="assertion failed",
+            provider_payload={"rpc_error": {"message": "stream closed"}},
+        ))
+        self.assertEqual(FailureClass.EXTERNAL_UNKNOWN, transport.failure_class)
+        self.assertEqual("transport", transport.source)
+        self.assertNotEqual(FailureClass.IMPLEMENTATION, transport.failure_class)
+
+        unknown = classifier.classify(FailureSignal(
+            terminal_status="failed",
+            final_response="테스트가 깨졌습니다",
+            provider_payload={"thread_id": "thread"},
+            evidence_documents=({
+                "kind": "test",
+                "observation": json.dumps({"passed": True, "exit_code": 0}),
+            },),
+        ))
+        self.assertIsNone(unknown.failure_class)
+        self.assertEqual("unclassified", unknown.source)
+        self.assertNotEqual(FailureClass.IMPLEMENTATION, unknown.failure_class)
+
+
+class FailureRoutingTableTests(unittest.TestCase):
+    def test_every_failure_class_routes_to_one_deterministic_action(self) -> None:
+        """여덟 분류 전부가 한 표에서 정확히 하나의 RepairAction으로 결정된다."""
+
+        self.assertEqual(set(FailureClass), set(FAILURE_REPAIR_ACTIONS))
+        for failure_class in FailureClass:
+            with self.subTest(failure_class=failure_class):
+                action = FAILURE_REPAIR_ACTIONS[failure_class]
+                self.assertIsInstance(action, RepairAction)
+                self.assertIs(action, EngineService.repair_action_for(failure_class))
+                self.assertIs(
+                    action, EvidenceFirstFailureClassifier._ACTION[failure_class]
+                )
+        self.assertIs(FAILURE_REPAIR_ACTIONS, EvidenceFirstFailureClassifier._ACTION)
+
+    def test_transient_marking_only_covers_retryable_environment_codes(self) -> None:
+        classifier = EvidenceFirstFailureClassifier()
+        for code in TRANSIENT_LOCAL_CODES:
+            with self.subTest(code=code):
+                diagnosis = classifier.classify(FailureSignal(
+                    terminal_status="failed",
+                    final_response=None,
+                    provider_payload={"error_code": code},
+                ))
+                self.assertEqual(FailureClass.ENVIRONMENT, diagnosis.failure_class)
+                self.assertTrue(diagnosis.transient)
+        for code in ("PERMISSION_POLICY_MISMATCH", "EXECUTABLE_NOT_FOUND", "ENVIRONMENT_ERROR"):
+            with self.subTest(code=code):
+                diagnosis = classifier.classify(FailureSignal(
+                    terminal_status="failed",
+                    final_response=None,
+                    provider_payload={"error_code": code},
+                ))
+                self.assertEqual(FailureClass.ENVIRONMENT, diagnosis.failure_class)
+                self.assertFalse(diagnosis.transient)
 
 
 class AutomaticRecoveryIntegrationTests(unittest.TestCase):
@@ -206,6 +331,161 @@ class AutomaticRecoveryIntegrationTests(unittest.TestCase):
             else:
                 self.assertEqual(RunOnceAction.BLOCKED, outcome.action)
                 self.assertEqual("SAME_FAILURE_RECOVERY_LIMIT", outcome.blocker_code)
+
+    def test_context_failure_recovers_into_a_new_execution_spec_revision(self) -> None:
+        """로컬 Context 실패는 같은 Task 의미의 새 ExecutionSpec 준비로 자동 복구한다."""
+
+        prepared, runtime = self.prepared(name="context-recovery")
+        dispatcher = EngineDispatcher(prepared.service, runtime)
+        failed = self._failed_attempt(
+            prepared, runtime, dispatcher, "CONTEXT_REQUIRED: 필요한 본문이 선택되지 않았습니다"
+        )
+
+        recovered = self._finish_runtime_job_tick(dispatcher, prepared.project_id)
+
+        self.assertEqual(RunOnceAction.RECOVERED, recovered.action)
+        with prepared.service.ledger.read() as connection:
+            assessment = json.loads(connection.execute(
+                "SELECT payload_json FROM recovery_assessments"
+            ).fetchone()["payload_json"])
+            task_status = connection.execute(
+                "SELECT status FROM task_contracts WHERE id=?", (prepared.task_id,)
+            ).fetchone()["status"]
+            events = [row["event_type"] for row in connection.execute(
+                "SELECT event_type FROM history_events WHERE entity_id=? ORDER BY sequence",
+                (prepared.task_id,),
+            ).fetchall()]
+        self.assertEqual(FailureClass.CONTEXT.value, assessment["failure_class"])
+        self.assertEqual(RepairAction.EXECUTION_SPEC_REVISION.value, assessment["action"])
+        self.assertEqual(failed.attempt_id, assessment["attempt_id"])
+        self.assertEqual("ready", task_status)
+        self.assertIn("task.execution_spec_recovery_enabled", events)
+
+        redispatched = dispatcher.run_once(
+            prepared.project_id, proposal=prepared.proposal
+        )
+        self.assertEqual(RunOnceAction.MATERIALIZED, redispatched.action)
+
+    def test_transient_local_code_is_retried_but_other_environment_failures_stop(self) -> None:
+        """직접 관측한 일시 code만 제한 재시도하고 나머지 환경 실패는 typed stop이다."""
+
+        prepared, runtime = self.prepared(name="transient-retry")
+        dispatcher = EngineDispatcher(prepared.service, runtime)
+        self._failed_attempt(
+            prepared, runtime, dispatcher, "RATE_LIMITED: 계정 제한을 관측했습니다"
+        )
+
+        recovered = self._finish_runtime_job_tick(dispatcher, prepared.project_id)
+
+        self.assertEqual(RunOnceAction.RECOVERED, recovered.action)
+        with prepared.service.ledger.read() as connection:
+            assessment = json.loads(connection.execute(
+                "SELECT payload_json FROM recovery_assessments"
+            ).fetchone()["payload_json"])
+        self.assertEqual(FailureClass.ENVIRONMENT.value, assessment["failure_class"])
+        self.assertEqual(RepairAction.CONTINUE.value, assessment["action"])
+        self.assertEqual(0, assessment["same_failure_replan_count"])
+        self.assertEqual(0, assessment["goal_replan_count"])
+        self.assertEqual(RunOnceAction.DISPATCHED, dispatcher.run_once(prepared.project_id).action)
+
+        other, other_runtime = self.prepared(name="environment-stop")
+        other_dispatcher = EngineDispatcher(other.service, other_runtime)
+        self._failed_attempt(
+            other, other_runtime, other_dispatcher,
+            "PERMISSION_POLICY_MISMATCH: sandbox 정책이 다릅니다",
+        )
+        blocked = other_dispatcher.run_once(other.project_id)
+        self.assertEqual(RunOnceAction.BLOCKED, blocked.action)
+        self.assertEqual("ENVIRONMENT_RECOVERY_REQUIRED", blocked.blocker_code)
+        self.assertEqual(FailureClass.ENVIRONMENT, blocked.failure_class)
+        with other.service.ledger.read() as connection:
+            self.assertEqual(0, connection.execute(
+                "SELECT COUNT(*) FROM recovery_assessments"
+            ).fetchone()[0])
+
+    def test_evidence_poor_failure_stops_typed_without_selecting_a_repair(self) -> None:
+        """근거 없는 failed terminal은 자동 복구 대신 typed stop으로 끝난다."""
+
+        prepared, runtime = self.prepared(name="unclassified-stop")
+        dispatcher = EngineDispatcher(prepared.service, runtime)
+        dispatcher.run_once(prepared.project_id, proposal=prepared.proposal)
+        dispatched = dispatcher.run_once(prepared.project_id)
+        with prepared.service.ledger.read() as connection:
+            binding = ThreadBinding.model_validate_json(connection.execute(
+                "SELECT binding_json FROM attempts WHERE id=?", (dispatched.attempt_id,)
+            ).fetchone()["binding_json"])
+        runtime.fail(binding.thread_id, response="IMPLEMENTATION_ERROR: 모델이 자칭한 원인")
+        dispatcher.run_once(prepared.project_id)
+
+        blocked = dispatcher.run_once(prepared.project_id)
+
+        self.assertEqual(RunOnceAction.BLOCKED, blocked.action)
+        self.assertEqual("RECOVERY_DIAGNOSIS_REQUIRED", blocked.blocker_code)
+        self.assertIsNone(blocked.suggested_repair_action)
+        with prepared.service.ledger.read() as connection:
+            self.assertEqual(0, connection.execute(
+                "SELECT COUNT(*) FROM recovery_assessments"
+            ).fetchone()[0])
+            self.assertEqual(0, connection.execute(
+                "SELECT COUNT(*) FROM history_events WHERE event_type IN "
+                "('task.retry_enabled','task.execution_spec_recovery_enabled')"
+            ).fetchone()[0])
+
+    def test_repeat_without_new_evidence_is_blocked_by_the_ledger(self) -> None:
+        """C3: 첫 복구 뒤 새 evidence 없는 반복만 차단하고 새 근거는 통과시킨다."""
+
+        prepared, runtime = self.prepared(name="no-new-evidence")
+        dispatcher = EngineDispatcher(prepared.service, runtime)
+        first = self._failed_attempt(
+            prepared, runtime, dispatcher, "IMPLEMENTATION_ERROR: injected fault"
+        )
+        self.assertEqual(
+            RunOnceAction.RECOVERED,
+            self._finish_runtime_job_tick(dispatcher, prepared.project_id).action,
+        )
+
+        stale = FailureDiagnosis(
+            failure_class=FailureClass.IMPLEMENTATION,
+            repair_action=RepairAction.TASK_REPAIR,
+            error_code="TEST_FAILED",
+            evidence_ids=(),
+            rationale="원인·새 근거 없이 같은 복구를 다시 요청합니다.",
+            source="explicit_code",
+        )
+        blocked = dispatcher._automatic_recovery(
+            project_id=prepared.project_id,
+            task_id=prepared.task_id,
+            attempt_id=first.attempt_id,
+            diagnosis=stale,
+            evidence_documents=(),
+        )
+        self.assertEqual(RunOnceAction.BLOCKED, blocked.action)
+        self.assertEqual("NEW_RECOVERY_EVIDENCE_REQUIRED", blocked.blocker_code)
+        self.assertEqual(RepairAction.TASK_REPAIR, blocked.suggested_repair_action)
+        with prepared.service.ledger.read() as connection:
+            self.assertEqual(1, connection.execute(
+                "SELECT COUNT(*) FROM recovery_assessments"
+            ).fetchone()[0])
+
+        fresh = EvidenceRecord(
+            evidence_id=new_id("evidence"),
+            project_id=prepared.project_id,
+            task_id=prepared.task_id,
+            attempt_id=first.attempt_id,
+            kind=EvidenceKind.TEST,
+            source_ref="fixture:fresh-after-recovery",
+            observation=json.dumps({"passed": False, "label": "fresh"}),
+            content_digest=sha256_digest({"label": "fresh"}),
+            observed_at=utc_now(),
+        )
+        prepared.service.record_evidence(fresh)
+        self.assertIsNone(dispatcher._recovery_limit_blocker(
+            project_id=prepared.project_id,
+            task_id=prepared.task_id,
+            attempt_id=first.attempt_id,
+            diagnosis=stale.model_copy(update={"evidence_ids": (fresh.evidence_id,)}),
+            validation_result_id=None,
+        ))
 
     def test_scope_expansion_is_asked_instead_of_automatically_replanned(self) -> None:
         prepared, runtime = self.prepared(name="scope-expansion")
@@ -416,6 +696,121 @@ class AutomaticRecoveryIntegrationTests(unittest.TestCase):
                     goal_replan_count=6,
                 ),
             )
+
+
+class FailureEvidenceBoundingTests(unittest.TestCase):
+    """실패 terminal evidence는 한도 안의 유효한 JSON이어야 하고 복구 단계가 재파싱에 의존하지 않는다."""
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.inventory = qualification_inventory()
+
+    def _failed_evidence(self, response: str):
+        base = self.root / "bounded"
+        base.mkdir()
+        workspace, _ = _copy_fixture(ROOT, base)
+        prepared = _prepare(
+            workspace=workspace, state_root=base / "state", inventory=self.inventory,
+            roles=default_role_configuration(ROOT),
+        )
+        runtime = FakeCodexRuntime(self.inventory)
+        dispatcher = EngineDispatcher(prepared.service, runtime)
+        dispatcher.run_once(prepared.project_id, proposal=prepared.proposal)
+        dispatched = dispatcher.run_once(prepared.project_id)
+        with prepared.service.ledger.read() as connection:
+            binding = ThreadBinding.model_validate_json(connection.execute(
+                "SELECT binding_json FROM attempts WHERE id=?", (dispatched.attempt_id,)
+            ).fetchone()["binding_json"])
+        error_code = response.partition(":")[0] if ":" in response else None
+        runtime.fail(binding.thread_id, response=response, error_code=error_code)
+        self.assertEqual(RunOnceAction.OBSERVED, dispatcher.run_once(prepared.project_id).action)
+        with prepared.service.ledger.read() as connection:
+            rows = connection.execute(
+                "SELECT observation, content_digest FROM evidence_records "
+                "WHERE attempt_id=? AND kind='external_observation'",
+                (dispatched.attempt_id,),
+            ).fetchall()
+        self.assertEqual(1, len(rows))
+        return dispatcher, dispatched.attempt_id, rows[0]
+
+    def test_failed_terminal_evidence_is_valid_json_within_limit_and_digest_bound(self) -> None:
+        """operation_trace가 붙은 payload도 잘린 문자열이 아니라 한도 안의 유효 JSON으로 남는다."""
+
+        dispatcher, attempt_id, row = self._failed_evidence("RATE_LIMITED: 계정 제한을 관측했습니다")
+        self.assertLessEqual(len(row["observation"]), 10_000)
+        stored = json.loads(row["observation"])
+        self.assertEqual(sha256_digest(stored), row["content_digest"])
+        self.assertEqual("failed", stored["terminal_status"])
+        projection = stored["failure_diagnosis"]
+        self.assertEqual("local_derived", projection["provenance"])
+        self.assertEqual(FailureClass.ENVIRONMENT.value, projection["failure_class"])
+        self.assertEqual("RATE_LIMITED", projection["provider_error_code"])
+        self.assertIsNone(projection["local_engine_code"])
+        self.assertTrue(projection["transient"])
+        payload = stored["provider_payload"]
+        self.assertEqual("RATE_LIMITED", payload["error_code"])
+        if "operation_trace" not in payload:
+            # 줄인 경우에는 명시 표식과 trace digest가 남아야 한다.
+            self.assertTrue(
+                payload.get("operation_trace_omitted") or payload.get("provider_payload_projected")
+            )
+            self.assertIn("operation_trace_digest", payload)
+
+        _, documents = dispatcher._failure_evidence(attempt_id)
+        observed = dispatcher._terminal_failure_diagnosis(documents)
+        self.assertIsNotNone(observed)
+        self.assertEqual(FailureClass.ENVIRONMENT, observed.failure_class)
+        self.assertEqual("RATE_LIMITED", observed.provider_error_code)
+        self.assertTrue(observed.transient)
+
+    def test_bounded_document_never_stores_a_truncated_json_string(self) -> None:
+        huge_trace = {"operations": [{"id": f"op{i}", "body": "x" * 200} for i in range(200)]}
+        payload = {
+            "thread_id": "thread", "turn_id": "turn", "error_code": "RATE_LIMITED",
+            "operation_trace": huge_trace, "operation_trace_digest": sha256_digest(huge_trace),
+            "nested": {"deep": ["y" * 50]},
+        }
+        document = {"terminal_status": "failed", "final_response": "z" * 20_000, "provider_payload": payload}
+
+        bounded = EngineDispatcher._bounded_failure_document(document)
+
+        encoded = json.dumps(bounded, ensure_ascii=False, sort_keys=True)
+        self.assertLessEqual(len(encoded), 10_000)
+        self.assertEqual(bounded, json.loads(encoded))
+        reduced = bounded["provider_payload"]
+        self.assertNotIn("operation_trace", reduced)
+        self.assertEqual("RATE_LIMITED", reduced["error_code"])
+        self.assertEqual(payload["operation_trace_digest"], reduced["operation_trace_digest"])
+        self.assertTrue(reduced["provider_payload_projected"])
+        self.assertEqual(sha256_digest(payload), reduced["provider_payload_digest"])
+        self.assertNotIn("nested", reduced)
+        self.assertTrue(bounded["final_response_truncated"])
+        self.assertTrue(bounded["final_response"].startswith("z"))
+        self.assertLess(len(bounded["final_response"]), 20_000)
+
+        small = {"terminal_status": "failed", "final_response": "짧음", "provider_payload": {"error_code": "X_Y"}}
+        self.assertIs(small, EngineDispatcher._bounded_failure_document(small))
+
+    def test_legacy_document_without_projection_is_reclassified_from_payload(self) -> None:
+        """projection이 없는 이전 형식 evidence는 보존된 provider_payload를 재관측한다."""
+
+        dispatcher = EngineDispatcher.__new__(EngineDispatcher)
+        dispatcher.failure_classifier = EvidenceFirstFailureClassifier()
+        legacy = {"kind": "external_observation", "observation": json.dumps({
+            "terminal_status": "failed", "final_response": "실패",
+            "provider_payload": {"error_code": "CONTEXT_REQUIRED"},
+        })}
+        truncated = {"kind": "external_observation", "observation": "{\"terminal_status\": \"fai"}
+
+        observed = dispatcher._terminal_failure_diagnosis((truncated, legacy))
+
+        self.assertIsNotNone(observed)
+        self.assertEqual(FailureClass.CONTEXT, observed.failure_class)
+        self.assertEqual("CONTEXT_REQUIRED", observed.provider_error_code)
+        self.assertFalse(observed.transient)
+        self.assertIsNone(dispatcher._terminal_failure_diagnosis((truncated,)))
 
 
 class AutomaticContextResolutionTests(unittest.TestCase):

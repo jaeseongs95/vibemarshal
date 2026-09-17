@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
-from pydantic import Field, model_serializer, model_validator
+from pydantic import Field, ValidationError, model_serializer, model_validator
 
 from ..canonical import sha256_bytes, sha256_digest
 from .domain import (
@@ -61,7 +61,12 @@ from .operation_trace import (
     use_operation_trace_scope,
 )
 from .service import ContextRequiredError, EngineService, EngineServiceError
-from .recovery import EvidenceFirstFailureClassifier, FailureDiagnosis, FailureSignal
+from .recovery import (
+    FAILURE_REPAIR_ACTIONS,
+    EvidenceFirstFailureClassifier,
+    FailureDiagnosis,
+    FailureSignal,
+)
 
 
 REQUIRED_PERMISSION_PROFILE = ":danger-full-access"
@@ -2061,6 +2066,12 @@ class RuntimeJobSupervisor:
         self.close()
 
 
+#: `EvidenceRecord.observation`의 최대 길이. 실패 관측 문서는 이 한도 안에서 항상 유효한 JSON이어야 한다.
+_FAILURE_OBSERVATION_LIMIT = 10_000
+#: 실패 기록 시점에 Engine이 계산한 분류 projection의 provenance 표식.
+_FAILURE_DIAGNOSIS_PROVENANCE = "local_derived"
+
+
 class EngineDispatcher:
     """원장 우선순위에 따라 호출당 한 상태 단계만 전진시키는 실행기."""
 
@@ -2793,9 +2804,15 @@ class EngineDispatcher:
                 evidence_ids, documents = self._failure_evidence(
                     failed["attempt_id"]
                 )
+                # 원장의 failure_class를 권위로 두고, 보존된 terminal 원문에서
+                # code 출처와 일시 실패 표시만 다시 관측해 덧붙인다.
+                observed = self._terminal_failure_diagnosis(documents)
+                matched = observed is not None and observed.failure_class is failure_class
                 diagnosis = FailureDiagnosis(
                     failure_class=failure_class,
                     repair_action=self.service.repair_action_for(failure_class),
+                    provider_error_code=observed.provider_error_code if matched else None,
+                    local_engine_code=observed.local_engine_code if matched else None,
                     evidence_ids=evidence_ids,
                     rationale=failed["failure_detail"] or "원장에 기록된 Attempt 실패",
                     source=(
@@ -2803,6 +2820,7 @@ class EngineDispatcher:
                         if failure_class is FailureClass.UNCLASSIFIED
                         else "direct_evidence"
                     ),
+                    transient=bool(matched and observed.transient),
                 )
                 automatic = self._automatic_recovery(
                     project_id=project_id,
@@ -2886,6 +2904,116 @@ class EngineDispatcher:
             project_id, plan, goal_validation_step=goal_validation_step,
             goal_validation_retry=goal_validation_retry,
         )
+
+    def _terminal_failure_diagnosis(
+        self, documents: tuple[dict[str, Any], ...]
+    ) -> FailureDiagnosis | None:
+        """원장에 보존한 failed terminal evidence에서 code 출처와 일시 실패 표시를 읽는다.
+
+        Attempt 행에는 `failure_class`만 남으므로 provider/local code 출처와 일시
+        실패 표시는 실패 관측 evidence에서만 복원할 수 있다. 기록 시점에 남긴
+        `failure_diagnosis` projection(`local_derived`)을 우선 읽고, projection이 없는
+        이전 형식 문서만 보존된 `provider_payload`를 같은 분류기로 다시 관측한다.
+        실패 판정 자체는 바꾸지 않으며 호출자가 원장 분류와 일치할 때만 사용한다.
+        """
+
+        for document in documents:
+            observation = document.get("observation")
+            if isinstance(observation, str):
+                try:
+                    observation = json.loads(observation)
+                except ValueError:
+                    continue
+            if not isinstance(observation, dict):
+                continue
+            projection = observation.get("failure_diagnosis")
+            if (
+                isinstance(projection, dict)
+                and projection.get("provenance") == _FAILURE_DIAGNOSIS_PROVENANCE
+            ):
+                failure_class = projection.get("failure_class")
+                try:
+                    parsed_class = (
+                        None if failure_class is None else FailureClass(failure_class)
+                    )
+                    return FailureDiagnosis(
+                        failure_class=parsed_class,
+                        repair_action=(
+                            None if parsed_class is None
+                            else FAILURE_REPAIR_ACTIONS[parsed_class]
+                        ),
+                        error_code=projection.get("error_code"),
+                        provider_error_code=projection.get("provider_error_code"),
+                        local_engine_code=projection.get("local_engine_code"),
+                        rationale="실패 기록 시점의 local_derived 분류 projection",
+                        source=projection.get("source") or "unclassified",
+                        model_reported_codes=tuple(
+                            projection.get("model_reported_codes") or ()
+                        ),
+                        transient=bool(projection.get("transient")),
+                    )
+                except (ValueError, ValidationError):
+                    continue
+            if "provider_payload" not in observation:
+                continue
+            payload = observation.get("provider_payload")
+            return self.failure_classifier.classify(FailureSignal(
+                terminal_status=observation.get("terminal_status"),
+                final_response=observation.get("final_response"),
+                provider_payload=payload if isinstance(payload, dict) else {},
+            ))
+        return None
+
+    @staticmethod
+    def _bounded_failure_document(document: dict[str, Any]) -> dict[str, Any]:
+        """`EvidenceRecord.observation` 한도 안에서 항상 유효한 JSON 문서를 만든다.
+
+        직렬화 문자열을 자르면 evidence가 파싱 불가능해지고 content digest도
+        저장 본문과 어긋난다. 대신 정보를 단계적으로 줄인다: operation_trace 본문을
+        digest/ref만 남기고 제거 → provider_payload를 최상위 scalar 항목과 전체 payload
+        digest로 투영 → final_response를 자른다. 각 단계는 문서에 명시 표식을 남긴다.
+        원문 payload는 runtime job 관측·usage 기록과 operation trace 파일에 별도로
+        보존된다.
+        """
+
+        def fits(candidate: dict[str, Any]) -> bool:
+            encoded = json.dumps(candidate, ensure_ascii=False, sort_keys=True)
+            return len(encoded) <= _FAILURE_OBSERVATION_LIMIT
+
+        if fits(document):
+            return document
+        payload = document.get("provider_payload")
+        payload = payload if isinstance(payload, dict) else {}
+        reduced = dict(document)
+        if "operation_trace" in payload:
+            reduced["provider_payload"] = {
+                key: value for key, value in payload.items() if key != "operation_trace"
+            } | {"operation_trace_omitted": True}
+            if fits(reduced):
+                return reduced
+        reduced["provider_payload"] = {
+            key: value for key, value in payload.items()
+            if key != "operation_trace"
+            and isinstance(value, (str, int, float, bool, type(None)))
+        } | {
+            "provider_payload_projected": True,
+            "provider_payload_digest": sha256_digest(payload),
+        }
+        if fits(reduced):
+            return reduced
+        response = reduced.get("final_response")
+        response = "" if response is None else str(response)
+        reduced["final_response_truncated"] = True
+        low, high = 0, len(response)
+        while low < high:
+            middle = (low + high + 1) // 2
+            reduced["final_response"] = response[:middle]
+            if fits(reduced):
+                low = middle
+            else:
+                high = middle - 1
+        reduced["final_response"] = response[:low]
+        return reduced
 
     def _failure_evidence(
         self,
@@ -3011,7 +3139,9 @@ class EngineDispatcher:
                 checkpoint_required=True,
                 detail="목표·범위·효과·운영 정책 확장은 사용자 승인이 필요합니다.",
             )
-        if failure is FailureClass.ENVIRONMENT:
+        if failure is FailureClass.ENVIRONMENT and not diagnosis.transient:
+            # provider/local code가 "다시 시도 가능"을 직접 말하지 않는 환경 실패는
+            # 사람이 환경 복구를 관측하기 전까지 같은 실행을 반복하지 않는다.
             return RunOnceOutcome(
                 action=RunOnceAction.BLOCKED,
                 project_id=project_id,
@@ -3099,7 +3229,7 @@ class EngineDispatcher:
             assessment = RecoveryAssessment.model_validate(result["assessment"])
             self.service.record_recovery_assessment(project_id, assessment)
 
-        if assessment.action is RepairAction.TASK_REPAIR:
+        if assessment.action in {RepairAction.TASK_REPAIR, RepairAction.CONTINUE}:
             self.service.retry_task(
                 task_id=task_id,
                 recovery_assessment=assessment,
@@ -3112,7 +3242,14 @@ class EngineDispatcher:
                 attempt_id=attempt_id,
                 validation_result_id=validation_result_id,
                 evidence_ids=assessment.new_evidence_ids,
-                detail="원장 생성 assessment로 동일 Task repair를 활성화했습니다. 다음 실행은 새 Attempt입니다.",
+                detail=(
+                    "원장 생성 assessment로 동일 Task repair를 활성화했습니다. 다음 실행은 새 Attempt입니다."
+                    if assessment.action is RepairAction.TASK_REPAIR
+                    else (
+                        "직접 관측된 일시 실패 code를 근거로 원장 한도 안에서 같은 "
+                        "ExecutionSpec을 한 번 더 실행합니다."
+                    )
+                ),
             )
         if assessment.action is RepairAction.EXECUTION_SPEC_REVISION:
             self.service.enable_execution_spec_recovery(
@@ -3219,7 +3356,11 @@ class EngineDispatcher:
 
         limit_code = None
         detail = None
-        if action in {RepairAction.TASK_REPAIR, RepairAction.EXECUTION_SPEC_REVISION}:
+        if action in {
+            RepairAction.TASK_REPAIR,
+            RepairAction.EXECUTION_SPEC_REVISION,
+            RepairAction.CONTINUE,
+        }:
             maximum = int(task_recovery["max_same_failure_replans"])
             if diagnosis.failure_class.value not in set(
                 task_recovery["retryable_failure_classes"]
@@ -4367,30 +4508,47 @@ class EngineDispatcher:
                 "final_response": observation.final_response,
                 "provider_payload": observation.payload,
             }
+            evidence_id = new_id("evidence")
+            diagnosis = self.failure_classifier.classify(FailureSignal(
+                terminal_status=terminal,
+                final_response=observation.final_response,
+                provider_payload=observation.payload,
+                evidence_ids=(evidence_id,),
+                evidence_documents=({
+                    "kind": EvidenceKind.EXTERNAL_OBSERVATION.value,
+                    "observation": document,
+                },),
+            ))
+            # 복구 단계가 잘린 원문을 재파싱하지 않도록 기록 시점 분류를 local_derived
+            # projection으로 함께 남긴다. 원장 failure_class가 권위이며 이 projection은
+            # code 출처와 일시 실패 표시만 보존한다.
+            stored = self._bounded_failure_document(document | {
+                "failure_diagnosis": {
+                    "provenance": _FAILURE_DIAGNOSIS_PROVENANCE,
+                    "failure_class": (
+                        None if diagnosis.failure_class is None
+                        else diagnosis.failure_class.value
+                    ),
+                    "error_code": diagnosis.error_code,
+                    "provider_error_code": diagnosis.provider_error_code,
+                    "local_engine_code": diagnosis.local_engine_code,
+                    "transient": diagnosis.transient,
+                    "source": diagnosis.source,
+                    "model_reported_codes": list(diagnosis.model_reported_codes),
+                },
+            })
             failure_evidence = EvidenceRecord(
-                evidence_id=new_id("evidence"),
+                evidence_id=evidence_id,
                 project_id=row["project_id"],
                 task_id=row["task_id"],
                 attempt_id=attempt_id,
                 kind=EvidenceKind.EXTERNAL_OBSERVATION,
                 source_ref=f"codex-terminal:{observation.thread_id}:{observation.turn_id}",
-                observation=json.dumps(
-                    document, ensure_ascii=False, sort_keys=True
-                )[:10_000],
-                content_digest=sha256_digest(document),
+                observation=json.dumps(stored, ensure_ascii=False, sort_keys=True),
+                content_digest=sha256_digest(stored),
                 observed_at=utc_now(),
             )
             self.service.record_evidence(failure_evidence)
-            diagnosis = self.failure_classifier.classify(FailureSignal(
-                terminal_status=terminal,
-                final_response=observation.final_response,
-                provider_payload=observation.payload,
-                evidence_ids=(failure_evidence.evidence_id,),
-                evidence_documents=({
-                    "kind": failure_evidence.kind.value,
-                    "observation": document,
-                },),
-            ))
             failure_class = diagnosis.failure_class or FailureClass.UNCLASSIFIED
             self.service.finish_attempt(
                 attempt_id=attempt_id,

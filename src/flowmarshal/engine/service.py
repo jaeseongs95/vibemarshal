@@ -94,6 +94,7 @@ from .planning import (
     skeleton_review_evidence_catalog,
 )
 from .planning_feedback import skeleton_semantic_digest
+from .recovery import FAILURE_REPAIR_ACTIONS
 from .model_observation import (
     PROVIDER_RAW_MODEL_OBSERVATION_SOURCE,
     authoritative_model_observation,
@@ -6718,16 +6719,9 @@ class EngineService:
 
     @staticmethod
     def repair_action_for(failure_class: FailureClass) -> RepairAction:
-        return {
-            FailureClass.UNCLASSIFIED: RepairAction.ABANDON,
-            FailureClass.IMPLEMENTATION: RepairAction.TASK_REPAIR,
-            FailureClass.CONTEXT: RepairAction.EXECUTION_SPEC_REVISION,
-            FailureClass.TASK_CONTRACT: RepairAction.SUBGRAPH_REPLAN,
-            FailureClass.DEPENDENCY: RepairAction.SUBGRAPH_REPLAN,
-            FailureClass.ENVIRONMENT: RepairAction.CONTINUE,
-            FailureClass.REQUIREMENT_CHANGE: RepairAction.GOAL_REVISION,
-            FailureClass.EXTERNAL_UNKNOWN: RepairAction.WAIT_EXTERNAL,
-        }[failure_class]
+        """여덟 분류를 단일 결정적 표로만 routing한다."""
+
+        return FAILURE_REPAIR_ACTIONS[failure_class]
 
     def status(self, project_id: str) -> dict[str, Any]:
         return self.ledger.project_snapshot(project_id)

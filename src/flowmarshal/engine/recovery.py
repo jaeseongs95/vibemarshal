@@ -9,7 +9,8 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
-from typing import Any, Iterable
+from types import MappingProxyType
+from typing import Any, Iterable, Mapping
 
 from pydantic import Field
 
@@ -20,6 +21,32 @@ from .domain import EngineModel, FailureClass, RepairAction
 _CODE_PATTERN = re.compile(r"\b([A-Z][A-Z0-9_]{2,99})\b")
 _CODE_KEYS = frozenset({"blocker_code", "code", "error_code", "failure_code"})
 
+#: `FailureClass` → `RepairAction`의 유일한 결정적 routing 표.
+#:
+#: 여덟 분류(`unclassified` 포함) 전부가 정확히 하나의 action으로 대응한다. 분류마다
+#: 별도 지능형 복구기를 두지 않고 Core·분류기·service가 모두 이 표만 참조한다.
+FAILURE_REPAIR_ACTIONS: Mapping[FailureClass, RepairAction] = MappingProxyType({
+    FailureClass.UNCLASSIFIED: RepairAction.ABANDON,
+    FailureClass.IMPLEMENTATION: RepairAction.TASK_REPAIR,
+    FailureClass.CONTEXT: RepairAction.EXECUTION_SPEC_REVISION,
+    FailureClass.TASK_CONTRACT: RepairAction.SUBGRAPH_REPLAN,
+    FailureClass.DEPENDENCY: RepairAction.SUBGRAPH_REPLAN,
+    FailureClass.ENVIRONMENT: RepairAction.CONTINUE,
+    FailureClass.REQUIREMENT_CHANGE: RepairAction.GOAL_REVISION,
+    FailureClass.EXTERNAL_UNKNOWN: RepairAction.WAIT_EXTERNAL,
+})
+
+#: provider/local이 명시한 code 중 "같은 입력으로 다시 시도할 수 있음"을 직접 뜻하는 집합.
+#:
+#: 이 집합의 code만 bounded transient local retry를 얻는다. 권한·실행 파일·model lock
+#: 처럼 재시도로 해소되지 않는 environment 실패는 여기에 넣지 않는다.
+TRANSIENT_LOCAL_CODES = frozenset({
+    "RATE_LIMITED",
+    "PROCESS_TIMEOUT",
+    "RESOURCE_LOCK_CONTENDED",
+    "TEMPORARY_LOCAL_FAILURE",
+})
+
 
 class FailureDiagnosis(EngineModel):
     """분류 결과와 그 결정을 직접 지지하는 evidence 결속."""
@@ -27,10 +54,13 @@ class FailureDiagnosis(EngineModel):
     failure_class: FailureClass | None = None
     repair_action: RepairAction | None = None
     error_code: str | None = Field(default=None, pattern=r"^[A-Z][A-Z0-9_]{2,99}$")
+    provider_error_code: str | None = Field(default=None, pattern=r"^[A-Z][A-Z0-9_]{2,99}$")
+    local_engine_code: str | None = Field(default=None, pattern=r"^[A-Z][A-Z0-9_]{2,99}$")
     evidence_ids: tuple[str, ...] = ()
     rationale: str = Field(min_length=1, max_length=5000)
     source: str = Field(pattern=r"^(explicit_code|effect|transport|direct_evidence|unclassified)$")
     model_reported_codes: tuple[str, ...] = ()
+    transient: bool = False
 
     @property
     def failure_fingerprint(self) -> str:
@@ -48,6 +78,7 @@ class FailureSignal:
     provider_payload: dict[str, Any]
     evidence_ids: tuple[str, ...] = ()
     evidence_documents: tuple[dict[str, Any], ...] = ()
+    local_engine_codes: tuple[str, ...] = ()
 
 
 class EvidenceFirstFailureClassifier:
@@ -67,6 +98,8 @@ class EvidenceFirstFailureClassifier:
         "ENVIRONMENT_ERROR": FailureClass.ENVIRONMENT,
         "PROCESS_TIMEOUT": FailureClass.ENVIRONMENT,
         "RATE_LIMITED": FailureClass.ENVIRONMENT,
+        "RESOURCE_LOCK_CONTENDED": FailureClass.ENVIRONMENT,
+        "TEMPORARY_LOCAL_FAILURE": FailureClass.ENVIRONMENT,
         # 계약과 dependency
         "TASK_CONTRACT_INVALID": FailureClass.TASK_CONTRACT,
         "PROPOSAL_TASK_MISMATCH": FailureClass.TASK_CONTRACT,
@@ -89,15 +122,8 @@ class EvidenceFirstFailureClassifier:
         "ASSERTION_FAILED": FailureClass.IMPLEMENTATION,
     }
 
-    _ACTION = {
-        FailureClass.IMPLEMENTATION: RepairAction.TASK_REPAIR,
-        FailureClass.CONTEXT: RepairAction.EXECUTION_SPEC_REVISION,
-        FailureClass.TASK_CONTRACT: RepairAction.SUBGRAPH_REPLAN,
-        FailureClass.DEPENDENCY: RepairAction.SUBGRAPH_REPLAN,
-        FailureClass.ENVIRONMENT: RepairAction.CONTINUE,
-        FailureClass.REQUIREMENT_CHANGE: RepairAction.GOAL_REVISION,
-        FailureClass.EXTERNAL_UNKNOWN: RepairAction.WAIT_EXTERNAL,
-    }
+    #: Core·service와 같은 단일 routing 표를 참조한다.
+    _ACTION = FAILURE_REPAIR_ACTIONS
 
     @staticmethod
     def _walk(value: Any) -> Iterable[tuple[str | None, Any]]:
@@ -110,25 +136,35 @@ class EvidenceFirstFailureClassifier:
                 yield None, child
                 yield from EvidenceFirstFailureClassifier._walk(child)
 
+    @staticmethod
+    def _codes_in(value: Any) -> Iterable[str]:
+        for key, child in EvidenceFirstFailureClassifier._walk(value):
+            if key in _CODE_KEYS and isinstance(child, str):
+                match = _CODE_PATTERN.search(child)
+                if match:
+                    yield match.group(1)
+
     @classmethod
-    def _explicit_codes(cls, signal: FailureSignal) -> tuple[str, ...]:
-        """provider/local typed payload와 직접 evidence의 구조화 코드만 반환한다.
+    def _provider_codes(cls, signal: FailureSignal) -> tuple[str, ...]:
+        """provider가 구조화해 반환한 payload의 code만 반환한다.
 
         ``final_response``는 모델이 작성한 비권위 텍스트다. 선두에 알려진 코드가
         있더라도 자동 recovery의 explicit error로 승격하지 않는다.
         """
+
+        return tuple(dict.fromkeys(cls._codes_in(signal.provider_payload)))
+
+    @classmethod
+    def _local_codes(cls, signal: FailureSignal) -> tuple[str, ...]:
+        """로컬 Engine이 직접 관측해 만든 code와 Core가 기록한 evidence 장부의 code."""
+
         codes: list[str] = []
-        for key, value in cls._walk(signal.provider_payload):
-            if key in _CODE_KEYS and isinstance(value, str):
-                match = _CODE_PATTERN.search(value)
-                if match:
-                    codes.append(match.group(1))
+        for code in signal.local_engine_codes:
+            match = _CODE_PATTERN.search(code)
+            if match:
+                codes.append(match.group(1))
         for document in signal.evidence_documents:
-            for key, value in cls._walk(document):
-                if key in _CODE_KEYS and isinstance(value, str):
-                    match = _CODE_PATTERN.search(value)
-                    if match:
-                        codes.append(match.group(1))
+            codes.extend(cls._codes_in(document))
         return tuple(dict.fromkeys(codes))
 
     @staticmethod
@@ -139,7 +175,12 @@ class EvidenceFirstFailureClassifier:
 
     @classmethod
     def classify(cls, signal: FailureSignal) -> FailureDiagnosis:
-        codes = cls._explicit_codes(signal)
+        provider_codes = cls._provider_codes(signal)
+        # 같은 code가 Core evidence 장부에도 복제돼 있으면 provider 출처를 유지한다.
+        local_codes = tuple(
+            code for code in cls._local_codes(signal) if code not in provider_codes
+        )
+        codes = tuple(dict.fromkeys(provider_codes + local_codes))
         model_reported_codes = cls._model_reported_codes(signal)
         for code in codes:
             failure_class = cls._CODE_CLASS.get(code)
@@ -150,10 +191,16 @@ class EvidenceFirstFailureClassifier:
                     failure_class=failure_class,
                     repair_action=cls._ACTION[failure_class],
                     error_code=code,
+                    provider_error_code=code if code in provider_codes else None,
+                    local_engine_code=code if code in local_codes else None,
                     evidence_ids=signal.evidence_ids,
                     rationale=f"직접 관측된 error code {code}를 우선 적용했습니다.",
                     source="explicit_code",
                     model_reported_codes=model_reported_codes,
+                    transient=(
+                        failure_class is FailureClass.ENVIRONMENT
+                        and code in TRANSIENT_LOCAL_CODES
+                    ),
                 )
 
         flattened = json.dumps(signal.provider_payload, ensure_ascii=False).casefold()
