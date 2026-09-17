@@ -17,6 +17,7 @@ dependencies = [
 [project.scripts]
 flowmarshal-engine = "flowmarshal.engine.console_host:main"
 
-[tool.setuptools.packages.find]
-where = ["src"]
-include = ["flowmarshal", "flowmarshal.engine", "flowmarshal.engine.*"]
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["flowmarshal", "flowmarshal.engine"]
+include-package-data = false

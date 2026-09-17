@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import subprocess
+import sys
+import tempfile
 import tomllib
 import unittest
+import zipfile
 from unittest.mock import patch
 from pathlib import Path
 import importlib.util
@@ -9,6 +13,18 @@ import os
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+# flowmarshal.core/.planning/.orchestration/.gate0b/.gate0c/.adapters/.compat는
+# legacy/prototype 도메인이며 Engine-only wheel에 포함되지 않아야 한다.
+LEGACY_TOP_LEVEL_PACKAGES = {
+    "core",
+    "planning",
+    "orchestration",
+    "gate0b",
+    "gate0c",
+    "adapters",
+    "compat",
+}
 
 
 class EnginePackagingContractTests(unittest.TestCase):
@@ -18,16 +34,185 @@ class EnginePackagingContractTests(unittest.TestCase):
             document["project"]["scripts"],
             {"flowmarshal-engine": "flowmarshal.engine.console_host:main"},
         )
+        setuptools_config = document["tool"]["setuptools"]
+        # 정적 packages 목록 + include-package-data=false 조합만 실제 wheel 내용을
+        # 제한한다. `packages.find(include=...)`만으로는 setuptools의
+        # `include_package_data` 기본 동작(egg_info SOURCES.txt 기반 안전망)이
+        # include 필터를 우회해 형제 legacy package를 "package data"로 다시
+        # 끌어들인다 (setuptools 84 `build_py.analyze_manifest` 확인, 실제 wheel
+        # 빌드로 재현·검증함). 이 assertion은 그 회귀를 다시 막는다.
         self.assertEqual(
-            document["tool"]["setuptools"]["packages"]["find"]["include"],
-            ["flowmarshal", "flowmarshal.engine", "flowmarshal.engine.*"],
+            setuptools_config["packages"],
+            ["flowmarshal", "flowmarshal.engine"],
         )
+        self.assertEqual(setuptools_config["package-dir"], {"": "src"})
+        self.assertFalse(setuptools_config["include-package-data"])
+        self.assertNotIn("find", setuptools_config.get("packages", {}))
         setup_source = (ROOT / "setup.py").read_text(encoding="utf-8")
         self.assertIn('shutil.rmtree(Path(self.build_lib) / "flowmarshal", ignore_errors=True)', setup_source)
         self.assertIn('if package == "flowmarshal"', setup_source)
         self.assertIn('{"__init__", "canonical", "time"}', setup_source)
         self.assertIn("ENGINE_DEVELOPER_MODULES", setup_source)
         self.assertIn('"scope_report_verification"', setup_source)
+
+    def test_built_wheel_contains_only_engine_scope_files(self) -> None:
+        """실제 wheel을 빌드해 파일 목록으로 Engine-only 범위를 직접 검사한다.
+
+        FM-10-C1 method: "wheel 파일/entrypoint와 import graph의 필요한 범위
+        검사". pyproject/setup.py 원문 검사만으로는 setuptools의 실제 build
+        결과를 보증하지 못하므로(위 테스트 docstring 참고) 여기서 진짜 wheel을
+        만들어 대조한다.
+        """
+        with tempfile.TemporaryDirectory() as temp:
+            out_dir = Path(temp)
+            try:
+                result = subprocess.run(
+                    [
+                        sys.executable,
+                        "-m",
+                        "pip",
+                        "wheel",
+                        "--no-deps",
+                        "-w",
+                        str(out_dir),
+                        str(ROOT),
+                    ],
+                    cwd=temp,
+                    capture_output=True,
+                    text=True,
+                    timeout=300,
+                )
+            except (OSError, subprocess.TimeoutExpired) as error:
+                self.skipTest(f"wheel build environment unavailable: {error}")
+            if result.returncode != 0:
+                self.skipTest(
+                    "wheel build failed in this environment "
+                    f"(likely no network for build isolation): {result.stderr[-2000:]}"
+                )
+            wheels = list(out_dir.glob("flowmarshal_engine-*.whl"))
+            self.assertEqual(1, len(wheels), result.stdout + result.stderr)
+            with zipfile.ZipFile(wheels[0]) as archive:
+                names = archive.namelist()
+                entry_points = archive.read(
+                    next(n for n in names if n.endswith(".dist-info/entry_points.txt"))
+                ).decode("utf-8")
+
+            flowmarshal_files = [n for n in names if n.startswith("flowmarshal/")]
+            top_level_subpackages = {
+                n.split("/")[1]
+                for n in flowmarshal_files
+                if "/" in n[len("flowmarshal/") :]
+            }
+            leaked = top_level_subpackages & LEGACY_TOP_LEVEL_PACKAGES
+            self.assertEqual(set(), leaked, f"wheel leaked legacy packages: {sorted(leaked)}")
+            self.assertEqual({"engine"}, top_level_subpackages)
+
+            top_level_modules = {
+                n[len("flowmarshal/") :]
+                for n in flowmarshal_files
+                if "/" not in n[len("flowmarshal/") :]
+            }
+            self.assertEqual({"__init__.py", "canonical.py", "time.py"}, top_level_modules)
+
+            engine_modules = {
+                n.split("/")[-1][: -len(".py")]
+                for n in flowmarshal_files
+                if n.startswith("flowmarshal/engine/") and n.endswith(".py")
+            }
+            # `qualification_manifest`는 dev-only qualification 도구
+            # (qualification.py/eval_cli.py/e2e_qualification.py/
+            # scope_report_verification.py)가 아니라
+            # `scripts/installed_candidate_qualification.py`의
+            # `_require_installed_product`/`probe`가 후보 wheel 안에서 직접
+            # `verify_candidate_wheel_installation`을 호출하기 위해 필요한
+            # shared canonical 자산이다. 그래서 의도적으로 wheel에 남긴다.
+            self.assertIn("qualification_manifest", engine_modules)
+            leaked_dev_modules = engine_modules & {
+                "qualification",
+                "eval_cli",
+                "benchmark",
+                "benchmark_candidate_costs",
+                "benchmark_lifecycle",
+                "benchmark_observation",
+                "benchmark_safety",
+                "e2e_qualification",
+                "evaluation",
+                "evaluation_budget",
+                "freeze",
+                "inspection_diagnostic_budget",
+                "performance",
+                "performance_assessment",
+                "performance_lifecycle_safety",
+                "scope_report_verification",
+                "smoke",
+            }
+            self.assertEqual(set(), leaked_dev_modules)
+            self.assertIn("cli", engine_modules)
+            self.assertIn("console_host", engine_modules)
+
+            self.assertEqual(
+                "[console_scripts]\nflowmarshal-engine = flowmarshal.engine.console_host:main\n",
+                entry_points.replace("\r\n", "\n"),
+            )
+
+    def test_shipped_engine_modules_do_not_import_developer_only_code(self) -> None:
+        """import graph 범위 검사(FM-10-C1)를 source AST로 직접 재현한다.
+
+        `setup.py`의 `ENGINE_DEVELOPER_MODULES`에 없는 `flowmarshal.engine.*`
+        module만 wheel에 실린다. 그 shipped 집합 중 하나라도 developer-only
+        module이나 legacy top-level package(`flowmarshal.core` 등)를 import하면
+        실제 사용자 wheel에서 `ModuleNotFoundError`가 난다. 예: 과거
+        `inspection_diagnostic_budget.py`는 shipped였지만 excluded
+        `evaluation_budget`을 import해 깨져 있었다.
+        """
+        import ast
+
+        setup_source = (ROOT / "setup.py").read_text(encoding="utf-8")
+        namespace: dict = {}
+        # ENGINE_DEVELOPER_MODULES 리터럴만 안전하게 추출한다 (setup() 실행은 피한다).
+        tree = ast.parse(setup_source)
+        developer_modules: set[str] = set()
+        for node in tree.body:
+            if isinstance(node, ast.Assign) and any(
+                isinstance(target, ast.Name) and target.id == "ENGINE_DEVELOPER_MODULES"
+                for target in node.targets
+            ):
+                developer_modules = set(ast.literal_eval(node.value))
+                break
+        self.assertTrue(developer_modules, "ENGINE_DEVELOPER_MODULES를 setup.py에서 읽지 못했습니다")
+
+        legacy_top_level = {
+            "core",
+            "planning",
+            "orchestration",
+            "gate0b",
+            "gate0c",
+            "adapters",
+            "compat",
+        }
+        engine_dir = ROOT / "src" / "flowmarshal" / "engine"
+        shipped = sorted(
+            path.stem for path in engine_dir.glob("*.py") if path.stem not in developer_modules
+        )
+        self.assertIn("cli", shipped)
+        violations: list[tuple[str, str]] = []
+        for name in shipped:
+            module_tree = ast.parse((engine_dir / f"{name}.py").read_text(encoding="utf-8"))
+            for node in ast.walk(module_tree):
+                if not isinstance(node, ast.ImportFrom):
+                    continue
+                module = node.module or ""
+                first = module.split(".")[0] if module else ""
+                if node.level == 1 and first in developer_modules:
+                    violations.append((name, f"from .{module}"))
+                elif node.level == 2 and first in legacy_top_level:
+                    violations.append((name, f"from ..{module}"))
+                elif node.level == 0 and any(
+                    module == f"flowmarshal.{legacy}" or module.startswith(f"flowmarshal.{legacy}.")
+                    for legacy in legacy_top_level
+                ):
+                    violations.append((name, module))
+        self.assertEqual([], violations)
 
     def test_installed_candidate_launcher_reads_literal_allowlist(self) -> None:
         launcher = self._launcher_module()

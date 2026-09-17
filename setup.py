@@ -24,6 +24,7 @@ ENGINE_DEVELOPER_MODULES = {
     "evaluation",
     "evaluation_budget",
     "freeze",
+    "inspection_diagnostic_budget",
     "performance",
     "performance_assessment",
     "performance_lifecycle_safety",
