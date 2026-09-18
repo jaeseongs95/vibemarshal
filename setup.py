@@ -30,6 +30,7 @@ ENGINE_DEVELOPER_MODULES = {
     "performance_assessment",
     "performance_lifecycle_safety",
     "qualification",
+    "release_freeze",
     "scope_report_verification",
     "smoke",
 }

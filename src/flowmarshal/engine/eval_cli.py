@@ -50,6 +50,12 @@ from .qualification import (
     run_role_fixture,
     source_manifest_digest,
 )
+from .release_freeze import (
+    ReleaseFreezeError,
+    ShardIsolationPlan,
+    build_release_freeze,
+    verify_release_freeze,
+)
 from .roles import StructuredRoleError
 from .runtime import RuntimePolicyError
 from .evaluation_budget import (
@@ -155,6 +161,46 @@ def _run(arguments: argparse.Namespace) -> int:
         }
     )
     return 0 if report.passed else 1
+
+
+def _release_freeze(arguments: argparse.Namespace) -> int:
+    root = Path(arguments.project_root).resolve(strict=True)
+    plan = ShardIsolationPlan.model_validate(_json(arguments.shard_plan))
+    role_configuration = (
+        None if arguments.role_config is None else _roles(arguments.role_config, root)
+    )
+    evaluation_policies = None
+    if arguments.budget_policy and arguments.role_timeout_policy:
+        evaluation_policies = load_evaluation_policies(
+            budget_policy_path=arguments.budget_policy,
+            role_timeout_policy_path=arguments.role_timeout_policy,
+            codex_project_binding_path=getattr(arguments, "codex_project_binding", None),
+        )
+    manifest = build_release_freeze(
+        source_root=root,
+        destination=Path(arguments.destination).resolve(),
+        candidate_wheel=Path(arguments.candidate_wheel),
+        built_from_commit=arguments.built_from_commit,
+        inventory_path=Path(arguments.inventory),
+        shard_plan=plan,
+        role_configuration=role_configuration,
+        evaluation_policies=evaluation_policies,
+        allow_dirty_rehearsal=bool(arguments.allow_dirty_rehearsal),
+    )
+    _emit({"freeze_digest": manifest.freeze_digest, "manifest": manifest.model_dump(mode="json")})
+    return 0
+
+
+def _verify_release_freeze(arguments: argparse.Namespace) -> int:
+    root = Path(arguments.project_root).resolve(strict=True)
+    result = verify_release_freeze(
+        Path(arguments.destination).resolve(),
+        source_root=root,
+        candidate_wheel=None if arguments.candidate_wheel is None else Path(arguments.candidate_wheel),
+        allow_rehearsal=bool(arguments.allow_rehearsal),
+    )
+    _emit(result.model_dump(mode="json"))
+    return 0 if result.valid else 1
 
 
 def _clean_install(arguments: argparse.Namespace) -> int:
@@ -615,6 +661,35 @@ def build_parser() -> argparse.ArgumentParser:
     cutover.add_argument("--benchmark-report", required=True)
     cutover.add_argument("--output")
     cutover.set_defaults(handler=_cutover)
+
+    release_freeze = commands.add_parser("release-freeze")
+    release_freeze.add_argument("--project-root", default=str(project_root()))
+    release_freeze.add_argument("--destination", required=True)
+    release_freeze.add_argument("--candidate-wheel", required=True, help="freeze할 candidate wheel의 절대경로")
+    release_freeze.add_argument("--built-from-commit", required=True)
+    release_freeze.add_argument("--inventory", required=True, help="저장된 ModelInventory JSON 관측 경로")
+    release_freeze.add_argument("--shard-plan", required=True, help="ShardIsolationPlan JSON 경로")
+    release_freeze.add_argument("--role-config")
+    release_freeze.add_argument("--codex-project-binding")
+    release_freeze.add_argument("--budget-policy")
+    release_freeze.add_argument("--role-timeout-policy")
+    release_freeze.add_argument(
+        "--allow-dirty-rehearsal",
+        action="store_true",
+        help="dirty worktree에서 rehearsal freeze를 만든다. 이 freeze는 release용으로 재검증되지 않는다.",
+    )
+    release_freeze.set_defaults(handler=_release_freeze)
+
+    verify_release_freeze_parser = commands.add_parser("verify-release-freeze")
+    verify_release_freeze_parser.add_argument("--project-root", default=str(project_root()))
+    verify_release_freeze_parser.add_argument("--destination", required=True)
+    verify_release_freeze_parser.add_argument("--candidate-wheel")
+    verify_release_freeze_parser.add_argument(
+        "--allow-rehearsal",
+        action="store_true",
+        help="rehearsal freeze를 검증 대상으로 허용한다. release 결속 판정에는 쓰지 않는다.",
+    )
+    verify_release_freeze_parser.set_defaults(handler=_verify_release_freeze)
     return parser
 
 
@@ -625,6 +700,7 @@ def main(argv: list[str] | None = None) -> int:
         return int(arguments.handler(arguments))
     except (
         QualificationRunError,
+        ReleaseFreezeError,
         CleanInstallError,
         BenchmarkObservationError,
         CheckpointContractError,
