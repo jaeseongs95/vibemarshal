@@ -1174,8 +1174,11 @@ def _normal_completion(
     runtime: CodexRuntimePort,
     source_digest: str,
     *, roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
 ) -> dict[str, Any]:
     from .execution import ExecutionProposalAdapter
+    from .governance_gate import MissingGovernanceGate
+    from .roles import CodexStructuredRoleRunner
     provider = None
     if roles is not None:
         with prepared.service.ledger.read() as connection:
@@ -1202,7 +1205,26 @@ def _normal_completion(
             "E2E_EXECUTION_PROPOSAL_PROVIDER_REQUIRED: raw-request E2E는 실제 "
             "execution_spec_prepare 역할을 사용해야 합니다."
         )
-    dispatcher = EngineDispatcher(prepared.service, runtime, proposal_provider=provider)
+    # 실행 Task는 제품 경로와 같은 필수 governance gate를 지난다. 설정이 없으면 GOVERNANCE_GATE_REQUIRED로 멈춘다.
+    task_gate = MissingGovernanceGate() if governance is None else governance.open_gate(
+        prepared.service, runtime=runtime, roles=roles,
+        runner=None if roles is None else CodexStructuredRoleRunner(
+            runtime, max_schema_recovery_attempts=0, ephemeral_threads=False),
+    )
+    try:
+        return _drive_normal_completion(prepared, runtime, source_digest, provider, task_gate)
+    finally:
+        task_gate.close()
+
+
+def _drive_normal_completion(
+    prepared: PreparedE2E,
+    runtime: CodexRuntimePort,
+    source_digest: str,
+    provider: Any,
+    task_gate: Any,
+) -> dict[str, Any]:
+    dispatcher = EngineDispatcher(prepared.service, runtime, proposal_provider=provider, task_gate=task_gate)
     deadline = time.monotonic() + 900
     actions: list[str] = []
     if prepared.service.status(prepared.project_id)["project"]["run_state"] == "completed":
@@ -1272,11 +1294,13 @@ def _stale_after_materialization(
     source_digest: str,
     *,
     roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
 ) -> dict[str, Any]:
     application = EngineApplication(
         prepared.service,
         runtime=runtime,
         role_configuration=roles,
+        governance=governance,
     )
     first = _materialize_with_application(application, prepared)
     (prepared.workspace / "app.py").write_text(
@@ -1305,11 +1329,13 @@ def _restart_resume(
     source_digest: str,
     *,
     roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
 ) -> dict[str, Any]:
     application = EngineApplication(
         prepared.service,
         runtime=runtime,
         role_configuration=roles,
+        governance=governance,
     )
     _materialize_with_application(application, prepared)
     dispatched = application.run_once(prepared.project_id)
@@ -1331,6 +1357,7 @@ def _restart_resume(
         prepared.service,
         runtime=runtime,
         role_configuration=roles,
+        governance=governance,
     )
     resumed = restarted.run_once(prepared.project_id)
     resume_deadline = time.monotonic() + 2
@@ -1363,11 +1390,13 @@ def _unknown_receipt(
     source_digest: str,
     *,
     roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
 ) -> dict[str, Any]:
     application = EngineApplication(
         prepared.service,
         runtime=runtime,
         role_configuration=roles,
+        governance=governance,
     )
     _materialize_with_application(application, prepared)
 
@@ -1589,6 +1618,7 @@ def _live_restart_resume(
     project_binding: CodexProjectBinding | None = None,
     runtime_selection: RuntimeProviderSelection | None = None,
     claude_state_root: Path | None = None,
+    governance: Any | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """실제 App Server 연결과 Core 인스턴스를 닫은 뒤 같은 저장 turn을 재관측한다."""
 
@@ -1603,6 +1633,7 @@ def _live_restart_resume(
             prepared.service,
             runtime=recorded,
             role_configuration=roles,
+            governance=governance,
         )
         _materialize_with_application(application, prepared, timeout_seconds=30)
         dispatched = application.run_once(prepared.project_id)
@@ -1665,6 +1696,7 @@ def _live_restart_resume(
             restored.service,
             runtime=recorded,
             role_configuration=roles,
+            governance=governance,
             supervisor=RuntimeJobSupervisor(
                 restored.service,
                 recorded,
@@ -1692,6 +1724,7 @@ def _live_restart_resume(
             recorded,
             source_digest,
             roles=roles,
+            governance=governance,
         )
         result.update(
             {
@@ -1987,7 +2020,9 @@ def run_project_e2e(
     evaluation_policies: EvaluationPolicies | None = None,
     candidate_wheel: Path | str | None = None,
     runtime_selection: RuntimeProviderSelection | None = None,
+    governance: Any | None = None,
 ) -> tuple[Path, ScopeQualificationReport]:
+    """release project E2E. 실행 Task는 제품 경로와 같은 필수 governance gate를 지난다."""
     if evaluation_policies is None:
         raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
     base = (root or project_root()).resolve(strict=True)
@@ -2020,6 +2055,10 @@ def run_project_e2e(
         destination = (
             run_root or _default_run_root(base, "project-e2e", contract.contract_digest[7:15])
         ).resolve()
+        if governance is None:
+            from .governance_gate import GovernanceSettings
+
+            governance = GovernanceSettings.from_environment(destination / "governance")
         store = ImmutableCheckpointStore(destination, contract)
         store.initialize()
         freeze_manifest = build_qualification_reproduction_bundle(
@@ -2121,18 +2160,21 @@ def run_project_e2e(
                             project_binding=evaluation_policies.codex_project,
                             runtime_selection=runtime_selection,
                             claude_state_root=base / ".flowmarshal-engine-eval" / "claude-threads",
+                            governance=governance,
                         )
                 else:
                     with use_role_timeout_policy(evaluation_policies.role_timeouts):
                         if scenario == "normal-completion":
-                            cell = _normal_completion(prepared, recorded, source_digest, roles=roles)
+                            cell = _normal_completion(
+                                prepared, recorded, source_digest, roles=roles, governance=governance
+                            )
                         elif scenario == "stale-after-materialization":
                             cell = _stale_after_materialization(
-                                prepared, recorded, source_digest, roles=roles
+                                prepared, recorded, source_digest, roles=roles, governance=governance
                             )
                         else:
                             cell = _unknown_receipt(
-                                prepared, recorded, source_digest, roles=roles
+                                prepared, recorded, source_digest, roles=roles, governance=governance
                             )
                     events = recorded.events
                 model_observation = _checkpoint_model_observation(events)

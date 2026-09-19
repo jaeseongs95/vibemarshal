@@ -1,4 +1,4 @@
-"""Task 3개짜리 합성 Goal(W4 대조 검사·W5 실제 측정용 spike).
+"""Task 3개짜리 합성 Goal. governance gate 테스트와 연동 spike가 함께 쓴다.
 
 `e2e_qualification._prepare`의 1 Task 계획을 본떠 Goal·Skeleton·Plan을 등록·승인·활성화한다.
 Task: add 수정(app.py) → shout 수정(text.py) → add를 쓰는 total 추가(app.py, add 수정에 의존).
@@ -34,7 +34,7 @@ from flowmarshal.engine.planning import (
 from flowmarshal.engine.qualification import _profile
 from flowmarshal.engine.service import EngineService
 
-FIXTURE = Path(__file__).resolve().parent / "fixtures" / "multitask"
+FIXTURE = Path(__file__).resolve().parent / "workspace"
 REQUEST = ("app.py의 add와 text.py의 shout 버그를 고치고, add로 정수 목록의 합을 구하는 total을 app.py에 "
            "추가해 test_app.py·test_text.py·test_total.py를 통과시켜줘.")
 

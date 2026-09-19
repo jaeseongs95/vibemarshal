@@ -389,6 +389,7 @@ dependency를 만족한 Task만 `ready`가 된다. 먼저 프로젝트별 직렬
 ready Task
 → Execution Spec materialize
 → precondition·snapshot·context·effect checkpoint
+→ governance gate(dispatch 전, 9.1)
 → Attempt reserve
 → intent 기록
 → 실제 효과 직전 freshness·target/context/prompt/model/policy 재검사
@@ -396,6 +397,7 @@ ready Task
 → receipt·binding
 → 결과 관측
 → Task validation
+→ governance gate(완료 전, 9.1)
 → State 재관측
 → Goal Test
 → Continue | Task Repair | ExecutionSpec Revision | Subgraph Replan | Goal Revision
@@ -421,6 +423,19 @@ provider가 구조화해 반환한 error code, 로컬 Engine이 직접 관측해
 PC 종료, thread 생성 결과 불명, turn 중단 뒤에는 새 task를 추측 생성하지 않는다. unreceipted intent를 `external_unknown`으로 표시하고 기존 provider operation·thread binding을 먼저 관측한다. 마지막 validated checkpoint에서만 재개한다.
 
 실행 직전 검증은 reserve 이후 입력 변화도 잡아야 한다. 생성 응답 유실·abrupt process death·timeout을 각각 검증한다. lease 만료·collector 종료·interrupt ACK를 terminal로 보지 않는다. 기존 binding을 먼저 관측하고 필요할 때만 새 turn을 만든다. 부분 쓰기 후 허용 resume와 immutable 입력 변경을 구분한다.
+
+### 9.1 agent-governance-suite 필수 gate
+
+활성화 뒤 모든 실행 Task는 Worker dispatch 직전(`before_execution`)과 Task 완료 직전(`before_completion`)에 agent-governance-suite workflow gate(`flowmarshal.engine.governance_gate`)를 지난다. 구현과 결정적 검증은 됐고 실제 모델 실측·release qualification은 아직이다.
+
+- **권위.** gate 판정은 Core 완료 판정에 더하는 AND 차단 조건이다. Core만 상태를 전이하고 완료를 판정한다. steward 판단은 Task validation·semantic Validator·Goal Test·Core evidence가 아니다. Planning·Goal 준비 역할 호출과 `FakeCodexRuntime` 결정적 smoke는 대상이 아니다. 두 제품은 독립 제품이며 플러그인은 외부 전제조건이다.
+- **필수화.** EngineApplication은 governance 설정이 없으면 `GOVERNANCE_GATE_REQUIRED`를 돌려주는 gate를 결속하므로 실행 Task를 dispatch하지 않는다. release project E2E harness도 같다. CLI `attempt retry`는 Task를 다시 열기만 하고 새 Attempt 예약·dispatch는 gate를 거친 run-once가 한다. `validate task --complete`는 받지 않는다.
+- **기준선.** dispatch 직전 작업 트리(.gitignore 적용, untracked 포함, Engine 무시 경로 제외)를 임시 index로 `read-tree HEAD`·`add -A`·`write-tree`·`commit-tree`해 스냅샷 commit C0를 만들고, 완료 직전 같은 방식으로 C1을 만든다. 플러그인 범위 확인은 `comparisonTarget: commit`으로 C0를 기준선으로 잡고 C1과 비교한다. commit 모드는 모든 entry를 clean으로 기록하므로 같은 Goal의 앞 Task가 커밋 없이 남긴 변경이 "기존 변경과 겹침"으로 분류되지 않는다. 사용자 HEAD·브랜치·index·작업 트리는 바꾸지 않는다. 대상 저장소 `.git`에 객체와 보호 ref `refs/flowmarshal/governance/<project>/<task>/<attempt>/c0|c1`을 남기는 로컬 효과이며, ref는 감사용으로 보존하고 사용자가 필요할 때 지운다. 기준선과 현재 commit이 달라도 비교되는 것은 문서화되지 않은 플러그인 구현 동작이므로 pin을 바꿀 때 회귀 검사로 다시 확인한다.
+- **사용자 변경.** steward·Worker 호출 전에 쓰기 target을 결정적으로 검사한다. 쓰기 target의 지금 내용이 HEAD와 다르고 이 Goal의 Attempt가 만든 변경으로 설명되지 않으면 사용자 변경으로 보고 steward·Worker 호출 전에 `GOVERNANCE_USER_CHANGE_OVERLAP`으로 막는다. Engine 변경으로 보는 경우는 그 경로가 Goal 시작(이 Goal의 첫 governed dispatch 스냅샷 C0) 때 HEAD와 같았고, 이 Goal의 앞 dispatch가 쓰기 target으로 삼았으며, 그 Attempt의 Worker 결과 file evidence(`after_digest`)와 지금 내용이 같을 때다. Worker가 실패해 결과 기록이 없으면 그 쓰기 target의 부분 변경도 Engine 변경으로 본다. 따라서 Goal 시작 전부터 있던 변경과 Goal 도중 사용자 편집은 막고, 실패한 Attempt를 포함한 앞 Attempt의 Worker 결과는 막지 않아 Task repair·재계획을 끊지 않는다. 실패한 Worker가 결과 기록 없이 남긴 파일에 사용자가 덧댄 변경은 구분하지 못한다. 쓰기 target과 겹치지 않는 사용자 변경은 막지 않는다. 신뢰 관계를 전제로 한 작업 보호이며 악의적 개입 방어가 아니다. 겹치지 않는 사용자 변경은 C0에 담겨 범위 판정에 섞이지 않는다.
+- **원장·재진입.** 스냅샷, steward 호출, 플러그인 MCP 호출, skill 스크립트는 (Task, Execution Spec revision, Attempt 번호) 키로 `CoreOperations`에 효과 전 `operation.prepared`와 완료 결과를 남긴다. 완료 직전 단계는 저장된 결과로 dispatch 전 run을 복원한다. 프로세스 재시작, finalize 뒤 `complete_task` 실패, `reserve_attempt` 예외 뒤에는 같은 키의 완료 결과를 재사용해 같은 run을 이어 가며 새 기준선을 잡지 않는다. 효과 전 실패는 `operation.no_effect`로 남겨 다음 tick에 다시 시도하고, 결과 없는 효과는 `external_unknown`으로 멈추며 자동 재실행하지 않는다. 확정 차단(steward 거절, 플러그인 거부, 범위·수용 근거 불통과)은 저장된 결과로 재생되어 steward를 다시 호출하지 않는다. dispatch 전 차단은 Task 상태를 바꾸지 않고 `task.governance_blocked`를 같은 사유당 한 번 남긴다. 완료 전 차단은 Task를 `blocked`로 두고 `task.validation_blocked`를 남긴다. 판정 보류(`GOVERNANCE_GATE_PENDING`)는 상태를 바꾸지 않는다. 플러그인 run 내부 상태의 별도 영속화는 하지 않는다.
+- **timeout.** MCP 응답, node 스크립트, 서명 CLI, git 스냅샷 호출에는 모두 절대 timeout이 있다. 응답 없는 MCP는 효과 여부를 모르므로 다음 tick에 `external_unknown`이 되고, 효과 전 명령의 timeout은 no_effect로 재시도한다.
+- **steward와 관측.** steward는 플러그인 stage 하한에 따라 역할 설정의 `general_reviewer`(general)·`critical_reviewer`(deep) binding으로 model-lock v2 요청을 만든다. 예산 예약·정산은 `BudgetedRoleRunner`, usage는 `validation` 예산 stage의 `governance_steward` 역할로 남긴다. 플러그인 stage 관측은 steward·Worker receipt의 권위 관측(`model_observation_source`가 있는 observed model·effort)만 쓰며, 없으면 token을 만들지 않고 막는다. Codex provider(inventory 출처 `model/list`)는 turn별 관측 근거가 확인될 때까지 steward 호출 전에 `GOVERNANCE_PROVIDER_UNSUPPORTED`로 멈추고 다른 provider로 fallback하지 않는다.
+- **전제조건과 후속.** node 22.13 이상, git 저장소 루트인 대상 프로젝트, host adapter(`flowmarshal-engine` attestation과 서명 CLI)가 들어간 플러그인이 필요하다. 플러그인 위치는 `FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT`로 준다. 현재 pin은 개발 커밋 `98db130`의 commit·dist digest다. release 버전·content digest pin과 release freeze의 플러그인·node 결속은 플러그인 release 뒤에 한다.
 
 ## 10. 개발·공개 인터페이스
 

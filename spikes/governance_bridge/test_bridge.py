@@ -19,7 +19,7 @@ from flowmarshal.engine.domain import RunOnceAction
 from flowmarshal.engine.e2e_qualification import _copy_fixture, _prepare
 from flowmarshal.engine.qualification import default_role_configuration
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime
-from multitask import git_init
+from tests.fixtures.engine.governance.multitask import git_init
 from test_scope_gate import MultitaskHarness
 from tests.test_engine_qualification import qualification_inventory
 

@@ -48,6 +48,7 @@ from flowmarshal.engine.recovery_planning import (
 )
 from flowmarshal.engine.runtime import FakeCodexRuntime
 from flowmarshal.engine.service import EngineService
+from tests.fixtures.engine.governance.allow import ALLOW_ALL
 from tests.engine_helpers import assignment, inventory, profile
 from tests.engine_inspection_helpers import InspectionScriptedRunner
 
@@ -212,6 +213,7 @@ class EngineFm08RecoveryIntegrationTests(unittest.TestCase):
             runtime=self.runtime,
             role_configuration=_roles(),
             structured_runner=self.runner,
+            governance=ALLOW_ALL,
         )
         self.authority = ApplicationAuthority(self.application)
         self.supervisors = [self.application.supervisor]

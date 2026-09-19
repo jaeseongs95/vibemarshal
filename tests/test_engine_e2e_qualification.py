@@ -34,6 +34,7 @@ from flowmarshal.engine.qualification import (
     default_role_configuration,
 )
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime, RuntimeObservation
+from tests.fixtures.engine.governance.allow import ALLOW_ALL
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -478,7 +479,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
             runtime = RecordedRuntime(
                 FakeCodexRuntime(self.inventory), journal=cell_root / "runtime.json"
             )
-            result = _unknown_receipt(prepared, runtime, source_digest)
+            result = _unknown_receipt(prepared, runtime, source_digest, governance=ALLOW_ALL)
 
             self.assertTrue(result["passed"], result)
             evidence = result["empty_thread_reconciliation"]
@@ -626,6 +627,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
                     run_root=destination,
                     role_configuration=self.roles,
                     evaluation_policies=policies,
+                    governance=ALLOW_ALL,
                 )
 
             runtime.assert_not_called()

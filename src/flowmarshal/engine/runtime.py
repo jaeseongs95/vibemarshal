@@ -2077,6 +2077,10 @@ _FAILURE_OBSERVATION_LIMIT = 10_000
 _FAILURE_DIAGNOSIS_PROVENANCE = FAILURE_DIAGNOSIS_PROVENANCE
 
 
+class TaskGatePending(RuntimeError):
+    """task gate가 아직 판정하지 못했다. Task 상태를 바꾸지 않고 다음 tick에 다시 묻는다."""
+
+
 class EngineDispatcher:
     """원장 우선순위에 따라 호출당 한 상태 단계만 전진시키는 실행기."""
 
@@ -2768,10 +2772,15 @@ class EngineDispatcher:
                 detail="proposal을 최신 Goal·Plan·State·Project Map에 결속했습니다.",
             )
         if materialized is not None:
-            blocker = None if self.task_gate is None else self.task_gate.before_execution(materialized)
-            if blocker is not None:
+            gated = self._task_gate_decision("before_execution", materialized)
+            if isinstance(gated, RunOnceOutcome):
+                return gated
+            if gated is not None:
+                # dispatch 전 차단은 Task 상태를 바꾸지 않는다. 같은 사유는 History에 한 번만 남긴다.
+                self.service.record_task_gate_block(task_id=materialized["id"], phase="before_execution",
+                                                    detail=gated)
                 return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=project_id,
-                    task_id=materialized["id"], blocker_code="GOVERNANCE_GATE_BLOCKED", detail=blocker)
+                    task_id=materialized["id"], blocker_code="GOVERNANCE_GATE_BLOCKED", detail=gated)
             attempt = self.service.reserve_attempt(task_id=materialized["id"])
             try:
                 if self.supervisor is None:
@@ -4607,6 +4616,22 @@ class EngineDispatcher:
         )
         return (evidence.evidence_id,), result.validation_result_id
 
+    def _task_gate_decision(self, phase: str, task: Any) -> str | RunOnceOutcome | None:
+        """task gate의 차단 사유를 돌려준다. 판정 보류와 효과 미확정은 상태 전이 없이 BLOCKED로 끝낸다."""
+        if self.task_gate is None:
+            return None
+        from .operations import ExternalOperationUnknown
+        try:
+            return getattr(self.task_gate, phase)(task)
+        except TaskGatePending as pending:
+            return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=task["project_id"], task_id=task["id"],
+                                  blocker_code="GOVERNANCE_GATE_PENDING", detail=str(pending))
+        except ExternalOperationUnknown as error:
+            return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=task["project_id"], task_id=task["id"],
+                                  blocker_code="EXTERNAL_EFFECT_UNKNOWN", failure_class=FailureClass.EXTERNAL_UNKNOWN,
+                                  suggested_repair_action=RepairAction.WAIT_EXTERNAL, checkpoint_required=True,
+                                  detail=str(error))
+
     def _advance_validation(self, task: Any) -> RunOnceOutcome:
         with self.service.ledger.read() as connection:
             spec_row = connection.execute(
@@ -4668,7 +4693,9 @@ class EngineDispatcher:
                 ),
                 detail=f"typed {step.method} observation이 필요합니다: {step.validation_id}",
             )
-        blocker = None if self.task_gate is None else self.task_gate.before_completion(task)
+        blocker = self._task_gate_decision("before_completion", task)
+        if isinstance(blocker, RunOnceOutcome):
+            return blocker
         if blocker is not None:
             # 완료 뒤 State 재관측은 바뀐 파일을 새 기준으로 흡수하므로 gate는 그 전에 막는다.
             self.service.block_task_from_validation(task_id=task["id"], detail=f"governance gate: {blocker}")

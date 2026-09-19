@@ -87,6 +87,7 @@ from flowmarshal.engine.roles import strict_json_output_schema
 from flowmarshal.engine.runtime import CodexProjectBinding, EngineDispatcher, FakeCodexRuntime
 from flowmarshal.engine.service import EngineService, EngineServiceError
 
+from tests.fixtures.engine.governance.allow import ALLOW_ALL
 from tests.engine_helpers import goal, profile
 
 
@@ -764,7 +765,7 @@ class EngineQualificationTests(unittest.TestCase):
                 (_stale_after_materialization, _restart_resume, _unknown_receipt)
             ):
                 prepared, digest = self.prepared(root / f"case-{index}")
-                cell = helper(prepared, FakeCodexRuntime(self.inventory), digest)
+                cell = helper(prepared, FakeCodexRuntime(self.inventory), digest, governance=ALLOW_ALL)
                 self.assertTrue(cell["passed"], cell)
 
     def test_live_restart_harness_reopens_core_and_records_read_before_resume(self) -> None:
@@ -811,7 +812,7 @@ class EngineQualificationTests(unittest.TestCase):
             ) as factory:
                 cell, receipts = _live_restart_resume(
                     prepared, digest, cell_root=cell_root, contract=contract,
-                    fixture_digest=fixture_digest, codex_bin=None,
+                    fixture_digest=fixture_digest, codex_bin=None, governance=ALLOW_ALL,
                 )
             self.assertEqual(2, factory.call_count)
             self.assertTrue(cell["passed"], cell)
@@ -885,7 +886,7 @@ class EngineQualificationTests(unittest.TestCase):
                 evaluation_contract_digest=contract_digest,
                 fixture_digest=fixture_digest,
             )
-            result = _normal_completion(restored, runtime, source_digest)
+            result = _normal_completion(restored, runtime, source_digest, governance=ALLOW_ALL)
             self.assertTrue(result["passed"], result)
             self.assertEqual(prepared.task_id, restored.proposal.task_id)
             self.assertEqual(1, runtime.create_calls)

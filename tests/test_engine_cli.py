@@ -222,6 +222,7 @@ class EngineCliTests(unittest.TestCase):
             service=service,
             supervisor=supervisor,
             run_once=lambda *_args, **_kwargs: (events.append("run") or outcome),
+            close_task_gate=lambda: None,
         )
         arguments = SimpleNamespace(
             project_id="project_" + "a" * 32,
@@ -271,6 +272,7 @@ class EngineCliTests(unittest.TestCase):
             service=service,
             supervisor=supervisor,
             run_once=lambda *_args, **_kwargs: (events.append("run") or outcome),
+            close_task_gate=lambda: None,
         )
         arguments = SimpleNamespace(
             project_id="project_" + "a" * 32,

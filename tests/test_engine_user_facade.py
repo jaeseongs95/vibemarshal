@@ -27,6 +27,7 @@ from flowmarshal.engine.ledger import SQLiteEngineLedger
 from flowmarshal.engine.models import EngineRoleConfiguration, RoleModelBinding
 from flowmarshal.engine.runtime import FakeCodexRuntime
 from flowmarshal.engine.service import EngineService
+from tests.fixtures.engine.governance.allow import ALLOW_ALL
 from tests.test_engine_ledger_service import TrustedTestEngineService
 from tests.engine_helpers import goal, inventory, plan, profile, project_map, skeleton, state
 from tests.engine_inspection_helpers import InspectionScriptedRunner
@@ -233,6 +234,7 @@ class EngineUserFacadeTests(unittest.TestCase):
             runtime=self.runtime,
             role_configuration=_roles(),
             structured_runner=runner,
+            governance=ALLOW_ALL,
         )
 
     def test_prepare_uses_real_goal_and_planning_roles_then_authorizes_selected_plan(self) -> None:
@@ -405,7 +407,7 @@ class EngineUserFacadeTests(unittest.TestCase):
             roles=default_role_configuration(ROOT),
         )
         runtime = FakeCodexRuntime(qualification_models)
-        application = EngineApplication(prepared.service, runtime=runtime)
+        application = EngineApplication(prepared.service, runtime=runtime, governance=ALLOW_ALL)
 
         materialized = application.run_once(
             prepared.project_id, proposal=prepared.proposal

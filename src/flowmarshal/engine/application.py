@@ -722,11 +722,15 @@ class EngineApplication:
         structured_runner: StructuredRolePort | None = None,
         supervisor: Any | None = None,
         inspection_contract: str = "plan-inspection-v1",
+        governance: Any | None = None,
     ) -> None:
         self.service = service
         self.runtime = runtime
         self.role_configuration = role_configuration
         self.inspection_contract = inspection_contract
+        # 실행 Task의 필수 governance gate 설정(open_gate). 없으면 실행 Task를 dispatch하지 않는다.
+        self.governance = governance
+        self._task_gate: Any | None = None
         self._structured_runner = structured_runner
         self._core_action_authority: CoreActionAuthority | None = None
         if supervisor is not None:
@@ -1028,7 +1032,27 @@ class EngineApplication:
             proposal_provider=provider,
             supervisor=self.supervisor,
             recovery_provider=recovery_provider,
+            task_gate=self.task_gate(),
         )
+
+    def task_gate(self) -> Any:
+        """활성화 뒤 실행 Task가 반드시 지나는 governance gate. 설정이 없으면 GOVERNANCE_GATE_REQUIRED로 막는다."""
+        if self._task_gate is None:
+            from .governance_gate import MissingGovernanceGate
+
+            if self.governance is None:
+                self._task_gate = MissingGovernanceGate()
+            else:
+                runner = None if self.role_configuration is None else self._execution_components()[2]
+                self._task_gate = self.governance.open_gate(
+                    self.service, runtime=self.runtime, roles=self.role_configuration, runner=runner
+                )
+        return self._task_gate
+
+    def close_task_gate(self) -> None:
+        if self._task_gate is not None:
+            self._task_gate.close()
+            self._task_gate = None
 
     def run_once(
         self,

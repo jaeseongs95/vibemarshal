@@ -116,9 +116,27 @@ provider 옵션은 하위 명령 앞에 두는 전역 옵션이다.
 - `--claude-bin`에는 실제 실행 파일을 준다. `.cmd`·`.bat`·`.ps1` shim은 거부한다. 실행 파일 digest와 `claude --version` 값을 잠그므로 CLI를 업데이트하면 새 binding이 필요하다.
 - 자식 세션은 `--safe-mode`로 실행해 CLAUDE.md·auto-memory·plugins·hooks·MCP를 상속하지 않는다. 프로젝트 `AGENTS.md`는 Engine이 Context로 직접 넣는다.
 - `:danger-full-access`/`never`는 Claude의 `bypassPermissions` 관측에서 도출한 로컬 대응값이다. 도구 거부(`permission_denials`)가 있는 turn은 실패로 처리한다.
-- effort는 provider가 되돌려 주지 않아 observed 값이 비어 있다. usage는 성공 turn에서만 기록하고 확인할 수 없으면 비워 둔다.
+- stream 응답에는 effort가 없다. CLI가 저장한 session 기록의 그 turn assistant 줄이 model·effort 한 쌍을 명시하면 `claude_session_transcript` 출처로 관측값을 기록하고, 아니면 비워 둔다. usage는 성공 turn에서만 기록하고 확인할 수 없으면 비워 둔다.
 
 세부 규칙은 [재설계 문서 7.2](docs/orchestration-redesign.md#72-claude-code-runtime-provider)에 있다.
+
+### agent-governance-suite 필수 연동
+
+활성화 뒤 모든 실행 Task는 agent-governance-suite workflow를 거쳐야 dispatch·완료된다. 플러그인이 없으면 run-once는 실행 Task를 `GOVERNANCE_GATE_REQUIRED`로 멈춘다.
+
+```powershell
+$env:FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT = "D:\claude\ags-engine-host"
+flowmarshal-engine --provider claude --claude-model-catalog D:\config\claude-model-catalog.json run-once --project-id <project-id> --role-config <역할 설정>
+```
+
+- node 22.13 이상과 `flowmarshal-engine` host adapter가 들어간 플러그인이 필요하다. 현재는 개발 커밋 `98db130`만 고정되어 있고, 플러그인 release 뒤 release 버전·digest 고정으로 바꾼다.
+- 대상 프로젝트는 git 저장소 루트여야 한다. Engine은 작업 트리를 임시 index로 스냅샷 commit에 담아 비교하며 사용자 HEAD·브랜치·index·파일은 바꾸지 않는다. `.git`에는 스냅샷 객체와 `refs/flowmarshal/governance/...` ref가 남는다. 감사가 끝나 필요 없으면 `git for-each-ref --format="%(refname)" refs/flowmarshal/governance`로 찾아 `git update-ref -d <ref>`로 지운다.
+- Task의 쓰기 대상 파일에 이 Goal의 앞 작업이 만들지 않은 미커밋 변경(Goal 전부터 있던 변경이나 Goal 도중 직접 고친 내용)이 있으면 그 Task 시작 전에 `GOVERNANCE_USER_CHANGE_OVERLAP`으로 멈춘다. 변경을 정리하거나 커밋한 뒤 다시 run-once를 실행한다.
+- 판단 보조(steward)는 역할 설정의 `general_reviewer`·`critical_reviewer` 모델을 쓰며 Task마다 추가 호출이 든다.
+- Codex provider에서는 turn별 model·effort 관측 근거가 아직 없어 `GOVERNANCE_PROVIDER_UNSUPPORTED`로 멈춘다.
+- `attempt retry`는 Task를 다시 열기만 하고, `validate task --complete`는 받지 않는다. 재시도와 완료는 run-once가 gate를 거쳐 처리한다.
+
+세부 규칙은 [재설계 문서 9.1](docs/orchestration-redesign.md#91-agent-governance-suite-필수-gate)에 있다.
 
 `project`, `model`, `goal`, `plan`, `task`, `run`, `attempt`, `validate`, `recover`, `report` 아래에는 진단과 세부 운영을 위한 중첩 명령이 있다. 전체 목록은 `flowmarshal-engine --help`와 각 명령의 `--help`에서 확인할 수 있다. 반복 실행과 재시작·receipt 복구 절차는 [Engine 사용자 workflow](docs/engine-user-workflow.md)에 정리되어 있다.
 

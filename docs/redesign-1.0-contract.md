@@ -105,6 +105,18 @@ Engine schema 4는 별도의 새 DB로 만든다. schema 3/raw receipt/history �
 
 패키지는 Engine-only 사용자 CLI와 필요한 shared canonical 자산을 포함한다. legacy/eval/developer 도구는 분리한다. source-tree 평가 도구에는 명시적 source root와 재현 입력 bundle을 요구할 수 있다. wheel에 없는 fixture/config가 있다고 가정하지 않으며 깨끗한 non-editable 설치에서 확인한다.
 
+## D13. agent-governance-suite 필수 연동 — 구현·결정적 검증 / 실측·qualification 미실행
+
+활성화 뒤 모든 실행 Task는 Worker dispatch 직전과 Task 완료 직전에 agent-governance-suite workflow gate를 지난다. 상세 규칙은 [재설계 문서 9.1](orchestration-redesign.md#91-agent-governance-suite-필수-gate)이 권위다. 요약하면 다음과 같다.
+
+- 권위: gate 판정은 Core 완료 판정에 더하는 AND 차단 조건이다. steward 판단은 Task validation·semantic Validator·Goal Test·Core evidence가 아니다. Planning·Goal 준비 역할 호출과 `FakeCodexRuntime` 결정적 smoke는 대상이 아니다.
+- 필수화: EngineApplication run_once와 release project E2E harness는 gate 설정 없이 실행 Task를 dispatch하지 않는다(`GOVERNANCE_GATE_REQUIRED`). CLI `attempt retry`는 Attempt를 직접 예약하지 않고, `validate task --complete`는 받지 않는다.
+- 기준선: 작업 트리 스냅샷 commit C0(dispatch 직전)·C1(완료 직전)을 플러그인 범위 확인의 commit 모드로 비교한다. 같은 파일을 여러 Task가 차례로 고치는 Goal도 완료할 수 있다. 사용자 git 상태는 바꾸지 않고 `.git` 객체와 보호 ref만 남긴다.
+- 사용자 변경: 쓰기 target이 HEAD와 다르고 이 Goal의 Attempt가 만든 변경(Goal 시작 때 깨끗했고 앞 dispatch가 썼으며 Worker 결과 기록과 같거나, Worker가 실패해 기록이 없음)으로 설명되지 않으면 steward·Worker 호출 전에 막는다. Goal 시작 전 변경과 Goal 도중 사용자 편집은 막고 앞 Attempt의 Worker 결과는 막지 않아 Task repair·재계획을 끊지 않는다.
+- 원장·재진입: gate 효과는 (Task, Execution Spec revision, Attempt 번호) 키의 CoreOperations intent·완료 결과로 남긴다. 재시작·부분 실패 뒤 같은 run을 이어 가고, 결과 없는 효과는 `external_unknown`으로 멈춘다.
+- provider: steward는 `general_reviewer`·`critical_reviewer` binding을 쓰고 권위 관측이 없으면 막는다. Codex provider는 관측 근거가 확인될 때까지 `GOVERNANCE_PROVIDER_UNSUPPORTED`로 멈춘다.
+- 후속: 플러그인 host adapter release, release 버전·content digest pin, release freeze의 플러그인·node 결속, 실제 steward로 여러 Task Goal 실측은 아직 하지 않았다. commit 모드에서 기준선과 현재 commit이 달라도 되는 것은 문서화되지 않은 플러그인 동작이므로 pin을 바꿀 때 회귀 검사로 다시 확인한다.
+
 ## V01. 기능·안전 기반 1.0 필수 검증 — planned / 미실행
 
 모든 필수 검증과 독립 최종 감사가 통과해야만 1.0 패키지 전환을 한다. 최신 작업 지시에 따른 main checkout의 개발·커밋은 이 전환 이전에도 수행한다. 문서 정합성 통과는 제품 PASS가 아니다. 아래는 각각 필수 책임이며 과거 51개 재검증이나 1,056개 결과는 대상·시점이 다른 provenance다. 새 실행으로 세지 않는다. 도구 환경 실패와 제품 실패를 구분한다.
@@ -116,7 +128,7 @@ Engine schema 4는 별도의 새 DB로 만든다. schema 3/raw receipt/history �
 | 결정적·호환·설치 | schema/DAG/원장/정책/검사 Gate, 변경 영향 회귀, schema 3 최소 read-only inspector와 schema 4 신규 DB, candidate wheel의 깨끗한 non-editable 설치. 모든 qualification evidence는 허용 root·파일 SHA-256·cell/fixture/seed/freeze에 결속한다. release project E2E는 절대 경로 candidate wheel과 그 SHA-256·배포판 이름/버전·non-editable 설치·import 경로·wheel 내부 package bytes까지 harness와 최종 scope verifier에서 재확인한다. source 기반 진단은 release PASS로 승격하지 않는다 | FM-11 harness, FM-12 검증 |
 | 실제 역할 48회 | Plan 8 + Goal 8 fixture × 3 seed 전 cell 완료; required finding recall ≥90%, precision ≥85%, critical false admission 0, clean false block 0, schema failure 0, critical admission seed instability 0 | FM-11, FM-13 |
 | 실제 Planning 18회 | 6 fixture × 3 seed 전 cell 완료; 정상 4종은 선택, 실제 정보 부족 2종은 의미 있는 blocking question; 일반 오류를 정상 blocked로 계산하지 않음; 준비 포함 역할 호출 ≤14, 후보 version ≤5, 선택 후보 deterministic finding 0 | FM-11, FM-13 |
-| 실제 요청 E2E | 실제 요청 → Goal 정규화 → 독립 review → Plan 선택 → 한 번의 승인 → Task 실행 → 독립 검사 → 최종 결과를 실제 provider로 연결 | FM-11, FM-14 |
+| 실제 요청 E2E | 실제 요청 → Goal 정규화 → 독립 review → Plan 선택 → 한 번의 승인 → Task 실행 → 독립 검사 → 최종 결과를 실제 provider로 연결. 실행 Task는 D13의 필수 governance gate를 지난다 | FM-11, FM-14 |
 | 독립 최종 감사 | 서로 입력을 공유하되 결론을 공유하지 않는 두 감사에서 필수 검증·허용 효과·비목표·패키지·증거/실행 설정과 남은 실패를 각각 확인하고 Core가 finding을 결정적으로 join | FM-15 |
 | 로컬 전환 | 감사 통과 뒤 main의 검증된 변경 확인·1.0 전환·동일 wheel digest의 delta 확인. 전환 전 main 개발·커밋과 구분 | FM-16 |
 
@@ -181,5 +193,6 @@ FM-09의 개발 조율·dispatch·원장 자동화는 제품 runtime 기능이�
 | 10 | D10, 제품 설계 §5·6 | FM-07 | FM-12, FM-13 |
 | 11 | D11, ADR | FM-02, FM-10 | FM-12, FM-15 |
 | 12 | D12, ADR | FM-07, FM-10 | FM-12, FM-13, FM-15 |
+| 13 | D13, 제품 설계 §9.1, ADR | FM-GOVERNANCE-MANDATORY-GATE | FM-12, FM-14, FM-15 |
 
 이 표는 책임 추적표이며 새 task 등록이나 완료 상태가 아니다. 정확한 명세·의존성·dispatch·검사 상태의 권위는 구현 조율 SQLite 원장이다. Worker는 원장을 직접 변경하거나 다음 앱 작업을 생성하지 않는다.

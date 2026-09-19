@@ -17,6 +17,7 @@ from flowmarshal.engine.ledger import SQLiteEngineLedger
 from flowmarshal.engine.models import EngineRoleConfiguration, RoleModelBinding
 from flowmarshal.engine.runtime import FakeCodexRuntime
 from flowmarshal.engine.service import EngineService
+from tests.fixtures.engine.governance.allow import ALLOW_ALL
 from tests.engine_helpers import inventory, profile
 from tests.engine_inspection_helpers import InspectionScriptedRunner
 
@@ -165,6 +166,7 @@ class EngineFm08CoreIntegrationTests(unittest.TestCase):
             runtime=self.runtime,
             role_configuration=_roles(),
             structured_runner=self.runner,
+            governance=ALLOW_ALL,
         )
         self.authority = ApplicationAuthority(self.application)
         self.addCleanup(self._close_supervisors)
@@ -436,6 +438,7 @@ class EngineFm08CoreIntegrationTests(unittest.TestCase):
             runtime=self.runtime,
             role_configuration=_roles(),
             structured_runner=self.runner,
+            governance=ALLOW_ALL,
         )
         self.supervisors.append(restarted.supervisor)
         after = restarted.status(self.project_id)

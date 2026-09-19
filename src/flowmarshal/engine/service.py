@@ -5443,6 +5443,19 @@ class EngineService:
                 {"detail": detail},
             )
 
+    def record_task_gate_block(self, *, task_id: str, phase: str, detail: str) -> None:
+        """task gate의 차단 사유를 History에 남긴다. Task 상태는 바꾸지 않고, 직전과 같은 사유는 반복하지 않는다."""
+        payload = {"phase": phase, "detail": detail}
+        with self.ledger.transaction() as tx:
+            task = tx.one("SELECT * FROM task_contracts WHERE id = ?", (task_id,))
+            last = tx.maybe_one(
+                "SELECT payload_json FROM history_events WHERE project_id = ? AND entity_type = 'task_contract' "
+                "AND entity_id = ? AND event_type = 'task.governance_blocked' ORDER BY sequence DESC LIMIT 1",
+                (task["project_id"], task_id),
+            )
+            if last is None or json.loads(last["payload_json"]) != payload:
+                tx.history(task["project_id"], "task.governance_blocked", "task_contract", task_id, payload)
+
     @staticmethod
     def _unresolved_execution_provider_calls(
         tx: Any, *, task_id: str | None = None, plan_revision_id: str | None = None,

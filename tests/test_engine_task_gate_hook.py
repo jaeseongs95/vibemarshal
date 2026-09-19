@@ -8,7 +8,7 @@ from unittest.mock import patch
 from flowmarshal.engine.domain import RunOnceAction
 from flowmarshal.engine.e2e_qualification import _copy_fixture, _prepare
 from flowmarshal.engine.qualification import default_role_configuration
-from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime
+from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime, TaskGatePending
 from tests.test_engine_qualification import qualification_inventory
 
 
@@ -92,6 +92,41 @@ class TaskGateHookTests(unittest.TestCase):
         reobserve.assert_not_called()
         self.assertEqual("blocked", self.task_status())
         self.assertEqual(["before_execution", "before_completion"], [name for name, _ in gate.calls])
+
+    def test_pending_gate_keeps_task_state_and_records_nothing(self) -> None:
+        class PendingGate(RecordingGate):
+            def before_execution(self, task):
+                super().before_execution(task)
+                raise TaskGatePending("GOVERNANCE_TIMEOUT: MCP tools/call")
+
+            def before_completion(self, task):
+                super().before_completion(task)
+                raise TaskGatePending("GOVERNANCE_TIMEOUT: script")
+
+        gate = PendingGate()
+        dispatcher = self.dispatcher(gate)
+        project_id = self.prepared.project_id
+        dispatcher.run_once(project_id, proposal=self.prepared.proposal)
+        outcome = dispatcher.run_once(project_id)
+        self.assertEqual(("BLOCKED", "GOVERNANCE_GATE_PENDING"), (outcome.action.name, outcome.blocker_code))
+        self.assertEqual("materialized", self.task_status())
+        with self.prepared.service.ledger.read() as connection:
+            self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0])
+            self.assertEqual(0, connection.execute(
+                "SELECT COUNT(*) FROM history_events WHERE event_type = 'task.governance_blocked'").fetchone()[0])
+
+    def test_blocked_dispatch_is_recorded_once_in_history(self) -> None:
+        gate = RecordingGate(execution="governance plan was not accepted")
+        dispatcher = self.dispatcher(gate)
+        project_id = self.prepared.project_id
+        dispatcher.run_once(project_id, proposal=self.prepared.proposal)
+        dispatcher.run_once(project_id)
+        dispatcher.run_once(project_id)
+        with self.prepared.service.ledger.read() as connection:
+            rows = connection.execute("SELECT payload_json FROM history_events "
+                                      "WHERE event_type = 'task.governance_blocked'").fetchall()
+        self.assertEqual(['{"detail":"governance plan was not accepted","phase":"before_execution"}'],
+                         [row[0] for row in rows])
 
     def test_passing_gate_leaves_completion_to_core(self) -> None:
         gate = RecordingGate()

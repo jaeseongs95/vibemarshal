@@ -4,7 +4,7 @@
   FLOWMARSHAL_ENGINE_SOURCE_ROOT=. .venv/Scripts/python.exe spikes/governance_bridge/run_real.py <빈 출력 디렉터리> [--multitask]
 
 모델 호출은 Task마다 steward 최대 4회(stage 하한 general→Sonnet급 3회, deep→Opus급 1회)와 Worker 1회다.
-기본은 한 Task(project-e2e), `--multitask`는 Task 3개 합성 Goal(`multitask.py`)을 Goal verdict나 차단까지 진행한다.
+기본은 한 Task(project-e2e), `--multitask`는 Task 3개 합성 Goal(`tests/fixtures/engine/governance/multitask.py`)을 Goal verdict나 차단까지 진행한다.
 출력 디렉터리에 governance-log.jsonl, steward-calls.jsonl, run-summary.json(원장 Worker usage 관측 포함)을 남긴다.
 """
 from __future__ import annotations
@@ -16,8 +16,9 @@ import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-import multitask  # noqa: E402
+from tests.fixtures.engine.governance import multitask  # noqa: E402
 from bridge import DEFAULT_PIN, GovernanceTaskGate, Observation  # noqa: E402
 from flowmarshal.engine.domain import RunOnceAction  # noqa: E402
 from flowmarshal.engine.e2e_qualification import _copy_fixture, _prepare  # noqa: E402

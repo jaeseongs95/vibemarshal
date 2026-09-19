@@ -1,5 +1,7 @@
 # FlowMarshal ↔ agent-governance-suite 연동 프로토타입
 
+> 이 spike의 결론에 따라 필수 gate는 제품 코드 `src/flowmarshal/engine/governance_gate.py`로 옮겨졌다. 제품 gate는 작업 트리 스냅샷 commit 기준선(발견 9 해소), 원장 재진입, timeout, 역할 설정 기반 steward를 쓴다. 규칙의 권위는 [재설계 문서 9.1](../../docs/orchestration-redesign.md#91-agent-governance-suite-필수-gate)이다. 아래는 spike 당시 기록이다.
+
 FlowMarshal Engine이 Task마다 agent-governance-suite의 orchestrated workflow를 진행하는 방식이 실제로 동작하는지 확인하는 spike다. 비교용으로 플러그인 없이 같은 빈틈을 막는 결정적 gate(방법론만 채택)도 둔다. 제품 wheel에는 들어가지 않는다. 결과를 보고 연동 형태(선택형 연동, 방법론만 채택, 필수 연동)를 정한다.
 
 ## 구성
@@ -10,7 +12,7 @@ FlowMarshal Engine이 Task마다 agent-governance-suite의 orchestrated workflow
 | `bridge.py` | `GovernanceTaskGate`. 플러그인 MCP 서버를 `flowmarshal-engine` 호스트로 띄우고 Task별 workflow를 진행한다. |
 | `test_bridge.py` | 가짜 provider 결정적 검사(모델 호출 없음). |
 | `scope_gate.py` | `WorkspaceScopeGate`. 플러그인 없이 Worker 전후 프로젝트 파일 내용 digest를 비교해 쓰기 target 밖 변경을 막는 결정적 gate(방법론만 채택 검증용). |
-| `multitask.py`, `fixtures/multitask/` | Task 3개 합성 Goal(add 수정 → shout 수정 → add를 쓰는 total 추가). Task가 ready가 될 때 Execution Spec 후보를 만든다. |
+| `tests/fixtures/engine/governance/multitask.py`, `workspace/` | Task 3개 합성 Goal(제품 gate 테스트와 함께 쓰려고 옮겼다)(add 수정 → shout 수정 → add를 쓰는 total 추가). Task가 ready가 될 때 Execution Spec 후보를 만든다. |
 | `test_scope_gate.py` | 합성 Goal에서 결정적 gate를 검사한다(모델 호출 없음). |
 | `run_real.py` | 실제 Claude Code provider로 합성 fixture를 끝까지 진행하는 1회 측정 스크립트. 기본은 한 Task, `--multitask`는 Task 3개 Goal. |
 

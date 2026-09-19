@@ -22,6 +22,7 @@
 
 - 기존 Core·revision·DAG·binding·evidence·validation을 유지한다. 재계획은 실행 중 Attempt를 보호하고 유효성이 확인된 완료 evidence만 재사용한다.
 - EngineApplication의 prepare/authorize/run_once/observe/pause/cancel/status/final-report 경계를 연결한다. run_once는 job 예약/시작 또는 관측 소비 후 신속히 반환한다. 활성화 후 준비·실행·검사·복구/replanning 역할 모두 RuntimeJob·checkpoint에 포함한다. 승인 전 대화형 준비는 동기 실행을 유지할 수 있다.
+- 활성화 뒤 모든 실행 Task는 agent-governance-suite workflow gate를 반드시 지난다. 구현과 결정적 검증은 됐고 실제 모델 실측·release qualification은 미실행이다. 규칙은 아래 「agent-governance-suite 필수 연동」 절을 따른다.
 - supervisor는 활성 job 동안만 연결·stream·receipt·provider terminal·usage·절대 deadline을 관리한다. 전역 daemon은 필수가 아니며 완료 판정은 Core만 한다. provider turn의 terminal은 외부 효과 완료가 아니며, 효과는 typed adapter receipt나 대상 재관측으로 별도 확인한다.
 - 실제 효과 직전 freshness와 target/context/prompt/requested model/policy 결속을 재검사한다. lease 만료·collector 종료는 provider terminal이 아니다. 부분 쓰기 후 허용 resume와 immutable 입력 변경을 구분한다. `model/list`는 요청 조합의 지원 여부만 증명하며 provider가 turn별 model/effort를 응답이나 자체 session 기록에 명시하지 않으면 실제 적용값으로 기록하지 않는다.
 - 원장 값은 `provider_observed`, `client_requested`, `local_derived`, `model_reported` provenance를 구분한다. model-reported error code·완료·효과·confidence를 provider 관측이나 Core 판정으로 승격하지 않는다.
@@ -157,13 +158,24 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 ## 실행·검사·복구
 
 - dependency를 만족한 Task만 `ready`가 된다. 같은 프로젝트는 먼저 직렬 실행하며 resource lock·충돌 검증 전에는 병렬화하지 않는다.
-- 기본 순서는 `Execution Spec → precondition·snapshot·context·effect checkpoint → Attempt reserve → intent → provider call → receipt/binding → 결과 관측 → Task validation → State 재관측 → Goal Test`다.
+- 기본 순서는 `Execution Spec → precondition·snapshot·context·effect checkpoint → governance gate(dispatch 전) → Attempt reserve → intent → provider call → receipt/binding → 결과 관측 → Task validation → governance gate(완료 전) → State 재관측 → Goal Test`다.
 - 준비 역할과 결정적 검증도 효과 전에 append-only intent를 남긴다. 완료 관측이 없는 효과는 `external_unknown`으로 보존하고 입력 변경·새 Task·모델 변경으로 우회해 자동 재실행하지 않는다. 기존 intent·binding·receipt와 provider 상태를 재개 없이 먼저 대조하고, 실제 후속 turn이 필요할 때만 마지막 validated checkpoint에서 resume한다.
 - 파일·artifact·build·test·diff의 결정적 검사를 우선하고 의미 검토에만 별도 Validator를 쓴다. Validator는 Worker와 분리된 실행 경로에서 원자료를 다시 관측하고 독립 request·receipt·evidence binding을 남긴다. Task validation과 plan-level Goal Test를 분리하며 모든 필수 Task·criterion·integration evidence 뒤에만 Goal을 완료한다.
 - 독립 Goal Test는 실제 명령 또는 별도 Validator의 새 관측이 필요하다. 다른 model/effort 표기만으로 독립성을 충족하지 않으며, Task evidence 집계는 Plan에 `task_aggregate`가 명시된 경우만 허용한다.
 - 실패 분류는 `implementation`, `context`, `task_contract`, `dependency`, `environment`, `requirement_change`, `external_unknown`이다. provider/local code와 직접 evidence로 분류하고 model-reported code는 진단 가설로만 보존한다. 1.0은 로컬 Context 해소·effect unknown observe-first와 직접 evidence에 결속한 실제 repair/replan 한 경로를 검증하며, 나머지는 명시적 정지·revision routing을 제공한다.
 - 동일 실패 재계획은 최대 2회, Goal 전체 재계획은 최대 5회이며 원장에서 계산한다. 첫 재계획 뒤 새 evidence 없는 반복을 차단한다.
 - 최종 GoalVerdict 전 deterministic Goal Test의 운영 상세를 복구할 때는 최신 FAIL·직접 evidence·원인 분류·동일 의미의 변경 명세를 명시하고 freshness·최대 두 번의 복구 한도를 검사한다. 이전 결과를 보존하고 새 binding·History·intent·receipt·validation으로 연결한다.
+
+## agent-governance-suite 필수 연동
+
+- 활성화 뒤 모든 실행 Task는 Worker dispatch 직전과 Task 완료 직전에 agent-governance-suite workflow gate(`flowmarshal.engine.governance_gate`)를 지난다. Planning·Goal 준비 역할 호출과 `FakeCodexRuntime` 결정적 smoke는 대상이 아니다. 두 제품은 독립 제품이며 플러그인은 외부 전제조건이다.
+- gate 판정은 Core 완료 판정에 더하는 AND 차단 조건이다. Core만 상태를 전이하고 완료를 판정한다. steward 판단은 Task validation·semantic Validator·Goal Test·Core evidence가 아니다.
+- 제품 경로(EngineApplication run_once, release project E2E harness)는 gate 설정이 없으면 실행 Task를 dispatch하지 않고 `GOVERNANCE_GATE_REQUIRED`로 멈춘다. CLI `attempt retry`는 Task를 다시 열기만 하고 새 Attempt는 gate를 거친 run-once가 예약한다. `validate task --complete`는 받지 않는다.
+- 기준선은 스냅샷 commit이다. dispatch 직전 작업 트리(.gitignore 적용, untracked 포함, Engine 무시 경로 제외)를 임시 index·commit-tree로 C0, 완료 직전 C1로 만들고 플러그인 범위 확인의 `comparisonTarget: commit`으로 비교한다. 사용자 HEAD·브랜치·index·작업 트리는 바꾸지 않는다. 대상 저장소 `.git`에 객체와 보호 ref `refs/flowmarshal/governance/<project>/<task>/<attempt>/c0|c1`을 남기는 로컬 효과이며, ref는 감사용으로 보존하고 사용자가 필요할 때 지운다. 기준선과 현재 commit이 달라도 비교되는 것은 문서화되지 않은 플러그인 구현 동작이므로 pin을 바꿀 때 회귀 검사로 다시 확인한다.
+- 쓰기 target의 지금 내용이 HEAD와 다르고 이 Goal의 Attempt가 만든 변경으로 설명되지 않으면 사용자 변경으로 보고 steward·Worker 호출 전에 `GOVERNANCE_USER_CHANGE_OVERLAP`으로 막는다. Engine 변경으로 보는 경우는 그 경로가 Goal 시작(이 Goal의 첫 governed dispatch 스냅샷 C0) 때 HEAD와 같았고, 이 Goal의 앞 dispatch가 쓰기 target으로 삼았으며, 그 Attempt의 Worker 결과 file evidence(`after_digest`)와 지금 내용이 같을 때다. Worker가 실패해 결과 기록이 없으면 그 쓰기 target의 부분 변경도 Engine 변경으로 본다. 따라서 Goal 시작 전부터 있던 변경과 Goal 도중 사용자 편집은 막고, 실패한 Attempt를 포함한 앞 Attempt의 Worker 결과는 막지 않아 Task repair·재계획을 끊지 않는다. 실패한 Worker가 결과 기록 없이 남긴 파일에 사용자가 덧댄 변경은 구분하지 못한다. 쓰기 target과 겹치지 않는 사용자 변경은 막지 않는다. 신뢰 관계를 전제로 한 작업 보호이며 악의적 개입 방어가 아니다.
+- gate의 스냅샷·steward·MCP·스크립트 효과는 (Task, Execution Spec revision, Attempt 번호) 키로 CoreOperations에 효과 전 intent와 완료 결과를 History에 남긴다. 재시작, finalize 뒤 완료 실패, reserve 예외 뒤에는 같은 키의 완료 결과로 같은 run을 이어 가고 새 기준선을 잡지 않는다. 결과 없는 효과는 `external_unknown`으로 멈추고 자동 재실행하지 않는다. 확정 차단은 저장된 결과로 재생되며 steward를 다시 호출하지 않는다. dispatch 전 차단은 `task.governance_blocked`, 완료 전 차단은 `task.validation_blocked`로 남고, 판정 보류(`GOVERNANCE_GATE_PENDING`)는 상태를 바꾸지 않는다. MCP·node·서명·git 호출에는 모두 절대 timeout이 있다.
+- steward는 역할 설정의 `general_reviewer`(general 하한)·`critical_reviewer`(deep 하한) binding으로 model-lock v2 요청을 만들고, usage는 `validation` 예산 stage의 `governance_steward` 역할로 남긴다. 플러그인 stage 관측은 steward·Worker receipt의 권위 관측만 쓰며 관측이 없으면 token을 만들지 않고 막는다. Codex provider(inventory 출처 `model/list`)는 관측 근거가 확인될 때까지 `GOVERNANCE_PROVIDER_UNSUPPORTED`로 멈추고 다른 provider로 fallback하지 않는다.
+- 전제조건은 node 22.13 이상, git 저장소 루트인 대상 프로젝트, host adapter(`flowmarshal-engine` attestation과 서명 CLI)가 들어간 플러그인이다. 플러그인 위치는 `FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT`로 준다. 현재 pin은 개발 커밋 `98db130`의 commit·dist digest이고, release 버전·content digest pin과 release freeze 결속은 플러그인 release 뒤 후속 작업이다.
 
 ## Qualification·legacy·cutover
 

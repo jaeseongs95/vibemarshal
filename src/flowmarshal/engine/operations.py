@@ -316,14 +316,35 @@ class CoreOperations:
                 )
             return tuple(row["entity_id"] for row in rows)
 
-    def invoke(
-        self, *, project_id: str, kind: str, request: dict[str, Any],
-        execute: Callable[[], dict[str, Any]],
-    ) -> dict[str, Any]:
+    @staticmethod
+    def _operation_id(project_id: str, kind: str, request: dict[str, Any]) -> tuple[str, str]:
         request_digest = sha256_digest({"kind": kind, "request": request})
         operation_id = "operation_" + sha256_digest(
             {"project_id": project_id, "request_digest": request_digest}
         )[7:39]
+        return request_digest, operation_id
+
+    def completed_result(self, *, project_id: str, kind: str, request: dict[str, Any]) -> dict[str, Any] | None:
+        """같은 입력의 완료 관측만 읽는다. 없으면 None이며 효과를 예약하지 않는다."""
+        request_digest, operation_id = self._operation_id(project_id, kind, request)
+        with self.service.ledger.read() as connection:
+            row = connection.execute(
+                "SELECT payload_json FROM history_events WHERE project_id = ? AND entity_type = 'core_operation' "
+                "AND entity_id = ? AND event_type = 'operation.completed' ORDER BY sequence LIMIT 1",
+                (project_id, operation_id),
+            ).fetchone()
+        if row is None:
+            return None
+        payload = json.loads(row["payload_json"])
+        if payload["request_digest"] != request_digest or sha256_digest(payload["result"]) != payload["result_digest"]:
+            raise EngineServiceError("Core operation 완료 관측의 입력 또는 결과 digest가 다릅니다.")
+        return payload["result"]
+
+    def invoke(
+        self, *, project_id: str, kind: str, request: dict[str, Any],
+        execute: Callable[[], dict[str, Any]],
+    ) -> dict[str, Any]:
+        request_digest, operation_id = self._operation_id(project_id, kind, request)
         self._hit(f"before_{kind}_intent")
         unknown = False
         with self.service.ledger.transaction() as tx:

@@ -10,7 +10,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import multitask
+from tests.fixtures.engine.governance import multitask
 from flowmarshal.engine.domain import RunOnceAction
 from flowmarshal.engine.qualification import default_role_configuration
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime

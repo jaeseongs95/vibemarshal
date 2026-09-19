@@ -23,6 +23,8 @@ R1~R3.1 prototype은 유용한 transport·원장·Planner 실험 자산이자 �
 11. semantic Validator는 Worker와 다른 Attempt·RuntimeJob·thread/turn에서 원자료를 새로 관측하고 자체 terminal provider receipt와 `model_review` evidence binding을 남긴다. `SemanticValidationObservation`과 `ValidationResult`의 PASS/FAIL, validation/task ID와 content digest가 정확히 일치해야 하며, 사용한 evidence를 재사용하거나 재결속하지 않는다. 다른 model/effort 표기만으로 독립성을 충족했다고 보지 않는다.
 12. ProjectMap은 Goal 범위의 파일·지침·등록 자료에서 시작해 필요한 symbol·검증된 연결만 lazy 관측한다. 관측 경로가 비어 있으면 적용 `AGENTS.md`와 명시 등록 자료만 기록하며 저장소 파일·symbol·module/test/build 관계를 기본 탐색하거나 추론하지 않는다. Goal 원문의 파일명·상대 경로 후보 탐색은 bounded path 비교만 하며 본문·symbol·연결 관측을 대신하지 않는다. 1.0 복구는 로컬 Context 해소·effect unknown observe-first와 직접 evidence에 결속한 실제 repair/replan 한 경로를 입증하되 범용 자율 복구기나 전체 symbol/module graph를 포함하지 않는다.
 
+13. 활성화 뒤 모든 실행 Task는 agent-governance-suite workflow gate를 반드시 지난다(구현·결정적 검증, 실측·qualification 미실행). gate 판정은 Core 완료 판정에 더하는 AND 차단 조건이며 steward 판단은 validation·Goal Test가 아니다. 기준선은 작업 트리 스냅샷 commit이고, gate 효과는 CoreOperations intent·완료 결과로 원장에 남겨 재시작 뒤 같은 run을 이어 간다. Codex provider는 관측 근거가 확인될 때까지 명시적으로 멈춘다. 상세는 [재설계 문서 9.1](orchestration-redesign.md#91-agent-governance-suite-필수-gate)이 권위다.
+
 승인 경계는 `TrustedConsoleHost → ApplicationAuthority → EngineApplication → EngineService / CoreActionAuthority → SQLite Core ledger`다. Console의 전체 `target_digest` 확인 뒤에만 Goal 전용 일회성 capability를 발급하고, effect checkpoint는 별도 target·capability 타입을 사용한다. Worker·Validator의 역할 scope에서는 권위 객체와 DB handle을 제공하거나 host에 재진입할 수 없다. 이 Application 권위 보장은 같은 OS 사용자의 raw SQLite 직접 쓰기나 hostile same-process 코드 격리를 포함하지 않는다. 두 경계는 1.0 known limitation이며 후속 broker/process identity/ACL hardening의 대상이다.
 
 ## Cutover 조건 — planned / 미실행
@@ -35,6 +37,7 @@ R1~R3.1 prototype은 유용한 transport·원장·Planner 실험 자산이자 �
 - 실제 Planning 18회 전 cell 완료와 정상 선택·진짜 정보 부족 질문·호출/후보 한도
 - 실제 요청부터 Goal 정규화·독립 review·Plan 선택·한 번의 승인·다중 Task/복구·독립 검사·최종 결과까지의 E2E와 안전 책임 전부. 모든 evidence artifact는 허용 root·SHA-256·cell/fixture/seed/freeze에 결속한다. release project E2E는 절대 경로 candidate wheel과 SHA-256·배포판 이름/버전·non-editable 설치·import 경로·wheel package bytes를 harness와 최종 verifier에서 재확인하며 source 기반 진단은 release PASS로 승격하지 않음
 - 깨끗한 non-editable 설치, 서로 독립인 두 최종 감사와 결정적 finding join
+- agent-governance-suite 필수 연동의 외부 전제: host adapter가 들어간 플러그인 release, release 버전·content digest pin, release freeze의 플러그인·node 결속, 실제 steward로 같은 파일을 여러 Task가 고치는 Goal 실측
 
 하나라도 필수 책임이 누락·실패·미실행이면 1.0 전환은 NO-GO다. 합성 smoke·과거 51개/1,056개 검사·미리 작성한 Goal/Plan/rating으로 실제 신규 qualification을 대신하지 않는다. 공통 계약이 바뀐 최초 실제 역할·Planning 평가는 새로 수행하며 판정 후 oracle·threshold를 낮추지 않는다.
 

@@ -58,6 +58,7 @@ from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime
 from flowmarshal.engine.service import EngineService, EngineServiceError
 from tests import engine_helpers as fixtures
 from tests import test_engine_fm08_core_integration as fm08
+from tests.fixtures.engine.governance.allow import ALLOW_ALL
 from tests.test_engine_ledger_service import TrustedTestEngineService
 
 
@@ -510,7 +511,7 @@ class Fm08EarlyCanaryExternalUnknownTests(unittest.TestCase):
             self.service.reserve_attempt(task_id=self.task_two.task_id)
 
         # 읽기 전용 status는 external_effect_unknown 단계와 미확정 provider call을 보고한다.
-        application = EngineApplication(EngineService(self.ledger), runtime=self.runtime)
+        application = EngineApplication(EngineService(self.ledger), runtime=self.runtime, governance=ALLOW_ALL)
         self.addCleanup(application.supervisor.close, timeout_seconds=0.1)
         status = application.status(self.project_id)
         self.assertEqual("external_effect_unknown", status["current_stage"])

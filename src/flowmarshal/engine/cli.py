@@ -95,6 +95,7 @@ from .reporting import render_final
 from .service import EngineService, EngineServiceError
 from .budget import BudgetManager, BudgetedRoleRunner, GoalBudgetPolicy, receipt_usage
 from .application import EngineApplication, EngineApplicationError
+from .governance_gate import GovernanceSettings
 from .model_rebinding import ModelRebindRequest, ModelRebindingError
 from .role_execution import RoleTimeoutPolicy, use_role_timeout_policy
 from .capabilities import require_host_execution
@@ -192,6 +193,11 @@ def _application(
         role_configuration=_role_configuration(arguments),
         inspection_contract=getattr(
             arguments, "inspection_contract", PLAN_INSPECTION_PROVIDER_V1
+        ),
+        # 실행 Task는 필수 governance gate를 지난다. 플러그인 위치는 환경 변수로만 받는다.
+        governance=(
+            None if runtime is None
+            else GovernanceSettings.from_environment(Path(arguments.artifacts) / "governance")
         ),
     )
 
@@ -994,6 +1000,7 @@ def _run_once_owned(arguments: argparse.Namespace, result_path: Path) -> None:
             )
         raise
     finally:
+        application.close_task_gate()
         if application.supervisor is not None:
             application.supervisor.close()
         else:
@@ -1021,8 +1028,13 @@ def _cmd_attempt_retry(arguments: argparse.Namespace) -> None:
         recovery_assessment=assessment,
         failed_validation_result_id=arguments.failed_validation_result_id,
     )
-    attempt = service.reserve_attempt(task_id=arguments.task_id)
-    _emit(attempt)
+    # 새 실행 Attempt는 run-once가 governance gate를 거친 뒤에만 예약·dispatch한다.
+    with service.ledger.read() as connection:
+        status = connection.execute(
+            "SELECT status FROM task_contracts WHERE id = ?", (arguments.task_id,)
+        ).fetchone()["status"]
+    _emit({"task_id": arguments.task_id, "status": status,
+           "next": "run-once가 governance gate를 거쳐 새 Attempt를 예약·dispatch합니다."})
 
 
 def _cmd_attempt_observe(arguments: argparse.Namespace) -> None:
@@ -1048,6 +1060,12 @@ def _cmd_attempt_interrupt(arguments: argparse.Namespace) -> None:
 
 
 def _cmd_validate_task(arguments: argparse.Namespace) -> None:
+    if arguments.complete:
+        # Task 완료는 run-once의 governance gate(before_completion)를 거쳐서만 한다.
+        raise EngineServiceError(
+            "GOVERNANCE_GATE_REQUIRED: validate task --complete는 governance gate를 우회하므로 받지 않습니다. "
+            "validation을 기록한 뒤 run-once로 완료하십시오."
+        )
     service = _service(arguments)
     result = ValidationResult.model_validate(_json(arguments.result_file))
     service.record_validation(
@@ -1055,8 +1073,7 @@ def _cmd_validate_task(arguments: argparse.Namespace) -> None:
         plan_revision_id=arguments.plan_revision_id,
         result=result,
     )
-    ready = service.complete_task(result.task_id) if arguments.complete and result.task_id else ()
-    _emit({"validation_result_id": result.validation_result_id, "new_ready_task_ids": ready})
+    _emit({"validation_result_id": result.validation_result_id, "new_ready_task_ids": ()})
 
 
 def _cmd_validate_goal(arguments: argparse.Namespace) -> None:
