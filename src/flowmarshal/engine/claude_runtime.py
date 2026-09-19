@@ -1065,7 +1065,8 @@ class ClaudeCodeRuntime:
     def _transcript_model_observation(turn: dict[str, Any] | None) -> dict[str, Any]:
         """저장 turn의 assistant 줄이 명시한 model·effort가 정확히 한 쌍일 때만 관측값으로 싣는다."""
         pairs = {
-            (record["message"]["model"], record.get("effort"))
+            # 문자열이 아닌 effort는 명시된 값이 아니므로 없는 것과 같게 둔다.
+            (record["message"]["model"], record["effort"] if isinstance(record.get("effort"), str) else None)
             for record in ([] if turn is None else turn["records"])
             if record.get("type") == "assistant"
             and isinstance(record.get("message"), dict)
@@ -1093,16 +1094,17 @@ class ClaudeCodeRuntime:
         }
 
     def _live_transcript_model_observation(self, thread_id: str, turn_id: str | None) -> dict[str, Any]:
+        # reader thread의 result 처리 안에서 부른다. 진단용 기록 읽기가 어떤 이유로 실패해도
+        # terminal 판정을 막지 않도록 관측값 없이(null과 이유) 돌려준다.
         try:
             records = self._parse_transcript(self._session_transcript(thread_id).read_bytes())
-        except (OSError, RuntimePolicyError):
-            # 비저장 thread(--no-session-persistence) 등. 관측값을 만들지 않는다.
+            matches = [item for item in self._stored_turns(records) if item["start"].get("uuid") == turn_id]
+            return self._transcript_model_observation(matches[0] if len(matches) == 1 else None)
+        except Exception:  # noqa: BLE001 - 비저장 thread(--no-session-persistence), 읽기·해석 실패
             return {
                 **self._transcript_model_observation(None),
                 "model_observation_reason": "CLAUDE_SESSION_TRANSCRIPT_UNAVAILABLE",
             }
-        matches = [item for item in self._stored_turns(records) if item["start"].get("uuid") == turn_id]
-        return self._transcript_model_observation(matches[0] if len(matches) == 1 else None)
 
     @staticmethod
     def _stored_turns(records: list[dict[str, Any]]) -> list[dict[str, Any]]:

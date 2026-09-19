@@ -11,6 +11,7 @@ import os
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -361,6 +362,19 @@ class ClaudeRuntimeTurnTests(ClaudeRuntimeTestBase):
         with self.assertRaisesRegex(RuntimePolicyError, "CLAUDE_EPHEMERAL_THREAD_PROCESS_LOST"):
             self.runtime().resume(thread_id=thread_id, cwd=self.workspace)
 
+    def test_transcript_read_failure_still_delivers_terminal_turn(self) -> None:
+        # 기록 읽기는 reader thread의 result 처리 안에서 한다. 해석이 실패해도 turn은 끝나고
+        # 관측값만 null과 이유로 남는다.
+        runtime = self.runtime()
+        thread_id = self.thread(runtime)
+        with mock.patch.object(ClaudeCodeRuntime, "_stored_turns", side_effect=ValueError("broken")):
+            runtime.start_turn(thread_id=thread_id, cwd=self.workspace, prompt="one", model=MODEL, effort="low")
+            self.finish(runtime)
+        observation = runtime.read(thread_id=thread_id)
+        self.assertEqual("completed", observation.terminal_status)
+        self.assertEqual((None, None), authoritative_model_observation(observation.payload))
+        self.assertEqual("CLAUDE_SESSION_TRANSCRIPT_UNAVAILABLE", observation.payload["model_observation_reason"])
+
 
 class ClaudeRuntimeProvenanceTests(ClaudeRuntimeTestBase):
     def assert_rejected(self, code: str, **env: str) -> None:
@@ -491,6 +505,7 @@ class ClaudeUsageAndTranscriptTests(unittest.TestCase):
         cases = {
             "CLAUDE_TRANSCRIPT_MODEL_EFFORT_NOT_REPORTED": (
                 None, turn(), turn({"message": {"model": "m"}}),
+                turn({"effort": ["high"], "message": {"model": "m"}}),
             ),
             "CLAUDE_TRANSCRIPT_MODEL_EFFORT_AMBIGUOUS": (
                 turn({"effort": "high", "message": {"model": "m"}}, {"effort": "low", "message": {"model": "m"}}),
