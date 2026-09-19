@@ -173,6 +173,10 @@ class WorkerUsageTests(unittest.TestCase):
                 "model_observation_source": "provider_raw_response",
                 "observed_model": "provider-model", "observed_effort": "high",
             }, ("provider-model", "high")),
+            ("claude-transcript", {
+                "model_observation_source": "claude_session_transcript",
+                "observed_model": "transcript-model", "observed_effort": "high",
+            }, ("transcript-model", "high")),
         )
         for name, model_fields, expected in cases:
             with self.subTest(name=name):
@@ -194,7 +198,7 @@ class WorkerUsageTests(unittest.TestCase):
                 assert recorded is not None
                 self.assertEqual(expected, (recorded.observed_model, recorded.observed_effort))
                 self.assertEqual(
-                    "provider_raw_response" if expected[0] is not None else None,
+                    model_fields["model_observation_source"] if expected[0] is not None else None,
                     recorded.binding_provenance["observed"],
                 )
 

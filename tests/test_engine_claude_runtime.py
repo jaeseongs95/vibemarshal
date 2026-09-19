@@ -23,7 +23,10 @@ from flowmarshal.engine.claude_runtime import (
     claude_turn_usage,
     project_claude_usage,
 )
-from flowmarshal.engine.model_observation import authoritative_model_observation
+from flowmarshal.engine.model_observation import (
+    authoritative_model_observation,
+    authoritative_receipt_model_observation,
+)
 from flowmarshal.engine.providers import (
     RuntimeProviderSelection,
     add_provider_arguments,
@@ -187,8 +190,10 @@ class ClaudeRuntimeTurnTests(ClaudeRuntimeTestBase):
         self.assertEqual("session_cumulative", observation.payload["provider_model_usage_scope"])
         self.assertEqual([], observation.payload["provider_permission_denials"])
         self.assertEqual([MODEL], observation.payload["provider_reported_models"])
-        # provider가 effort를 echo하지 않으므로 권위 model/effort 관측은 없다.
-        self.assertEqual((None, None), authoritative_model_observation(observation.payload))
+        # stream에는 effort가 없고, CLI session 기록의 assistant 줄이 그 turn의 한 쌍을 준다.
+        self.assertEqual((MODEL, "high"), authoritative_model_observation(observation.payload))
+        self.assertEqual("claude_session_transcript", observation.payload["model_observation_source"])
+        # start_turn receipt의 요청값은 관측값이 아니다.
         self.assertEqual((None, None), authoritative_model_observation(payload))
         argv = self.invocations()[0]
         self.assertIn("--safe-mode", argv)
@@ -316,6 +321,7 @@ class ClaudeRuntimeTurnTests(ClaudeRuntimeTestBase):
         self.assertEqual("completed", stored.terminal_status)
         self.assertEqual({"ok": False}, json.loads(stored.final_response or ""))
         self.assertEqual(2, stored.payload["turn_count"])
+        self.assertEqual((MODEL, "low"), authoritative_model_observation(stored.payload))
         with self.assertRaisesRegex(RuntimePolicyError, "RUNTIME_OBSERVATION_BINDING_MISMATCH"):
             runtime.read_stored(thread_id=thread_id, turn_id="missing-turn")
 
@@ -344,6 +350,9 @@ class ClaudeRuntimeTurnTests(ClaudeRuntimeTestBase):
         runtime.start_turn(thread_id=thread_id, cwd=self.workspace, prompt="one", model=MODEL, effort="low")
         self.finish(runtime)
         self.assertIn("--no-session-persistence", self.invocations()[0])
+        observation = runtime.read(thread_id=thread_id)
+        self.assertEqual((None, None), authoritative_model_observation(observation.payload))
+        self.assertEqual("CLAUDE_SESSION_TRANSCRIPT_UNAVAILABLE", observation.payload["model_observation_reason"])
         with self.assertRaisesRegex(RuntimePolicyError, "CLAUDE_TURN_CONFIGURATION_CHANGE_REQUIRES_PERSISTED_THREAD"):
             runtime.start_turn(
                 thread_id=thread_id, cwd=self.workspace, prompt="two", model=MODEL, effort="high",
@@ -464,6 +473,36 @@ class ClaudeUsageAndTranscriptTests(unittest.TestCase):
         status, final, models = ClaudeCodeRuntime._stored_status(turns[0])
         self.assertEqual(("completed", "a", ["m"]), (status, final, models))
         self.assertEqual((None, None, []), ClaudeCodeRuntime._stored_status(turns[1]))
+
+    def test_transcript_model_observation_requires_exactly_one_pair(self) -> None:
+        def turn(*assistants: dict) -> dict:
+            return {"records": [{"type": "assistant", **item} for item in assistants]}
+
+        observe = ClaudeCodeRuntime._transcript_model_observation
+        one = observe(turn({"effort": "high", "message": {"model": "m"}},
+                           {"effort": "high", "message": {"model": "m"}},
+                           {"message": {"model": "<synthetic>"}}))
+        self.assertEqual(("m", "high"), authoritative_model_observation(one))
+        # 저장 receipt 재검증도 출처 표식으로만 인정한다.
+        for source, expected in (("claude_session_transcript", ("m", "high")), ("request_echo", (None, None))):
+            self.assertEqual(expected, authoritative_receipt_model_observation(
+                observed_model="m", observed_effort="high", binding_provenance={"observed": source},
+            ))
+        cases = {
+            "CLAUDE_TRANSCRIPT_MODEL_EFFORT_NOT_REPORTED": (
+                None, turn(), turn({"message": {"model": "m"}}),
+            ),
+            "CLAUDE_TRANSCRIPT_MODEL_EFFORT_AMBIGUOUS": (
+                turn({"effort": "high", "message": {"model": "m"}}, {"effort": "low", "message": {"model": "m"}}),
+                turn({"effort": "high", "message": {"model": "m"}}, {"message": {"model": "m"}}),
+            ),
+        }
+        for reason, turns in cases.items():
+            for item in turns:
+                with self.subTest(reason=reason, turn=item):
+                    observed = observe(item)
+                    self.assertEqual((None, None), authoritative_model_observation(observed))
+                    self.assertEqual(reason, observed["model_observation_reason"])
 
 
 class ClaudeModelCatalogTests(unittest.TestCase):

@@ -10,7 +10,8 @@
 - `--version`은 버전 한 줄을 출력한다. `--session-id`는 새 session, `--resume`은 기존
   저장 기록이 있어야 한다.
 - `--no-session-persistence`가 없으면 `$CLAUDE_CONFIG_DIR/projects/<slug>/<id>.jsonl`에
-  user(promptSource)·assistant·tool_result(toolEndsTurn) 기록을 쓴다.
+  user(promptSource)·assistant·tool_result(toolEndsTurn) 기록을 쓴다. 실제 CLI처럼 assistant
+  기록에는 `--effort` 값을 top-level `effort`로 남긴다(stream 이벤트에는 없다).
 
 prompt 지시어:
 
@@ -72,6 +73,7 @@ def main() -> int:
     resume = _option(argv, "--resume")
     session_id = resume or _option(argv, "--session-id") or str(uuid.uuid4())
     model = _option(argv, "--model") or "fake-model"
+    effort = _option(argv, "--effort")
     permission_mode = _option(argv, "--permission-mode") or "default"
     persist = "--no-session-persistence" not in argv
     schema = _option(argv, "--json-schema")
@@ -174,7 +176,7 @@ def main() -> int:
             tool_input = {"file_path": os.path.join(cwd, "denied.txt"), "content": "x"}
             tool_use = {"model": model, "role": "assistant", "stop_reason": "tool_use",
                         "content": [{"type": "tool_use", "id": tool_id, "name": "Write", "input": tool_input}]}
-            record({"type": "assistant", "uuid": str(uuid.uuid4()), "message": tool_use})
+            record({"type": "assistant", "uuid": str(uuid.uuid4()), "effort": effort, "message": tool_use})
             _emit({"type": "assistant", "message": tool_use, "session_id": session_id,
                    "parent_tool_use_id": None})
             denied = {"role": "user", "content": [
@@ -194,7 +196,7 @@ def main() -> int:
         )
         assistant = {"model": model, "role": "assistant", "content": content,
                      "stop_reason": "tool_use" if structured is not None else "end_turn"}
-        record({"type": "assistant", "uuid": str(uuid.uuid4()), "message": assistant})
+        record({"type": "assistant", "uuid": str(uuid.uuid4()), "effort": effort, "message": assistant})
         _emit({"type": "assistant", "message": assistant, "session_id": session_id,
                "parent_tool_use_id": None})
         if structured is not None:

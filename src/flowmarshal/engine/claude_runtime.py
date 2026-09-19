@@ -19,8 +19,11 @@ provenance 원칙:
 - turn ID는 provider가 되돌려준 user 메시지 uuid(`--replay-user-messages`)다. replay가
   없으면 다른 값으로 대체하지 않고 turn 시작을 미확인으로 멈춘다.
 - `result.permission_denials`가 비어 있지 않은 turn은 `success`여도 실패다.
-- provider가 effort를 echo하지 않으므로 model/effort 권위 관측값은 남기지 않는다.
-  실제로 응답한 모델은 진단 필드 `provider_reported_models`로만 보존한다.
+- stream 응답에는 effort가 없다. terminal turn의 model/effort 관측값은 CLI가 저장한
+  session 기록에서 그 turn의 assistant 줄이 명시한 값이 정확히 한 쌍일 때만 출처
+  `claude_session_transcript`로 싣는다. 기록이 없거나 쌍이 없거나 둘 이상이면 null과
+  이유를 남긴다. start_turn receipt의 요청값은 관측값이 아니다. 응답 모델 목록은 진단
+  필드 `provider_reported_models`로 따로 보존한다.
 - usage는 `result.usage`의 제공 구성요소만 Engine usage 키로 투영하며 total은
   만들지 않는다. turn 범위는 성공 result에 API 호출 기록(`iterations`)이 있을 때만
   인정하고, 그 밖(interrupt 등으로 0이 채워진 값 포함)은 unknown으로 둔다.
@@ -53,6 +56,7 @@ from .model_lock import (
     ModelInventory,
     RuntimeCapability,
 )
+from .model_observation import CLAUDE_SESSION_TRANSCRIPT_MODEL_OBSERVATION_SOURCE
 from .operation_trace import current_operation_trace_scope
 from .runtime import (
     REQUIRED_APPROVAL_POLICY,
@@ -277,6 +281,7 @@ class _ClaudeTurn:
     done: threading.Event = field(default_factory=threading.Event)
     observer: Callable[[RuntimeObservation], None] | None = None
     observer_error: str | None = None
+    transcript_observation: dict[str, Any] | None = None
 
 
 @dataclass
@@ -628,6 +633,13 @@ class ClaudeCodeRuntime:
     def _dispatch(self, thread: _ClaudeThread, process: subprocess.Popen, event: dict[str, Any]) -> None:
         kind = event.get("type")
         finished: _ClaudeTurn | None = None
+        transcript = None
+        if kind == "result":
+            # done 전에 읽어 둔다. 완료 대기·관측자 전달이 파일 읽기를 기다리지 않게 한다.
+            current = thread.current
+            transcript = self._live_transcript_model_observation(
+                thread.thread_id, None if current is None else current.turn_id,
+            )
         with self._lock:
             if kind == "control_response":
                 response = event.get("response")
@@ -701,6 +713,7 @@ class ClaudeCodeRuntime:
                 turn.last_rate_limit_event = event
             elif kind == "result":
                 turn.result = event
+                turn.transcript_observation = transcript
                 turn.replayed.set()
                 turn.done.set()
                 finished = turn
@@ -955,6 +968,8 @@ class ClaudeCodeRuntime:
                 payload["error"] = turn.policy_violation or turn.collector_error
                 payload["exit_code"] = thread.exit_code
                 payload["stderr_tail"] = list(thread.stderr_tail)
+        if status is not None:
+            payload.update(turn.transcript_observation or self._transcript_model_observation(None))
         return RuntimeObservation(
             thread_id=thread.thread_id,
             turn_id=turn.turn_id,
@@ -1045,6 +1060,49 @@ class ClaudeCodeRuntime:
             if isinstance(document, dict):
                 records.append(document)
         return records
+
+    @staticmethod
+    def _transcript_model_observation(turn: dict[str, Any] | None) -> dict[str, Any]:
+        """저장 turn의 assistant 줄이 명시한 model·effort가 정확히 한 쌍일 때만 관측값으로 싣는다."""
+        pairs = {
+            (record["message"]["model"], record.get("effort"))
+            for record in ([] if turn is None else turn["records"])
+            if record.get("type") == "assistant"
+            and isinstance(record.get("message"), dict)
+            and isinstance(record["message"].get("model"), str)
+            and record["message"]["model"] not in {"", "<synthetic>"}
+        }
+        if len(pairs) == 1:
+            ((model, effort),) = pairs
+            if isinstance(effort, str) and effort:
+                return {
+                    "observed_model": model,
+                    "observed_effort": effort,
+                    "model_observation_source": CLAUDE_SESSION_TRANSCRIPT_MODEL_OBSERVATION_SOURCE,
+                    "model_observation_reason": None,
+                }
+        return {
+            "observed_model": None,
+            "observed_effort": None,
+            "model_observation_source": None,
+            "model_observation_reason": (
+                "CLAUDE_TRANSCRIPT_MODEL_EFFORT_AMBIGUOUS"
+                if len(pairs) > 1
+                else "CLAUDE_TRANSCRIPT_MODEL_EFFORT_NOT_REPORTED"
+            ),
+        }
+
+    def _live_transcript_model_observation(self, thread_id: str, turn_id: str | None) -> dict[str, Any]:
+        try:
+            records = self._parse_transcript(self._session_transcript(thread_id).read_bytes())
+        except (OSError, RuntimePolicyError):
+            # 비저장 thread(--no-session-persistence) 등. 관측값을 만들지 않는다.
+            return {
+                **self._transcript_model_observation(None),
+                "model_observation_reason": "CLAUDE_SESSION_TRANSCRIPT_UNAVAILABLE",
+            }
+        matches = [item for item in self._stored_turns(records) if item["start"].get("uuid") == turn_id]
+        return self._transcript_model_observation(matches[0] if len(matches) == 1 else None)
 
     @staticmethod
     def _stored_turns(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -1169,6 +1227,9 @@ class ClaudeCodeRuntime:
         status, final_response, models = (
             (None, None, []) if selected is None else self._stored_status(selected)
         )
+        model_observation = (
+            {} if status is None else self._transcript_model_observation(selected)
+        )
         return RuntimeObservation(
             thread_id=thread_id,
             turn_id=None if selected is None else selected["start"]["uuid"],
@@ -1195,6 +1256,7 @@ class ClaudeCodeRuntime:
                 "session_transcript_path": str(path),
                 "session_transcript_digest": sha256_bytes(data),
                 "lifecycle": {"terminal_status": status, "terminal_error": None},
+                **model_observation,
             },
         )
 

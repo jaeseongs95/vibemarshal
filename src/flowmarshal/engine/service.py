@@ -96,8 +96,8 @@ from .planning import (
 from .planning_feedback import skeleton_semantic_digest
 from .recovery import FAILURE_REPAIR_ACTIONS
 from .model_observation import (
-    PROVIDER_RAW_MODEL_OBSERVATION_SOURCE,
     authoritative_model_observation,
+    model_observation_source,
 )
 
 if TYPE_CHECKING:
@@ -5983,11 +5983,7 @@ class EngineService:
                 adapter_capability_digest=model_observation.inventory.adapter_capability_digest,
                 binding_provenance={
                     "requested": "runtime_intent",
-                    "observed": (
-                        PROVIDER_RAW_MODEL_OBSERVATION_SOURCE
-                        if observed_model is not None and observed_effort is not None
-                        else None
-                    ),
+                    "observed": model_observation_source(provider_payload),
                     "provider_inventory": model_observation.inventory.inventory_provenance,
                     "adapter_capability": "local_operational_binding",
                 },
