@@ -1,10 +1,11 @@
-"""실제 Claude Code provider로 합성 fixture 한 Task를 governance gate와 함께 끝까지 진행한다(1회 측정).
+"""실제 Claude Code provider로 합성 fixture를 governance gate와 함께 끝까지 진행한다(1회 측정).
 
 실행(저장소 루트):
-  FLOWMARSHAL_ENGINE_SOURCE_ROOT=. .venv/Scripts/python.exe spikes/governance_bridge/run_real.py <빈 출력 디렉터리>
+  FLOWMARSHAL_ENGINE_SOURCE_ROOT=. .venv/Scripts/python.exe spikes/governance_bridge/run_real.py <빈 출력 디렉터리> [--multitask]
 
-모델 호출: steward 4회(stage 하한 general→Sonnet급 3회, deep→Opus급 1회)와 Worker 1회.
-출력 디렉터리에 governance-log.jsonl, steward-calls.jsonl, run-summary.json을 남긴다.
+모델 호출은 Task마다 steward 최대 4회(stage 하한 general→Sonnet급 3회, deep→Opus급 1회)와 Worker 1회다.
+기본은 한 Task(project-e2e), `--multitask`는 Task 3개 합성 Goal(`multitask.py`)을 Goal verdict나 차단까지 진행한다.
+출력 디렉터리에 governance-log.jsonl, steward-calls.jsonl, run-summary.json(원장 Worker usage 관측 포함)을 남긴다.
 """
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+import multitask  # noqa: E402
 from bridge import DEFAULT_PIN, GovernanceTaskGate, Observation  # noqa: E402
 from flowmarshal.engine.domain import RunOnceAction  # noqa: E402
 from flowmarshal.engine.e2e_qualification import _copy_fixture, _prepare  # noqa: E402
@@ -81,51 +83,78 @@ class ClaudeSteward:
         return result.payload, observation
 
 
-def main(out: Path) -> int:
+def worker_usage(service) -> list[dict]:
+    """원장에 기록된 Worker usage의 요청·관측 model/effort와 관측 출처."""
+    with service.ledger.read() as connection:
+        rows = connection.execute("SELECT payload_json FROM budget_usage WHERE stage = 'execution' "
+                                  "ORDER BY recorded_at").fetchall()
+    fields = ("logical_call_ref", "call_status", "requested_model", "requested_effort", "observed_model",
+              "observed_effort", "input_tokens", "cached_input_tokens", "output_tokens")
+    return [{**{key: payload.get(key) for key in fields},
+             "observed_source": (payload.get("binding_provenance") or {}).get("observed")}
+            for payload in (json.loads(row["payload_json"]) for row in rows)]
+
+
+def main(out: Path, multi: bool) -> int:
     out = out.resolve()
     if out.exists() and any(out.iterdir()):
         raise SystemExit(f"빈 출력 디렉터리가 필요하다: {out}")
     out.mkdir(parents=True, exist_ok=True)
-    workspace, fixture_digest = _copy_fixture(ROOT, out)
-    (workspace / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
-    for args in (("init", "-q"), ("add", "-A"), ("-c", "user.name=fm", "-c", "user.email=fm@local", "commit", "-qm", "fixture")):
-        subprocess.run(["git", "-C", str(workspace), *args], check=True)
+    if multi:
+        workspace = multitask.copy_fixture(out)
+        fixture_digest = None
+    else:
+        workspace, fixture_digest = _copy_fixture(ROOT, out)
+    multitask.git_init(workspace)
     runtime = open_runtime(RuntimeProviderSelection(
         provider="claude", claude_model_catalog=str(ROOT / "config" / "claude-model-catalog.json"),
         claude_state_root=str(out / "claude-threads")))
     roles = EngineRoleConfiguration.model_validate_json(
         (ROOT / "config" / "qualification-roles.claude.json").read_text(encoding="utf-8"))
-    prepared = _prepare(workspace=workspace, state_root=out / "state", inventory=runtime.list_models(), roles=roles)
+    inventory = runtime.list_models()
+    if multi:
+        prepared = multitask.prepare(workspace=workspace, state_root=out / "state", inventory=inventory, roles=roles)
+        task_ids = prepared.task_ids
+    else:
+        prepared = _prepare(workspace=workspace, state_root=out / "state", inventory=inventory, roles=roles)
+        task_ids = {"task_fix_add": prepared.task_id}
     gate = GovernanceTaskGate(
         prepared.service, pin=DEFAULT_PIN, state_dir=out / "governance",
         steward=ClaudeSteward(runtime, out / "steward-cwd", out / "steward-calls.jsonl"),
         observe_worker=lambda attempt, thread: transcript_observation(runtime, thread, f"flowmarshal-engine:worker:{attempt}"))
-    dispatcher = EngineDispatcher(prepared.service, runtime, task_gate=gate)
-    outcomes, proposal, started = [], prepared.proposal, time.monotonic()
+    dispatcher = EngineDispatcher(prepared.service, runtime, task_gate=gate,
+                                  proposal_provider=multitask.MultitaskProposals(prepared) if multi else None)
+    refs = {task_id: ref for ref, task_id in task_ids.items()}
+    outcomes, proposal, started = [], None if multi else prepared.proposal, time.monotonic()
+    goal = multitask.goal_step(prepared) if multi else None
     try:
-        while time.monotonic() - started < 1800:
+        while time.monotonic() - started < 3600:
             tick = time.monotonic()
-            outcome = dispatcher.run_once(prepared.project_id, proposal=proposal)
+            outcome = dispatcher.run_once(prepared.project_id, proposal=proposal, goal_validation_step=goal)
             proposal = None
-            outcomes.append({"action": outcome.action.value, "blocker": outcome.blocker_code,
-                             "detail": (outcome.detail or "")[:600], "seconds": round(time.monotonic() - tick, 1)})
+            outcomes.append({"action": outcome.action.value, "task": refs.get(outcome.task_id),
+                             "blocker": outcome.blocker_code, "detail": (outcome.detail or "")[:600],
+                             "seconds": round(time.monotonic() - tick, 1)})
             print(json.dumps(outcomes[-1], ensure_ascii=False), flush=True)
-            if outcome.action in (RunOnceAction.COMPLETED, RunOnceAction.BLOCKED):
+            if outcome.action is RunOnceAction.BLOCKED or outcome.goal_verdict_id is not None or (
+                    not multi and outcome.action is RunOnceAction.COMPLETED):
                 break
             time.sleep(3)
     finally:
         gate.close()
         runtime.close()
     with prepared.service.ledger.read() as connection:
-        status = connection.execute("SELECT status FROM task_contracts WHERE id = ?", (prepared.task_id,)).fetchone()[0]
-    summary = {"fixtureDigest": fixture_digest, "plugin": gate.plugin, "taskStatus": status,
-               "seconds": round(time.monotonic() - started, 1), "outcomes": outcomes,
+        statuses = {ref: connection.execute("SELECT status FROM task_contracts WHERE id = ?", (task_id,)).fetchone()[0]
+                    for ref, task_id in task_ids.items()}
+    summary = {"mode": "multitask" if multi else "single", "fixtureDigest": fixture_digest, "plugin": gate.plugin,
+               "taskStatus": statuses, "seconds": round(time.monotonic() - started, 1), "outcomes": outcomes,
+               "workerUsage": worker_usage(prepared.service),
                "diff": subprocess.run(["git", "-C", str(workspace), "status", "--porcelain"], capture_output=True,
                                       text=True).stdout}
     (out / "run-summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
-    print(json.dumps({"taskStatus": status, "seconds": summary["seconds"]}, ensure_ascii=False))
-    return 0 if status == "completed" else 1
+    print(json.dumps({"taskStatus": statuses, "seconds": summary["seconds"]}, ensure_ascii=False))
+    return 0 if set(statuses.values()) == {"completed"} else 1
 
 
 if __name__ == "__main__":
-    raise SystemExit(main(Path(sys.argv[1])))
+    raise SystemExit(main(Path(sys.argv[1]), "--multitask" in sys.argv[2:]))

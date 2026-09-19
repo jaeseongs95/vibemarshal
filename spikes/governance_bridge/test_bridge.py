@@ -10,7 +10,6 @@ from __future__ import annotations
 import dataclasses
 import json
 import shutil
-import subprocess
 import tempfile
 import unittest
 from pathlib import Path
@@ -20,6 +19,8 @@ from flowmarshal.engine.domain import RunOnceAction
 from flowmarshal.engine.e2e_qualification import _copy_fixture, _prepare
 from flowmarshal.engine.qualification import default_role_configuration
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime
+from multitask import git_init
+from test_scope_gate import MultitaskHarness
 from tests.test_engine_qualification import qualification_inventory
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -54,10 +55,7 @@ class GovernanceBridgeTests(unittest.TestCase):
         self.addCleanup(temp.cleanup)
         self.base = Path(temp.name)
         workspace, _ = _copy_fixture(ROOT, self.base)
-        # 범위 확인은 git 저장소를 요구한다. 검증이 만드는 __pycache__는 범위 밖으로 둔다.
-        (workspace / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
-        for args in (("init", "-q"), ("add", "-A"), ("-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "fixture")):
-            subprocess.run(["git", "-C", str(workspace), *args], check=True)
+        git_init(workspace)
         self.inventory = qualification_inventory()
         self.prepared = _prepare(workspace=workspace, state_root=self.base / "state", inventory=self.inventory,
                                  roles=default_role_configuration(ROOT))
@@ -172,6 +170,31 @@ class GovernanceBridgeTests(unittest.TestCase):
         with self.assertRaisesRegex(GovernanceBridgeError, "PLUGIN_PIN_MISMATCH"):
             GovernanceTaskGate(self.prepared.service, pin=wrong, state_dir=self.base / "governance",
                                steward=ScriptedSteward(), observe_worker=worker_observed)
+
+
+@unittest.skipUnless(shutil.which("node") and (DEFAULT_PIN.root / "mcp-server/dist/server.mjs").is_file(),
+                     "플러그인 worktree 또는 node가 없다")
+class GovernanceMultitaskTests(MultitaskHarness):
+    def test_later_task_on_a_file_changed_by_an_earlier_task_needs_approval(self) -> None:
+        # Task마다 workflow를 하나씩 연다. 범위 기준선은 작업 트리라서 앞 Task가 커밋 없이 남긴
+        # app.py 변경이 '기존 변경'이 되고, 같은 파일을 쓰기 target으로 가진 total Task가 막힌다.
+        git_init(self.prepared.workspace)
+        steward = ScriptedSteward()
+        gate = GovernanceTaskGate(self.prepared.service, pin=DEFAULT_PIN, state_dir=self.base / "governance",
+                                  steward=steward, observe_worker=worker_observed)
+        self.addCleanup(gate.close)
+        outcome = self.drive(gate)
+        self.assertEqual(RunOnceAction.BLOCKED, outcome.action)
+        self.assertEqual("GOVERNANCE_GATE_FAILED", outcome.blocker_code)
+        self.assertIn("preexisting-overlap:app.py", outcome.detail)
+        self.assertEqual({"task_fix_add": "completed", "task_fix_shout": "completed", "task_add_total": "blocked"},
+                         self.statuses())
+        log = [json.loads(line) for line in (self.base / "governance" / "governance-log.jsonl").read_text(
+            encoding="utf-8").splitlines()]
+        finals = [event for event in log if event["event"] == "mcp" and event["tool"] == "finalize_workflow"]
+        self.assertEqual(["passed", "passed"], [event["state"] for event in finals])
+        self.assertEqual(["bootstrap", "baseline", "scope", "acceptance"] * 2 + ["bootstrap", "baseline", "scope"],
+                         steward.stages)
 
 
 if __name__ == "__main__":
