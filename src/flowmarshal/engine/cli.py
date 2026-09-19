@@ -194,7 +194,7 @@ def _application(
         inspection_contract=getattr(
             arguments, "inspection_contract", PLAN_INSPECTION_PROVIDER_V1
         ),
-        # 실행 Task는 필수 governance gate를 지난다. 플러그인 위치는 환경 변수로만 받는다.
+        # 실행 Task는 필수 governance gate를 지난다. 플러그인 위치와 model class 대응표는 환경 변수로만 받는다.
         governance=(
             None if runtime is None
             else GovernanceSettings.from_environment(Path(arguments.artifacts) / "governance")

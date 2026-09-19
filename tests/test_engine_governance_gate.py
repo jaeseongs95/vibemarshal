@@ -1,8 +1,9 @@
 """필수 governance gate(`flowmarshal.engine.governance_gate`) 검사.
 
 가짜 플러그인·steward로 gate 논리(스냅샷 기준선, 사용자 변경 겹침, 원장 재진입, 판정 보류, provider 정지,
-제품 경로 필수화)를 결정적으로 확인한다. 개발 플러그인 worktree와 node가 있으면 실제 플러그인 스크립트·MCP로
-같은 Task 3개 Goal을 한 번 더 확인한다. 모델·Codex는 호출하지 않는다.
+제품 경로 필수화, 플러그인 계약 불일치 분류, manifest 조회와 preflight)를 결정적으로 확인한다.
+FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT가 host-integration.json이 있는 plugin root를 가리키고 node가 있으면 실제 플러그인
+스크립트·서명 CLI·MCP로 같은 Task 3개 Goal을 한 번 더 확인한다. 모델·Codex는 호출하지 않는다.
 """
 from __future__ import annotations
 
@@ -23,8 +24,9 @@ from flowmarshal.engine import governance_gate
 from flowmarshal.engine.application import EngineApplication
 from flowmarshal.engine.domain import RunOnceAction
 from flowmarshal.engine.governance_gate import (
-    DEFAULT_PIN, GovernancePlugin, GovernanceRejected, GovernanceTaskGate, GovernanceTimeout, GovernanceUnavailable,
-    McpStdioClient, MissingGovernanceGate, RoleSteward, snapshot_worktree, user_change_overlap,
+    CONSUMED_SURFACE, GovernanceContractMismatch, GovernancePlugin, GovernanceTaskGate, GovernanceTimeout,
+    GovernanceUnavailable, McpStdioClient, MissingGovernanceGate, RoleSteward, load_model_classes, snapshot_worktree,
+    user_change_overlap,
 )
 from flowmarshal.engine.qualification import default_role_configuration
 from flowmarshal.engine.roles import ScriptedStructuredRoleRunner
@@ -33,7 +35,9 @@ from tests.fixtures.engine.governance import multitask
 from tests.test_engine_qualification import qualification_inventory
 
 ROOT = Path(__file__).resolve().parents[1]
-PLUGIN_ROOT = Path(os.environ.get("FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT", "D:/claude/mcp변경/ags-engine-host"))
+# 실제 플러그인 검사는 host-integration.json이 있는 plugin root를 환경 변수로 받을 때만 실행한다. 고정 경로 default는 없다.
+PLUGIN_ROOT = Path(os.environ["FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT"]) if os.environ.get(
+    "FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT") else None
 
 
 def git(root: Path, *args: str) -> str:
@@ -77,6 +81,17 @@ class FakePlugin:
         self.scripts: list[tuple[str, dict]] = []
         self.revisions: dict[str, int] = {}
         self.failures: dict[str, Exception] = {}
+        self.responses: dict[str, object] = {}
+        self.script_outputs: dict[str, object] = {}
+        self.preflight_failure: Exception | None = None
+        self.identity = {"summary": {"provenance": "local_derived", "closure_tree_digest": "sha256:" + "0" * 64},
+                         "labels": [{"source": "plugin_manifest_file", "plugin": {"id": "fake", "version": "0"}}],
+                         "files": {"fake.mjs": "0" * 64}}
+
+    def preflight(self):
+        if self.preflight_failure is not None:
+            raise self.preflight_failure
+        return json.loads(json.dumps(self.identity))
 
     def count(self, tool: str) -> int:
         return sum(1 for name, _, _ in self.calls if name == tool)
@@ -85,6 +100,11 @@ class FakePlugin:
         self.calls.append((tool, arguments, observation))
         if tool in self.failures:
             raise self.failures.pop(tool)
+        if tool in self.responses:
+            return self.responses.pop(tool)
+        return {"content": [{"type": "text", "text": json.dumps(self.envelope(tool, arguments))}]}
+
+    def envelope(self, tool, arguments):
         serial = len(self.calls)
         if tool == "plan_workflow":
             data = {"executionMode": "orchestrated", "stages": [
@@ -114,16 +134,18 @@ class FakePlugin:
     def script(self, name, request_path):
         request = json.loads(Path(request_path).read_text(encoding="utf-8"))
         self.scripts.append((name, request))
-        if name.endswith("cli.mjs"):
+        if name in self.script_outputs:
+            return self.script_outputs.pop(name)
+        if name == "acceptance-cli":
             passed = all(item["direction"] == "supports" for item in request["evidence"])
             return {"verdict": "PASS" if passed else "FAIL", "criteria": []}
         root = Path(request["repositoryRoot"])
-        if name.endswith("capture-workspace-baseline.mjs"):
+        if name == "scope-baseline":
             entries = [{"path": path, "status": "clean", "sha256": blob}
                        for path, blob in sorted(ls_tree(root, request["commit"]).items())]
             return {"comparisonTarget": request["comparisonTarget"], "targetRef": request["commit"],
                     "entries": entries, "manifestSha256": hashlib.sha256(json.dumps(entries).encode()).hexdigest()}
-        if name.endswith("compare-change-scope.mjs"):
+        if name == "scope-compare":
             before = {entry["path"]: entry["sha256"] for entry in request["baseline"]["entries"]}
             after = ls_tree(root, request["commit"])
             included = set(request["taskEnvelope"]["scope"]["included"])
@@ -268,8 +290,8 @@ class GovernanceGateTests(MultitaskGateHarness):
         self.assertEqual(RunOnceAction.COMPLETED, outcome.action, outcome.detail)
         self.assertIsNotNone(outcome.goal_verdict_id)
         self.assertEqual({"completed"}, set(self.statuses().values()))
-        captures = [request for name, request in self.plugin.scripts if name.endswith("capture-workspace-baseline.mjs")]
-        compares = [request for name, request in self.plugin.scripts if name.endswith("compare-change-scope.mjs")]
+        captures = [request for name, request in self.plugin.scripts if name == "scope-baseline"]
+        compares = [request for name, request in self.plugin.scripts if name == "scope-compare"]
         self.assertEqual(["commit"] * 6, [item["comparisonTarget"] for item in captures + compares])
         self.assertEqual(3, self.plugin.count("finalize_workflow"))
         baseline_questions = [brief["question"] for stage, brief in self.steward.stages if stage == "baseline"]
@@ -723,6 +745,349 @@ class StewardTests(MultitaskGateHarness):
             self.assertNotIn(name, source)
 
 
+def mcp_result(envelope) -> dict:
+    return {"content": [{"type": "text", "text": json.dumps(envelope)}]}
+
+
+class PluginContractTests(MultitaskGateHarness):
+    """플러그인 계약·환경 불일치는 Task 상태와 원장 확정 결과를 건드리지 않고, 고치면 같은 키에서 이어 간다."""
+
+    def run_state(self) -> str:
+        with self.prepared.service.ledger.read() as connection:
+            return connection.execute("SELECT run_state FROM projects WHERE id = ?",
+                                      (self.prepared.project_id,)).fetchone()[0]
+
+    def gate_operations(self, event_type: str) -> list[dict]:
+        return [item for item in self.history(event_type)
+                if item.get("kind") == "governance_gate" or "GOVERNANCE_CONTRACT_MISMATCH" in item.get("detail", "")]
+
+    def test_preflight_mismatch_before_dispatch_changes_nothing_and_unlocks_after_the_fix(self) -> None:
+        self.plugin.preflight_failure = GovernanceContractMismatch("manifest_format", "v1", "v9")
+        gate = self.gate()
+        first = self.drive(gate)
+        second = self.dispatcher(gate).run_once(self.prepared.project_id)
+        for outcome in (first, second):
+            self.assertEqual("GOVERNANCE_CONTRACT_MISMATCH", outcome.blocker_code)
+            self.assertEqual("GOVERNANCE_CONTRACT_MISMATCH: manifest_format: 기대 v1, 관측 v9", outcome.detail)
+        self.assertEqual("materialized", self.statuses()["task_fix_add"])
+        self.assertEqual([], self.gate_operations("operation.prepared"))
+        self.assertEqual([], self.steward.stages)
+        self.assertEqual("", git(self.prepared.workspace, "for-each-ref", "refs/flowmarshal"))
+        self.assertEqual([{"phase": "before_execution", "detail": first.detail}],
+                         self.history("task.governance_blocked"))
+        self.plugin.preflight_failure = None
+        outcome = self.drive(gate)
+        self.assertEqual(RunOnceAction.COMPLETED, outcome.action, outcome.detail)
+
+    def test_preflight_mismatch_before_completion_keeps_the_task_validating(self) -> None:
+        gate = self.gate()
+        self.drive(gate, stop=lambda outcome: outcome.action is RunOnceAction.DISPATCHED)
+        self.plugin.preflight_failure = GovernanceContractMismatch("closure_file", "plugin root 안의 파일", "gone.mjs")
+        first = self.drive(gate)
+        second = self.dispatcher(gate).run_once(self.prepared.project_id)
+        for outcome in (first, second):
+            self.assertEqual("GOVERNANCE_CONTRACT_MISMATCH", outcome.blocker_code)
+        self.assertEqual("validating", self.statuses()["task_fix_add"])
+        self.assertEqual([], self.history("task.validation_blocked"))
+        self.assertEqual([{"phase": "before_completion", "detail": first.detail}],
+                         self.history("task.governance_blocked"))
+        self.plugin.preflight_failure = None
+        outcome = self.drive(gate)
+        self.assertEqual(RunOnceAction.COMPLETED, outcome.action, outcome.detail)
+        self.assertEqual(3, len(self.gate_steps("snapshot_c0")))
+
+    def test_rejected_tool_call_is_not_stored_and_is_called_again_under_the_same_key(self) -> None:
+        self.plugin.responses["open_convergence_root"] = mcp_result(
+            {"ok": False, "data": None, "error": {"code": "BINDING_INVALID", "message": "below the floor"}})
+        gate = self.gate()
+        blocked = self.drive(gate)
+        self.assertEqual("GOVERNANCE_CONTRACT_MISMATCH", blocked.blocker_code)
+        self.assertIn("mcp_tool:open_convergence_root", blocked.detail)
+        self.assertIn("BINDING_INVALID below the floor", blocked.detail)
+        self.assertEqual([], self.gate_steps("root"))
+        self.assertEqual(1, len(self.gate_operations("operation.no_effect")))
+        self.assertEqual("materialized", self.statuses()["task_fix_add"])
+        outcome = self.drive(gate)
+        self.assertEqual(RunOnceAction.COMPLETED, outcome.action, outcome.detail)
+        self.assertEqual(4, self.plugin.count("open_convergence_root"))
+        self.assertEqual(3, len(self.gate_steps("snapshot_c0")))
+        self.assertEqual(["bootstrap"], [stage for stage, _ in self.steward.stages[:1]])
+        self.assertEqual(1, sum(1 for stage, _ in self.steward.stages[:3] if stage == "bootstrap"))
+
+    def test_malformed_effectful_response_is_stored_raw_and_never_requires_recovery(self) -> None:
+        for response, fragment in (({"content": []}, "ok:true인 JSON envelope"),
+                                   (mcp_result({"ok": True, "data": {"runId": 7, "revision": True}}), "'runId': 'int'")):
+            with self.subTest(fragment=fragment):
+                self.setUp()
+                self.plugin.responses["start_guarded_workflow"] = response
+                gate = self.gate()
+                first = self.drive(gate)
+                second = self.dispatcher(gate).run_once(self.prepared.project_id)
+                for outcome in (first, second):
+                    self.assertEqual("GOVERNANCE_CONTRACT_MISMATCH", outcome.blocker_code, outcome.detail)
+                    self.assertIn("mcp_response:start_guarded_workflow", outcome.detail)
+                    self.assertIn(fragment, outcome.detail)
+                self.assertEqual(response, self.gate_steps("start")[0]["data"]["raw"])
+                self.assertEqual(1, self.plugin.count("start_guarded_workflow"))
+                self.assertNotEqual("recovery_required", self.run_state())
+                self.assertEqual("materialized", self.statuses()["task_fix_add"])
+
+    def test_malformed_plan_stage_requirement_is_a_mismatch_and_never_requires_recovery(self) -> None:
+        # steward가 읽는 필드다. 검증 없이 넘기면 execute 안 예외가 되어 다음 tick이 recovery_required로 간다.
+        for requirement in ("deep", {"minimumModelClass": "ultra"}):
+            with self.subTest(requirement=requirement):
+                self.setUp()
+                data = self.plugin.envelope("plan_workflow", {})["data"]
+                data["stages"][0]["executionRequirement"] = requirement
+                self.plugin.responses["plan_workflow"] = mcp_result({"ok": True, "data": data, "error": None})
+                gate = self.gate()
+                first = self.drive(gate)
+                second = self.dispatcher(gate).run_once(self.prepared.project_id)
+                for outcome in (first, second):
+                    self.assertEqual("GOVERNANCE_CONTRACT_MISMATCH", outcome.blocker_code, outcome.detail)
+                    self.assertIn("mcp_response:plan_workflow:stage:executionRequirement", outcome.detail)
+                self.assertEqual(["bootstrap"], [stage for stage, _ in self.steward.stages])
+                self.assertNotEqual("recovery_required", self.run_state())
+                self.assertEqual("materialized", self.statuses()["task_fix_add"])
+
+    def test_malformed_script_output_has_no_effect_and_is_run_again(self) -> None:
+        self.plugin.script_outputs["scope-baseline"] = {"manifestSha256": "0" * 64, "entries": "not-a-list"}
+        gate = self.gate()
+        blocked = self.drive(gate)
+        self.assertEqual("GOVERNANCE_CONTRACT_MISMATCH", blocked.blocker_code)
+        self.assertIn("script_output:scope-baseline", blocked.detail)
+        self.assertNotEqual("recovery_required", self.run_state())
+        self.assertEqual([], self.gate_steps("baseline"))
+        self.plugin.script_outputs["scope-compare"] = {"verdict": "MAYBE", "summary": {}, "findings": [],
+                                                       "currentDigest": "0" * 64}
+        blocked = self.drive(gate)
+        self.assertEqual("GOVERNANCE_CONTRACT_MISMATCH", blocked.blocker_code)
+        self.assertIn("script_output:scope-compare:verdict", blocked.detail)
+        self.assertEqual("validating", self.statuses()["task_fix_add"])
+        self.assertNotEqual("recovery_required", self.run_state())
+        outcome = self.drive(gate)
+        self.assertEqual(RunOnceAction.COMPLETED, outcome.action, outcome.detail)
+
+    def test_plugin_identity_is_recorded_once_per_key_and_a_change_is_recorded_at_completion(self) -> None:
+        gate = self.gate()
+        self.drive(gate, stop=lambda outcome: outcome.action is RunOnceAction.DISPATCHED)
+        recorded = self.gate_steps("plugin_identity")
+        self.assertEqual(1, len(recorded))
+        self.assertEqual(self.plugin.identity["summary"], recorded[0]["data"]["summary"])
+        self.assertEqual("local_derived", recorded[0]["data"]["summary"]["provenance"])
+        self.assertEqual(["plugin_manifest_file"], [label["source"] for label in recorded[0]["data"]["labels"]])
+        self.assertEqual(self.plugin.identity["files"],
+                         json.loads(Path(recorded[0]["data"]["files"]).read_text(encoding="utf-8")))
+        before = dict(self.plugin.identity["summary"])
+        self.plugin.identity["summary"]["closure_tree_digest"] = "sha256:" + "1" * 64
+        outcome = self.drive(gate)
+        self.assertEqual(RunOnceAction.COMPLETED, outcome.action, outcome.detail)
+        changed = self.gate_steps("plugin_identity_changed:before_completion")
+        self.assertEqual(1, len(changed))
+        self.assertEqual(before, changed[0]["data"]["stored"])
+        self.assertEqual(self.plugin.identity["summary"], changed[0]["data"]["current"])
+        self.assertEqual(3, len(self.gate_steps("plugin_identity")))
+
+
+class PluginSurfaceTests(unittest.TestCase):
+    """GovernancePlugin은 manifest로 진입점을 찾고 preflight로 실행 전에 계약·환경을 확인한다(node·플러그인 없이 검사)."""
+
+    PATHS = {"mcp-server": "dist/server.mjs", "host-attestation-cli": "dist/sign.mjs",
+             "scope-baseline": "moved/baseline.mjs", "scope-compare": "moved/compare.mjs",
+             "acceptance-cli": "moved/cli.mjs"}
+
+    def setUp(self) -> None:
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        self.base = Path(temp.name)
+        self.root = self.base / "plugin"
+        for relative in (*self.PATHS.values(), "data/schema.json"):
+            (self.root / relative).parent.mkdir(parents=True, exist_ok=True)
+            (self.root / relative).write_text(relative, encoding="utf-8")
+        self.manifest = {"format": governance_gate.MANIFEST_FORMAT, "plugin": {"id": "fake", "version": "9.9.9"},
+                         "entryPoints": [{"id": entry_id, "path": path, "executionClosure": [path, "data/schema.json"]}
+                                         for entry_id, path in self.PATHS.items()]}
+        self.classes = self.base / "classes.json"
+        self.write_classes({"observed-model": "deep"})
+        self.node_version = b"v22.13.0\n"
+        self.tools = list(CONSUMED_SURFACE["mcp_tools"])
+        self.runs: list[tuple[list[str], dict]] = []
+        self.clients: list[list[str]] = []
+        test = self
+
+        class StubClient:
+            server_info = {"name": "stub-server", "version": "0"}
+
+            def __init__(self, command, **kwargs):
+                test.clients.append(command)
+
+            def tool_names(self):
+                if isinstance(test.tools, Exception):
+                    raise test.tools
+                return list(test.tools)
+
+            def call(self, tool, arguments):
+                return {"tool": tool, "arguments": arguments}
+
+            def close(self):
+                return None
+
+        for name, value in (("McpStdioClient", StubClient), ("_run", self.fake_run)):
+            patcher = patch.object(governance_gate, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def fake_run(self, command, **kwargs):
+        self.runs.append((command, kwargs))
+        output = self.node_version if command[1] == "--version" else json.dumps(
+            {"token": "signed"} if command[1].endswith("sign.mjs") else {"ran": command[1:]}).encode("utf-8")
+        return subprocess.CompletedProcess(command, 0, output, b"")
+
+    def write_classes(self, classes, **extra) -> None:
+        self.classes.write_text(json.dumps({"format": governance_gate.MODEL_CLASSES_FORMAT, "classes": classes,
+                                            **extra}), encoding="utf-8")
+
+    def plugin(self) -> GovernancePlugin:
+        (self.root / governance_gate.MANIFEST).write_text(json.dumps(self.manifest), encoding="utf-8")
+        return GovernancePlugin(self.root, self.base / "state", self.classes)
+
+    def assert_mismatch(self, check: str) -> None:
+        with self.assertRaises(GovernanceContractMismatch) as raised:
+            self.plugin().preflight()
+        self.assertTrue(str(raised.exception).startswith(f"GOVERNANCE_CONTRACT_MISMATCH: {check}: 기대 "), raised.exception)
+        self.assertIn(", 관측 ", str(raised.exception))
+
+    def test_entry_points_come_from_the_manifest_and_identity_is_derived_from_the_closure(self) -> None:
+        plugin = self.plugin()
+        identity = plugin.preflight()
+        self.assertEqual([["node", str(self.root / "dist/server.mjs")]], self.clients)
+        self.assertEqual(sorted([*self.PATHS.values(), "data/schema.json"]), sorted(identity["files"]))
+        tree = "".join(f"{path}\0{hashlib.sha256(path.encode()).hexdigest()}\n" for path in sorted(identity["files"]))
+        summary = identity["summary"]
+        self.assertEqual("sha256:" + hashlib.sha256(tree.encode()).hexdigest(), summary["closure_tree_digest"])
+        self.assertEqual("sha256:" + hashlib.sha256((self.root / governance_gate.MANIFEST).read_bytes()).hexdigest(),
+                         summary["manifest_sha256"])
+        self.assertEqual("sha256:" + hashlib.sha256(self.classes.read_bytes()).hexdigest(),
+                         summary["model_class_table_digest"])
+        self.assertEqual(("local_derived", 6, "v22.13.0"),
+                         (summary["provenance"], summary["file_count"], summary["node_version"]))
+        self.assertEqual([{"source": "plugin_manifest_file", "plugin": {"id": "fake", "version": "9.9.9"}},
+                          {"source": "mcp_server_info", "serverInfo": {"name": "stub-server", "version": "0"}}],
+                         identity["labels"])
+        # version label은 판정에 쓰이지 않지만 manifest bytes라 manifest_sha256은 달라진다. tree digest는 closure만 따른다.
+        self.manifest["plugin"]["version"] = "10.0.0"
+        relabeled = self.plugin().preflight()["summary"]
+        self.assertNotEqual(summary["manifest_sha256"], relabeled["manifest_sha256"])
+        self.assertEqual(summary["closure_tree_digest"], relabeled["closure_tree_digest"])
+        (self.root / "data/schema.json").write_text("changed", encoding="utf-8")
+        changed = self.plugin().preflight()["summary"]
+        self.assertNotEqual(summary["closure_tree_digest"], changed["closure_tree_digest"])
+
+        request = self.base / "request.json"
+        request.write_text("{}", encoding="utf-8")
+        self.assertEqual({"ran": [str(self.root / "moved/baseline.mjs"), str(request)]},
+                         plugin.script("scope-baseline", request))
+        self.assertEqual({"ran": [str(self.root / "moved/cli.mjs"), "--input", str(request)]},
+                         plugin.script("acceptance-cli", request))
+
+    def test_signing_submits_the_host_and_the_class_from_the_injected_table(self) -> None:
+        plugin = self.plugin()
+        plugin.preflight()
+        observation = {"model": "observed-model", "effort": "high", "actorId": "actor"}
+        result = plugin.call("plan_workflow", {"a": 1}, observation)
+        self.assertEqual({"a": 1, "_hostAttestation": "signed"}, result["arguments"])
+        command, options = self.runs[-1]
+        self.assertEqual(["node", str(self.root / "dist/sign.mjs")], command)
+        self.assertEqual({"host": "flowmarshal-engine", "tool": "plan_workflow", "input": {"a": 1},
+                          "model": "observed-model", "modelClass": "deep", "reasoningEffort": "high",
+                          "actorId": "actor"}, json.loads(options["input"]))
+        signed = len(self.runs)
+        with self.assertRaises(GovernanceContractMismatch) as raised:
+            plugin.call("plan_workflow", {}, {**observation, "model": "undeclared-model"})
+        self.assertIn("GOVERNANCE_CONTRACT_MISMATCH: model_class:", str(raised.exception))
+        self.assertIn("undeclared-model", str(raised.exception))
+        self.assertEqual(signed, len(self.runs))
+
+    def test_refused_or_malformed_signing_and_failed_scripts_are_effect_free_mismatches(self) -> None:
+        plugin = self.plugin()
+        plugin.preflight()
+        observation = {"model": "observed-model", "effort": "high", "actorId": "actor"}
+        request = self.base / "request.json"
+        request.write_text("{}", encoding="utf-8")
+        cases = (("host_attestation_output", 0, b'{"signed": "no token field"}', lambda: plugin.call("plan_workflow", {}, observation)),
+                 ("host_attestation_output", 0, b"not json", lambda: plugin.call("plan_workflow", {}, observation)),
+                 ("host_attestation:", 1, b"", lambda: plugin.call("plan_workflow", {}, observation)),
+                 ("script_exit:scope-compare", 2, b"", lambda: plugin.script("scope-compare", request)))
+        for check, code, output, act in cases:
+            with self.subTest(check=check, output=output):
+                with patch.object(governance_gate, "_run", lambda command, **kwargs: subprocess.CompletedProcess(
+                        command, code, output, b"refused")):
+                    with self.assertRaises(GovernanceContractMismatch) as raised:
+                        act()
+                self.assertIn(f"GOVERNANCE_CONTRACT_MISMATCH: {check}", str(raised.exception))
+                # CoreOperations는 effects_started가 False인 예외만 no_effect로 남긴다.
+                self.assertIs(False, raised.exception.effects_started)
+
+    def test_preflight_names_the_failed_check(self) -> None:
+        cases = {
+            "manifest_format": lambda: self.manifest.update(format="agent-governance-suite.host-integration.v2"),
+            "entry_point:scope-compare": lambda: self.manifest["entryPoints"].pop(3),
+            "entry_point:mcp-server": lambda: self.manifest["entryPoints"][0].pop("executionClosure"),
+            "entry_point:acceptance-cli": lambda: self.manifest["entryPoints"][4].update(id=["acceptance-cli"]),
+            "entry_points": lambda: self.manifest.update(entryPoints=7),
+            "closure_file": lambda: self.manifest["entryPoints"][1]["executionClosure"].append("missing.json"),
+            "node_version": lambda: setattr(self, "node_version", b"v22.12.9\n"),
+            "mcp_tools": lambda: self.tools.remove("finalize_workflow"),
+            "mcp_server_start": lambda: setattr(self, "tools", GovernanceTimeout(
+                "MCP_SERVER_EXITED: tools/list 응답 전에 서버가 끝났습니다.")),
+            "model_class_table": lambda: self.write_classes({"observed-model": "huge"}),
+        }
+        for check, break_it in cases.items():
+            with self.subTest(check=check):
+                self.setUp()
+                break_it()
+                self.assert_mismatch(check)
+        self.setUp()
+        outside = self.base / "outside.json"
+        outside.write_text("x", encoding="utf-8")
+        for escaping in ("../outside.json", str(outside), ""):
+            with self.subTest(path=escaping):
+                self.manifest["entryPoints"][0]["executionClosure"][2:] = [escaping]
+                self.assert_mismatch("closure_file")
+        self.setUp()
+        (self.root / governance_gate.MANIFEST).unlink(missing_ok=True)
+        with self.assertRaises(GovernanceContractMismatch) as raised:
+            GovernancePlugin(self.root, self.base / "state", self.classes).preflight()
+        self.assertIn("GOVERNANCE_CONTRACT_MISMATCH: manifest:", str(raised.exception))
+
+    def test_model_class_table_is_rejected_before_typed_use(self) -> None:
+        self.assertEqual({"observed-model": "deep"}, load_model_classes(self.classes)[0])
+        raw = {
+            "duplicate model": '{"format": "%s", "classes": {"m": "deep", "m": "general"}}' % governance_gate.MODEL_CLASSES_FORMAT,
+            "empty model": json.dumps({"format": governance_gate.MODEL_CLASSES_FORMAT, "classes": {" ": "deep"}}),
+            "class outside the enum": json.dumps({"format": governance_gate.MODEL_CLASSES_FORMAT, "classes": {"m": None}}),
+            "empty table": json.dumps({"format": governance_gate.MODEL_CLASSES_FORMAT, "classes": {}}),
+            "unknown key": json.dumps({"format": governance_gate.MODEL_CLASSES_FORMAT, "classes": {"m": "deep"}, "x": 1}),
+            "other format": json.dumps({"format": "other", "classes": {"m": "deep"}}),
+            "not json": "{",
+        }
+        for name, text in raw.items():
+            with self.subTest(name=name):
+                self.classes.write_text(text, encoding="utf-8")
+                with self.assertRaises(GovernanceContractMismatch) as raised:
+                    load_model_classes(self.classes)
+                self.assertIn("GOVERNANCE_CONTRACT_MISMATCH: model_class_table:", str(raised.exception))
+        for path in (None, self.base / "absent.json"):
+            with self.assertRaises(GovernanceContractMismatch):
+                load_model_classes(path)
+
+    def test_product_gate_does_not_pin_the_plugin(self) -> None:
+        source = Path(governance_gate.__file__).read_text(encoding="utf-8")
+        for name in ("PluginPin", "DEFAULT_PIN", "PLUGIN_PIN", "SERVER =", "SIGNER", "SCOPE_SCRIPTS", "ACCEPTANCE_CLI",
+                     "engine-attestation", "server_sha256"):
+            self.assertNotIn(name, source)
+
+
 class ProductPathTests(MultitaskGateHarness):
     def test_application_without_governance_uses_a_blocking_gate(self) -> None:
         application = EngineApplication(self.prepared.service, runtime=self.runtime)
@@ -797,22 +1162,25 @@ class TimeoutTests(unittest.TestCase):
         self.assertEqual(1, source.count("subprocess.Popen("))
 
 
-def plugin_available() -> bool:
-    if shutil.which("node") is None or not (PLUGIN_ROOT / governance_gate.SERVER).is_file():
-        return False
-    try:
-        DEFAULT_PIN.verify(PLUGIN_ROOT)
-    except GovernanceRejected:
-        return False
-    return True
+def plugin_unavailable() -> str | None:
+    """실제 플러그인 검사를 건너뛰는 이유. 실행할 수 있으면 None이다."""
+    if PLUGIN_ROOT is None:
+        return "FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT가 없다"
+    if not (PLUGIN_ROOT / governance_gate.MANIFEST).is_file():
+        return f"{PLUGIN_ROOT}에 {governance_gate.MANIFEST}가 없다"
+    return None if shutil.which("node") else "node가 없다"
 
 
-@unittest.skipUnless(plugin_available(), f"고정한 플러그인 worktree({PLUGIN_ROOT})나 node가 없다")
+@unittest.skipIf(plugin_unavailable(), f"실제 플러그인 검사 생략: {plugin_unavailable()}")
 class RealPluginTests(MultitaskGateHarness):
-    """개발 플러그인 worktree의 실제 스크립트·MCP 서버로 같은 합성 Goal을 확인한다(모델 호출 없음)."""
+    """환경 변수로 받은 plugin root의 실제 스크립트·서명 CLI·MCP 서버로 같은 합성 Goal을 확인한다(모델 호출 없음)."""
 
     def real_gate(self) -> GovernanceTaskGate:
-        plugin = GovernancePlugin(PLUGIN_ROOT, self.base / "governance" / "plugin")
+        # ScriptedSteward와 worker_observed가 관측했다고 보고하는 모델의 class를 호출자 설정으로 준다.
+        classes = self.base / "model-classes.json"
+        classes.write_text(json.dumps({"format": governance_gate.MODEL_CLASSES_FORMAT, "classes": {
+            "claude-sonnet-5": "general", "claude-opus-5": "deep"}}), encoding="utf-8")
+        plugin = GovernancePlugin(PLUGIN_ROOT, self.base / "governance" / "plugin", classes)
         gate = self.gate(plugin=plugin)
         self.addCleanup(gate.close)
         return gate

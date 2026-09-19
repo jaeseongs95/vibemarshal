@@ -15,6 +15,10 @@ Task validation·semantic Validator·Goal Test가 아니며 Core evidence로 세
   그대로 재사용하고, 결과 없는 효과는 external_unknown으로 멈춘다.
 - 관측: 플러그인 stage 관측은 steward·Worker receipt의 권위 관측만 쓴다. 관측 근거가 확인되지 않은
   provider(Codex)는 GOVERNANCE_PROVIDER_UNSUPPORTED로 멈추며 다른 provider로 넘어가지 않는다.
+- 플러그인 계약: 플러그인을 commit·digest로 고정하지 않는다. 플러그인이 생성한 host-integration manifest에서
+  진입점을 id로 찾고, 두 단계 맨 앞의 preflight로 실행 가능 여부를 확인한다. 계약·환경 불일치는
+  GOVERNANCE_CONTRACT_MISMATCH 하나로 드러내며 Task 상태를 바꾸지 않고 원장에 확정 결과로 굳히지 않는다.
+  실행에 쓴 플러그인 bytes의 identity는 Engine이 manifest closure 경로로 계산해 남긴다(local_derived).
 """
 from __future__ import annotations
 
@@ -34,13 +38,38 @@ from .context import DEFAULT_IGNORED_DIRECTORIES
 from .domain import BudgetStage, BudgetUsageRecord, PlanContractRevision, TaskContract, TaskExecutionSpecRevision, new_id
 from .model_observation import authoritative_receipt_model_observation
 from .operations import CoreOperations
-from .runtime import TaskGatePending
+from .runtime import TaskGateContractMismatch, TaskGatePending
 from .service import latest_write_observation
 
-SERVER = "mcp-server/dist/server.mjs"
-SIGNER = "mcp-server/dist/engine-attestation.mjs"
-SCOPE_SCRIPTS = "skills/change-scope-guardian/scripts"
-ACCEPTANCE_CLI = "skills/acceptance-evidence-validator/scripts/cli.mjs"
+MANIFEST = "host-integration.json"
+MANIFEST_FORMAT = "agent-governance-suite.host-integration.v1"
+HOST_ID = "flowmarshal-engine"
+MINIMUM_NODE = (22, 13)
+# 소비 표면 선언: Engine이 플러그인에 기대는 진입점 id, MCP 도구와 그 data에서 읽는 필드, 스크립트 출력에서
+# 읽는 필드다. Engine의 의존이 바뀔 때만 바뀐다. 플러그인 버전·digest는 여기 두지 않는다.
+CONSUMED_SURFACE: dict[str, Any] = {
+    "entry_points": ["mcp-server", "host-attestation-cli", "scope-baseline", "scope-compare", "acceptance-cli"],
+    "mcp_tools": {
+        "plan_workflow": {"executionMode": "str", "stages": "list"},
+        "open_convergence_root": {"rootId": "str", "revision": "int"},
+        "claim_workflow_attempt": {"leaseId": "str", "rootRevision": "int"},
+        "start_guarded_workflow": {"runId": "str", "revision": "int"},
+        "record_stage_result": {"revision": "int"},
+        "finalize_workflow": {"state": "str"},
+        "abort_workflow": {},
+    },
+    "plan_stage": {"requiredCapability": "str", "stageId": "str"},
+    # 없어도 되는 필드다. 있으면 object이고 minimumModelClass는 없거나 steward binding 표의 class다.
+    "plan_stage_optional": {"executionRequirement": "dict"},
+    "scripts": {
+        "scope-baseline": {"manifestSha256": "str", "entries": "list"},
+        "scope-compare": {"verdict": "str", "summary": "dict", "findings": "list", "currentDigest": "str"},
+        "acceptance-cli": {"verdict": "str"},
+    },
+}
+_FIELD_TYPES = {"str": str, "int": int, "list": list, "dict": dict}
+MODEL_CLASSES_FORMAT = "flowmarshal-governance-model-classes-v1"
+MODEL_CLASSES = ("lightweight", "general", "deep", "frontier")
 SUPPORTED_CAPABILITIES = frozenset({
     "change-scope-baseline-capture", "minimal-implementation", "change-scope-assurance",
     "acceptance-evidence-validation",
@@ -92,6 +121,51 @@ class GovernanceUnavailable(RuntimeError):
 
 class GovernanceTimeout(RuntimeError):
     """응답 시간을 넘겼다. 효과 여부를 모르므로 다음 tick은 external_unknown으로 멈춘다."""
+
+
+class GovernanceContractMismatch(RuntimeError):
+    """플러그인 계약·환경 불일치다. Task의 잘못이 아니므로 Task 상태를 바꾸지 않고 확정 결과로 굳히지 않는다.
+
+    CoreOperations execute 안에서 나면 no_effect로 기록되어, 플러그인·환경을 고친 뒤 같은 키에서 다시 시도한다.
+    """
+
+    effects_started = False
+
+    def __init__(self, check: str, expected: Any, observed: Any) -> None:
+        super().__init__(f"GOVERNANCE_CONTRACT_MISMATCH: {check}: 기대 {expected}, 관측 {observed}")
+
+
+def _json(text: Any) -> Any:
+    """JSON으로 읽히지 않으면 None이다. 형태 판정은 _fields가 한다."""
+    try:
+        return json.loads(text)
+    except (TypeError, ValueError):
+        return None
+
+
+def _fields(check: str, value: Any, spec: dict[str, str]) -> dict[str, Any]:
+    """소비 표면이 선언한 필드가 선언한 타입으로 있는지 확인하고 value를 돌려준다."""
+    observed = ({key: type(value.get(key)).__name__ for key in spec} if isinstance(value, dict)
+                else type(value).__name__)
+    # bool은 int의 하위 타입이지만 revision·count 자리에 오면 형태 오류다.
+    if not isinstance(value, dict) or any(
+            not isinstance(value.get(key), _FIELD_TYPES[kind]) or isinstance(value.get(key), bool)
+            for key, kind in spec.items()):
+        raise GovernanceContractMismatch(check, spec, observed)
+    return value
+
+
+def _plan_stage(item: Any) -> dict[str, Any]:
+    """plan 응답의 stage 하나를 검증한다. steward가 읽는 executionRequirement도 여기서 확인한다."""
+    stage = _fields("mcp_response:plan_workflow:stage", item, CONSUMED_SURFACE["plan_stage"])
+    requirement = stage.get("executionRequirement")
+    if requirement is not None and (
+            not isinstance(requirement, dict)
+            or requirement.get("minimumModelClass") not in (None, *STEWARD_ROLE_BINDINGS)):
+        raise GovernanceContractMismatch(
+            "mcp_response:plan_workflow:stage:executionRequirement",
+            f"없음, 또는 minimumModelClass가 없거나 {sorted(STEWARD_ROLE_BINDINGS)} 중 하나인 object", requirement)
+    return stage
 
 
 def _sha256_file(path: Path) -> str:
@@ -179,32 +253,36 @@ def user_change_overlap(root: Path, writes: list[str], goal_start: dict[str, Any
     return overlaps
 
 
-@dataclass(frozen=True)
-class PluginPin:
-    """플러그인 commit과 dist 번들 digest. 하나라도 다르면 gate를 시작하지 않는다."""
-
-    commit: str
-    server_sha256: str
-    signer_sha256: str
-
-    def verify(self, root: Path) -> dict[str, str]:
-        actual = {"commit": _git(root, "rev-parse", "HEAD") if (root / ".git").exists() else "",
-                  "server_sha256": _sha256_file(root / SERVER) if (root / SERVER).is_file() else "",
-                  "signer_sha256": _sha256_file(root / SIGNER) if (root / SIGNER).is_file() else ""}
-        expected = {"commit": self.commit, "server_sha256": self.server_sha256, "signer_sha256": self.signer_sha256}
-        if actual != expected:
-            raise GovernanceRejected(f"PLUGIN_PIN_MISMATCH: expected {expected}, found {actual}")
-        return {"root": str(root), **actual}
-
-
-# ponytail: 플러그인 host adapter가 들어간 개발 커밋이다. release 버전·content digest pin과 freeze 결속은
-# 플러그인 release 뒤 별도 작업으로 바꾼다(marketplace 설치본에는 .git과 서명 CLI가 없다).
-DEFAULT_PIN = PluginPin(
-    commit="98db1302db8371883bc87c58017f7747bac2e77f",
-    server_sha256="6e44ff66325df9f315675fe6e1faa8eb3591da1bc78b42aba289f3cb1704bca7",
-    signer_sha256="d0232aa7e8780d7c8ccf611fa07b3c084760297253467353c24868054cc74592",
-)
 PLUGIN_ROOT_ENV = "FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT"
+MODEL_CLASSES_ENV = "FLOWMARSHAL_GOVERNANCE_MODEL_CLASSES"
+
+
+def load_model_classes(path: Path | None) -> tuple[dict[str, str], str]:
+    """호출자가 주입한 '관측된 model 이름 → class' 대응표와 원문 digest를 돌려준다.
+
+    플러그인 서명 입력의 modelClass는 이 표에서만 얻는다. class는 호출자 설정에서 나온 주장이지 관측이 아니다.
+    원문은 typed 변환 전에 duplicate key·빈 값·enum 밖 class를 거부한다.
+    """
+    expected = f"{MODEL_CLASSES_ENV}가 가리키는 {MODEL_CLASSES_FORMAT} JSON"
+
+    def pairs(items: list[tuple[str, Any]]) -> dict[str, Any]:
+        if len({key for key, _ in items}) != len(items):
+            raise ValueError("duplicate key")
+        return dict(items)
+
+    if path is None:
+        raise GovernanceContractMismatch("model_class_table", expected, "미설정")
+    try:
+        raw = path.read_bytes()
+        table = json.loads(raw, object_pairs_hook=pairs)
+    except (OSError, ValueError) as error:
+        raise GovernanceContractMismatch("model_class_table", expected, f"{path}: {error}") from error
+    classes = table.get("classes") if isinstance(table, dict) else None
+    if (not isinstance(table, dict) or set(table) != {"format", "classes"} or table["format"] != MODEL_CLASSES_FORMAT
+            or not isinstance(classes, dict) or not classes
+            or any(not model.strip() or kind not in MODEL_CLASSES for model, kind in classes.items())):
+        raise GovernanceContractMismatch("model_class_table", expected, f"{path}: 형식이 다릅니다")
+    return classes, sha256_bytes(raw)
 
 
 class McpStdioClient:
@@ -225,8 +303,11 @@ class McpStdioClient:
         self._pump_thread.start()
         self.sequence = 0
         try:
-            self._request("initialize", {"protocolVersion": "2025-03-26", "capabilities": {},
-                                         "clientInfo": {"name": "flowmarshal-engine-governance", "version": "1.0"}})
+            initialized = self._request("initialize", {
+                "protocolVersion": "2025-03-26", "capabilities": {},
+                "clientInfo": {"name": "flowmarshal-engine-governance", "version": "1.0"}})
+            # 서버의 자기 보고 label이다. 판정에 쓰지 않는다.
+            self.server_info = initialized.get("serverInfo") if isinstance(initialized, dict) else None
             self._send({"jsonrpc": "2.0", "method": "notifications/initialized", "params": {}})
         except BaseException:
             self.process.kill()
@@ -257,15 +338,23 @@ class McpStdioClient:
                 raise GovernanceTimeout(f"GOVERNANCE_TIMEOUT: MCP {method}: {self.timeout}초") from error
             if line is None:
                 raise GovernanceTimeout(f"MCP_SERVER_EXITED: {method} 응답 전에 서버가 끝났습니다.")
-            message = json.loads(line)
-            if message.get("id") == self.sequence:
+            try:
+                message = json.loads(line)
+            except ValueError:
+                continue  # JSON-RPC가 아닌 stdout 줄은 건너뛴다. 응답이 끝내 없으면 timeout으로 끝난다.
+            if isinstance(message, dict) and message.get("id") == self.sequence:
                 if "error" in message:
-                    raise GovernanceRejected(f"MCP_PROTOCOL_ERROR: {message['error']}")
-                return message["result"]
+                    raise GovernanceContractMismatch(f"mcp_protocol:{method}", "result", message["error"])
+                return message.get("result")
 
-    def call(self, tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        result = self._request("tools/call", {"name": tool, "arguments": arguments})
-        return json.loads(result["content"][0]["text"])
+    def tool_names(self) -> list[str]:
+        result = self._request("tools/list", {})
+        tools = result.get("tools") if isinstance(result, dict) else None
+        return [tool.get("name") for tool in tools if isinstance(tool, dict)] if isinstance(tools, list) else []
+
+    def call(self, tool: str, arguments: dict[str, Any]) -> Any:
+        """tools/call의 JSON-RPC result 원문을 그대로 돌려준다. 형태 해석은 호출자가 한다."""
+        return self._request("tools/call", {"name": tool, "arguments": arguments})
 
     def close(self) -> None:
         if self.process.stdin is not None:
@@ -282,46 +371,152 @@ class McpStdioClient:
 
 
 class GovernancePlugin:
-    """고정한 플러그인의 MCP 서버·서명 CLI·skill 스크립트 실행기. 서버는 첫 호출 때 띄운다."""
+    """플러그인 manifest가 선언한 MCP 서버·서명 CLI·skill 스크립트 실행기.
 
-    def __init__(self, root: Path, state_dir: Path, pin: PluginPin = DEFAULT_PIN) -> None:
-        self.root, self.state_dir, self.pin = root, state_dir, pin
+    진입점 경로는 manifest에서 id로 찾는다. preflight가 실행 가능 여부를 확인하고 실행에 쓸 bytes의 identity를
+    계산한다. 플러그인의 .git, 버전, 기대 digest는 보지 않는다.
+    """
+
+    def __init__(self, root: Path, state_dir: Path, model_classes: Path | None = None) -> None:
+        self.root, self.state_dir, self.model_classes_path = root, state_dir, model_classes
         state_dir.mkdir(parents=True, exist_ok=True)
         self.env = {**os.environ,
-                    "AGENT_GOVERNANCE_HOST_ATTESTATION": "flowmarshal-engine",
+                    "AGENT_GOVERNANCE_HOST_ATTESTATION": HOST_ID,
                     "AGENT_GOVERNANCE_DB_PATH": str(state_dir / "workflows.sqlite3"),
                     "AGENT_GOVERNANCE_CONTINUITY_DB_PATH": str(state_dir / "continuity.sqlite3")}
         self._mcp: McpStdioClient | None = None
-        self.identity: dict[str, str] | None = None
+        self._node_version: str | None = None
+        self._entries: dict[str, Path] = {}
+        self._model_classes: dict[str, str] = {}
+
+    def preflight(self) -> dict[str, Any]:
+        """플러그인을 실행할 수 있는지 확인하고 identity(요약과 파일별 sha256)를 돌려준다.
+
+        Core 효과·steward 호출 전에 부른다. 어긋나면 GovernanceContractMismatch다.
+        """
+        manifest_path = self.root / MANIFEST
+        try:
+            manifest_bytes = manifest_path.read_bytes()
+            manifest = json.loads(manifest_bytes)
+        except (OSError, ValueError) as error:
+            raise GovernanceContractMismatch("manifest", f"{manifest_path} JSON", str(error)) from error
+        observed_format = manifest.get("format") if isinstance(manifest, dict) else None
+        if observed_format != MANIFEST_FORMAT:
+            raise GovernanceContractMismatch("manifest_format", MANIFEST_FORMAT, observed_format)
+        listed = manifest.get("entryPoints")
+        if not isinstance(listed, list):
+            raise GovernanceContractMismatch("entry_points", "진입점 object의 list", type(listed).__name__)
+        declared = {entry["id"]: entry for entry in listed
+                    if isinstance(entry, dict) and isinstance(entry.get("id"), str)}
+        files: set[str] = set()
+        entries: dict[str, Path] = {}
+        for entry_id in CONSUMED_SURFACE["entry_points"]:
+            entry = declared.get(entry_id)
+            closure = entry.get("executionClosure") if entry else None
+            if (not entry or not isinstance(entry.get("path"), str) or not isinstance(closure, list)
+                    or not all(isinstance(item, str) for item in closure)):
+                raise GovernanceContractMismatch(f"entry_point:{entry_id}", "path와 executionClosure 선언", entry)
+            entries[entry_id] = self.root / entry["path"]
+            files.update([entry["path"], *closure])
+        root = self.root.resolve()
+        digests: dict[str, str] = {}
+        for relative in sorted(files):
+            path = (self.root / relative).resolve()
+            if not path.is_relative_to(root) or not path.is_file():
+                raise GovernanceContractMismatch("closure_file", "plugin root 안의 파일", relative)
+            digests[relative] = _sha256_file(path)
+        self._model_classes, table_digest = load_model_classes(self.model_classes_path)
+        self._entries = entries
+        client = self._client()
+        label = manifest.get("plugin")
+        return {
+            "summary": {
+                "provenance": "local_derived",
+                "closure_tree_digest": sha256_bytes("".join(
+                    f"{path}\0{digest}\n" for path, digest in digests.items()).encode("utf-8")),
+                "manifest_sha256": sha256_bytes(manifest_bytes), "file_count": len(digests),
+                "node_version": self._node(), "consumed_surface_digest": sha256_digest(CONSUMED_SURFACE),
+                "model_class_table_digest": table_digest,
+            },
+            # 자기 보고 label이다. 관측·판정·동등성 비교에 쓰지 않는다.
+            "labels": [{"source": "plugin_manifest_file", "plugin": label if isinstance(label, dict) else None},
+                       {"source": "mcp_server_info", "serverInfo": client.server_info}],
+            "files": digests,
+        }
+
+    def _node(self) -> str:
+        if self._node_version is None:
+            expected = f"node {MINIMUM_NODE[0]}.{MINIMUM_NODE[1]} 이상"
+            try:
+                result = _run(["node", "--version"], timeout=GIT_TIMEOUT_SECONDS, code="GOVERNANCE_NODE",
+                              effects_started=False)
+            except GovernanceUnavailable as error:
+                if "GOVERNANCE_TIMEOUT" in str(error):
+                    raise
+                raise GovernanceContractMismatch("node_version", expected, str(error)) from error
+            version = result.stdout.decode("utf-8", "replace").strip()
+            try:
+                parsed = tuple(int(part) for part in version.lstrip("v").split(".")[:2])
+            except ValueError:
+                parsed = ()
+            if result.returncode != 0 or len(parsed) != 2 or parsed < MINIMUM_NODE:
+                raise GovernanceContractMismatch("node_version", expected, version or result.returncode)
+            self._node_version = version
+        return self._node_version
 
     def _client(self) -> McpStdioClient:
         if self._mcp is None:
-            self.identity = self.pin.verify(self.root)
-            self._mcp = McpStdioClient(["node", str(self.root / SERVER)], cwd=self.root, env=self.env,
-                                       stderr_path=self.state_dir / "mcp-server.stderr.log")
+            self._node()
+            try:
+                client = McpStdioClient(["node", str(self._entries["mcp-server"])], cwd=self.root, env=self.env,
+                                        stderr_path=self.state_dir / "mcp-server.stderr.log")
+                try:
+                    missing = sorted(set(CONSUMED_SURFACE["mcp_tools"]) - set(client.tool_names()))
+                except BaseException:
+                    client.close()
+                    raise
+            except (GovernanceTimeout, GovernanceUnavailable) as error:
+                # initialize·tools/list는 효과가 없다. 그 전에 서버가 끝나면 실행할 수 없는 플러그인이다.
+                if "MCP_SERVER_EXITED" not in str(error) and "MCP_SERVER_START_FAILED" not in str(error):
+                    raise
+                raise GovernanceContractMismatch("mcp_server_start", "initialize와 tools/list에 응답하는 MCP 서버",
+                                                 str(error)) from error
+            if missing:
+                client.close()
+                raise GovernanceContractMismatch("mcp_tools", sorted(CONSUMED_SURFACE["mcp_tools"]),
+                                                 f"없는 도구 {missing}")
+            self._mcp = client
         return self._mcp
 
-    def call(self, tool: str, arguments: dict[str, Any], observation: dict[str, Any] | None) -> dict[str, Any]:
+    def call(self, tool: str, arguments: dict[str, Any], observation: dict[str, Any] | None) -> Any:
+        """MCP 도구를 부르고 JSON-RPC result 원문을 돌려준다. 관측이 있으면 호출마다 새 token을 서명한다."""
         client = self._client()
         if observation is not None:
-            signed = _run(["node", str(self.root / SIGNER)], timeout=SCRIPT_TIMEOUT_SECONDS,
+            model_class = self._model_classes.get(observation["model"])
+            if model_class is None:
+                raise GovernanceContractMismatch("model_class", "대응표에 선언된 모델", observation["model"])
+            signed = _run(["node", str(self._entries["host-attestation-cli"])], timeout=SCRIPT_TIMEOUT_SECONDS,
                           code="GOVERNANCE_ATTESTATION", effects_started=False, env=self.env,
-                          input=json.dumps({"tool": tool, "input": arguments, "model": observation["model"],
+                          input=json.dumps({"host": HOST_ID, "tool": tool, "input": arguments,
+                                            "model": observation["model"], "modelClass": model_class,
                                             "reasoningEffort": observation["effort"],
                                             "actorId": observation["actorId"]}, ensure_ascii=False).encode("utf-8"))
             if signed.returncode != 0:
-                raise GovernanceRejected(f"ATTESTATION_REFUSED: {signed.stderr.decode('utf-8', 'replace').strip()}")
-            arguments = {**arguments, "_hostAttestation": json.loads(signed.stdout)["token"]}
+                raise GovernanceContractMismatch("host_attestation", "token",
+                                                 signed.stderr.decode("utf-8", "replace").strip())
+            token = _fields("host_attestation_output", _json(signed.stdout), {"token": "str"})["token"]
+            arguments = {**arguments, "_hostAttestation": token}
         return client.call(tool, arguments)
 
-    def script(self, name: str, request_path: Path) -> dict[str, Any]:
-        args = ["--input", str(request_path)] if name == ACCEPTANCE_CLI else [str(request_path)]
-        result = _run(["node", str(self.root / name), *args], timeout=SCRIPT_TIMEOUT_SECONDS,
-                      code=f"GOVERNANCE_SCRIPT {name}", effects_started=False, env=self.env)
+    def script(self, entry_id: str, request_path: Path) -> dict[str, Any]:
+        """읽기 전용 skill 스크립트를 실행하고 JSON 출력을 돌려준다. 읽히지 않으면 None이며 형태는 gate가 확인한다."""
+        args = ["--input", str(request_path)] if entry_id == "acceptance-cli" else [str(request_path)]
+        result = _run(["node", str(self._entries[entry_id]), *args], timeout=SCRIPT_TIMEOUT_SECONDS,
+                      code=f"GOVERNANCE_SCRIPT {entry_id}", effects_started=False, env=self.env)
         if result.returncode != 0:
             detail = (result.stderr or result.stdout).decode("utf-8", "replace").strip()
-            raise GovernanceRejected(f"SKILL_SCRIPT_FAILED: {name}: {detail}")
-        return json.loads(result.stdout)
+            raise GovernanceContractMismatch(f"script_exit:{entry_id}", "exit 0", detail)
+        return _json(result.stdout)
 
     def close(self) -> None:
         if self._mcp is not None:
@@ -453,23 +648,24 @@ class MissingGovernanceGate:
 
 @dataclass(frozen=True)
 class GovernanceSettings:
-    """제품 경로가 필수 gate를 만드는 입력. 플러그인 위치와 gate 산출물 폴더만 받는다."""
+    """제품 경로가 필수 gate를 만드는 입력. 플러그인 위치, gate 산출물 폴더, model class 대응표 파일을 받는다."""
 
     plugin_root: Path
     state_dir: Path
-    pin: PluginPin = DEFAULT_PIN
+    model_classes: Path | None = None
 
     @classmethod
     def from_environment(cls, state_dir: Path) -> "GovernanceSettings | None":
         root = os.environ.get(PLUGIN_ROOT_ENV)
-        return None if not root else cls(Path(root), state_dir)
+        classes = os.environ.get(MODEL_CLASSES_ENV)
+        return None if not root else cls(Path(root), state_dir, Path(classes) if classes else None)
 
     def open_gate(self, service: Any, *, runtime: Any, roles: Any, runner: Any) -> Any:
         if roles is None or runner is None:
             return MissingGovernanceGate(
                 "GOVERNANCE_ROLE_CONFIGURATION_REQUIRED: steward binding에 쓸 역할 설정이 필요합니다.")
         return GovernanceTaskGate(
-            service, plugin=GovernancePlugin(self.plugin_root, self.state_dir / "plugin", self.pin),
+            service, plugin=GovernancePlugin(self.plugin_root, self.state_dir / "plugin", self.model_classes),
             steward=RoleSteward(service, runtime=runtime, roles=roles, runner=runner,
                                 cwd=self.state_dir / "steward-cwd"),
             state_dir=self.state_dir)
@@ -515,6 +711,8 @@ class GovernanceTaskGate:
         try:
             action()
             return None
+        except GovernanceContractMismatch as error:
+            raise TaskGateContractMismatch(str(error)) from error
         except GovernanceRejected as error:
             return str(error)
         except ExternalOperationUnknown:
@@ -550,12 +748,31 @@ class GovernanceTaskGate:
 
     def _mcp(self, task: Any, run: _Run, step: str, tool: str, arguments: dict[str, Any],
              observation: dict[str, Any] | None, *, replay: bool) -> dict[str, Any]:
-        envelope = self._op(task, run, step, {"tool": tool, "arguments": arguments, "observation": observation},
-                            lambda: self.plugin.call(tool, arguments, observation), replay=replay)
-        if not envelope.get("ok"):
-            error = envelope.get("error") or {}
-            raise GovernanceRejected(f"GOVERNANCE_PLUGIN_REJECTED: {tool}: {error.get('code')} {error.get('message')}")
-        return envelope["data"]
+        def execute() -> dict[str, Any]:
+            raw = self.plugin.call(tool, arguments, observation)
+            envelope = self._envelope_of(raw)
+            if isinstance(envelope, dict) and envelope.get("ok") is False:
+                # 거절된 호출은 플러그인 상태를 바꾸지 않는다(플러그인 provider 테스트가 보호). 확정 결과로 굳히지
+                # 않고 no_effect로 남겨, 원인을 고친 뒤 같은 키에서 다시 부른다.
+                error = envelope.get("error") if isinstance(envelope.get("error"), dict) else {}
+                raise GovernanceContractMismatch(f"mcp_tool:{tool}", "ok:true",
+                                                 f"{error.get('code')} {error.get('message')}")
+            # 효과가 있었을 수 있는 응답은 원문 그대로 저장한다. 형태 검증은 저장 뒤 execute 밖에서 한다.
+            return {"raw": raw}
+
+        stored = self._op(task, run, step, {"tool": tool, "arguments": arguments, "observation": observation},
+                          execute, replay=replay)
+        envelope = self._envelope_of(stored.get("raw") if isinstance(stored, dict) else None)
+        if not isinstance(envelope, dict) or envelope.get("ok") is not True:
+            raise GovernanceContractMismatch(f"mcp_response:{tool}", "ok:true인 JSON envelope", stored)
+        return _fields(f"mcp_response:{tool}", envelope.get("data"), CONSUMED_SURFACE["mcp_tools"][tool])
+
+    @staticmethod
+    def _envelope_of(raw: Any) -> Any:
+        """tools/call result 원문에서 플러그인 envelope을 꺼낸다. 형태가 다르면 None이며 예외를 내지 않는다."""
+        content = raw.get("content") if isinstance(raw, dict) else None
+        first = content[0] if isinstance(content, list) and content else None
+        return _json(first.get("text")) if isinstance(first, dict) else None
 
     def _review(self, task: Any, run: _Run, stage: str, requirement: dict[str, Any] | None,
                 brief: dict[str, Any], *, replay: bool) -> dict[str, Any]:
@@ -570,18 +787,23 @@ class GovernanceTaskGate:
         return result["observation"]
 
     def _script(self, task: Any, run: _Run, step: str, name: str, request: dict[str, Any], *,
-                replay: bool) -> tuple[dict[str, Any], Path]:
+                replay: bool, verdicts: dict[str, str] | None = None) -> tuple[dict[str, Any], Path]:
         request_path = self._write(run.folder / f"{step}-request.json", request)
         output_path = run.folder / f"{step}.json"
 
         def execute() -> dict[str, Any]:
-            output = self.plugin.script(name, request_path)
+            # 읽기 전용 스크립트라 형태 오류도 효과 없는 계약 불일치다(no_effect, 고친 뒤 같은 키에서 다시 실행).
+            output = _fields(f"script_output:{name}", self.plugin.script(name, request_path),
+                             CONSUMED_SURFACE["scripts"][name])
+            if verdicts is not None and output["verdict"] not in verdicts:
+                raise GovernanceContractMismatch(f"script_output:{name}:verdict", sorted(verdicts), output["verdict"])
             self._write(output_path, output)
             return {"path": str(output_path), "sha256": _sha256_file(output_path)}
 
         stored = self._op(task, run, step, {"script": name, "request": sha256_digest(request)}, execute, replay=replay)
         if not output_path.is_file() or _sha256_file(output_path) != stored["sha256"]:
             raise GovernanceRejected(f"GOVERNANCE_ARTIFACT_CHANGED: {output_path}")
+        # digest가 같은 파일은 plugin.script가 형태를 확인한 출력 그대로다.
         return json.loads(output_path.read_text(encoding="utf-8")), output_path
 
     @staticmethod
@@ -603,7 +825,7 @@ class GovernanceTaskGate:
             "expectedRevision": run.revision, "state": stage_state,
             "output": {"schemaVersion": "1.0.0", "kind": "output", "output": None, "error": error, "artifacts": [
                 {"artifactId": artifact_id, "schemaId": schema_id, "locator": f"{output_file}{pointer}",
-                 # 고정한 플러그인(v1.20.2 기준)은 범위 stage는 16진수만, 수용 근거 stage는 sha256: 접두사만 받는다.
+                 # 범위 stage는 16진수, 수용 근거 stage는 sha256: 접두사로 낸다. 플러그인 stage validator가 받는 형식이다.
                  "digest": f"{'sha256:' if stage_key == 'acceptance' else ''}{digest}",
                  "targetDigest": run.target_digest, "verified": True}
                 for artifact_id, schema_id, pointer in artifacts]},
@@ -623,7 +845,7 @@ class GovernanceTaskGate:
             self._mcp(task, run, "abort", "abort_workflow",
                       {"runId": run.run_id, "expectedRevision": run.revision, "responseMode": "compact"}, None,
                       replay=False)
-        except GovernanceRejected:
+        except (GovernanceRejected, GovernanceContractMismatch):
             pass
 
     # ------------------------------------------------------------ Task 계약 투영
@@ -704,8 +926,24 @@ class GovernanceTaskGate:
         return False, None
 
     # ------------------------------------------------------------ gate 단계
+    def _identity(self, task: Any, key: dict[str, Any], folder: Path, identity: dict[str, Any], *,
+                  replay: bool) -> None:
+        """실행에 쓴 플러그인 bytes의 identity를 gate 키에 한 번 남기고, 달라졌으면 양쪽 값을 남긴 뒤 계속한다."""
+        phase = "before_completion" if replay else "before_execution"
+        stored = self._op(task, key, "plugin_identity", {}, lambda: {
+            "summary": identity["summary"], "labels": identity["labels"],
+            "files": str(self._write(folder / "plugin-identity.json", identity["files"]))}, replay=replay)
+        if stored["summary"] != identity["summary"]:
+            self._op(task, key, f"plugin_identity_changed:{phase}",
+                     {"stored": stored["summary"], "current": identity["summary"]},
+                     lambda: {"stored": stored["summary"], "current": identity["summary"], "labels": identity["labels"],
+                              "files": str(self._write(folder / f"plugin-identity-{phase}.json", identity["files"]))},
+                     replay=False)
+
     def _open(self, task: Any, key: dict[str, Any], *, replay: bool) -> _Run:
         self.steward.ensure_supported()
+        # 계약·환경 확인은 Core 효과와 steward 호출보다 먼저, CoreOperations 밖에서 한다.
+        identity = self.plugin.preflight()
         contract, spec, plan, root = self._task_inputs(task)
         envelope = self._envelope(key, contract, spec, plan)
         writes = envelope["scope"]["included"]
@@ -722,6 +960,7 @@ class GovernanceTaskGate:
                 raise GovernanceRejected(
                     "GOVERNANCE_USER_CHANGE_OVERLAP: 쓰기 target에 이 Goal의 Attempt가 만들지 않은 미커밋 변경이 "
                     f"있습니다: {', '.join(overlaps)}")
+        self._identity(task, key, folder, identity, replay=replay)
         ref = f"refs/flowmarshal/governance/{task['project_id']}/{key['task_id']}/{key['attempt_no']}"
         excluded = (self.service.ledger.artifact_root, self.state_dir)
         c0 = self._op(task, key, "snapshot_c0", {"ref": f"{ref}/c0"}, lambda: {**snapshot_worktree(
@@ -735,10 +974,10 @@ class GovernanceTaskGate:
             replay=replay)
         workflow = self._mcp(task, run, "plan", "plan_workflow", {"schemaVersion": "1.0.0", "taskEnvelope": envelope},
                              observation, replay=replay)
-        stages = {stage["requiredCapability"]: stage for stage in workflow["stages"]}
-        unsupported = sorted(set(stages) - SUPPORTED_CAPABILITIES)
-        if workflow["executionMode"] != "orchestrated" or unsupported:
-            raise GovernanceRejected(f"UNSUPPORTED_PLAN: mode={workflow['executionMode']} stages={unsupported}")
+        stages = {stage["requiredCapability"]: stage for stage in map(_plan_stage, workflow["stages"])}
+        if workflow["executionMode"] != "orchestrated" or set(stages) != SUPPORTED_CAPABILITIES:
+            raise GovernanceContractMismatch("plan_shape", f"orchestrated, stages {sorted(SUPPORTED_CAPABILITIES)}",
+                                             f"{workflow['executionMode']}, stages {sorted(stages)}")
         run.stages = {"baseline": stages["change-scope-baseline-capture"],
                       "implementation": stages["minimal-implementation"],
                       "scope": stages["change-scope-assurance"],
@@ -763,7 +1002,7 @@ class GovernanceTaskGate:
             "responseMode": "compact"}, None, replay=replay)
         run.run_id, run.revision = started["runId"], started["revision"]
         try:
-            run.baseline, baseline_path = self._script(task, run, "baseline", f"{SCOPE_SCRIPTS}/capture-workspace-baseline.mjs", {
+            run.baseline, baseline_path = self._script(task, run, "baseline", "scope-baseline", {
                 "schemaVersion": "1.0.0", "repositoryRoot": str(root), "mode": "capture",
                 "comparisonTarget": "commit", "commit": c0["commit"], "taskEnvelope": envelope}, replay=replay)
             run.target_digest = run.baseline["manifestSha256"]
@@ -809,10 +1048,10 @@ class GovernanceTaskGate:
         self._record(task, run, "implementation", "passed", worker, output_file=implementation,
                      note=f"Worker attempt {attempt['id']} observed via {worker['source']}", replay=False)
 
-        report, report_path = self._script(task, run, "scope", f"{SCOPE_SCRIPTS}/compare-change-scope.mjs", {
+        report, report_path = self._script(task, run, "scope", "scope-compare", {
             "schemaVersion": "1.0.0", "repositoryRoot": str(run.root), "mode": "verify", "comparisonTarget": "commit",
             "commit": c1["commit"], "taskEnvelope": run.envelope, "baseline": run.baseline,
-            "baselineArtifactDigest": run.baseline["manifestSha256"]}, replay=False)
+            "baselineArtifactDigest": run.baseline["manifestSha256"]}, replay=False, verdicts=SCOPE_STATES)
         run.target_digest = report["currentDigest"]
         scope_state = SCOPE_STATES[report["verdict"]]
         observation = self._review(task, run, "scope", run.stages["scope"].get("executionRequirement"), {
@@ -829,7 +1068,8 @@ class GovernanceTaskGate:
             raise GovernanceRejected(f"CHANGE_SCOPE_{report['verdict']}: {report['findings']}")
 
         request = self._acceptance_request(task, run, c1["commit"])
-        acceptance, acceptance_path = self._script(task, run, "acceptance", ACCEPTANCE_CLI, request, replay=False)
+        acceptance, acceptance_path = self._script(task, run, "acceptance", "acceptance-cli", request, replay=False,
+                                                   verdicts=ACCEPTANCE_STATES)
         acceptance_state = ACCEPTANCE_STATES[acceptance["verdict"]]
         observation = self._review(task, run, "acceptance", run.stages["acceptance"].get("executionRequirement"), {
             "question": "각 수용 기준의 판정이 연결된 FlowMarshal 검증 근거와 맞는가?",

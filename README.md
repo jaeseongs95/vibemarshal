@@ -125,11 +125,15 @@ provider 옵션은 하위 명령 앞에 두는 전역 옵션이다.
 활성화 뒤 모든 실행 Task는 agent-governance-suite workflow를 거쳐야 dispatch·완료된다. 플러그인이 없으면 run-once는 실행 Task를 `GOVERNANCE_GATE_REQUIRED`로 멈춘다.
 
 ```powershell
-$env:FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT = "D:\claude\ags-engine-host"
+$env:FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT = "D:\claude\agent-governance-suite"
+$env:FLOWMARSHAL_GOVERNANCE_MODEL_CLASSES = "D:\config\governance-model-classes.json"
 flowmarshal-engine --provider claude --claude-model-catalog D:\config\claude-model-catalog.json run-once --project-id <project-id> --role-config <역할 설정>
 ```
 
-- node 22.13 이상과 `flowmarshal-engine` host adapter가 들어간 플러그인이 필요하다. 현재는 개발 커밋 `98db130`만 고정되어 있고, 플러그인 release 뒤 release 버전·digest 고정으로 바꾼다.
+- node 22.13 이상과, `host-integration.json`과 호스트 중립 서명 CLI가 들어간 플러그인이 필요하다. 그 표면이 들어간 플러그인 release는 아직 없다. Engine은 플러그인을 commit·버전으로 고정하지 않고 manifest에서 진입점을 찾아 실행 전에 확인한다.
+- model class 대응표는 Worker·steward로 관측되는 model 이름마다 플러그인 등급을 적은 JSON이다. 예: `{"format": "flowmarshal-governance-model-classes-v1", "classes": {"<관측되는 model 이름>": "general"}}`. 등급은 `lightweight`·`general`·`deep`·`frontier` 중 하나이고, 표에 없는 모델이 관측되면 멈춘다. 이 값은 사용자가 설정한 주장으로 기록된다.
+- 플러그인·환경이 맞지 않으면 run-once는 `GOVERNANCE_CONTRACT_MISMATCH: <검사 ID>: 기대 …, 관측 …`로 멈추고 Task 상태는 바꾸지 않는다. 플러그인 위치·node·대응표를 고친 뒤 다시 run-once를 실행하면 같은 자리에서 이어 간다. 다만 이미 저장된 플러그인 응답의 형태가 어긋난 경우에는 같은 Attempt에서 같은 불일치가 다시 나온다(known limitation).
+- Engine은 실행에 쓴 플러그인 파일의 sha256과 tree digest를 Task마다 원장에 남긴다. 기록용이며 판정에는 쓰지 않는다. 오래 떠 있는 프로세스는 처음 띄운 플러그인 서버를 계속 쓰므로, 도중에 플러그인 파일을 바꾸면 기록과 실제 실행이 다를 수 있다.
 - 대상 프로젝트는 git 저장소 루트여야 한다. Engine은 작업 트리를 임시 index로 스냅샷 commit에 담아 비교하며 사용자 HEAD·브랜치·index·파일은 바꾸지 않는다. `.git`에는 스냅샷 객체와 `refs/flowmarshal/governance/...` ref가 남는다. 감사가 끝나 필요 없으면 `git for-each-ref --format="%(refname)" refs/flowmarshal/governance`로 찾아 `git update-ref -d <ref>`로 지운다.
 - Task의 쓰기 대상 파일에 이 Goal의 앞 작업이 만들지 않은 미커밋 변경(Goal 전부터 있던 변경이나 Goal 도중 직접 고친 내용)이 있으면 그 Task 시작 전에 `GOVERNANCE_USER_CHANGE_OVERLAP`으로 멈춘다. 변경을 정리하거나 커밋한 뒤 다시 run-once를 실행한다.
 - 판단 보조(steward)는 역할 설정의 `general_reviewer`·`critical_reviewer` 모델을 쓰며 Task마다 추가 호출이 든다.

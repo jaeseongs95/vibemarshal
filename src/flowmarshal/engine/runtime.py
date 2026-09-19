@@ -2081,6 +2081,10 @@ class TaskGatePending(RuntimeError):
     """task gate가 아직 판정하지 못했다. Task 상태를 바꾸지 않고 다음 tick에 다시 묻는다."""
 
 
+class TaskGateContractMismatch(RuntimeError):
+    """task gate가 기대는 외부 계약·환경이 맞지 않는다. Task의 잘못이 아니므로 어느 단계에서도 Task 상태를 바꾸지 않는다."""
+
+
 class EngineDispatcher:
     """원장 우선순위에 따라 호출당 한 상태 단계만 전진시키는 실행기."""
 
@@ -4636,7 +4640,7 @@ class EngineDispatcher:
         return (evidence.evidence_id,), result.validation_result_id
 
     def _task_gate_decision(self, phase: str, task: Any) -> str | RunOnceOutcome | None:
-        """task gate의 차단 사유를 돌려준다. 판정 보류와 효과 미확정은 상태 전이 없이 BLOCKED로 끝낸다."""
+        """task gate의 차단 사유를 돌려준다. 판정 보류·계약 불일치·효과 미확정은 상태 전이 없이 BLOCKED로 끝낸다."""
         if self.task_gate is None:
             return None
         from .operations import ExternalOperationUnknown
@@ -4645,6 +4649,11 @@ class EngineDispatcher:
         except TaskGatePending as pending:
             return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=task["project_id"], task_id=task["id"],
                                   blocker_code="GOVERNANCE_GATE_PENDING", detail=str(pending))
+        except TaskGateContractMismatch as mismatch:
+            # dispatch·완료 두 단계 모두 상태 전이 없이 사유만 남긴다. 같은 사유는 History에 한 번만 남는다.
+            self.service.record_task_gate_block(task_id=task["id"], phase=phase, detail=str(mismatch))
+            return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=task["project_id"], task_id=task["id"],
+                                  blocker_code="GOVERNANCE_CONTRACT_MISMATCH", detail=str(mismatch))
         except ExternalOperationUnknown as error:
             return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=task["project_id"], task_id=task["id"],
                                   blocker_code="EXTERNAL_EFFECT_UNKNOWN", failure_class=FailureClass.EXTERNAL_UNKNOWN,
