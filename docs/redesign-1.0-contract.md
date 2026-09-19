@@ -95,6 +95,14 @@ Engine schema 4는 별도의 새 DB로 만든다. schema 3/raw receipt/history �
 
 제품 기본 provider는 qualification된 v1을 유지한다. v2 static 11/qualification 13과 관련 실제 Goal 경로 근거는 v2 자체 채택 조건이며 모든 제품 실행의 선행조건이 아니다. provider version 사이 임의 fallback이나 checkpoint 재사용을 금지한다.
 
+이와 별개로 runtime provider는 기본 Codex App Server와 명시적 `--provider claude`(Claude Code CLI) 두 가지다. 둘 다 `CodexRuntimePort` 뒤에 두고 자동 fallback을 하지 않으며, Codex 경로의 동작과 run metadata digest는 바꾸지 않는다. Claude의 상세 규칙은 [재설계 문서 7.2](orchestration-redesign.md#72-claude-code-runtime-provider)가 권위다. 요약하면 다음과 같다.
+
+- inventory: 호출자가 주입한 카탈로그를 `configured_catalog` provenance로 투영한다. `model/list` 관측이 아니다. model-lock-v2 실행 잠금에는 실제 실행 파일 digest와 CLI 버전이 들어간 runtime capability를 결속하고, 프로세스 시작 직전 digest와 매 turn init의 CLI 버전을 다시 대조한다. `.cmd`·`.bat`·`.ps1` shim은 거부한다. 카탈로그 원문은 typed 변환 전에 검사하고 원문 순서와 digest를 보존한다.
+- provenance: `permissionMode` 관측은 `provider_observed`, Engine 정책 식별자 `:danger-full-access`/`never`는 `local_derived`다. observed model/effort는 provider echo가 없어 null이다. usage는 성공 result에 `iterations`가 있을 때만 turn 범위로 기록하고 그 밖은 null/unavailable이다. `modelUsage`는 session 누적 원문이다.
+- 실패 분류: `result.permission_denials`가 비어 있지 않은 turn은 `success` result여도 실패다.
+- 격리: 자식 세션은 `--safe-mode`로 CLAUDE.md·auto-memory·plugins·hooks·MCP 상속을 끄고, 프로젝트 `AGENTS.md`는 Context Pack으로 공급한다. 관리자 정책 설정 적용은 known limitation이다.
+- release freeze는 Claude 카탈로그와 Claude 역할 설정 파일의 digest를 결속한다. 결속 추가 뒤 기존 FM-12 wheel과 freeze는 새로 만들어야 하며, 재동결은 별도 작업이다.
+
 패키지는 Engine-only 사용자 CLI와 필요한 shared canonical 자산을 포함한다. legacy/eval/developer 도구는 분리한다. source-tree 평가 도구에는 명시적 source root와 재현 입력 bundle을 요구할 수 있다. wheel에 없는 fixture/config가 있다고 가정하지 않으며 깨끗한 non-editable 설치에서 확인한다.
 
 ## V01. 기능·안전 기반 1.0 필수 검증 — planned / 미실행

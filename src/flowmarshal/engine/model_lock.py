@@ -93,6 +93,13 @@ class ModelInventory(LockModel):
             "runtime_capabilities": self.runtime_capabilities,
         })
 
+    @property
+    def inventory_provenance(self) -> str:
+        """inventory 원문의 출처 label. Claude provider는 호출자가 주입한 카탈로그다."""
+        if self.source.startswith("claude-code:configured-catalog@"):
+            return "configured_catalog"
+        return "model/list"
+
     def supports(self, model: str, effort: str) -> bool:
         return any(item.model == model and effort in item.supported_efforts for item in self.models)
 

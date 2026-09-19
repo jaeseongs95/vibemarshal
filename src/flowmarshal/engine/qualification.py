@@ -102,7 +102,13 @@ from .roles import (
     StructuredRoleError,
     strict_json_output_schema,
 )
-from .runtime import CodexAppServerRuntime
+from .providers import (
+    RuntimeProviderSelection,
+    open_harness_runtime,
+    provider_run_metadata,
+    selection_from_run_metadata,
+)
+from .runtime import CodexAppServerRuntime, CodexRuntimePort
 from .role_execution import use_role_timeout_policy
 from .qualification_manifest import (
     EvidenceProvenance,
@@ -941,6 +947,7 @@ def run_role_fixture(
     role_configuration: EngineRoleConfiguration | None = None,
     codex_bin: Path | str | None = None,
     evaluation_policies: EvaluationPolicies | None = None,
+    runtime_selection: RuntimeProviderSelection | None = None,
 ) -> tuple[Path, ScopeQualificationReport]:
     if evaluation_policies is None:
         raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
@@ -955,8 +962,10 @@ def run_role_fixture(
             encoding="utf-8"
         )
     )
-    with CodexAppServerRuntime(
-        codex_bin=codex_bin, project_binding=evaluation_policies.codex_project
+    with open_harness_runtime(
+        runtime_selection, codex_factory=CodexAppServerRuntime, codex_bin=codex_bin,
+        project_binding=evaluation_policies.codex_project,
+        default_state_root=base / ".flowmarshal-engine-eval" / "claude-threads",
     ) as runtime:
         inventory = runtime.list_models()
         roles.validate_inventory(inventory)
@@ -1004,6 +1013,7 @@ def run_role_fixture(
                 "project_root": str(base),
                 "role_configuration": roles.model_dump(mode="json"),
                 "codex_bin": None if codex_bin is None else str(Path(codex_bin).resolve()),
+                **provider_run_metadata(runtime_selection),
             },
             evaluation_policies,
         )
@@ -1361,7 +1371,7 @@ def _planning_cell(
     scenario: PlanningScenario,
     seed: int,
     fixture_root: Path,
-    runtime: CodexAppServerRuntime,
+    runtime: CodexRuntimePort,
     inventory: ModelInventory,
     roles: EngineRoleConfiguration,
     inspection_provider_contract: PlanInspectionProviderVersion = PLAN_INSPECTION_PROVIDER_V1,
@@ -1741,6 +1751,7 @@ def run_full_planning_pipeline(
     codex_bin: Path | str | None = None,
     inspection_provider_contract: PlanInspectionProviderVersion = PLAN_INSPECTION_PROVIDER_V1,
     evaluation_policies: EvaluationPolicies | None = None,
+    runtime_selection: RuntimeProviderSelection | None = None,
 ) -> tuple[Path, ScopeQualificationReport]:
     if evaluation_policies is None:
         raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
@@ -1756,8 +1767,10 @@ def run_full_planning_pipeline(
     catalog = PlanningScenarioCatalog.load(
         base / "tests" / "fixtures" / "engine" / "planning-scenarios.json"
     )
-    with CodexAppServerRuntime(
-        codex_bin=codex_bin, project_binding=evaluation_policies.codex_project
+    with open_harness_runtime(
+        runtime_selection, codex_factory=CodexAppServerRuntime, codex_bin=codex_bin,
+        project_binding=evaluation_policies.codex_project,
+        default_state_root=base / ".flowmarshal-engine-eval" / "claude-threads",
     ) as runtime:
         inventory = runtime.list_models()
         roles.validate_inventory(inventory)
@@ -1801,6 +1814,7 @@ def run_full_planning_pipeline(
                 "role_configuration": roles.model_dump(mode="json"),
                 "codex_bin": None if codex_bin is None else str(Path(codex_bin).resolve()),
                 "inspection_provider_contract": inspection_provider_contract,
+                **provider_run_metadata(runtime_selection),
             },
             evaluation_policies,
         )
@@ -1987,6 +2001,7 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
     roles = EngineRoleConfiguration.model_validate(metadata["role_configuration"])
     policies = policies_from_metadata(metadata)
     codex_bin = metadata.get("codex_bin")
+    runtime_selection = selection_from_run_metadata(metadata)
     if scope == "role-fixture":
         return run_role_fixture(
             root=base,
@@ -1994,6 +2009,7 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
             role_configuration=roles,
             codex_bin=codex_bin,
             evaluation_policies=policies,
+            runtime_selection=runtime_selection,
         )
     if scope == "full-planning-pipeline":
         _guard_full_planning_resume(
@@ -2008,6 +2024,7 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
                 "inspection_provider_contract", PLAN_INSPECTION_PROVIDER_V1
             ),
             evaluation_policies=policies,
+            runtime_selection=runtime_selection,
         )
     if scope == "project-e2e":
         from .e2e_qualification import run_project_e2e
@@ -2024,5 +2041,6 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
             codex_bin=codex_bin,
             evaluation_policies=policies,
             candidate_wheel=candidate_binding.wheel_path,
+            runtime_selection=runtime_selection,
         )
     raise QualificationRunError(f"지원하지 않는 resume scope입니다: {scope}")

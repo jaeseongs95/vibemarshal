@@ -96,6 +96,14 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 - 부모 prompt나 설정으로 자식 정책을 추정하지 않으며 turn 시작 뒤의 정책 변경을 소급 적용하지 않는다. 전체 권한은 GoalAuthorization·Core 상태 변경 권한이 아니다.
 - `read_only` Goal은 산출물 mutation 계약이지 sandbox profile이 아니다. 응답 보고와 파일 산출물을 구분하고 명시적 파일 요구·금지를 보고 형식으로 대체하지 않는다.
 
+## Claude Code runtime provider
+
+- runtime provider는 기본 Codex App Server와 명시적 `--provider claude`(Claude Code CLI `claude -p` stream-json) 두 가지다. 둘 다 `CodexRuntimePort` 뒤에 두고 provider 사이 자동 fallback을 하지 않는다. Codex 경로의 동작과 run metadata digest는 Claude 추가로 바뀌지 않는다. 이 선택은 plan-inspection provider version(v1/v2)과 별개다.
+- Claude inventory는 호출자가 주입한 `flowmarshal-claude-model-catalog-v1` 카탈로그를 `configured_catalog` provenance로 투영한 것이다. provider 관측이나 지원 증명이 아니다. 카탈로그 원문은 typed 변환 전에 duplicate key·model·effort와 빈/null 값을 거부하고 원문 순서와 bytes digest를 보존한다. model-lock-v2 실행 잠금에는 executable digest와 CLI 버전이 들어간 runtime capability를 결속하며, 프로세스 시작 직전 digest를, 매 turn `system/init`에서 `claude_code_version`·model·session·cwd·`permissionMode`를 다시 대조한다. `.cmd`·`.bat`·`.ps1` shim은 거부한다.
+- 권한은 매 turn `permissionMode=bypassPermissions` 관측(`provider_observed`)으로 확인한다. Engine 정책 식별자 `:danger-full-access`/`never`는 이 관측에서 도출한 `local_derived` 대응값이다. `result.permission_denials`가 비어 있지 않으면 `success` result여도 turn을 실패로 둔다.
+- provider가 effort를 echo하지 않으므로 observed model/effort는 null이다. `result.usage`는 성공 result에 `iterations`가 있을 때만 turn usage로 쓰고, 그 밖은 null/unavailable로 둔다. session 누적인 `modelUsage`는 원문으로만 보존한다.
+- 자식 세션은 `--safe-mode`, 빈 `--setting-sources`, `--strict-mcp-config`로 실행해 전역·프로젝트 CLAUDE.md, auto-memory, plugins, hooks, MCP 상속을 끈다. 필요한 프로젝트 `AGENTS.md`는 Engine Context Pack과 역할 지침으로 공급한다. 관리자 정책 설정은 `--safe-mode`에서도 적용되는 known limitation이다.
+
 ## Planning·검토·모델 배정
 
 ### 후보 탐색
@@ -139,7 +147,7 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 
 ### `flowmarshal-model-lock-v2`
 
-- 실제 모델 이름을 제품 코드에 하드코딩하지 않는다. 실행·검사 역할을 별도로 배정하고 선택 이유·inventory digest·순서 있는 fallback envelope를 Plan에 남긴다. 호출자가 requested model/effort를 주입하며 실제 호출 직전 App Server `model/list`에서 지원 여부를 확인한다. requested/observed model·effort, provider inventory digest, adapter capability digest와 provenance는 원장·receipt·read model에 직렬화한다. provider의 turn별 echo가 없으면 observed 값은 null이고 요청값을 실제 적용 model/effort로 표기하지 않는다.
+- 실제 모델 이름을 제품 코드에 하드코딩하지 않는다. 실행·검사 역할을 별도로 배정하고 선택 이유·inventory digest·순서 있는 fallback envelope를 Plan에 남긴다. 호출자가 requested model/effort를 주입하며 실제 호출 직전 App Server `model/list`에서 지원 여부를 확인한다. Claude runtime provider는 `model/list`가 없으므로 아래 `configured_catalog` 규칙으로 대신한다. requested/observed model·effort, provider inventory digest, adapter capability digest와 provenance는 원장·receipt·read model에 직렬화한다. provider의 turn별 echo가 없으면 observed 값은 null이고 요청값을 실제 적용 model/effort로 표기하지 않는다.
 - 제한 diagnostics의 역할 후보는 prepare의 명시적 외부 설정으로만 주입한다. 절대 입력 경로·선택 이유·원문 bytes와 canonical digest·typed configuration digest·원문 snapshot을 잠그고 실제 호출 전에 재대조한다. 실행 모드에서 설정을 교체하거나 cwd로 다른 입력을 선택하지 않으며, 요청의 역할·선택·fallback 순서와 v2 결속 불일치를 차단한다. 후보 검증을 기본 역할 변경이나 실제 의미 검증 성공으로 승격하지 않는다.
 - 전체 원본 JSON은 typed coercion 전에 검사한다. hidden 행을 포함해 duplicate, 빈/null/잘못된 model·effort와 불완전 pagination을 제거·정규화·생략하지 않고 거부하며 원문 순서와 전체 digest를 감사 evidence로 보존한다.
 - 실행 잠금은 역할별 선택·fallback 조합의 지원 상태, fallback 순서, executable digest와 필요한 runtime capability만 투영한다. 무관한 모델·순서·미사용 effort 변화는 감사 digest만 바꿀 수 있지만 선택·fallback·capability·executable 변화는 새 binding 없이 실행할 수 없다.

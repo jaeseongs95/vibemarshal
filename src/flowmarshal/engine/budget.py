@@ -898,7 +898,7 @@ def record_validator_usage(service: EngineService, attempt_id: str, observation:
                     if observed_model is not None and observed_effort is not None
                     else None
                 ),
-                "provider_inventory": "model/list",
+                "provider_inventory": model_observation.inventory.inventory_provenance,
                 "adapter_capability": "local_operational_binding",
             },
             approval_policy=receipt.response_payload["approval_policy"],

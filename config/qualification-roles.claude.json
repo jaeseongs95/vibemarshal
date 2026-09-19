@@ -1,0 +1,30 @@
+{
+  "normalizer": {
+    "model": "claude-sonnet-5",
+    "effort": "high"
+  },
+  "skeleton_generator": {
+    "model": "claude-sonnet-5",
+    "effort": "high"
+  },
+  "plan_expander": {
+    "model": "claude-sonnet-5",
+    "effort": "high"
+  },
+  "general_reviewer": {
+    "model": "claude-sonnet-5",
+    "effort": "high"
+  },
+  "critical_reviewer": {
+    "model": "claude-opus-5",
+    "effort": "xhigh"
+  },
+  "executor": {
+    "model": "claude-sonnet-5",
+    "effort": "high"
+  },
+  "validator": {
+    "model": "claude-opus-5",
+    "effort": "xhigh"
+  }
+}

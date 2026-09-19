@@ -102,6 +102,24 @@ GoalVerdict가 확정될 때까지 필요한 tick 수는 Plan과 원장 상태�
 | `status` | Core, control, job 상태 조회 |
 | `final-report` | GoalVerdict에 근거한 최종 보고 출력 |
 
+### Claude Code runtime provider
+
+역할·Worker 호출 provider의 기본값은 Codex App Server다. Claude Code CLI를 쓰려면 `--provider claude`와 model/effort 카탈로그를 명시한다. provider 사이 자동 fallback은 없다.
+
+```powershell
+flowmarshal-engine --provider claude --claude-model-catalog D:\config\claude-model-catalog.json --claude-bin C:\Users\<사용자>\.local\bin\claude.exe <명령> ...
+```
+
+provider 옵션은 하위 명령 앞에 두는 전역 옵션이다.
+
+- 카탈로그(`flowmarshal-claude-model-catalog-v1`)는 `model/list`를 대신하는 사용자 설정이며 `configured_catalog`로 기록된다. 예시는 `config/claude-model-catalog.json`, 역할 예시는 `config/qualification-roles.claude.json`이다.
+- `--claude-bin`에는 실제 실행 파일을 준다. `.cmd`·`.bat`·`.ps1` shim은 거부한다. 실행 파일 digest와 `claude --version` 값을 잠그므로 CLI를 업데이트하면 새 binding이 필요하다.
+- 자식 세션은 `--safe-mode`로 실행해 CLAUDE.md·auto-memory·plugins·hooks·MCP를 상속하지 않는다. 프로젝트 `AGENTS.md`는 Engine이 Context로 직접 넣는다.
+- `:danger-full-access`/`never`는 Claude의 `bypassPermissions` 관측에서 도출한 로컬 대응값이다. 도구 거부(`permission_denials`)가 있는 turn은 실패로 처리한다.
+- effort는 provider가 되돌려 주지 않아 observed 값이 비어 있다. usage는 성공 turn에서만 기록하고 확인할 수 없으면 비워 둔다.
+
+세부 규칙은 [재설계 문서 7.2](docs/orchestration-redesign.md#72-claude-code-runtime-provider)에 있다.
+
 `project`, `model`, `goal`, `plan`, `task`, `run`, `attempt`, `validate`, `recover`, `report` 아래에는 진단과 세부 운영을 위한 중첩 명령이 있다. 전체 목록은 `flowmarshal-engine --help`와 각 명령의 `--help`에서 확인할 수 있다. 반복 실행과 재시작·receipt 복구 절차는 [Engine 사용자 workflow](docs/engine-user-workflow.md)에 정리되어 있다.
 
 ## 데이터와 안전 경계

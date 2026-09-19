@@ -84,7 +84,11 @@ from .plan_inspection_provider import (
 from .planning import PlanningError, PlanningSearchOutcome
 from .planning import SkeletonFirstPlanner
 from .planning_recovery import PlanningRecoveryPolicy
-from .runtime import CodexAppServerRuntime, CodexProjectBinding, EngineDispatcher, RuntimePolicyError
+from .providers import add_provider_arguments, open_runtime, selection_from_arguments
+from .runtime import (
+    CodexAppServerRuntime, CodexProjectBinding, CodexRuntimePort, EngineDispatcher,
+    RuntimePolicyError,
+)
 from .validation_execution import GoalValidationRetryRequest
 from .roles import CodexStructuredRoleRunner, RoleCallReceipt, StructuredRoleError
 from .reporting import render_final
@@ -180,7 +184,7 @@ def _cmd_config_init(arguments: argparse.Namespace) -> None:
 def _application(
     arguments: argparse.Namespace,
     *,
-    runtime: CodexAppServerRuntime | None = None,
+    runtime: CodexRuntimePort | None = None,
 ) -> EngineApplication:
     return EngineApplication(
         _service(arguments),
@@ -853,18 +857,26 @@ def _cmd_task_materialize(arguments: argparse.Namespace) -> None:
     _emit({"task_id": spec.task_id, "execution_spec_digest": spec.definition_digest})
 
 
-def _runtime(arguments: argparse.Namespace) -> CodexAppServerRuntime:
+def _runtime(arguments: argparse.Namespace) -> CodexRuntimePort:
+    selection = selection_from_arguments(
+        arguments, default_state_root=Path(arguments.artifacts) / "claude-threads",
+    )
     binding_path = getattr(arguments, "codex_project_binding", None)
-    if binding_path is not None:
-        return CodexAppServerRuntime(
-            codex_bin=arguments.codex_bin,
-            project_binding=CodexProjectBinding.model_validate(_json(binding_path)),
-        )
-    return CodexAppServerRuntime(codex_bin=arguments.codex_bin)
+    project_binding = (
+        None if binding_path is None
+        else CodexProjectBinding.model_validate(_json(binding_path))
+    )
+    if selection.provider == "codex":
+        if project_binding is not None:
+            return CodexAppServerRuntime(
+                codex_bin=selection.codex_bin, project_binding=project_binding,
+            )
+        return CodexAppServerRuntime(codex_bin=selection.codex_bin)
+    return open_runtime(selection, project_binding=project_binding)
 
 
 def _wait_dispatched_turn(
-    service: EngineService, runtime: CodexAppServerRuntime, attempt_id: str | None
+    service: EngineService, runtime: CodexRuntimePort, attempt_id: str | None
 ) -> None:
     if attempt_id is None:
         return
@@ -1259,6 +1271,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--codex-project-binding", help="새 역할·Worker thread의 App Server 프로젝트 결속 JSON")
     parser.add_argument("--db", default=str(Path.cwd() / ".flowmarshal-engine" / DEFAULT_DB_NAME))
     parser.add_argument("--artifacts", default=str(Path.cwd() / ".flowmarshal-engine" / DEFAULT_ARTIFACT_DIRECTORY))
+    add_provider_arguments(parser)
     commands = parser.add_subparsers(dest="command", required=True)
 
     config = commands.add_parser(

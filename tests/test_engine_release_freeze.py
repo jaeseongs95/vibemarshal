@@ -8,7 +8,7 @@ import zipfile
 from pathlib import Path
 from unittest.mock import patch
 
-from flowmarshal.canonical import sha256_digest
+from flowmarshal.canonical import sha256_bytes, sha256_digest
 from flowmarshal.engine import release_freeze as rf
 from flowmarshal.engine.model_lock import RUNTIME_CAPABILITIES, ModelCapability, ModelInventory
 from flowmarshal.engine.qualification import default_role_configuration, project_root
@@ -41,6 +41,25 @@ def _inventory_with_executable(path: Path) -> ModelInventory:
             "runtime_capabilities": tuple(RUNTIME_CAPABILITIES),
         }
     )
+
+
+def _current_source_candidate(destination: Path) -> None:
+    """FM-12 wheel의 metadata에 현재 source product bytes를 넣은 테스트 전용 후보를 만든다.
+
+    고정 FM-12 wheel은 built_from 이후의 source 변경과 비교하면 항상 달라진다. 이 테스트는
+    freeze 도구 자체를 검사하므로 wheel·source 일치 조건을 현재 bytes로 재현한다.
+    release 후보나 재동결 evidence가 아니다.
+    """
+
+    expected = rf._expected_source_product_files(ROOT)
+    with zipfile.ZipFile(FM12_WHEEL) as source, \
+         zipfile.ZipFile(destination, "w", zipfile.ZIP_DEFLATED) as out:
+        for name in source.namelist():
+            if name.startswith("flowmarshal/") and not name.endswith("/"):
+                continue
+            out.writestr(name, source.read(name))
+        for name in sorted(expected):
+            out.writestr(name, (ROOT / "src" / name).read_bytes())
 
 
 def _patched_git(clean: bool):
@@ -79,7 +98,7 @@ class ReleaseFreezeBuildTests(unittest.TestCase):
         cls.temp = tempfile.TemporaryDirectory()
         cls.work = Path(cls.temp.name)
         cls.wheel_copy = cls.work / "candidate.whl"
-        shutil.copyfile(FM12_WHEEL, cls.wheel_copy)
+        _current_source_candidate(cls.wheel_copy)
         cls.inventory_path = cls.work / "inventory-with-executable.json"
         cls.inventory_path.write_text(
             _inventory_with_executable(INVENTORY_PATH).model_dump_json(indent=2) + "\n",
@@ -162,12 +181,34 @@ class ReleaseFreezeBuildTests(unittest.TestCase):
         self.assertEqual(manifest.lane_lock("role").expected_cell_count, 48)
         self.assertEqual(manifest.lane_lock("planning").expected_cell_count, 18)
         self.assertTrue(manifest.isolation_preflight.passed)
+        for name in ("config/claude-model-catalog.json", "config/qualification-roles.claude.json"):
+            self.assertEqual(
+                sha256_bytes((ROOT / name).read_bytes()), manifest.inputs.config_file_digests[name], name,
+            )
 
         with patch.object(rf, "source_manifest_files", wraps=rf.source_manifest_files):
             result = rf.verify_release_freeze(destination, source_root=ROOT, candidate_wheel=self.wheel_copy)
         self.assertTrue(result.valid, result.mismatches)
         self.assertFalse(result.refreeze_required)
         self.assertEqual((), result.mismatches)
+
+    def test_claude_config_change_detected_at_verify(self) -> None:
+        destination = self.work / "freeze-for-claude-config"
+        self._build(destination=destination, wheel=self.wheel_copy, clean=True)
+        original_read_bytes = Path.read_bytes
+
+        for name in ("config/claude-model-catalog.json", "config/qualification-roles.claude.json"):
+            target = (ROOT / name).resolve()
+
+            def drifted(path: Path, target=target) -> bytes:
+                data = original_read_bytes(path)
+                return data + b"\n" if path.resolve() == target else data
+
+            with patch.object(Path, "read_bytes", drifted):
+                result = rf.verify_release_freeze(destination, source_root=ROOT)
+            self.assertFalse(result.valid, name)
+            self.assertIn("RELEASE_FREEZE_CONFIG_DIGEST_MISMATCH", result.mismatches)
+            self.assertTrue(result.refreeze_required)
 
     def test_tampered_wheel_bytes_rejected_at_build(self) -> None:
         tampered = self.work / "tampered.whl"

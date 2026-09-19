@@ -57,6 +57,7 @@ from .release_freeze import (
     verify_release_freeze,
 )
 from .roles import StructuredRoleError
+from .providers import add_provider_arguments, selection_from_arguments
 from .runtime import RuntimePolicyError
 from .evaluation_budget import (
     EvaluationPolicies,
@@ -127,31 +128,37 @@ def _run(arguments: argparse.Namespace) -> int:
     else:
         roles = _roles(arguments.role_config, root)
         policies = _evaluation_policies(arguments)
+        selection = selection_from_arguments(arguments)
+        runtime_selection = None if selection.provider == "codex" else selection
+        codex_bin = arguments.codex_bin if runtime_selection is None else None
         if arguments.scope == "role-fixture":
             run_root, report = run_role_fixture(
                 root=root,
                 run_root=destination,
                 role_configuration=roles,
-                codex_bin=arguments.codex_bin,
+                codex_bin=codex_bin,
                 evaluation_policies=policies,
+                runtime_selection=runtime_selection,
             )
         elif arguments.scope == "full-planning-pipeline":
             run_root, report = run_full_planning_pipeline(
                 root=root,
                 run_root=destination,
                 role_configuration=roles,
-                codex_bin=arguments.codex_bin,
+                codex_bin=codex_bin,
                 inspection_provider_contract=arguments.inspection_contract,
                 evaluation_policies=policies,
+                runtime_selection=runtime_selection,
             )
         else:
             run_root, report = run_project_e2e(
                 root=root,
                 run_root=destination,
                 role_configuration=roles,
-                codex_bin=arguments.codex_bin,
+                codex_bin=codex_bin,
                 evaluation_policies=policies,
                 candidate_wheel=arguments.candidate_wheel,
+                runtime_selection=runtime_selection,
             )
     _emit(
         {
@@ -581,6 +588,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("--run-root")
     run.add_argument("--role-config")
     run.add_argument("--codex-bin")
+    add_provider_arguments(run)
     run.add_argument(
         "--candidate-wheel",
         help="project-e2e에서 검증할 non-editable 설치 candidate wheel의 절대경로",

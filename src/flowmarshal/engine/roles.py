@@ -850,7 +850,7 @@ class CodexStructuredRoleRunner:
                     if observed_model is not None and observed_effort is not None
                     else None
                 ),
-                "provider_inventory": "model/list",
+                "provider_inventory": observed_binding.inventory.inventory_provenance,
                 "adapter_capability": "local_operational_binding",
             },
             inventory_digest=request.inventory_digest,

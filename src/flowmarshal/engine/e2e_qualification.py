@@ -107,6 +107,11 @@ from .qualification_manifest import (
     verify_candidate_wheel_installation,
     verify_candidate_wheel_metadata,
 )
+from .providers import (
+    RuntimeProviderSelection,
+    open_harness_runtime,
+    provider_run_metadata,
+)
 from .runtime import (
     CodexAppServerRuntime,
     CodexProjectBinding,
@@ -1582,11 +1587,17 @@ def _live_restart_resume(
     codex_bin: Path | str | None,
     roles: EngineRoleConfiguration | None = None,
     project_binding: CodexProjectBinding | None = None,
+    runtime_selection: RuntimeProviderSelection | None = None,
+    claude_state_root: Path | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """실제 App Server 연결과 Core 인스턴스를 닫은 뒤 같은 저장 turn을 재관측한다."""
 
     journal = cell_root / "runtime-receipts.json"
-    with CodexAppServerRuntime(codex_bin=codex_bin, project_binding=project_binding) as first_runtime:
+    with open_harness_runtime(
+        runtime_selection, codex_factory=CodexAppServerRuntime, codex_bin=codex_bin,
+        project_binding=project_binding,
+        default_state_root=claude_state_root or cell_root / "claude-threads",
+    ) as first_runtime:
         recorded = RecordedRuntime(first_runtime, journal=journal)
         application = EngineApplication(
             prepared.service,
@@ -1643,7 +1654,11 @@ def _live_restart_resume(
         evaluation_contract_digest=contract.contract_digest,
         fixture_digest=fixture_digest,
     )
-    with CodexAppServerRuntime(codex_bin=codex_bin, project_binding=project_binding) as second_runtime:
+    with open_harness_runtime(
+        runtime_selection, codex_factory=CodexAppServerRuntime, codex_bin=codex_bin,
+        project_binding=project_binding,
+        default_state_root=claude_state_root or cell_root / "claude-threads",
+    ) as second_runtime:
         recorded = RecordedRuntime(second_runtime, journal=journal)
         restart_index = len(recorded.events)
         restarted = EngineApplication(
@@ -1971,6 +1986,7 @@ def run_project_e2e(
     codex_bin: Path | str | None = None,
     evaluation_policies: EvaluationPolicies | None = None,
     candidate_wheel: Path | str | None = None,
+    runtime_selection: RuntimeProviderSelection | None = None,
 ) -> tuple[Path, ScopeQualificationReport]:
     if evaluation_policies is None:
         raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
@@ -1986,8 +2002,10 @@ def run_project_e2e(
         raise QualificationRunError("; ".join(preflight_failures))
     roles = role_configuration or default_role_configuration(base)
     source_digest = _project_e2e_fixture_source_digest(base)
-    with CodexAppServerRuntime(
-        codex_bin=codex_bin, project_binding=evaluation_policies.codex_project
+    with open_harness_runtime(
+        runtime_selection, codex_factory=CodexAppServerRuntime, codex_bin=codex_bin,
+        project_binding=evaluation_policies.codex_project,
+        default_state_root=base / ".flowmarshal-engine-eval" / "claude-threads",
     ) as real_runtime:
         inventory = real_runtime.list_models()
         roles.validate_inventory(inventory)
@@ -2028,6 +2046,7 @@ def run_project_e2e(
                 "codex_bin": None if codex_bin is None else str(Path(codex_bin).resolve()),
                 "candidate_wheel_binding": candidate_binding.model_dump(mode="json"),
                 "candidate_wheel_binding_digest": candidate_binding.binding_digest,
+                **provider_run_metadata(runtime_selection),
             },
             evaluation_policies,
         )
@@ -2100,6 +2119,8 @@ def run_project_e2e(
                             codex_bin=codex_bin,
                             roles=roles,
                             project_binding=evaluation_policies.codex_project,
+                            runtime_selection=runtime_selection,
+                            claude_state_root=base / ".flowmarshal-engine-eval" / "claude-threads",
                         )
                 else:
                     with use_role_timeout_policy(evaluation_policies.role_timeouts):
@@ -2116,7 +2137,7 @@ def run_project_e2e(
                     events = recorded.events
                 model_observation = _checkpoint_model_observation(events)
                 receipt = {
-                    "runtime": "CodexAppServerRuntime",
+                    "runtime": type(real_runtime).__name__,
                     "actual_model": model_observation["actual_model"],
                     "actual_effort": model_observation["actual_effort"],
                     "model_observation": model_observation,

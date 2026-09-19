@@ -646,7 +646,10 @@ def _provider_receipt_projection(
                     if observed_model is not None and observed_effort is not None
                     else None
                 ),
-                "provider_inventory": "model/list" if receipt.observed_binding is not None else None,
+                "provider_inventory": (
+                    receipt.observed_binding.inventory.inventory_provenance
+                    if receipt.observed_binding is not None else None
+                ),
                 "adapter_capability": "local_operational_binding" if receipt.observed_binding is not None else None,
             },
             runner_receipt_digest=runner_digest, input_tokens=values[0], cached_input_tokens=values[1],

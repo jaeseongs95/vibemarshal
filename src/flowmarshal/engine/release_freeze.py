@@ -48,11 +48,13 @@ COMMIT_PATTERN = r"^[0-9a-f]{40}$"
 FORMAT = "flowmarshal.release-freeze.v1"
 
 CONFIG_FILES: tuple[str, ...] = (
+    "config/claude-model-catalog.json",
     "config/legacy-freeze-manifest.json",
     "config/pre-1.0-performance-thresholds.json",
     "config/pre-1.0-role-timeouts.json",
     "config/pre-1.0-validation-budget.json",
     "config/qualification-finding-taxonomy.json",
+    "config/qualification-roles.claude.json",
     "config/qualification-roles.json",
     "config/qualification-suite.json",
 )

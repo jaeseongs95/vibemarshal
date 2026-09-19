@@ -338,6 +338,22 @@ runtime capability는 adapter가 사용하는 `thread/start`, `turn/start`, `thr
 
 전체 권한은 Planner나 Worker가 Core 상태를 변경할 수 있다는 뜻이 아니다. 권위 경계는 축소 OS sandbox가 아니라 typed 입력·출력, Core capability 미제공, digest와 receipt 검증으로 유지한다.
 
+### 7.2 Claude Code runtime provider
+
+runtime provider는 기본 Codex App Server와 명시적 `--provider claude`로 고르는 Claude Code CLI 두 가지다. Claude adapter도 `CodexRuntimePort` 계약(thread 생성·turn 시작·관측·저장 관측·resume·interrupt)을 구현하며, 한 thread는 `claude -p` stream-json 프로세스 하나를 유지한다. provider 사이 자동 fallback은 없고, Codex 경로의 동작과 run metadata digest는 바뀌지 않는다. Claude run metadata에는 provider 이름과 카탈로그 원문 digest를 더한다. 이 선택은 plan-inspection provider version(v1/v2)과 별개다.
+
+Claude Code에는 `model/list`가 없다. inventory는 호출자가 주입한 `flowmarshal-claude-model-catalog-v1` 카탈로그를 `configured_catalog` provenance로 투영한다. 카탈로그는 provider 관측이 아니며 조합의 실제 지원을 증명하지 않는다. 7.1의 원문 검사 원칙을 그대로 적용해 typed 변환 전에 duplicate JSON key·model·effort, 빈/null 값과 선언 밖 field를 거부하고 원문 순서와 bytes digest(`catalogSourceSha256`)를 보존한다. v2 실행 잠금의 executable digest는 실제 `claude` 실행 파일의 digest이고, runtime capability 계약에는 `claude --version`으로 읽은 CLI 버전을 넣는다. 따라서 CLI 버전이나 실행 파일이 바뀌면 새 binding이 필요하다. adapter는 프로세스를 띄우기 직전 실행 파일 digest를 다시 계산하고(`CLAUDE_EXECUTABLE_CHANGED`), 매 turn `system/init`의 `claude_code_version`을 잠금 값과 대조한다(`CLAUDE_CLI_VERSION_MISMATCH`). `cmd.exe`를 거치는 `.cmd`·`.bat`·`.ps1` shim은 명령줄 한도와 인자 재해석 때문에 거부한다.
+
+매 turn `system/init`의 session·cwd·model과 `permissionMode=bypassPermissions`를 관측해 결속하고, 다르면 프로세스를 종료하고 turn을 거부한다. receipt의 `:danger-full-access`/`never`는 이 관측에서 로컬로 도출한 대응값이므로 `permission_profile_provenance`·`approval_policy_provenance=local_derived`로, `provider_permission_mode`는 `provider_observed`로 기록한다. `--permission-prompts none`에서는 승인이 필요한 도구가 조용히 거부되고 result는 `success`로 끝난다. 그래서 `result.permission_denials`가 비어 있지 않으면 turn을 `failed`(`CLAUDE_PERMISSION_DENIED`)로 둔다. 저장 기록에는 구조화 거부 필드가 없어 CLI 거부 문구의 접두어로만 판정할 수 있으므로, live result의 `permission_denials`를 우선 근거로 쓴다.
+
+turn ID는 provider가 되돌려준 user 메시지 uuid(`--replay-user-messages`)다. 2.1.277 실측에서 같은 프로세스의 모든 turn(첫 turn 포함)은 `system/init` 다음에 replay user를 냈고, 저장 기록의 user uuid와 같았다. replay가 없으면 client uuid 등으로 대체하지 않고 `CLAUDE_TURN_START_UNCONFIRMED`로 멈춘다.
+
+provider는 effort를 echo하지 않으므로 observed model/effort는 null이고 응답 모델은 진단 필드 `provider_reported_models`로만 둔다. usage는 `result.usage`의 제공 구성요소만 투영하고 total을 만들지 않는다. 실측에서 성공 result의 `usage`는 turn마다 따로 나오고 `iterations`에 API 호출이 기록됐지만, interrupt로 끝난 result는 모든 값이 0이고 `iterations`가 비어 있었다. 따라서 성공 result에 `iterations`가 있을 때만 `usage_scope=turn`으로 기록하고 나머지는 usage를 null, scope를 `unavailable`로 두며 판단 근거를 `usage_scope_basis`에 남긴다. `modelUsage`는 session 누적이므로 `provider_model_usage_scope=session_cumulative` 원문으로만 보존한다.
+
+자식 세션은 `--safe-mode`, 빈 `--setting-sources`, `--strict-mcp-config`로 실행한다. `--safe-mode`는 CLAUDE.md·skills·plugins·hooks·MCP 등 사용자 설정을 끄며, 실측에서 프로젝트 CLAUDE.md와 auto-memory가 모두 상속되지 않았다. `--safe-mode` 없이 빈 `--setting-sources`만 쓰면 auto-memory가 상속됐다. 필요한 프로젝트 `AGENTS.md`는 5.3 Context Pack의 필수 정책과 역할 지침으로 Engine이 직접 공급한다. 관리자 정책(policy) 설정은 `--safe-mode`에서도 적용되므로 known limitation으로 남긴다.
+
+release freeze는 `config/claude-model-catalog.json`과 `config/qualification-roles.claude.json`의 bytes digest를 다른 qualification 설정과 함께 결속한다. 이 결속 추가만으로 기존 freeze를 다시 만들지 않는다.
+
 localhost와 인터넷을 일괄 차단하지 않는다. Task가 필요한 연결과 외부 효과를 계약에 표시한다. 배포·삭제·공개·외부 메시지·권한 확대처럼 비가역적이거나 제3자에게 영향을 주는 효과만 실행 직전 checkpoint를 둔다.
 
 ## 8. 원장과 상태 전이

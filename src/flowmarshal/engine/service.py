@@ -5988,7 +5988,7 @@ class EngineService:
                         if observed_model is not None and observed_effort is not None
                         else None
                     ),
-                    "provider_inventory": "model/list",
+                    "provider_inventory": model_observation.inventory.inventory_provenance,
                     "adapter_capability": "local_operational_binding",
                 },
                 permission_profile=start["permission_profile"], approval_policy=start["approval_policy"],
