@@ -396,6 +396,24 @@ class GovernanceGateTests(MultitaskGateHarness):
         self.assertEqual("blocked", self.statuses()["task_fix_add"])
         self.assertEqual([], self.history("task.retry_enabled"))
 
+    def test_repair_reopens_when_the_worker_deleted_its_target_and_recorded_the_absence(self) -> None:
+        from flowmarshal.engine.service import latest_write_observation
+
+        # Worker가 쓰기 target을 지우고 성공 terminal로 끝나면 Attempt는 실패하고 after_digest null 관측이 남는다.
+        recovered = self.drive(self.gate(), {"task_fix_add": lambda root: (root / "app.py").unlink()},
+                               stop=lambda outcome: outcome.action is RunOnceAction.RECOVERED)
+        self.assertEqual(RunOnceAction.RECOVERED, recovered.action, recovered.detail)
+        with self.prepared.service.ledger.read() as connection:
+            attempt = connection.execute(
+                "SELECT id, status FROM attempts WHERE task_id = ? AND kind = 'execution'",
+                (self.prepared.task_ids["task_fix_add"],)).fetchone()
+            observed = latest_write_observation(connection, attempt["id"], "app.py")
+        self.assertEqual("failed", attempt["status"])
+        # 기록된 부재(null)가 지금의 부재와 같으므로 Engine 변경이다. 예외 없이 새 Execution Spec 준비로 연다.
+        self.assertEqual((True, None), observed)
+        self.assertEqual("ready", self.statuses()["task_fix_add"])
+        self.assertTrue(self.history("task.retry_enabled")[-1]["execution_spec_refresh"])
+
     def test_task_repair_keeps_the_recheck_error_for_an_unreadable_input(self) -> None:
         from unittest import mock
 
