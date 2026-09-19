@@ -510,6 +510,77 @@ class EngineFm08RecoveryIntegrationTests(unittest.TestCase):
             [item["attempt_id"] for item in after["recovery"]["assessments"]],
         )
 
+    def test_repair_after_the_worker_wrote_its_target_prepares_a_new_spec_and_finishes(self) -> None:
+        """Worker가 쓰기 target을 바꾼 뒤 실패해도 같은 spec의 STALE로 멈추지 않고 새 Execution Spec으로 끝까지 간다."""
+
+        task_id = self._prepare()
+        self._authorize()
+        first_attempt, first_binding = self._dispatch_worker(task_id)
+        self.app_file.write_text("value = 3\n", encoding="utf-8")
+        self._fail_worker(first_attempt, first_binding, response="구현이 요구를 만족하지 못했습니다.",
+                          error_code="IMPLEMENTATION_ERROR")
+
+        recovered = self._run_until(RunOnceAction.RECOVERED)
+        self.assertIn("새 ExecutionSpec", recovered.detail)
+        self._queue_execution_preparation(task_id)
+        self._run_until(RunOnceAction.MATERIALIZED)
+        second = self.application.run_once(self.project_id)
+        self.assertEqual(RunOnceAction.DISPATCHED, second.action, second)
+        second_binding = self._worker_binding(second.attempt_id)
+        self.app_file.write_text("value = 2\n", encoding="utf-8")
+        self.runtime.complete(second_binding.thread_id, response="repair complete")
+        self._run_until(RunOnceAction.VALIDATED)
+        self._queue_goal_validation(task_id)
+        completed = self._run_until(RunOnceAction.COMPLETED)
+        if completed.goal_verdict_id is None:
+            completed = self._run_until(RunOnceAction.COMPLETED)
+        report = self.application.final_report(self.project_id, goal_verdict_id=completed.goal_verdict_id)
+        self.assertEqual("satisfied", report.verdict.status.value)
+
+        with self.service.ledger.read() as connection:
+            specs = connection.execute(
+                "SELECT COUNT(*) FROM execution_spec_revisions WHERE task_id=?", (task_id,)
+            ).fetchone()[0]
+            attempts = connection.execute(
+                "SELECT attempt_no,status FROM attempts WHERE task_id=? AND kind='execution' ORDER BY attempt_no",
+                (task_id,),
+            ).fetchall()
+            retry = json.loads(connection.execute(
+                "SELECT payload_json FROM history_events WHERE entity_id=? AND event_type='task.retry_enabled'",
+                (task_id,),
+            ).fetchone()[0])
+        self.assertEqual(2, specs)
+        self.assertEqual([(1, "failed"), (2, "succeeded")], [tuple(row) for row in attempts])
+        self.assertTrue(retry["execution_spec_refresh"])
+
+    def test_repair_stops_when_an_input_outside_the_write_targets_changed(self) -> None:
+        """재시도 입력 중 쓰기 target이 아닌 원본이 바뀌면 재관측으로 흡수하지 않고 멈춘다."""
+
+        task_id = self._prepare()
+        self._authorize()
+        first_attempt, first_binding = self._dispatch_worker(task_id)
+        self._fail_worker(first_attempt, first_binding, response="구현이 요구를 만족하지 못했습니다.",
+                          error_code="IMPLEMENTATION_ERROR")
+        (self.root / "AGENTS.md").write_text("사용자가 고친 지침\n", encoding="utf-8")
+        with self.service.ledger.read() as connection:
+            maps_before = connection.execute(
+                "SELECT COUNT(*) FROM project_map_revisions WHERE project_id=?", (self.project_id,)
+            ).fetchone()[0]
+
+        blocked = self._run_until(RunOnceAction.BLOCKED)
+        self.assertEqual("REPAIR_INPUT_CHANGED", blocked.blocker_code, blocked)
+        self.assertIn("AGENTS.md", blocked.detail)
+        again = self.application.run_once(self.project_id)
+        self.assertEqual("REPAIR_INPUT_CHANGED", again.blocker_code, again)
+        with self.service.ledger.read() as connection:
+            status = connection.execute("SELECT status FROM task_contracts WHERE id=?", (task_id,)).fetchone()[0]
+            maps_after = connection.execute(
+                "SELECT COUNT(*) FROM project_map_revisions WHERE project_id=?", (self.project_id,)
+            ).fetchone()[0]
+        self.assertEqual("failed", status)
+        self.assertEqual(maps_before, maps_after)
+        self.assertEqual(0, self._ledger_counts()["recovery_history"])
+
     def test_subgraph_replan_is_reviewed_activated_and_finishes_through_the_facade(self) -> None:
         """C1-b: task_contract 실패가 사용자 경로에서 실제 subgraph replan으로 복구된다."""
 

@@ -3174,11 +3174,19 @@ class EngineDispatcher:
             self.service.record_recovery_assessment(project_id, assessment)
 
         if assessment.action in {RepairAction.TASK_REPAIR, RepairAction.CONTINUE}:
-            self.service.retry_task(
-                task_id=task_id,
-                recovery_assessment=assessment,
-                failed_validation_result_id=validation_result_id,
-            )
+            try:
+                status = self.service.retry_task(
+                    task_id=task_id,
+                    recovery_assessment=assessment,
+                    failed_validation_result_id=validation_result_id,
+                )
+            except EngineServiceError as error:
+                if not str(error).startswith("REPAIR_INPUT_CHANGED"):
+                    raise
+                # 사용자 변경은 재관측으로 흡수하지 않는다. Task 상태는 그대로 두고 사유만 돌려준다.
+                return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=project_id, task_id=task_id,
+                                      attempt_id=attempt_id, validation_result_id=validation_result_id,
+                                      blocker_code="REPAIR_INPUT_CHANGED", detail=str(error))
             return RunOnceOutcome(
                 action=RunOnceAction.RECOVERED,
                 project_id=project_id,
@@ -3187,7 +3195,10 @@ class EngineDispatcher:
                 validation_result_id=validation_result_id,
                 evidence_ids=assessment.new_evidence_ids,
                 detail=(
-                    "원장 생성 assessment로 동일 Task repair를 활성화했습니다. 다음 실행은 새 Attempt입니다."
+                    "직전 Attempt가 바꾼 쓰기 target 때문에 입력이 stale해 재관측 뒤 새 ExecutionSpec으로 "
+                    "repair를 준비합니다."
+                    if status == "ready"
+                    else "원장 생성 assessment로 동일 Task repair를 활성화했습니다. 다음 실행은 새 Attempt입니다."
                     if assessment.action is RepairAction.TASK_REPAIR
                     else (
                         "직접 관측된 일시 실패 code를 근거로 원장 한도 안에서 같은 "
@@ -3370,22 +3381,28 @@ class EngineDispatcher:
             ).fetchone()
             if task is None:
                 raise EngineServiceError("Execution Spec 준비 Task가 없습니다.")
-            checkpoint = (
+            prefix = (
                 f"execution_spec_prepare:{task['plan_revision_id']}:{task_id}:"
                 f"{sha256_digest(task['updated_at'])}:"
-                f"{sha256_digest(supplied_proposal) if supplied_proposal is not None else 'provider'}"
+            )
+            checkpoint = prefix + (
+                sha256_digest(supplied_proposal) if supplied_proposal is not None else "provider"
             )
             if supplied_proposal is None:
                 # 이전 tick이 caller-supplied proposal과 inventory를 이미 job에
                 # 결속했다면 후속 tick은 같은 입력을 다시 요구하지 않고 소비한다.
+                # repair·context 복구로 Task를 다시 연 뒤(updated_at 변경)의 옛 준비 결과는 쓰지 않는다.
                 row = connection.execute(
                     "SELECT * FROM runtime_jobs WHERE project_id=? AND task_id=? "
-                    "AND kind=? AND status <> ? ORDER BY created_at DESC,rowid DESC LIMIT 1",
+                    "AND kind=? AND status <> ? AND substr(checkpoint_key, 1, ?) = ? "
+                    "ORDER BY created_at DESC,rowid DESC LIMIT 1",
                     (
                         project_id,
                         task_id,
                         RuntimeJobKind.EXECUTION_SPEC_PREPARE.value,
                         RuntimeJobStatus.CANCELLED.value,
+                        len(prefix),
+                        prefix,
                     ),
                 ).fetchone()
             else:

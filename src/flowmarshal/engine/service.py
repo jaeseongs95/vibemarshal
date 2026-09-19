@@ -146,6 +146,26 @@ def _same_assignment(left: Any, right: Any) -> bool:
         return False
 
 
+def latest_write_observation(connection: Any, attempt_id: str, path: str) -> tuple[bool, str | None]:
+    """Attempt가 path에 남긴 가장 최근 쓰기 관측(file·diff evidence)의 after_digest를 돌려준다.
+
+    Worker 결과와 그 뒤 deterministic validation 관측이 같은 Attempt에 쌓이므로 최신 기록을 쓴다.
+    관측이 없으면(Worker가 결과를 남기지 못하고 실패) ``(False, None)``이다. Core repair와
+    governance gate가 이 한 정의로 Engine 변경을 판정한다.
+    """
+
+    rows = connection.execute(
+        "SELECT observation FROM evidence_records WHERE attempt_id = ? AND source_ref = ? "
+        "AND kind IN ('file', 'diff') ORDER BY rowid DESC",
+        (attempt_id, path),
+    ).fetchall()
+    for row in rows:
+        observed = json.loads(row["observation"])
+        if observed.get("access") != "read":
+            return True, observed.get("after_digest")
+    return False, None
+
+
 class EngineService:
     """FlowMarshal Engine에서 권위 상태를 전이할 수 있는 유일한 서비스."""
 
@@ -2414,8 +2434,8 @@ class EngineService:
         new_evidence_ids: tuple[str, ...] = (),
         recovery_assessment: RecoveryAssessment | None = None,
         failed_validation_result_id: str | None = None,
-    ) -> None:
-        """동일 TaskContract 범위의 재시도만 다시 materialized 상태로 연다."""
+    ) -> str:
+        """동일 TaskContract 범위의 재시도만 다시 연다. 연 상태(materialized 또는 ready)를 돌려준다."""
 
         with self.ledger.transaction() as tx:
             task = tx.one("SELECT * FROM task_contracts WHERE id = ?", (task_id,))
@@ -2499,14 +2519,17 @@ class EngineService:
                     f"TaskContract가 {failure.value} 실패의 동일 Task 재시도를 허용하지 않습니다."
                 )
             current_spec = tx.one(
-                "SELECT definition_digest FROM execution_spec_revisions WHERE task_id = ? AND is_current = 1",
+                "SELECT * FROM execution_spec_revisions WHERE task_id = ? AND is_current = 1",
                 (task_id,),
             )
             if failure is FailureClass.CONTEXT and current_spec["definition_digest"] == attempt["execution_spec_digest"]:
                 raise EngineServiceError("context 실패는 새 ExecutionSpec revision을 먼저 만들어야 합니다.")
+            # 입력이 그대로면 같은 spec으로, 직전 Attempt의 쓰기로 stale해졌으면 재관측 뒤 새 spec으로 준비한다.
+            refresh = self._repair_input_stale(tx, task, current_spec, attempt)
+            status = "ready" if refresh else "materialized"
             tx.connection.execute(
-                "UPDATE task_contracts SET status = 'materialized', updated_at = ? WHERE id = ?",
-                (tx.now, task_id),
+                "UPDATE task_contracts SET status = ?, updated_at = ? WHERE id = ?",
+                (status, tx.now, task_id),
             )
             tx.history(
                 task["project_id"],
@@ -2521,8 +2544,52 @@ class EngineService:
                         None if recovery_assessment is None else recovery_assessment.assessment_id
                     ),
                     "failed_validation_result_id": failed_validation_result_id,
+                    "execution_spec_refresh": refresh,
                 },
             )
+        return status
+
+    def _repair_input_stale(self, tx: Any, task: Any, spec_row: Any, attempt: Any) -> bool:
+        """재시도할 spec의 입력이 stale하면 True다.
+
+        바뀐 경로가 모두 쓰기 target이고 직전 Attempt의 최신 쓰기 관측과 같거나 그 Attempt가 관측을 남기지
+        못했으면(승인된 실패 Worker 한계) Engine 변경이다. 그 밖(읽기 target·context 원본 변경, 관측과 다른
+        쓰기 target)은 사용자 변경이므로 재관측으로 흡수하지 않고 REPAIR_INPUT_CHANGED로 멈춘다.
+        """
+
+        try:
+            self._verify_execution_inputs(tx, task, spec_row)
+            return False
+        except EngineServiceError as error:
+            if not str(error).startswith("STALE_EXECUTION_INPUT"):
+                raise
+        spec = TaskExecutionSpecRevision.model_validate_json(spec_row["payload_json"])
+        root = Path(tx.one("SELECT root FROM projects WHERE id = ?", (task["project_id"],))["root"])
+        writes = {target.path for target in spec.definition.resolved_targets if target.access != "read"}
+        expected = {
+            target.path: target.expected_content_digest for target in spec.definition.resolved_targets
+            if target.expected_content_digest is not None or target.access == "create"
+        }
+        for fragment in spec.definition.context_manifest.fragments:
+            if fragment.source_kind.value in {"code", "test", "reference", "policy", "project"}:
+                expected.setdefault(fragment.source_ref, fragment.content_digest)
+        changed = []
+        for raw_path, digest in sorted(expected.items()):
+            path = Path(raw_path) if Path(raw_path).is_absolute() else root / raw_path
+            current = sha256_bytes(path.read_bytes()) if path.is_file() else None
+            if current == digest:
+                continue
+            if raw_path in writes:
+                recorded, output = latest_write_observation(tx.connection, attempt["id"], raw_path)
+                if not recorded or output == current:
+                    continue
+            changed.append(raw_path)
+        if changed:
+            raise EngineServiceError(
+                "REPAIR_INPUT_CHANGED: 재시도할 Task 입력에 직전 Attempt가 만들지 않은 변경이 있습니다: "
+                + ", ".join(changed)
+            )
+        return True
 
     def enable_execution_spec_recovery(
         self,

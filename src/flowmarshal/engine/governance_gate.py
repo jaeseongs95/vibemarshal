@@ -35,6 +35,7 @@ from .domain import BudgetStage, BudgetUsageRecord, PlanContractRevision, TaskCo
 from .model_observation import authoritative_receipt_model_observation
 from .operations import CoreOperations
 from .runtime import TaskGatePending
+from .service import latest_write_observation
 
 SERVER = "mcp-server/dist/server.mjs"
 SIGNER = "mcp-server/dist/engine-attestation.mjs"
@@ -679,22 +680,28 @@ class GovernanceTaskGate:
         return [item for item in results if item["key"] != key]
 
     def _engine_output(self, dispatches: list[dict[str, Any]], path: str) -> tuple[bool, str | None]:
-        """path를 쓰기 target으로 삼은 마지막 앞 dispatch의 Worker 결과 sha256. 기록이 없으면 None."""
-        writer = next((item for item in reversed(dispatches) if path in item["data"].get("writes", ())), None)
-        if writer is None:
-            return False, None
+        """path를 쓰기 target으로 삼고 실제 Attempt를 만든 마지막 앞 dispatch의 Worker 결과 sha256.
+
+        같은 (Task, Attempt 번호)는 뒤 dispatch가 그 Attempt의 주인이다. Attempt가 없는 dispatch(gate 거절·reserve
+        실패로 Worker 미실행)는 건너뛴다. 쓰기 관측이 없으면(Worker 실패) None, 그런 dispatch가 없으면 (False, None)이다.
+        """
+        owners: set[tuple[str, int]] = set()
         with self.service.ledger.read() as connection:
-            attempt = connection.execute(
-                "SELECT id FROM attempts WHERE task_id = ? AND kind = 'execution' AND attempt_no = ?",
-                (writer["key"]["task_id"], writer["key"]["attempt_no"])).fetchone()
-            rows = [] if attempt is None else connection.execute(
-                "SELECT observation FROM evidence_records WHERE attempt_id = ? AND source_ref = ? "
-                "AND kind IN ('file', 'diff')", (attempt["id"], path)).fetchall()
-        for row in rows:
-            observed = json.loads(row["observation"])
-            if observed.get("access") != "read":
-                return True, observed.get("after_digest")
-        return True, None
+            for item in reversed(dispatches):
+                owner = (item["key"]["task_id"], item["key"]["attempt_no"])
+                if owner in owners:
+                    continue
+                owners.add(owner)
+                if path not in item["data"].get("writes", ()):
+                    continue
+                attempt = connection.execute(
+                    "SELECT id FROM attempts WHERE task_id = ? AND kind = 'execution' AND attempt_no = ?",
+                    owner).fetchone()
+                if attempt is None:
+                    continue
+                recorded, output = latest_write_observation(connection, attempt["id"], path)
+                return True, output if recorded else None
+        return False, None
 
     # ------------------------------------------------------------ gate 단계
     def _open(self, task: Any, key: dict[str, Any], *, replay: bool) -> _Run:

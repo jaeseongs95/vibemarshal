@@ -24,7 +24,7 @@ from flowmarshal.engine.application import EngineApplication
 from flowmarshal.engine.domain import RunOnceAction
 from flowmarshal.engine.governance_gate import (
     DEFAULT_PIN, GovernancePlugin, GovernanceRejected, GovernanceTaskGate, GovernanceTimeout, GovernanceUnavailable,
-    McpStdioClient, MissingGovernanceGate, RoleSteward, snapshot_worktree,
+    McpStdioClient, MissingGovernanceGate, RoleSteward, snapshot_worktree, user_change_overlap,
 )
 from flowmarshal.engine.qualification import default_role_configuration
 from flowmarshal.engine.roles import ScriptedStructuredRoleRunner
@@ -312,13 +312,19 @@ class GovernanceGateTests(MultitaskGateHarness):
         self.assertEqual(RunOnceAction.COMPLETED, outcome.action, outcome.detail)
         self.assertIsNotNone(outcome.goal_verdict_id)
 
-    def repair_after_failed_validation(self, gate) -> None:
-        """add Task Worker가 잘못 고쳐 validation이 실패하면 실패 근거로 Task repair 재시도를 연다."""
+    def repair_after_failed_validation(self, gate, before_retry=None) -> None:
+        """add Task Worker가 잘못 고쳐 validation이 실패하면 실패 근거로 Task repair 재시도를 연다.
+
+        validation 실패는 자동 분류되지 않으므로(TASK_VALIDATION_RECOVERY_REQUIRED) CLI `attempt retry`처럼
+        RecoveryAssessment를 주어 retry_task를 부른다.
+        """
         from flowmarshal.engine.domain import FailureClass, RecoveryAssessment, RepairAction, new_id
 
         wrong = {"task_fix_add": lambda root: replace(root / "app.py", "left + right", "left * right")}
         failed = self.drive(gate, wrong)
         self.assertEqual("TASK_VALIDATION_FAILED", failed.blocker_code, failed.detail)
+        if before_retry is not None:
+            before_retry(self.prepared.workspace)
         task_id = self.prepared.task_ids["task_fix_add"]
         with self.prepared.service.ledger.read() as connection:
             attempt = connection.execute("SELECT id FROM attempts WHERE task_id = ? AND kind = 'execution'",
@@ -334,21 +340,75 @@ class GovernanceGateTests(MultitaskGateHarness):
                 new_evidence_ids=tuple(json.loads(result["payload_json"])["evidence_ids"]),
                 same_failure_replan_count=0, goal_replan_count=0))
 
-    def test_task_repair_after_failed_validation_passes_the_gate(self) -> None:
+    def task_row(self, ref: str):
+        with self.prepared.service.ledger.read() as connection:
+            return connection.execute("SELECT * FROM task_contracts WHERE id = ?",
+                                      (self.prepared.task_ids[ref],)).fetchone()
+
+    def test_task_repair_after_failed_validation_completes_the_goal_through_the_gate(self) -> None:
         gate = self.gate()
         self.repair_after_failed_validation(gate)
         task_id = self.prepared.task_ids["task_fix_add"]
+        # Attempt 1이 바꾼 app.py로 입력이 stale해 같은 spec이 아니라 재관측 뒤 새 Execution Spec으로 준비한다.
+        self.assertEqual("ready", self.statuses()["task_fix_add"])
+        # 크기가 같은 편집이 같은 초에 겹치면 Python이 옛 .pyc를 써서 validation이 흔들리므로 크기를 바꿔 고친다.
+        fix = {"task_fix_add": lambda root: replace(root / "app.py", "left * right", "(left + right)")}
+        outcome = self.drive(gate, fix)
+        self.assertEqual(RunOnceAction.COMPLETED, outcome.action, outcome.detail)
+        self.assertIsNotNone(outcome.goal_verdict_id)
+        self.assertEqual({"completed"}, set(self.statuses().values()))
         with self.prepared.service.ledger.read() as connection:
-            task = connection.execute("SELECT * FROM task_contracts WHERE id = ?", (task_id,)).fetchone()
-        self.assertEqual("materialized", task["status"])
-        # Attempt 1의 Worker가 남긴 app.py 변경은 사용자 변경이 아니므로 repair Attempt 2가 gate를 지난다.
-        # 같은 Execution Spec 재시도가 이후 STALE_EXECUTION_INPUT을 내는 것은 gate와 무관한 Core 규칙이다.
-        self.assertIsNone(gate.before_execution(task))
+            specs = connection.execute("SELECT COUNT(*) FROM execution_spec_revisions WHERE task_id = ?",
+                                       (task_id,)).fetchone()[0]
+            attempts = [row["status"] for row in connection.execute(
+                "SELECT status FROM attempts WHERE task_id = ? AND kind = 'execution' ORDER BY attempt_no", (task_id,))]
+        self.assertEqual(2, specs)
+        self.assertEqual(["succeeded", "succeeded"], attempts)
+        # repair Attempt 2의 C0는 Attempt 1 Worker가 남긴 app.py를 담고, 그 변경은 사용자 변경이 아니다.
         snapshots = {item["key"]["attempt_no"]: item["data"] for item in self.gate_steps("snapshot_c0")
                      if item["key"]["task_id"] == task_id}
-        self.assertEqual([1, 2], sorted(snapshots))
         self.assertIn("left * right", git(self.prepared.workspace, "show", f"{snapshots[2]['commit']}:app.py"))
         self.assertEqual([], self.history("task.governance_blocked"))
+        self.assertTrue(self.history("task.retry_enabled")[-1]["execution_spec_refresh"])
+
+    def test_task_repair_stops_when_the_user_edited_the_worker_output(self) -> None:
+        from flowmarshal.engine.service import EngineServiceError
+
+        gate = self.gate()
+        with self.assertRaises(EngineServiceError) as raised:
+            self.repair_after_failed_validation(
+                gate, before_retry=lambda root: replace(root / "app.py", "left * right", "left * right  "))
+        self.assertIn("REPAIR_INPUT_CHANGED", str(raised.exception))
+        self.assertIn("app.py", str(raised.exception))
+        # 사용자 편집은 재관측으로 흡수하지 않는다. Task는 실패 상태 그대로이고 새 spec을 준비하지 않는다.
+        self.assertEqual("blocked", self.statuses()["task_fix_add"])
+        self.assertEqual([], self.history("task.retry_enabled"))
+
+    def engine_write_decision(self, gate, task) -> list[str]:
+        """이 Goal의 앞 dispatch 기록만으로 새 dispatch key의 app.py 사용자 변경 판정을 본다."""
+        key = {"task_id": task["id"], "execution_spec_revision_id": "spec-next", "attempt_no": 99}
+        dispatches = gate._goal_dispatches(task, key)
+        return user_change_overlap(self.prepared.workspace, ["app.py"], dispatches[0]["data"],
+                                   lambda path: gate._engine_output(dispatches, path))
+
+    def test_user_edit_after_a_dispatch_without_attempt_blocks(self) -> None:
+        # steward가 bootstrap에서 거절한 dispatch는 C0만 남기고 Worker를 실행하지 않는다.
+        rejected = self.gate(steward=ScriptedSteward(reject=("bootstrap",)))
+        self.assertIn("STEWARD_REJECTED", self.drive(rejected).detail)
+        self.assertEqual(0, self.runtime.create_calls)
+        replace(self.prepared.workspace / "app.py", "return", "return  ")
+        self.assertEqual(["app.py"], self.engine_write_decision(rejected, self.task_row("task_fix_add")))
+
+    def test_engine_write_stays_engine_after_a_later_dispatch_without_attempt(self) -> None:
+        gate = self.gate()
+        self.repair_after_failed_validation(gate)
+        # Attempt 1이 app.py를 쓴 뒤 repair의 새 spec dispatch가 거절돼 Attempt 없이 C0만 남아도 Attempt 1 결과는 Engine 변경이다.
+        rejected = self.gate(steward=ScriptedSteward(reject=("bootstrap",)))
+        self.assertIn("STEWARD_REJECTED", self.drive(rejected).detail)
+        self.assertEqual(1, self.runtime.create_calls)
+        self.assertEqual([], self.engine_write_decision(rejected, self.task_row("task_fix_add")))
+        replace(self.prepared.workspace / "app.py", "return", "return  ")
+        self.assertEqual(["app.py"], self.engine_write_decision(rejected, self.task_row("task_fix_add")))
 
     def test_user_change_made_before_the_goal_blocks_a_later_task_that_writes_it(self) -> None:
         # Goal 시작 전부터 있던 text.py 변경은 add Task를 막지 않고, text.py를 쓰는 shout Task 앞에서 막는다.
