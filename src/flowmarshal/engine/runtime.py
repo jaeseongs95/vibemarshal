@@ -3186,7 +3186,9 @@ class EngineDispatcher:
                 # 사용자 변경은 재관측으로 흡수하지 않는다. Task 상태는 그대로 두고 사유만 돌려준다.
                 return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=project_id, task_id=task_id,
                                       attempt_id=attempt_id, validation_result_id=validation_result_id,
-                                      blocker_code="REPAIR_INPUT_CHANGED", detail=str(error))
+                                      blocker_code="REPAIR_INPUT_CHANGED",
+                                      detail=f"{error}. 바뀐 입력을 직전 상태로 되돌리면 다음 run_once가 repair를 이어 가고, "
+                                             "변경을 유지하려면 Goal revision·재계획 경로로 갑니다.")
             return RunOnceOutcome(
                 action=RunOnceAction.RECOVERED,
                 project_id=project_id,

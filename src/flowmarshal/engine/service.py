@@ -146,6 +146,10 @@ def _same_assignment(left: Any, right: Any) -> bool:
         return False
 
 
+#: 입력 파일을 읽지 못했을 때의 오류 문구. reserve·resume은 이 문구 그대로 멈추고 repair 재시도만 stale로 받는다.
+_INPUT_UNREADABLE = "실행 전 입력 파일을 재확인할 수 없습니다"
+
+
 def latest_write_observation(connection: Any, attempt_id: str, path: str) -> tuple[bool, str | None]:
     """Attempt가 path에 남긴 가장 최근 쓰기 관측(file·diff evidence)의 after_digest를 돌려준다.
 
@@ -2555,14 +2559,16 @@ class EngineService:
         바뀐 경로가 모두 쓰기 target이고 직전 Attempt의 최신 쓰기 관측과 같거나 그 Attempt가 관측을 남기지
         못했으면(승인된 실패 Worker 한계) Engine 변경이다. 그 밖(읽기 target·context 원본 변경, 관측과 다른
         쓰기 target)은 사용자 변경이므로 재관측으로 흡수하지 않고 REPAIR_INPUT_CHANGED로 멈춘다.
+        없어진 입력도 바뀐 경로로 같은 규칙을 따른다(쓰기 관측의 after_digest null이 부재와 같다).
         """
 
         try:
             self._verify_execution_inputs(tx, task, spec_row)
             return False
         except EngineServiceError as error:
-            if not str(error).startswith("STALE_EXECUTION_INPUT"):
+            if not str(error).startswith(("STALE_EXECUTION_INPUT", _INPUT_UNREADABLE)):
                 raise
+            unverified = error
         spec = TaskExecutionSpecRevision.model_validate_json(spec_row["payload_json"])
         root = Path(tx.one("SELECT root FROM projects WHERE id = ?", (task["project_id"],))["root"])
         writes = {target.path for target in spec.definition.resolved_targets if target.access != "read"}
@@ -2576,7 +2582,11 @@ class EngineService:
         changed = []
         for raw_path, digest in sorted(expected.items()):
             path = Path(raw_path) if Path(raw_path).is_absolute() else root / raw_path
-            current = sha256_bytes(path.read_bytes()) if path.is_file() else None
+            try:
+                current = sha256_bytes(path.read_bytes()) if path.is_file() else None
+            except OSError:
+                # 있지만 읽을 수 없는 파일은 부재가 아니다. 판정하지 않고 재확인 오류 그대로 멈춘다.
+                raise unverified from None
             if current == digest:
                 continue
             if raw_path in writes:
@@ -3975,9 +3985,7 @@ class EngineService:
             try:
                 actual_digest = sha256_bytes(path.read_bytes())
             except OSError as error:
-                raise EngineServiceError(
-                    f"실행 전 입력 파일을 재확인할 수 없습니다: {raw_path}"
-                ) from error
+                raise EngineServiceError(f"{_INPUT_UNREADABLE}: {raw_path}") from error
             if actual_digest != expected_digest:
                 raise EngineServiceError(
                     f"STALE_EXECUTION_INPUT: materialization 이후 파일이 바뀌었습니다: {raw_path}"

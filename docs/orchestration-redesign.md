@@ -416,7 +416,7 @@ provider가 구조화해 반환한 error code, 로컬 Engine이 직접 관측해
 | `external_unknown` | 기존 intent·binding·receipt 우선 대조 |
 | `unclassified` | 근거 보강 전 분류·재시도 확정 금지 |
 
-같은 Task repair(`task_repair`·`continue`)는 현재 Execution Spec 입력이 그대로면 같은 spec으로 다시 연다. 직전 Attempt가 쓰기 target을 바꿔 입력이 stale하면, 바뀐 경로가 모두 쓰기 target이고 그 Attempt의 최신 쓰기 관측(file·diff evidence `after_digest`)과 같거나 Worker가 기록 없이 실패한 경우에만 Task를 `ready`로 되돌려 재관측 뒤 새 Execution Spec revision으로 준비한다. 읽기 target·context 원본의 변경이나 관측과 다른 쓰기 target(사용자 편집)은 재관측으로 흡수하지 않고 `REPAIR_INPUT_CHANGED`로 멈춘다. reserve의 mutable target 허용은 같은 Worker의 resume에만 쓴다. 실패한 Worker가 선언 밖 파일에 남긴 변경은 재관측이 흡수하는 known limitation이다.
+같은 Task repair(`task_repair`·`continue`)는 현재 Execution Spec 입력이 그대로면 같은 spec으로 다시 연다. 직전 Attempt가 쓰기 target을 바꿔 입력이 stale하면, 바뀐 경로가 모두 쓰기 target이고 그 Attempt의 최신 쓰기 관측(file·diff evidence `after_digest`)과 같거나 Worker가 기록 없이 실패한 경우에만 Task를 `ready`로 되돌려 재관측 뒤 새 Execution Spec revision으로 준비한다. 읽기 target·context 원본의 변경이나 관측과 다른 쓰기 target(사용자 편집)은 재관측으로 흡수하지 않고 `REPAIR_INPUT_CHANGED`로 멈춘다. reserve의 mutable target 허용은 같은 Worker의 resume에만 쓴다. 실패한 Worker가 선언 밖 파일에 남긴 변경은 재관측이 흡수하는 known limitation이다. 없어진 입력도 바뀐 경로로 같은 규칙을 따른다(쓰기 관측의 `after_digest` null이 부재와 같다). `REPAIR_INPUT_CHANGED`로 멈춘 뒤에는 바뀐 입력을 직전 상태로 되돌리면 다음 `run_once`가 repair를 이어 가고, 변경을 유지하려면 Goal revision·재계획 경로로 간다. 삭제 뒤 `ready`로 열린 Task가 Goal 완료까지 가는지는 새 Execution Spec 준비 결과에 달려 있다.
 
 동일 실패 재계획은 최대 2회, Goal 전체 재계획은 최대 5회다. 횟수는 원장에서 계산하며 호출자가 제공한 값을 신뢰하지 않는다. 첫 재계획 이후에는 새 evidence 없는 반복을 차단한다.
 

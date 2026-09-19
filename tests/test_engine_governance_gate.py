@@ -384,6 +384,35 @@ class GovernanceGateTests(MultitaskGateHarness):
         self.assertEqual("blocked", self.statuses()["task_fix_add"])
         self.assertEqual([], self.history("task.retry_enabled"))
 
+    def test_task_repair_stops_when_the_user_deleted_the_worker_output(self) -> None:
+        from flowmarshal.engine.service import EngineServiceError
+
+        gate = self.gate()
+        with self.assertRaises(EngineServiceError) as raised:
+            self.repair_after_failed_validation(gate, before_retry=lambda root: (root / "app.py").unlink())
+        # Worker 결과 기록이 내용을 남겼는데 파일이 없어졌으면 사용자 변경이다. 예외 문구가 아니라 같은 코드로 멈춘다.
+        self.assertIn("REPAIR_INPUT_CHANGED", str(raised.exception))
+        self.assertIn("app.py", str(raised.exception))
+        self.assertEqual("blocked", self.statuses()["task_fix_add"])
+        self.assertEqual([], self.history("task.retry_enabled"))
+
+    def test_task_repair_keeps_the_recheck_error_for_an_unreadable_input(self) -> None:
+        from unittest import mock
+
+        from flowmarshal.engine.service import EngineServiceError
+
+        # 있지만 읽을 수 없는 파일은 부재가 아니다. 사용자 변경으로 판정하지 않고 재확인 오류 그대로 멈춘다.
+        patcher = mock.patch.object(Path, "read_bytes", side_effect=PermissionError("denied"))
+        try:
+            with self.assertRaises(EngineServiceError) as raised:
+                self.repair_after_failed_validation(self.gate(), before_retry=lambda root: patcher.start())
+        finally:
+            patcher.stop()
+        self.assertIn("재확인할 수 없습니다", str(raised.exception))
+        self.assertNotIn("REPAIR_INPUT_CHANGED", str(raised.exception))
+        self.assertEqual("blocked", self.statuses()["task_fix_add"])
+        self.assertEqual([], self.history("task.retry_enabled"))
+
     def engine_write_decision(self, gate, task) -> list[str]:
         """이 Goal의 앞 dispatch 기록만으로 새 dispatch key의 app.py 사용자 변경 판정을 본다."""
         key = {"task_id": task["id"], "execution_spec_revision_id": "spec-next", "attempt_no": 99}

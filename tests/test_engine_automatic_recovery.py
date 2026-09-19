@@ -403,6 +403,40 @@ class AutomaticRecoveryIntegrationTests(unittest.TestCase):
                 "SELECT COUNT(*) FROM recovery_assessments"
             ).fetchone()[0])
 
+    def test_transient_retry_after_the_worker_wrote_its_target_prepares_a_new_spec(self) -> None:
+        """일시 실패 code의 CONTINUE 재시도도 Worker가 바꾼 쓰기 target이면 새 Execution Spec으로 준비한다."""
+
+        prepared, runtime = self.prepared(name="transient-retry-after-write")
+        dispatcher = EngineDispatcher(prepared.service, runtime)
+        dispatcher.run_once(prepared.project_id, proposal=prepared.proposal)
+        dispatched = dispatcher.run_once(prepared.project_id)
+        with prepared.service.ledger.read() as connection:
+            binding = ThreadBinding.model_validate_json(connection.execute(
+                "SELECT binding_json FROM attempts WHERE id=?", (dispatched.attempt_id,)
+            ).fetchone()["binding_json"])
+        target = prepared.workspace / "app.py"
+        target.write_text(target.read_text(encoding="utf-8") + "\n# partial worker edit\n", encoding="utf-8")
+        runtime.fail(binding.thread_id, response="RATE_LIMITED: 계정 제한을 관측했습니다", error_code="RATE_LIMITED")
+        self.assertEqual(RunOnceAction.OBSERVED, dispatcher.run_once(prepared.project_id).action)
+
+        recovered = self._finish_runtime_job_tick(dispatcher, prepared.project_id)
+
+        self.assertEqual(RunOnceAction.RECOVERED, recovered.action, recovered)
+        self.assertIn("새 ExecutionSpec", recovered.detail)
+        with prepared.service.ledger.read() as connection:
+            assessment = json.loads(connection.execute(
+                "SELECT payload_json FROM recovery_assessments"
+            ).fetchone()["payload_json"])
+            status = connection.execute(
+                "SELECT status FROM task_contracts WHERE id=?", (dispatched.task_id,)
+            ).fetchone()["status"]
+            retry = json.loads(connection.execute(
+                "SELECT payload_json FROM history_events WHERE event_type='task.retry_enabled'"
+            ).fetchone()["payload_json"])
+        self.assertEqual(RepairAction.CONTINUE.value, assessment["action"])
+        self.assertEqual("ready", status)
+        self.assertTrue(retry["execution_spec_refresh"])
+
     def test_evidence_poor_failure_stops_typed_without_selecting_a_repair(self) -> None:
         """근거 없는 failed terminal은 자동 복구 대신 typed stop으로 끝난다."""
 

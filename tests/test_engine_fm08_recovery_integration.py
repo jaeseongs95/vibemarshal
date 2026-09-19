@@ -581,6 +581,68 @@ class EngineFm08RecoveryIntegrationTests(unittest.TestCase):
         self.assertEqual(maps_before, maps_after)
         self.assertEqual(0, self._ledger_counts()["recovery_history"])
 
+    def _retry_enabled(self, task_id: str) -> tuple[str, dict]:
+        with self.service.ledger.read() as connection:
+            status = connection.execute("SELECT status FROM task_contracts WHERE id=?", (task_id,)).fetchone()[0]
+            retry = json.loads(connection.execute(
+                "SELECT payload_json FROM history_events WHERE entity_id=? AND event_type='task.retry_enabled'",
+                (task_id,),
+            ).fetchone()[0])
+        return status, retry
+
+    def test_repair_after_the_worker_deleted_its_target_reopens_without_an_exception(self) -> None:
+        """Worker가 쓰기 target을 지우고 실패해도 예외 없이 새 Execution Spec 준비로 이어진다."""
+
+        task_id = self._prepare()
+        self._authorize()
+        first_attempt, first_binding = self._dispatch_worker(task_id)
+        self.app_file.unlink()
+        self._fail_worker(first_attempt, first_binding, response="구현이 요구를 만족하지 못했습니다.",
+                          error_code="IMPLEMENTATION_ERROR")
+
+        recovered = self._run_until(RunOnceAction.RECOVERED)
+        self.assertIn("새 ExecutionSpec", recovered.detail)
+        status, retry = self._retry_enabled(task_id)
+        self.assertEqual("ready", status)
+        self.assertTrue(retry["execution_spec_refresh"])
+        following = self.application.run_once(self.project_id)
+        self.assertIn("Execution Spec 준비", following.detail)
+
+    def test_repair_stops_when_a_context_source_was_deleted_and_resumes_once_it_is_restored(self) -> None:
+        """없어진 context 원본은 사용자 변경으로 멈추고, 되돌리면 같은 Task의 repair를 이어 간다."""
+
+        task_id = self._prepare()
+        self._authorize()
+        first_attempt, first_binding = self._dispatch_worker(task_id)
+        self._fail_worker(first_attempt, first_binding, response="구현이 요구를 만족하지 못했습니다.",
+                          error_code="IMPLEMENTATION_ERROR")
+        instructions = self.root / "AGENTS.md"
+        original = instructions.read_bytes()
+        instructions.unlink()
+        with self.service.ledger.read() as connection:
+            maps_before = connection.execute(
+                "SELECT COUNT(*) FROM project_map_revisions WHERE project_id=?", (self.project_id,)
+            ).fetchone()[0]
+
+        blocked = self._run_until(RunOnceAction.BLOCKED)
+        self.assertEqual("REPAIR_INPUT_CHANGED", blocked.blocker_code, blocked)
+        self.assertIn("AGENTS.md", blocked.detail)
+        self.assertIn("되돌리면", blocked.detail)
+        self.assertIn("Goal revision", blocked.detail)
+        with self.service.ledger.read() as connection:
+            status = connection.execute("SELECT status FROM task_contracts WHERE id=?", (task_id,)).fetchone()[0]
+            maps_after = connection.execute(
+                "SELECT COUNT(*) FROM project_map_revisions WHERE project_id=?", (self.project_id,)
+            ).fetchone()[0]
+        self.assertEqual("failed", status)
+        self.assertEqual(maps_before, maps_after)
+
+        instructions.write_bytes(original)
+        self._run_until(RunOnceAction.RECOVERED)
+        status, retry = self._retry_enabled(task_id)
+        self.assertEqual("materialized", status)
+        self.assertFalse(retry["execution_spec_refresh"])
+
     def test_subgraph_replan_is_reviewed_activated_and_finishes_through_the_facade(self) -> None:
         """C1-b: task_contract 실패가 사용자 경로에서 실제 subgraph replan으로 복구된다."""
 
