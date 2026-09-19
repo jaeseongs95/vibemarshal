@@ -2093,9 +2093,13 @@ class EngineDispatcher:
         supervisor: RuntimeJobSupervisor | None = None,
         recovery_provider: Any | None = None,
         failure_classifier: EvidenceFirstFailureClassifier | None = None,
+        task_gate: Any | None = None,
     ) -> None:
         self.service = service
         self.runtime = runtime
+        # 선택적 외부 gate. before_execution(task_row)와 before_completion(task_row)가
+        # 차단 사유 문자열을 돌려주면 Worker dispatch나 Task 완료를 막는다. 완료 판정은 Core에 남는다.
+        self.task_gate = task_gate
         self.fault_hook = fault_hook
         self.proposal_provider = proposal_provider
         self.supervisor = supervisor
@@ -2764,6 +2768,10 @@ class EngineDispatcher:
                 detail="proposal을 최신 Goal·Plan·State·Project Map에 결속했습니다.",
             )
         if materialized is not None:
+            blocker = None if self.task_gate is None else self.task_gate.before_execution(materialized)
+            if blocker is not None:
+                return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=project_id,
+                    task_id=materialized["id"], blocker_code="GOVERNANCE_GATE_BLOCKED", detail=blocker)
             attempt = self.service.reserve_attempt(task_id=materialized["id"])
             try:
                 if self.supervisor is None:
@@ -4660,6 +4668,12 @@ class EngineDispatcher:
                 ),
                 detail=f"typed {step.method} observation이 필요합니다: {step.validation_id}",
             )
+        blocker = None if self.task_gate is None else self.task_gate.before_completion(task)
+        if blocker is not None:
+            # 완료 뒤 State 재관측은 바뀐 파일을 새 기준으로 흡수하므로 gate는 그 전에 막는다.
+            self.service.block_task_from_validation(task_id=task["id"], detail=f"governance gate: {blocker}")
+            return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=task["project_id"],
+                task_id=task["id"], blocker_code="GOVERNANCE_GATE_FAILED", detail=blocker)
         ready = self.service.complete_task(task["id"])
         self._hit("before_state_reobservation")
         self.service.reobserve_project(task["project_id"], force_state_revision=True)
