@@ -212,3 +212,7 @@ pnpm dev
 | RuntimeJob과 Codex adapter | `src/flowmarshal/engine/runtime.py` |
 | 서비스와 상태 전이 | `src/flowmarshal/engine/service.py` |
 | CLI와 보고 | `src/flowmarshal/engine/cli.py`, `src/flowmarshal/engine/reporting.py` |
+
+## 라이선스
+
+FlowMarshal은 Apache License 2.0으로 배포한다. 자세한 내용은 [LICENSE](LICENSE)와 [NOTICE](NOTICE)를 참고한다.
