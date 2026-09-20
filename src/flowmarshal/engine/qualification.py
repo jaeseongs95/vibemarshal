@@ -2242,6 +2242,8 @@ def aggregate_shard_runs(
                     continue
                 if (checkpoint.order_seed, checkpoint.fixture_digest) != (seed, digest):
                     raise CheckpointContractError("checkpoint identity가 저장 경로와 다릅니다")
+                if not checkpoint.completed:
+                    raise CheckpointContractError("미완료 cell은 aggregate 입력으로 쓸 수 없습니다")
                 actual[(seed, digest)] = checkpoint
         except Exception as error:
             raise QualificationRunError(
@@ -2302,6 +2304,79 @@ def aggregate_shard_runs(
                 f"missing={sorted(expected - actual)} unexpected={sorted(actual - expected)}"
             )
 
+    expected_checkpoints = {
+        cell: actual_by_shard[shard][cell]
+        for shard in shards
+        for cell in actual_by_shard[shard]
+    }
+    if target.exists() and not target.is_dir():
+        raise QualificationRunError("AGGREGATE_DESTINATION_INVALID: directory가 아닙니다")
+    target_store = ImmutableCheckpointStore(target, contract)
+    target_contract = target / "evaluation-contract.json"
+    target_state = target / "run-state.json"
+    target_cells = target / "cells"
+    if target_contract.exists():
+        try:
+            existing_contract = EvaluationContract.model_validate_json(
+                target_contract.read_text(encoding="utf-8")
+            )
+            if existing_contract.contract_digest != contract.contract_digest:
+                raise CheckpointContractError("기존 checkpoint의 evaluation 계약이 다릅니다")
+        except Exception as error:
+            raise QualificationRunError(
+                f"AGGREGATE_DESTINATION_CHECKPOINT_INVALID: {error}"
+            ) from error
+    elif target_state.exists() or target_cells.exists():
+        raise QualificationRunError(
+            "AGGREGATE_DESTINATION_CHECKPOINT_INVALID: evaluation 계약이 없습니다"
+        )
+    if target_cells.exists() and not target_cells.is_dir():
+        raise QualificationRunError(
+            "AGGREGATE_DESTINATION_CHECKPOINT_INVALID: cells가 directory가 아닙니다"
+        )
+    destination_actual: dict[tuple[int, str], EvaluationCellCheckpoint] = {}
+    if target_contract.exists():
+        try:
+            for seed, digest in cells:
+                checkpoint = target_store.completed(digest, seed)
+                if checkpoint is None:
+                    continue
+                if (checkpoint.order_seed, checkpoint.fixture_digest) != (seed, digest):
+                    raise CheckpointContractError(
+                        "destination checkpoint identity가 저장 경로와 다릅니다"
+                    )
+                if not checkpoint.completed:
+                    raise CheckpointContractError(
+                        "미완료 cell은 aggregate destination에 둘 수 없습니다"
+                    )
+                if checkpoint.checkpoint_digest != expected_checkpoints[(seed, digest)].checkpoint_digest:
+                    raise CheckpointContractError(
+                        f"destination checkpoint가 입력과 다릅니다: seed={seed} fixture={digest}"
+                    )
+                destination_actual[(seed, digest)] = checkpoint
+            target_cell_files = tuple(target_cells.rglob("*.json")) if target_cells.is_dir() else ()
+            if len(target_cell_files) != len(destination_actual):
+                raise CheckpointContractError(
+                    "destination checkpoint 파일과 계약 cell이 일치하지 않습니다"
+                )
+            if target_state.exists():
+                state = target_store.state()
+                if state.completed_cell_count != len(destination_actual):
+                    raise CheckpointContractError(
+                        "destination run state와 checkpoint 수가 다릅니다"
+                    )
+        except Exception as error:
+            raise QualificationRunError(
+                f"AGGREGATE_DESTINATION_CHECKPOINT_INVALID: {error}"
+            ) from error
+
+    for name in bound[1:]:
+        path = target / name
+        if path.exists() and path.read_bytes() != (first / name).read_bytes():
+            raise QualificationRunError(
+                f"AGGREGATE_SHARD_BINDING_MISMATCH: {name} roots={target},{first}"
+            )
+
     target_bundle = target / "reproduction-bundle"
     if target_bundle.exists():
         try:
@@ -2317,7 +2392,7 @@ def aggregate_shard_runs(
                 "AGGREGATE_DESTINATION_REPRODUCTION_BUNDLE_MISMATCH"
             )
 
-    store = ImmutableCheckpointStore(target, contract)
+    store = target_store
     store.initialize()
     for shard in shards:
         for (seed, digest), checkpoint in actual_by_shard[shard].items():
@@ -2331,8 +2406,6 @@ def aggregate_shard_runs(
     for name in bound[1:]:
         if not (target / name).exists():
             shutil.copyfile(first / name, target / name)
-        elif (target / name).read_bytes() != (first / name).read_bytes():
-            raise QualificationRunError(f"AGGREGATE_SHARD_BINDING_MISMATCH: {name} roots={target},{first}")
     shutil.copytree(first / "reproduction-bundle", target_bundle, dirs_exist_ok=True)
     try:
         copied_bundle_digest = verify_qualification_reproduction_bundle(

@@ -161,6 +161,13 @@ class ShardAggregateTests(unittest.TestCase):
             copies.append(Path(shutil.copytree(shard, scratch / f"s{index}")))
         return scratch, copies
 
+    def _snapshot(self, root: Path) -> dict[str, bytes]:
+        return {
+            path.relative_to(root).as_posix(): path.read_bytes()
+            for path in root.rglob("*")
+            if path.is_file()
+        }
+
     def test_shards_run_disjoint_contiguous_blocks_of_the_unchanged_contract(self) -> None:
         cells = _contract_cells(self._contract(self.planning_full))
         self.assertEqual(18, len(cells))
@@ -417,6 +424,62 @@ class ShardAggregateTests(unittest.TestCase):
                 root=ROOT, shard_run_roots=tuple(copies), destination=target
             )
         self.assertFalse((target / "evaluation-contract.json").exists())
+
+    def test_aggregate_rejects_incomplete_checkpoint_before_writing(self) -> None:
+        scratch, copies = self._copies()
+        cell = sorted((copies[-1] / "cells").rglob("*.json"))[-1]
+        document = json.loads(cell.read_text(encoding="utf-8"))
+        document["completed"] = False
+        cell.write_text(json.dumps(document), encoding="utf-8")
+        target = scratch / "out"
+        with self.assertRaisesRegex(
+            QualificationRunError, "AGGREGATE_SHARD_CHECKPOINT_INVALID"
+        ):
+            aggregate_shard_runs(
+                root=ROOT, shard_run_roots=tuple(copies), destination=target
+            )
+        self.assertFalse(target.exists())
+        self.assertFalse(json.loads(cell.read_text(encoding="utf-8"))["completed"])
+
+    def test_aggregate_rejects_destination_metadata_conflict_without_changes(self) -> None:
+        scratch, copies = self._copies()
+        target = scratch / "out"
+        target.mkdir()
+        (target / "run-metadata.json").write_text('{"different":true}', encoding="utf-8")
+        before = self._snapshot(target)
+        with self.assertRaisesRegex(
+            QualificationRunError, "AGGREGATE_SHARD_BINDING_MISMATCH: run-metadata.json"
+        ):
+            aggregate_shard_runs(
+                root=ROOT, shard_run_roots=tuple(copies), destination=target
+            )
+        self.assertEqual(before, self._snapshot(target))
+
+    def test_aggregate_rejects_destination_checkpoint_conflict_without_changes(self) -> None:
+        scratch, copies = self._copies()
+        target = scratch / "out"
+        target.mkdir()
+        shutil.copyfile(copies[0] / "evaluation-contract.json", target / "evaluation-contract.json")
+        shutil.copyfile(copies[0] / "run-state.json", target / "run-state.json")
+        source_cell = sorted((copies[-1] / "cells").rglob("*.json"))[-1]
+        destination_cell = target / "cells" / source_cell.relative_to(copies[-1] / "cells")
+        destination_cell.parent.mkdir(parents=True)
+        document = json.loads(source_cell.read_text(encoding="utf-8"))
+        document["raw_structured_assessment"]["selected"] = not document[
+            "raw_structured_assessment"
+        ]["selected"]
+        destination_cell.write_text(json.dumps(document), encoding="utf-8")
+        state = json.loads((target / "run-state.json").read_text(encoding="utf-8"))
+        state["completed_cell_count"] = 1
+        (target / "run-state.json").write_text(json.dumps(state), encoding="utf-8")
+        before = self._snapshot(target)
+        with self.assertRaisesRegex(
+            QualificationRunError, "AGGREGATE_DESTINATION_CHECKPOINT_INVALID"
+        ):
+            aggregate_shard_runs(
+                root=ROOT, shard_run_roots=tuple(copies), destination=target
+            )
+        self.assertEqual(before, self._snapshot(target))
 
     def test_aggregate_rejects_root_overlap_before_writing(self) -> None:
         scratch, copies = self._copies()
