@@ -174,7 +174,7 @@ class EngineQualificationTests(unittest.TestCase):
                 contract_digest=contract.contract_digest,
                 status=EvaluationRunStatus.COMPLETED,
                 passed=True,
-                metrics={"actual_codex_cell_count": 4},
+                metrics={"actual_codex_cell_count": 5},
                 generated_at=utc_now(),
             )
             _write_json(destination / "qualification-report.json", report)
@@ -586,7 +586,7 @@ class EngineQualificationTests(unittest.TestCase):
             contract_digest=sha256_digest({"contract": "cli-release-freeze"}),
             status=EvaluationRunStatus.COMPLETED,
             passed=True,
-            metrics={"actual_codex_cell_count": 4},
+            metrics={"actual_codex_cell_count": 5},
             generated_at=utc_now(),
         )
 

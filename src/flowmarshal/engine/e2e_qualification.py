@@ -130,6 +130,7 @@ E2E_SCENARIOS = (
     "stale-after-materialization",
     "stored-turn-restart-resume",
     "unknown-receipt-no-duplicate",
+    "cancel-active-job",
 )
 
 _RUNTIME_EVENT_SCHEMA = "flowmarshal.project-e2e.runtime-event.v3"
@@ -1840,6 +1841,227 @@ def _live_restart_resume(
         return result, recorded.events
 
 
+def _cancel_active_job(
+    prepared: PreparedE2E,
+    runtime: RecordedRuntime,
+    source_digest: str,
+    *,
+    roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
+    timeout_seconds: float = 30,
+) -> dict[str, Any]:
+    """활성 turn을 취소하고 새 provider 효과 없이 exact turn을 terminal로 정리한다."""
+
+    application = EngineApplication(
+        prepared.service,
+        runtime=runtime,
+        role_configuration=roles,
+        governance=governance,
+        supervisor=RuntimeJobSupervisor(
+            prepared.service,
+            runtime,
+            observation_timeout_seconds=5.0,
+        ),
+    )
+    _materialize_with_application(application, prepared, timeout_seconds=timeout_seconds)
+    dispatched = application.run_once(prepared.project_id)
+    if dispatched.action is not RunOnceAction.DISPATCHED or dispatched.attempt_id is None:
+        raise QualificationRunError("cancel E2E에서 active execution Attempt를 시작하지 못했습니다.")
+
+    deadline = time.monotonic() + timeout_seconds
+    binding: ThreadBinding | None = None
+    job_id: str | None = None
+    while time.monotonic() < deadline:
+        with prepared.service.ledger.read() as connection:
+            row = connection.execute(
+                "SELECT a.binding_json,j.id AS job_id,j.status AS job_status "
+                "FROM attempts a JOIN runtime_jobs j ON j.attempt_id=a.id "
+                "WHERE a.id=? ORDER BY j.rowid DESC LIMIT 1",
+                (dispatched.attempt_id,),
+            ).fetchone()
+        if row is not None and row["binding_json"] is not None:
+            candidate = ThreadBinding.model_validate_json(row["binding_json"])
+            if candidate.turn_id is not None and row["job_status"] in {
+                "running",
+                "interrupting",
+                "collector_lost",
+            }:
+                binding = candidate
+                job_id = row["job_id"]
+                break
+        time.sleep(0.05)
+    if binding is None or binding.turn_id is None or job_id is None:
+        raise QualificationRunError("cancel E2E의 active exact turn binding을 확인하지 못했습니다.")
+
+    pre_cancel_observation = runtime.read_stored(
+        thread_id=binding.thread_id,
+        turn_id=binding.turn_id,
+        timeout_seconds=5.0,
+    )
+    if (
+        pre_cancel_observation.thread_id != binding.thread_id
+        or pre_cancel_observation.turn_id != binding.turn_id
+        or not pre_cancel_observation.active
+    ):
+        raise QualificationRunError("cancel E2E가 active exact provider turn을 관측하지 못했습니다.")
+
+    def ledger_effect_counts() -> dict[str, int]:
+        with prepared.service.ledger.read() as connection:
+            provider_calls = connection.execute(
+                "SELECT COUNT(*) FROM provider_calls WHERE attempt_id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()[0]
+            intents = connection.execute(
+                "SELECT COUNT(*) FROM runtime_intents WHERE attempt_id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()[0]
+            receipts = connection.execute(
+                "SELECT COUNT(*),COUNT(DISTINCT provider_operation_id) "
+                "FROM runtime_receipts WHERE intent_id IN "
+                "(SELECT id FROM runtime_intents WHERE attempt_id=?)",
+                (dispatched.attempt_id,),
+            ).fetchone()
+        return {
+            "provider_calls": provider_calls,
+            "runtime_intents": intents,
+            "runtime_receipts": receipts[0],
+            "distinct_provider_operation_ids": receipts[1],
+        }
+
+    provider_effects_before = (
+        runtime.create_calls,
+        runtime.turn_calls,
+        runtime.resume_calls,
+    )
+    ledger_effects_before = ledger_effect_counts()
+    cancelled = application.cancel(prepared.project_id, reason="E2E-16 active job cancel")
+    blocked = application.run_once(prepared.project_id, resume=True)
+
+    deadline = time.monotonic() + timeout_seconds
+    observed: dict[str, Any] | None = None
+    attempt_status: str | None = None
+    failure_class: str | None = None
+    while time.monotonic() < deadline:
+        observed = application.observe(prepared.project_id)
+        with prepared.service.ledger.read() as connection:
+            attempt = connection.execute(
+                "SELECT status,failure_class FROM attempts WHERE id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+        attempt_status = None if attempt is None else attempt["status"]
+        failure_class = None if attempt is None else attempt["failure_class"]
+        if attempt_status in {"interrupted", "unknown"}:
+            break
+        time.sleep(0.25)
+
+    blocked_after_observe = application.run_once(prepared.project_id, resume=True)
+    provider_effects_after = (
+        runtime.create_calls,
+        runtime.turn_calls,
+        runtime.resume_calls,
+    )
+    ledger_effects_after = ledger_effect_counts()
+    provider_effect_delta = tuple(
+        after - before
+        for before, after in zip(provider_effects_before, provider_effects_after, strict=True)
+    )
+    with prepared.service.ledger.read() as connection:
+        job = connection.execute(
+            "SELECT status,thread_id,turn_id,provider_terminal_status,result_digest "
+            "FROM runtime_jobs WHERE id=?",
+            (job_id,),
+        ).fetchone()
+        terminal = connection.execute(
+            "SELECT terminal_status,payload_digest FROM runtime_job_observations "
+            "WHERE job_id=? AND provider_terminal=1 ORDER BY rowid DESC LIMIT 1",
+            (job_id,),
+        ).fetchone()
+        evidence = connection.execute(
+            "SELECT id,source_ref,content_digest FROM evidence_records "
+            "WHERE attempt_id=? AND source_ref LIKE 'runtime-cancelled:%' "
+            "ORDER BY rowid DESC LIMIT 1",
+            (dispatched.attempt_id,),
+        ).fetchone()
+        provider_call = connection.execute(
+            "SELECT status,usage_id,execution_status,new_turn_count FROM provider_calls WHERE attempt_id=? "
+            "ORDER BY rowid DESC LIMIT 1",
+            (dispatched.attempt_id,),
+        ).fetchone()
+        interrupts = connection.execute(
+            "SELECT kind,payload_json FROM runtime_job_observations "
+            "WHERE job_id=? AND kind IN ('interrupt_requested','interrupt_receipt') "
+            "ORDER BY rowid",
+            (job_id,),
+        ).fetchall()
+        control_history = connection.execute(
+            "SELECT event_type,payload_json FROM history_events WHERE project_id=? "
+            "AND event_type='workflow.cancelled' ORDER BY sequence DESC LIMIT 1",
+            (prepared.project_id,),
+        ).fetchone()
+    exact_binding_preserved = bool(
+        job is not None
+        and job["thread_id"] == binding.thread_id
+        and job["turn_id"] == binding.turn_id
+    )
+    passed = all(
+        (
+            cancelled["control_state"] == "cancelled",
+            blocked.action is RunOnceAction.BLOCKED,
+            blocked.blocker_code == "WORKFLOW_CANCELLED",
+            blocked_after_observe.action is RunOnceAction.BLOCKED,
+            blocked_after_observe.blocker_code == "WORKFLOW_CANCELLED",
+            attempt_status == "interrupted",
+            failure_class is None,
+            job is not None and job["status"] == "consumed",
+            terminal is not None,
+            evidence is not None,
+            exact_binding_preserved,
+            provider_effect_delta == (0, 0, 0),
+            ledger_effects_after == ledger_effects_before,
+            provider_call is not None
+            and provider_call["execution_status"] == "terminal"
+            and provider_call["new_turn_count"] == 1,
+            {row["kind"] for row in interrupts}
+            == {"interrupt_requested", "interrupt_receipt"},
+            control_history is not None,
+        )
+    )
+    return {
+        "passed": passed,
+        "source_fixture_digest": source_digest,
+        "runtime_job": None if job is None else dict(job),
+        "control_state": cancelled["control_state"],
+        "run_once_blocker": blocked.blocker_code,
+        "post_observe_run_once_blocker": blocked_after_observe.blocker_code,
+        "pre_cancel_observation": pre_cancel_observation.model_dump(mode="json"),
+        "runtime_observation": None if terminal is None else dict(terminal),
+        "ledger": {
+            "attempt_id": dispatched.attempt_id,
+            "attempt_status": attempt_status,
+            "failure_class": failure_class,
+            "evidence": None if evidence is None else dict(evidence),
+            "provider_call": None if provider_call is None else dict(provider_call),
+            "effect_counts_before": ledger_effects_before,
+            "effect_counts_after": ledger_effects_after,
+            "interrupt_observations": [
+                {"kind": row["kind"], "payload": json.loads(row["payload_json"])}
+                for row in interrupts
+            ],
+        },
+        "control_history": None if control_history is None else {
+            "event_type": control_history["event_type"],
+            "payload": json.loads(control_history["payload_json"]),
+        },
+        "exact_binding_preserved": exact_binding_preserved,
+        "effect_count": {
+            "create_thread": provider_effect_delta[0],
+            "start_turn": provider_effect_delta[1],
+            "resume": provider_effect_delta[2],
+        },
+        "last_observe": observed,
+    }
+
+
 def _responsibility_outcome(
     *,
     scenario: str,
@@ -1856,7 +2078,7 @@ def _responsibility_outcome(
     candidate_distribution_name: str,
     candidate_distribution_version: str,
 ) -> QualificationCellOutcome:
-    """기존 4개 실행 cell이 실제로 증명한 책임만 명시적으로 투영한다."""
+    """각 실행 cell이 실제로 증명한 책임만 명시적으로 투영한다."""
 
     mapping = {
         "normal-completion": (
@@ -1890,6 +2112,12 @@ def _responsibility_outcome(
             ("intent", "runtime_receipt", "operation_journal", "effect_count"),
             (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
         ),
+        "cancel-active-job": (
+            "E2E-16",
+            ("task_execution", "cancel", "observe_existing"),
+            ("runtime_job", "control_state", "runtime_observation", "ledger"),
+            (EvidenceProvenance.LIVE,),
+        ),
     }
     responsibility_id, suffix, evidence_kinds, provenance = mapping[scenario]
     artifact_by_kind = {
@@ -1907,6 +2135,9 @@ def _responsibility_outcome(
         "validation": cell_root / "state" / "flowmarshal-engine.sqlite3",
         "intent": cell_root / "state" / "flowmarshal-engine.sqlite3",
         "operation_journal": cell_root / "runtime-receipts.json",
+        "runtime_job": cell_root / "qualification-observation.json",
+        "control_state": cell_root / "qualification-observation.json",
+        "runtime_observation": cell_root / "runtime-receipts.json",
     }
     evidence_records = tuple(
         build_qualification_evidence_record(
@@ -2301,9 +2532,17 @@ def run_project_e2e(
                             cell = _stale_after_materialization(
                                 prepared, recorded, source_digest, roles=roles, governance=governance
                             )
-                        else:
+                        elif scenario == "unknown-receipt-no-duplicate":
                             cell = _unknown_receipt(
                                 prepared, recorded, source_digest, roles=roles, governance=governance
+                            )
+                        else:
+                            cell = _cancel_active_job(
+                                prepared,
+                                recorded,
+                                source_digest,
+                                roles=roles,
+                                governance=governance,
                             )
                     events = recorded.events
                 after_identity = _observe_frozen_plugin_identity(governance, governance_freeze)

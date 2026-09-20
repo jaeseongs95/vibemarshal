@@ -184,6 +184,7 @@ class ScopeReportVerificationTests(unittest.TestCase):
             "stale-after-materialization": "E2E-11",
             "stored-turn-restart-resume": "E2E-07",
             "unknown-receipt-no-duplicate": "E2E-08",
+            "cancel-active-job": "E2E-16",
         }
         cells: list[EvaluationCellCheckpoint] = []
         first_evidence_path: Path | None = None
@@ -381,7 +382,7 @@ class ScopeReportVerificationTests(unittest.TestCase):
         self.assertTrue(result.valid, result.errors)
         self.assertEqual(18, result.recalculated_metrics["cell_count"])
 
-    def test_project_e2e_four_prebuilt_cells_cannot_replace_responsibility_gate(self) -> None:
+    def test_project_e2e_prebuilt_cells_cannot_replace_responsibility_gate(self) -> None:
         fixtures = tuple(sha256_digest({"e2e": scenario}) for scenario in E2E_SCENARIOS)
         contract = _contract(scope=EvaluationScope.PROJECT_E2E, fixtures=fixtures, seeds=(0,))
         cells = []
@@ -394,7 +395,12 @@ class ScopeReportVerificationTests(unittest.TestCase):
                     "thread_create_count": 1},
                 runner_receipts=({"events": events, "events_digest": sha256_digest(events)},),
             ))
-        metrics = {"cell_count": 4, "passed_cell_count": 4, "actual_codex_cell_count": 4, "duplicate_effect_count": 0}
+        metrics = {
+            "cell_count": len(cells),
+            "passed_cell_count": len(cells),
+            "actual_codex_cell_count": len(cells),
+            "duplicate_effect_count": 0,
+        }
         with tempfile.TemporaryDirectory() as raw:
             run = Path(raw); _store(run, contract, cells)
             report = _report(contract, passed=True, metrics=metrics, failures=())

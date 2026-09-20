@@ -15,6 +15,7 @@ from flowmarshal.engine.domain import (
     RuntimeJobKind,
     RuntimeJobObservationKind,
     RuntimeJobStatus,
+    RuntimeIntentKind,
     ValidationExecutionStep,
     utc_now,
 )
@@ -802,7 +803,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
         self.assertEqual("running", attempt["status"])
 
     def test_cancel_reason_does_not_resume_provider(self) -> None:
-        _dispatcher, _dispatched = self._dispatch_worker()
+        _dispatcher, dispatched = self._dispatch_worker()
         supervisor = RuntimeJobSupervisor(self.prepared.service, self.runtime)
         application = EngineApplication(
             self.prepared.service,
@@ -812,9 +813,11 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
 
         cancelled = application.cancel(self.prepared.project_id, reason="사용자 취소")
         blocked = application.run_once(self.prepared.project_id, resume=True)
+        observed = application.observe(self.prepared.project_id)
 
         self.assertEqual("cancelled", cancelled["control_state"])
         self.assertEqual("WORKFLOW_CANCELLED", blocked.blocker_code)
+        self.assertEqual("consumed", observed["runtime_job"]["status"], observed)
         self.assertEqual((1, 1, 0, 1), (
             self.runtime.create_calls,
             self.runtime.turn_calls,
@@ -826,7 +829,364 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
                 "SELECT payload_json FROM runtime_job_observations "
                 "WHERE kind='interrupt_requested' ORDER BY rowid DESC LIMIT 1"
             ).fetchone()
+            attempt = connection.execute(
+                "SELECT status,failure_class FROM attempts WHERE id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+            evidence = connection.execute(
+                "SELECT source_ref FROM evidence_records WHERE attempt_id=? "
+                "ORDER BY rowid DESC LIMIT 1",
+                (dispatched.attempt_id,),
+            ).fetchone()
+            provider_call = connection.execute(
+                "SELECT execution_status,new_turn_count,status FROM provider_calls "
+                "WHERE attempt_id=? ORDER BY rowid DESC LIMIT 1",
+                (dispatched.attempt_id,),
+            ).fetchone()
         self.assertEqual("workflow_cancelled", json.loads(request[0])["reason"])
+        self.assertEqual(("interrupted", None), tuple(attempt))
+        self.assertTrue(evidence["source_ref"].startswith("runtime-cancelled:"))
+        self.assertEqual(("terminal", 1, "usage_unknown"), tuple(provider_call))
+
+    def test_cancel_finalization_requires_cancelled_workflow(self) -> None:
+        _dispatcher, dispatched = self._dispatch_worker()
+        job = self.prepared.service.active_runtime_job(self.prepared.project_id)
+        self.assertIsNotNone(job)
+
+        with self.assertRaisesRegex(EngineServiceError, "WORKFLOW_CANCELLED_REQUIRED"):
+            self.prepared.service.finalize_cancelled_attempt(
+                job_id=job.job_id,
+                evidence_id="evidence_not_recorded",
+                detail="잘못된 직접 호출",
+            )
+        with self.prepared.service.ledger.read() as connection:
+            attempt = connection.execute(
+                "SELECT status FROM attempts WHERE id=?", (dispatched.attempt_id,)
+            ).fetchone()
+        self.assertEqual("running", attempt["status"])
+
+    def test_transient_cancel_observation_failure_retries_before_unknown(self) -> None:
+        class FailsOnceRuntime(FakeCodexRuntime):
+            stored_reads = 0
+
+            def read_stored(inner, **kwargs):
+                inner.stored_reads += 1
+                if inner.stored_reads == 1:
+                    raise TimeoutError("temporary provider timeout")
+                return super(FailsOnceRuntime, inner).read_stored(**kwargs)
+
+        runtime = FailsOnceRuntime(self.inventory)
+        self.runtime = runtime
+        _dispatcher, dispatched = self._dispatch_worker()
+        application = EngineApplication(
+            self.prepared.service,
+            runtime=runtime,
+            supervisor=RuntimeJobSupervisor(self.prepared.service, runtime),
+        )
+
+        application.cancel(self.prepared.project_id, reason="사용자 취소")
+        first = application.observe(self.prepared.project_id)
+        with self.prepared.service.ledger.read() as connection:
+            first_attempt = connection.execute(
+                "SELECT status,failure_class FROM attempts WHERE id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+        second = application.observe(self.prepared.project_id)
+        with self.prepared.service.ledger.read() as connection:
+            second_attempt = connection.execute(
+                "SELECT status,failure_class FROM attempts WHERE id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+
+        self.assertEqual("cancelled", first["runtime_job"]["status"])
+        self.assertEqual(("running", None), tuple(first_attempt))
+        self.assertEqual("consumed", second["runtime_job"]["status"])
+        self.assertEqual(("interrupted", None), tuple(second_attempt))
+        self.assertEqual((1, 1, 0, 1), (
+            runtime.create_calls,
+            runtime.turn_calls,
+            runtime.resume_calls,
+            runtime.interrupt_calls,
+        ))
+
+    def test_cancel_observation_failure_is_preserved_as_unknown(self) -> None:
+        class UnavailableRuntime(FakeCodexRuntime):
+            def read_stored(inner, **_kwargs):
+                raise RuntimeError("provider unavailable")
+
+        runtime = UnavailableRuntime(self.inventory)
+        self.runtime = runtime
+        _dispatcher, dispatched = self._dispatch_worker()
+        application = EngineApplication(
+            self.prepared.service,
+            runtime=runtime,
+            supervisor=RuntimeJobSupervisor(
+                self.prepared.service,
+                runtime,
+                terminal_observation_grace_seconds=0,
+            ),
+        )
+
+        application.cancel(self.prepared.project_id, reason="사용자 취소")
+        observed = application.observe(self.prepared.project_id)
+
+        self.assertEqual("cancelled", observed["runtime_job"]["status"])
+        with self.prepared.service.ledger.read() as connection:
+            attempt = connection.execute(
+                "SELECT status,failure_class FROM attempts WHERE id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+            evidence = connection.execute(
+                "SELECT source_ref FROM evidence_records WHERE attempt_id=? "
+                "ORDER BY rowid DESC LIMIT 1",
+                (dispatched.attempt_id,),
+            ).fetchone()
+        self.assertEqual(("unknown", "external_unknown"), tuple(attempt))
+        self.assertTrue(evidence["source_ref"].startswith("runtime-cancel-unknown:"))
+        self.assertEqual((1, 1, 0), (
+            runtime.create_calls,
+            runtime.turn_calls,
+            runtime.resume_calls,
+        ))
+
+    def test_cancel_with_unreceipted_intent_stays_external_unknown(self) -> None:
+        _dispatcher, dispatched = self._dispatch_worker()
+        self.prepared.service.prepare_runtime_intent(
+            attempt_id=dispatched.attempt_id,
+            kind=RuntimeIntentKind.INTERRUPT_TURN,
+            idempotency_key=f"cancel-unreceipted:{dispatched.attempt_id}",
+            request={"reason": "simulated receipt loss"},
+        )
+        application = EngineApplication(
+            self.prepared.service,
+            runtime=self.runtime,
+            supervisor=RuntimeJobSupervisor(self.prepared.service, self.runtime),
+        )
+
+        application.cancel(self.prepared.project_id, reason="사용자 취소")
+        observed = application.observe(self.prepared.project_id)
+
+        self.assertEqual("provider_terminal", observed["runtime_job"]["status"])
+        with self.prepared.service.ledger.read() as connection:
+            attempt = connection.execute(
+                "SELECT status,failure_class,failure_detail FROM attempts WHERE id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+        self.assertEqual(("unknown", "external_unknown"), tuple(attempt)[:2])
+        self.assertIn("UNRECEIPTED_RUNTIME_INTENT", attempt["failure_detail"])
+
+    def test_cancel_racing_with_late_turn_start_preserves_binding_and_interrupts(self) -> None:
+        start_entered = threading.Event()
+        start_release = threading.Event()
+
+        class LateStartRuntime(FakeCodexRuntime):
+            def start_turn(inner, **kwargs):
+                start_entered.set()
+                if not start_release.wait(1):
+                    raise TimeoutError("late start release를 기다리지 못했습니다.")
+                return super(LateStartRuntime, inner).start_turn(**kwargs)
+
+        runtime = LateStartRuntime(self.inventory)
+        supervisor = RuntimeJobSupervisor(
+            self.prepared.service, runtime, handoff_wait_seconds=0.002,
+        )
+        dispatcher = EngineDispatcher(
+            self.prepared.service, runtime, supervisor=supervisor,
+        )
+        self.prepared.service.compile_execution_spec(
+            self.prepared.proposal, inventory=self.inventory,
+        )
+        dispatched = dispatcher.run_once(self.prepared.project_id)
+        worker = supervisor._workers[dispatched.runtime_job_id]
+        self.addCleanup(start_release.set)
+        self.addCleanup(lambda: worker.join(1))
+        self.assertTrue(start_entered.wait(0.5))
+        application = EngineApplication(
+            self.prepared.service, runtime=runtime, supervisor=supervisor,
+        )
+
+        application.cancel(self.prepared.project_id, reason="late start race")
+        first_observation = application.observe(self.prepared.project_id)
+        self.assertEqual("cancelled", first_observation["runtime_job"]["status"])
+        start_release.set()
+        worker.join(1)
+        self.assertFalse(worker.is_alive())
+        deadline = time.monotonic() + 1
+        observed = None
+        while time.monotonic() < deadline:
+            observed = application.observe(self.prepared.project_id)
+            if observed["runtime_job"]["status"] in {"consumed", "provider_terminal"}:
+                break
+            time.sleep(0.01)
+
+        self.assertIsNotNone(observed)
+        with self.prepared.service.ledger.read() as connection:
+            observation_rows = [
+                (row["kind"], row["payload_json"])
+                for row in connection.execute(
+                    "SELECT kind,payload_json FROM runtime_job_observations "
+                    "WHERE job_id=? ORDER BY rowid",
+                    (dispatched.runtime_job_id,),
+                )
+            ]
+        self.assertEqual(
+            "consumed",
+            observed["runtime_job"]["status"],
+            {
+                "observed": observed,
+                "job_observations": observation_rows,
+                "worker_results": supervisor._results,
+            },
+        )
+        self.assertIsNotNone(observed["runtime_job"]["thread_id"])
+        self.assertIsNotNone(observed["runtime_job"]["turn_id"])
+        self.assertEqual((1, 1, 1), (
+            runtime.create_calls,
+            runtime.turn_calls,
+            runtime.interrupt_calls,
+        ))
+
+    def test_cancel_before_turn_effect_blocks_late_start(self) -> None:
+        create_entered = threading.Event()
+        create_release = threading.Event()
+
+        class LateCreateRuntime(FakeCodexRuntime):
+            def create_thread(inner, **kwargs):
+                create_entered.set()
+                if not create_release.wait(1):
+                    raise TimeoutError("late create release를 기다리지 못했습니다.")
+                return super(LateCreateRuntime, inner).create_thread(**kwargs)
+
+        runtime = LateCreateRuntime(self.inventory)
+        supervisor = RuntimeJobSupervisor(
+            self.prepared.service, runtime, handoff_wait_seconds=0.002,
+        )
+        dispatcher = EngineDispatcher(
+            self.prepared.service, runtime, supervisor=supervisor,
+        )
+        self.prepared.service.compile_execution_spec(
+            self.prepared.proposal, inventory=self.inventory,
+        )
+        dispatched = dispatcher.run_once(self.prepared.project_id)
+        worker = supervisor._workers[dispatched.runtime_job_id]
+        self.addCleanup(create_release.set)
+        self.addCleanup(lambda: worker.join(1))
+        self.assertTrue(create_entered.wait(0.5))
+        application = EngineApplication(
+            self.prepared.service, runtime=runtime, supervisor=supervisor,
+        )
+
+        application.cancel(self.prepared.project_id, reason="before turn effect")
+        create_release.set()
+        worker.join(1)
+        observed = application.observe(self.prepared.project_id)
+
+        self.assertFalse(worker.is_alive())
+        self.assertEqual((1, 0), (runtime.create_calls, runtime.turn_calls))
+        self.assertEqual("consumed", observed["runtime_job"]["status"])
+        with self.prepared.service.ledger.read() as connection:
+            blocked = connection.execute(
+                "SELECT payload_json FROM history_events "
+                "WHERE event_type='runtime.effect_not_started' ORDER BY sequence DESC LIMIT 1"
+            ).fetchone()
+            attempt = connection.execute(
+                "SELECT status,failure_class FROM attempts WHERE id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+            task = connection.execute(
+                "SELECT status FROM task_contracts WHERE id=?",
+                (self.prepared.task_id,),
+            ).fetchone()
+            project = connection.execute(
+                "SELECT run_state,recovery_reason FROM projects WHERE id=?",
+                (self.prepared.project_id,),
+            ).fetchone()
+            provider_call = connection.execute(
+                "SELECT status,execution_status,effect_status,result_status,new_turn_count "
+                "FROM provider_calls WHERE attempt_id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+            prepared_intents = connection.execute(
+                "SELECT COUNT(*) FROM runtime_intents WHERE attempt_id=? AND status='prepared'",
+                (dispatched.attempt_id,),
+            ).fetchone()[0]
+        self.assertIsNotNone(blocked)
+        self.assertEqual("WORKFLOW_CANCELLED", json.loads(blocked["payload_json"])["code"])
+        self.assertEqual(("interrupted", None), tuple(attempt))
+        self.assertEqual("blocked", task["status"])
+        self.assertEqual(("active", None), tuple(project))
+        self.assertEqual(
+            ("released", "released", "none", "invalid", 0),
+            tuple(provider_call),
+        )
+        self.assertEqual(0, prepared_intents)
+
+    def test_pause_during_thread_creation_can_resume_same_attempt(self) -> None:
+        create_entered = threading.Event()
+        create_release = threading.Event()
+
+        class LateCreateRuntime(FakeCodexRuntime):
+            def create_thread(inner, **kwargs):
+                create_entered.set()
+                if not create_release.wait(1):
+                    raise TimeoutError("late create release를 기다리지 못했습니다.")
+                return super(LateCreateRuntime, inner).create_thread(**kwargs)
+
+        runtime = LateCreateRuntime(self.inventory)
+        supervisor = RuntimeJobSupervisor(
+            self.prepared.service, runtime, handoff_wait_seconds=0.002,
+        )
+        dispatcher = EngineDispatcher(
+            self.prepared.service, runtime, supervisor=supervisor,
+        )
+        self.prepared.service.compile_execution_spec(
+            self.prepared.proposal, inventory=self.inventory,
+        )
+        dispatched = dispatcher.run_once(self.prepared.project_id)
+        worker = supervisor._workers[dispatched.runtime_job_id]
+        self.addCleanup(create_release.set)
+        self.addCleanup(lambda: worker.join(1))
+        self.assertTrue(create_entered.wait(0.5))
+        application = EngineApplication(
+            self.prepared.service, runtime=runtime, supervisor=supervisor,
+        )
+
+        application.pause(self.prepared.project_id, reason="thread creation race")
+        create_release.set()
+        worker.join(1)
+
+        self.assertFalse(worker.is_alive())
+        self.assertEqual((1, 1, 1), (
+            runtime.create_calls,
+            runtime.turn_calls,
+            runtime.interrupt_calls,
+        ))
+        self.assertEqual(
+            "WORKFLOW_PAUSED",
+            application.run_once(self.prepared.project_id).blocker_code,
+        )
+        first = application.run_once(self.prepared.project_id, resume=True)
+        second = application.run_once(self.prepared.project_id)
+
+        self.assertEqual(RunOnceAction.OBSERVED, first.action)
+        self.assertEqual(RunOnceAction.DISPATCHED, second.action)
+        self.assertEqual((1, 2, 1, 1), (
+            runtime.create_calls,
+            runtime.turn_calls,
+            runtime.resume_calls,
+            runtime.interrupt_calls,
+        ))
+        with self.prepared.service.ledger.read() as connection:
+            paused_effect_markers = connection.execute(
+                "SELECT COUNT(*) FROM history_events "
+                "WHERE event_type='runtime.effect_not_started' AND payload_json LIKE '%WORKFLOW_PAUSED%'"
+            ).fetchone()[0]
+            prepared_intents = connection.execute(
+                "SELECT COUNT(*) FROM runtime_intents WHERE attempt_id=? AND status='prepared'",
+                (dispatched.attempt_id,),
+            ).fetchone()[0]
+        self.assertEqual(0, paused_effect_markers)
+        self.assertEqual(0, prepared_intents)
 
     def test_second_interrupted_turn_is_resume_exhausted(self) -> None:
         dispatcher, _dispatched = self._dispatch_worker()

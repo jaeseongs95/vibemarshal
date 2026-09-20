@@ -1100,8 +1100,27 @@ class EngineApplication:
         if self.supervisor is None:
             raise EngineApplicationError("RUNTIME_REQUIRED")
         job = self.service.active_runtime_job(project_id)
+        cancelled = self.service.workflow_control_state(project_id) == "cancelled"
+        if job is None and cancelled:
+            job = self.service.unsettled_cancelled_runtime_job(project_id)
         if job is not None:
-            if job.status is RuntimeJobStatus.COLLECTOR_LOST and job.thread_id is not None:
+            if cancelled and job.status in {
+                RuntimeJobStatus.CANCELLED,
+                RuntimeJobStatus.PROVIDER_TERMINAL,
+            }:
+                if job.status is RuntimeJobStatus.CANCELLED:
+                    job = self._dispatcher().finalize_cancelled_runtime_job(job.job_id)
+                    if job.status is RuntimeJobStatus.CANCELLED:
+                        try:
+                            job = self.supervisor.observe_cancelled(job.job_id)
+                        except Exception as error:
+                            job = self._dispatcher().finalize_cancelled_runtime_job(
+                                job.job_id,
+                                observation_error=error,
+                            )
+                if job.status is RuntimeJobStatus.PROVIDER_TERMINAL:
+                    job = self._dispatcher().finalize_cancelled_runtime_job(job.job_id)
+            elif job.status is RuntimeJobStatus.COLLECTOR_LOST and job.thread_id is not None:
                 job = self.supervisor.reattach(job.job_id)
             else:
                 job = self.supervisor.tick(job.job_id)

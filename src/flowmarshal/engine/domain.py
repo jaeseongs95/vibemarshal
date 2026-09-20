@@ -1928,14 +1928,25 @@ class RuntimeJob(EngineModel):
     _updated_at_is_aware = field_validator("updated_at")(_aware)
 
     @model_validator(mode="after")
-    def terminal_is_provider_observed(self) -> "RuntimeJob":
-        terminal = self.status in {
+    def terminal_or_proven_no_effect_is_consistent(self) -> "RuntimeJob":
+        provider_terminal = self.provider_terminal_status is not None
+        if self.status is RuntimeJobStatus.PROVIDER_TERMINAL and not provider_terminal:
+            raise ValueError("provider terminal 상태와 관측값이 일치해야 합니다.")
+        if self.status is RuntimeJobStatus.CONSUMED and not provider_terminal:
+            if any(value is not None for value in (self.thread_id, self.turn_id, self.result_digest)):
+                raise ValueError("provider turn 전 무효과 소비에는 provider binding이나 결과가 없어야 합니다.")
+        elif (
+            self.status not in {
+                RuntimeJobStatus.PROVIDER_TERMINAL,
+                RuntimeJobStatus.CONSUMED,
+            }
+            and provider_terminal
+        ):
+            raise ValueError("provider terminal 상태와 관측값이 일치해야 합니다.")
+        if self.result_digest is not None and self.status not in {
             RuntimeJobStatus.PROVIDER_TERMINAL,
             RuntimeJobStatus.CONSUMED,
-        }
-        if terminal != (self.provider_terminal_status is not None):
-            raise ValueError("provider terminal 상태와 관측값이 일치해야 합니다.")
-        if self.result_digest is not None and not terminal:
+        }:
             raise ValueError("provider terminal 전에는 job 결과 digest를 둘 수 없습니다.")
         return self
 

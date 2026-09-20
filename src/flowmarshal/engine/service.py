@@ -1493,6 +1493,19 @@ class EngineService:
             ).fetchone()
         return None if row is None else self._runtime_job_from_row(row)
 
+    def unsettled_cancelled_runtime_job(self, project_id: str) -> RuntimeJob | None:
+        """workflow cancel 뒤 아직 terminal 처리되지 않은 Attempt의 최신 job을 읽는다."""
+
+        with self.ledger.read() as connection:
+            row = connection.execute(
+                "SELECT j.* FROM runtime_jobs j JOIN attempts a ON a.id=j.attempt_id "
+                "WHERE j.project_id=? AND j.status IN ('cancelled','provider_terminal') "
+                "AND a.status IN ('reserved','starting','running') "
+                "ORDER BY j.created_at DESC,j.rowid DESC LIMIT 1",
+                (project_id,),
+            ).fetchone()
+        return None if row is None else self._runtime_job_from_row(row)
+
     def _append_runtime_job_observation(
         self,
         tx: Any,
@@ -1599,13 +1612,14 @@ class EngineService:
                 RuntimeJobStatus.RUNNING.value,
                 RuntimeJobStatus.INTERRUPTING.value,
                 RuntimeJobStatus.COLLECTOR_LOST.value,
+                RuntimeJobStatus.CANCELLED.value,
             }:
                 raise EngineServiceError(
-                    "활성 runtime job에만 provider binding을 추가할 수 있습니다."
+                    "실행 또는 취소 관측 중인 runtime job에만 provider binding을 추가할 수 있습니다."
                 )
             tx.connection.execute(
                 "UPDATE runtime_jobs SET thread_id=?,turn_id=?,updated_at=? "
-                "WHERE id=? AND status IN ('running','interrupting','collector_lost') "
+                "WHERE id=? AND status IN ('running','interrupting','collector_lost','cancelled') "
                 "AND thread_id IS NULL AND turn_id IS NULL",
                 (thread_id, turn_id, tx.now, job_id),
             )
@@ -1826,6 +1840,254 @@ class EngineService:
             )
             return self._runtime_job_from_row(
                 tx.one("SELECT * FROM runtime_jobs WHERE id=?", (job_id,))
+            )
+
+    def finalize_cancelled_attempt(
+        self,
+        *,
+        job_id: str,
+        evidence_id: str,
+        detail: str,
+        observation_unknown: bool = False,
+    ) -> None:
+        """cancelled workflow의 active Attempt를 terminal 또는 unknown으로 한 번 닫는다."""
+
+        with self.ledger.transaction() as tx:
+            job = tx.one("SELECT * FROM runtime_jobs WHERE id=?", (job_id,))
+            if job["attempt_id"] is None:
+                raise EngineServiceError("CANCELLED_RUNTIME_JOB_ATTEMPT_REQUIRED")
+            attempt = tx.one("SELECT * FROM attempts WHERE id=?", (job["attempt_id"],))
+            if attempt["status"] in {
+                AttemptStatus.INTERRUPTED.value,
+                AttemptStatus.UNKNOWN.value,
+            }:
+                return
+            if attempt["status"] not in {
+                AttemptStatus.RESERVED.value,
+                AttemptStatus.STARTING.value,
+                AttemptStatus.RUNNING.value,
+            }:
+                raise EngineServiceError("active Attempt만 cancel 관측으로 종료할 수 있습니다.")
+            project = tx.one(
+                "SELECT active_goal_revision_id FROM projects WHERE id=?",
+                (attempt["project_id"],),
+            )
+            control = "running"
+            for row in tx.all(
+                "SELECT event_type,payload_json FROM history_events "
+                "WHERE project_id=? AND event_type IN "
+                "('workflow.paused','workflow.resumed','workflow.cancelled') "
+                "ORDER BY sequence DESC",
+                (attempt["project_id"],),
+            ):
+                payload = json.loads(row["payload_json"])
+                if payload.get("goal_revision_id") == project["active_goal_revision_id"]:
+                    control = {
+                        "workflow.paused": "paused",
+                        "workflow.resumed": "running",
+                        "workflow.cancelled": "cancelled",
+                    }[row["event_type"]]
+                    break
+            if control != "cancelled":
+                raise EngineServiceError("WORKFLOW_CANCELLED_REQUIRED")
+            effect_not_started = self._cancelled_effect_not_started(
+                tx.connection,
+                job=job,
+                attempt=attempt,
+            )
+            unresolved: list[str] = []
+            unreceipted = tx.connection.execute(
+                "SELECT COUNT(*) FROM runtime_intents WHERE attempt_id=? AND status='prepared'",
+                (attempt["id"],),
+            ).fetchone()[0]
+            if unreceipted and effect_not_started is None:
+                unresolved.append("UNRECEIPTED_RUNTIME_INTENT")
+            if (
+                effect_not_started is None
+                and attempt["kind"] == AttemptKind.EXECUTION.value
+                and attempt["task_id"] is not None
+            ):
+                unresolved.extend(
+                    self._external_effect_execution_call_blockers(
+                        tx,
+                        task_id=attempt["task_id"],
+                        attempt_id=attempt["id"],
+                        require_attempt_succeeded=False,
+                        require_effect_confirmation=True,
+                    )
+                )
+            if observation_unknown or unresolved:
+                status = AttemptStatus.UNKNOWN.value
+                failure_class = FailureClass.EXTERNAL_UNKNOWN.value
+                event_type = "attempt.cancel_observation_unknown"
+                if unresolved:
+                    detail = detail + " unresolved=" + ",".join(unresolved)
+                tx.connection.execute(
+                    "UPDATE projects SET run_state='recovery_required',recovery_reason=?,updated_at=? "
+                    "WHERE id=?",
+                    ("CANCEL_OBSERVATION_UNKNOWN", tx.now, attempt["project_id"]),
+                )
+            else:
+                if (
+                    job["status"] != RuntimeJobStatus.PROVIDER_TERMINAL.value
+                    and effect_not_started is None
+                ):
+                    raise EngineServiceError("cancelled provider terminal 관측이 필요합니다.")
+                status = AttemptStatus.INTERRUPTED.value
+                failure_class = None
+                event_type = "attempt.interrupted"
+                if effect_not_started is not None:
+                    for intent_id in effect_not_started["intent_ids"]:
+                        tx.connection.execute(
+                            "UPDATE runtime_intents SET status='abandoned',updated_at=? WHERE id=?",
+                            (tx.now, intent_id),
+                        )
+                        tx.history(
+                            attempt["project_id"],
+                            "runtime.intent_abandoned",
+                            "runtime_intent",
+                            intent_id,
+                            {
+                                "attempt_id": attempt["id"],
+                                "reason": "WORKFLOW_CANCELLED_BEFORE_PROVIDER_EFFECT",
+                            },
+                        )
+                    tx.connection.execute(
+                        "UPDATE provider_calls SET status='released',execution_status='released',"
+                        "effect_status='none',result_status='invalid',completed_at=? WHERE id=?",
+                        (tx.now, effect_not_started["provider_call_id"]),
+                    )
+                    tx.history(
+                        attempt["project_id"],
+                        "budget.cancelled_before_turn_released",
+                        "provider_call",
+                        effect_not_started["provider_call_id"],
+                        {
+                            "attempt_id": attempt["id"],
+                            "job_id": job_id,
+                            "new_turn_count": 0,
+                        },
+                    )
+                tx.connection.execute(
+                    "UPDATE runtime_jobs SET status='consumed',updated_at=? WHERE id=?",
+                    (tx.now, job_id),
+                )
+                consumed = {
+                    "result_digest": job["result_digest"],
+                    "cancelled_before_provider_turn": effect_not_started is not None,
+                }
+                self._append_runtime_job_observation(
+                    tx,
+                    job_id=job_id,
+                    project_id=job["project_id"],
+                    kind=RuntimeJobObservationKind.CONSUMED,
+                    payload=consumed,
+                )
+                tx.history(
+                    job["project_id"],
+                    "runtime_job.consumed",
+                    "runtime_job",
+                    job_id,
+                    consumed,
+                )
+            tx.connection.execute(
+                "UPDATE attempts SET status=?,failure_class=?,failure_detail=?,ended_at=?,updated_at=? "
+                "WHERE id=?",
+                (status, failure_class, detail, tx.now, tx.now, attempt["id"]),
+            )
+            if attempt["kind"] == AttemptKind.EXECUTION.value:
+                tx.connection.execute(
+                    "UPDATE task_contracts SET status='blocked',updated_at=? WHERE id=?",
+                    (tx.now, attempt["task_id"]),
+                )
+            tx.history(
+                attempt["project_id"],
+                event_type,
+                "attempt",
+                attempt["id"],
+                {
+                    "task_id": attempt["task_id"],
+                    "job_id": job_id,
+                    "evidence_id": evidence_id,
+                    "failure_class": failure_class,
+                    "observed_terminal_status": job["provider_terminal_status"],
+                    "unresolved": unresolved,
+                },
+            )
+
+    @staticmethod
+    def _cancelled_effect_not_started(
+        connection: Any,
+        *,
+        job: Any,
+        attempt: Any,
+    ) -> dict[str, Any] | None:
+        """취소로 준비된 provider 효과가 하나도 시작되지 않았음을 원장에서 증명한다."""
+
+        if job["thread_id"] is not None or job["turn_id"] is not None:
+            return None
+        prepared = connection.execute(
+            "SELECT id FROM runtime_intents WHERE attempt_id=? AND status='prepared' "
+            "ORDER BY prepared_at,rowid",
+            (attempt["id"],),
+        ).fetchall()
+        if not prepared:
+            return None
+        for intent in prepared:
+            marker = connection.execute(
+                "SELECT payload_json FROM history_events WHERE project_id=? "
+                "AND event_type='runtime.effect_not_started' "
+                "AND entity_type='runtime_intent' AND entity_id=? "
+                "ORDER BY sequence DESC LIMIT 1",
+                (attempt["project_id"], intent["id"]),
+            ).fetchone()
+            if (
+                marker is None
+                or json.loads(marker["payload_json"]).get("code") != "WORKFLOW_CANCELLED"
+            ):
+                return None
+        calls = connection.execute(
+            "SELECT id,status,execution_status,new_turn_count,receipt_json "
+            "FROM provider_calls WHERE attempt_id=? ORDER BY rowid",
+            (attempt["id"],),
+        ).fetchall()
+        if len(calls) != 1:
+            return None
+        call = calls[0]
+        if (
+            call["status"] != "reserved"
+            or call["execution_status"] != "reserved"
+            or call["new_turn_count"] != 0
+            or call["receipt_json"] is not None
+        ):
+            return None
+        return {
+            "intent_ids": tuple(intent["id"] for intent in prepared),
+            "provider_call_id": call["id"],
+        }
+
+    def cancelled_runtime_effect_not_started(self, job_id: str) -> bool:
+        """runtime job의 취소가 provider turn 이전 무효과로 증명되는지 읽는다."""
+
+        with self.ledger.read() as connection:
+            job = connection.execute(
+                "SELECT * FROM runtime_jobs WHERE id=?",
+                (job_id,),
+            ).fetchone()
+            if job is None or job["attempt_id"] is None:
+                return False
+            attempt = connection.execute(
+                "SELECT * FROM attempts WHERE id=?",
+                (job["attempt_id"],),
+            ).fetchone()
+            return (
+                attempt is not None
+                and self._cancelled_effect_not_started(
+                    connection,
+                    job=job,
+                    attempt=attempt,
+                )
+                is not None
             )
 
     def workflow_control_state(self, project_id: str) -> str:
@@ -4049,6 +4311,25 @@ class EngineService:
                     "RUNTIME_INTENT_BINDING_MISMATCH: 저장된 intent와 실제 효과 요청이 다릅니다."
                 )
             self._assert_attempt_authorized(tx, attempt)
+            project = tx.one(
+                "SELECT active_goal_revision_id FROM projects WHERE id=?",
+                (attempt["project_id"],),
+            )
+            for row in tx.all(
+                "SELECT event_type,payload_json FROM history_events "
+                "WHERE project_id=? AND event_type IN "
+                "('workflow.paused','workflow.resumed','workflow.cancelled') "
+                "ORDER BY sequence DESC",
+                (attempt["project_id"],),
+            ):
+                payload = json.loads(row["payload_json"])
+                if payload.get("goal_revision_id") != project["active_goal_revision_id"]:
+                    continue
+                if row["event_type"] == "workflow.cancelled":
+                    raise EngineServiceError(
+                        "WORKFLOW_CANCELLED: 취소 뒤 새 provider 효과를 시작할 수 없습니다."
+                    )
+                break
             task = tx.one("SELECT * FROM task_contracts WHERE id = ?", (attempt["task_id"],))
             spec_row = tx.one(
                 "SELECT * FROM execution_spec_revisions WHERE task_id = ? AND is_current = 1",

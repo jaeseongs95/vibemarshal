@@ -13,6 +13,7 @@ from flowmarshal.engine.budget import BudgetManager
 from flowmarshal.engine.e2e_qualification import (
     RecordedRuntime,
     _assert_no_transient_plugin_identity_change,
+    _cancel_active_job,
     _checkpoint_model_observation,
     _contract,
     _copy_fixture,
@@ -732,6 +733,74 @@ class EngineE2EQualificationTests(unittest.TestCase):
             self.assertEqual(0, runtime.resume_calls)
             self.assertNotIn("start_turn", [event["operation"] for event in runtime.events])
             self.assertNotIn("resume", [event["operation"] for event in runtime.events])
+
+    def test_cancel_active_job_observes_exact_turn_without_new_provider_effect(self) -> None:
+        policies = load_evaluation_policies(
+            budget_policy_path=ROOT / "config" / "pre-1.0-validation-budget.json",
+            role_timeout_policy_path=ROOT / "config" / "pre-1.0-role-timeouts.json",
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root = Path(raw) / "cell"
+            cell_root.mkdir()
+            workspace, source_digest = _copy_fixture(ROOT, cell_root)
+            prepared = _prepare(
+                workspace=workspace,
+                state_root=cell_root / "state",
+                inventory=self.inventory,
+                roles=self.roles,
+                evaluation_policies=policies,
+                evaluation_contract_digest=sha256_digest({"contract": "cancel"}),
+                fixture_digest=sha256_digest({"fixture": "cancel-active-job"}),
+            )
+            runtime = RecordedRuntime(
+                FakeCodexRuntime(self.inventory), journal=cell_root / "runtime-receipts.json"
+            )
+
+            result = _cancel_active_job(
+                prepared,
+                runtime,
+                source_digest,
+                governance=ALLOW_ALL,
+                timeout_seconds=2,
+            )
+
+            self.assertTrue(result["passed"], result)
+            self.assertEqual("cancelled", result["control_state"])
+            self.assertEqual("WORKFLOW_CANCELLED", result["run_once_blocker"])
+            self.assertEqual("consumed", result["runtime_job"]["status"])
+            self.assertEqual("interrupted", result["ledger"]["attempt_status"])
+            self.assertEqual(
+                {"create_thread": 0, "start_turn": 0, "resume": 0},
+                result["effect_count"],
+            )
+            self.assertTrue(result["exact_binding_preserved"])
+            self.assertIn("read_stored", [event["operation"] for event in runtime.events])
+
+            (cell_root / "qualification-observation.json").write_text(
+                json.dumps(result), encoding="utf-8"
+            )
+            digest = sha256_digest({"binding": "cancel-active-job"})
+            outcome = _responsibility_outcome(
+                scenario="cancel-active-job",
+                prepared=prepared,
+                cell=result,
+                contract=SimpleNamespace(contract_digest=digest),
+                cell_root=cell_root,
+                run_root=cell_root.parent,
+                fixture_digest=digest,
+                freeze_bundle_digest=digest,
+                governance_plugin_identity_digest=digest,
+                candidate_wheel_digest=digest,
+                candidate_wheel_binding_digest=digest,
+                candidate_distribution_name="flowmarshal-engine",
+                candidate_distribution_version="1.0.0",
+            )
+            self.assertEqual(("E2E-16",), outcome.responsibility_ids)
+            self.assertEqual((EvidenceProvenance.LIVE,), outcome.provenance)
+            self.assertEqual(
+                {"runtime_job", "control_state", "runtime_observation", "ledger"},
+                set(outcome.evidence_kinds),
+            )
 
     def test_journal_tamper_and_nonresumable_cell_are_explicitly_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

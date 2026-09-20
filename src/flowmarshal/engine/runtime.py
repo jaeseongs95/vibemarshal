@@ -1711,16 +1711,9 @@ class RuntimeJobSupervisor:
         thread_id = event.get("thread_id")
         turn_id = event.get("turn_id")
         if isinstance(thread_id, str) and isinstance(turn_id, str):
-            before = self.service.load_runtime_job(job_id)
-            bound = self.service.bind_runtime_job_provider(
+            self.bind_provider_turn(
                 job_id, thread_id=thread_id, turn_id=turn_id,
             )
-            if (
-                before.thread_id is None
-                and bound.status is RuntimeJobStatus.INTERRUPTING
-                and not self._interrupt_receipt_recorded(job_id)
-            ):
-                self._deliver_bounded_interrupt(bound)
         payload = {"role_progress": self._json_value(event)}
         self.service.record_runtime_job_observation(
             job_id, kind=RuntimeJobObservationKind.PROVIDER_PROGRESS, payload=payload,
@@ -1885,9 +1878,20 @@ class RuntimeJobSupervisor:
         return self.service.load_runtime_job(job_id)
 
     def bind_provider_turn(self, job_id: str, *, thread_id: str, turn_id: str) -> RuntimeJob:
-        return self.service.bind_runtime_job_provider(
+        before = self.service.load_runtime_job(job_id)
+        bound = self.service.bind_runtime_job_provider(
             job_id, thread_id=thread_id, turn_id=turn_id,
         )
+        if (
+            before.thread_id is None
+            and bound.status in {
+                RuntimeJobStatus.INTERRUPTING,
+                RuntimeJobStatus.CANCELLED,
+            }
+            and not self._interrupt_receipt_recorded(job_id)
+        ):
+            self._deliver_bounded_interrupt(bound)
+        return self.service.load_runtime_job(job_id)
 
     def _request_bounded_interrupt(
         self,
@@ -1956,7 +1960,7 @@ class RuntimeJobSupervisor:
         job = self.service.load_runtime_job(job_id)
         if job.status not in {
             RuntimeJobStatus.RUNNING, RuntimeJobStatus.COLLECTOR_LOST,
-            RuntimeJobStatus.INTERRUPTING,
+            RuntimeJobStatus.INTERRUPTING, RuntimeJobStatus.CANCELLED,
         }:
             return job
         checkpointed, checkpoint_result = self._durable_target_result(job_id)
@@ -1980,7 +1984,10 @@ class RuntimeJobSupervisor:
             and not self._interrupt_receipt_recorded(job_id)
         ):
             self._deliver_bounded_interrupt(job)
-        if job.status is not RuntimeJobStatus.INTERRUPTING:
+        if job.status not in {
+            RuntimeJobStatus.INTERRUPTING,
+            RuntimeJobStatus.CANCELLED,
+        }:
             self.service.start_runtime_job(
                 job_id, thread_id=job.thread_id, turn_id=job.turn_id
             )
@@ -2018,6 +2025,47 @@ class RuntimeJobSupervisor:
             self.service.record_runtime_job_observation(
                 job_id, kind=RuntimeJobObservationKind.PROVIDER_PROGRESS, payload=payload)
         return self.service.load_runtime_job(job_id)
+
+    def observe_cancelled(self, job_id: str) -> RuntimeJob:
+        """cancel된 exact turn을 관측하되 일시 read 실패는 grace 동안 재시도한다."""
+
+        job = self.service.load_runtime_job(job_id)
+        if job.status is not RuntimeJobStatus.CANCELLED:
+            return job
+        grace_anchor = job.ended_at or job.updated_at
+        grace_elapsed = datetime.now(timezone.utc) >= grace_anchor + timedelta(
+            seconds=self.terminal_observation_grace_seconds
+        )
+        if job.thread_id is None or job.turn_id is None:
+            if grace_elapsed:
+                raise RuntimePolicyError("CANCELLED_RUNTIME_BINDING_UNKNOWN")
+            return job
+        try:
+            return self.reattach(job_id)
+        except Exception as error:
+            self.service.record_runtime_job_observation(
+                job_id,
+                kind=RuntimeJobObservationKind.COLLECTOR_LOST,
+                payload={
+                    "reason": "cancelled provider turn re-observation failed",
+                    "error_type": type(error).__name__,
+                    "error": str(error),
+                },
+            )
+            definitive = isinstance(error, RuntimePolicyError) and any(
+                code in str(error)
+                for code in {
+                    "RUNTIME_OBSERVATION_BINDING_MISMATCH",
+                    "RUNTIME_OBSERVATION_PAGINATION_INCOMPLETE",
+                }
+            )
+            job = self.service.load_runtime_job(job_id)
+            grace_elapsed = datetime.now(timezone.utc) >= (job.ended_at or job.updated_at) + timedelta(
+                seconds=self.terminal_observation_grace_seconds
+            )
+            if definitive or grace_elapsed:
+                raise
+            return job
 
     def mark_collector_lost(self, job_id: str, *, reason: str) -> RuntimeJob:
         self.service.record_runtime_job_observation(
@@ -2296,6 +2344,8 @@ class EngineDispatcher:
                             "PERMISSION_POLICY_MISMATCH",
                             "TARGET_BINDING_CHANGED",
                             "EFFECT_CHECKPOINT_STALE",
+                            "WORKFLOW_CANCELLED",
+                            "WORKFLOW_PAUSED",
                         } or prefix.startswith("MODEL_LOCK_") else "RUNTIME_EFFECT_PREFLIGHT_FAILED"
                     self.service.record_runtime_effect_not_started(
                         attempt_id=attempt_id,
@@ -4064,7 +4114,7 @@ class EngineDispatcher:
         if current_job_id is not None and turn_receipt.binding is not None:
             # start receipt가 생긴 즉시 exact turn을 durable job에 먼저 결속한다.
             # Attempt receipt 기록과 scheduler 관측이 경합해도 provider turn을 잃지 않는다.
-            self.service.bind_runtime_job_provider(
+            self.supervisor.bind_provider_turn(
                 current_job_id,
                 thread_id=turn_receipt.binding.thread_id,
                 turn_id=turn_receipt.binding.turn_id,
@@ -4087,7 +4137,7 @@ class EngineDispatcher:
                 else RuntimeJobKind.TASK_SEMANTIC_VALIDATE
             )
             if current_job_id is not None:
-                runtime_job = self.service.bind_runtime_job_provider(
+                runtime_job = self.supervisor.bind_provider_turn(
                     current_job_id,
                     thread_id=turn_receipt.binding.thread_id,
                     turn_id=turn_receipt.binding.turn_id,
@@ -4157,6 +4207,135 @@ class EngineDispatcher:
             terminal_status=observation.terminal_status, provider_payload=observation.payload,
             output_digest=None if observation.final_response is None else sha256_digest(observation.final_response),
         )
+
+    def _record_cancel_evidence(
+        self,
+        job: RuntimeJob,
+        *,
+        source_ref: str,
+        document: dict[str, Any],
+    ) -> str:
+        """같은 cancel observation의 evidence를 재시작 뒤에도 한 번만 남긴다."""
+
+        with self.service.ledger.read() as connection:
+            existing = connection.execute(
+                "SELECT id FROM evidence_records WHERE project_id=? AND source_ref=? "
+                "ORDER BY rowid DESC LIMIT 1",
+                (job.project_id, source_ref),
+            ).fetchone()
+        if existing is not None:
+            return existing["id"]
+        evidence = EvidenceRecord(
+            evidence_id=new_id("evidence"),
+            project_id=job.project_id,
+            task_id=job.task_id,
+            attempt_id=job.attempt_id,
+            kind=EvidenceKind.EXTERNAL_OBSERVATION,
+            source_ref=source_ref,
+            observation=json.dumps(document, ensure_ascii=False, sort_keys=True),
+            content_digest=sha256_digest(document),
+            observed_at=utc_now(),
+        )
+        self.service.record_evidence(evidence)
+        return evidence.evidence_id
+
+    def finalize_cancelled_runtime_job(
+        self,
+        job_id: str,
+        *,
+        observation_error: BaseException | None = None,
+    ) -> RuntimeJob:
+        """새 provider 효과 없이 cancel된 exact turn의 관측으로 Attempt를 닫는다."""
+
+        job = self.service.load_runtime_job(job_id)
+        if job.attempt_id is None or job.task_id is None:
+            return job
+        with self.service.ledger.read() as connection:
+            attempt = connection.execute(
+                "SELECT status FROM attempts WHERE id=?", (job.attempt_id,)
+            ).fetchone()
+        if attempt is None or attempt["status"] not in {"reserved", "starting", "running"}:
+            return job
+        if self.service.cancelled_runtime_effect_not_started(job_id):
+            document = self._bounded_failure_document({
+                "error_code": "WORKFLOW_CANCELLED_BEFORE_PROVIDER_EFFECT",
+                "job_id": job_id,
+                "thread_id": job.thread_id,
+                "turn_id": job.turn_id,
+            })
+            evidence_id = self._record_cancel_evidence(
+                job,
+                source_ref=f"runtime-cancelled-before-effect:{job_id}",
+                document=document,
+            )
+            self.service.finalize_cancelled_attempt(
+                job_id=job_id,
+                evidence_id=evidence_id,
+                detail="사용자 취소로 provider turn이 시작되지 않았습니다.",
+            )
+            return self.service.load_runtime_job(job_id)
+        if observation_error is not None:
+            document = self._bounded_failure_document({
+                "error_code": "CANCEL_OBSERVATION_UNKNOWN",
+                "job_id": job_id,
+                "thread_id": job.thread_id,
+                "turn_id": job.turn_id,
+                "error_type": type(observation_error).__name__,
+                "detail": str(observation_error),
+            })
+            evidence_id = self._record_cancel_evidence(
+                job,
+                source_ref=f"runtime-cancel-unknown:{job_id}",
+                document=document,
+            )
+            self.service.finalize_cancelled_attempt(
+                job_id=job_id,
+                evidence_id=evidence_id,
+                detail="취소한 provider turn의 exact 상태를 재관측하지 못했습니다.",
+                observation_unknown=True,
+            )
+            return self.service.load_runtime_job(job_id)
+        if job.status is not RuntimeJobStatus.PROVIDER_TERMINAL:
+            return job
+        with self.service.ledger.read() as connection:
+            terminal = connection.execute(
+                "SELECT payload_json FROM runtime_job_observations "
+                "WHERE job_id=? AND provider_terminal=1 ORDER BY rowid DESC LIMIT 1",
+                (job_id,),
+            ).fetchone()
+        if terminal is None:
+            raise EngineServiceError("CANCELLED_PROVIDER_TERMINAL_OBSERVATION_REQUIRED")
+        payload = json.loads(terminal["payload_json"])
+        result = payload.get("result")
+        try:
+            observation = RuntimeObservation.model_validate(result)
+        except ValidationError as error:
+            return self.finalize_cancelled_runtime_job(
+                job_id,
+                observation_error=RuntimePolicyError(
+                    f"CANCELLED_PROVIDER_OBSERVATION_INVALID: {error}"
+                ),
+            )
+        self._record_worker_usage(job.attempt_id, observation)
+        document = self._bounded_failure_document({
+            "error_code": "WORKFLOW_CANCELLED",
+            "job_id": job_id,
+            "provider_observation": observation.model_dump(mode="json"),
+        })
+        evidence_id = self._record_cancel_evidence(
+            job,
+            source_ref=f"runtime-cancelled:{job_id}",
+            document=document,
+        )
+        self.service.finalize_cancelled_attempt(
+            job_id=job_id,
+            evidence_id=evidence_id,
+            detail=(
+                "사용자 취소 뒤 exact provider turn terminal을 재관측했습니다. "
+                f"terminal_status={observation.terminal_status}"
+            ),
+        )
+        return self.service.load_runtime_job(job_id)
 
     def _resume_bound_attempt(self, row: Any, spec: TaskExecutionSpecRevision) -> None:
         binding = ThreadBinding.model_validate_json(row["binding_json"])
