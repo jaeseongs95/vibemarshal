@@ -2033,6 +2033,11 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
             candidate_binding = verify_candidate_wheel_metadata(metadata)
         except QualificationManifestError as error:
             raise QualificationRunError(str(error)) from error
+        release_freeze = metadata.get("release_freeze_path")
+        if not isinstance(release_freeze, str) or not Path(release_freeze).is_absolute():
+            raise QualificationRunError(
+                "project-e2e resume metadata에 절대경로 release_freeze_path가 없습니다."
+            )
 
         return run_project_e2e(
             root=base,
@@ -2042,5 +2047,6 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
             evaluation_policies=policies,
             candidate_wheel=candidate_binding.wheel_path,
             runtime_selection=runtime_selection,
+            release_freeze=release_freeze,
         )
     raise QualificationRunError(f"지원하지 않는 resume scope입니다: {scope}")

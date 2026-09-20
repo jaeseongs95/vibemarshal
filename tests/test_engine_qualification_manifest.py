@@ -35,6 +35,7 @@ WHEEL = "sha256:" + "e" * 64
 WHEEL_BINDING = "sha256:" + "d" * 64
 DISTRIBUTION_NAME = "flowmarshal-engine"
 DISTRIBUTION_VERSION = "0.2.0a1"
+GOVERNANCE_PLUGIN_IDENTITY = "sha256:" + "9" * 64
 
 
 class QualificationManifestTests(unittest.TestCase):
@@ -306,6 +307,78 @@ class QualificationManifestTests(unittest.TestCase):
         self.assertFalse(report.passed)
         self.assertTrue(
             any("CANDIDATE_WHEEL_BINDING_MISSING" in item for item in report.failures)
+        )
+
+    def test_governance_plugin_identity_is_optional_but_exact_when_expected(self) -> None:
+        outcomes = tuple(
+            self.outcome(item.responsibility_id)
+            for item in self.suite.e2e_responsibilities
+        )
+        self.assertTrue(self.evaluate(outcomes).passed)
+
+        bound = tuple(
+            outcome.model_copy(
+                update={
+                    "evidence_records": tuple(
+                        record.model_copy(
+                            update={
+                                "governance_plugin_identity_digest": (
+                                    GOVERNANCE_PLUGIN_IDENTITY
+                                )
+                            }
+                        )
+                        for record in outcome.evidence_records
+                    )
+                }
+            )
+            for outcome in outcomes
+        )
+        expected_arguments = {
+            "evaluation_contract_digest": CONTRACT,
+            "run_root": self.run_root,
+            "expected_cell_bindings": {
+                item.cell_id: (FIXTURE, 0) for item in bound
+            },
+            "expected_governance_plugin_identity_digest": (
+                GOVERNANCE_PLUGIN_IDENTITY
+            ),
+            "expected_candidate_wheel_digest": WHEEL,
+            "expected_candidate_wheel_binding_digest": WHEEL_BINDING,
+            "expected_candidate_distribution_name": DISTRIBUTION_NAME,
+            "expected_candidate_distribution_version": DISTRIBUTION_VERSION,
+        }
+        report = evaluate_qualification_responsibilities(
+            self.suite,
+            bound,
+            **expected_arguments,
+        )
+        self.assertTrue(report.passed, report.failures)
+
+        first = bound[0]
+        drifted = first.model_copy(
+            update={
+                "evidence_records": (
+                    first.evidence_records[0].model_copy(
+                        update={
+                            "governance_plugin_identity_digest": "sha256:" + "8" * 64
+                        }
+                    ),
+                    *first.evidence_records[1:],
+                )
+            }
+        )
+        report = evaluate_qualification_responsibilities(
+            self.suite,
+            (drifted, *bound[1:]),
+            **expected_arguments,
+        )
+        self.assertFalse(report.passed)
+        self.assertTrue(
+            any(
+                "EVIDENCE_GOVERNANCE_PLUGIN_MISMATCH" in item
+                for item in report.failures
+            ),
+            report.failures,
         )
 
     def test_typed_evidence_rejects_tamper_wrong_binding_and_wrong_kind(self) -> None:

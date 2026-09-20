@@ -3913,6 +3913,21 @@ class EngineService:
                 status=AttemptStatus.RESERVED,
             )
 
+    def assert_execution_inputs_current(self, task_id: str) -> None:
+        """provider를 부르는 dispatch gate 전에 materialized 입력 freshness를 확인한다."""
+
+        with self.ledger.transaction() as tx:
+            task = tx.one("SELECT * FROM task_contracts WHERE id = ?", (task_id,))
+            if task["status"] != TaskRuntimeStatus.MATERIALIZED.value:
+                raise EngineServiceError(
+                    "materialized Task만 dispatch 전 입력 freshness를 확인할 수 있습니다."
+                )
+            spec_row = tx.one(
+                "SELECT * FROM execution_spec_revisions WHERE task_id = ? AND is_current = 1",
+                (task_id,),
+            )
+            self._verify_execution_inputs(tx, task, spec_row)
+
     @staticmethod
     def _verify_execution_inputs(
         tx: Any,

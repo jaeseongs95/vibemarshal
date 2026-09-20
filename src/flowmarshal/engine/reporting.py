@@ -12,6 +12,7 @@ from .domain import (
 from .application import summarize_usage_records
 from .read_models import (
     ExecutionObservationSummary,
+    GovernancePluginTaskObservation,
     HistoryCursor,
     ReadOnlyReportVerification,
     ReadPresentation,
@@ -77,6 +78,7 @@ def render_final(
     usage_summary: UsageSummary | None = None,
     execution_summary: ExecutionObservationSummary | None = None,
     read_only_verification: ReadOnlyReportVerification | None = None,
+    governance_plugin_tasks: tuple[GovernancePluginTaskObservation, ...] = (),
 ) -> str:
     if usage_summary is None:
         usage_summary = summarize_usage_records(
@@ -137,6 +139,18 @@ def render_final(
                 f"`{read_only_verification.observed_project_map_semantic_digest}`",
             )
         )
+    lines.extend(("", "## Task별 governance plugin identity", ""))
+    if governance_plugin_tasks:
+        for item in governance_plugin_tasks:
+            lines.append(
+                f"- `{item.task_ref}`: closure="
+                f"`{item.closure_tree_digest or '미관측'}`, version="
+                f"`{item.plugin_version_label or '미관측'}`, changed="
+                f"`{'true' if item.changed else 'false'}`, phases="
+                f"`{','.join(item.changed_phases) if item.changed_phases else '없음'}`"
+            )
+    else:
+        lines.append("- 관측된 실행 Task가 없습니다.")
     lines.extend([
         "",
         "## 단계별 소계 집계 호출",

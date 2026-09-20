@@ -4,7 +4,7 @@
 
 ## 실행 대상과 권위
 
-- 현재 변경 대상: `D:/codex/flowmarshal`의 `main` 브랜치 main checkout. 1.0 릴리스 완료까지 모든 파일 변경·커밋을 이 위치에서만 수행한다. 다른 브랜치·worktree·detached HEAD에서는 작업하거나 커밋하지 않는다. 릴리스 완료가 확인되면 이 한시 규칙은 만료되고 당시 Git 작업 지침을 따른다.
+- 권위 통합 대상은 `D:/codex/flowmarshal`의 `main` 브랜치다. 단일 작성자와 비중첩 파일 소유권이 명시된 목적별 worktree·브랜치에서 개발·검증하고, 통과한 커밋만 `main`에 순차 통합할 수 있다. detached HEAD는 읽기·qualification 전용이며 커밋하지 않는다. 최종 release freeze·candidate wheel·필수 qualification은 모든 승인 변경을 통합한 깨끗한 `main` 커밋에 결속한다. 릴리스 완료가 확인되면 이 한시 규칙은 만료되고 당시 Git 작업 지침을 따른다.
 - 필수 입력의 과거 source: `D:/codex/fm-performance-floor`, 승인 당시 기준 `a5bf2bf7a21a0dfe7ffe2e4bb34e8ae67808da08` / `codex/performance-release-floor`. 현재 쓰기 대상이 아니며 최신 명시 지시에 따라 main 상태와 직접 대조한다.
 - 승인 기준선: `D:/codex/fm-inspection-runtime/performance-release-floor-20260907/redesign-1.0/approved-plan.md`, SHA-256 `a24eb860c8b603f8edc43a71370c6d8638cc53d3c5c49b8a568c44fc9f5b1742`. 같은 디렉터리의 `approved-plan-revision-4.md` SHA-256 `72be4b60e51bfb46268d36fd34bbc62a60e25c5cf3a67bc013b40eb8653afc58`, `approved-plan-revision-5.md` SHA-256 `7a34a45bad290d96f3b7ce93543dd0f9e51351a4793f7561945896b4e8a037e0`을 순서 있는 superseding delta로 적용한다. 충돌하는 계약은 뒤 revision이 우선하며 상세 계보는 [승인 계약](redesign-1.0-contract.md)에 결속한다.
 - 구현 조율 원장: `D:/codex/fm-inspection-runtime/performance-release-floor-20260907/orchestration-status.sqlite3`. 제품 Engine 원장과 별개다.
@@ -21,7 +21,7 @@ source·template·실제 작업 프로젝트의 AGENTS는 최신 명시 승인�
 
 실제 동작과 새 계약의 차이는 FM-02~FM-10 구현, FM-11 harness, FM-12~FM-14 독립 검증, FM-15 감사에서 해소한다. 최초 실제 역할48/Planning18은 공통 계약 변경에 맞춰 새로 실행한다. 과거 51개와 1,056개 검사를 새 실행으로 합치지 않는다. 깨끗한 non-editable install과 E2E의 read_only·local context·usage missing·재시작·응답 유실·timeout·stale·partial resume·cancel·실행 중 replan을 모두 확인한다.
 
-로컬 task는 첫 파일/명령 전에 실제 danger-full-access·approval_policy=never를 확인한다. Fast·증거 없는 재시도·임의 fallback·원격 push·공개 배포·외부 메시지·삭제·인증/권한 변경은 하지 않는다. 종료 시 실제 evidence와 report를 남기고 assignment/spec/dispatch digest에 결속한다.
+로컬 task는 첫 파일/명령 전에 실제 danger-full-access·approval_policy=never를 확인한다. Fast·증거 없는 재시도·임의 fallback·필수 Gate 전 `origin/main` push·공개 배포·외부 메시지·삭제·인증/권한 변경은 하지 않는다. 최종 Gate 통과 뒤에는 적용 중인 Git 지침에 따라 검증된 `main`만 `origin/main`에 push한다. 종료 시 실제 evidence와 report를 남기고 assignment/spec/dispatch digest에 결속한다.
 
 ## 보존된 이전 실행
 

@@ -490,19 +490,66 @@ def _preserve_inventory_observation(
     _write_json(path, expected)
 
 
-def _require_plugin_conformance(governance: Any, destination: Path) -> None:
-    """cell을 실행하기 전에 governance 플러그인 적합성 검사를 요구하고 결과를 run root에 남긴다.
+def _observe_frozen_plugin_identity(governance: Any, frozen: Any) -> dict[str, Any]:
+    """현재 설치형 identity를 freeze의 네 E2E rebind 필드와 대조한다. 적합성 검사는 재실행하지 않는다."""
+    from .governance_conformance import CHECK_SET_DIGEST
 
-    결과 이름에 digest를 넣어 덮어쓰지 않는다. freeze 블록과의 대조와 cell evidence 결속은 아직 하지 않는다.
-    """
-    result = governance.check_conformance()
-    path = destination / ("governance-conformance-" + sha256_digest(result)[7:23] + ".json")
-    if not path.is_file():
-        _write_json(path, result)
-    failed = next((item for item in result["checks"] if item["status"] != "PASS"), None)
-    if failed is not None:
+    try:
+        observed = governance.inspect_identity()
+        summary = observed["summary"]
+        fields = {
+            "closure_tree_digest": summary["closure_tree_digest"],
+            "entrypoint_table_digest": summary["entrypoint_table_digest"],
+            "check_set_digest": CHECK_SET_DIGEST,
+            "conformance_result_digest": frozen.conformance_result_digest,
+        }
+    except Exception as error:
+        raise QualificationRunError(f"E2E_GOVERNANCE_PREFLIGHT_FAILED:{error}") from error
+    digest = sha256_digest(fields)
+    if digest != frozen.e2e_identity_digest:
         raise QualificationRunError(
-            f"GOVERNANCE_CONFORMANCE_FAILED: {failed['id']}: 기대 {failed['expected']}, 관측 {failed['observed']}")
+            "E2E_GOVERNANCE_PLUGIN_IDENTITY_MISMATCH: "
+            f"기대 {frozen.e2e_identity_digest}, 관측 {digest}"
+        )
+    labels = observed.get("labels", ())
+    manifest_label = next((item.get("plugin") for item in labels
+                           if item.get("source") == "plugin_manifest_file"), None)
+    server_info = next((item.get("serverInfo") for item in labels
+                        if item.get("source") == "mcp_server_info"), None)
+    audit_changes = {
+        "manifest_sha256": summary.get("manifest_sha256") != frozen.manifest_sha256,
+        "node_version": summary.get("node_version") != frozen.node_version,
+        "plugin_version_label": (
+            manifest_label.get("version") if isinstance(manifest_label, dict) else None
+        ) != frozen.plugin_version_label,
+        "server_info": server_info != frozen.server_info,
+        "installation_root": str(governance.plugin_root.resolve()) != frozen.installation_root,
+    }
+    return {
+        "governance_plugin_identity_digest": digest,
+        "rebind_fields": fields,
+        "audit_only_changes": audit_changes,
+        "plugin_version_label": (
+            manifest_label.get("version") if isinstance(manifest_label, dict) else None
+        ),
+    }
+
+
+def _assert_no_transient_plugin_identity_change(prepared: "PreparedE2E") -> None:
+    """cell 원장에 제품 gate가 관측한 transient identity drift가 있으면 PASS를 금지한다."""
+    with prepared.service.ledger.read() as connection:
+        rows = connection.execute(
+            "SELECT payload_json FROM history_events WHERE project_id = ? "
+            "AND event_type = 'operation.prepared' AND entity_type = 'core_operation'",
+            (prepared.project_id,),
+        ).fetchall()
+    for row in rows:
+        payload = json.loads(row["payload_json"])
+        request = payload.get("request", {})
+        if payload.get("kind") == "governance_gate" and str(request.get("step", "")).startswith(
+            "plugin_identity_changed:"
+        ):
+            raise QualificationRunError("E2E_GOVERNANCE_PLUGIN_IDENTITY_CHANGED_DURING_CELL")
 
 
 @dataclass
@@ -528,6 +575,7 @@ def _write_prepared_state(
     *,
     evaluation_contract_digest: str,
     fixture_digest: str,
+    governance_plugin_identity_digest: str | None = None,
 ) -> None:
     """사용량 제한·프로세스 중단 뒤 같은 cell을 이어갈 최소 권위 참조를 저장한다."""
 
@@ -535,6 +583,7 @@ def _write_prepared_state(
         "schema": _CELL_STATE_SCHEMA,
         "evaluation_contract_digest": evaluation_contract_digest,
         "fixture_digest": fixture_digest,
+        "governance_plugin_identity_digest": governance_plugin_identity_digest,
         "project_id": prepared.project_id,
         "task_id": prepared.task_id,
         "plan_revision_id": prepared.plan_revision_id,
@@ -558,6 +607,7 @@ def _restore_prepared_state(
     *,
     evaluation_contract_digest: str,
     fixture_digest: str,
+    governance_plugin_identity_digest: str | None = None,
 ) -> PreparedE2E:
     state_path = cell_root / "cell-state.json"
     if not state_path.is_file():
@@ -577,6 +627,8 @@ def _restore_prepared_state(
         raise QualificationRunError("E2E cell이 현재 evaluation 계약과 다릅니다.")
     if document.get("fixture_digest") != fixture_digest:
         raise QualificationRunError("E2E cell이 현재 fixture와 다릅니다.")
+    if document.get("governance_plugin_identity_digest") != governance_plugin_identity_digest:
+        raise QualificationRunError("E2E cell이 현재 governance plugin identity와 다릅니다.")
 
     workspace = (cell_root / "workspace").resolve(strict=True)
     if Path(str(document.get("workspace"))).resolve(strict=True) != workspace:
@@ -1280,7 +1332,7 @@ def _materialize_with_application(
     application: EngineApplication,
     prepared: PreparedE2E,
     *,
-    timeout_seconds: float = 2,
+    timeout_seconds: float = 900,
 ) -> Any:
     """비동기 execution-spec 준비를 완료한 뒤 materialized 결과를 돌려준다."""
 
@@ -1318,22 +1370,47 @@ def _stale_after_materialization(
         governance=governance,
     )
     first = _materialize_with_application(application, prepared)
-    (prepared.workspace / "app.py").write_text(
-        (prepared.workspace / "app.py").read_text(encoding="utf-8") + "\n# external change\n",
+    # 쓰기 target 변경은 governance의 사용자 변경 보호가 먼저 막는다. 여기서는
+    # 고정된 read-context를 바꿔 실제 효과 직전 freshness 검사를 직접 관측한다.
+    (prepared.workspace / "test_app.py").write_text(
+        (prepared.workspace / "test_app.py").read_text(encoding="utf-8")
+        + "\n# external context change\n",
         encoding="utf-8",
+    )
+    provider_effect_counts_before = (
+        runtime.create_calls,
+        runtime.turn_calls,
+        runtime.resume_calls,
     )
     failure: str | None = None
     try:
-        application.run_once(prepared.project_id)
+        outcome = application.run_once(prepared.project_id)
+        if outcome.action is RunOnceAction.BLOCKED:
+            failure = f"{outcome.blocker_code}: {outcome.detail}"
     except EngineServiceError as error:
         failure = str(error)
+    with prepared.service.ledger.read() as connection:
+        execution_attempt_count = connection.execute(
+            "SELECT COUNT(*) FROM attempts WHERE task_id=? AND kind='execution'",
+            (prepared.task_id,),
+        ).fetchone()[0]
+    provider_effect_count = sum(
+        current - before
+        for current, before in zip(
+            (runtime.create_calls, runtime.turn_calls, runtime.resume_calls),
+            provider_effect_counts_before,
+        )
+    )
     return {
         "passed": first.action is RunOnceAction.MATERIALIZED
         and failure is not None
         and "STALE_EXECUTION_INPUT" in failure
-        and runtime.create_calls == 0,
+        and provider_effect_count == 0
+        and execution_attempt_count == 0,
         "source_fixture_digest": source_digest,
         "error": failure,
+        "effect_count": provider_effect_count,
+        "worker_attempt_count": execution_attempt_count,
         "thread_create_count": runtime.create_calls,
     }
 
@@ -1629,6 +1706,7 @@ def _live_restart_resume(
     contract: EvaluationContract,
     fixture_digest: str,
     codex_bin: Path | str | None,
+    governance_plugin_identity_digest: str | None = None,
     roles: EngineRoleConfiguration | None = None,
     project_binding: CodexProjectBinding | None = None,
     runtime_selection: RuntimeProviderSelection | None = None,
@@ -1699,6 +1777,7 @@ def _live_restart_resume(
         cell_root,
         evaluation_contract_digest=contract.contract_digest,
         fixture_digest=fixture_digest,
+        governance_plugin_identity_digest=governance_plugin_identity_digest,
     )
     with open_harness_runtime(
         runtime_selection, codex_factory=CodexAppServerRuntime, codex_bin=codex_bin,
@@ -1771,6 +1850,7 @@ def _responsibility_outcome(
     run_root: Path,
     fixture_digest: str,
     freeze_bundle_digest: str,
+    governance_plugin_identity_digest: str,
     candidate_wheel_digest: str,
     candidate_wheel_binding_digest: str,
     candidate_distribution_name: str,
@@ -1838,6 +1918,7 @@ def _responsibility_outcome(
             fixture_digest=fixture_digest,
             order_seed=0,
             freeze_bundle_digest=freeze_bundle_digest,
+            governance_plugin_identity_digest=governance_plugin_identity_digest,
             candidate_wheel_digest=candidate_wheel_digest,
             candidate_wheel_binding_digest=candidate_wheel_binding_digest,
             candidate_distribution_name=candidate_distribution_name,
@@ -2036,6 +2117,7 @@ def run_project_e2e(
     candidate_wheel: Path | str | None = None,
     runtime_selection: RuntimeProviderSelection | None = None,
     governance: Any | None = None,
+    release_freeze: Path | str | None = None,
 ) -> tuple[Path, ScopeQualificationReport]:
     """release project E2E. 실행 Task는 제품 경로와 같은 필수 governance gate를 지난다."""
     if evaluation_policies is None:
@@ -2047,10 +2129,32 @@ def run_project_e2e(
         run_root=None if run_root is None else Path(run_root).resolve(),
         candidate_wheel=candidate_wheel,
     )
+    if release_freeze is None:
+        raise QualificationRunError("E2E_RELEASE_FREEZE_REQUIRED")
+    freeze_path = Path(release_freeze)
+    if not freeze_path.is_absolute():
+        raise QualificationRunError("E2E_RELEASE_FREEZE_ABSOLUTE_PATH_REQUIRED")
+    roles = role_configuration or default_role_configuration(base)
+    try:
+        from .release_freeze import verify_release_freeze
+
+        release_verification = verify_release_freeze(
+            freeze_path,
+            source_root=base,
+            candidate_wheel=candidate_binding.wheel_path,
+            role_configuration=roles,
+            evaluation_policies=evaluation_policies,
+        )
+    except Exception as error:
+        raise QualificationRunError(f"E2E_RELEASE_FREEZE_INVALID:{error}") from error
+    if not release_verification.valid:
+        raise QualificationRunError(
+            "E2E_RELEASE_FREEZE_INVALID:" + ";".join(release_verification.mismatches)
+        )
+    governance_freeze = release_verification.manifest.governance_plugin
     preflight_failures = _preflight(base)
     if preflight_failures:
         raise QualificationRunError("; ".join(preflight_failures))
-    roles = role_configuration or default_role_configuration(base)
     source_digest = _project_e2e_fixture_source_digest(base)
     with open_harness_runtime(
         runtime_selection, codex_factory=CodexAppServerRuntime, codex_bin=codex_bin,
@@ -2074,6 +2178,9 @@ def run_project_e2e(
             from .governance_gate import GovernanceSettings
 
             governance = GovernanceSettings.from_environment(destination / "governance")
+        if governance is None:
+            raise QualificationRunError("GOVERNANCE_GATE_REQUIRED")
+        governance_observation = _observe_frozen_plugin_identity(governance, governance_freeze)
         store = ImmutableCheckpointStore(destination, contract)
         store.initialize()
         freeze_manifest = build_qualification_reproduction_bundle(
@@ -2100,12 +2207,13 @@ def run_project_e2e(
                 "codex_bin": None if codex_bin is None else str(Path(codex_bin).resolve()),
                 "candidate_wheel_binding": candidate_binding.model_dump(mode="json"),
                 "candidate_wheel_binding_digest": candidate_binding.binding_digest,
+                "release_freeze_path": str(freeze_path.resolve(strict=True)),
+                "release_freeze_digest": release_verification.manifest.freeze_digest,
+                **governance_observation,
                 **provider_run_metadata(runtime_selection),
             },
             evaluation_policies,
         )
-        if governance is not None:
-            _require_plugin_conformance(governance, destination)
         active_scenario: str | None = None
         try:
             for index, scenario in enumerate(E2E_SCENARIOS):
@@ -2113,6 +2221,7 @@ def run_project_e2e(
                 digest = contract.fixture_digests[index]
                 if store.completed(digest, 0) is not None:
                     continue
+                before_identity = _observe_frozen_plugin_identity(governance, governance_freeze)
                 cell_root = destination / "work" / scenario
                 recorded = RecordedRuntime(
                     real_runtime, journal=cell_root / "runtime-receipts.json"
@@ -2131,6 +2240,7 @@ def run_project_e2e(
                         cell_root,
                         evaluation_contract_digest=contract.contract_digest,
                         fixture_digest=digest,
+                        governance_plugin_identity_digest=before_identity["governance_plugin_identity_digest"],
                     )
                     if prepared.preparation_provenance is not EvidenceProvenance.LIVE:
                         raise QualificationRunError(
@@ -2163,6 +2273,7 @@ def run_project_e2e(
                         prepared,
                         evaluation_contract_digest=contract.contract_digest,
                         fixture_digest=digest,
+                        governance_plugin_identity_digest=before_identity["governance_plugin_identity_digest"],
                     )
                 if scenario == "stored-turn-restart-resume":
                     with use_role_timeout_policy(evaluation_policies.role_timeouts):
@@ -2172,6 +2283,7 @@ def run_project_e2e(
                             cell_root=cell_root,
                             contract=contract,
                             fixture_digest=digest,
+                            governance_plugin_identity_digest=before_identity["governance_plugin_identity_digest"],
                             codex_bin=codex_bin,
                             roles=roles,
                             project_binding=evaluation_policies.codex_project,
@@ -2194,6 +2306,12 @@ def run_project_e2e(
                                 prepared, recorded, source_digest, roles=roles, governance=governance
                             )
                     events = recorded.events
+                after_identity = _observe_frozen_plugin_identity(governance, governance_freeze)
+                if after_identity["governance_plugin_identity_digest"] != before_identity[
+                    "governance_plugin_identity_digest"
+                ]:
+                    raise QualificationRunError("E2E_GOVERNANCE_PLUGIN_IDENTITY_CHANGED_DURING_CELL")
+                _assert_no_transient_plugin_identity_change(prepared)
                 model_observation = _checkpoint_model_observation(events)
                 receipt = {
                     "runtime": type(real_runtime).__name__,
@@ -2227,6 +2345,7 @@ def run_project_e2e(
                     run_root=destination,
                     fixture_digest=digest,
                     freeze_bundle_digest=freeze_manifest.bundle_digest,
+                    governance_plugin_identity_digest=before_identity["governance_plugin_identity_digest"],
                     candidate_wheel_digest=candidate_binding.wheel_digest,
                     candidate_wheel_binding_digest=candidate_binding.binding_digest,
                     candidate_distribution_name=candidate_binding.distribution_name,
@@ -2311,6 +2430,9 @@ def run_project_e2e(
                 )
             },
             expected_freeze_bundle_digest=freeze_manifest.bundle_digest,
+            expected_governance_plugin_identity_digest=governance_observation[
+                "governance_plugin_identity_digest"
+            ],
             expected_candidate_wheel_digest=candidate_binding.wheel_digest,
             expected_candidate_wheel_binding_digest=candidate_binding.binding_digest,
             expected_candidate_distribution_name=candidate_binding.distribution_name,

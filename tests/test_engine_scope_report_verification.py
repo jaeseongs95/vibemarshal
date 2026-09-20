@@ -4,6 +4,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from flowmarshal.canonical import sha256_bytes, sha256_digest
@@ -17,6 +18,10 @@ from flowmarshal.engine.evaluation import (
     ImmutableCheckpointStore,
     evaluate_role_fixtures,
 )
+from flowmarshal.engine.evaluation_budget import (
+    load_evaluation_policies,
+    metadata_with_policies,
+)
 from flowmarshal.engine.qualification import (
     ORDER_SEEDS,
     PlanningScenarioCatalog,
@@ -24,6 +29,7 @@ from flowmarshal.engine.qualification import (
     _combined_role_catalog,
     _deterministic_contract,
     _write_json,
+    default_role_configuration,
     qualification_suite_manifest,
     source_manifest_digest,
 )
@@ -41,6 +47,8 @@ from flowmarshal.engine.role_observations import RoleCallReceipt
 
 ROOT = Path(__file__).resolve().parents[1]
 DIGEST = "sha256:" + "a" * 64
+GOVERNANCE_PLUGIN_IDENTITY = "sha256:" + "9" * 64
+RELEASE_FREEZE_DIGEST = "sha256:" + "8" * 64
 
 
 def _contract(*, scope: EvaluationScope, fixtures: tuple[str, ...], seeds: tuple[int, ...]) -> EvaluationContract:
@@ -80,6 +88,37 @@ def _report(contract: EvaluationContract, *, passed: bool, metrics: dict, failur
 
 
 class ScopeReportVerificationTests(unittest.TestCase):
+    def _verify_typed_e2e(
+        self,
+        *,
+        run: Path,
+        report: ScopeQualificationReport,
+        binding: CandidateWheelBinding,
+        contract: EvaluationContract,
+        freeze_identity: str = GOVERNANCE_PLUGIN_IDENTITY,
+    ):
+        release = SimpleNamespace(
+            valid=True,
+            mismatches=(),
+            manifest=SimpleNamespace(
+                freeze_digest=RELEASE_FREEZE_DIGEST,
+                governance_plugin=SimpleNamespace(
+                    e2e_identity_digest=freeze_identity
+                ),
+            ),
+        )
+        with patch(
+            "flowmarshal.engine.scope_report_verification.verify_candidate_wheel_metadata",
+            return_value=binding,
+        ), patch(
+            "flowmarshal.engine.scope_report_verification.source_manifest_digest",
+            return_value=contract.source_manifest_digest,
+        ), patch(
+            "flowmarshal.engine.release_freeze.verify_release_freeze",
+            return_value=release,
+        ):
+            return verify_scope_report(root=ROOT, run_root=run, report=report)
+
     def _typed_e2e_run(
         self, run: Path, contract: EvaluationContract
     ) -> tuple[ScopeQualificationReport, Path, CandidateWheelBinding]:
@@ -122,12 +161,21 @@ class ScopeReportVerificationTests(unittest.TestCase):
             wheel_package_digest=sha256_digest(package_digests),
             installed_package_digest=sha256_digest(package_digests),
         )
-        metadata = {
+        policies = load_evaluation_policies(
+            budget_policy_path=ROOT / "config" / "pre-1.0-validation-budget.json",
+            role_timeout_policy_path=ROOT / "config" / "pre-1.0-role-timeouts.json",
+        )
+        metadata = metadata_with_policies({
             "scope": "project-e2e",
             "candidate_wheel_binding": binding.model_dump(mode="json"),
             "candidate_wheel_binding_digest": binding.binding_digest,
-        }
-        metadata["metadata_digest"] = sha256_digest(metadata)
+            "role_configuration": default_role_configuration(ROOT).model_dump(
+                mode="json"
+            ),
+            "release_freeze_path": str((run / "release-freeze").resolve()),
+            "release_freeze_digest": RELEASE_FREEZE_DIGEST,
+            "governance_plugin_identity_digest": GOVERNANCE_PLUGIN_IDENTITY,
+        }, policies)
         (run / "run-metadata.json").write_text(
             json.dumps(metadata), encoding="utf-8"
         )
@@ -168,6 +216,9 @@ class ScopeReportVerificationTests(unittest.TestCase):
                         fixture_digest=digest,
                         order_seed=0,
                         freeze_bundle_digest=freeze.bundle_digest,
+                        governance_plugin_identity_digest=(
+                            GOVERNANCE_PLUGIN_IDENTITY
+                        ),
                         candidate_wheel_digest=binding.wheel_digest,
                         candidate_wheel_binding_digest=binding.binding_digest,
                         candidate_distribution_name=binding.distribution_name,
@@ -208,32 +259,24 @@ class ScopeReportVerificationTests(unittest.TestCase):
                 )
             )
         _store(run, contract, cells)
-        with patch(
-            "flowmarshal.engine.scope_report_verification.verify_candidate_wheel_metadata",
-            return_value=binding,
-        ), patch(
-            "flowmarshal.engine.scope_report_verification.source_manifest_digest",
-            return_value=contract.source_manifest_digest,
-        ):
-            draft = verify_scope_report(
-                root=ROOT,
-                run_root=run,
-                report=_report(contract, passed=False, metrics={}, failures=()),
-            )
+        draft = self._verify_typed_e2e(
+            run=run,
+            report=_report(contract, passed=False, metrics={}, failures=()),
+            binding=binding,
+            contract=contract,
+        )
         report = _report(
             contract,
             passed=draft.recalculated_passed,
             metrics=draft.recalculated_metrics,
             failures=draft.recalculated_failures,
         )
-        with patch(
-            "flowmarshal.engine.scope_report_verification.verify_candidate_wheel_metadata",
-            return_value=binding,
-        ), patch(
-            "flowmarshal.engine.scope_report_verification.source_manifest_digest",
-            return_value=contract.source_manifest_digest,
-        ):
-            baseline = verify_scope_report(root=ROOT, run_root=run, report=report)
+        baseline = self._verify_typed_e2e(
+            run=run,
+            report=report,
+            binding=binding,
+            contract=contract,
+        )
         self.assertTrue(baseline.valid, baseline.errors)
         assert first_evidence_path is not None
         return report, first_evidence_path, binding
@@ -394,14 +437,12 @@ class ScopeReportVerificationTests(unittest.TestCase):
             )
 
             evidence_path.write_text("tampered", encoding="utf-8")
-            with patch(
-                "flowmarshal.engine.scope_report_verification.verify_candidate_wheel_metadata",
-                return_value=binding,
-            ), patch(
-                "flowmarshal.engine.scope_report_verification.source_manifest_digest",
-                return_value=contract.source_manifest_digest,
-            ):
-                tampered = verify_scope_report(root=ROOT, run_root=run, report=report)
+            tampered = self._verify_typed_e2e(
+                run=run,
+                report=report,
+                binding=binding,
+                contract=contract,
+            )
             self.assertFalse(tampered.valid)
             self.assertTrue(
                 any(
@@ -412,14 +453,12 @@ class ScopeReportVerificationTests(unittest.TestCase):
             evidence_path.write_bytes(original_evidence)
 
             evidence_path.unlink()
-            with patch(
-                "flowmarshal.engine.scope_report_verification.verify_candidate_wheel_metadata",
-                return_value=binding,
-            ), patch(
-                "flowmarshal.engine.scope_report_verification.source_manifest_digest",
-                return_value=contract.source_manifest_digest,
-            ):
-                deleted = verify_scope_report(root=ROOT, run_root=run, report=report)
+            deleted = self._verify_typed_e2e(
+                run=run,
+                report=report,
+                binding=binding,
+                contract=contract,
+            )
             self.assertFalse(deleted.valid)
             self.assertTrue(
                 any(
@@ -462,6 +501,11 @@ class ScopeReportVerificationTests(unittest.TestCase):
                     "sha256:" + "b" * 64,
                     "EVIDENCE_FREEZE_MISMATCH",
                 ),
+                "wrong-governance-plugin": (
+                    "governance_plugin_identity_digest",
+                    "sha256:" + "b" * 64,
+                    "EVIDENCE_GOVERNANCE_PLUGIN_MISMATCH",
+                ),
                 "wrong-kind": (
                     "kind",
                     "unrelated",
@@ -485,22 +529,51 @@ class ScopeReportVerificationTests(unittest.TestCase):
                         "evidence_records"
                     ][0][field] = value
                     checkpoint_path.write_text(json.dumps(payload), encoding="utf-8")
-                    with patch(
-                        "flowmarshal.engine.scope_report_verification.verify_candidate_wheel_metadata",
-                        return_value=binding,
-                    ), patch(
-                        "flowmarshal.engine.scope_report_verification.source_manifest_digest",
-                        return_value=contract.source_manifest_digest,
-                    ):
-                        changed = verify_scope_report(
-                            root=ROOT, run_root=run, report=report
-                        )
+                    changed = self._verify_typed_e2e(
+                        run=run,
+                        report=report,
+                        binding=binding,
+                        contract=contract,
+                    )
                     self.assertFalse(changed.valid)
                     joined = "\n".join(
                         (*changed.errors, *changed.recalculated_failures)
                     )
                     self.assertIn(expected, joined)
                     checkpoint_path.write_text(checkpoint_text, encoding="utf-8")
+
+            freeze_drift = self._verify_typed_e2e(
+                run=run,
+                report=report,
+                binding=binding,
+                contract=contract,
+                freeze_identity="sha256:" + "7" * 64,
+            )
+            self.assertFalse(freeze_drift.valid)
+            self.assertIn(
+                "SCOPE_REPORT_E2E_GOVERNANCE_PLUGIN_INVALID",
+                freeze_drift.errors,
+            )
+
+            metadata_path = run / "run-metadata.json"
+            original_metadata = metadata_path.read_text(encoding="utf-8")
+            metadata = json.loads(original_metadata)
+            metadata["governance_plugin_identity_digest"] = "sha256:" + "6" * 64
+            metadata.pop("metadata_digest")
+            metadata["metadata_digest"] = sha256_digest(metadata)
+            metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+            metadata_drift = self._verify_typed_e2e(
+                run=run,
+                report=report,
+                binding=binding,
+                contract=contract,
+            )
+            self.assertFalse(metadata_drift.valid)
+            self.assertIn(
+                "SCOPE_REPORT_E2E_GOVERNANCE_PLUGIN_INVALID",
+                metadata_drift.errors,
+            )
+            metadata_path.write_text(original_metadata, encoding="utf-8")
 
 
 if __name__ == "__main__":

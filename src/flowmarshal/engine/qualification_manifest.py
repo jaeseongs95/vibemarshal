@@ -420,6 +420,9 @@ class QualificationEvidenceRecord(EngineModel):
     freeze_bundle_digest: str | None = Field(
         default=None, pattern=r"^sha256:[0-9a-f]{64}$"
     )
+    governance_plugin_identity_digest: str | None = Field(
+        default=None, pattern=r"^sha256:[0-9a-f]{64}$"
+    )
     candidate_wheel_digest: str | None = Field(
         default=None, pattern=r"^sha256:[0-9a-f]{64}$"
     )
@@ -497,6 +500,7 @@ def build_qualification_evidence_record(
     fixture_digest: str,
     order_seed: int,
     freeze_bundle_digest: str | None = None,
+    governance_plugin_identity_digest: str | None = None,
     candidate_wheel_digest: str | None = None,
     candidate_wheel_binding_digest: str | None = None,
     candidate_distribution_name: str | None = None,
@@ -525,6 +529,7 @@ def build_qualification_evidence_record(
         fixture_digest=fixture_digest,
         order_seed=order_seed,
         freeze_bundle_digest=freeze_bundle_digest,
+        governance_plugin_identity_digest=governance_plugin_identity_digest,
         candidate_wheel_digest=candidate_wheel_digest,
         candidate_wheel_binding_digest=candidate_wheel_binding_digest,
         candidate_distribution_name=candidate_distribution_name,
@@ -539,6 +544,7 @@ def verify_qualification_evidence_records(
     expected_fixture_digest: str,
     expected_order_seed: int,
     expected_freeze_bundle_digest: str | None = None,
+    expected_governance_plugin_identity_digest: str | None = None,
     expected_candidate_wheel_digest: str | None = None,
     expected_candidate_wheel_binding_digest: str | None = None,
     expected_candidate_distribution_name: str | None = None,
@@ -569,6 +575,8 @@ def verify_qualification_evidence_records(
             failures.append(f"EVIDENCE_ORDER_SEED_MISMATCH:{prefix}")
         if record.freeze_bundle_digest != expected_freeze_bundle_digest:
             failures.append(f"EVIDENCE_FREEZE_MISMATCH:{prefix}")
+        if record.governance_plugin_identity_digest != expected_governance_plugin_identity_digest:
+            failures.append(f"EVIDENCE_GOVERNANCE_PLUGIN_MISMATCH:{prefix}")
         if record.candidate_wheel_digest != expected_candidate_wheel_digest:
             failures.append(f"EVIDENCE_WHEEL_MISMATCH:{prefix}")
         if (
@@ -697,6 +705,7 @@ def evaluate_qualification_responsibilities(
     run_root: Path | str,
     expected_cell_bindings: Mapping[str, tuple[str, int]],
     expected_freeze_bundle_digest: str | None = None,
+    expected_governance_plugin_identity_digest: str | None = None,
     expected_candidate_wheel_digest: str | None = None,
     expected_candidate_wheel_binding_digest: str | None = None,
     expected_candidate_distribution_name: str | None = None,
@@ -765,6 +774,9 @@ def evaluate_qualification_responsibilities(
                         expected_order_seed=binding[1],
                         expected_freeze_bundle_digest=(
                             expected_freeze_bundle_digest
+                        ),
+                        expected_governance_plugin_identity_digest=(
+                            expected_governance_plugin_identity_digest
                         ),
                         expected_candidate_wheel_digest=(
                             expected_candidate_wheel_digest

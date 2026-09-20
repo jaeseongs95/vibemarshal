@@ -250,6 +250,17 @@ class ReadOnlyReportVerification(EngineModel):
     observed_project_map_semantic_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
 
 
+class GovernancePluginTaskObservation(EngineModel):
+    """Task별 governance gate가 실제로 관측한 plugin identity 요약."""
+
+    task_id: str = Field(min_length=1, max_length=500)
+    task_ref: str = Field(min_length=1, max_length=300)
+    closure_tree_digest: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
+    plugin_version_label: str | None = Field(default=None, max_length=200)
+    changed: bool = False
+    changed_phases: tuple[str, ...] = ()
+
+
 class FinalReport(ReadPresentation):
     project_id: str = Field(min_length=1, max_length=500)
     goal: GoalContractRevision
@@ -258,6 +269,7 @@ class FinalReport(ReadPresentation):
     usage: UsageSummary
     execution_summary: ExecutionObservationSummary
     ledger_history_valid: bool
+    governance_plugin_tasks: tuple[GovernancePluginTaskObservation, ...] = ()
     read_only_verification: ReadOnlyReportVerification | None = None
 
 

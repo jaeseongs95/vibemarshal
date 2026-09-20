@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
 import re
 import subprocess
 import tomllib
@@ -253,6 +254,50 @@ class IsolationPreflightReport(EngineModel):
         return self
 
 
+class GovernancePluginFreeze(EngineModel):
+    """release qualification이 재사용할 설치형 governance plugin의 동결 관측."""
+
+    manifest_sha256: str = Field(pattern=DIGEST_PATTERN)
+    closure_tree_digest: str = Field(pattern=DIGEST_PATTERN)
+    closure_file_digests: dict[str, str]
+    entrypoint_table_digest: str = Field(pattern=DIGEST_PATTERN)
+    node_version: str = Field(min_length=1)
+    consumed_surface_digest: str = Field(pattern=DIGEST_PATTERN)
+    check_set_digest: str = Field(pattern=DIGEST_PATTERN)
+    conformance_verdict: Literal["PASS"] = "PASS"
+    conformance_result_digest: str = Field(pattern=DIGEST_PATTERN)
+    conformance_result_relative_path: str = "governance-conformance.json"
+    plugin_version_label: str | None = None
+    server_info: dict[str, Any] | None = None
+    installation_root: str = Field(min_length=1)
+    e2e_identity_digest: str = Field(pattern=DIGEST_PATTERN)
+
+    @property
+    def e2e_identity_fields(self) -> dict[str, str]:
+        return {
+            "closure_tree_digest": self.closure_tree_digest,
+            "entrypoint_table_digest": self.entrypoint_table_digest,
+            "check_set_digest": self.check_set_digest,
+            "conformance_result_digest": self.conformance_result_digest,
+        }
+
+    @model_validator(mode="after")
+    def _identity_digest_matches_exact_rebind_fields(self) -> "GovernancePluginFreeze":
+        if not self.closure_file_digests or any(
+            not re.fullmatch(r"[0-9a-f]{64}", digest)
+            for digest in self.closure_file_digests.values()
+        ):
+            raise ValueError("governance closure 파일 digest가 비었거나 sha256 형식이 아닙니다.")
+        closure_digest = sha256_bytes("".join(
+            f"{path}\0{digest}\n" for path, digest in sorted(self.closure_file_digests.items())
+        ).encode("utf-8"))
+        if self.closure_tree_digest != closure_digest:
+            raise ValueError("governance closure tree digest가 파일 map과 다릅니다.")
+        if self.e2e_identity_digest != sha256_digest(self.e2e_identity_fields):
+            raise ValueError("governance E2E identity digest가 네 rebind 필드와 다릅니다.")
+        return self
+
+
 class ReleaseFreezeManifest(EngineModel):
     format: Literal["flowmarshal.release-freeze.v1"] = FORMAT
     rehearsal: bool = False
@@ -261,6 +306,7 @@ class ReleaseFreezeManifest(EngineModel):
     package_identity: PackageIdentityFreeze
     inputs: InputsFreeze
     model_inventory: ModelInventoryFreeze
+    governance_plugin: GovernancePluginFreeze
     lane_locks: tuple[LaneLock, ...] = Field(min_length=3, max_length=3)
     isolation_preflight: IsolationPreflightReport
     refreeze_policy: RefreezePolicy
@@ -540,12 +586,13 @@ def _lane_lock(lane: str, contract, evidence_record_formats: tuple[str, ...]) ->
 
 
 def _write_immutable_json(path: Path, payload: str) -> None:
+    encoded = payload.encode("utf-8")
     path.parent.mkdir(parents=True, exist_ok=True)
     if path.exists():
-        if path.read_text(encoding="utf-8") != payload:
+        if path.read_bytes() != encoded:
             raise ReleaseFreezeError(f"RELEASE_FREEZE_IMMUTABLE_OVERWRITE:{path}")
         return
-    path.write_text(payload, encoding="utf-8")
+    path.write_bytes(encoded)
 
 
 def _canonical_document(document: Any) -> str:
@@ -634,6 +681,7 @@ def build_release_freeze(
     shard_plan: ShardIsolationPlan,
     role_configuration: EngineRoleConfiguration | None = None,
     evaluation_policies: EvaluationPolicies | None = None,
+    governance_settings: Any | None = None,
     allow_dirty_rehearsal: bool = False,
 ) -> ReleaseFreezeManifest:
     root = Path(source_root).resolve(strict=True)
@@ -744,6 +792,51 @@ def build_release_freeze(
             "RELEASE_FREEZE_ISOLATION_PREFLIGHT_FAILED:" + ";".join(isolation_report.violations)
         )
 
+    if governance_settings is None:
+        from .governance_gate import GovernanceSettings
+
+        governance_settings = GovernanceSettings.from_environment(destination_root / "governance")
+    if governance_settings is None:
+        raise ReleaseFreezeError("RELEASE_FREEZE_GOVERNANCE_SETTINGS_REQUIRED")
+    try:
+        conformance = governance_settings.check_conformance()
+    except Exception as error:
+        raise ReleaseFreezeError(f"RELEASE_FREEZE_GOVERNANCE_CONFORMANCE_FAILED:{error}") from error
+    if conformance.get("verdict") != "PASS":
+        failed = next((item for item in conformance.get("checks", ()) if item.get("status") != "PASS"), None)
+        raise ReleaseFreezeError(f"RELEASE_FREEZE_GOVERNANCE_CONFORMANCE_NOT_PASS:{failed}")
+    identity = conformance.get("identity", {})
+    labels = conformance.get("identity_labels", ())
+    manifest_label = next((item.get("plugin") for item in labels
+                           if item.get("source") == "plugin_manifest_file"), None)
+    server_label = next((item.get("serverInfo") for item in labels
+                         if item.get("source") == "mcp_server_info"), None)
+    conformance_document = _canonical_document(conformance)
+    conformance_digest = sha256_bytes(conformance_document.encode("utf-8"))
+    e2e_fields = {
+        "closure_tree_digest": identity.get("closure_tree_digest"),
+        "entrypoint_table_digest": identity.get("entrypoint_table_digest"),
+        "check_set_digest": conformance.get("check_set_digest"),
+        "conformance_result_digest": conformance_digest,
+    }
+    try:
+        governance_plugin = GovernancePluginFreeze(
+            manifest_sha256=identity.get("manifest_sha256"),
+            closure_tree_digest=identity.get("closure_tree_digest"),
+            closure_file_digests=conformance.get("identity_files", {}),
+            entrypoint_table_digest=identity.get("entrypoint_table_digest"),
+            node_version=identity.get("node_version"),
+            consumed_surface_digest=identity.get("consumed_surface_digest"),
+            check_set_digest=conformance.get("check_set_digest"),
+            conformance_result_digest=conformance_digest,
+            plugin_version_label=manifest_label.get("version") if isinstance(manifest_label, dict) else None,
+            server_info=server_label if isinstance(server_label, dict) else None,
+            installation_root=conformance.get("installation_root"),
+            e2e_identity_digest=sha256_digest(e2e_fields),
+        )
+    except (TypeError, ValueError) as error:
+        raise ReleaseFreezeError(f"RELEASE_FREEZE_GOVERNANCE_IDENTITY_INVALID:{error}") from error
+
     refreeze_policy = RefreezePolicy()
 
     body: dict[str, Any] = {
@@ -754,12 +847,17 @@ def build_release_freeze(
         "package_identity": package_identity.model_dump(mode="json"),
         "inputs": inputs.model_dump(mode="json"),
         "model_inventory": model_inventory.model_dump(mode="json"),
+        "governance_plugin": governance_plugin.model_dump(mode="json"),
         "lane_locks": [item.model_dump(mode="json") for item in lane_locks],
         "isolation_preflight": isolation_report.model_dump(mode="json"),
         "refreeze_policy": refreeze_policy.model_dump(mode="json"),
     }
     manifest = ReleaseFreezeManifest.model_validate(body | {"freeze_digest": sha256_digest(body)})
 
+    _write_immutable_json(
+        destination_root / governance_plugin.conformance_result_relative_path,
+        conformance_document,
+    )
     _write_immutable_json(destination_root / "release-freeze.json", _canonical_document(manifest.model_dump(mode="json")))
     _write_immutable_json(
         destination_root / "isolation-preflight.json", _canonical_document(isolation_report.model_dump(mode="json"))
@@ -775,6 +873,8 @@ def verify_release_freeze(
     *,
     source_root: Path | str,
     candidate_wheel: Path | str | None = None,
+    role_configuration: EngineRoleConfiguration | None = None,
+    evaluation_policies: EvaluationPolicies | None = None,
     allow_rehearsal: bool = False,
 ) -> ReleaseFreezeVerification:
     root = Path(source_root).resolve(strict=True)
@@ -795,6 +895,60 @@ def verify_release_freeze(
 
     if preflight_echo != manifest.isolation_preflight:
         mismatches.append("RELEASE_FREEZE_ISOLATION_ECHO_MISMATCH")
+
+    try:
+        governance_bytes = (dest / manifest.governance_plugin.conformance_result_relative_path).read_bytes()
+        governance_echo = json.loads(governance_bytes)
+    except (OSError, ValueError):
+        governance_echo = None
+        mismatches.append("RELEASE_FREEZE_GOVERNANCE_CONFORMANCE_MISSING")
+    if governance_echo is not None:
+        if sha256_bytes(governance_bytes) != manifest.governance_plugin.conformance_result_digest:
+            mismatches.append("RELEASE_FREEZE_GOVERNANCE_CONFORMANCE_DIGEST_MISMATCH")
+        if governance_echo.get("verdict") != "PASS":
+            mismatches.append("RELEASE_FREEZE_GOVERNANCE_CONFORMANCE_NOT_PASS")
+        echo_identity = governance_echo.get("identity", {})
+        echo_labels = governance_echo.get("identity_labels", ())
+        if isinstance(echo_labels, list):
+            manifest_label = next(
+                (
+                    item.get("plugin")
+                    for item in echo_labels
+                    if isinstance(item, dict)
+                    and item.get("source") == "plugin_manifest_file"
+                ),
+                None,
+            )
+            server_label = next(
+                (
+                    item.get("serverInfo")
+                    for item in echo_labels
+                    if isinstance(item, dict) and item.get("source") == "mcp_server_info"
+                ),
+                None,
+            )
+        else:
+            manifest_label = None
+            server_label = None
+        echo_fields = {
+            "manifest_sha256": echo_identity.get("manifest_sha256"),
+            "closure_tree_digest": echo_identity.get("closure_tree_digest"),
+            "entrypoint_table_digest": echo_identity.get("entrypoint_table_digest"),
+            "node_version": echo_identity.get("node_version"),
+            "consumed_surface_digest": echo_identity.get("consumed_surface_digest"),
+            "check_set_digest": governance_echo.get("check_set_digest"),
+            "closure_file_digests": governance_echo.get("identity_files", {}),
+            "installation_root": governance_echo.get("installation_root"),
+            "plugin_version_label": (
+                manifest_label.get("version") if isinstance(manifest_label, dict) else None
+            ),
+            "server_info": server_label if isinstance(server_label, dict) else None,
+        }
+        frozen_fields = {
+            key: getattr(manifest.governance_plugin, key) for key in echo_fields
+        }
+        if echo_fields != frozen_fields:
+            mismatches.append("RELEASE_FREEZE_GOVERNANCE_BLOCK_MISMATCH")
 
     current_files = source_manifest_files(root)
     if (
@@ -826,7 +980,7 @@ def verify_release_freeze(
     if suite.manifest_digest != manifest.inputs.suite_manifest_digest:
         mismatches.append("RELEASE_FREEZE_SUITE_MANIFEST_MISMATCH")
 
-    roles = default_role_configuration(root)
+    roles = role_configuration or default_role_configuration(root)
     if roles.configuration_digest != manifest.inputs.roles_config_digest:
         mismatches.append("RELEASE_FREEZE_ROLES_CONFIG_MISMATCH")
 
@@ -860,7 +1014,7 @@ def verify_release_freeze(
             manifest.model_inventory.selected_fallback_projection_digest
         ):
             mismatches.append("RELEASE_FREEZE_SELECTED_FALLBACK_PROJECTION_MISMATCH")
-        policies = _default_policies(root)
+        policies = evaluation_policies or _default_policies(root)
         role_contract, planning_contract, e2e_contract = _lane_contracts(root, inventory, roles, policies)
         recomputed = {
             "role": role_contract.contract_digest,

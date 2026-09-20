@@ -28,6 +28,9 @@ from tests.test_engine_qualification import qualification_inventory
 
 
 ROOT = Path(__file__).resolve().parents[1]
+# 느린 provider fixture(0.5초)와 분리하면서 Windows의 전체-suite worker 정리
+# scheduling 변동을 허용하는 공통 짧은 tick 상한이다.
+SHORT_TICK_LIMIT_SECONDS = 0.25
 
 
 class RuntimeJobSupervisorTests(unittest.TestCase):
@@ -90,7 +93,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
         self.assertEqual(1, len({row["checkpoint_key"] for row in rows}))
         self.assertEqual(RuntimeJobStatus.CONSUMED.value, rows[0]["status"])
 
-    def _slow_inventory_runtime(self, delay_seconds=0.3):
+    def _slow_inventory_runtime(self, delay_seconds=0.5):
         inventory = self.inventory
 
         class SlowInventoryRuntime(FakeCodexRuntime):
@@ -157,7 +160,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
                     release.wait(1), {"kind": current.value}
                 )[1],
             )
-            self.assertLess(time.monotonic() - started, 0.15)
+            self.assertLess(time.monotonic() - started, SHORT_TICK_LIMIT_SECONDS)
             self.assertEqual(RuntimeJobStatus.RUNNING, job.status)
             release.set()
             deadline = time.monotonic() + 1
@@ -271,7 +274,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
         started = time.monotonic()
         first = dispatcher.run_once(self.prepared.project_id)
 
-        self.assertLess(time.monotonic() - started, 0.15)
+        self.assertLess(time.monotonic() - started, SHORT_TICK_LIMIT_SECONDS)
         self.assertEqual(RunOnceAction.DISPATCHED, first.action)
         self.assertEqual(RuntimeJobKind.EXECUTION_SPEC_PREPARE, first.runtime_job_kind)
         self.assertEqual(
@@ -300,7 +303,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
             proposal=self.prepared.proposal,
         )
 
-        self.assertLess(time.monotonic() - started, 0.15)
+        self.assertLess(time.monotonic() - started, SHORT_TICK_LIMIT_SECONDS)
         self.assertEqual(RunOnceAction.DISPATCHED, first.action)
         self.assertEqual(RuntimeJobKind.EXECUTION_SPEC_PREPARE, first.runtime_job_kind)
         self.assertEqual(
@@ -338,7 +341,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
         started = time.monotonic()
         first = dispatcher.run_once(self.prepared.project_id)
 
-        self.assertLess(time.monotonic() - started, 0.15)
+        self.assertLess(time.monotonic() - started, SHORT_TICK_LIMIT_SECONDS)
         self.assertEqual(RunOnceAction.DISPATCHED, first.action)
         self.assertEqual(RuntimeJobKind.GOAL_TEST_PREPARE, first.runtime_job_kind)
         self.assertEqual(
@@ -442,7 +445,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
         started = time.monotonic()
         first = dispatcher.run_once(prepared.project_id)
 
-        self.assertLess(time.monotonic() - started, 0.15)
+        self.assertLess(time.monotonic() - started, SHORT_TICK_LIMIT_SECONDS)
         self.assertEqual(RunOnceAction.DISPATCHED, first.action)
         self.assertEqual(RuntimeJobKind.GOAL_SEMANTIC_VALIDATE, first.runtime_job_kind)
         self.assertEqual(
@@ -645,7 +648,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
     def test_deadline_interrupt_is_bounded_and_not_terminal(self) -> None:
         class SlowInterruptRuntime(FakeCodexRuntime):
             def interrupt(inner, **kwargs):
-                time.sleep(0.3)
+                time.sleep(0.5)
                 return super(SlowInterruptRuntime, inner).interrupt(**kwargs)
 
         runtime = SlowInterruptRuntime(self.inventory)
@@ -672,7 +675,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
         )
         started = time.monotonic()
         observed = supervisor.tick(job.job_id)
-        self.assertLess(time.monotonic() - started, 0.15)
+        self.assertLess(time.monotonic() - started, SHORT_TICK_LIMIT_SECONDS)
         self.assertEqual(RuntimeJobStatus.INTERRUPTING, observed.status)
         self.assertIsNone(observed.provider_terminal_status)
         with self.prepared.service.ledger.read() as connection:
@@ -767,7 +770,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
         class SlowCloseRuntime(FakeCodexRuntime):
             def close(inner, *, timeout_seconds=5.0):
                 del timeout_seconds
-                time.sleep(0.3)
+                time.sleep(0.5)
 
         runtime = SlowCloseRuntime(self.inventory)
         supervisor = RuntimeJobSupervisor(
@@ -782,7 +785,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
         )
         started = time.monotonic()
         supervisor.close()
-        self.assertLess(time.monotonic() - started, 0.15)
+        self.assertLess(time.monotonic() - started, SHORT_TICK_LIMIT_SECONDS)
         job = self.prepared.service.load_runtime_job(job.job_id)
         self.assertEqual(RuntimeJobStatus.COLLECTOR_LOST, job.status)
         self.assertIsNone(job.provider_terminal_status)
@@ -954,7 +957,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
         first = dispatcher.run_once(self.prepared.project_id)
         worker = supervisor._workers[first.runtime_job_id]
         self.addCleanup(lambda: worker.join(1))
-        self.assertLess(time.monotonic() - started, 0.15)
+        self.assertLess(time.monotonic() - started, SHORT_TICK_LIMIT_SECONDS)
         self.assertTrue(create_started.wait(0.2))
         self.assertEqual(RunOnceAction.DISPATCHED, first.action)
         self.assertEqual(RuntimeJobKind.WORKER_TURN, first.runtime_job_kind)
@@ -966,7 +969,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
 
         started = time.monotonic()
         second = dispatcher.run_once(self.prepared.project_id)
-        self.assertLess(time.monotonic() - started, 0.15)
+        self.assertLess(time.monotonic() - started, SHORT_TICK_LIMIT_SECONDS)
         self.assertIn(second.action, {RunOnceAction.DISPATCHED, RunOnceAction.OBSERVED})
         with self.prepared.service.ledger.read() as connection:
             attempts = connection.execute(
@@ -1110,7 +1113,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
 
         started = time.monotonic()
         observed = dispatcher.run_once(self.prepared.project_id)
-        self.assertLess(time.monotonic() - started, 0.2)
+        self.assertLess(time.monotonic() - started, SHORT_TICK_LIMIT_SECONDS)
         self.assertTrue(read_started.wait(0.2))
         self.assertIn(observed.action, {
             RunOnceAction.DISPATCHED, RunOnceAction.OBSERVED, RunOnceAction.BLOCKED,

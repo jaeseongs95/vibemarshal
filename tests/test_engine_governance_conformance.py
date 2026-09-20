@@ -13,11 +13,13 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from flowmarshal.engine import governance_conformance, governance_gate
-from flowmarshal.engine.e2e_qualification import QualificationRunError, _require_plugin_conformance
+from flowmarshal.engine.e2e_qualification import QualificationRunError, _observe_frozen_plugin_identity
 from flowmarshal.engine.governance_conformance import (
     CHECK_SET_DIGEST, CHECKS, PROBE_CLASS, PROBE_MODEL, first_failure, run_conformance,
 )
-from flowmarshal.engine.governance_gate import GovernanceContractMismatch, GovernanceTimeout, GovernanceUnavailable
+from flowmarshal.engine.governance_gate import (
+    GovernanceContractMismatch, GovernanceRejected, GovernanceTimeout, GovernanceUnavailable,
+)
 from tests.test_engine_governance_gate import PLUGIN_ROOT, FakePlugin, mcp_result, plugin_unavailable
 
 RECORD_STAGES = {"record_baseline": "stage-1", "record_implementation": "stage-2", "record_scope": "stage-3",
@@ -40,6 +42,9 @@ class ConformanceFake(FakePlugin):
         if tool == "record_stage_result" and RECORD_STAGES.get(self.broken) == arguments["stageId"]:
             self.calls.append((tool, arguments, observation))
             return mcp_result({"ok": False, "data": None, "error": {"code": "INVALID_INPUT", "message": "digest format"}})
+        if tool == "abort_workflow" and self.broken == "abort":
+            self.calls.append((tool, arguments, observation))
+            return mcp_result({"ok": True, "data": {"state": "running"}, "error": None})
         return super().call(tool, arguments, observation)
 
     def envelope(self, tool, arguments):
@@ -177,7 +182,29 @@ class ConformanceModuleTests(unittest.TestCase):
         self.assertIn("CONFORMANCE_ERROR", str(raised.exception))
         self.assertIs(False, raised.exception.effects_started)
         # 정리만 실패하면 이미 관측한 검사 항목으로 정해진 결과를 그대로 돌려준다.
-        self.assertEqual("PASS", run_conformance(Path("unused"), plugin_factory=only_close_fails)["verdict"])
+        result = run_conformance(Path("unused"), plugin_factory=only_close_fails)
+        self.assertEqual("PASS", result["verdict"])
+        self.assertIn("생성·정리 실패", result["cleanup_error"])
+
+    def test_probe_model_class_write_failure_is_retryable(self) -> None:
+        original = governance_conformance._write
+
+        def fail_probe_classes(path, value):
+            if Path(path).name == "probe-model-classes.json":
+                raise OSError("대응표 기록 실패")
+            return original(path, value)
+
+        with patch.object(governance_conformance, "_write", side_effect=fail_probe_classes):
+            with self.assertRaises(GovernanceUnavailable) as raised:
+                self.run_with()
+        self.assertIn("대응표 기록 실패", str(raised.exception))
+        self.assertIs(False, raised.exception.effects_started)
+
+    def test_deterministic_rejection_is_not_reclassified_as_retryable(self) -> None:
+        rejection = GovernanceRejected("CONFORMANCE_REJECTED")
+        with self.assertRaises(GovernanceRejected) as raised:
+            governance_gate.conformance_result(lambda: (_ for _ in ()).throw(rejection))
+        self.assertIs(rejection, raised.exception)
 
     def test_preflight_mismatch_is_reported_as_a_contract_mismatch(self) -> None:
         def factory(root, state_dir, classes):
@@ -232,22 +259,52 @@ class CallSiteTests(unittest.TestCase):
         self.assertIn("GOVERNANCE_PLUGIN_ROOT_REQUIRED", emitted[0]["message"])
         run.assert_not_called()
 
-    def test_e2e_preflight_stops_before_cells_unless_the_plugin_conforms(self) -> None:
-        with tempfile.TemporaryDirectory() as temp:
-            destination = Path(temp)
-            _require_plugin_conformance(SimpleNamespace(check_conformance=lambda: self.result("PASS")), destination)
-            stored = list(destination.glob("governance-conformance-*.json"))
-            self.assertEqual(1, len(stored))
-            self.assertEqual("PASS", json.loads(stored[0].read_text(encoding="utf-8"))["verdict"])
-            with self.assertRaisesRegex(QualificationRunError, "GOVERNANCE_CONFORMANCE_FAILED: plan"):
-                _require_plugin_conformance(SimpleNamespace(check_conformance=lambda: self.result("FAIL")), destination)
-            self.assertEqual(2, len(list(destination.glob("governance-conformance-*.json"))))
-        # harness는 cell loop에 들어가기 전에 이 검사를 부른다.
+    def test_e2e_reuses_frozen_conformance_and_only_rebinds_exact_identity(self) -> None:
+        fields = {
+            "closure_tree_digest": "sha256:" + "1" * 64,
+            "entrypoint_table_digest": "sha256:" + "2" * 64,
+            "check_set_digest": CHECK_SET_DIGEST,
+            "conformance_result_digest": "sha256:" + "3" * 64,
+        }
+        frozen = SimpleNamespace(
+            **fields,
+            e2e_identity_digest=governance_gate.sha256_digest(fields),
+            manifest_sha256="sha256:" + "4" * 64,
+            node_version="v22.13.0",
+            plugin_version_label="2.1.2",
+            server_info={"name": "frozen"},
+            installation_root=str(Path("D:/other-plugin").resolve()),
+        )
+        identity = {
+            "summary": {
+                "closure_tree_digest": fields["closure_tree_digest"],
+                "entrypoint_table_digest": fields["entrypoint_table_digest"],
+                "manifest_sha256": "sha256:" + "9" * 64,
+                "node_version": "v22.14.0",
+            },
+            "labels": [
+                {"source": "plugin_manifest_file", "plugin": {"version": "2.1.3"}},
+                {"source": "mcp_server_info", "serverInfo": {"name": "changed"}},
+            ],
+        }
+        governance = SimpleNamespace(
+            plugin_root=Path("D:/plugin"),
+            inspect_identity=lambda: identity,
+            check_conformance=lambda: (_ for _ in ()).throw(AssertionError("재실행 금지")),
+        )
+        observed = _observe_frozen_plugin_identity(governance, frozen)
+        self.assertEqual(frozen.e2e_identity_digest, observed["governance_plugin_identity_digest"])
+        self.assertTrue(all(observed["audit_only_changes"].values()))
+        identity["summary"]["closure_tree_digest"] = "sha256:" + "8" * 64
+        with self.assertRaisesRegex(QualificationRunError, "E2E_GOVERNANCE_PLUGIN_IDENTITY_MISMATCH"):
+            _observe_frozen_plugin_identity(governance, frozen)
+        # harness는 cell loop 전에 frozen identity를 대조하며 conformance를 다시 실행하지 않는다.
         from flowmarshal.engine import e2e_qualification
 
         source = Path(e2e_qualification.__file__).read_text(encoding="utf-8")
         body = source[source.index("def run_project_e2e"):]
-        self.assertLess(body.index("_require_plugin_conformance(governance, destination)"),
+        self.assertNotIn("governance.check_conformance", body)
+        self.assertLess(body.index("_observe_frozen_plugin_identity(governance, governance_freeze)"),
                         body.index("for index, scenario in enumerate(E2E_SCENARIOS)"))
 
 

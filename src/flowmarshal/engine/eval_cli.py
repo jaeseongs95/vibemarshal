@@ -106,6 +106,10 @@ def _run(arguments: argparse.Namespace) -> int:
             )
         if not Path(arguments.candidate_wheel).is_absolute():
             raise QualificationRunError("--candidate-wheel은 절대경로여야 합니다.")
+        if not getattr(arguments, "pre_provider_dry_run", False) and not arguments.release_freeze:
+            raise QualificationRunError("project-e2e에는 절대경로 --release-freeze가 필요합니다.")
+        if arguments.release_freeze and not Path(arguments.release_freeze).is_absolute():
+            raise QualificationRunError("--release-freeze는 절대경로여야 합니다.")
     if getattr(arguments, "pre_provider_dry_run", False):
         if arguments.scope != "project-e2e":
             raise QualificationRunError(
@@ -159,6 +163,7 @@ def _run(arguments: argparse.Namespace) -> int:
                 evaluation_policies=policies,
                 candidate_wheel=arguments.candidate_wheel,
                 runtime_selection=runtime_selection,
+                release_freeze=arguments.release_freeze,
             )
     _emit(
         {
@@ -200,10 +205,22 @@ def _release_freeze(arguments: argparse.Namespace) -> int:
 
 def _verify_release_freeze(arguments: argparse.Namespace) -> int:
     root = Path(arguments.project_root).resolve(strict=True)
+    role_configuration = (
+        None if arguments.role_config is None else _roles(arguments.role_config, root)
+    )
+    evaluation_policies = None
+    if arguments.budget_policy and arguments.role_timeout_policy:
+        evaluation_policies = load_evaluation_policies(
+            budget_policy_path=arguments.budget_policy,
+            role_timeout_policy_path=arguments.role_timeout_policy,
+            codex_project_binding_path=getattr(arguments, "codex_project_binding", None),
+        )
     result = verify_release_freeze(
         Path(arguments.destination).resolve(),
         source_root=root,
         candidate_wheel=None if arguments.candidate_wheel is None else Path(arguments.candidate_wheel),
+        role_configuration=role_configuration,
+        evaluation_policies=evaluation_policies,
         allow_rehearsal=bool(arguments.allow_rehearsal),
     )
     _emit(result.model_dump(mode="json"))
@@ -593,6 +610,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--candidate-wheel",
         help="project-e2e에서 검증할 non-editable 설치 candidate wheel의 절대경로",
     )
+    run.add_argument(
+        "--release-freeze",
+        help="project-e2e가 재사용할 검증된 release freeze 디렉터리의 절대경로",
+    )
     run.add_argument("--codex-project-binding", help="App Server 프로젝트 ID·예상 root 결속 JSON")
     run.add_argument("--budget-policy")
     run.add_argument("--role-timeout-policy")
@@ -692,6 +713,10 @@ def build_parser() -> argparse.ArgumentParser:
     verify_release_freeze_parser.add_argument("--project-root", default=str(project_root()))
     verify_release_freeze_parser.add_argument("--destination", required=True)
     verify_release_freeze_parser.add_argument("--candidate-wheel")
+    verify_release_freeze_parser.add_argument("--role-config")
+    verify_release_freeze_parser.add_argument("--codex-project-binding")
+    verify_release_freeze_parser.add_argument("--budget-policy")
+    verify_release_freeze_parser.add_argument("--role-timeout-policy")
     verify_release_freeze_parser.add_argument(
         "--allow-rehearsal",
         action="store_true",

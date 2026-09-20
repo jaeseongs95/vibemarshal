@@ -60,6 +60,7 @@ from .read_models import (
     EntityRef,
     ExecutionObservationSummary,
     FinalReport,
+    GovernancePluginTaskObservation,
     HistoryCursor,
     IntentDetail,
     ModelBindingItem,
@@ -2201,10 +2202,12 @@ class EngineApplication:
             if goal.definition.effect_policy.mutation_policy is MutationPolicy.READ_ONLY
             else None
         )
+        governance_plugin_tasks = self._governance_plugin_task_observations(project_id, plan)
         return FinalReport(
             project_id=project_id, goal=goal, plan=plan, verdict=verdict, usage=usage,
             execution_summary=execution_summary,
             ledger_history_valid=self.service.ledger.verify_history(project_id),
+            governance_plugin_tasks=governance_plugin_tasks,
             entity_refs=presentation.entity_refs, history_cursor=presentation.history_cursor,
             read_only_verification=read_only_verification,
             error_code=(
@@ -2225,6 +2228,71 @@ class EngineApplication:
                 )
                 else usage.next_action
             ),
+        )
+
+    def _governance_plugin_task_observations(
+        self, project_id: str, plan: PlanContractRevision,
+    ) -> tuple[GovernancePluginTaskObservation, ...]:
+        """governance CoreOperations history를 Task별 최종 identity와 drift flag로 투영한다."""
+        with self.service.ledger.read() as connection:
+            rows = connection.execute(
+                "SELECT p.sequence, p.payload_json AS prepared_json, c.payload_json AS completed_json "
+                "FROM history_events p LEFT JOIN history_events c "
+                "ON c.project_id = p.project_id AND c.entity_id = p.entity_id "
+                "AND c.entity_type = 'core_operation' AND c.event_type = 'operation.completed' "
+                "WHERE p.project_id = ? AND p.entity_type = 'core_operation' "
+                "AND p.event_type = 'operation.prepared' ORDER BY p.sequence, c.sequence",
+                (project_id,),
+            ).fetchall()
+        observed: dict[str, dict[str, Any]] = {}
+        for row in rows:
+            prepared = json.loads(row["prepared_json"])
+            if prepared.get("kind") != "governance_gate" or row["completed_json"] is None:
+                continue
+            request = prepared.get("request", {})
+            key = request.get("key", {})
+            task_id = key.get("task_id")
+            step = request.get("step")
+            if not isinstance(task_id, str) or not isinstance(step, str):
+                continue
+            item = observed.setdefault(
+                task_id,
+                {
+                    "closure_tree_digest": None,
+                    "plugin_version_label": None,
+                    "changed": False,
+                    "changed_phases": [],
+                },
+            )
+            if step.startswith("plugin_identity_changed:"):
+                item["changed"] = True
+                phase = step.partition(":")[2]
+                if phase and phase not in item["changed_phases"]:
+                    item["changed_phases"].append(phase)
+            if step != "plugin_identity":
+                continue
+            completed = json.loads(row["completed_json"])
+            result = completed.get("result", {}).get("data", {})
+            summary = result.get("summary", {})
+            item["closure_tree_digest"] = summary.get("closure_tree_digest")
+            labels = result.get("labels", ())
+            manifest = next((label.get("plugin") for label in labels
+                             if label.get("source") == "plugin_manifest_file"), None)
+            item["plugin_version_label"] = manifest.get("version") if isinstance(manifest, dict) else None
+        return tuple(
+            GovernancePluginTaskObservation(
+                task_id=task.task_id,
+                task_ref=task.task_ref,
+                **(
+                    observed.get(task.task_id, {})
+                    | {
+                        "changed_phases": tuple(
+                            observed.get(task.task_id, {}).get("changed_phases", ())
+                        )
+                    }
+                ),
+            )
+            for task in plan.definition.tasks
         )
 
     def _read_only_report_verification(

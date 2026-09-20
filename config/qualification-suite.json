@@ -132,8 +132,8 @@
       "fixture_id": "stale-before-start",
       "expected_semantics": ["실제 효과 직전 target/context/prompt/model/policy 결속을 재검사한다.", "변경된 입력에는 provider 효과를 만들지 않는다."],
       "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "materialize", "freshness_check"],
-      "allowed_provenance": ["fake", "fault_injected"],
-      "required_provenance": ["fault_injected"],
+      "allowed_provenance": ["live", "fault_injected"],
+      "required_provenance": ["live", "fault_injected"],
       "required_evidence_kinds": ["execution_spec", "source_digest", "error", "effect_count"]
     },
     {

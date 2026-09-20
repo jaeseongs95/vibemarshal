@@ -2776,6 +2776,9 @@ class EngineDispatcher:
                 detail="proposal을 최신 Goal·Plan·State·Project Map에 결속했습니다.",
             )
         if materialized is not None:
+            # stale 입력은 steward를 포함한 어떤 provider 효과보다 먼저 차단한다.
+            # gate 뒤 reserve_attempt도 같은 검사를 반복해 TOCTOU를 막는다.
+            self.service.assert_execution_inputs_current(materialized["id"])
             gated = self._task_gate_decision("before_execution", materialized)
             if isinstance(gated, RunOnceOutcome):
                 return gated

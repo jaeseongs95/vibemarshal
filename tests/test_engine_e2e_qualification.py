@@ -5,20 +5,24 @@ import tempfile
 import unittest
 from collections import defaultdict
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from flowmarshal.canonical import sha256_digest
 from flowmarshal.engine.budget import BudgetManager
 from flowmarshal.engine.e2e_qualification import (
     RecordedRuntime,
+    _assert_no_transient_plugin_identity_change,
     _checkpoint_model_observation,
     _contract,
     _copy_fixture,
     _e2e_failure_disposition,
     _guard_e2e_partial_resume,
+    _observe_frozen_plugin_identity,
     _prepare,
     _prepare_from_raw_request,
     _preserve_inventory_observation,
+    _responsibility_outcome,
     _unknown_receipt,
     run_project_e2e,
 )
@@ -29,15 +33,62 @@ from flowmarshal.engine.evaluation_budget import (
 )
 from flowmarshal.engine.model_lock import RUNTIME_CAPABILITIES
 from flowmarshal.engine.models import ModelCapability, ModelInventory
+from flowmarshal.engine.operations import CoreOperations
 from flowmarshal.engine.qualification import (
     QualificationRunError,
     default_role_configuration,
+)
+from flowmarshal.engine.qualification_manifest import (
+    EvidenceProvenance,
+    QualificationSuiteManifest,
 )
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime, RuntimeObservation
 from tests.fixtures.engine.governance.allow import ALLOW_ALL
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _frozen_governance_identity(root: Path):
+    from flowmarshal.engine.governance_conformance import CHECK_SET_DIGEST
+
+    summary = {
+        "manifest_sha256": sha256_digest({"manifest": "frozen"}),
+        "closure_tree_digest": sha256_digest({"closure": "frozen"}),
+        "entrypoint_table_digest": sha256_digest({"entrypoints": "frozen"}),
+        "node_version": "v22.13.0",
+    }
+    fields = {
+        "closure_tree_digest": summary["closure_tree_digest"],
+        "entrypoint_table_digest": summary["entrypoint_table_digest"],
+        "check_set_digest": CHECK_SET_DIGEST,
+        "conformance_result_digest": sha256_digest({"conformance": "frozen"}),
+    }
+    frozen = SimpleNamespace(
+        **fields,
+        manifest_sha256=summary["manifest_sha256"],
+        node_version=summary["node_version"],
+        plugin_version_label="2.1.2",
+        server_info={"name": "governance", "version": "2.1.2"},
+        installation_root=str(root.resolve()),
+        e2e_identity_digest=sha256_digest(fields),
+    )
+    return frozen, summary
+
+
+class _IdentityOnlyGovernance:
+    def __init__(self, root: Path, summary: dict, labels=()) -> None:
+        self.plugin_root = root
+        self.summary = summary
+        self.labels = labels
+        self.check_conformance_calls = 0
+
+    def inspect_identity(self):
+        return {"summary": self.summary, "labels": self.labels}
+
+    def check_conformance(self):
+        self.check_conformance_calls += 1
+        raise AssertionError("E2E rebind는 conformance를 재실행하면 안 됩니다.")
 
 
 def _inventory() -> ModelInventory:
@@ -133,6 +184,186 @@ class EngineE2EQualificationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.roles = default_role_configuration(ROOT)
         self.inventory = _inventory()
+
+    def test_stale_responsibility_uses_allowed_live_fault_provenance(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            run_root = Path(raw)
+            cell_root = run_root / "work" / "stale-after-materialization"
+            cell_root.mkdir(parents=True)
+            (cell_root / "qualification-observation.json").write_text(
+                "{}", encoding="utf-8"
+            )
+            digest = sha256_digest({"binding": "test"})
+
+            outcome = _responsibility_outcome(
+                scenario="stale-after-materialization",
+                prepared=SimpleNamespace(pipeline_stages=("prepare",)),
+                cell={"passed": True},
+                contract=SimpleNamespace(contract_digest=digest),
+                cell_root=cell_root,
+                run_root=run_root,
+                fixture_digest=digest,
+                freeze_bundle_digest=digest,
+                governance_plugin_identity_digest=digest,
+                candidate_wheel_digest=digest,
+                candidate_wheel_binding_digest=digest,
+                candidate_distribution_name="flowmarshal-engine",
+                candidate_distribution_version="1.0.0",
+            )
+
+            self.assertEqual(
+                (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
+                outcome.provenance,
+            )
+            requirement = next(
+                item
+                for item in QualificationSuiteManifest.load(
+                    ROOT / "config" / "qualification-suite.json"
+                ).e2e_responsibilities
+                if item.responsibility_id == "E2E-11"
+            )
+            self.assertLessEqual(
+                set(outcome.provenance), set(requirement.allowed_provenance)
+            )
+            self.assertLessEqual(
+                set(requirement.required_provenance), set(outcome.provenance)
+            )
+
+    def test_frozen_governance_identity_rebind_uses_only_four_exact_fields(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            frozen_root = Path(raw) / "frozen-plugin"
+            current_root = Path(raw) / "current-plugin"
+            frozen_root.mkdir()
+            current_root.mkdir()
+            frozen, summary = _frozen_governance_identity(frozen_root)
+            governance = _IdentityOnlyGovernance(
+                current_root,
+                summary
+                | {
+                    "manifest_sha256": sha256_digest({"manifest": "audit-drift"}),
+                    "node_version": "v22.13.9",
+                },
+                labels=(
+                    {
+                        "source": "plugin_manifest_file",
+                        "plugin": {"id": "governance", "version": "9.9.9"},
+                    },
+                    {
+                        "source": "mcp_server_info",
+                        "serverInfo": {"name": "renamed", "version": "9.9.9"},
+                    },
+                ),
+            )
+
+            observed = _observe_frozen_plugin_identity(governance, frozen)
+
+            self.assertEqual(
+                frozen.e2e_identity_digest,
+                observed["governance_plugin_identity_digest"],
+            )
+            self.assertTrue(all(observed["audit_only_changes"].values()))
+            self.assertEqual(0, governance.check_conformance_calls)
+
+            exact_drifts = {
+                "closure_tree_digest": (
+                    summary
+                    | {"closure_tree_digest": sha256_digest({"drift": "closure"})},
+                    frozen,
+                ),
+                "entrypoint_table_digest": (
+                    summary
+                    | {
+                        "entrypoint_table_digest": sha256_digest(
+                            {"drift": "entrypoints"}
+                        )
+                    },
+                    frozen,
+                ),
+                "conformance_result_digest": (
+                    summary,
+                    SimpleNamespace(
+                        **(
+                            vars(frozen)
+                            | {
+                                "conformance_result_digest": sha256_digest(
+                                    {"drift": "conformance"}
+                                )
+                            }
+                        )
+                    ),
+                ),
+            }
+            for field, (drifted_summary, drifted_frozen) in exact_drifts.items():
+                with self.subTest(field=field), self.assertRaisesRegex(
+                    QualificationRunError,
+                    "E2E_GOVERNANCE_PLUGIN_IDENTITY_MISMATCH",
+                ):
+                    _observe_frozen_plugin_identity(
+                        _IdentityOnlyGovernance(frozen_root, drifted_summary),
+                        drifted_frozen,
+                    )
+            with patch(
+                "flowmarshal.engine.governance_conformance.CHECK_SET_DIGEST",
+                sha256_digest({"drift": "checks"}),
+            ), self.assertRaisesRegex(
+                QualificationRunError,
+                "E2E_GOVERNANCE_PLUGIN_IDENTITY_MISMATCH",
+            ):
+                _observe_frozen_plugin_identity(
+                    _IdentityOnlyGovernance(frozen_root, summary),
+                    frozen,
+                )
+
+    def test_frozen_governance_identity_wraps_contract_and_environment_errors(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            root = Path(raw)
+            frozen, _ = _frozen_governance_identity(root)
+
+            for error in (ValueError("contract"), OSError("environment")):
+                governance = _IdentityOnlyGovernance(root, {})
+                governance.inspect_identity = lambda error=error: (_ for _ in ()).throw(
+                    error
+                )
+                with self.subTest(error=type(error).__name__), self.assertRaisesRegex(
+                    QualificationRunError,
+                    "E2E_GOVERNANCE_PREFLIGHT_FAILED",
+                ):
+                    _observe_frozen_plugin_identity(governance, frozen)
+
+    def test_transient_governance_identity_change_in_ledger_forbids_cell_pass(self) -> None:
+        policies = load_evaluation_policies(
+            budget_policy_path=ROOT / "config" / "pre-1.0-validation-budget.json",
+            role_timeout_policy_path=ROOT / "config" / "pre-1.0-role-timeouts.json",
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            for phase in ("before_dispatch", "before_completion"):
+                with self.subTest(phase=phase):
+                    cell_root = Path(raw) / phase
+                    cell_root.mkdir()
+                    workspace, _ = _copy_fixture(ROOT, cell_root)
+                    prepared = _prepare(
+                        workspace=workspace,
+                        state_root=cell_root / "state",
+                        inventory=self.inventory,
+                        roles=self.roles,
+                        evaluation_policies=policies,
+                        evaluation_contract_digest=sha256_digest(
+                            {"contract": phase}
+                        ),
+                        fixture_digest=sha256_digest({"fixture": phase}),
+                    )
+                    _assert_no_transient_plugin_identity_change(prepared)
+                    CoreOperations(prepared.service).invoke(
+                        project_id=prepared.project_id,
+                        kind="governance_gate",
+                        request={"step": f"plugin_identity_changed:{phase}"},
+                        execute=lambda: {"changed": True},
+                    )
+                    with self.assertRaisesRegex(
+                        QualificationRunError,
+                        "E2E_GOVERNANCE_PLUGIN_IDENTITY_CHANGED_DURING_CELL",
+                    ):
+                        _assert_no_transient_plugin_identity_change(prepared)
 
     def test_release_project_e2e_requires_absolute_candidate_wheel_before_provider(self) -> None:
         policies = load_evaluation_policies(

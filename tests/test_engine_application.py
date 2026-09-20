@@ -32,6 +32,7 @@ from flowmarshal.engine.read_models import (
     ReadPresentation,
 )
 from flowmarshal.engine.service import EngineService
+from flowmarshal.engine.reporting import render_final
 from tests.test_engine_ledger_service import TrustedTestEngineService
 from flowmarshal.engine.roles import RoleCallReceipt, RoleCallRequest, strict_json_output_schema
 from tests.engine_helpers import (
@@ -388,6 +389,36 @@ class EngineApplicationTests(unittest.TestCase):
                 (verdict.goal_verdict_id, self.project_id, self.plan.plan_revision_id,
                  verdict.goal_contract_digest, verdict.status.value, canonical_json(verdict), verdict.evaluated_at.isoformat()),
             )
+            task = self.plan.definition.tasks[0]
+            tx.history(
+                self.project_id, "operation.prepared", "core_operation", "operation_plugin_identity",
+                {"kind": "governance_gate", "request": {"key": {"task_id": task.task_id},
+                                                         "step": "plugin_identity"}},
+            )
+            tx.history(
+                self.project_id, "operation.completed", "core_operation", "operation_plugin_identity",
+                {"result": {"data": {"summary": {"closure_tree_digest": DIGEST_A}, "labels": [
+                    {"source": "plugin_manifest_file", "plugin": {"version": "2.1.2"}},
+                ]}}},
+            )
+            tx.history(
+                self.project_id, "operation.prepared", "core_operation", "operation_plugin_changed",
+                {"kind": "governance_gate", "request": {"key": {"task_id": task.task_id},
+                                                         "step": "plugin_identity_changed:before_completion"}},
+            )
+            tx.history(
+                self.project_id, "operation.completed", "core_operation", "operation_plugin_changed",
+                {"result": {"data": {"changed": True}}},
+            )
+            tx.history(
+                self.project_id, "operation.prepared", "core_operation", "operation_plugin_changed_execution",
+                {"kind": "governance_gate", "request": {"key": {"task_id": task.task_id},
+                                                         "step": "plugin_identity_changed:before_execution"}},
+            )
+            tx.history(
+                self.project_id, "operation.completed", "core_operation", "operation_plugin_changed_execution",
+                {"result": {"data": {"changed": True}}},
+            )
 
         report = self.application.final_report(self.project_id)
 
@@ -395,6 +426,37 @@ class EngineApplicationTests(unittest.TestCase):
         self.assertEqual(self.goal.goal_id, report.usage.goal_id)
         self.assertEqual(2, report.usage.logical_call_count)
         self.assertEqual({self.goal.definition_digest, revised.definition_digest}, set(report.usage.goal_revision_digests))
+        self.assertEqual(1, len(report.governance_plugin_tasks))
+        self.assertEqual(
+            (
+                task.task_ref,
+                DIGEST_A,
+                "2.1.2",
+                True,
+                ("before_completion", "before_execution"),
+            ),
+            (
+                report.governance_plugin_tasks[0].task_ref,
+                report.governance_plugin_tasks[0].closure_tree_digest,
+                report.governance_plugin_tasks[0].plugin_version_label,
+                report.governance_plugin_tasks[0].changed,
+                report.governance_plugin_tasks[0].changed_phases,
+            ),
+        )
+        rendered = render_final(
+            goal=report.goal,
+            plan=report.plan,
+            verdict=report.verdict,
+            usage=report.usage.usage_records,
+            usage_summary=report.usage,
+            execution_summary=report.execution_summary,
+            governance_plugin_tasks=report.governance_plugin_tasks,
+        )
+        self.assertIn(
+            f"`{task.task_ref}`: closure=`{DIGEST_A}`, version=`2.1.2`, "
+            "changed=`true`, phases=`before_completion,before_execution`",
+            rendered,
+        )
 
     def test_model_binding_needs_observed_inventory_without_calling_provider(self) -> None:
         status = self.application.model_binding_status(self.project_id, inventory=None)

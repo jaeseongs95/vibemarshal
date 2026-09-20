@@ -16,7 +16,7 @@ from .evaluation import (
     ImmutableCheckpointStore,
     evaluate_role_fixtures,
 )
-from .evaluation_budget import verify_metadata_digest
+from .evaluation_budget import policies_from_metadata, verify_metadata_digest
 from .role_observations import RoleCallReceipt
 from .qualification import (
     ORDER_SEEDS,
@@ -251,6 +251,7 @@ def _project_e2e(
         freeze_bundle_digest = None
         _error(errors, "SCOPE_REPORT_E2E_FREEZE_BUNDLE_INVALID")
     candidate_binding = None
+    metadata: dict[str, Any] = {}
     try:
         metadata = json.loads(
             (run_root / "run-metadata.json").read_text(encoding="utf-8")
@@ -261,6 +262,28 @@ def _project_e2e(
     except Exception:
         candidate_wheel_digest = None
         _error(errors, "SCOPE_REPORT_E2E_CANDIDATE_WHEEL_INVALID")
+    governance_plugin_identity_digest = None
+    try:
+        from .models import EngineRoleConfiguration
+        from .release_freeze import verify_release_freeze
+
+        release = verify_release_freeze(
+            metadata["release_freeze_path"],
+            source_root=root,
+            candidate_wheel=None if candidate_binding is None else candidate_binding.wheel_path,
+            role_configuration=EngineRoleConfiguration.model_validate(metadata["role_configuration"]),
+            evaluation_policies=policies_from_metadata(metadata),
+        )
+        if not release.valid:
+            raise ValueError(";".join(release.mismatches))
+        governance_plugin_identity_digest = release.manifest.governance_plugin.e2e_identity_digest
+        if metadata.get("release_freeze_digest") != release.manifest.freeze_digest:
+            raise ValueError("release freeze digest mismatch")
+        if metadata.get("governance_plugin_identity_digest") != governance_plugin_identity_digest:
+            raise ValueError("governance plugin identity digest mismatch")
+    except Exception:
+        governance_plugin_identity_digest = None
+        _error(errors, "SCOPE_REPORT_E2E_GOVERNANCE_PLUGIN_INVALID")
     responsibility_report = evaluate_qualification_responsibilities(
         qualification_suite_manifest(root),
         tuple(outcomes),
@@ -268,6 +291,7 @@ def _project_e2e(
         run_root=run_root,
         expected_cell_bindings=expected_cell_bindings,
         expected_freeze_bundle_digest=freeze_bundle_digest,
+        expected_governance_plugin_identity_digest=governance_plugin_identity_digest,
         expected_candidate_wheel_digest=candidate_wheel_digest,
         expected_candidate_wheel_binding_digest=(
             None if candidate_binding is None else candidate_binding.binding_digest

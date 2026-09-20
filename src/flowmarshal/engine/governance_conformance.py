@@ -23,8 +23,9 @@ from typing import Any, Callable
 
 from ..canonical import sha256_digest
 from .governance_gate import (
-    ACCEPTANCE_STATES, CONSUMED_SURFACE, MODEL_CLASSES_FORMAT, SCOPE_STATES, SNAPSHOT_IDENTITY, SUPPORTED_CAPABILITIES,
-    GovernanceContractMismatch, GovernancePlugin, GovernanceUnavailable, _fields, _git, _sha256_file,
+    ACCEPTANCE_STATES, CONSUMED_SURFACE, CONSUMED_SURFACE_DIGEST, MODEL_CLASSES_FORMAT, SCOPE_STATES,
+    SNAPSHOT_IDENTITY, SUPPORTED_CAPABILITIES, GovernanceContractMismatch, GovernancePlugin,
+    GovernanceUnavailable, _fields, _git, _sha256_file,
     conformance_result, convergence_frame, mcp_data, mcp_envelope, plan_stages, snapshot_worktree,
     stage_record_arguments,
 )
@@ -37,11 +38,12 @@ PROBE_OBSERVATION = {"model": PROBE_MODEL, "effort": "high", "actorId": "flowmar
 DEADLINE_SECONDS = 600.0
 # 검사 항목 ID. gate가 기대는 표면이 바뀔 때만 바뀐다. 이 목록의 digest가 검사 집합 digest다.
 CHECKS = (
-    "attestation_required", "plan", "root", "claim", "start", "baseline", "record_baseline", "scope_out_of_scope",
+    "attestation_required", "plan", "root", "claim", "start", "abort", "baseline", "record_baseline", "scope_out_of_scope",
     "scope_in_scope", "record_implementation", "record_scope", "acceptance_refuted", "acceptance",
     "record_acceptance", "finalize",
 )
-CHECK_SET_DIGEST = sha256_digest({"format": CONFORMANCE_FORMAT, "checks": list(CHECKS)})
+CHECK_SET_DIGEST = sha256_digest({"format": CONFORMANCE_FORMAT, "checks": list(CHECKS),
+                                  "consumed_surface_digest": CONSUMED_SURFACE_DIGEST})
 TARGET = "target.txt"
 
 
@@ -67,7 +69,7 @@ def _write(path: Path, value: Any) -> Path:
     return path
 
 
-def _close(plugin: Any) -> None:
+def _close(plugin: Any) -> str | None:
     """정리 실패가 진행 중인 예외를 덮지 않게 한다.
 
     검사 효과는 임시 디렉터리 안에만 있고 결과는 이미 관측한 검사 항목으로 정해지므로, 정리 실패는 판정을 바꾸지
@@ -75,8 +77,9 @@ def _close(plugin: Any) -> None:
     """
     try:
         plugin.close()
-    except Exception:
-        pass
+    except Exception as error:
+        return f"{type(error).__name__}: {error}"
+    return None
 
 
 class _Probe:
@@ -161,6 +164,30 @@ class _Probe:
         if started is None:
             return
         run_id, revision = started["runId"], started["revision"]
+
+        def abort() -> None:
+            abort_root = self.call(
+                "open_convergence_root", {"schemaVersion": "1.0.0", "parentRootId": None,
+                                          "taskEnvelope": envelope,
+                                          "frame": convergence_frame("flowmarshal-conformance-abort", self.repo,
+                                                                     envelope_path, c0),
+                                          "userApprovalRefs": [], "responseMode": "compact"}, signed=False)
+            abort_lease = self.call(
+                "claim_workflow_attempt", {"schemaVersion": "1.0.0", "rootId": abort_root["rootId"],
+                                           "expectedRevision": abort_root["revision"], "plan": workflow,
+                                           "actorId": PROBE_OBSERVATION["actorId"],
+                                           "outputTargets": [str(self.repo)], "priorFailure": None}, signed=False)
+            abort_started = self.call(
+                "start_guarded_workflow", {"schemaVersion": "1.0.0", "leaseId": abort_lease["leaseId"],
+                                           "expectedRootRevision": abort_lease["rootRevision"],
+                                           "responseMode": "compact"}, signed=False)
+            aborted = self.call(
+                "abort_workflow", {"runId": abort_started["runId"],
+                                   "expectedRevision": abort_started["revision"],
+                                   "responseMode": "compact"}, signed=False)
+            self.expect("abort", "aborted", aborted.get("state"), aborted.get("state") == "aborted")
+
+        self.check("abort", "시작된 별도 workflow가 aborted로 끝남", abort)
 
         def record(check_id: str, stage_key: str, state: str, output_file: Path, artifacts: tuple, target: str) -> bool:
             nonlocal revision
@@ -266,18 +293,24 @@ def _observe(plugin_root: Path, plugin_factory: Callable[..., Any], deadline_sec
         work = Path(temp)
         classes = _write(work / "probe-model-classes.json", {"format": MODEL_CLASSES_FORMAT, "classes": {PROBE_MODEL: PROBE_CLASS}})
         plugin = plugin_factory(plugin_root, work / "plugin-state", classes)
+        set_deadline = getattr(plugin, "set_deadline", None)
+        if callable(set_deadline):
+            set_deadline(started + deadline_seconds)
+        cleanup_error = None
         try:
             identity = plugin.preflight()
             probe = _Probe(plugin, work, started + deadline_seconds)
             probe.run()
         finally:
-            _close(plugin)
+            cleanup_error = _close(plugin)
     ran = {item["id"]: item for item in probe.results}
     checks = [ran.get(check_id, {"id": check_id, "status": "NOT_RUN", "expected": None, "observed": None}) for check_id in CHECKS]
     return {
         "format": CONFORMANCE_FORMAT, "provenance": "local_derived",
         "verdict": "PASS" if all(item["status"] == "PASS" for item in checks) else "FAIL",
         "check_set_digest": CHECK_SET_DIGEST, "identity": identity["summary"],
+        "identity_files": identity.get("files", {}), "identity_labels": identity.get("labels", []),
+        "installation_root": str(plugin_root.resolve()), "cleanup_error": cleanup_error,
         "probe": {"model": PROBE_MODEL, "modelClass": PROBE_CLASS, "actorId": PROBE_OBSERVATION["actorId"]},
         "checks": checks, "duration_seconds": round(time.monotonic() - started, 1),
     }

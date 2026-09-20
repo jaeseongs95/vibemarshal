@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from flowmarshal.engine.model_lock import OperationalBinding, RUNTIME_CAPABILITIES
 
+import json
 import tempfile
 import unittest
 import sqlite3
@@ -198,6 +199,64 @@ class EngineQualificationTests(unittest.TestCase):
                 QualificationRunError, "CANDIDATE_WHEEL_BINDING_CHANGED"
             ):
                 resume_run(destination)
+
+    def test_project_e2e_resume_reuses_bound_release_freeze(self) -> None:
+        policies = EvaluationPolicies(
+            budget=GoalBudgetPolicy(
+                total_tokens=1_000_000, call_reservation_tokens=100_000
+            ),
+            role_timeouts=RoleTimeoutPolicy(),
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            destination = Path(raw)
+            release_freeze = destination / "release-freeze"
+            release_freeze.mkdir()
+            contract = EvaluationContract(
+                model_lock_format="flowmarshal-model-lock-v2",
+                scope=EvaluationScope.PROJECT_E2E,
+                fixture_digests=("sha256:" + "1" * 64,),
+                scenario_set_digest="sha256:" + "2" * 64,
+                order_seeds=(0,),
+                expected_cell_count=1,
+                role_configuration_digest="sha256:" + "3" * 64,
+                source_manifest_digest=source_manifest_digest(ROOT),
+                rules_digest="sha256:" + "4" * 64,
+                threshold_digest="sha256:" + "5" * 64,
+                taxonomy_digest="sha256:" + "6" * 64,
+                prompt_digest="sha256:" + "7" * 64,
+                output_schema_digest="sha256:" + "8" * 64,
+                model_lock_digest="sha256:" + "9" * 64,
+            )
+            _write_json(destination / "evaluation-contract.json", contract)
+            write_immutable_run_metadata(
+                destination / "run-metadata.json",
+                {
+                    "scope": "project-e2e",
+                    "project_root": str(ROOT),
+                    "evaluation_contract_digest": contract.contract_digest,
+                    "role_configuration": self.roles.model_dump(mode="json"),
+                    "codex_bin": None,
+                    "candidate_wheel_binding": {"bound": True},
+                    "candidate_wheel_binding_digest": "sha256:" + "b" * 64,
+                    "release_freeze_path": str(release_freeze.resolve()),
+                },
+                policies,
+            )
+            binding = SimpleNamespace(wheel_path=destination / "candidate.whl")
+            sentinel = object()
+            with patch(
+                "flowmarshal.engine.qualification.verify_candidate_wheel_metadata",
+                return_value=binding,
+            ), patch(
+                "flowmarshal.engine.e2e_qualification.run_project_e2e",
+                return_value=sentinel,
+            ) as run_project:
+                self.assertIs(sentinel, resume_run(destination))
+
+            self.assertEqual(
+                str(release_freeze.resolve()),
+                run_project.call_args.kwargs["release_freeze"],
+            )
 
     def setUp(self) -> None:
         self.roles = default_role_configuration(ROOT)
@@ -501,6 +560,79 @@ class EngineQualificationTests(unittest.TestCase):
         with self.assertRaisesRegex(QualificationRunError, "절대경로"):
             _run(relative)
 
+    def test_eval_cli_forwards_release_freeze_to_project_e2e(self) -> None:
+        parser = build_parser()
+        candidate = str((ROOT / "dist" / "candidate.whl").resolve())
+        release_freeze = str((ROOT / "release-freeze").resolve())
+        arguments = parser.parse_args(
+            [
+                "run",
+                "--scope",
+                "project-e2e",
+                "--project-root",
+                str(ROOT),
+                "--candidate-wheel",
+                candidate,
+                "--release-freeze",
+                release_freeze,
+                "--budget-policy",
+                str(ROOT / "config" / "pre-1.0-validation-budget.json"),
+                "--role-timeout-policy",
+                str(ROOT / "config" / "pre-1.0-role-timeouts.json"),
+            ]
+        )
+        report = ScopeQualificationReport(
+            scope=EvaluationScope.PROJECT_E2E,
+            contract_digest=sha256_digest({"contract": "cli-release-freeze"}),
+            status=EvaluationRunStatus.COMPLETED,
+            passed=True,
+            metrics={"actual_codex_cell_count": 4},
+            generated_at=utc_now(),
+        )
+
+        with patch(
+            "flowmarshal.engine.eval_cli.run_project_e2e",
+            return_value=(ROOT / "run", report),
+        ) as run_project, patch("flowmarshal.engine.eval_cli._emit"):
+            self.assertEqual(0, _run(arguments))
+
+        self.assertEqual(
+            release_freeze,
+            run_project.call_args.kwargs["release_freeze"],
+        )
+
+    def test_eval_cli_role_fixture_passes_only_supported_arguments(self) -> None:
+        parser = build_parser()
+        arguments = parser.parse_args(
+            [
+                "run",
+                "--scope",
+                "role-fixture",
+                "--project-root",
+                str(ROOT),
+                "--budget-policy",
+                str(ROOT / "config" / "pre-1.0-validation-budget.json"),
+                "--role-timeout-policy",
+                str(ROOT / "config" / "pre-1.0-role-timeouts.json"),
+            ]
+        )
+        report = ScopeQualificationReport(
+            scope=EvaluationScope.ROLE_FIXTURE,
+            contract_digest=sha256_digest({"contract": "cli-role-fixture"}),
+            status=EvaluationRunStatus.COMPLETED,
+            passed=True,
+            metrics={"cell_count": 48},
+            generated_at=utc_now(),
+        )
+
+        with patch(
+            "flowmarshal.engine.eval_cli.run_role_fixture",
+            return_value=(ROOT / "run", report),
+        ) as run_role, patch("flowmarshal.engine.eval_cli._emit"):
+            self.assertEqual(0, _run(arguments))
+
+        self.assertNotIn("release_freeze", run_role.call_args.kwargs)
+
     def test_benchmark_project_binding_changes_only_legacy_thread_persistence(self) -> None:
         policies = EvaluationPolicies(
             budget=GoalBudgetPolicy(total_tokens=1_000_000, call_reservation_tokens=100_000),
@@ -768,6 +900,46 @@ class EngineQualificationTests(unittest.TestCase):
                 cell = helper(prepared, FakeCodexRuntime(self.inventory), digest, governance=ALLOW_ALL)
                 self.assertTrue(cell["passed"], cell)
 
+    def test_stale_e2e_blocks_provider_effects_before_gate_after_live_preparation(self) -> None:
+        class RecordingGate:
+            def __init__(self) -> None:
+                self.before_execution_calls = 0
+
+            def before_execution(self, task) -> None:
+                del task
+                self.before_execution_calls += 1
+
+            def before_completion(self, task) -> None:
+                del task
+
+            def close(self) -> None:
+                return None
+
+        gate = RecordingGate()
+        governance = SimpleNamespace(
+            open_gate=lambda service, **kwargs: gate,
+        )
+        with tempfile.TemporaryDirectory() as temp:
+            prepared, digest = self.prepared(Path(temp) / "stale")
+            runtime = FakeCodexRuntime(self.inventory)
+            runtime.create_calls = 7  # 앞선 live 준비 호출을 재현한다.
+            runtime.turn_calls = 7
+            runtime.resume_calls = 2
+
+            cell = _stale_after_materialization(
+                prepared,
+                runtime,
+                digest,
+                governance=governance,
+            )
+
+        self.assertTrue(cell["passed"], cell)
+        self.assertEqual(0, gate.before_execution_calls)
+        self.assertEqual(0, cell["effect_count"])
+        self.assertEqual(0, cell["worker_attempt_count"])
+        self.assertEqual(7, cell["thread_create_count"])
+        self.assertIn("STALE_EXECUTION_INPUT", cell["error"])
+
     def test_live_restart_harness_reopens_core_and_records_read_before_resume(self) -> None:
         class RuntimeConnection(FakeCodexRuntime):
             stored_read_calls = 0
@@ -858,12 +1030,35 @@ class EngineQualificationTests(unittest.TestCase):
             prepared, source_digest = self.prepared(cell_root)
             contract_digest = sha256_digest({"contract": "resume"})
             fixture_digest = sha256_digest({"fixture": "normal-completion"})
+            governance_plugin_identity_digest = sha256_digest(
+                {"governance_plugin": "frozen"}
+            )
             _write_prepared_state(
                 cell_root,
                 prepared,
                 evaluation_contract_digest=contract_digest,
                 fixture_digest=fixture_digest,
+                governance_plugin_identity_digest=governance_plugin_identity_digest,
             )
+            state = json.loads(
+                (cell_root / "cell-state.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                governance_plugin_identity_digest,
+                state["governance_plugin_identity_digest"],
+            )
+            with self.assertRaisesRegex(
+                QualificationRunError,
+                "governance plugin identity",
+            ):
+                _restore_prepared_state(
+                    cell_root,
+                    evaluation_contract_digest=contract_digest,
+                    fixture_digest=fixture_digest,
+                    governance_plugin_identity_digest=sha256_digest(
+                        {"governance_plugin": "drifted"}
+                    ),
+                )
             runtime = FakeCodexRuntime(self.inventory)
             dispatcher = EngineDispatcher(prepared.service, runtime)
             dispatcher.run_once(prepared.project_id, proposal=prepared.proposal)
@@ -885,6 +1080,7 @@ class EngineQualificationTests(unittest.TestCase):
                 cell_root,
                 evaluation_contract_digest=contract_digest,
                 fixture_digest=fixture_digest,
+                governance_plugin_identity_digest=governance_plugin_identity_digest,
             )
             result = _normal_completion(restored, runtime, source_digest, governance=ALLOW_ALL)
             self.assertTrue(result["passed"], result)

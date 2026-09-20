@@ -31,6 +31,7 @@ import queue
 import subprocess
 import tempfile
 import threading
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -70,6 +71,7 @@ CONSUMED_SURFACE: dict[str, Any] = {
         "acceptance-cli": {"verdict": "str"},
     },
 }
+CONSUMED_SURFACE_DIGEST = sha256_digest(CONSUMED_SURFACE)
 _FIELD_TYPES = {"str": str, "int": int, "list": list, "dict": dict}
 MODEL_CLASSES_FORMAT = "flowmarshal-governance-model-classes-v1"
 SUPPORTED_CAPABILITIES = frozenset({
@@ -147,7 +149,7 @@ def conformance_result(run: Callable[[], dict[str, Any]]) -> dict[str, Any]:
     """
     try:
         return run()
-    except (GovernanceContractMismatch, GovernanceUnavailable):
+    except (GovernanceContractMismatch, GovernanceRejected, GovernanceUnavailable):
         raise
     except Exception as error:
         detail = str(error) if isinstance(error, GovernanceTimeout) else f"CONFORMANCE_ERROR: {error!r}"
@@ -366,8 +368,10 @@ class McpStdioClient:
     """플러그인 MCP 서버와 줄 단위 JSON-RPC로 통신한다. 모든 응답 대기에 timeout이 있다."""
 
     def __init__(self, command: list[str], *, cwd: Path, env: dict[str, str], stderr_path: Path,
-                 timeout: float = MCP_TIMEOUT_SECONDS) -> None:
-        self.timeout = timeout
+                 timeout: float = MCP_TIMEOUT_SECONDS, deadline: float | None = None) -> None:
+        self.timeout, self.deadline = timeout, deadline
+        if deadline is not None and deadline <= time.monotonic():
+            raise GovernanceUnavailable("GOVERNANCE_TIMEOUT: MCP start: absolute deadline")
         self._stderr = stderr_path.open("ab")
         try:
             self.process = subprocess.Popen(command, cwd=str(cwd), env=env, stdin=subprocess.PIPE,
@@ -406,13 +410,22 @@ class McpStdioClient:
             raise GovernanceUnavailable(f"MCP_SERVER_EXITED: {error}") from error
 
     def _request(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+        if self.deadline is not None and self.deadline <= time.monotonic():
+            raise GovernanceTimeout(
+                f"GOVERNANCE_TIMEOUT: MCP {method}: absolute deadline"
+            )
         self.sequence += 1
         self._send({"jsonrpc": "2.0", "id": self.sequence, "method": method, "params": params})
         while True:
+            timeout = self.timeout
+            if self.deadline is not None:
+                timeout = min(timeout, self.deadline - time.monotonic())
+                if timeout <= 0:
+                    raise GovernanceTimeout(f"GOVERNANCE_TIMEOUT: MCP {method}: absolute deadline")
             try:
-                line = self._lines.get(timeout=self.timeout)
+                line = self._lines.get(timeout=timeout)
             except queue.Empty as error:
-                raise GovernanceTimeout(f"GOVERNANCE_TIMEOUT: MCP {method}: {self.timeout}초") from error
+                raise GovernanceTimeout(f"GOVERNANCE_TIMEOUT: MCP {method}: {timeout}초") from error
             if line is None:
                 raise GovernanceTimeout(f"MCP_SERVER_EXITED: {method} 응답 전에 서버가 끝났습니다.")
             try:
@@ -434,20 +447,35 @@ class McpStdioClient:
         return self._request("tools/call", {"name": tool, "arguments": arguments})
 
     def close(self) -> None:
+        errors: list[str] = []
         if self.process.stdin is not None:
             try:
                 self.process.stdin.close()
-            except OSError:
-                pass  # stdin이 이미 끊겼어도 프로세스·스레드 정리는 계속한다.
+            except OSError as error:
+                errors.append(f"stdin: {error}")
         try:
             self.process.wait(timeout=10)
         except subprocess.TimeoutExpired:
-            self.process.kill()
-            self.process.wait(timeout=10)
+            try:
+                self.process.kill()
+                self.process.wait(timeout=10)
+            except (OSError, subprocess.TimeoutExpired) as error:
+                errors.append(f"process: {error}")
         self._pump_thread.join(timeout=10)
+        is_alive = getattr(self._pump_thread, "is_alive", None)
+        if callable(is_alive) and is_alive():
+            errors.append("stdout pump thread did not stop")
         if self.process.stdout is not None:
-            self.process.stdout.close()
-        self._stderr.close()
+            try:
+                self.process.stdout.close()
+            except OSError as error:
+                errors.append(f"stdout: {error}")
+        try:
+            self._stderr.close()
+        except OSError as error:
+            errors.append(f"stderr: {error}")
+        if errors:
+            raise GovernanceUnavailable("MCP_CLEANUP_FAILED: " + "; ".join(errors))
 
 
 class GovernancePlugin:
@@ -468,6 +496,19 @@ class GovernancePlugin:
         self._node_version: str | None = None
         self._entries: dict[str, Path] = {}
         self._model_classes: dict[str, str] = {}
+        self._deadline: float | None = None
+
+    def set_deadline(self, deadline: float) -> None:
+        """이 인스턴스의 모든 뒤따르는 외부 호출에 하나의 monotonic deadline을 결속한다."""
+        self._deadline = deadline
+
+    def _timeout(self, limit: float, operation: str) -> float:
+        if self._deadline is None:
+            return limit
+        remaining = min(limit, self._deadline - time.monotonic())
+        if remaining <= 0:
+            raise GovernanceUnavailable(f"GOVERNANCE_TIMEOUT: {operation}: absolute deadline")
+        return remaining
 
     def preflight(self) -> dict[str, Any]:
         """플러그인을 실행할 수 있는지 확인하고 identity(요약과 파일별 sha256)를 돌려준다.
@@ -515,7 +556,8 @@ class GovernancePlugin:
                 "closure_tree_digest": sha256_bytes("".join(
                     f"{path}\0{digest}\n" for path, digest in digests.items()).encode("utf-8")),
                 "manifest_sha256": sha256_bytes(manifest_bytes), "file_count": len(digests),
-                "node_version": self._node(), "consumed_surface_digest": sha256_digest(CONSUMED_SURFACE),
+                "entrypoint_table_digest": sha256_digest(listed),
+                "node_version": self._node(), "consumed_surface_digest": CONSUMED_SURFACE_DIGEST,
                 "model_class_table_digest": table_digest,
             },
             # 자기 보고 label이다. 관측·판정·동등성 비교에 쓰지 않는다.
@@ -528,7 +570,7 @@ class GovernancePlugin:
         if self._node_version is None:
             expected = f"node {MINIMUM_NODE[0]}.{MINIMUM_NODE[1]} 이상"
             try:
-                result = _run(["node", "--version"], timeout=GIT_TIMEOUT_SECONDS, code="GOVERNANCE_NODE",
+                result = _run(["node", "--version"], timeout=self._timeout(GIT_TIMEOUT_SECONDS, "node --version"), code="GOVERNANCE_NODE",
                               effects_started=False)
             except GovernanceUnavailable as error:
                 if "GOVERNANCE_TIMEOUT" in str(error):
@@ -549,7 +591,7 @@ class GovernancePlugin:
             self._node()
             try:
                 client = McpStdioClient(["node", str(self._entries["mcp-server"])], cwd=self.root, env=self.env,
-                                        stderr_path=self.state_dir / "mcp-server.stderr.log")
+                                        stderr_path=self.state_dir / "mcp-server.stderr.log", deadline=self._deadline)
                 try:
                     missing = sorted(set(CONSUMED_SURFACE["mcp_tools"]) - set(client.tool_names()))
                 except BaseException:
@@ -575,7 +617,8 @@ class GovernancePlugin:
             model_class = self._model_classes.get(observation["model"])
             if model_class is None:
                 raise GovernanceContractMismatch("model_class", "대응표에 선언된 모델", observation["model"])
-            signed = _run(["node", str(self._entries["host-attestation-cli"])], timeout=SCRIPT_TIMEOUT_SECONDS,
+            signed = _run(["node", str(self._entries["host-attestation-cli"])],
+                          timeout=self._timeout(SCRIPT_TIMEOUT_SECONDS, "host attestation"),
                           code="GOVERNANCE_ATTESTATION", effects_started=False, env=self.env,
                           input=json.dumps({"host": HOST_ID, "tool": tool, "input": arguments,
                                             "model": observation["model"], "modelClass": model_class,
@@ -591,7 +634,8 @@ class GovernancePlugin:
     def script(self, entry_id: str, request_path: Path) -> dict[str, Any]:
         """읽기 전용 skill 스크립트를 실행하고 JSON 출력을 돌려준다. 읽히지 않으면 None이며 형태는 gate가 확인한다."""
         args = ["--input", str(request_path)] if entry_id == "acceptance-cli" else [str(request_path)]
-        result = _run(["node", str(self._entries[entry_id]), *args], timeout=SCRIPT_TIMEOUT_SECONDS,
+        result = _run(["node", str(self._entries[entry_id]), *args],
+                      timeout=self._timeout(SCRIPT_TIMEOUT_SECONDS, f"script {entry_id}"),
                       code=f"GOVERNANCE_SCRIPT {entry_id}", effects_started=False, env=self.env)
         if result.returncode != 0:
             detail = (result.stderr or result.stdout).decode("utf-8", "replace").strip()
@@ -745,6 +789,14 @@ class GovernanceSettings:
         from .governance_conformance import run_conformance
 
         return run_conformance(self.plugin_root)
+
+    def inspect_identity(self) -> dict[str, Any]:
+        """적합성 검사를 재실행하지 않고 현재 설치형 플러그인의 identity만 관측한다."""
+        plugin = GovernancePlugin(self.plugin_root, self.state_dir / "identity", self.model_classes)
+        try:
+            return plugin.preflight()
+        finally:
+            plugin.close()
 
     def open_gate(self, service: Any, *, runtime: Any, roles: Any, runner: Any) -> Any:
         if roles is None or runner is None:
@@ -1019,6 +1071,7 @@ class GovernanceTaskGate:
             project_id=task["project_id"], kind=CONFORMANCE_KIND,
             execute=lambda: conformance_result(self.conformance),
             request={"closure_tree_digest": summary.get("closure_tree_digest"), "node_version": summary.get("node_version"),
+                     "consumed_surface_digest": summary.get("consumed_surface_digest"),
                      "check_set_digest": self.conformance_check_set})
         failed = next((item for item in result["checks"] if item["status"] != "PASS"), None)
         if failed is not None:

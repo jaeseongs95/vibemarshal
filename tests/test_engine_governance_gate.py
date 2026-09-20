@@ -1272,11 +1272,43 @@ class McpClientCleanupTests(unittest.TestCase):
                                     kill=lambda: done.append("kill")),
             _pump_thread=SimpleNamespace(join=lambda timeout: done.append("join")),
             _stderr=SimpleNamespace(close=lambda: done.append("stderr")))
-        McpStdioClient.close(stub)
+        with self.assertRaisesRegex(GovernanceUnavailable, "MCP_CLEANUP_FAILED.*stdin은 이미 끊겼다"):
+            McpStdioClient.close(stub)
         self.assertEqual(["wait", "join", "stdout", "stderr"], done)
 
 
 class TimeoutTests(unittest.TestCase):
+    def test_expired_mcp_deadline_blocks_before_sending(self) -> None:
+        sent: list[dict] = []
+        client = SimpleNamespace(
+            sequence=0,
+            timeout=30,
+            deadline=time.monotonic() - 1,
+            _send=sent.append,
+        )
+
+        with self.assertRaisesRegex(GovernanceTimeout, "absolute deadline"):
+            McpStdioClient._request(client, "tools/call", {})
+
+        self.assertEqual([], sent)
+        self.assertEqual(0, client.sequence)
+
+    def test_mcp_absolute_deadline_is_not_reset_by_irrelevant_output(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            server = Path(temp) / "noise.py"
+            server.write_text(
+                "import sys, time\nsys.stdin.readline()\n"
+                "while True:\n print('not-json', flush=True); time.sleep(0.05)\n",
+                encoding="utf-8")
+            started = time.monotonic()
+            with self.assertRaises(GovernanceTimeout) as raised:
+                McpStdioClient(
+                    [sys.executable, str(server)], cwd=Path(temp), env=dict(os.environ),
+                    stderr_path=Path(temp) / "stderr.log", timeout=30,
+                    deadline=time.monotonic() + 0.5)
+            self.assertLess(time.monotonic() - started, 5)
+            self.assertIn("GOVERNANCE_TIMEOUT: MCP initialize", str(raised.exception))
+
     def test_mcp_client_times_out_on_a_silent_server(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             server = Path(temp) / "silent.py"
