@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import threading
 import time
@@ -76,7 +77,10 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
             # 완료 소비 tick에는 SQLite materialization도 포함된다. 전체 suite가
             # 병렬 worker 정리를 수행하는 Windows에서도 300ms provider 지연과
             # 명확히 분리되는 상한을 둔다.
-            self.assertLess(time.monotonic() - tick_started, 0.2)
+            self.assertLess(
+                time.monotonic() - tick_started,
+                SHORT_TICK_LIMIT_SECONDS,
+            )
             if outcome.action is action:
                 return outcome
             time.sleep(0.005)
@@ -115,6 +119,18 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
             supervisor.close(timeout_seconds=0.05)
 
         self.addCleanup(cleanup)
+
+    def _dispatch_worker(self):
+        dispatcher = EngineDispatcher(self.prepared.service, self.runtime)
+        self.assertEqual(
+            RunOnceAction.MATERIALIZED,
+            dispatcher.run_once(
+                self.prepared.project_id, proposal=self.prepared.proposal,
+            ).action,
+        )
+        dispatched = dispatcher.run_once(self.prepared.project_id)
+        self.assertEqual(RunOnceAction.DISPATCHED, dispatched.action)
+        return dispatcher, dispatched
 
     def _core_completion_snapshot(self) -> dict[str, object]:
         with self.prepared.service.ledger.read() as connection:
@@ -695,6 +711,182 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
                 ).fetchone()[0],
             )
 
+    def test_deadline_interrupt_fails_attempt_without_resume(self) -> None:
+        dispatcher, dispatched = self._dispatch_worker()
+        with self.prepared.service.ledger.read() as connection:
+            job = connection.execute(
+                "SELECT id,thread_id FROM runtime_jobs WHERE attempt_id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+        job_id = job["id"]
+        self.runtime.threads[job["thread_id"]].provider_payload = {
+            "error_code": "RATE_LIMITED",
+        }
+        supervisor = RuntimeJobSupervisor(self.prepared.service, self.runtime)
+        supervisor.request_interrupt(
+            job_id, reason="absolute_deadline_exceeded",
+        )
+        calls = (
+            self.runtime.create_calls,
+            self.runtime.turn_calls,
+            self.runtime.resume_calls,
+        )
+
+        observed = dispatcher.run_once(self.prepared.project_id)
+        blocked = dispatcher.run_once(self.prepared.project_id)
+
+        self.assertEqual(RunOnceAction.OBSERVED, observed.action)
+        self.assertEqual(RunOnceAction.BLOCKED, blocked.action)
+        self.assertEqual("ENVIRONMENT_RECOVERY_REQUIRED", blocked.blocker_code)
+        self.assertEqual(calls, (
+            self.runtime.create_calls,
+            self.runtime.turn_calls,
+            self.runtime.resume_calls,
+        ))
+        with self.prepared.service.ledger.read() as connection:
+            attempt = connection.execute(
+                "SELECT status,failure_class FROM attempts WHERE id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+            evidence = connection.execute(
+                "SELECT source_ref,observation FROM evidence_records "
+                "WHERE attempt_id=? ORDER BY observed_at DESC,rowid DESC LIMIT 1",
+                (dispatched.attempt_id,),
+            ).fetchone()
+        self.assertEqual(("failed", "environment"), tuple(attempt))
+        self.assertEqual(f"runtime-deadline:{job_id}", evidence["source_ref"])
+        stored = json.loads(evidence["observation"])
+        self.assertEqual(
+            "ABSOLUTE_DEADLINE_EXCEEDED",
+            stored["failure_diagnosis"]["local_engine_code"],
+        )
+        self.assertEqual("RATE_LIMITED", stored["provider_payload"]["error_code"])
+        self.assertFalse(stored["failure_diagnosis"]["transient"])
+
+    def test_pause_reason_preserves_single_resume_path(self) -> None:
+        _dispatcher, dispatched = self._dispatch_worker()
+        supervisor = RuntimeJobSupervisor(self.prepared.service, self.runtime)
+        application = EngineApplication(
+            self.prepared.service,
+            runtime=self.runtime,
+            supervisor=supervisor,
+        )
+
+        paused = application.pause(self.prepared.project_id, reason="검토")
+        self.assertEqual("paused", paused["control_state"])
+        self.assertEqual(
+            "WORKFLOW_PAUSED",
+            application.run_once(self.prepared.project_id).blocker_code,
+        )
+        first = application.run_once(self.prepared.project_id, resume=True)
+        second = application.run_once(self.prepared.project_id)
+
+        self.assertEqual(RunOnceAction.OBSERVED, first.action)
+        self.assertEqual(RunOnceAction.DISPATCHED, second.action)
+        self.assertEqual((1, 2, 1, 1), (
+            self.runtime.create_calls,
+            self.runtime.turn_calls,
+            self.runtime.resume_calls,
+            self.runtime.interrupt_calls,
+        ))
+        with self.prepared.service.ledger.read() as connection:
+            request = connection.execute(
+                "SELECT payload_json FROM runtime_job_observations "
+                "WHERE kind='interrupt_requested' ORDER BY rowid DESC LIMIT 1"
+            ).fetchone()
+            attempt = connection.execute(
+                "SELECT status FROM attempts WHERE id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+        self.assertEqual("workflow_paused", json.loads(request[0])["reason"])
+        self.assertEqual("running", attempt["status"])
+
+    def test_cancel_reason_does_not_resume_provider(self) -> None:
+        _dispatcher, _dispatched = self._dispatch_worker()
+        supervisor = RuntimeJobSupervisor(self.prepared.service, self.runtime)
+        application = EngineApplication(
+            self.prepared.service,
+            runtime=self.runtime,
+            supervisor=supervisor,
+        )
+
+        cancelled = application.cancel(self.prepared.project_id, reason="사용자 취소")
+        blocked = application.run_once(self.prepared.project_id, resume=True)
+
+        self.assertEqual("cancelled", cancelled["control_state"])
+        self.assertEqual("WORKFLOW_CANCELLED", blocked.blocker_code)
+        self.assertEqual((1, 1, 0, 1), (
+            self.runtime.create_calls,
+            self.runtime.turn_calls,
+            self.runtime.resume_calls,
+            self.runtime.interrupt_calls,
+        ))
+        with self.prepared.service.ledger.read() as connection:
+            request = connection.execute(
+                "SELECT payload_json FROM runtime_job_observations "
+                "WHERE kind='interrupt_requested' ORDER BY rowid DESC LIMIT 1"
+            ).fetchone()
+        self.assertEqual("workflow_cancelled", json.loads(request[0])["reason"])
+
+    def test_second_interrupted_turn_is_resume_exhausted(self) -> None:
+        dispatcher, _dispatched = self._dispatch_worker()
+        with self.prepared.service.ledger.read() as connection:
+            first_job = connection.execute(
+                "SELECT thread_id,turn_id FROM runtime_jobs "
+                "WHERE kind='worker_turn' ORDER BY rowid DESC LIMIT 1"
+            ).fetchone()
+        self.runtime.interrupt(
+            thread_id=first_job["thread_id"], turn_id=first_job["turn_id"],
+        )
+        self.assertEqual(
+            RunOnceAction.DISPATCHED,
+            dispatcher.run_once(self.prepared.project_id).action,
+        )
+        with self.prepared.service.ledger.read() as connection:
+            resumed_job = connection.execute(
+                "SELECT thread_id,turn_id FROM runtime_jobs "
+                "WHERE kind='worker_turn' ORDER BY rowid DESC LIMIT 1"
+            ).fetchone()
+        self.runtime.threads[resumed_job["thread_id"]].provider_payload = {
+            "error_code": "RATE_LIMITED",
+        }
+        self.runtime.interrupt(
+            thread_id=resumed_job["thread_id"], turn_id=resumed_job["turn_id"],
+        )
+        calls = (
+            self.runtime.create_calls,
+            self.runtime.turn_calls,
+            self.runtime.resume_calls,
+        )
+
+        blocked = dispatcher.run_once(self.prepared.project_id)
+        stopped = dispatcher.run_once(self.prepared.project_id)
+
+        self.assertEqual(RunOnceAction.BLOCKED, blocked.action)
+        self.assertEqual("RESUME_EXHAUSTED", blocked.blocker_code)
+        self.assertEqual(RunOnceAction.BLOCKED, stopped.action)
+        self.assertEqual("ENVIRONMENT_RECOVERY_REQUIRED", stopped.blocker_code)
+        self.assertEqual(calls, (
+            self.runtime.create_calls,
+            self.runtime.turn_calls,
+            self.runtime.resume_calls,
+        ))
+        self.assertEqual(1, len(blocked.evidence_ids))
+        with self.prepared.service.ledger.read() as connection:
+            evidence = connection.execute(
+                "SELECT source_ref,observation FROM evidence_records "
+                "WHERE id=?",
+                (blocked.evidence_ids[0],),
+            ).fetchone()
+        self.assertTrue(evidence["source_ref"].startswith("runtime-resume-exhausted:"))
+        self.assertEqual(
+            "RESUME_EXHAUSTED",
+            json.loads(evidence["observation"])["failure_diagnosis"]["local_engine_code"],
+        )
+        self.assertFalse(
+            json.loads(evidence["observation"])["failure_diagnosis"]["transient"]
+        )
+
     def test_deadline_before_provider_binding_delivers_interrupt_after_late_start(self) -> None:
         thread = self.runtime.create_thread(
             cwd=self.prepared.workspace, title="late-binding", model="gpt-5.6-sol",
@@ -715,6 +907,8 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
         job = self.prepared.service.start_runtime_job(job.job_id)
         supervisor = RuntimeJobSupervisor(self.prepared.service, self.runtime)
 
+        supervisor.request_interrupt(job.job_id, reason="workflow_paused")
+
         interrupting = supervisor.tick(job.job_id)
         self.assertEqual(RuntimeJobStatus.INTERRUPTING, interrupting.status)
         self.assertEqual(0, self.runtime.interrupt_calls)
@@ -729,6 +923,11 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
         )
         self.assertEqual(1, self.runtime.interrupt_calls)
         with self.prepared.service.ledger.read() as connection:
+            receipt = connection.execute(
+                "SELECT payload_json FROM runtime_job_observations "
+                "WHERE job_id=? AND kind='interrupt_receipt'",
+                (job.job_id,),
+            ).fetchone()
             self.assertEqual(
                 1,
                 connection.execute(
@@ -737,6 +936,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
                     (job.job_id,),
                 ).fetchone()[0],
             )
+        self.assertEqual("workflow_paused", json.loads(receipt[0])["reason"])
 
     def test_deadline_terminal_observation_grace_ends_as_collector_lost(self) -> None:
         job = self.prepared.service.schedule_runtime_job(

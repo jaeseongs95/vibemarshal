@@ -1119,7 +1119,9 @@ class EngineApplication:
             raise EngineApplicationError("RUNTIME_REQUIRED")
         state = self.service.set_workflow_control(project_id, state="paused", reason=reason)
         if job is not None:
-            job = self.supervisor.request_interrupt(job.job_id)
+            job = self.supervisor.request_interrupt(
+                job.job_id, reason="workflow_paused",
+            )
         return {
             "project_id": project_id,
             "control_state": state,

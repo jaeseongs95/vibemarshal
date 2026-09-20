@@ -1732,7 +1732,7 @@ class EngineService:
             return observation
 
     def begin_runtime_job_interrupt(self, job_id: str, *, payload: dict[str, Any]) -> bool:
-        """절대 deadline interrupt를 정확히 한 번 예약한다."""
+        """원인이 결속된 interrupt를 정확히 한 번 예약한다."""
         with self.ledger.transaction() as tx:
             row = tx.one("SELECT * FROM runtime_jobs WHERE id=?", (job_id,))
             if row["status"] == RuntimeJobStatus.INTERRUPTING.value:

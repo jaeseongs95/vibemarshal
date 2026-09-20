@@ -97,6 +97,8 @@ class EvidenceFirstFailureClassifier:
         "PERMISSION_POLICY_MISMATCH": FailureClass.ENVIRONMENT,
         "EXECUTABLE_NOT_FOUND": FailureClass.ENVIRONMENT,
         "ENVIRONMENT_ERROR": FailureClass.ENVIRONMENT,
+        "ABSOLUTE_DEADLINE_EXCEEDED": FailureClass.ENVIRONMENT,
+        "RESUME_EXHAUSTED": FailureClass.ENVIRONMENT,
         "PROCESS_TIMEOUT": FailureClass.ENVIRONMENT,
         "RATE_LIMITED": FailureClass.ENVIRONMENT,
         "RESOURCE_LOCK_CONTENDED": FailureClass.ENVIRONMENT,

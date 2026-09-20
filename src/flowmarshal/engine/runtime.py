@@ -1827,7 +1827,9 @@ class RuntimeJobSupervisor:
         if checkpointed:
             return self.reattach(job_id)
         if datetime.now(timezone.utc) >= job.absolute_deadline_at:
-            self._request_bounded_interrupt(job)
+            self._request_bounded_interrupt(
+                job, reason="absolute_deadline_exceeded",
+            )
             job = self.service.load_runtime_job(job_id)
             if job.status is not RuntimeJobStatus.INTERRUPTING:
                 return job
@@ -1888,9 +1890,15 @@ class RuntimeJobSupervisor:
         )
 
     def _request_bounded_interrupt(
-        self, job: RuntimeJob, *, timeout_seconds: float | None = None,
+        self,
+        job: RuntimeJob,
+        *,
+        reason: str,
+        timeout_seconds: float | None = None,
     ) -> None:
-        request = {"reason": "absolute_deadline_exceeded", "thread_id": job.thread_id,
+        if not reason.strip():
+            raise ValueError("interrupt reason이 필요합니다.")
+        request = {"reason": reason, "thread_id": job.thread_id,
                    "turn_id": job.turn_id,
                    "absolute_deadline_at": job.absolute_deadline_at.isoformat()}
         requested = self.service.begin_runtime_job_interrupt(job.job_id, payload=request)
@@ -1911,15 +1919,24 @@ class RuntimeJobSupervisor:
             ).fetchone() is not None
 
     def _deliver_bounded_interrupt(
-        self, job: RuntimeJob, *, timeout_seconds: float | None = None,
+        self,
+        job: RuntimeJob,
+        *,
+        timeout_seconds: float | None = None,
     ) -> None:
         assert job.thread_id is not None and job.turn_id is not None
         wait = self.interrupt_timeout_seconds if timeout_seconds is None else timeout_seconds
         if wait <= 0:
             return
-        request = {"reason": "absolute_deadline_exceeded", "thread_id": job.thread_id,
-                   "turn_id": job.turn_id,
-                   "absolute_deadline_at": job.absolute_deadline_at.isoformat()}
+        with self.service.ledger.read() as connection:
+            row = connection.execute(
+                "SELECT payload_json FROM runtime_job_observations "
+                "WHERE job_id=? AND kind=? ORDER BY rowid DESC LIMIT 1",
+                (job.job_id, RuntimeJobObservationKind.INTERRUPT_REQUESTED.value),
+            ).fetchone()
+        if row is None:
+            raise RuntimePolicyError("RUNTIME_INTERRUPT_REQUEST_MISSING")
+        request = json.loads(row["payload_json"])
         try:
             receipt = bounded_observation_call(
                 lambda: self.runtime.interrupt(thread_id=job.thread_id, turn_id=job.turn_id,
@@ -2007,7 +2024,9 @@ class RuntimeJobSupervisor:
             job_id, kind=RuntimeJobObservationKind.COLLECTOR_LOST, payload={"reason": reason})
         return self.service.load_runtime_job(job_id)
 
-    def request_interrupt(self, job_id: str) -> RuntimeJob:
+    def request_interrupt(
+        self, job_id: str, *, reason: str = "absolute_deadline_exceeded",
+    ) -> RuntimeJob:
         """pause/cancel facade가 쓰는 bounded interrupt 요청 경계."""
 
         job = self.service.load_runtime_job(job_id)
@@ -2016,13 +2035,13 @@ class RuntimeJobSupervisor:
             RuntimeJobStatus.CONSUMED,
             RuntimeJobStatus.CANCELLED,
         }:
-            self._request_bounded_interrupt(job)
+            self._request_bounded_interrupt(job, reason=reason)
         return self.service.load_runtime_job(job_id)
 
     def cancel(self, job_id: str, *, reason: str) -> RuntimeJob:
         """중단 요청을 먼저 남긴 뒤 Core job을 cancelled로 표시한다."""
 
-        self.request_interrupt(job_id)
+        self.request_interrupt(job_id, reason="workflow_cancelled")
         return self.service.cancel_runtime_job(job_id, reason=reason)
 
     def close(self, *, timeout_seconds: float | None = None) -> None:
@@ -2043,6 +2062,7 @@ class RuntimeJobSupervisor:
                 if job.thread_id is not None and job.turn_id is not None:
                     self._request_bounded_interrupt(
                         job,
+                        reason="supervisor_closed",
                         timeout_seconds=max(0.0, deadline - time.monotonic()),
                     )
                 self.mark_collector_lost(
@@ -4183,6 +4203,15 @@ class EngineDispatcher:
                 "AND kind = 'resume_turn' AND status = 'received'",
                 (row["id"],),
             ).fetchone()[0]
+            resumed_turn_received = connection.execute(
+                "SELECT 1 FROM runtime_intents WHERE attempt_id=? AND kind='start_turn' "
+                "AND status='received' AND idempotency_key=? LIMIT 1",
+                (row["id"], f"{attempt_key}:resumed:turn"),
+            ).fetchone()
+        if resume_count and resumed_turn_received is not None:
+            raise EngineServiceError(
+                "같은 Attempt에서 이미 재개한 turn이 다시 중단돼 추가 resume을 거부합니다."
+            )
         if resume_count:
             provider_call_id = self._attempt_provider_call_id(row["id"])
             if provider_call_id is None:
@@ -4314,6 +4343,18 @@ class EngineDispatcher:
                 "SELECT * FROM runtime_jobs WHERE attempt_id=? ORDER BY created_at DESC,rowid DESC LIMIT 1",
                 (attempt_id,),
             ).fetchone()
+            interrupt_row = (
+                None
+                if job_row is None
+                else connection.execute(
+                    "SELECT payload_json FROM runtime_job_observations "
+                    "WHERE job_id=? AND kind=? ORDER BY rowid DESC LIMIT 1",
+                    (
+                        job_row["id"],
+                        RuntimeJobObservationKind.INTERRUPT_REQUESTED.value,
+                    ),
+                ).fetchone()
+            )
         if observation.active:
             if job_row is not None:
                 self.service.record_runtime_job_observation(
@@ -4328,6 +4369,14 @@ class EngineDispatcher:
                 detail="기존 Attempt가 아직 실행 중입니다.",
             )
         terminal = observation.terminal_status
+        interrupt_request = (
+            None if interrupt_row is None else json.loads(interrupt_row["payload_json"])
+        )
+        deadline_interrupted = (
+            terminal == "interrupted"
+            and interrupt_request is not None
+            and interrupt_request.get("reason") == "absolute_deadline_exceeded"
+        )
         if terminal is not None and job_row is not None and job_row["status"] not in {
             RuntimeJobStatus.PROVIDER_TERMINAL.value, RuntimeJobStatus.CONSUMED.value,
         }:
@@ -4338,7 +4387,7 @@ class EngineDispatcher:
             )
         if terminal is not None and job_row is not None:
             self.service.consume_runtime_job(job_row["id"])
-        if terminal in self._SUCCESS | self._FAILED:
+        if terminal in self._SUCCESS | self._FAILED or deadline_interrupted:
             observation = self._attach_observation_trace(
                 observation, self._operation_trace(attempt_id), seal=True,
             )
@@ -4381,22 +4430,34 @@ class EngineDispatcher:
                     else "worker 종료 뒤 target 계약 위반을 관측했습니다: " + violation
                 ),
             )
-        if terminal in self._FAILED:
+        if terminal in self._FAILED or deadline_interrupted:
             document = {
                 "terminal_status": terminal,
                 "final_response": observation.final_response,
                 "provider_payload": observation.payload,
             }
+            if deadline_interrupted:
+                document["runtime_deadline"] = {
+                    "error_code": "ABSOLUTE_DEADLINE_EXCEEDED",
+                    "job_id": job_row["id"],
+                    "absolute_deadline_at": job_row["absolute_deadline_at"],
+                    "interrupt_request": interrupt_request,
+                }
             evidence_id = new_id("evidence")
             diagnosis = self.failure_classifier.classify(FailureSignal(
                 terminal_status=terminal,
                 final_response=observation.final_response,
-                provider_payload=observation.payload,
+                # 로컬 absolute deadline은 provider가 동시에 돌려준 재시도 가능
+                # 오류보다 우선하는 hard stop이다. 원문 payload는 evidence에 보존한다.
+                provider_payload={} if deadline_interrupted else observation.payload,
                 evidence_ids=(evidence_id,),
                 evidence_documents=({
                     "kind": EvidenceKind.EXTERNAL_OBSERVATION.value,
                     "observation": document,
                 },),
+                local_engine_codes=(
+                    ("ABSOLUTE_DEADLINE_EXCEEDED",) if deadline_interrupted else ()
+                ),
             ))
             # 복구 단계가 잘린 원문을 재파싱하지 않도록 기록 시점 분류를 local_derived
             # projection으로 함께 남긴다. 원장 failure_class가 권위이며 이 projection은
@@ -4422,7 +4483,11 @@ class EngineDispatcher:
                 task_id=row["task_id"],
                 attempt_id=attempt_id,
                 kind=EvidenceKind.EXTERNAL_OBSERVATION,
-                source_ref=f"codex-terminal:{observation.thread_id}:{observation.turn_id}",
+                source_ref=(
+                    f"runtime-deadline:{job_row['id']}"
+                    if deadline_interrupted
+                    else f"codex-terminal:{observation.thread_id}:{observation.turn_id}"
+                ),
                 observation=json.dumps(stored, ensure_ascii=False, sort_keys=True),
                 content_digest=sha256_digest(stored),
                 observed_at=utc_now(),
@@ -4474,17 +4539,67 @@ class EngineDispatcher:
                     ),
                     detail=str(error),
                 )
+            evidence_id = new_id("evidence")
+            resume_document = {
+                "error_code": "RESUME_EXHAUSTED",
+                "thread_id": observation.thread_id,
+                "turn_id": observation.turn_id,
+                "provider_payload": observation.payload,
+                "detail": str(error),
+            }
+            diagnosis = self.failure_classifier.classify(FailureSignal(
+                terminal_status=terminal,
+                final_response=observation.final_response,
+                provider_payload={},
+                evidence_ids=(evidence_id,),
+                evidence_documents=({
+                    "kind": EvidenceKind.EXTERNAL_OBSERVATION.value,
+                    "observation": resume_document,
+                },),
+                local_engine_codes=("RESUME_EXHAUSTED",),
+            ))
+            stored_resume = self._bounded_failure_document(resume_document | {
+                "failure_diagnosis": {
+                    "provenance": _FAILURE_DIAGNOSIS_PROVENANCE,
+                    "failure_class": (
+                        None if diagnosis.failure_class is None
+                        else diagnosis.failure_class.value
+                    ),
+                    "error_code": diagnosis.error_code,
+                    "provider_error_code": diagnosis.provider_error_code,
+                    "local_engine_code": diagnosis.local_engine_code,
+                    "transient": diagnosis.transient,
+                    "source": diagnosis.source,
+                    "model_reported_codes": list(diagnosis.model_reported_codes),
+                },
+            })
+            resume_evidence = EvidenceRecord(
+                evidence_id=evidence_id,
+                project_id=row["project_id"],
+                task_id=row["task_id"],
+                attempt_id=attempt_id,
+                kind=EvidenceKind.EXTERNAL_OBSERVATION,
+                source_ref=(
+                    f"runtime-resume-exhausted:{observation.thread_id}:"
+                    f"{observation.turn_id}"
+                ),
+                observation=json.dumps(stored_resume, ensure_ascii=False, sort_keys=True),
+                content_digest=sha256_digest(stored_resume),
+                observed_at=utc_now(),
+            )
+            self.service.record_evidence(resume_evidence)
             self.service.finish_attempt(
                 attempt_id=attempt_id,
                 succeeded=False,
-                failure_class=FailureClass.ENVIRONMENT,
-                detail=str(error),
+                failure_class=diagnosis.failure_class or FailureClass.ENVIRONMENT,
+                detail=diagnosis.rationale,
             )
             return RunOnceOutcome(
                 action=RunOnceAction.BLOCKED,
                 project_id=row["project_id"],
                 task_id=row["task_id"],
                 attempt_id=attempt_id,
+                evidence_ids=(resume_evidence.evidence_id,),
                 blocker_code="RESUME_EXHAUSTED",
                 detail=str(error),
             )
