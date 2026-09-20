@@ -1109,6 +1109,23 @@ def _cmd_recover_inspect(arguments: argparse.Namespace) -> None:
     _emit(EngineApplication(service).recovery_status(arguments.project_id))
 
 
+def _cmd_governance_check_plugin(arguments: argparse.Namespace) -> None:
+    """플러그인 채택 전 확인: preflight와 적합성 검사를 임시 자원에서 실행한다. 프로젝트·원장 없이 동작한다."""
+    from .governance_conformance import first_failure, run_conformance
+    from .governance_gate import PLUGIN_ROOT_ENV, GovernanceContractMismatch, GovernanceUnavailable
+
+    root = arguments.plugin_root or os.environ.get(PLUGIN_ROOT_ENV)
+    if not root:
+        raise ValueError(f"GOVERNANCE_PLUGIN_ROOT_REQUIRED: --plugin-root 또는 {PLUGIN_ROOT_ENV}가 필요합니다.")
+    try:
+        result = run_conformance(Path(root))
+    except (GovernanceContractMismatch, GovernanceUnavailable) as error:
+        raise ValueError(str(error)) from error
+    _emit(result)
+    if first_failure(result) is not None:
+        arguments.exit_code = 1
+
+
 def _cmd_model_status(arguments: argparse.Namespace) -> None:
     application = EngineApplication(_service(arguments))
     if arguments.live:
@@ -1435,6 +1452,13 @@ def build_parser() -> argparse.ArgumentParser:
     budget_observe.add_argument("--codex-bin")
     budget_observe.set_defaults(handler=_cmd_budget_observe)
 
+    governance = commands.add_parser("governance")
+    governance_commands = governance.add_subparsers(dest="governance_command", required=True)
+    check_plugin = governance_commands.add_parser(
+        "check-plugin", help="agent-governance-suite 플러그인 채택 전 적합성 검사(임시 자원에서 실행)")
+    check_plugin.add_argument("--plugin-root")
+    check_plugin.set_defaults(handler=_cmd_governance_check_plugin)
+
     model = commands.add_parser("model")
     model_commands = model.add_subparsers(dest="model_command", required=True)
     model_status = model_commands.add_parser("status")
@@ -1645,7 +1669,7 @@ def _execute_parsed(
         code = getattr(error, "code", None) or (prefix if prefix.isupper() and " " not in prefix else None)
         _emit({"error": type(error).__name__, "error_code": code, "message": str(error)})
         return 2
-    return 0
+    return getattr(arguments, "exit_code", 0)
 
 
 def main(argv: list[str] | None = None) -> int:

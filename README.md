@@ -131,6 +131,7 @@ flowmarshal-engine --provider claude --claude-model-catalog D:\config\claude-mod
 ```
 
 - node 22.13 이상과, `host-integration.json`과 호스트 중립 서명 CLI가 들어간 플러그인이 필요하다. 그 표면이 들어간 플러그인 release는 아직 없다. Engine은 플러그인을 commit·버전으로 고정하지 않고 manifest에서 진입점을 찾아 실행 전에 확인한다.
+- 플러그인 적합성 검사: 플러그인을 처음 쓰거나 바꿨을 때는 `flowmarshal-engine governance check-plugin --plugin-root <플러그인 위치>`로 먼저 확인한다. Engine이 기대는 플러그인 동작을 임시 폴더에서 끝까지 돌려 보고 항목별 결과를 JSON으로 출력하며, 통과하지 못하면 exit code가 0이 아니다. 프로젝트와 원장은 건드리지 않는다. run-once도 프로젝트마다 처음 보는 플러그인 파일 구성이면 첫 Task 시작 전에 같은 검사를 한 번 자동으로 실행한다(몇 초가 더 걸린다). 통과하지 못하면 `GOVERNANCE_CONTRACT_MISMATCH: conformance:<검사 ID>`로 멈추고, 플러그인을 고치면 다시 검사한다. release project E2E도 cell을 실행하기 전에 같은 검사를 요구한다. 검사 모듈과 이 세 호출 지점은 구현과 결정적 검증까지 된 상태다. release 동결을 만들 때 검사를 필수로 하는 것, 동결·E2E 근거에 플러그인 identity를 결속하는 것, 최종 보고서 표기, 실제 steward 실측, 플러그인 release는 아직 하지 않았다.
 - model class 대응표는 Worker·steward로 관측되는 model 이름마다 플러그인 등급을 적은 JSON이다. 예: `{"format": "flowmarshal-governance-model-classes-v1", "classes": {"<관측되는 model 이름>": "general"}}`. 등급은 `lightweight`·`general`·`deep`·`frontier` 중 하나이고, 표에 없는 모델이 관측되면 멈춘다. 이 값은 사용자가 설정한 주장으로 기록된다.
 - 플러그인·환경이 맞지 않으면 run-once는 `GOVERNANCE_CONTRACT_MISMATCH: <검사 ID>: 기대 …, 관측 …`로 멈추고 Task 상태는 바꾸지 않는다. 플러그인 위치·node·대응표를 고친 뒤 다시 run-once를 실행하면 같은 자리에서 이어 간다. 다만 이미 저장된 플러그인 응답의 형태가 어긋난 경우에는 같은 Attempt에서 같은 불일치가 다시 나온다(known limitation).
 - Engine은 실행에 쓴 플러그인 파일의 sha256과 tree digest를 Task마다 원장에 남긴다. 기록용이며 판정에는 쓰지 않는다. 오래 떠 있는 프로세스는 처음 띄운 플러그인 서버를 계속 쓰므로, 도중에 플러그인 파일을 바꾸면 기록과 실제 실행이 다를 수 있다.

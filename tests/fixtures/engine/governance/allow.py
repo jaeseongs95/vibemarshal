@@ -20,6 +20,9 @@ class AllowAllGate:
 
 
 class AllowAllGovernance:
+    def check_conformance(self) -> dict[str, Any]:
+        return {"verdict": "PASS", "checks": [], "provenance": "local_derived"}
+
     def open_gate(self, service: Any, *, runtime: Any, roles: Any, runner: Any) -> AllowAllGate:
         return AllowAllGate()
 

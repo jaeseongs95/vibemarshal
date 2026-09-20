@@ -37,7 +37,7 @@ R1~R3.1 prototype은 유용한 transport·원장·Planner 실험 자산이자 �
 - 실제 Planning 18회 전 cell 완료와 정상 선택·진짜 정보 부족 질문·호출/후보 한도
 - 실제 요청부터 Goal 정규화·독립 review·Plan 선택·한 번의 승인·다중 Task/복구·독립 검사·최종 결과까지의 E2E와 안전 책임 전부. 모든 evidence artifact는 허용 root·SHA-256·cell/fixture/seed/freeze에 결속한다. release project E2E는 절대 경로 candidate wheel과 SHA-256·배포판 이름/버전·non-editable 설치·import 경로·wheel package bytes를 harness와 최종 verifier에서 재확인하며 source 기반 진단은 release PASS로 승격하지 않음
 - 깨끗한 non-editable 설치, 서로 독립인 두 최종 감사와 결정적 finding join
-- agent-governance-suite 필수 연동의 후속 책임: `host-integration.json`과 호스트 중립 서명 CLI가 들어간 플러그인 release, 적합성 검사 모듈과 그 호출 지점(채택 명령, freeze build, E2E preflight, 처음 보는 identity의 런타임 검사), release freeze·E2E cell evidence의 플러그인 identity 결속과 final report 표기, 실제 steward로 같은 파일을 여러 Task가 고치는 Goal 실측. 플러그인은 commit·digest·버전으로 고정하지 않는다([1.0 계약 D13](redesign-1.0-contract.md))
+- agent-governance-suite 필수 연동의 후속 책임: `host-integration.json`과 호스트 중립 서명 CLI가 들어간 플러그인 release, freeze build의 적합성 필수화, release freeze·E2E cell evidence의 플러그인 identity 결속(E2E preflight 결과와 freeze 블록의 대조 포함)과 final report 표기, 실제 steward로 같은 파일을 여러 Task가 고치는 Goal 실측. 적합성 검사 모듈과 채택 명령·E2E preflight·제품 런타임의 처음 보는 identity 검사는 구현과 결정적 검증까지 됐다. 플러그인은 commit·digest·버전으로 고정하지 않는다([1.0 계약 D13](redesign-1.0-contract.md))
 
 하나라도 필수 책임이 누락·실패·미실행이면 1.0 전환은 NO-GO다. 합성 smoke·과거 51개/1,056개 검사·미리 작성한 Goal/Plan/rating으로 실제 신규 qualification을 대신하지 않는다. 공통 계약이 바뀐 최초 실제 역할·Planning 평가는 새로 수행하며 판정 후 oracle·threshold를 낮추지 않는다.
 

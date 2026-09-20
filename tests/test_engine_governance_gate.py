@@ -204,9 +204,9 @@ class MultitaskGateHarness(unittest.TestCase):
         self.steward = ScriptedSteward()
         self.worker_payload: dict | None = None
 
-    def gate(self, plugin=None, steward=None) -> GovernanceTaskGate:
+    def gate(self, plugin=None, steward=None, **kwargs) -> GovernanceTaskGate:
         return GovernanceTaskGate(self.prepared.service, plugin=plugin or self.plugin, steward=steward or self.steward,
-                                  state_dir=self.base / "governance", observe_worker=worker_observed)
+                                  state_dir=self.base / "governance", observe_worker=worker_observed, **kwargs)
 
     def dispatcher(self, gate) -> EngineDispatcher:
         return EngineDispatcher(self.prepared.service, self.runtime, task_gate=gate,
@@ -244,6 +244,11 @@ class MultitaskGateHarness(unittest.TestCase):
             return [json.loads(row[0]) for row in connection.execute(
                 "SELECT payload_json FROM history_events WHERE project_id = ? AND event_type = ? ORDER BY sequence",
                 (self.prepared.project_id, event_type))]
+
+    def run_state(self) -> str:
+        with self.prepared.service.ledger.read() as connection:
+            return connection.execute("SELECT run_state FROM projects WHERE id = ?",
+                                      (self.prepared.project_id,)).fetchone()[0]
 
     def gate_steps(self, step: str) -> list[dict]:
         return [item["result"] for item in self.history("operation.completed")
@@ -752,11 +757,6 @@ def mcp_result(envelope) -> dict:
 class PluginContractTests(MultitaskGateHarness):
     """플러그인 계약·환경 불일치는 Task 상태와 원장 확정 결과를 건드리지 않고, 고치면 같은 키에서 이어 간다."""
 
-    def run_state(self) -> str:
-        with self.prepared.service.ledger.read() as connection:
-            return connection.execute("SELECT run_state FROM projects WHERE id = ?",
-                                      (self.prepared.project_id,)).fetchone()[0]
-
     def gate_operations(self, event_type: str) -> list[dict]:
         return [item for item in self.history(event_type)
                 if item.get("kind") == "governance_gate" or "GOVERNANCE_CONTRACT_MISMATCH" in item.get("detail", "")]
@@ -887,6 +887,99 @@ class PluginContractTests(MultitaskGateHarness):
         self.assertEqual(before, changed[0]["data"]["stored"])
         self.assertEqual(self.plugin.identity["summary"], changed[0]["data"]["current"])
         self.assertEqual(3, len(self.gate_steps("plugin_identity")))
+
+
+class RuntimeConformanceTests(MultitaskGateHarness):
+    """제품 런타임은 처음 보는 plugin identity에서 적합성 검사를 한 번 실행하고 CoreOperations 기록으로 재생한다."""
+
+    def conformance(self, verdict="PASS", failures=()):
+        self.conformance_calls = 0
+        pending = list(failures)
+
+        def run():
+            self.conformance_calls += 1
+            if pending:
+                raise pending.pop(0)
+            return {"format": "flowmarshal-governance-conformance-v1", "provenance": "local_derived", "verdict": verdict,
+                    "checks": [{"id": "plan", "status": verdict, "expected": "orchestrated", "observed": "direct"}]}
+
+        return {"conformance": run, "conformance_check_set": "sha256:" + "1" * 64}
+
+    def conformance_history(self, event_type):
+        return [item for item in self.history(event_type) if item.get("kind") == "governance_conformance"
+                or "conformance" in item.get("detail", "").lower()]
+
+    def test_first_seen_identity_runs_once_and_is_replayed_for_later_tasks(self) -> None:
+        gate = self.gate(**self.conformance())
+        outcome = self.drive(gate)
+        self.assertEqual(RunOnceAction.COMPLETED, outcome.action, outcome.detail)
+        self.assertEqual(1, self.conformance_calls)
+        self.assertEqual(3, len(self.gate_steps("snapshot_c0")))
+        completed = self.conformance_history("operation.completed")
+        self.assertEqual(1, len(completed))
+        self.assertEqual("local_derived", completed[0]["result"]["provenance"])
+        # 새 gate(재시작)도 원장 기록으로 재생한다.
+        restarted = self.gate(**self.conformance())
+        restarted._conform({"project_id": self.prepared.project_id}, self.plugin.preflight())
+        self.assertEqual(0, self.conformance_calls)
+
+    def test_failed_conformance_is_replayed_as_a_mismatch_until_the_plugin_bytes_change(self) -> None:
+        gate = self.gate(**self.conformance("FAIL"))
+        first = self.drive(gate)
+        second = self.dispatcher(gate).run_once(self.prepared.project_id)
+        for outcome in (first, second):
+            self.assertEqual("GOVERNANCE_CONTRACT_MISMATCH", outcome.blocker_code, outcome.detail)
+            self.assertIn("GOVERNANCE_CONTRACT_MISMATCH: conformance:plan: 기대 orchestrated, 관측 direct", outcome.detail)
+        self.assertEqual(1, self.conformance_calls)
+        self.assertEqual("materialized", self.statuses()["task_fix_add"])
+        self.assertEqual([], self.steward.stages)
+        self.assertEqual([], self.gate_steps("plugin_identity"))
+        self.assertEqual("", git(self.prepared.workspace, "for-each-ref", "refs/flowmarshal"))
+        self.assertNotEqual("recovery_required", self.run_state())
+        # 플러그인 bytes가 바뀌면 새 identity라 다시 검사한다.
+        self.plugin.identity["summary"]["closure_tree_digest"] = "sha256:" + "2" * 64
+        fixed = self.gate(**self.conformance())
+        outcome = self.drive(fixed)
+        self.assertEqual(RunOnceAction.COMPLETED, outcome.action, outcome.detail)
+        self.assertEqual(1, self.conformance_calls)
+
+    def test_environment_failure_is_retried_and_never_requires_recovery(self) -> None:
+        gate = self.gate(**self.conformance(failures=[GovernanceUnavailable("GOVERNANCE_TIMEOUT: conformance")]))
+        first = self.drive(gate)
+        self.assertEqual("GOVERNANCE_GATE_PENDING", first.blocker_code, first.detail)
+        self.assertEqual("materialized", self.statuses()["task_fix_add"])
+        self.assertNotEqual("recovery_required", self.run_state())
+        self.assertEqual(1, len(self.conformance_history("operation.no_effect")))
+        outcome = self.drive(gate)
+        self.assertEqual(RunOnceAction.COMPLETED, outcome.action, outcome.detail)
+        self.assertEqual(2, self.conformance_calls)
+
+    def test_unexpected_conformance_error_is_retried_and_never_requires_recovery(self) -> None:
+        """주입된 적합성 검사가 분류되지 않은 예외를 내도 gate가 효과 없는 실패로 바꾼다."""
+        gate = self.gate(**self.conformance(failures=[OSError("적합성 검사가 예상 밖으로 죽었다")]))
+        first = self.drive(gate)
+        self.assertEqual("GOVERNANCE_GATE_PENDING", first.blocker_code, first.detail)
+        self.assertIn("CONFORMANCE_ERROR", first.detail)
+        self.assertEqual("materialized", self.statuses()["task_fix_add"])
+        self.assertNotEqual("recovery_required", self.run_state())
+        self.assertEqual(1, len(self.conformance_history("operation.no_effect")))
+        outcome = self.drive(gate)
+        self.assertEqual(RunOnceAction.COMPLETED, outcome.action, outcome.detail)
+        self.assertEqual(2, self.conformance_calls)
+
+    def test_product_gate_always_binds_the_runtime_conformance_branch(self) -> None:
+        from flowmarshal.engine.governance_conformance import CHECK_SET_DIGEST
+        from flowmarshal.engine.governance_gate import GovernanceSettings
+
+        settings = GovernanceSettings(self.base / "plugin-root", self.base / "governance-state")
+        gate = settings.open_gate(self.prepared.service, runtime=self.runtime, roles=object(), runner=object())
+        self.assertIsInstance(gate, GovernanceTaskGate)
+        self.assertTrue(callable(gate.conformance))
+        self.assertEqual(CHECK_SET_DIGEST, gate.conformance_check_set)
+        with patch("flowmarshal.engine.governance_conformance.run_conformance", return_value={"verdict": "PASS"}) as run:
+            self.assertEqual({"verdict": "PASS"}, gate.conformance())
+            self.assertEqual({"verdict": "PASS"}, settings.check_conformance())
+        self.assertEqual([((self.base / "plugin-root",), {})] * 2, [tuple(call) for call in run.call_args_list])
 
 
 class PluginSurfaceTests(unittest.TestCase):
@@ -1060,6 +1153,33 @@ class PluginSurfaceTests(unittest.TestCase):
             GovernancePlugin(self.root, self.base / "state", self.classes).preflight()
         self.assertIn("GOVERNANCE_CONTRACT_MISMATCH: manifest:", str(raised.exception))
 
+    def test_client_start_timeouts_stay_retryable_and_a_start_failure_is_a_mismatch(self) -> None:
+        # initialize·tools/list의 timeout은 판정할 수 없는 상태다. 계약 불일치로 바꾸지 않고 그대로 다시 시도하게 둔다.
+        for error in (GovernanceTimeout("GOVERNANCE_TIMEOUT: MCP tools/list: 120초"),
+                      GovernanceUnavailable("GOVERNANCE_TIMEOUT: MCP initialize: 120초")):
+            with self.subTest(error=str(error)):
+                self.setUp()
+                self.tools = error
+                with self.assertRaises(type(error)) as raised:
+                    self.plugin().preflight()
+                self.assertIs(error, raised.exception)
+        self.setUp()
+        self.tools = GovernanceUnavailable("MCP_SERVER_START_FAILED: [WinError 2] node")
+        self.assert_mismatch("mcp_server_start")
+
+    def test_plan_stage_requirement_is_validated_from_the_consumed_surface_declaration(self) -> None:
+        declared = CONSUMED_SURFACE["plan_stage_optional"]["executionRequirement"]
+        self.assertEqual({None, *governance_gate.STEWARD_ROLE_BINDINGS}, set(declared["minimumModelClass"]))
+        self.assertEqual(set(governance_gate.MODEL_CLASSES), set(governance_gate.STEWARD_ROLE_BINDINGS))
+        stage = {"requiredCapability": "x", "stageId": "s", "executionRequirement": {"minimumModelClass": "deep"}}
+        self.assertIs(stage, governance_gate._plan_stage(stage))
+        # 검증은 선언을 읽는다. 선언이 바뀌면 판정과 소비 표면 digest가 함께 바뀐다.
+        before = governance_gate.sha256_digest(CONSUMED_SURFACE)
+        with patch.dict(declared, {"minimumModelClass": [None]}):
+            self.assertNotEqual(before, governance_gate.sha256_digest(CONSUMED_SURFACE))
+            with self.assertRaises(GovernanceContractMismatch):
+                governance_gate._plan_stage(stage)
+
     def test_model_class_table_is_rejected_before_typed_use(self) -> None:
         self.assertEqual({"observed-model": "deep"}, load_model_classes(self.classes)[0])
         raw = {
@@ -1136,6 +1256,25 @@ class ProductPathTests(MultitaskGateHarness):
         retry.assert_called_once()
         self.assertEqual(task_id, emitted[0]["task_id"])
         self.assertIn("governance gate", emitted[0]["next"])
+
+class McpClientCleanupTests(unittest.TestCase):
+    def test_close_finishes_cleanup_when_stdin_is_already_gone(self) -> None:
+        """stdin.close()가 실패해도 프로세스·스레드 정리를 건너뛰지 않는다. 남은 프로세스가 앞 예외를 덮지 않게 한다."""
+        done: list[str] = []
+
+        def gone() -> None:
+            raise OSError("stdin은 이미 끊겼다")
+
+        stub = SimpleNamespace(
+            process=SimpleNamespace(stdin=SimpleNamespace(close=gone),
+                                    stdout=SimpleNamespace(close=lambda: done.append("stdout")),
+                                    wait=lambda timeout: done.append("wait"),
+                                    kill=lambda: done.append("kill")),
+            _pump_thread=SimpleNamespace(join=lambda timeout: done.append("join")),
+            _stderr=SimpleNamespace(close=lambda: done.append("stderr")))
+        McpStdioClient.close(stub)
+        self.assertEqual(["wait", "join", "stdout", "stderr"], done)
+
 
 class TimeoutTests(unittest.TestCase):
     def test_mcp_client_times_out_on_a_silent_server(self) -> None:

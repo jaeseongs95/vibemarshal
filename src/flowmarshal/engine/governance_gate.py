@@ -19,6 +19,8 @@ Task validation·semantic Validator·Goal Test가 아니며 Core evidence로 세
   진입점을 id로 찾고, 두 단계 맨 앞의 preflight로 실행 가능 여부를 확인한다. 계약·환경 불일치는
   GOVERNANCE_CONTRACT_MISMATCH 하나로 드러내며 Task 상태를 바꾸지 않고 원장에 확정 결과로 굳히지 않는다.
   실행에 쓴 플러그인 bytes의 identity는 Engine이 manifest closure 경로로 계산해 남긴다(local_derived).
+- 적합성: 제품 경로의 gate는 이 프로젝트 원장에서 처음 보는 plugin identity면 Worker·steward 호출 전에
+  governance_conformance의 검사를 한 번 실행하고 CoreOperations 기록으로 재생한다.
 """
 from __future__ import annotations
 
@@ -45,6 +47,7 @@ MANIFEST = "host-integration.json"
 MANIFEST_FORMAT = "agent-governance-suite.host-integration.v1"
 HOST_ID = "flowmarshal-engine"
 MINIMUM_NODE = (22, 13)
+MODEL_CLASSES = ("lightweight", "general", "deep", "frontier")
 # 소비 표면 선언: Engine이 플러그인에 기대는 진입점 id, MCP 도구와 그 data에서 읽는 필드, 스크립트 출력에서
 # 읽는 필드다. Engine의 의존이 바뀔 때만 바뀐다. 플러그인 버전·digest는 여기 두지 않는다.
 CONSUMED_SURFACE: dict[str, Any] = {
@@ -59,8 +62,8 @@ CONSUMED_SURFACE: dict[str, Any] = {
         "abort_workflow": {},
     },
     "plan_stage": {"requiredCapability": "str", "stageId": "str"},
-    # 없어도 되는 필드다. 있으면 object이고 minimumModelClass는 없거나 steward binding 표의 class다.
-    "plan_stage_optional": {"executionRequirement": "dict"},
+    # 없어도 되는 필드다. 있으면 object이고 minimumModelClass는 아래 허용값(steward binding 표의 class) 중 하나다.
+    "plan_stage_optional": {"executionRequirement": {"minimumModelClass": [None, *MODEL_CLASSES]}},
     "scripts": {
         "scope-baseline": {"manifestSha256": "str", "entries": "list"},
         "scope-compare": {"verdict": "str", "summary": "dict", "findings": "list", "currentDigest": "str"},
@@ -69,7 +72,6 @@ CONSUMED_SURFACE: dict[str, Any] = {
 }
 _FIELD_TYPES = {"str": str, "int": int, "list": list, "dict": dict}
 MODEL_CLASSES_FORMAT = "flowmarshal-governance-model-classes-v1"
-MODEL_CLASSES = ("lightweight", "general", "deep", "frontier")
 SUPPORTED_CAPABILITIES = frozenset({
     "change-scope-baseline-capture", "minimal-implementation", "change-scope-assurance",
     "acceptance-evidence-validation",
@@ -92,6 +94,7 @@ STEWARD_INSTRUCTIONS = (
     "rationale에 한국어 한두 문장으로 판단 근거를 쓴다."
 )
 GATE_KIND = "governance_gate"
+CONFORMANCE_KIND = "governance_conformance"
 MCP_TIMEOUT_SECONDS = 120.0
 SCRIPT_TIMEOUT_SECONDS = 300.0
 GIT_TIMEOUT_SECONDS = 120.0
@@ -135,6 +138,22 @@ class GovernanceContractMismatch(RuntimeError):
         super().__init__(f"GOVERNANCE_CONTRACT_MISMATCH: {check}: 기대 {expected}, 관측 {observed}")
 
 
+def conformance_result(run: Callable[[], dict[str, Any]]) -> dict[str, Any]:
+    """임시 자원 안에서만 효과가 있는 적합성 검사를 부르고, 그 밖의 모든 예외를 다시 시도할 실패로 바꾼다.
+
+    검사의 효과는 모두 임시 디렉터리 안에 있으므로 timeout·정리 실패·예상 밖 예외까지 전부 effects_started=False다.
+    분류하지 않은 예외를 그대로 내보내면 CoreOperations가 결과 없는 효과로 보고 프로젝트를 recovery_required로
+    보낸다. 검사를 부르는 모든 경로(채택 명령, E2E preflight, gate 런타임 분기)가 이 한 곳을 지난다.
+    """
+    try:
+        return run()
+    except (GovernanceContractMismatch, GovernanceUnavailable):
+        raise
+    except Exception as error:
+        detail = str(error) if isinstance(error, GovernanceTimeout) else f"CONFORMANCE_ERROR: {error!r}"
+        raise GovernanceUnavailable(detail) from error
+
+
 def _json(text: Any) -> Any:
     """JSON으로 읽히지 않으면 None이다. 형태 판정은 _fields가 한다."""
     try:
@@ -159,13 +178,71 @@ def _plan_stage(item: Any) -> dict[str, Any]:
     """plan 응답의 stage 하나를 검증한다. steward가 읽는 executionRequirement도 여기서 확인한다."""
     stage = _fields("mcp_response:plan_workflow:stage", item, CONSUMED_SURFACE["plan_stage"])
     requirement = stage.get("executionRequirement")
+    allowed = CONSUMED_SURFACE["plan_stage_optional"]["executionRequirement"]["minimumModelClass"]
     if requirement is not None and (
-            not isinstance(requirement, dict)
-            or requirement.get("minimumModelClass") not in (None, *STEWARD_ROLE_BINDINGS)):
+            not isinstance(requirement, dict) or requirement.get("minimumModelClass") not in allowed):
         raise GovernanceContractMismatch(
             "mcp_response:plan_workflow:stage:executionRequirement",
-            f"없음, 또는 minimumModelClass가 없거나 {sorted(STEWARD_ROLE_BINDINGS)} 중 하나인 object", requirement)
+            f"없음, 또는 minimumModelClass가 {allowed} 중 하나인 object", requirement)
     return stage
+
+
+def mcp_envelope(raw: Any) -> Any:
+    """tools/call result 원문에서 플러그인 envelope을 꺼낸다. 형태가 다르면 None이며 예외를 내지 않는다."""
+    content = raw.get("content") if isinstance(raw, dict) else None
+    first = content[0] if isinstance(content, list) and content else None
+    return _json(first.get("text")) if isinstance(first, dict) else None
+
+
+def mcp_data(tool: str, raw: Any) -> dict[str, Any]:
+    """저장된 tools/call 원문을 검증해 소비 표면이 선언한 data를 돌려준다(execute 밖 typed adapter)."""
+    envelope = mcp_envelope(raw)
+    if not isinstance(envelope, dict) or envelope.get("ok") is not True:
+        raise GovernanceContractMismatch(f"mcp_response:{tool}", "ok:true인 JSON envelope", raw)
+    return _fields(f"mcp_response:{tool}", envelope.get("data"), CONSUMED_SURFACE["mcp_tools"][tool])
+
+
+def plan_stages(workflow: dict[str, Any]) -> dict[str, dict[str, Any]]:
+    """plan 응답을 검증하고 gate가 기록하는 네 stage를 돌려준다."""
+    stages = {stage["requiredCapability"]: stage for stage in map(_plan_stage, workflow["stages"])}
+    if workflow["executionMode"] != "orchestrated" or set(stages) != SUPPORTED_CAPABILITIES:
+        raise GovernanceContractMismatch("plan_shape", f"orchestrated, stages {sorted(SUPPORTED_CAPABILITIES)}",
+                                         f"{workflow['executionMode']}, stages {sorted(stages)}")
+    return {"baseline": stages["change-scope-baseline-capture"], "implementation": stages["minimal-implementation"],
+            "scope": stages["change-scope-assurance"], "acceptance": stages["acceptance-evidence-validation"]}
+
+
+def convergence_frame(workspace_id: str, root: Path, envelope_path: Path, commit: str) -> dict[str, Any]:
+    return {"schemaVersion": "1.0.0", "workspace": {"workspaceId": workspace_id, "locator": str(root)},
+            "controlArtifacts": [{"artifactId": "task-envelope", "role": "pass-condition",
+                                  "locator": str(envelope_path), "digest": f"sha256:{_sha256_file(envelope_path)}"}],
+            "targetArtifacts": [{"artifactId": "snapshot-c0", "role": "target", "locator": f"{root} {commit}",
+                                 "digest": sha256_digest(commit)}],
+            "operationalSettings": {"maxAttemptsPerEpoch": 3, "maxEpochs": 2, "leaseTtlSeconds": 86400}}
+
+
+def stage_record_arguments(*, run_id: str, revision: int, stage: dict[str, Any], stage_key: str, stage_state: str,
+                           output_file: Path, artifacts: tuple[tuple[str, str, str], ...], note: str,
+                           target_digest: str) -> dict[str, Any]:
+    """record_stage_result 인자. gate와 적합성 검사가 같은 형태로 부른다."""
+    digest = _sha256_file(output_file)
+    code = STATE_ERRORS.get((stage_key, stage_state))
+    error = None if code is None else {"code": code, "message": note, "details": None}
+    return {
+        "schemaVersion": "1.0.0", "runId": run_id, "stageId": stage["stageId"],
+        "expectedRevision": revision, "state": stage_state,
+        "output": {"schemaVersion": "1.0.0", "kind": "output", "output": None, "error": error, "artifacts": [
+            {"artifactId": artifact_id, "schemaId": schema_id, "locator": f"{output_file}{pointer}",
+             # 범위 stage는 16진수, 수용 근거 stage는 sha256: 접두사로 낸다. 플러그인 stage validator가 받는 형식이다.
+             "digest": f"{'sha256:' if stage_key == 'acceptance' else ''}{digest}",
+             "targetDigest": target_digest, "verified": True}
+            for artifact_id, schema_id, pointer in artifacts]},
+        # 통과 stage는 검증된 evidence가 하나 이상 있어야 한다. 산출물이 없으면 출력 파일 자체를 근거로 둔다.
+        "evidence": [{"artifactId": artifact_id, "kind": "tool", "locator": f"{output_file}{pointer}",
+                      "verified": True, "note": note} for artifact_id, _, pointer in artifacts or (("stage-output", "", ""),)],
+        "findings": [], "blockers": [], "responseMode": "compact", "error": error,
+        "outputFile": {"locator": str(output_file), "digest": f"sha256:{digest}"},
+    }
 
 
 def _sha256_file(path: Path) -> str:
@@ -358,7 +435,10 @@ class McpStdioClient:
 
     def close(self) -> None:
         if self.process.stdin is not None:
-            self.process.stdin.close()
+            try:
+                self.process.stdin.close()
+            except OSError:
+                pass  # stdin이 이미 끊겼어도 프로세스·스레드 정리는 계속한다.
         try:
             self.process.wait(timeout=10)
         except subprocess.TimeoutExpired:
@@ -660,15 +740,24 @@ class GovernanceSettings:
         classes = os.environ.get(MODEL_CLASSES_ENV)
         return None if not root else cls(Path(root), state_dir, Path(classes) if classes else None)
 
+    def check_conformance(self) -> dict[str, Any]:
+        """E2E preflight가 cell 실행 전에 부르는 적합성 검사."""
+        from .governance_conformance import run_conformance
+
+        return run_conformance(self.plugin_root)
+
     def open_gate(self, service: Any, *, runtime: Any, roles: Any, runner: Any) -> Any:
         if roles is None or runner is None:
             return MissingGovernanceGate(
                 "GOVERNANCE_ROLE_CONFIGURATION_REQUIRED: steward binding에 쓸 역할 설정이 필요합니다.")
+        from .governance_conformance import CHECK_SET_DIGEST
+
+        # 제품 경로의 gate에는 항상 런타임 적합성 분기를 결속한다.
         return GovernanceTaskGate(
             service, plugin=GovernancePlugin(self.plugin_root, self.state_dir / "plugin", self.model_classes),
             steward=RoleSteward(service, runtime=runtime, roles=roles, runner=runner,
                                 cwd=self.state_dir / "steward-cwd"),
-            state_dir=self.state_dir)
+            state_dir=self.state_dir, conformance=self.check_conformance, conformance_check_set=CHECK_SET_DIGEST)
 
 
 @dataclass
@@ -690,8 +779,10 @@ class GovernanceTaskGate:
 
     def __init__(self, service: Any, *, plugin: Any, steward: Any, state_dir: Path,
                  observe_worker: Callable[[str], dict[str, Any] | None] | None = None,
-                 operations: CoreOperations | None = None) -> None:
+                 operations: CoreOperations | None = None,
+                 conformance: Callable[[], dict[str, Any]] | None = None, conformance_check_set: str = "") -> None:
         self.service, self.plugin, self.steward, self.state_dir = service, plugin, steward, state_dir
+        self.conformance, self.conformance_check_set = conformance, conformance_check_set
         self.observe_worker = observe_worker or (lambda attempt_id: ledger_worker_observation(service, attempt_id))
         self.operations = operations or CoreOperations(service)
 
@@ -750,7 +841,7 @@ class GovernanceTaskGate:
              observation: dict[str, Any] | None, *, replay: bool) -> dict[str, Any]:
         def execute() -> dict[str, Any]:
             raw = self.plugin.call(tool, arguments, observation)
-            envelope = self._envelope_of(raw)
+            envelope = mcp_envelope(raw)
             if isinstance(envelope, dict) and envelope.get("ok") is False:
                 # 거절된 호출은 플러그인 상태를 바꾸지 않는다(플러그인 provider 테스트가 보호). 확정 결과로 굳히지
                 # 않고 no_effect로 남겨, 원인을 고친 뒤 같은 키에서 다시 부른다.
@@ -762,17 +853,7 @@ class GovernanceTaskGate:
 
         stored = self._op(task, run, step, {"tool": tool, "arguments": arguments, "observation": observation},
                           execute, replay=replay)
-        envelope = self._envelope_of(stored.get("raw") if isinstance(stored, dict) else None)
-        if not isinstance(envelope, dict) or envelope.get("ok") is not True:
-            raise GovernanceContractMismatch(f"mcp_response:{tool}", "ok:true인 JSON envelope", stored)
-        return _fields(f"mcp_response:{tool}", envelope.get("data"), CONSUMED_SURFACE["mcp_tools"][tool])
-
-    @staticmethod
-    def _envelope_of(raw: Any) -> Any:
-        """tools/call result 원문에서 플러그인 envelope을 꺼낸다. 형태가 다르면 None이며 예외를 내지 않는다."""
-        content = raw.get("content") if isinstance(raw, dict) else None
-        first = content[0] if isinstance(content, list) and content else None
-        return _json(first.get("text")) if isinstance(first, dict) else None
+        return mcp_data(tool, stored.get("raw") if isinstance(stored, dict) else None)
 
     def _review(self, task: Any, run: _Run, stage: str, requirement: dict[str, Any] | None,
                 brief: dict[str, Any], *, replay: bool) -> dict[str, Any]:
@@ -816,25 +897,10 @@ class GovernanceTaskGate:
     def _record(self, task: Any, run: _Run, stage_key: str, stage_state: str, observation: dict[str, Any] | None,
                 *, output_file: Path, artifacts: tuple[tuple[str, str, str], ...] = (), note: str,
                 replay: bool) -> None:
-        stage = run.stages[stage_key]
-        digest = _sha256_file(output_file)
-        code = STATE_ERRORS.get((stage_key, stage_state))
-        error = None if code is None else {"code": code, "message": note, "details": None}
-        arguments: dict[str, Any] = {
-            "schemaVersion": "1.0.0", "runId": run.run_id, "stageId": stage["stageId"],
-            "expectedRevision": run.revision, "state": stage_state,
-            "output": {"schemaVersion": "1.0.0", "kind": "output", "output": None, "error": error, "artifacts": [
-                {"artifactId": artifact_id, "schemaId": schema_id, "locator": f"{output_file}{pointer}",
-                 # 범위 stage는 16진수, 수용 근거 stage는 sha256: 접두사로 낸다. 플러그인 stage validator가 받는 형식이다.
-                 "digest": f"{'sha256:' if stage_key == 'acceptance' else ''}{digest}",
-                 "targetDigest": run.target_digest, "verified": True}
-                for artifact_id, schema_id, pointer in artifacts]},
-            # 통과 stage는 검증된 evidence가 하나 이상 있어야 한다. 산출물이 없으면 출력 파일 자체를 근거로 둔다.
-            "evidence": [{"artifactId": artifact_id, "kind": "tool", "locator": f"{output_file}{pointer}",
-                          "verified": True, "note": note} for artifact_id, _, pointer in artifacts or (("stage-output", "", ""),)],
-            "findings": [], "blockers": [], "responseMode": "compact", "error": error,
-            "outputFile": {"locator": str(output_file), "digest": f"sha256:{digest}"},
-        }
+        arguments = stage_record_arguments(
+            run_id=run.run_id, revision=run.revision, stage=run.stages[stage_key], stage_key=stage_key,
+            stage_state=stage_state, output_file=output_file, artifacts=artifacts, note=note,
+            target_digest=run.target_digest)
         run.revision = self._mcp(task, run, f"record:{stage_key}", "record_stage_result", arguments, observation,
                                  replay=replay)["revision"]
 
@@ -940,10 +1006,30 @@ class GovernanceTaskGate:
                               "files": str(self._write(folder / f"plugin-identity-{phase}.json", identity["files"]))},
                      replay=False)
 
+    def _conform(self, task: Any, identity: dict[str, Any]) -> None:
+        """이 프로젝트 원장에서 처음 보는 plugin identity면 적합성 검사를 한 번 실행하고 결과를 남긴다.
+
+        같은 identity는 저장된 결과를 재생한다. 결정적 FAIL도 재생되어 매번 같은 계약 불일치로 멈추고, 환경성 실패는
+        no_effect로 남아 다음 tick에 다시 실행된다. 결과는 gate 판정의 전제일 뿐 Task validation 근거가 아니다.
+        """
+        if self.conformance is None:
+            return
+        summary = identity["summary"]
+        result = self.operations.invoke(
+            project_id=task["project_id"], kind=CONFORMANCE_KIND,
+            execute=lambda: conformance_result(self.conformance),
+            request={"closure_tree_digest": summary.get("closure_tree_digest"), "node_version": summary.get("node_version"),
+                     "check_set_digest": self.conformance_check_set})
+        failed = next((item for item in result["checks"] if item["status"] != "PASS"), None)
+        if failed is not None:
+            raise GovernanceContractMismatch(f"conformance:{failed['id']}", failed["expected"], failed["observed"])
+
     def _open(self, task: Any, key: dict[str, Any], *, replay: bool) -> _Run:
         self.steward.ensure_supported()
         # 계약·환경 확인은 Core 효과와 steward 호출보다 먼저, CoreOperations 밖에서 한다.
         identity = self.plugin.preflight()
+        if not replay:
+            self._conform(task, identity)
         contract, spec, plan, root = self._task_inputs(task)
         envelope = self._envelope(key, contract, spec, plan)
         writes = envelope["scope"]["included"]
@@ -974,22 +1060,8 @@ class GovernanceTaskGate:
             replay=replay)
         workflow = self._mcp(task, run, "plan", "plan_workflow", {"schemaVersion": "1.0.0", "taskEnvelope": envelope},
                              observation, replay=replay)
-        stages = {stage["requiredCapability"]: stage for stage in map(_plan_stage, workflow["stages"])}
-        if workflow["executionMode"] != "orchestrated" or set(stages) != SUPPORTED_CAPABILITIES:
-            raise GovernanceContractMismatch("plan_shape", f"orchestrated, stages {sorted(SUPPORTED_CAPABILITIES)}",
-                                             f"{workflow['executionMode']}, stages {sorted(stages)}")
-        run.stages = {"baseline": stages["change-scope-baseline-capture"],
-                      "implementation": stages["minimal-implementation"],
-                      "scope": stages["change-scope-assurance"],
-                      "acceptance": stages["acceptance-evidence-validation"]}
-        frame = {"schemaVersion": "1.0.0",
-                 "workspace": {"workspaceId": f"flowmarshal-{task['project_id']}", "locator": str(root)},
-                 "controlArtifacts": [{"artifactId": "task-envelope", "role": "pass-condition",
-                                       "locator": str(envelope_path), "digest": f"sha256:{_sha256_file(envelope_path)}"}],
-                 "targetArtifacts": [{"artifactId": "snapshot-c0", "role": "target",
-                                      "locator": f"{root} {c0['commit']}",
-                                      "digest": sha256_digest(c0["commit"])}],
-                 "operationalSettings": {"maxAttemptsPerEpoch": 3, "maxEpochs": 2, "leaseTtlSeconds": 86400}}
+        run.stages = plan_stages(workflow)
+        frame = convergence_frame(f"flowmarshal-{task['project_id']}", root, envelope_path, c0["commit"])
         root_record = self._mcp(task, run, "root", "open_convergence_root", {
             "schemaVersion": "1.0.0", "parentRootId": None, "taskEnvelope": envelope, "frame": frame,
             "userApprovalRefs": [], "responseMode": "compact"}, None, replay=replay)

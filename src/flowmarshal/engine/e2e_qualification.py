@@ -490,6 +490,21 @@ def _preserve_inventory_observation(
     _write_json(path, expected)
 
 
+def _require_plugin_conformance(governance: Any, destination: Path) -> None:
+    """cell을 실행하기 전에 governance 플러그인 적합성 검사를 요구하고 결과를 run root에 남긴다.
+
+    결과 이름에 digest를 넣어 덮어쓰지 않는다. freeze 블록과의 대조와 cell evidence 결속은 아직 하지 않는다.
+    """
+    result = governance.check_conformance()
+    path = destination / ("governance-conformance-" + sha256_digest(result)[7:23] + ".json")
+    if not path.is_file():
+        _write_json(path, result)
+    failed = next((item for item in result["checks"] if item["status"] != "PASS"), None)
+    if failed is not None:
+        raise QualificationRunError(
+            f"GOVERNANCE_CONFORMANCE_FAILED: {failed['id']}: 기대 {failed['expected']}, 관측 {failed['observed']}")
+
+
 @dataclass
 class PreparedE2E:
     service: EngineService
@@ -2089,6 +2104,8 @@ def run_project_e2e(
             },
             evaluation_policies,
         )
+        if governance is not None:
+            _require_plugin_conformance(governance, destination)
         active_scenario: str | None = None
         try:
             for index, scenario in enumerate(E2E_SCENARIOS):
