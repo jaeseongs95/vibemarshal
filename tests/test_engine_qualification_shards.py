@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from flowmarshal.canonical import sha256_digest
 from flowmarshal.engine.budget import GoalBudgetPolicy
 from flowmarshal.engine.domain import utc_now
 from flowmarshal.engine.evaluation import EvaluationContract, EvaluationRunStatus
@@ -299,33 +300,146 @@ class ShardAggregateTests(unittest.TestCase):
         self.assertFalse((scratch / "b").exists())
 
     def test_aggregate_names_the_missing_cells(self) -> None:
+        scratch, copies = self._copies()
         contract = self._contract(self.planning_full)
         seed, digest = _contract_cells(contract)[6]
+        fixture_key = digest.split(":", 1)[-1][:24]
+        (copies[1] / "cells" / f"seed-{seed}" / f"{fixture_key}.json").unlink()
         with self.assertRaisesRegex(
-            QualificationRunError, f"AGGREGATE_CELL_MISSING: seed={seed} fixture={digest}"
+            QualificationRunError,
+            f"AGGREGATE_SHARD_CELL_SET_MISMATCH:.*missing=.*{seed}.*{digest}",
         ):
             aggregate_shard_runs(
                 root=ROOT,
-                shard_run_roots=(self.planning_shards[0], self.planning_shards[2]),
-                destination=self.work / "missing-aggregate",
+                shard_run_roots=tuple(copies),
+                destination=scratch / "missing-aggregate",
             )
-        self.assertFalse((self.work / "missing-aggregate" / "qualification-report.json").exists())
+        self.assertFalse((scratch / "missing-aggregate").exists())
 
-    def test_aggregate_names_the_conflicting_cell_and_both_roots(self) -> None:
+    def test_aggregate_rejects_duplicate_checkpoint_before_writing(self) -> None:
         scratch, copies = self._copies()
-        retry = Path(shutil.copytree(copies[0], scratch / "retry"))
-        cell = next((retry / "cells").rglob("*.json"))
+        cell = next((copies[0] / "cells").rglob("*.json"))
+        duplicate = copies[1] / cell.relative_to(copies[0])
+        duplicate.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(cell, duplicate)
         document = json.loads(cell.read_text(encoding="utf-8"))
-        document["raw_structured_assessment"]["logical_role_calls"] = 2
-        cell.write_text(json.dumps(document), encoding="utf-8")
         with self.assertRaises(QualificationRunError) as raised:
             aggregate_shard_runs(
-                root=ROOT, shard_run_roots=(*copies, retry), destination=scratch / "out",
+                root=ROOT, shard_run_roots=tuple(copies), destination=scratch / "out",
             )
         message = str(raised.exception)
-        self.assertIn("AGGREGATE_CELL_CONFLICT", message)
+        self.assertIn("AGGREGATE_CELL_DUPLICATE", message)
         self.assertIn(f"seed={document['order_seed']} fixture={document['fixture_digest']}", message)
-        self.assertIn(f"roots={copies[0]},{retry}", message)
+        self.assertIn(f"roots={copies[0]},{copies[1]}", message)
+        self.assertFalse((scratch / "out").exists())
+
+    def test_aggregate_requires_complete_unique_strict_assignments(self) -> None:
+        cases = (
+            ("missing", lambda roots: (roots[0] / "shard-assignment.json").unlink()),
+            (
+                "duplicate-index",
+                lambda roots: (roots[2] / "shard-assignment.json").write_text(
+                    json.dumps({"shard_index": 1, "shard_count": 3}), encoding="utf-8"
+                ),
+            ),
+            (
+                "different-count",
+                lambda roots: (roots[2] / "shard-assignment.json").write_text(
+                    json.dumps({"shard_index": 2, "shard_count": 4}), encoding="utf-8"
+                ),
+            ),
+            (
+                "extra-field",
+                lambda roots: (roots[2] / "shard-assignment.json").write_text(
+                    json.dumps({"shard_index": 2, "shard_count": 3, "extra": True}),
+                    encoding="utf-8",
+                ),
+            ),
+        )
+        for name, mutate in cases:
+            with self.subTest(name):
+                scratch, copies = self._copies()
+                mutate(copies)
+                with self.assertRaisesRegex(
+                    QualificationRunError, "AGGREGATE_SHARD_ASSIGNMENT_"
+                ):
+                    aggregate_shard_runs(
+                        root=ROOT, shard_run_roots=tuple(copies), destination=scratch / "out"
+                    )
+                self.assertFalse((scratch / "out").exists())
+        scratch, copies = self._copies()
+        with self.assertRaisesRegex(
+            QualificationRunError, "AGGREGATE_SHARD_ASSIGNMENT_MISMATCH"
+        ):
+            aggregate_shard_runs(
+                root=ROOT, shard_run_roots=tuple(copies[:2]), destination=scratch / "out"
+            )
+        self.assertFalse((scratch / "out").exists())
+
+    def test_aggregate_revalidates_each_bundle_and_requires_equal_digests(self) -> None:
+        scratch, copies = self._copies()
+        payload = next((copies[1] / "reproduction-bundle" / "payload").rglob("*.py"))
+        payload.write_bytes(payload.read_bytes() + b"\n")
+        with self.assertRaisesRegex(
+            QualificationRunError, "AGGREGATE_SHARD_REPRODUCTION_BUNDLE_INVALID"
+        ):
+            aggregate_shard_runs(
+                root=ROOT, shard_run_roots=tuple(copies), destination=scratch / "invalid"
+            )
+        self.assertFalse((scratch / "invalid").exists())
+
+        scratch, copies = self._copies()
+        manifest_path = copies[2] / "reproduction-bundle" / "qualification-freeze.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["suite_manifest_digest"] = "sha256:" + "f" * 64
+        manifest["bundle_digest"] = sha256_digest(
+            {key: value for key, value in manifest.items() if key != "bundle_digest"}
+        )
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaisesRegex(
+            QualificationRunError, "AGGREGATE_SHARD_REPRODUCTION_BUNDLE_MISMATCH"
+        ):
+            aggregate_shard_runs(
+                root=ROOT, shard_run_roots=tuple(copies), destination=scratch / "mismatch"
+            )
+        self.assertFalse((scratch / "mismatch").exists())
+
+    def test_aggregate_revalidates_existing_destination_bundle(self) -> None:
+        scratch, copies = self._copies()
+        target = scratch / "out"
+        shutil.copytree(copies[0] / "reproduction-bundle", target / "reproduction-bundle")
+        payload = next((target / "reproduction-bundle" / "payload").rglob("*.py"))
+        payload.write_bytes(payload.read_bytes() + b"\n")
+        with self.assertRaisesRegex(
+            QualificationRunError, "AGGREGATE_DESTINATION_REPRODUCTION_BUNDLE_INVALID"
+        ):
+            aggregate_shard_runs(
+                root=ROOT, shard_run_roots=tuple(copies), destination=target
+            )
+        self.assertFalse((target / "evaluation-contract.json").exists())
+
+    def test_aggregate_rejects_root_overlap_before_writing(self) -> None:
+        scratch, copies = self._copies()
+        child_target = copies[0] / "aggregate"
+        with self.assertRaisesRegex(QualificationRunError, "AGGREGATE_SHARD_ROOTS_OVERLAP"):
+            aggregate_shard_runs(
+                root=ROOT, shard_run_roots=tuple(copies), destination=child_target
+            )
+        self.assertFalse(child_target.exists())
+
+        with self.assertRaisesRegex(QualificationRunError, "AGGREGATE_SHARD_ROOTS_OVERLAP"):
+            aggregate_shard_runs(
+                root=ROOT, shard_run_roots=tuple(copies), destination=scratch
+            )
+        self.assertFalse((scratch / "evaluation-contract.json").exists())
+
+        nested = copies[0] / "nested"
+        nested.mkdir()
+        with self.assertRaisesRegex(QualificationRunError, "AGGREGATE_SHARD_ROOTS_OVERLAP"):
+            aggregate_shard_runs(
+                root=ROOT, shard_run_roots=(copies[0], nested), destination=scratch / "out"
+            )
+        self.assertFalse((scratch / "out").exists())
 
     def test_aggregate_rejects_shards_bound_to_different_metadata_or_inventory(self) -> None:
         scratch, copies = self._copies()

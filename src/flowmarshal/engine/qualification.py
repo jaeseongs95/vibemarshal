@@ -2165,8 +2165,15 @@ def aggregate_shard_runs(
     base = (root or project_root()).resolve(strict=True)
     shards = [Path(item).resolve(strict=True) for item in shard_run_roots]
     target = Path(destination).resolve()
-    if not shards or len(set(shards)) != len(shards) or target in shards:
+    if not shards or len(set(shards)) != len(shards):
         raise QualificationRunError("AGGREGATE_SHARD_ROOTS_INVALID")
+    roots = (*shards, target)
+    if any(
+        left == right or left in right.parents or right in left.parents
+        for index, left in enumerate(roots)
+        for right in roots[index + 1 :]
+    ):
+        raise QualificationRunError("AGGREGATE_SHARD_ROOTS_OVERLAP")
     first = shards[0]
     observations = {
         tuple(sorted(item.name for item in shard.glob("inventory-observation-*.json")))
@@ -2194,15 +2201,126 @@ def aggregate_shard_runs(
         raise QualificationRunError(f"AGGREGATE_SCOPE_UNSUPPORTED: {contract.scope.value}")
     if contract.source_manifest_digest != source_manifest_digest(base):
         raise QualificationRunError("AGGREGATE_SOURCE_MANIFEST_MISMATCH")
+
+    assignments: list[tuple[int, int]] = []
+    bundle_digests: list[str] = []
+    actual_by_shard: dict[Path, dict[tuple[int, str], EvaluationCellCheckpoint]] = {}
+    for shard in shards:
+        try:
+            assignment = json.loads(
+                (shard / "shard-assignment.json").read_text(encoding="utf-8")
+            )
+            if not isinstance(assignment, dict) or set(assignment) != {
+                "shard_index", "shard_count"
+            }:
+                raise ValueError("필드가 정확하지 않습니다")
+            shard_index = assignment["shard_index"]
+            shard_count = assignment["shard_count"]
+            _check_shard_args(shard_index, shard_count)
+        except Exception as error:
+            raise QualificationRunError(
+                f"AGGREGATE_SHARD_ASSIGNMENT_INVALID: root={shard}: {error}"
+            ) from error
+        assignments.append((shard_index, shard_count))
+        try:
+            bundle_digests.append(
+                verify_qualification_reproduction_bundle(
+                    shard / "reproduction-bundle"
+                ).bundle_digest
+            )
+        except Exception as error:
+            raise QualificationRunError(
+                f"AGGREGATE_SHARD_REPRODUCTION_BUNDLE_INVALID: root={shard}: {error}"
+            ) from error
+
+        source = ImmutableCheckpointStore(shard, contract)
+        actual: dict[tuple[int, str], EvaluationCellCheckpoint] = {}
+        try:
+            for seed, digest in _contract_cells(contract):
+                checkpoint = source.completed(digest, seed)
+                if checkpoint is None:
+                    continue
+                if (checkpoint.order_seed, checkpoint.fixture_digest) != (seed, digest):
+                    raise CheckpointContractError("checkpoint identity가 저장 경로와 다릅니다")
+                actual[(seed, digest)] = checkpoint
+        except Exception as error:
+            raise QualificationRunError(
+                f"AGGREGATE_SHARD_CHECKPOINT_INVALID: root={shard}: {error}"
+            ) from error
+        cell_files = tuple((shard / "cells").rglob("*.json"))
+        if len(cell_files) != len(actual):
+            raise QualificationRunError(
+                f"AGGREGATE_SHARD_CHECKPOINT_INVALID: root={shard}: "
+                "checkpoint 파일과 계약 cell이 일치하지 않습니다"
+            )
+        actual_by_shard[shard] = actual
+
+    shard_counts = {count for _index, count in assignments}
+    shard_indices = [index for index, _count in assignments]
+    if (
+        len(shard_counts) != 1
+        or next(iter(shard_counts)) != len(shards)
+        or set(shard_indices) != set(range(len(shards)))
+        or len(shard_indices) != len(set(shard_indices))
+    ):
+        raise QualificationRunError(
+            f"AGGREGATE_SHARD_ASSIGNMENT_MISMATCH: assignments={assignments}"
+        )
+    if len(set(bundle_digests)) != 1:
+        raise QualificationRunError(
+            f"AGGREGATE_SHARD_REPRODUCTION_BUNDLE_MISMATCH: digests={bundle_digests}"
+        )
+
+    origin: dict[tuple[int, str], Path] = {}
+    for shard, actual in actual_by_shard.items():
+        for cell in actual:
+            if cell in origin:
+                seed, digest = cell
+                raise QualificationRunError(
+                    f"AGGREGATE_CELL_DUPLICATE: seed={seed} fixture={digest} "
+                    f"roots={origin[cell]},{shard}"
+                )
+            origin[cell] = shard
+    cells = _contract_cells(contract)
+    shard_count = next(iter(shard_counts))
+    if shard_count > len(cells):
+        raise QualificationRunError(
+            f"AGGREGATE_SHARD_ASSIGNMENT_MISMATCH: shard_count={shard_count} "
+            f"cells={len(cells)}"
+        )
+    for shard, (shard_index, _count) in zip(shards, assignments, strict=True):
+        expected = set(
+            cells[
+                shard_index * len(cells) // shard_count :
+                (shard_index + 1) * len(cells) // shard_count
+            ]
+        )
+        actual = set(actual_by_shard[shard])
+        if actual != expected:
+            raise QualificationRunError(
+                f"AGGREGATE_SHARD_CELL_SET_MISMATCH: root={shard} "
+                f"missing={sorted(expected - actual)} unexpected={sorted(actual - expected)}"
+            )
+
+    target_bundle = target / "reproduction-bundle"
+    if target_bundle.exists():
+        try:
+            target_digest = verify_qualification_reproduction_bundle(
+                target_bundle
+            ).bundle_digest
+        except Exception as error:
+            raise QualificationRunError(
+                f"AGGREGATE_DESTINATION_REPRODUCTION_BUNDLE_INVALID: {error}"
+            ) from error
+        if target_digest != bundle_digests[0]:
+            raise QualificationRunError(
+                "AGGREGATE_DESTINATION_REPRODUCTION_BUNDLE_MISMATCH"
+            )
+
     store = ImmutableCheckpointStore(target, contract)
     store.initialize()
-    origin: dict[tuple[int, str], Path] = {}
     for shard in shards:
-        source = ImmutableCheckpointStore(shard, contract)
-        for seed, digest in _contract_cells(contract):
-            checkpoint = source.completed(digest, seed)
-            if checkpoint is None:
-                continue
+        for (seed, digest), checkpoint in actual_by_shard[shard].items():
             try:
                 store.put(checkpoint)
             except CheckpointContractError as error:
@@ -2210,20 +2328,22 @@ def aggregate_shard_runs(
                     f"AGGREGATE_CELL_CONFLICT: seed={seed} fixture={digest} "
                     f"roots={origin.get((seed, digest), target)},{shard}"
                 ) from error
-            origin.setdefault((seed, digest), shard)
-    missing = [
-        f"seed={seed} fixture={digest}"
-        for seed, digest in _contract_cells(contract)
-        if store.completed(digest, seed) is None
-    ]
-    if missing:
-        raise QualificationRunError("AGGREGATE_CELL_MISSING: " + "; ".join(missing))
     for name in bound[1:]:
         if not (target / name).exists():
             shutil.copyfile(first / name, target / name)
         elif (target / name).read_bytes() != (first / name).read_bytes():
             raise QualificationRunError(f"AGGREGATE_SHARD_BINDING_MISMATCH: {name} roots={target},{first}")
-    shutil.copytree(first / "reproduction-bundle", target / "reproduction-bundle", dirs_exist_ok=True)
+    shutil.copytree(first / "reproduction-bundle", target_bundle, dirs_exist_ok=True)
+    try:
+        copied_bundle_digest = verify_qualification_reproduction_bundle(
+            target_bundle
+        ).bundle_digest
+    except Exception as error:
+        raise QualificationRunError(
+            f"AGGREGATE_DESTINATION_REPRODUCTION_BUNDLE_INVALID: {error}"
+        ) from error
+    if copied_bundle_digest != bundle_digests[0]:
+        raise QualificationRunError("AGGREGATE_DESTINATION_REPRODUCTION_BUNDLE_MISMATCH")
     if contract.scope is EvaluationScope.ROLE_FIXTURE:
         report = _finalize_role_run(
             destination=target, contract=contract, catalog=_combined_role_catalog(base)
