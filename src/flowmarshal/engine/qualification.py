@@ -61,6 +61,7 @@ from .evaluation_budget import (
     write_immutable_run_metadata,
 )
 from .evaluation import (
+    CheckpointContractError,
     EvaluationCellCheckpoint,
     EvaluationContract,
     EvaluationRunState,
@@ -940,6 +941,156 @@ def _guard_full_planning_resume(
             )
 
 
+def _contract_cells(contract: EvaluationContract) -> list[tuple[int, str]]:
+    return [(seed, digest) for seed in contract.order_seeds for digest in contract.fixture_digests]
+
+
+def _check_shard_args(shard_index: int | None, shard_count: int | None) -> None:
+    if shard_index is None and shard_count is None:
+        return
+    if not (
+        type(shard_index) is int and type(shard_count) is int and 0 <= shard_index < shard_count
+    ):
+        raise QualificationRunError(
+            f"SHARD_ASSIGNMENT_INVALID: index={shard_index} count={shard_count}. "
+            "shard_index와 shard_count는 함께 주고 0 <= index < count여야 합니다."
+        )
+
+
+def _shard_cells(
+    contract: EvaluationContract,
+    destination: Path,
+    shard_index: int | None,
+    shard_count: int | None,
+) -> set[tuple[int, str]] | None:
+    """이 run이 실행할 cell을 돌려준다. 전체 실행이면 None이다.
+
+    배정은 run root의 shard-assignment.json에 고정해 resume도 같은 cell만 실행한다.
+    run-metadata.json에는 넣지 않는다. shard 사이 metadata bytes가 같아야 aggregate가 대조한다.
+    """
+    _check_shard_args(shard_index, shard_count)
+    path = destination / "shard-assignment.json"
+    if path.is_file():
+        stored = json.loads(path.read_text(encoding="utf-8"))
+        if shard_index is None:
+            shard_index, shard_count = stored["shard_index"], stored["shard_count"]
+        elif stored != {"shard_index": shard_index, "shard_count": shard_count}:
+            raise QualificationRunError(
+                f"SHARD_ASSIGNMENT_MISMATCH: run root는 {stored}에 배정돼 있습니다."
+            )
+    if shard_index is None:
+        return None
+    if not path.is_file() and (destination / "run-metadata.json").exists():
+        raise QualificationRunError(
+            "SHARD_ASSIGNMENT_MISMATCH: 전체 실행으로 시작한 run root입니다. 새 --run-root를 사용하세요."
+        )
+    _check_shard_args(shard_index, shard_count)
+    cells = _contract_cells(contract)
+    if shard_count > len(cells):
+        raise QualificationRunError(
+            f"SHARD_ASSIGNMENT_INVALID: index={shard_index} count={shard_count} cells={len(cells)}"
+        )
+    if not path.is_file():
+        _write_json(path, {"shard_index": shard_index, "shard_count": shard_count})
+    total = len(cells)
+    return set(cells[shard_index * total // shard_count : (shard_index + 1) * total // shard_count])
+
+
+def _shard_report(
+    contract: EvaluationContract, store: ImmutableCheckpointStore
+) -> ScopeQualificationReport:
+    """부분 실행의 반환값이다. 파일로 쓰지 않으며 판정은 aggregate 뒤 finalize가 한다."""
+    state = store.set_state(EvaluationRunStatus.RUNNING, updated_at=utc_now())
+    return ScopeQualificationReport(
+        scope=contract.scope,
+        contract_digest=contract.contract_digest,
+        status=EvaluationRunStatus.RUNNING,
+        passed=False,
+        metrics={"completed_cell_count": state.completed_cell_count},
+        generated_at=utc_now(),
+    )
+
+
+def _finalize_role_run(
+    *, destination: Path, contract: EvaluationContract, catalog: RegressionCatalog
+) -> ScopeQualificationReport:
+    store = ImmutableCheckpointStore(destination, contract)
+    # resume에서 순회 순서와 무관하게 모든 완료 cell을 정확히 다시 읽는다.
+    results = [
+        _checkpoint_fixture_result(store.completed(digest, seed))  # type: ignore[arg-type]
+        for seed in contract.order_seeds
+        for digest in contract.fixture_digests
+        if store.completed(digest, seed) is not None
+    ]
+    if len(results) != contract.expected_cell_count:
+        raise QualificationRunError("role fixture 완료 cell 수가 계약과 다릅니다.")
+    report = evaluate_role_fixtures(
+        catalog=catalog,
+        results=tuple(results),
+        prompt_digest=contract.prompt_digest,
+        output_schema_digest=contract.output_schema_digest,
+        model_lock_digest=contract.model_lock_digest,
+    )
+    store.set_state(EvaluationRunStatus.COMPLETED, updated_at=utc_now())
+    scope_report = ScopeQualificationReport(
+        scope=contract.scope,
+        contract_digest=contract.contract_digest,
+        status=EvaluationRunStatus.COMPLETED,
+        passed=report.passed,
+        metrics=report.metrics.model_dump(mode="json"),
+        failures=report.failures,
+        generated_at=utc_now(),
+    )
+    _write_json(destination / "role-qualification-report.json", report)
+    _write_json(destination / "qualification-report.json", scope_report)
+    return scope_report
+
+
+def _finalize_planning_run(
+    *, destination: Path, contract: EvaluationContract
+) -> ScopeQualificationReport:
+    store = ImmutableCheckpointStore(destination, contract)
+    cells = [
+        store.completed(digest, seed).raw_structured_assessment  # type: ignore[union-attr]
+        for seed in contract.order_seeds
+        for digest in contract.fixture_digests
+    ]
+    failures = tuple(
+        f"{item['scenario_id']}/seed-{item['order_seed']}: {item.get('failure') or 'FAIL'}"
+        for item in cells
+        if not bool(item.get("passed"))
+    )
+    clean_selected = sum(
+        1
+        for item in cells
+        if item.get("expected_disposition") == "selected" and item.get("selected")
+    )
+    adversarial_blocked = sum(
+        1
+        for item in cells
+        if item.get("expected_disposition") == "blocked" and item.get("passed") and not item.get("selected", False)
+    )
+    store.set_state(EvaluationRunStatus.COMPLETED, updated_at=utc_now())
+    report = ScopeQualificationReport(
+        scope=contract.scope,
+        contract_digest=contract.contract_digest,
+        status=EvaluationRunStatus.COMPLETED,
+        passed=not failures,
+        metrics={
+            "cell_count": len(cells),
+            "clean_selected_count": clean_selected,
+            "adversarial_blocked_count": adversarial_blocked,
+            "max_logical_role_calls": max(int(item.get("logical_role_calls", 0)) for item in cells),
+            "max_candidate_versions": max(int(item.get("candidate_versions", 0)) for item in cells),
+            "schema_failure_count": sum(1 for item in cells if item.get("schema_valid") is False),
+        },
+        failures=failures,
+        generated_at=utc_now(),
+    )
+    _write_json(destination / "qualification-report.json", report)
+    return report
+
+
 def run_role_fixture(
     *,
     root: Path | None = None,
@@ -948,9 +1099,12 @@ def run_role_fixture(
     codex_bin: Path | str | None = None,
     evaluation_policies: EvaluationPolicies | None = None,
     runtime_selection: RuntimeProviderSelection | None = None,
+    shard_index: int | None = None,
+    shard_count: int | None = None,
 ) -> tuple[Path, ScopeQualificationReport]:
     if evaluation_policies is None:
         raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
+    _check_shard_args(shard_index, shard_count)
     base = (root or project_root()).resolve(strict=True)
     preflight_failures = _preflight(base)
     if preflight_failures:
@@ -992,6 +1146,7 @@ def run_role_fixture(
                 "ROLE_FIXTURE_FAILED_RUN_REQUIRES_NEW_RUN_ROOT: 실패한 run의 원장과 "
                 "provider effect evidence를 보존하고 새 Attempt에는 새 --run-root를 사용하세요."
             )
+        selected = _shard_cells(contract, destination, shard_index, shard_count)
         qualification_suite_manifest(base)
         build_qualification_reproduction_bundle(
             root=base,
@@ -1017,16 +1172,15 @@ def run_role_fixture(
             },
             evaluation_policies,
         )
-        results: list[FixtureResult] = []
         by_digest = {item.fixture_digest: item for item in catalog.fixtures}
         try:
             for seed in contract.order_seeds:
                 ordered = list(catalog.fixtures)
                 random.Random(seed).shuffle(ordered)
                 for fixture in ordered:
-                    existing = store.completed(fixture.fixture_digest, seed)
-                    if existing is not None:
-                        results.append(_checkpoint_fixture_result(existing))
+                    if selected is not None and (seed, fixture.fixture_digest) not in selected:
+                        continue
+                    if store.completed(fixture.fixture_digest, seed) is not None:
                         continue
                     cell_ref = {
                         "contract": contract.contract_digest,
@@ -1157,7 +1311,6 @@ def run_role_fixture(
                         runner_receipts=tuple(item.model_dump(mode="json") for item in receipts),
                     )
                     store.put(checkpoint)
-                    results.append(fixture_result)
         except Exception:
             if store.state().status is EvaluationRunStatus.RUNNING:
                 store.set_state(
@@ -1166,35 +1319,11 @@ def run_role_fixture(
                     reason="role fixture 실행 중 복구 불가능한 오류",
                 )
             raise
-        # resume에서 순회 순서와 무관하게 모든 완료 cell을 정확히 다시 읽는다.
-        results = [
-            _checkpoint_fixture_result(store.completed(digest, seed))  # type: ignore[arg-type]
-            for seed in contract.order_seeds
-            for digest in contract.fixture_digests
-            if store.completed(digest, seed) is not None
-        ]
-        if len(results) != contract.expected_cell_count:
-            raise QualificationRunError("role fixture 완료 cell 수가 계약과 다릅니다.")
-        report = evaluate_role_fixtures(
-            catalog=catalog,
-            results=tuple(results),
-            prompt_digest=contract.prompt_digest,
-            output_schema_digest=contract.output_schema_digest,
-            model_lock_digest=contract.model_lock_digest,
+        if selected is not None:
+            return destination, _shard_report(contract, store)
+        return destination, _finalize_role_run(
+            destination=destination, contract=contract, catalog=catalog
         )
-        store.set_state(EvaluationRunStatus.COMPLETED, updated_at=utc_now())
-        scope_report = ScopeQualificationReport(
-            scope=contract.scope,
-            contract_digest=contract.contract_digest,
-            status=EvaluationRunStatus.COMPLETED,
-            passed=report.passed,
-            metrics=report.metrics.model_dump(mode="json"),
-            failures=report.failures,
-            generated_at=utc_now(),
-        )
-        _write_json(destination / "role-qualification-report.json", report)
-        _write_json(destination / "qualification-report.json", scope_report)
-        return destination, scope_report
 
 
 def _planning_contract(
@@ -1752,9 +1881,12 @@ def run_full_planning_pipeline(
     inspection_provider_contract: PlanInspectionProviderVersion = PLAN_INSPECTION_PROVIDER_V1,
     evaluation_policies: EvaluationPolicies | None = None,
     runtime_selection: RuntimeProviderSelection | None = None,
+    shard_index: int | None = None,
+    shard_count: int | None = None,
 ) -> tuple[Path, ScopeQualificationReport]:
     if evaluation_policies is None:
         raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
+    _check_shard_args(shard_index, shard_count)
     base = (root or project_root()).resolve(strict=True)
     if run_root is not None:
         _guard_full_planning_resume(
@@ -1792,6 +1924,7 @@ def run_full_planning_pipeline(
         }
         store = ImmutableCheckpointStore(destination, contract)
         store.initialize()
+        selected = _shard_cells(contract, destination, shard_index, shard_count)
         qualification_suite_manifest(base)
         build_qualification_reproduction_bundle(
             root=base,
@@ -1825,6 +1958,8 @@ def run_full_planning_pipeline(
                 ordered = list(catalog.scenarios)
                 random.Random(seed).shuffle(ordered)
                 for scenario in ordered:
+                    if selected is not None and (seed, scenario.scenario_digest) not in selected:
+                        continue
                     if store.completed(scenario.scenario_digest, seed) is not None:
                         continue
                     try:
@@ -1909,45 +2044,9 @@ def run_full_planning_pipeline(
                     reason="full planning pipeline 실행 중 복구 불가능한 오류",
                 )
             raise
-        cells = [
-            store.completed(digest, seed).raw_structured_assessment  # type: ignore[union-attr]
-            for seed in contract.order_seeds
-            for digest in contract.fixture_digests
-        ]
-        failures = tuple(
-            f"{item['scenario_id']}/seed-{item['order_seed']}: {item.get('failure') or 'FAIL'}"
-            for item in cells
-            if not bool(item.get("passed"))
-        )
-        clean_selected = sum(
-            1
-            for item in cells
-            if item.get("expected_disposition") == "selected" and item.get("selected")
-        )
-        adversarial_blocked = sum(
-            1
-            for item in cells
-            if item.get("expected_disposition") == "blocked" and item.get("passed") and not item.get("selected", False)
-        )
-        store.set_state(EvaluationRunStatus.COMPLETED, updated_at=utc_now())
-        report = ScopeQualificationReport(
-            scope=contract.scope,
-            contract_digest=contract.contract_digest,
-            status=EvaluationRunStatus.COMPLETED,
-            passed=not failures,
-            metrics={
-                "cell_count": len(cells),
-                "clean_selected_count": clean_selected,
-                "adversarial_blocked_count": adversarial_blocked,
-                "max_logical_role_calls": max(int(item.get("logical_role_calls", 0)) for item in cells),
-                "max_candidate_versions": max(int(item.get("candidate_versions", 0)) for item in cells),
-                "schema_failure_count": sum(1 for item in cells if item.get("schema_valid") is False),
-            },
-            failures=failures,
-            generated_at=utc_now(),
-        )
-        _write_json(destination / "qualification-report.json", report)
-        return destination, report
+        if selected is not None:
+            return destination, _shard_report(contract, store)
+        return destination, _finalize_planning_run(destination=destination, contract=contract)
 
 
 def load_run_metadata(run_root: Path | str) -> dict[str, Any]:
@@ -2050,3 +2149,85 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
             release_freeze=release_freeze,
         )
     raise QualificationRunError(f"지원하지 않는 resume scope입니다: {scope}")
+
+
+def aggregate_shard_runs(
+    *,
+    root: Path | None = None,
+    shard_run_roots: tuple[Path | str, ...],
+    destination: Path | str,
+) -> tuple[Path, ScopeQualificationReport]:
+    """같은 계약의 shard run root들을 provider 없이 하나의 완료 run으로 합친다.
+
+    누락·중복·digest 불일치는 ``ImmutableCheckpointStore``와 finalize가 거부한다.
+    실패한 shard를 새 run root로 다시 돌렸으면 실패한 root는 입력에서 뺀다.
+    """
+    base = (root or project_root()).resolve(strict=True)
+    shards = [Path(item).resolve(strict=True) for item in shard_run_roots]
+    target = Path(destination).resolve()
+    if not shards or len(set(shards)) != len(shards) or target in shards:
+        raise QualificationRunError("AGGREGATE_SHARD_ROOTS_INVALID")
+    first = shards[0]
+    observations = {
+        tuple(sorted(item.name for item in shard.glob("inventory-observation-*.json")))
+        for shard in shards
+    }
+    if len(observations) != 1 or len(next(iter(observations))) != 1:
+        raise QualificationRunError(
+            f"AGGREGATE_INVENTORY_OBSERVATION_MISMATCH: {sorted(observations)}"
+        )
+    bound = ("evaluation-contract.json", "run-metadata.json", next(iter(observations))[0])
+    for shard in shards:
+        try:
+            load_run_metadata(shard)
+        except ValueError as error:
+            raise QualificationRunError(f"AGGREGATE_SHARD_METADATA_INVALID: {shard}: {error}") from error
+        for name in bound:
+            if (shard / name).read_bytes() != (first / name).read_bytes():
+                raise QualificationRunError(
+                    f"AGGREGATE_SHARD_BINDING_MISMATCH: {name} roots={first},{shard}"
+                )
+    contract = EvaluationContract.model_validate_json(
+        (first / "evaluation-contract.json").read_text(encoding="utf-8")
+    )
+    if contract.scope not in (EvaluationScope.ROLE_FIXTURE, EvaluationScope.FULL_PLANNING_PIPELINE):
+        raise QualificationRunError(f"AGGREGATE_SCOPE_UNSUPPORTED: {contract.scope.value}")
+    if contract.source_manifest_digest != source_manifest_digest(base):
+        raise QualificationRunError("AGGREGATE_SOURCE_MANIFEST_MISMATCH")
+    store = ImmutableCheckpointStore(target, contract)
+    store.initialize()
+    origin: dict[tuple[int, str], Path] = {}
+    for shard in shards:
+        source = ImmutableCheckpointStore(shard, contract)
+        for seed, digest in _contract_cells(contract):
+            checkpoint = source.completed(digest, seed)
+            if checkpoint is None:
+                continue
+            try:
+                store.put(checkpoint)
+            except CheckpointContractError as error:
+                raise QualificationRunError(
+                    f"AGGREGATE_CELL_CONFLICT: seed={seed} fixture={digest} "
+                    f"roots={origin.get((seed, digest), target)},{shard}"
+                ) from error
+            origin.setdefault((seed, digest), shard)
+    missing = [
+        f"seed={seed} fixture={digest}"
+        for seed, digest in _contract_cells(contract)
+        if store.completed(digest, seed) is None
+    ]
+    if missing:
+        raise QualificationRunError("AGGREGATE_CELL_MISSING: " + "; ".join(missing))
+    for name in bound[1:]:
+        if not (target / name).exists():
+            shutil.copyfile(first / name, target / name)
+        elif (target / name).read_bytes() != (first / name).read_bytes():
+            raise QualificationRunError(f"AGGREGATE_SHARD_BINDING_MISMATCH: {name} roots={target},{first}")
+    shutil.copytree(first / "reproduction-bundle", target / "reproduction-bundle", dirs_exist_ok=True)
+    if contract.scope is EvaluationScope.ROLE_FIXTURE:
+        report = _finalize_role_run(
+            destination=target, contract=contract, catalog=_combined_role_catalog(base)
+        )
+    else:
+        report = _finalize_planning_run(destination=target, contract=contract)
+    return target, report
