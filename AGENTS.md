@@ -200,7 +200,9 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 ## GitHub commit과 push
 
 - 권위 원격은 비공개 `https://github.com/jaeseongs95/vibemarshal`이다.
-- 세션의 요청 작업과 검증이 끝나면 현재 승인된 브랜치·checkout에 그 세션 변경만 하나의 한국어 commit으로 기록한다. 원격 push는 현재 사용자가 명시적으로 승인한 경우에만 수행하며, 로컬 commit·제품 전환 승인을 push 승인으로 해석하지 않는다. 무관한 사용자 변경을 포함하지 않는다.
+- 세션의 요청 작업과 검증이 끝나면 현재 승인된 브랜치·checkout에 그 세션 변경만 하나의 한국어 commit으로 기록한다. 무관한 사용자 변경을 포함하지 않는다.
+- 원격 push는 1.0 릴리스까지 한시적으로 기본 동작이다. 아래 commit 조건을 실제로 충족한 commit은 로컬 기본 브랜치에 병합한 뒤 `origin/main`에 push하는 것까지가 한 작업이며 push마다 따로 승인을 받지 않는다. 이 한시 조항은 이 저장소의 기본 브랜치 push에만 적용하고 tag·PR·force push·원격 브랜치 삭제와 다른 저장소에는 적용하지 않는다.
+- 1.0 릴리스를 마치면 위 한시 조항은 끝난다. 그 뒤로는 원격 push를 현재 사용자가 명시적으로 승인한 경우에만 수행하며, 로컬 commit·제품 전환 승인을 push 승인으로 해석하지 않는다.
 - commit 전 관련 테스트·결정적 Gate·`git diff --check`를 실행하고 실제로 통과하지 않은 qualification을 PASS 또는 1.0 완료로 기록하지 않는다.
 - 비밀·인증정보, 로컬 Engine DB, cache, 임시 디렉터리와 미완료 evaluation cell을 commit하지 않는다.
 - R1~R3.1 동결 source·artifact와 prototype Planner 스킬은 수정하지 않으며 freeze manifest를 확인한다.
