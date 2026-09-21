@@ -17,18 +17,24 @@ from flowmarshal.engine.e2e_qualification import (
     _cancel_active_job,
     _checkpoint_model_observation,
     _contract,
+    _DRAFT_ACTIVATION_ERROR,
+    _E2E_SOURCE_REQUEST,
+    _PROHIBITED_EFFECT_REQUEST,
     _copy_fixture,
     _e2e_failure_disposition,
     _forced_termination_no_duplicate,
     _guard_e2e_partial_resume,
     _in_flight_replan_protection,
+    _ledger_delta,
     _observe_frozen_plugin_identity,
     _partial_write_input_changed,
     _partial_write_resume,
     _prepare,
     _prepare_from_raw_request,
     _preserve_inventory_observation,
+    _prohibited_effect_blocked,
     _responsibility_outcome,
+    _scope_expansion_blocked,
     _unknown_receipt,
     run_project_e2e,
 )
@@ -46,6 +52,8 @@ from flowmarshal.engine.qualification import (
 )
 from flowmarshal.engine.qualification_manifest import (
     EvidenceProvenance,
+    QualificationCellStatus,
+    QualificationFailureClass,
     QualificationSuiteManifest,
 )
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime, RuntimeObservation
@@ -423,6 +431,259 @@ class EngineE2EQualificationTests(unittest.TestCase):
                 )
         runtime.assert_not_called()
 
+    def test_invalid_clean_install_link_stops_before_provider(self) -> None:
+        from flowmarshal.canonical import sha256_bytes
+        from flowmarshal.engine.qualification_manifest import CandidateWheelBinding
+
+        policies = load_evaluation_policies(
+            budget_policy_path=ROOT / "config" / "pre-1.0-validation-budget.json",
+            role_timeout_policy_path=ROOT / "config" / "pre-1.0-role-timeouts.json",
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            base = Path(raw)
+            wheel = base / "candidate.whl"
+            wheel.write_bytes(b"candidate")
+            import_root = base / "site-packages" / "flowmarshal"
+            import_root.mkdir(parents=True)
+            digests = {"flowmarshal/__init__.py": sha256_bytes(b"package")}
+            binding = CandidateWheelBinding(
+                wheel_path=str(wheel), wheel_digest=sha256_bytes(b"candidate"),
+                distribution_name="flowmarshal-engine", distribution_version="0.2.0a1",
+                distribution_root=str(import_root.parent), import_root=str(import_root),
+                package_file_digests=digests, wheel_package_digest=sha256_digest(digests),
+                installed_package_digest=sha256_digest(digests),
+            )
+            release = SimpleNamespace(
+                valid=True, mismatches=(),
+                manifest=SimpleNamespace(governance_plugin=None, freeze_digest="sha256:" + "1" * 64),
+            )
+            with patch(
+                "flowmarshal.engine.e2e_qualification._bind_project_e2e_candidate_wheel",
+                return_value=binding,
+            ), patch(
+                "flowmarshal.engine.release_freeze.verify_release_freeze", return_value=release,
+            ), patch(
+                "flowmarshal.engine.e2e_qualification._preflight"
+            ) as preflight, patch(
+                "flowmarshal.engine.e2e_qualification.CodexAppServerRuntime"
+            ) as runtime:
+                for broken in (Path("relative-clean-install"), base / "missing-clean-install"):
+                    with self.subTest(broken=broken), self.assertRaisesRegex(
+                        QualificationRunError, "E2E_CLEAN_INSTALL_LINK_INVALID"
+                    ):
+                        run_project_e2e(
+                            root=ROOT,
+                            evaluation_policies=policies,
+                            candidate_wheel=wheel,
+                            release_freeze=base / "freeze",
+                            clean_install_run_root=broken,
+                        )
+            preflight.assert_not_called()
+            runtime.assert_not_called()
+
+    def _linked_clean_install(self):
+        """검증기를 실제로 통과하는 clean install run root를 만든다(clean install 테스트 fixture 재사용)."""
+
+        from tests.test_engine_clean_install_qualification import CleanInstallQualificationTests
+
+        case = CleanInstallQualificationTests(
+            "test_link_passes_for_verified_live_run_with_same_candidate"
+        )
+        case.setUp()
+        self.addCleanup(case.tearDown)
+        binding, report = case._linked_run()
+        return case, binding, report
+
+    def _enter_project_e2e_fakes(self, stack, *, binding, prepare, inventory=None) -> None:
+        """provider·freeze·설치 결속·governance 설정만 가짜로 두고 run_project_e2e 본문을 돌린다."""
+
+        from contextlib import nullcontext
+
+        runtime_inventory = inventory or self.inventory
+        release = SimpleNamespace(
+            valid=True,
+            mismatches=(),
+            manifest=SimpleNamespace(governance_plugin=None, freeze_digest="sha256:" + "1" * 64),
+        )
+        for target, options in (
+            ("flowmarshal.engine.e2e_qualification._bind_project_e2e_candidate_wheel",
+             {"return_value": binding}),
+            ("flowmarshal.engine.release_freeze.verify_release_freeze", {"return_value": release}),
+            ("flowmarshal.engine.e2e_qualification._preflight", {"return_value": ()}),
+            ("flowmarshal.engine.e2e_qualification.CodexAppServerRuntime",
+             {"side_effect": lambda **_: nullcontext(FakeCodexRuntime(runtime_inventory))}),
+            ("flowmarshal.engine.e2e_qualification._observe_frozen_plugin_identity",
+             {"return_value": {"governance_plugin_identity_digest": "sha256:" + "e" * 64}}),
+            ("flowmarshal.engine.governance_gate.GovernanceSettings.from_environment",
+             {"return_value": ALLOW_ALL}),
+            # _contract가 이 함수의 소스를 digest에 넣으므로 MagicMock이 아니라 함수로 바꾼다.
+            ("flowmarshal.engine.e2e_qualification._prepare_from_raw_request", {"new": prepare}),
+        ):
+            stack.enter_context(patch(target, **options))
+
+    def test_clean_install_anchor_survives_rate_limit_pause_and_resume(self) -> None:
+        from contextlib import ExitStack
+
+        from flowmarshal.engine.evaluation import EvaluationContract
+        from flowmarshal.engine.ledger import SQLiteEngineLedger
+        from flowmarshal.engine.qualification import resume_run
+        from flowmarshal.engine.service import EngineService
+
+        case, binding, report = self._linked_clean_install()
+        anchor = {
+            "run_root": str(case.run_root.resolve()),
+            "report_digest": report.report_digest,
+            "evaluation_contract_digest": case.contract_digest,
+        }
+        prepared_roots: list[Path] = []
+
+        def rate_limited(**kwargs):
+            # provider 호출 전 사용량 제한: 빈 cell 원장만 남기고 멈춘다.
+            state_root = kwargs["state_root"]
+            prepared_roots.append(state_root)
+            EngineService(SQLiteEngineLedger(
+                state_root / "flowmarshal-engine.sqlite3", artifact_root=state_root / "artifacts"
+            )).initialize()
+            raise RuntimeError("provider rate limit")
+
+        policies = load_evaluation_policies(
+            budget_policy_path=ROOT / "config" / "pre-1.0-validation-budget.json",
+            role_timeout_policy_path=ROOT / "config" / "pre-1.0-role-timeouts.json",
+        )
+        with tempfile.TemporaryDirectory() as raw, ExitStack() as stack:
+            destination = Path(raw) / "e2e-run"
+            freeze = Path(raw) / "freeze"
+            freeze.mkdir()
+            self._enter_project_e2e_fakes(stack, binding=binding, prepare=rate_limited)
+            arguments = {
+                "root": ROOT,
+                "run_root": destination,
+                "role_configuration": self.roles,
+                "evaluation_policies": policies,
+                "candidate_wheel": case.wheel,
+                "governance": ALLOW_ALL,
+                "release_freeze": freeze,
+            }
+            with self.assertRaisesRegex(RuntimeError, "rate limit"):
+                run_project_e2e(**arguments, clean_install_run_root=case.run_root)
+            contract = EvaluationContract.model_validate_json(
+                (destination / "evaluation-contract.json").read_text(encoding="utf-8")
+            )
+            store = ImmutableCheckpointStore(destination, contract)
+            self.assertEqual(EvaluationRunStatus.PAUSED_RATE_LIMIT, store.state().status)
+            metadata_path = destination / "run-metadata.json"
+            self.assertEqual(
+                anchor, json.loads(metadata_path.read_text(encoding="utf-8"))["clean_install_link"]
+            )
+            saved = metadata_path.read_bytes()
+
+            # 연결을 빠뜨린 재개는 metadata 대조에서 멈추고 pause 상태를 RUNNING으로 바꾸지 않는다.
+            with self.assertRaisesRegex(ValueError, "EVALUATION_RUN_METADATA_BINDING_MISMATCH"):
+                run_project_e2e(**arguments)
+            self.assertEqual(EvaluationRunStatus.PAUSED_RATE_LIMIT, store.state().status)
+
+            # resume_run은 고정한 연결을 다시 넘겨 metadata 대조를 지나 미완료 cell 재개 단계에 닿는다.
+            with patch(
+                "flowmarshal.engine.qualification.verify_candidate_wheel_metadata",
+                return_value=binding,
+            ), self.assertRaisesRegex(QualificationRunError, "재개 상태가 없습니다"):
+                resume_run(destination)
+            self.assertEqual(saved, metadata_path.read_bytes())
+            self.assertEqual(1, len(prepared_roots))
+
+    def test_project_e2e_routes_authority_cells_and_keeps_typed_failures(self) -> None:
+        from contextlib import ExitStack
+
+        from flowmarshal.engine.evaluation import EvaluationContract
+        from tests.engine_helpers import inventory
+        from tests.engine_inspection_helpers import InspectionScriptedRunner
+        from tests.test_engine_user_facade import _responses, _roles
+
+        case, binding, _report = self._linked_clean_install()
+        requested: dict[str, dict[str, object]] = {}
+
+        def scripted(**kwargs):
+            # 실제 _prepare_from_raw_request를 scripted 역할로 돌린다(제품 facade 경로 그대로).
+            responses = _responses()
+            responses["goal_normalizer"][0]["prohibited_effects"] = ["원격 저장소에 변경을 push한다."]
+            requested[kwargs["state_root"].parent.name] = {
+                "source_request": kwargs["source_request"],
+                "authorize": kwargs.get("authorize", True),
+            }
+            return _prepare_from_raw_request(
+                **kwargs, structured_runner=InspectionScriptedRunner(responses)
+            )
+
+        policies = load_evaluation_policies(
+            budget_policy_path=ROOT / "config" / "pre-1.0-validation-budget.json",
+            role_timeout_policy_path=ROOT / "config" / "pre-1.0-role-timeouts.json",
+        )
+        with tempfile.TemporaryDirectory() as raw, ExitStack() as stack:
+            destination = Path(raw) / "e2e-run"
+            freeze = Path(raw) / "freeze"
+            freeze.mkdir()
+            self._enter_project_e2e_fakes(
+                stack, binding=binding, prepare=scripted, inventory=inventory()
+            )
+            stack.enter_context(patch(
+                "flowmarshal.engine.e2e_qualification.E2E_SCENARIOS",
+                ("prohibited-effect", "scope-expansion"),
+            ))
+            _run_root, report = run_project_e2e(
+                root=ROOT,
+                run_root=destination,
+                role_configuration=_roles(),
+                evaluation_policies=policies,
+                candidate_wheel=case.wheel,
+                governance=ALLOW_ALL,
+                release_freeze=freeze,
+                clean_install_run_root=case.run_root,
+            )
+            contract = EvaluationContract.model_validate_json(
+                (destination / "evaluation-contract.json").read_text(encoding="utf-8")
+            )
+            store = ImmutableCheckpointStore(destination, contract)
+            cells = {
+                scenario: store.completed(digest, 0).raw_structured_assessment
+                for scenario, digest in zip(
+                    ("prohibited-effect", "scope-expansion"), contract.fixture_digests
+                )
+            }
+            receipt = json.loads(
+                (destination / "work" / "scope-expansion" / "plan-activation-receipt.json")
+                .read_text(encoding="utf-8")
+            )
+
+        # E2E-14만 금지 효과 요청을 쓰고, E2E-15만 승인을 cell driver에 넘긴다.
+        self.assertEqual(
+            {
+                "prohibited-effect": {"source_request": _PROHIBITED_EFFECT_REQUEST, "authorize": True},
+                "scope-expansion": {"source_request": _E2E_SOURCE_REQUEST, "authorize": False},
+            },
+            requested,
+        )
+        prohibited = cells["prohibited-effect"]
+        self.assertTrue(prohibited["passed"], prohibited)
+        self.assertEqual(["live", "fake"], prohibited["qualification_outcome"]["provenance"])
+        scope = cells["scope-expansion"]
+        self.assertFalse(scope["passed"])
+        self.assertEqual("product", scope["qualification_outcome"]["failure_class"])
+        self.assertEqual(
+            "E2E15_TARGET_EFFECT_NOT_COVERED_LIVE", scope["qualification_outcome"]["failure_code"]
+        )
+        # 두 cell 모두 활성화 receipt digest가 있고 E2E-15 receipt는 이 계약·fixture에 결속된다.
+        for item in cells.values():
+            self.assertIsNotNone(item["qualification_plan_activation"]["activation_receipt_digest"])
+        self.assertEqual(contract.contract_digest, receipt["evaluation_contract_digest"])
+        self.assertEqual(contract.fixture_digests[1], receipt["fixture_digest"])
+        self.assertIn(
+            "PRODUCT_FAILURE:E2E-15:E2E15_TARGET_EFFECT_NOT_COVERED_LIVE", report.failures
+        )
+        self.assertFalse(any(item.startswith(("PRODUCT_FAILURE:E2E-14", "PROVENANCE")) for item in report.failures))
+        self.assertEqual("passed", report.metrics["clean_install_link_status"])
+        # E2E-14와 연결된 E2E-18만 PASS다.
+        self.assertEqual(2, report.metrics["passed_responsibility_count"])
+
     def test_candidate_wheel_binding_changes_project_e2e_contract(self) -> None:
         fixture_root = ROOT / "tests" / "fixtures" / "engine" / "project-e2e"
         source_digest = sha256_digest(
@@ -728,7 +989,8 @@ class EngineE2EQualificationTests(unittest.TestCase):
                 source_request="두 단계 변경을 실제 사용자 흐름으로 준비해줘.",
                 structured_runner=runner,
             )
-            self.assertEqual("live", prepared.preparation_provenance.value)
+            # scripted runner·fake runtime으로 돈 준비는 LIVE로 적지 않는다.
+            self.assertEqual("fake", prepared.preparation_provenance.value)
             self.assertIsNone(prepared.proposal)
             self.assertEqual(
                 (
@@ -1156,6 +1418,268 @@ class EngineE2EQualificationTests(unittest.TestCase):
             )
             self.assertEqual(1, runtime.resume_calls)
             self.assertEqual(1, result["validation"]["goal_verdict_count"])
+
+    def _raw_request_cell(self, raw: str, *, prohibited: tuple[str, ...] = (), authorize: bool = True):
+        from tests.engine_helpers import inventory
+        from tests.engine_inspection_helpers import InspectionScriptedRunner
+        from tests.test_engine_user_facade import _responses, _roles
+
+        responses = _responses()
+        responses["goal_normalizer"][0]["prohibited_effects"] = list(prohibited)
+        cell_root = Path(raw) / "cell"
+        cell_root.mkdir()
+        workspace, source_digest = _copy_fixture(ROOT, cell_root)
+        runtime = RecordedRuntime(
+            FakeCodexRuntime(inventory()), journal=cell_root / "runtime-receipts.json"
+        )
+        prepared = _prepare_from_raw_request(
+            workspace=workspace,
+            state_root=cell_root / "state",
+            runtime=runtime,
+            roles=_roles(),
+            evaluation_policies=load_evaluation_policies(
+                budget_policy_path=ROOT / "config" / "pre-1.0-validation-budget.json",
+                role_timeout_policy_path=ROOT / "config" / "pre-1.0-role-timeouts.json",
+            ),
+            evaluation_contract_digest=sha256_digest({"contract": "authority"}),
+            fixture_digest=sha256_digest({"fixture": "authority"}),
+            source_request=_PROHIBITED_EFFECT_REQUEST,
+            structured_runner=InspectionScriptedRunner(responses),
+            authorize=authorize,
+        )
+        return cell_root, prepared, runtime, source_digest, _roles()
+
+    def test_prohibited_effect_candidate_is_blocked_before_execution(self) -> None:
+        statement = "원격 저장소에 변경을 push한다."
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root, prepared, runtime, source_digest, roles = self._raw_request_cell(
+                raw, prohibited=(statement,)
+            )
+            active_before = prepared.service.status(prepared.project_id)["project"][
+                "active_plan_revision_id"
+            ]
+
+            result = _prohibited_effect_blocked(
+                prepared, runtime, source_digest, cell_root=cell_root, roles=roles
+            )
+
+            self.assertTrue(result["passed"], result)
+            self.assertTrue(all(result["checks"].values()), result["checks"])
+            self.assertEqual(_DRAFT_ACTIVATION_ERROR, result["error"])
+            self.assertIn("PLAN_EFFECT_POLICY_VIOLATION", result["candidate_finding_codes"])
+            self.assertEqual({"create_thread": 0, "start_turn": 0, "resume": 0}, result["effect_count"])
+            self.assertEqual(0, result["execution_spec"]["candidate_execution_spec_count"])
+            self.assertEqual(
+                active_before,
+                prepared.service.status(prepared.project_id)["project"]["active_plan_revision_id"],
+            )
+            observation = json.loads(
+                (cell_root / "authorization-observation.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(
+                "scripted_plan_expander_stub_via_recovery_plan_provider",
+                observation["candidate_source"],
+            )
+            self.assertEqual([statement], observation["goal_prohibited_effects"])
+            self.assertEqual([statement], observation["authorization"]["effect_policy"]["prohibited_effects"])
+            self.assertEqual(["plan_expander"], observation["stub_calls"])
+            self.assertEqual(
+                f"Goal 효과 정책 밖의 외부 효과입니다: unexpected=[], prohibited={[statement]}",
+                observation["finding_summary"],
+            )
+            self.assertEqual(["PLAN_EFFECT_POLICY_VIOLATION"], result["candidate_finding_codes"])
+            self.assertIn("history_events", observation["measured_tables"])
+            # 후보 생성은 stub 호출 한 건과 그 예산 회계 history만 남긴다.
+            candidate = observation["candidate_creation_ledger_delta"]
+            self.assertEqual({"provider_calls", "history_events"}, set(candidate))
+            self.assertTrue(all(
+                row["event_type"].startswith("budget.")
+                for row in candidate["history_events"]["added"]
+            ))
+            # 차단 단계에는 provider 호출·실행 행이 없고 draft 후보 행과 등록 history만 생긴다.
+            block = observation["block_ledger_delta"]
+            self.assertLessEqual(set(block), {"plans", "tasks", "history_events"})
+            self.assertEqual(
+                ["plan.registered"],
+                [row["event_type"] for row in block["history_events"]["added"]],
+            )
+            with prepared.service.ledger.read() as connection:
+                self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM runtime_intents").fetchone()[0])
+                self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0])
+                self.assertEqual(
+                    0, connection.execute("SELECT COUNT(*) FROM execution_spec_revisions").fetchone()[0]
+                )
+
+    def test_prohibited_effect_cell_needs_live_prohibition(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root, prepared, runtime, source_digest, roles = self._raw_request_cell(raw)
+
+            result = _prohibited_effect_blocked(
+                prepared, runtime, source_digest, cell_root=cell_root, roles=roles
+            )
+
+            self.assertFalse(result["passed"])
+            self.assertTrue(result["failure"].startswith("E2E14_PRECONDITION_NO_PROHIBITED_EFFECT"))
+            with prepared.service.ledger.read() as connection:
+                roles_called = [
+                    row[0] for row in connection.execute("SELECT role FROM provider_calls ORDER BY rowid")
+                ]
+            # 전제 불충족이면 stub 후보를 만들지 않는다.
+            self.assertEqual(1, roles_called.count("plan_expander"))
+
+    def test_scope_expansion_policy_boundary_is_observed_but_not_passed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root, prepared, runtime, source_digest, roles = self._raw_request_cell(
+                raw, authorize=False
+            )
+            self.assertEqual("plan_reviewer", prepared.pipeline_stages[-1])
+            self.assertFalse((cell_root / "goal-authorization.json").exists())
+            goal_id = prepared.service.load_active_goal(prepared.project_id).goal_id
+
+            contract_digest = sha256_digest({"contract": "authority"})
+            fixture_digest = sha256_digest({"fixture": "scope-expansion"})
+            result = _scope_expansion_blocked(
+                prepared,
+                runtime,
+                source_digest,
+                cell_root=cell_root,
+                roles=roles,
+                evaluation_contract_digest=contract_digest,
+                fixture_digest=fixture_digest,
+                governance=ALLOW_ALL,
+            )
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E15_TARGET_EFFECT_NOT_COVERED_LIVE", result["failure_code"])
+            self.assertEqual("product", result["failure_class"])
+            self.assertTrue(result["failure"].startswith("E2E15_TARGET_EFFECT_NOT_COVERED_LIVE: "))
+            self.assertNotIn("정책 경계 단계 실패", result["failure"])
+            self.assertTrue(result["coverage"]["policy_boundary_passed"], result)
+            self.assertEqual(["target", "effect"], result["coverage"]["not_covered_live"])
+            changes = {item["step"]: item["authorization_changes"] for item in result["steps"]}
+            self.assertEqual(
+                {
+                    "A_narrow_authorization": [["policy", "planning_budget.max_logical_role_calls"]],
+                    "B_internal_plan_id_activation": [["goal", "authorization"]],
+                    "C_user_authorization": None,
+                    "D_budget_expansion_run_once": [["policy", f"budget.effective.{goal_id}"]],
+                    "E_selected_plan_reactivation": [["policy", f"budget.effective.{goal_id}"]],
+                    "F_user_reauthorization": None,
+                },
+                changes,
+            )
+            self.assertEqual({"create_thread": 0, "start_turn": 0, "resume": 0}, result["effect_count"])
+            scope = json.loads((cell_root / "scope-check.json").read_text(encoding="utf-8"))
+            self.assertFalse(scope["cost_estimate"]["authorization_has_plan_or_cost_field"])
+            self.assertIn("history_events", scope["measured_tables"])
+            self.assertIn("budget_policy_revisions", scope["measured_tables"])
+            steps = {item["step"]: item for item in scope["steps"]}
+            # 원장 불변 주장은 history·예산 표까지 포함한 측정과 일치한다.
+            for name in ("A_narrow_authorization", "B_internal_plan_id_activation",
+                         "D_budget_expansion_run_once", "E_selected_plan_reactivation"):
+                self.assertEqual({}, steps[name]["ledger_delta"], name)
+            setup = steps["D_budget_expansion_run_once"]["budget_setup_ledger_delta"]
+            self.assertEqual(
+                [goal_id],
+                [row["scope_key"] for row in setup["budget_policy_revisions"]["added"]],
+            )
+            receipt = json.loads(
+                (cell_root / "plan-activation-receipt.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual(contract_digest, receipt["evaluation_contract_digest"])
+            self.assertEqual(fixture_digest, receipt["fixture_digest"])
+            self.assertEqual(prepared.plan_revision_id, receipt["plan_revision_id"])
+            with prepared.service.ledger.read() as connection:
+                self.assertEqual(2, connection.execute("SELECT COUNT(*) FROM goal_authorizations").fetchone()[0])
+                self.assertEqual(1, connection.execute("SELECT COUNT(*) FROM plan_activations").fetchone()[0])
+                self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM runtime_jobs").fetchone()[0])
+                self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0])
+
+    def test_scope_expansion_policy_regression_is_primary_product_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root, prepared, runtime, source_digest, roles = self._raw_request_cell(
+                raw, authorize=False
+            )
+            # Core가 승인 없이 내부 Plan ID 활성화를 받아 준 회귀를 흉내 낸다.
+            with patch.object(
+                prepared.service, "activate_authorized_plan", return_value="activation_forged"
+            ):
+                result = _scope_expansion_blocked(
+                    prepared,
+                    runtime,
+                    source_digest,
+                    cell_root=cell_root,
+                    roles=roles,
+                    evaluation_contract_digest=sha256_digest({"contract": "authority"}),
+                    fixture_digest=sha256_digest({"fixture": "scope-expansion"}),
+                    governance=ALLOW_ALL,
+                )
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E15_POLICY_BOUNDARY_REGRESSION", result["failure_code"])
+            self.assertEqual("product", result["failure_class"])
+            self.assertIn("B_internal_plan_id_activation:failed", result["failure"])
+            # 정책 회귀가 주 code여도 미커버 범위는 따로 남는다.
+            self.assertFalse(result["coverage"]["policy_boundary_passed"])
+            self.assertEqual(["target", "effect"], result["coverage"]["not_covered_live"])
+
+    def test_authority_cells_claim_only_contract_provenance(self) -> None:
+        from flowmarshal.engine.e2e_qualification import _cell_failure
+
+        suite = QualificationSuiteManifest.load(ROOT / "config" / "qualification-suite.json")
+        requirements = {item.responsibility_id: item for item in suite.e2e_responsibilities}
+        digest = "sha256:" + "a" * 64
+        with tempfile.TemporaryDirectory() as raw:
+            for scenario, responsibility_id, code in (
+                ("prohibited-effect", "E2E-14", "E2E14_BLOCK_EVIDENCE_MISSING"),
+                ("scope-expansion", "E2E-15", "E2E15_TARGET_EFFECT_NOT_COVERED_LIVE"),
+            ):
+                cell_root = Path(raw) / scenario
+                (cell_root / "state").mkdir(parents=True)
+                for name in (
+                    "authorization-observation.json", "qualification-observation.json",
+                    "scope-check.json", "state/flowmarshal-engine.sqlite3",
+                ):
+                    (cell_root / name).write_text("{}", encoding="utf-8")
+                outcome = _responsibility_outcome(
+                    scenario=scenario,
+                    prepared=SimpleNamespace(pipeline_stages=("prepare",)),
+                    cell={"passed": False, **_cell_failure(code, "설명 문장")},
+                    contract=SimpleNamespace(contract_digest=digest),
+                    cell_root=cell_root,
+                    run_root=Path(raw),
+                    fixture_digest=digest,
+                    freeze_bundle_digest=digest,
+                    governance_plugin_identity_digest=digest,
+                    candidate_wheel_digest=digest,
+                    candidate_wheel_binding_digest=digest,
+                    candidate_distribution_name="flowmarshal-engine",
+                    candidate_distribution_version="1.0.0",
+                )
+                requirement = requirements[responsibility_id]
+                # 동결 suite가 허용·요구하는 출처 안에서만 주장한다.
+                self.assertLessEqual(set(outcome.provenance), set(requirement.allowed_provenance))
+                self.assertLessEqual(set(requirement.required_provenance), set(outcome.provenance))
+                self.assertEqual(QualificationCellStatus.FAILED, outcome.status)
+                # 책임 판정에는 설명 문장이 아니라 안정된 code와 class가 들어간다.
+                self.assertEqual(code, outcome.failure_code)
+                self.assertEqual(QualificationFailureClass.PRODUCT, outcome.failure_class)
+
+    def test_ledger_delta_reports_new_changed_and_removed_rows(self) -> None:
+        before = {"plans": {"p1": {"id": "p1", "status": "ready"}, "p0": {"id": "p0", "status": "draft"}}}
+        after = {"plans": {"p1": {"id": "p1", "status": "active"}, "p2": {"id": "p2", "status": "draft"}}}
+
+        self.assertEqual({}, _ledger_delta(before, before))
+        self.assertEqual(
+            {
+                "plans": {
+                    "added": [{"id": "p2", "status": "draft"}],
+                    "changed": [{"before": {"id": "p1", "status": "ready"}, "after": {"id": "p1", "status": "active"}}],
+                    "removed": [{"id": "p0", "status": "draft"}],
+                }
+            },
+            _ledger_delta(before, after),
+        )
 
     def test_in_flight_replan_rejects_invalid_reuse_and_preserves_active_binding(self) -> None:
         with tempfile.TemporaryDirectory() as raw:

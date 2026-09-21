@@ -32,8 +32,10 @@ from flowmarshal.engine.clean_install_qualification import (
     CleanInstallStageObservation,
     clean_install_contract_digest,
     clean_install_fixture_digest,
+    candidate_python_path,
     clean_install_suite,
     run_clean_install,
+    verify_clean_install_link,
     verify_clean_install_report,
 )
 from flowmarshal.engine.qualification import (
@@ -426,6 +428,277 @@ class CleanInstallQualificationTests(unittest.TestCase):
         )
         self.assertFalse(verification.valid)
         shutil.rmtree(run_root, ignore_errors=True)
+
+    # --- 기존 run root를 project-E2E candidate와 연결하는 검증 ---
+
+    def _candidate_binding(self, purelib: Path, **changes) -> CandidateWheelBinding:
+        files = {"flowmarshal/__init__.py": "sha256:" + "1" * 64}
+        digest = sha256_digest(files)
+        return CandidateWheelBinding.model_validate(
+            {
+                "wheel_path": str(self.wheel),
+                "wheel_digest": self.wheel_digest,
+                "distribution_name": DISTRIBUTION_NAME,
+                "distribution_version": DISTRIBUTION_VERSION,
+                "distribution_root": str(purelib),
+                "import_root": str(purelib / "flowmarshal"),
+                "package_file_digests": files,
+                "wheel_package_digest": digest,
+                "installed_package_digest": digest,
+            }
+            | changes
+        )
+
+    def _linked_run(
+        self,
+        *,
+        probe: dict | None = None,
+        origin: dict | None = None,
+        dry: dict | None = None,
+        **changes,
+    ) -> tuple[CandidateWheelBinding, CleanInstallReport]:
+        """설치본 모양의 run root를 만들고 산출물을 쓴 뒤 evidence를 결속한다."""
+
+        venv = self.run_root / "candidate-venv"
+        python = candidate_python_path(venv)
+        python.parent.mkdir(parents=True, exist_ok=True)
+        python.write_bytes(b"")
+        purelib = venv / "Lib" / "site-packages"
+        package = purelib / "flowmarshal" / "__init__.py"
+        package.parent.mkdir(parents=True, exist_ok=True)
+        package.write_text("", encoding="utf-8")
+        binding = self._candidate_binding(purelib)
+        documents = {
+            "candidate-probe.json": {
+                "candidate_wheel_binding": binding.model_dump(mode="json")
+                | (probe or {}),
+            },
+            "import-origin.json": origin
+            or {"package": str(package), "purelib": str(purelib)},
+            "pre-provider-dry-run.json": dry
+            or {
+                "mode": "pre_provider_dry_run",
+                "release_pass": False,
+                "candidate_wheel_binding": {"wheel_digest": self.wheel_digest},
+            },
+        }
+        for name, document in documents.items():
+            (self.run_root / name).write_text(json.dumps(document), encoding="utf-8")
+        self.contract_digest = clean_install_contract_digest(
+            suite_manifest_digest=self.suite.manifest_digest,
+            source_manifest_digest_value=source_manifest_digest(ROOT),
+            fixture_digest=self.fixture_digest,
+            candidate_wheel_binding_digest=binding.binding_digest,
+            distribution_name=DISTRIBUTION_NAME,
+            distribution_version=DISTRIBUTION_VERSION,
+        )
+        report = self._report(
+            records=self._records(candidate_wheel_binding_digest=binding.binding_digest),
+            evaluation_contract_digest=self.contract_digest,
+            candidate_wheel_binding_digest=binding.binding_digest,
+            candidate_python=str(python),
+            **changes,
+        )
+        self._save(report)
+        return binding, report
+
+    def _save(self, report: CleanInstallReport) -> None:
+        (self.run_root / "clean-install-report.json").write_text(
+            report.model_dump_json(), encoding="utf-8"
+        )
+
+    def _link(self, binding: CandidateWheelBinding, **changes):
+        return verify_clean_install_link(
+            root=ROOT,
+            clean_install_run_root=self.run_root,
+            candidate_binding=binding,
+            **changes,
+        )
+
+    def test_link_without_run_root_is_not_run(self) -> None:
+        result = verify_clean_install_link(
+            root=ROOT,
+            clean_install_run_root=None,
+            candidate_binding=self._candidate_binding(self.run_root),
+        )
+        self.assertEqual("not_run", result.status)
+        self.assertEqual(("NOT_RUN:E2E-18:clean install run root 없음",), result.failures)
+        self.assertIsNone(result.report_digest)
+
+    def test_link_rejects_relative_run_root_and_missing_report(self) -> None:
+        binding = self._candidate_binding(self.run_root)
+        relative = verify_clean_install_link(
+            root=ROOT, clean_install_run_root="run", candidate_binding=binding
+        )
+        self.assertEqual("failed", relative.status)
+        self.assertEqual(("CLEAN_INSTALL_LINK_ABSOLUTE_PATH_REQUIRED",), relative.failures)
+        missing = self._link(binding)
+        self.assertEqual("failed", missing.status)
+        self.assertTrue(
+            missing.failures[0].startswith("CLEAN_INSTALL_LINK_REPORT_INVALID"),
+            missing.failures,
+        )
+
+    def test_link_passes_for_verified_live_run_with_same_candidate(self) -> None:
+        binding, report = self._linked_run()
+        before = {
+            path: path.read_bytes() for path in self.run_root.rglob("*") if path.is_file()
+        }
+        result = self._link(binding, expected_report_digest=report.report_digest)
+        self.assertEqual((), result.failures)
+        self.assertEqual("passed", result.status)
+        self.assertEqual(str(self.run_root.resolve()), result.run_root)
+        self.assertEqual(report.report_digest, result.report_digest)
+        # clean install은 자기 계약 digest를 유지하고 run root를 바꾸지 않는다.
+        self.assertEqual(self.contract_digest, result.evaluation_contract_digest)
+        after = {
+            path: path.read_bytes() for path in self.run_root.rglob("*") if path.is_file()
+        }
+        self.assertEqual(before, after)
+
+    def test_link_rejects_report_digest_mismatch(self) -> None:
+        binding, _ = self._linked_run()
+        result = self._link(binding, expected_report_digest="sha256:" + "0" * 64)
+        self.assertEqual("failed", result.status)
+        self.assertIn("CLEAN_INSTALL_LINK_REPORT_DIGEST_MISMATCH", result.failures)
+
+    def test_link_reports_failed_install_as_product_failure(self) -> None:
+        binding, _ = self._linked_run(status=QualificationCellStatus.FAILED, passed=False)
+        result = self._link(binding)
+        self.assertEqual("failed", result.status)
+        self.assertIn("PRODUCT_FAILURE:E2E-18:CLEAN_INSTALL_FAILED", result.failures)
+        self.assertIsNotNone(result.report_digest)
+
+    def test_link_rejects_reused_or_non_live_provenance(self) -> None:
+        binding, report = self._linked_run()
+        cases = (
+            {
+                "provenance": (EvidenceProvenance.REUSED,),
+                "reused_from_contract_digest": "sha256:" + "5" * 64,
+            },
+            {"provenance": (EvidenceProvenance.FAKE,)},
+            {"provenance": (EvidenceProvenance.LIVE, EvidenceProvenance.FAKE)},
+        )
+        for update in cases:
+            with self.subTest(provenance=update["provenance"]):
+                changed = report.model_copy(
+                    update={"outcome": report.outcome.model_copy(update=update)}
+                )
+                self._save(changed)
+                result = self._link(binding)
+                self.assertEqual("failed", result.status)
+                self.assertIn("CLEAN_INSTALL_LINK_PROVENANCE_NOT_LIVE", result.failures)
+
+    def test_link_rejects_candidate_probe_mismatch_or_editable(self) -> None:
+        binding, _ = self._linked_run(probe={"wheel_digest": "sha256:" + "7" * 64})
+        mismatch = self._link(binding)
+        self.assertIn("CLEAN_INSTALL_LINK_CANDIDATE_PROBE_MISMATCH", mismatch.failures)
+        binding, _ = self._linked_run(probe={"editable": True})
+        editable = self._link(binding)
+        self.assertEqual("failed", editable.status)
+        self.assertIn("CLEAN_INSTALL_LINK_CANDIDATE_PROBE_INVALID", editable.failures)
+
+    def test_link_rejects_import_origin_outside_venv_or_under_source(self) -> None:
+        source_package = ROOT / "src" / "flowmarshal" / "__init__.py"
+        binding, _ = self._linked_run(
+            origin={"package": str(source_package), "purelib": str(ROOT / "src")}
+        )
+        result = self._link(binding)
+        self.assertEqual("failed", result.status)
+        self.assertIn(
+            "CLEAN_INSTALL_LINK_IMPORT_ORIGIN_OUTSIDE_CANDIDATE_VENV", result.failures
+        )
+        self.assertIn("CLEAN_INSTALL_LINK_SOURCE_PRODUCT_IMPORT", result.failures)
+
+    def test_link_rejects_missing_or_failed_stage(self) -> None:
+        missing = tuple(
+            CleanInstallStageObservation(
+                stage=stage, command=("noop",), returncode=0, passed=True
+            )
+            for stage in CLEAN_INSTALL_STAGES[:-1]
+        )
+        binding, _ = self._linked_run(observations=missing)
+        self.assertIn("CLEAN_INSTALL_LINK_STAGES_MISMATCH", self._link(binding).failures)
+        failed = tuple(
+            CleanInstallStageObservation(
+                stage=stage,
+                command=("noop",),
+                returncode=0,
+                passed=stage != "user_cli_smoke",
+            )
+            for stage in CLEAN_INSTALL_STAGES
+        )
+        binding, _ = self._linked_run(observations=failed)
+        result = self._link(binding)
+        self.assertEqual("failed", result.status)
+        self.assertIn("CLEAN_INSTALL_LINK_STAGE_NOT_PASSED:user_cli_smoke", result.failures)
+
+    def test_link_rejects_dry_run_that_claims_release_pass(self) -> None:
+        binding, _ = self._linked_run(
+            dry={
+                "mode": "pre_provider_dry_run",
+                "release_pass": True,
+                "candidate_wheel_binding": {"wheel_digest": self.wheel_digest},
+            }
+        )
+        result = self._link(binding)
+        self.assertEqual("failed", result.status)
+        self.assertIn("CLEAN_INSTALL_LINK_DRY_RUN_MISMATCH", result.failures)
+
+    def test_link_rejects_different_project_e2e_candidate(self) -> None:
+        binding, _ = self._linked_run()
+        other_wheel = binding.model_copy(update={"wheel_digest": "sha256:" + "3" * 64})
+        result = self._link(other_wheel)
+        self.assertEqual("failed", result.status)
+        self.assertIn("CLEAN_INSTALL_LINK_WHEEL_DIGEST_MISMATCH", result.failures)
+        self.assertIn("CLEAN_INSTALL_LINK_WHEEL_BINDING_MISMATCH", result.failures)
+        other_environment = binding.model_copy(
+            update={"distribution_root": str(self.base / "other-venv")}
+        )
+        result = self._link(other_environment)
+        self.assertEqual(
+            ("CLEAN_INSTALL_LINK_WHEEL_BINDING_MISMATCH",), result.failures
+        )
+        other_version = binding.model_copy(update={"distribution_version": "9.9.9"})
+        self.assertIn(
+            "CLEAN_INSTALL_LINK_DISTRIBUTION_MISMATCH", self._link(other_version).failures
+        )
+
+    def test_link_fails_closed_on_malformed_run_root(self) -> None:
+        binding = self._candidate_binding(self.run_root)
+        for broken, code in (
+            (7, "CLEAN_INSTALL_LINK_RUN_ROOT_INVALID"),
+            ({"run_root": str(self.run_root)}, "CLEAN_INSTALL_LINK_RUN_ROOT_INVALID"),
+            ("", "CLEAN_INSTALL_LINK_ABSOLUTE_PATH_REQUIRED"),
+            (str(self.run_root) + "\x00", "CLEAN_INSTALL_LINK_REPORT_INVALID"),
+        ):
+            with self.subTest(broken=broken):
+                result = verify_clean_install_link(
+                    root=ROOT, clean_install_run_root=broken, candidate_binding=binding
+                )
+                self.assertEqual("failed", result.status)
+                self.assertTrue(result.failures[0].startswith(code), result.failures)
+
+    def test_link_keeps_clean_install_failure_class(self) -> None:
+        binding, report = self._linked_run(status=QualificationCellStatus.FAILED, passed=False)
+        environment = report.model_copy(update={"outcome": report.outcome.model_copy(
+            update={"failure_class": QualificationFailureClass.ENVIRONMENT}
+        )})
+        self._save(environment)
+        result = self._link(binding)
+        self.assertEqual("failed", result.status)
+        self.assertIn("ENVIRONMENT_FAILURE:E2E-18:CLEAN_INSTALL_FAILED", result.failures)
+        self.assertFalse(any(item.startswith("PRODUCT_FAILURE") for item in result.failures))
+
+    def test_link_rejects_candidate_import_root_outside_venv(self) -> None:
+        outside = self.base / "outside-site-packages" / "flowmarshal"
+        outside.mkdir(parents=True)
+        binding, _ = self._linked_run(
+            probe={"import_root": str(outside), "distribution_root": str(outside.parent)}
+        )
+        result = self._link(binding)
+        self.assertEqual("failed", result.status)
+        self.assertIn("CLEAN_INSTALL_LINK_CANDIDATE_IMPORT_ROOT_OUTSIDE_VENV", result.failures)
 
 
 class ProjectE2EPreProviderDryRunTests(unittest.TestCase):

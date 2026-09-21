@@ -110,6 +110,21 @@ def _run(arguments: argparse.Namespace) -> int:
             raise QualificationRunError("project-e2e에는 절대경로 --release-freeze가 필요합니다.")
         if arguments.release_freeze and not Path(arguments.release_freeze).is_absolute():
             raise QualificationRunError("--release-freeze는 절대경로여야 합니다.")
+        if getattr(arguments, "pre_provider_dry_run", False):
+            # dry invocation은 E2E-18을 연결하지 않는다. 조용히 무시하지 않는다.
+            if arguments.clean_install_run_root:
+                raise QualificationRunError(
+                    "--pre-provider-dry-run에는 --clean-install-run-root를 함께 줄 수 없습니다."
+                )
+        elif not arguments.clean_install_run_root:
+            # 연결 없이 시작하면 E2E-18이 NOT_RUN으로 끝나므로 campaign 전에 멈춘다.
+            raise QualificationRunError(
+                "project-e2e release run에는 E2E-18을 연결할 절대경로 --clean-install-run-root가 필요합니다."
+            )
+        if arguments.clean_install_run_root and not Path(arguments.clean_install_run_root).is_absolute():
+            raise QualificationRunError("--clean-install-run-root는 절대경로여야 합니다.")
+    elif getattr(arguments, "clean_install_run_root", None):
+        raise QualificationRunError("--clean-install-run-root는 project-e2e scope에서만 쓸 수 있습니다.")
     if getattr(arguments, "pre_provider_dry_run", False):
         if arguments.scope != "project-e2e":
             raise QualificationRunError(
@@ -164,6 +179,7 @@ def _run(arguments: argparse.Namespace) -> int:
                 candidate_wheel=arguments.candidate_wheel,
                 runtime_selection=runtime_selection,
                 release_freeze=arguments.release_freeze,
+                clean_install_run_root=arguments.clean_install_run_root,
             )
     _emit(
         {
@@ -613,6 +629,10 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument(
         "--release-freeze",
         help="project-e2e가 재사용할 검증된 release freeze 디렉터리의 절대경로",
+    )
+    run.add_argument(
+        "--clean-install-run-root",
+        help="E2E-18을 연결할, 같은 candidate로 끝난 clean-install run root의 절대경로",
     )
     run.add_argument("--codex-project-binding", help="App Server 프로젝트 ID·예상 root 결속 JSON")
     run.add_argument("--budget-policy")

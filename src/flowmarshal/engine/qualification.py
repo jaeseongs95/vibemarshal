@@ -2144,6 +2144,17 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
             raise QualificationRunError(
                 "project-e2e resume metadata에 절대경로 release_freeze_path가 없습니다."
             )
+        # 시작 때 고정한 E2E-18 연결을 그대로 넘긴다. 빠뜨리면 anchor가 None으로 바뀌어
+        # immutable metadata 대조가 실패한다.
+        link = metadata.get("clean_install_link")
+        clean_install_run_root = None
+        if link is not None:
+            linked_root = link.get("run_root") if isinstance(link, dict) else None
+            if not isinstance(linked_root, str) or not Path(linked_root).is_absolute():
+                raise QualificationRunError(
+                    "project-e2e resume metadata의 clean_install_link.run_root가 절대경로 문자열이 아닙니다."
+                )
+            clean_install_run_root = linked_root
 
         return run_project_e2e(
             root=base,
@@ -2154,6 +2165,7 @@ def resume_run(run_root: Path | str) -> tuple[Path, ScopeQualificationReport]:
             candidate_wheel=candidate_binding.wheel_path,
             runtime_selection=runtime_selection,
             release_freeze=release_freeze,
+            clean_install_run_root=clean_install_run_root,
         )
     raise QualificationRunError(f"지원하지 않는 resume scope입니다: {scope}")
 

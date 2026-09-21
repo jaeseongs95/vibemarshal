@@ -120,7 +120,10 @@ class ScopeReportVerificationTests(unittest.TestCase):
             return verify_scope_report(root=ROOT, run_root=run, report=report)
 
     def _typed_e2e_run(
-        self, run: Path, contract: EvaluationContract
+        self,
+        run: Path,
+        contract: EvaluationContract,
+        binding: CandidateWheelBinding | None = None,
     ) -> tuple[ScopeQualificationReport, Path, CandidateWheelBinding]:
         suite = qualification_suite_manifest(ROOT)
         source_root = run / "bundle-source"
@@ -142,25 +145,26 @@ class ScopeReportVerificationTests(unittest.TestCase):
             model_lock_document={"digest": contract.model_lock_digest},
             evaluator_files=("evaluator.py",),
         )
-        wheel_path = run / "candidate.whl"
-        wheel_path.write_bytes(b"candidate-wheel")
-        distribution_root = run / "site-packages"
-        import_root = distribution_root / "flowmarshal"
-        import_root.mkdir(parents=True)
-        package_digests = {
-            "flowmarshal/__init__.py": sha256_bytes(b"package")
-        }
-        binding = CandidateWheelBinding(
-            wheel_path=str(wheel_path.resolve()),
-            wheel_digest=sha256_bytes(wheel_path.read_bytes()),
-            distribution_name="flowmarshal-engine",
-            distribution_version="0.2.0a1",
-            distribution_root=str(distribution_root.resolve()),
-            import_root=str(import_root.resolve()),
-            package_file_digests=package_digests,
-            wheel_package_digest=sha256_digest(package_digests),
-            installed_package_digest=sha256_digest(package_digests),
-        )
+        if binding is None:
+            wheel_path = run / "candidate.whl"
+            wheel_path.write_bytes(b"candidate-wheel")
+            distribution_root = run / "site-packages"
+            import_root = distribution_root / "flowmarshal"
+            import_root.mkdir(parents=True)
+            package_digests = {
+                "flowmarshal/__init__.py": sha256_bytes(b"package")
+            }
+            binding = CandidateWheelBinding(
+                wheel_path=str(wheel_path.resolve()),
+                wheel_digest=sha256_bytes(wheel_path.read_bytes()),
+                distribution_name="flowmarshal-engine",
+                distribution_version="0.2.0a1",
+                distribution_root=str(distribution_root.resolve()),
+                import_root=str(import_root.resolve()),
+                package_file_digests=package_digests,
+                wheel_package_digest=sha256_digest(package_digests),
+                installed_package_digest=sha256_digest(package_digests),
+            )
         policies = load_evaluation_policies(
             budget_policy_path=ROOT / "config" / "pre-1.0-validation-budget.json",
             role_timeout_policy_path=ROOT / "config" / "pre-1.0-role-timeouts.json",
@@ -190,6 +194,8 @@ class ScopeReportVerificationTests(unittest.TestCase):
             "partial-write-input-changed": "E2E-13",
             "in-flight-replan-protection": "E2E-17",
             "partial-write-resume": "E2E-12",
+            "prohibited-effect": "E2E-14",
+            "scope-expansion": "E2E-15",
         }
         cells: list[EvaluationCellCheckpoint] = []
         first_evidence_path: Path | None = None
@@ -425,6 +431,84 @@ class ScopeReportVerificationTests(unittest.TestCase):
             result = verify_scope_report(root=ROOT, run_root=run, report=report)
         self.assertFalse(result.valid)
         self.assertIn("SCOPE_REPORT_E2E_RECEIPT_BINDING_MISMATCH", result.errors)
+
+    def test_project_e2e_joins_only_the_anchored_clean_install_link(self) -> None:
+        # 실제 검증기를 통과하는 clean install run root(같은 candidate)를 만든다.
+        from tests.test_engine_clean_install_qualification import CleanInstallQualificationTests
+
+        link_case = CleanInstallQualificationTests(
+            "test_link_passes_for_verified_live_run_with_same_candidate"
+        )
+        link_case.setUp()
+        self.addCleanup(link_case.tearDown)
+        binding, clean_report = link_case._linked_run()
+
+        fixtures = tuple(sha256_digest({"e2e": scenario}) for scenario in E2E_SCENARIOS)
+        contract = _contract(scope=EvaluationScope.PROJECT_E2E, fixtures=fixtures, seeds=(0,))
+        with tempfile.TemporaryDirectory() as raw:
+            run = Path(raw)
+            report, _evidence_path, _binding = self._typed_e2e_run(run, contract, binding)
+            # 연결이 없으면 E2E-18은 NOT_RUN이다. 아직 cell이 없는 다른 책임도 NOT_RUN으로 남는다.
+            self.assertEqual("not_run", report.metrics["clean_install_link_status"])
+            self.assertEqual(18, report.metrics["responsibility_count"])
+            baseline_passed = report.metrics["passed_responsibility_count"]
+            self.assertEqual(len(E2E_SCENARIOS), baseline_passed)
+            self.assertIn("NOT_RUN:E2E-18:clean install run root 없음", report.failures)
+
+            metadata_path = run / "run-metadata.json"
+            original = json.loads(metadata_path.read_text(encoding="utf-8"))
+
+            def verify(anchor):
+                metadata = dict(original, clean_install_link=anchor)
+                metadata.pop("metadata_digest")
+                metadata["metadata_digest"] = sha256_digest(metadata)
+                metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+                return self._verify_typed_e2e(
+                    run=run, report=report, binding=binding, contract=contract
+                )
+
+            anchored = {
+                "run_root": str(link_case.run_root.resolve()),
+                "report_digest": clean_report.report_digest,
+                "evaluation_contract_digest": link_case.contract_digest,
+            }
+            joined = verify(anchored)
+            self.assertFalse(any("E2E-18" in item for item in joined.recalculated_failures))
+            self.assertFalse(any("CLEAN_INSTALL_LINK" in item for item in joined.recalculated_failures))
+            self.assertEqual(
+                baseline_passed + 1, joined.recalculated_metrics["passed_responsibility_count"]
+            )
+            self.assertEqual("passed", joined.recalculated_metrics["clean_install_link_status"])
+
+            broken = (
+                (dict(anchored, report_digest="sha256:" + "0" * 64),
+                 "CLEAN_INSTALL_LINK_REPORT_DIGEST_MISMATCH"),
+                (dict(anchored, evaluation_contract_digest="sha256:" + "c" * 64),
+                 "CLEAN_INSTALL_LINK_ANCHOR_MISMATCH"),
+                (dict(anchored, run_root=7), "CLEAN_INSTALL_LINK_RUN_ROOT_INVALID"),
+                (dict(anchored, run_root="relative/clean-install"),
+                 "CLEAN_INSTALL_LINK_ABSOLUTE_PATH_REQUIRED"),
+                ({"run_root": anchored["run_root"]}, "CLEAN_INSTALL_LINK_ANCHOR_INVALID"),
+                ("not-an-object", "CLEAN_INSTALL_LINK_ANCHOR_INVALID"),
+            )
+            for anchor, code in broken:
+                with self.subTest(code=code, anchor=anchor):
+                    result = verify(anchor)
+                    self.assertFalse(result.recalculated_passed)
+                    self.assertIn(code, result.recalculated_failures)
+                    self.assertEqual("failed", result.recalculated_metrics["clean_install_link_status"])
+                    self.assertEqual(
+                        baseline_passed, result.recalculated_metrics["passed_responsibility_count"]
+                    )
+
+            # anchor 뒤 clean install report가 바뀌면 고정한 digest로 잡는다.
+            tampered = clean_report.model_copy(update={"failures": ("edited-after-anchor",)})
+            (link_case.run_root / "clean-install-report.json").write_text(
+                tampered.model_dump_json(), encoding="utf-8"
+            )
+            result = verify(anchored)
+            self.assertIn("CLEAN_INSTALL_LINK_REPORT_DIGEST_MISMATCH", result.recalculated_failures)
+            self.assertEqual("failed", result.recalculated_metrics["clean_install_link_status"])
 
     def test_project_e2e_final_verifier_rechecks_typed_evidence(self) -> None:
         fixtures = tuple(

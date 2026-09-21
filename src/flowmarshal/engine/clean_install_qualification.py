@@ -717,3 +717,178 @@ def load_clean_install_report(run_root: Path | str) -> CleanInstallReport:
         return CleanInstallReport.model_validate_json(path.read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         raise QualificationRunError(f"CLEAN_INSTALL_REPORT_INVALID:{error}") from error
+
+
+@dataclass(frozen=True)
+class CleanInstallLinkResult:
+    """기존 E2E-18 run root를 release project-E2E candidate와 연결한 판정이다.
+
+    clean install cell은 자기 evaluation 계약을 그대로 유지한다. 이 결과는
+    project-E2E digest를 clean install evidence에 다시 결속하지 않는다.
+    """
+
+    status: Literal["passed", "failed", "not_run"]
+    failures: tuple[str, ...]
+    run_root: str | None
+    report_digest: str | None
+    evaluation_contract_digest: str | None
+
+
+def _read_json_object(path: Path) -> dict[str, Any] | None:
+    try:
+        document = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return document if isinstance(document, dict) else None
+
+
+def verify_clean_install_link(
+    *,
+    root: Path | str,
+    clean_install_run_root: Path | str | None,
+    candidate_binding: CandidateWheelBinding,
+    expected_report_digest: str | None = None,
+) -> CleanInstallLinkResult:
+    """이미 만든 clean install run root를 다시 실행하지 않고 검증·연결한다.
+
+    저장 산출물만 읽으며 파일을 만들거나 바꾸지 않는다. REUSED provenance는
+    만들지도 받지도 않는다.
+    """
+
+    if clean_install_run_root is None:
+        return CleanInstallLinkResult(
+            "not_run", ("NOT_RUN:E2E-18:clean install run root 없음",), None, None, None
+        )
+    # metadata에서 온 값일 수 있으므로 형식이 틀리면 예외 대신 실패로 닫는다.
+    if not isinstance(clean_install_run_root, (str, os.PathLike)):
+        return CleanInstallLinkResult(
+            "failed", ("CLEAN_INSTALL_LINK_RUN_ROOT_INVALID",), None, None, None
+        )
+    location = Path(clean_install_run_root)
+    if not location.is_absolute():
+        return CleanInstallLinkResult(
+            "failed", ("CLEAN_INSTALL_LINK_ABSOLUTE_PATH_REQUIRED",), None, None, None
+        )
+    try:
+        destination = location.resolve(strict=True)
+        report = load_clean_install_report(destination)
+    except (OSError, ValueError, QualificationRunError) as error:
+        return CleanInstallLinkResult(
+            "failed",
+            (f"CLEAN_INSTALL_LINK_REPORT_INVALID:{error}",),
+            str(location),
+            None,
+            None,
+        )
+
+    failures: list[str] = []
+    if expected_report_digest is not None and expected_report_digest != report.report_digest:
+        failures.append("CLEAN_INSTALL_LINK_REPORT_DIGEST_MISMATCH")
+    try:
+        verification = verify_clean_install_report(
+            root=root, run_root=destination, report=report
+        )
+    except OSError as error:
+        failures.append(f"CLEAN_INSTALL_LINK_VERIFY_ERROR:{error}")
+    else:
+        failures.extend(verification.errors)
+    if not report.passed:
+        # clean install cell이 매긴 실패 class를 그대로 옮긴다(환경 실패를 제품 실패로 덮지 않는다).
+        failure_class = report.outcome.failure_class
+        failures.append(
+            f"NOT_RUN:E2E-18:{report.outcome.failure_code or 'clean install cell 미실행'}"
+            if failure_class is None
+            else f"{failure_class.value.upper()}_FAILURE:E2E-18:{report.outcome.failure_code}"
+        )
+
+    outcome = report.outcome
+    if outcome.responsibility_ids != (CLEAN_INSTALL_RESPONSIBILITY_ID,):
+        failures.append("CLEAN_INSTALL_LINK_RESPONSIBILITY_MISMATCH")
+    if outcome.provenance != (EvidenceProvenance.LIVE,):
+        failures.append("CLEAN_INSTALL_LINK_PROVENANCE_NOT_LIVE")
+    if outcome.cell_id != CLEAN_INSTALL_CELL_ID:
+        failures.append("CLEAN_INSTALL_LINK_CELL_ID_MISMATCH")
+
+    # 기존 검증기가 다시 보지 않는 저장 산출물의 의미를 직접 재검사한다.
+    probe = _read_json_object(destination / "candidate-probe.json")
+    probed: CandidateWheelBinding | None = None
+    try:
+        probed = CandidateWheelBinding.model_validate(
+            (probe or {})["candidate_wheel_binding"]
+        )
+    except (KeyError, ValueError):
+        failures.append("CLEAN_INSTALL_LINK_CANDIDATE_PROBE_INVALID")
+    else:
+        if (
+            probed.binding_digest != report.candidate_wheel_binding_digest
+            or probed.editable is not False
+            or probed.wheel_digest != report.candidate_wheel_digest
+            or probed.wheel_package_digest != probed.installed_package_digest
+            or probed.distribution_name != report.candidate_distribution_name
+            or probed.distribution_version != report.candidate_distribution_version
+        ):
+            failures.append("CLEAN_INSTALL_LINK_CANDIDATE_PROBE_MISMATCH")
+
+    # venv root는 candidate_python의 Scripts/bin 상위이며 run root 안에 실제로 있어야 한다.
+    origin = _read_json_object(destination / "import-origin.json") or {}
+    candidate_python = Path(report.candidate_python)
+    venv_root = candidate_python.parent.parent
+    if not {"package", "purelib"} <= origin.keys():
+        failures.append("CLEAN_INSTALL_LINK_IMPORT_ORIGIN_INVALID")
+    elif candidate_python_path(venv_root) != candidate_python or not _is_within(
+        venv_root, destination
+    ):
+        failures.append("CLEAN_INSTALL_LINK_CANDIDATE_VENV_INVALID")
+    else:
+        package_file = Path(str(origin["package"]))
+        purelib = Path(str(origin["purelib"]))
+        if not _is_within(package_file, purelib) or not _is_within(purelib, venv_root):
+            failures.append("CLEAN_INSTALL_LINK_IMPORT_ORIGIN_OUTSIDE_CANDIDATE_VENV")
+        if _is_within(package_file, Path(root) / "src"):
+            failures.append("CLEAN_INSTALL_LINK_SOURCE_PRODUCT_IMPORT")
+        # probe가 결속한 설치 경계(import root·distribution root)도 같은 candidate venv 안이어야 한다.
+        if probed is not None and not (
+            _is_within(Path(probed.import_root), venv_root)
+            and _is_within(Path(probed.distribution_root), venv_root)
+            and _is_within(package_file, Path(probed.import_root))
+        ):
+            failures.append("CLEAN_INSTALL_LINK_CANDIDATE_IMPORT_ROOT_OUTSIDE_VENV")
+
+    if tuple(item.stage for item in report.observations) != CLEAN_INSTALL_STAGES:
+        failures.append("CLEAN_INSTALL_LINK_STAGES_MISMATCH")
+    failures.extend(
+        f"CLEAN_INSTALL_LINK_STAGE_NOT_PASSED:{item.stage}"
+        for item in report.observations
+        if not item.passed
+    )
+
+    dry = _read_json_object(destination / "pre-provider-dry-run.json") or {}
+    dry_binding = dry.get("candidate_wheel_binding")
+    if (
+        dry.get("mode") != "pre_provider_dry_run"
+        or dry.get("release_pass") is not False
+        or not isinstance(dry_binding, dict)
+        or dry_binding.get("wheel_digest") != report.candidate_wheel_digest
+    ):
+        failures.append("CLEAN_INSTALL_LINK_DRY_RUN_MISMATCH")
+
+    # project-E2E candidate와의 교차 결속. binding digest가 같으면 같은 wheel 경로와
+    # 같은 설치 환경(distribution/import root)까지 같다.
+    if report.candidate_wheel_digest != candidate_binding.wheel_digest:
+        failures.append("CLEAN_INSTALL_LINK_WHEEL_DIGEST_MISMATCH")
+    if report.candidate_wheel_binding_digest != candidate_binding.binding_digest:
+        failures.append("CLEAN_INSTALL_LINK_WHEEL_BINDING_MISMATCH")
+    if (
+        report.candidate_distribution_name != candidate_binding.distribution_name
+        or report.candidate_distribution_version
+        != candidate_binding.distribution_version
+    ):
+        failures.append("CLEAN_INSTALL_LINK_DISTRIBUTION_MISMATCH")
+
+    return CleanInstallLinkResult(
+        "failed" if failures else "passed",
+        tuple(failures),
+        str(destination),
+        report.report_digest,
+        report.evaluation_contract_digest,
+    )

@@ -21,14 +21,17 @@ from .domain import (
     BehaviorPolicy,
     CandidateDecision,
     CandidateStatus,
+    EffectContract,
     EffectPolicy,
     ExecutionAction,
     ExecutionContextNeed,
     ExecutionSpecProposal,
+    GoalAuthorization,
     GoalContractDefinition,
     GoalContractRevision,
     GoalCoverage,
     GoalCriterion,
+    GoalOperatingPolicy,
     IntegrationValidationContract,
     MissionClass,
     ModelAssignmentContract,
@@ -75,9 +78,10 @@ from .evaluation_budget import (
     write_immutable_run_metadata,
 )
 from .application import EngineApplication
-from .budget import BudgetManager
+from .budget import BudgetManager, GoalBudgetPolicy
 from .ledger import SQLiteEngineLedger
 from .models import EngineRoleConfiguration, ModelInventory
+from .planner_roles import DetailedTaskDraft
 from .planning import (
     CandidateEvaluation,
     ExpandedPlanEvaluation,
@@ -98,12 +102,18 @@ from .qualification import (
     qualification_suite_manifest,
     source_manifest_digest,
 )
+from .clean_install_qualification import (
+    CLEAN_INSTALL_RESPONSIBILITY_ID,
+    CleanInstallLinkResult,
+    verify_clean_install_link,
+)
 from .qualification_manifest import (
     CandidateWheelBinding,
     EvidenceProvenance,
     QualificationCellOutcome,
     QualificationCellStatus,
     QualificationFailureClass,
+    QualificationSuiteManifest,
     build_qualification_evidence_record,
     classify_qualification_failure,
     evaluate_qualification_responsibilities,
@@ -124,8 +134,15 @@ from .runtime import (
     RuntimeJobSupervisor,
     RuntimeOperationReceipt,
 )
+from .recovery_planning import RecoveryPlanProvider
 from .role_execution import use_role_timeout_policy
-from .service import EngineService, EngineServiceError, PlanStateSnapshotStaleError
+from .roles import ScriptedStructuredRoleRunner
+from .service import (
+    EngineService,
+    EngineServiceError,
+    GoalAuthorizationRequired,
+    PlanStateSnapshotStaleError,
+)
 
 
 E2E_SCENARIOS = (
@@ -139,6 +156,17 @@ E2E_SCENARIOS = (
     "partial-write-input-changed",
     "in-flight-replan-protection",
     "partial-write-resume",
+    "prohibited-effect",
+    "scope-expansion",
+)
+
+_E2E_SOURCE_REQUEST = (
+    "app.py의 add 함수가 두 정수의 합을 반환하도록 최소 수정하고 "
+    "공개 함수 계약을 유지하며 test_app.py 검증을 통과시켜줘."
+)
+# E2E-14만 사용자 금지 효과를 원문에 명시한다. 금지를 Goal·승인에 넣는 것은 live 역할이다.
+_PROHIBITED_EFFECT_REQUEST = (
+    _E2E_SOURCE_REQUEST + " 원격 저장소 push나 패키지 배포 같은 외부 시스템 변경은 하지 마."
 )
 
 _RUNTIME_EVENT_SCHEMA = "flowmarshal.project-e2e.runtime-event.v3"
@@ -584,6 +612,7 @@ class PreparedE2E:
     preparation_provenance: EvidenceProvenance = EvidenceProvenance.FAKE
     pipeline_stages: tuple[str, ...] = ()
     preparation_evidence_refs: tuple[str, ...] = ()
+    authority: CoreActionAuthority | None = None
 
 
 _CELL_STATE_SCHEMA = "flowmarshal.project-e2e.cell-state.v1"
@@ -718,8 +747,13 @@ def _prepare_from_raw_request(
     fixture_digest: str,
     source_request: str,
     structured_runner: Any | None = None,
+    authorize: bool = True,
 ) -> PreparedE2E:
-    """실제 사용자 facade로 raw request부터 승인·Plan 활성화까지 수행한다."""
+    """실제 사용자 facade로 raw request부터 승인·Plan 활성화까지 수행한다.
+
+    ``authorize=False``면 승인 후보 준비까지만 하고 승인·활성화는 cell driver에 맡긴다.
+    역할이 scripted runner나 fake runtime으로 돌았으면 준비 출처를 LIVE로 적지 않는다.
+    """
 
     ledger = SQLiteEngineLedger(
         state_root / "flowmarshal-engine.sqlite3",
@@ -760,7 +794,7 @@ def _prepare_from_raw_request(
     if len(selected) != 1:
         raise QualificationRunError("E2E_SELECTED_PLAN_CARDINALITY_MISMATCH")
     plan = selected[0]
-    authorization = application.authorize(
+    authorization = None if not authorize else application.authorize(
         project_id,
         source="qualification user authorization",
         capability=authority.issue_goal_authorization(
@@ -787,7 +821,6 @@ def _prepare_from_raw_request(
     )
     _write_json(goal_path, preparation.goal_preparation)
     _write_json(planning_path, preparation.planning)
-    _write_json(authorization_path, authorization)
     _write_json(
         generated_plan_path,
         {
@@ -801,19 +834,21 @@ def _prepare_from_raw_request(
             "activation_digest": plan.activation_digest,
         },
     )
-    _write_json(
-        activation_receipt_path,
-        {
-            "schema": "flowmarshal.project-e2e.plan-activation-receipt.v2",
-            "evaluation_contract_digest": evaluation_contract_digest,
-            "fixture_digest": fixture_digest,
-            "source": "EngineApplication.authorize",
-            "authorization_id": authorization.authorization.authorization_id,
-            "activation_id": authorization.activation_id,
-            "plan_revision_id": plan.plan_revision_id,
-            "activation_digest": plan.activation_digest,
-        },
-    )
+    if authorization is not None:
+        _write_json(authorization_path, authorization)
+        _write_json(
+            activation_receipt_path,
+            {
+                "schema": "flowmarshal.project-e2e.plan-activation-receipt.v2",
+                "evaluation_contract_digest": evaluation_contract_digest,
+                "fixture_digest": fixture_digest,
+                "source": "EngineApplication.authorize",
+                "authorization_id": authorization.authorization.authorization_id,
+                "activation_id": authorization.activation_id,
+                "plan_revision_id": plan.plan_revision_id,
+                "activation_digest": plan.activation_digest,
+            },
+        )
     with service.ledger.read() as connection:
         role_rows = connection.execute(
             "SELECT role FROM provider_calls WHERE project_id=? ORDER BY rowid",
@@ -842,7 +877,12 @@ def _prepare_from_raw_request(
         activation_digest=plan.activation_digest,
         proposal=None,
         workspace=workspace,
-        preparation_provenance=EvidenceProvenance.LIVE,
+        preparation_provenance=(
+            EvidenceProvenance.LIVE
+            if structured_runner is None
+            and not isinstance(getattr(runtime, "runtime", runtime), FakeCodexRuntime)
+            else EvidenceProvenance.FAKE
+        ),
         pipeline_stages=(
             "raw_request",
             "goal_normalizer",
@@ -851,8 +891,7 @@ def _prepare_from_raw_request(
             "skeleton_reviewer",
             "plan_expander",
             "plan_reviewer",
-            "goal_authorization",
-            "plan_activation",
+            *(("goal_authorization", "plan_activation") if authorization is not None else ()),
         ),
         preparation_evidence_refs=tuple(
             str(path.resolve())
@@ -860,11 +899,15 @@ def _prepare_from_raw_request(
                 raw_request_path,
                 goal_path,
                 planning_path,
-                authorization_path,
                 generated_plan_path,
-                activation_receipt_path,
+                *(
+                    (authorization_path, activation_receipt_path)
+                    if authorization is not None
+                    else ()
+                ),
             )
         ),
+        authority=authority,
     )
 
 
@@ -2629,6 +2672,719 @@ def _replacement_state(service: EngineService, project_id: str) -> dict[str, Any
         }
 
 
+_LEDGER_ROWS = {
+    "project": "SELECT id,active_plan_revision_id,run_state FROM projects WHERE id=?",
+    "plans": "SELECT id,status FROM plan_revisions WHERE project_id=? ORDER BY rowid",
+    "tasks": "SELECT id,plan_revision_id,status FROM task_contracts WHERE project_id=? ORDER BY rowid",
+    "goal_authorizations": (
+        "SELECT id,revision_no,authorization_digest FROM goal_authorizations "
+        "WHERE project_id=? ORDER BY rowid"
+    ),
+    "plan_activations": (
+        "SELECT id,plan_revision_id,authorization_id FROM plan_activations "
+        "WHERE project_id=? ORDER BY rowid"
+    ),
+    "execution_specs": (
+        "SELECT s.id,s.task_id FROM execution_spec_revisions s "
+        "JOIN task_contracts t ON t.id=s.task_id WHERE t.project_id=? ORDER BY s.rowid"
+    ),
+    "attempts": "SELECT id,task_id,status FROM attempts WHERE project_id=? ORDER BY rowid",
+    "runtime_intents": (
+        "SELECT i.id,i.kind,i.status FROM runtime_intents i "
+        "JOIN attempts a ON a.id=i.attempt_id WHERE a.project_id=? ORDER BY i.rowid"
+    ),
+    "runtime_jobs": "SELECT id,kind,status FROM runtime_jobs WHERE project_id=? ORDER BY rowid",
+    "provider_calls": (
+        "SELECT id,role,attempt_id,execution_status FROM provider_calls "
+        "WHERE project_id=? ORDER BY rowid"
+    ),
+    "budget_policy_revisions": (
+        "SELECT id,scope_key,revision_no,policy_digest FROM budget_policy_revisions "
+        "WHERE project_id=? ORDER BY rowid"
+    ),
+    "history_events": (
+        "SELECT id,event_type,entity_type,entity_id FROM history_events "
+        "WHERE project_id=? ORDER BY sequence"
+    ),
+}
+# 실행 효과로 이어지는 표. 승인 경계 판정 동안 여기에는 새 행이 생기면 안 된다.
+_EXECUTION_TABLES = frozenset({"execution_specs", "attempts", "runtime_intents", "runtime_jobs"})
+_ZERO_EFFECTS = {"create_thread": 0, "start_turn": 0, "resume": 0}
+_AUTHORIZATION_REQUIRED_PREFIX = str(GoalAuthorizationRequired(()))[: -len("[]")]
+# 비admissible 후보는 draft로 저장되고 활성화는 이 문구로 거절된다(service._activate_plan_in_transaction).
+_DRAFT_ACTIVATION_ERROR = "admissible이며 ready인 PlanContract만 활성화할 수 있습니다."
+
+
+def _cell_failure(code: str, detail: str) -> dict[str, str]:
+    """cell 실패를 안정된 code·설명·class로 남긴다. 책임 판정은 code와 class만 쓴다."""
+
+    return {
+        "failure": f"{code}: {detail}",
+        "failure_code": code,
+        "failure_class": QualificationFailureClass.PRODUCT.value,
+    }
+
+
+def _history_types(delta: dict[str, dict[str, list[Any]]]) -> list[str] | None:
+    """history_events가 추가만 됐으면 그 event_type 목록, 바뀌거나 지워졌으면 None이다."""
+
+    history = delta.get("history_events", {"added": [], "changed": [], "removed": []})
+    if history["changed"] or history["removed"]:
+        return None
+    return [row["event_type"] for row in history["added"]]
+
+
+def _ledger_rows(service: EngineService, project_id: str) -> dict[str, dict[str, dict[str, Any]]]:
+    """승인·활성화·실행 판정에 쓰는 원장 행(append-only history 포함)을 표·id별로 읽는다."""
+
+    with service.ledger.read() as connection:
+        return {
+            key: {row["id"]: dict(row) for row in connection.execute(query, (project_id,))}
+            for key, query in _LEDGER_ROWS.items()
+        }
+
+
+def _ledger_delta(
+    before: dict[str, dict[str, dict[str, Any]]],
+    after: dict[str, dict[str, dict[str, Any]]],
+) -> dict[str, dict[str, list[Any]]]:
+    """표별로 새 행·바뀐 행·사라진 행만 남긴다. 변화 없는 표는 뺀다."""
+
+    delta: dict[str, dict[str, list[Any]]] = {}
+    for key, rows in after.items():
+        old = before[key]
+        added = [row for row_id, row in rows.items() if row_id not in old]
+        changed = [
+            {"before": old[row_id], "after": row}
+            for row_id, row in rows.items()
+            if row_id in old and old[row_id] != row
+        ]
+        removed = [row for row_id, row in old.items() if row_id not in rows]
+        if added or changed or removed:
+            delta[key] = {"added": added, "changed": changed, "removed": removed}
+    return delta
+
+
+def _authorization_change_fields(message: str | None) -> list[list[str]] | None:
+    """GoalAuthorizationRequired 문구에서 Core가 낸 (boundary, field) 목록을 되읽는다."""
+
+    if not message or not message.startswith(_AUTHORIZATION_REQUIRED_PREFIX):
+        return None
+    changes = json.loads(message[len(_AUTHORIZATION_REQUIRED_PREFIX):])
+    return sorted([item["boundary"], item["field"]] for item in changes)
+
+
+def _plan_expansion_stub(
+    plan: PlanContractRevision, *, task_ref: str, effect: EffectContract
+) -> dict[str, Any]:
+    """활성 Plan을 plan_expander 응답 형식으로 되돌리고 한 Task에 효과 하나를 더한다."""
+
+    refs = {task.task_id: task.task_ref for task in plan.definition.tasks}
+    fields = set(DetailedTaskDraft.model_fields)
+    tasks = []
+    for task in plan.definition.tasks:
+        body = {key: value for key, value in task.model_dump(mode="json").items() if key in fields}
+        if task.task_ref == task_ref:
+            body["expected_effects"] = [*body["expected_effects"], effect.model_dump(mode="json")]
+        tasks.append(body)
+    definition = plan.definition
+    return {
+        "tasks": tasks,
+        "dependencies": [
+            {
+                "producer_task_ref": refs[item.producer_task_id],
+                "consumer_task_ref": refs[item.consumer_task_id],
+                "dependency_type": item.dependency_type.value,
+                "products": list(item.products),
+            }
+            for item in definition.dependencies
+        ],
+        "goal_coverage": [
+            {
+                "criterion_id": item.criterion_id,
+                "task_refs": [refs[task_id] for task_id in item.task_ids],
+                "validation_ids": list(item.validation_ids),
+            }
+            for item in definition.goal_coverage
+        ],
+        "integration_validations": [
+            item.model_dump(mode="json") for item in definition.integration_validations
+        ],
+        "expected_effects": list(definition.expected_effects),
+        "prohibited_effects": list(definition.prohibited_effects),
+    }
+
+
+def _stub_plan_inspection(plan: dict[str, Any], goal: dict[str, Any]) -> dict[str, Any]:
+    """stub plan_expander 응답의 v1 inspection 대조표. 의미 판단이 아니라 형식 채움이다."""
+
+    citations: list[dict[str, Any]] = []
+
+    def cite(source: str, selector: str, text: str) -> str:
+        citations.append({
+            "citation_id": f"c{len(citations)}",
+            "source_ref": source,
+            "selector": selector,
+            "quote": text,
+        })
+        return citations[-1]["citation_id"]
+
+    ac_refs = {
+        ac["criterion_id"]: (
+            cite("source:goal", f"/hard_acceptance/{index}/statement", ac["statement"]),
+            cite("source:goal", f"/hard_acceptance/{index}/validation_intent", ac["validation_intent"]),
+        )
+        for index, ac in enumerate(goal["hard_acceptance"])
+    }
+    validations = [
+        (f"/tasks/{task_index}/validations/{index}", item)
+        for task_index, task in enumerate(plan["tasks"])
+        for index, item in enumerate(task["validations"])
+    ] + [
+        (f"/integration_validations/{index}", item)
+        for index, item in enumerate(plan["integration_validations"])
+    ]
+    validation_refs = {
+        item["validation_id"]: cite("artifact:plan_draft", path + "/statement", item["statement"])
+        for path, item in validations
+    }
+    constraint_refs = {
+        item["constraint_id"]: cite("source:goal", f"/constraints/{index}/statement", item["statement"])
+        for index, item in enumerate(goal.get("constraints", []))
+    }
+    return {
+        "citations": citations,
+        "ac_validation_rows": [
+            {
+                "criterion_id": criterion_id,
+                "validation_id": validation_id,
+                "ac_link_required": False,
+                "scope_ids": [],
+                "basis_refs": [*ac_ref, validation_ref],
+                "finding_codes": [],
+            }
+            for criterion_id, ac_ref in ac_refs.items()
+            for validation_id, validation_ref in validation_refs.items()
+        ],
+        "constraint_task_rows": [
+            {
+                "constraint_id": constraint_id,
+                "task_ref": task["task_ref"],
+                "applicability": "not_applicable",
+                "validation_ids": [],
+                "basis_refs": [ref],
+                "finding_codes": [],
+            }
+            for constraint_id, ref in constraint_refs.items()
+            for task in plan["tasks"]
+        ],
+        "validation_rows": [
+            {
+                "validation_id": validation_id,
+                "claim_ref": ref,
+                "mechanisms": [{"tool": "합성 검사 책임", "phase": None, "basis_refs": [ref]}],
+                "separate_check_refs": [],
+            }
+            for validation_id, ref in validation_refs.items()
+        ],
+        "validation_scope_rows": [
+            {
+                "scope_id": f"scope_{index}",
+                "validation_id": validation_id,
+                "claim_ref": ref,
+                "procedure": "합성 검사 책임",
+                "phase": None,
+                "basis_refs": [ref],
+                "assessment": "supported",
+                "finding_codes": [],
+            }
+            for index, (validation_id, ref) in enumerate(validation_refs.items())
+        ],
+        "finding_links": [],
+    }
+
+
+class _StubPlanExpanderRunner(ScriptedStructuredRoleRunner):
+    """E2E-14 후보를 만드는 synthetic stub(fake). plan_expander 응답을 v1 envelope로 준다."""
+
+    def run(self, request: Any, *, validator: Any = None) -> Any:
+        pending = self.responses.get(request.role)
+        if request.role == "plan_expander" and pending and "inspection" not in pending[0]:
+            pending[0] = {
+                "plan": pending[0],
+                "inspection": _stub_plan_inspection(pending[0], request.payload["goal"]),
+            }
+        return super().run(request, validator=validator)
+
+
+def _prohibited_effect_blocked(
+    prepared: PreparedE2E,
+    runtime: RecordedRuntime,
+    source_digest: str,
+    *,
+    cell_root: Path,
+    roles: EngineRoleConfiguration,
+) -> dict[str, Any]:
+    """live Goal·승인이 금지한 효과를 요구하는 재계획 후보가 활성화·실행 전에 막히는지 본다.
+
+    live Planner는 금지 효과를 스스로 넣지 않으므로 위반 후보만 제품 RecoveryPlanProvider에
+    scripted plan_expander stub(fake)을 끼워 만든다. 판정은 Core plan_gate와 활성화가 한다.
+    """
+
+    service, project_id = prepared.service, prepared.project_id
+    goal = service.load_active_goal(project_id)
+    with service.ledger.read() as connection:
+        authorization = GoalAuthorization.model_validate_json(connection.execute(
+            "SELECT payload_json FROM goal_authorizations WHERE project_id=? "
+            "ORDER BY revision_no DESC LIMIT 1",
+            (project_id,),
+        ).fetchone()["payload_json"])
+        active = PlanContractRevision.model_validate_json(connection.execute(
+            "SELECT p.payload_json FROM plan_revisions p "
+            "JOIN projects j ON j.active_plan_revision_id=p.id WHERE j.id=?",
+            (project_id,),
+        ).fetchone()["payload_json"])
+    prohibited = goal.definition.effect_policy.prohibited_effects
+    observation: dict[str, Any] = {
+        "schema": "flowmarshal.project-e2e.authorization-observation.v2",
+        "cell_id": "prohibited-effect",
+        "source_request": _PROHIBITED_EFFECT_REQUEST,
+        "authorization": authorization.model_dump(mode="json"),
+        "goal_prohibited_effects": list(prohibited),
+        "authorization_matches_goal_effect_policy": (
+            authorization.effect_policy == goal.definition.effect_policy
+        ),
+        "live_active_plan_revision_id": active.plan_revision_id,
+        "blocking_check": (
+            "Core plan_gate가 Goal effect_policy로 막는다. GoalAuthorization 효과 정책과 같은지는 "
+            "authorization_matches_goal_effect_policy로 따로 대조한다."
+        ),
+        "limitations": [
+            "후보 Plan 내용은 harness가 stub plan_expander 응답으로 작성한다.",
+            "재계획 트리거는 실패 없이 활성 Task로 직접 호출한 합성 트리거다.",
+            "run_once 자동 재계획을 거치지 않고 같은 등록·활성화 API를 직접 부른다.",
+            "Core Gate는 금지 효과 문장과 정확히 같은 문자열만 막는다. 의미가 같은 다른 표현은 다루지 않는다.",
+        ],
+    }
+    if not prohibited or not observation["authorization_matches_goal_effect_policy"]:
+        failure = _cell_failure(
+            "E2E14_PRECONDITION_NO_PROHIBITED_EFFECT",
+            "live Goal·승인에 금지 효과가 없거나 승인 효과 정책이 Goal과 다릅니다.",
+        )
+        observation["failure"] = failure["failure"]
+        _write_json(cell_root / "authorization-observation.json", observation)
+        return {
+            "passed": False,
+            "source_fixture_digest": source_digest,
+            **failure,
+            "error": None,
+            "execution_spec": {"candidate_execution_spec_count": None},
+            "effect_count": None,
+        }
+    statement = prohibited[0]
+    failed_task = active.definition.tasks[0]
+    stub = _StubPlanExpanderRunner({
+        "plan_expander": [_plan_expansion_stub(
+            active,
+            task_ref=failed_task.task_ref,
+            effect=EffectContract(
+                effect_id="qualification-prohibited", statement=statement, external=False
+            ),
+        )],
+    })
+    inventory = runtime.list_models()
+    journal_before = _journal_operation_counts(runtime.events)
+    # 후보 생성과 차단을 따로 잰다. 후보 생성은 stub 계획 호출 하나만, 차단 단계는
+    # draft 후보 행만 남겨야 한다.
+    before = _ledger_rows(service, project_id)
+    evaluation = RecoveryPlanProvider(service=service, runner=stub, roles=roles).replan(
+        project_id=project_id, task_id=failed_task.task_id, assessment=None, inventory=inventory
+    )
+    candidate_rows = _ledger_rows(service, project_id)
+    activation_error: str | None = None
+    try:
+        service.register_authorized_plan_revision(evaluation)
+    except EngineServiceError as error:
+        activation_error = str(error)
+    candidate_delta = _ledger_delta(before, candidate_rows)
+    block_delta = _ledger_delta(candidate_rows, _ledger_rows(service, project_id))
+    journal_after = _journal_operation_counts(runtime.events)
+    effect_count = {key: journal_after[key] - journal_before[key] for key in _ZERO_EFFECTS}
+    candidate_id = evaluation.plan.plan_revision_id
+    finding = next(
+        (item for item in evaluation.deterministic_findings
+         if item.finding_code == "PLAN_EFFECT_POLICY_VIOLATION"),
+        None,
+    )
+    blocked = {key: value["added"] for key, value in block_delta.items()}
+    candidate_history = _history_types(candidate_delta)
+    checks = {
+        "decision_not_admissible": evaluation.decision.status is not CandidateStatus.ADMISSIBLE,
+        # 차단 사유가 금지 효과 하나여야 stub이 다른 결함을 더하지 않았다고 볼 수 있다.
+        "only_effect_policy_finding": tuple(evaluation.decision.finding_codes)
+        == ("PLAN_EFFECT_POLICY_VIOLATION",),
+        "prohibited_finding_exact": finding is not None and finding.summary == (
+            f"Goal 효과 정책 밖의 외부 효과입니다: unexpected=[], prohibited={[statement]}"
+        ),
+        "reviewer_not_called": not evaluation.semantic_submissions,
+        # 후보 생성은 stub plan_expander 호출 한 건과 그 예산 회계 history만 남긴다.
+        "candidate_creation_is_one_stub_plan_expander_call": set(candidate_delta)
+        <= {"provider_calls", "history_events"}
+        and "provider_calls" in candidate_delta
+        and not candidate_delta["provider_calls"]["changed"]
+        and not candidate_delta["provider_calls"]["removed"]
+        and [
+            (row["role"], row["attempt_id"])
+            for row in candidate_delta["provider_calls"]["added"]
+        ] == [("plan_expander", None)]
+        and candidate_history is not None
+        and all(item.startswith("budget.") for item in candidate_history),
+        "activation_rejected_exactly": activation_error == _DRAFT_ACTIVATION_ERROR,
+        # 차단은 draft 후보 행과 그 등록 history 한 건만 남긴다.
+        "block_adds_only_draft_candidate_rows": set(block_delta)
+        <= {"plans", "tasks", "history_events"}
+        and all(not value["changed"] and not value["removed"] for value in block_delta.values())
+        and [(row["id"], row["status"]) for row in blocked.get("plans", [])]
+        == [(candidate_id, "draft")]
+        and all(row["plan_revision_id"] == candidate_id for row in blocked.get("tasks", []))
+        and _history_types(block_delta) == ["plan.registered"],
+        "no_runtime_effect": effect_count == _ZERO_EFFECTS,
+    }
+    passed = all(checks.values())
+    observation.update({
+        "candidate_source": "scripted_plan_expander_stub_via_recovery_plan_provider",
+        "candidate_plan_revision_id": candidate_id,
+        "requested_effect": {"effect_id": "qualification-prohibited", "statement": statement},
+        "stub_calls": [call.role for call in stub.calls],
+        "decision": evaluation.decision.model_dump(mode="json"),
+        "finding_summary": None if finding is None else finding.summary,
+        "activation_error": activation_error,
+        "measured_tables": sorted(_LEDGER_ROWS),
+        "candidate_creation_ledger_delta": candidate_delta,
+        "block_ledger_delta": block_delta,
+        "stage_attribution": {
+            "live_active_plan": list(prepared.pipeline_stages),
+            "candidate": [
+                "plan_expander (scripted stub)",
+                "effect_policy_check (Core plan_gate)",
+                "plan_activation (rejected)",
+            ],
+        },
+        "checks": checks,
+    })
+    _write_json(cell_root / "authorization-observation.json", observation)
+    return {
+        "passed": passed,
+        "source_fixture_digest": source_digest,
+        **({"failure": None} if passed else _cell_failure(
+            "E2E14_BLOCK_EVIDENCE_MISSING",
+            "금지 효과 후보가 실행 전에 막힌다는 증거가 부족합니다: "
+            + ",".join(key for key, value in checks.items() if not value),
+        )),
+        "error": activation_error,
+        "execution_spec": {"candidate_execution_spec_count": len(blocked.get("execution_specs", []))},
+        "effect_count": effect_count,
+        "checks": checks,
+        "candidate_plan_revision_id": candidate_id,
+        "candidate_decision": evaluation.decision.status.value,
+        "candidate_finding_codes": list(evaluation.decision.finding_codes),
+    }
+
+
+def _scope_expansion_blocked(
+    prepared: PreparedE2E,
+    runtime: RecordedRuntime,
+    source_digest: str,
+    *,
+    cell_root: Path,
+    roles: EngineRoleConfiguration,
+    evaluation_contract_digest: str,
+    fixture_digest: str,
+    governance: Any | None = None,
+) -> dict[str, Any]:
+    """승인 범위를 넘는 운영 정책은 새 사용자 승인 없이 활성화·실행되지 않는지 본다.
+
+    live 1.0 경로는 target·효과 확장 후보를 만들 수 없다(project root 불변, live Goal에
+    typed 외부 효과 승인 경로 없음). 그 두 경계는 구조 관측만 남기고 이 cell을 PASS로
+    내지 않는다(target·effect NOT_COVERED_LIVE, PRODUCT). PASS는 공개 EngineApplication
+    경로로 target·효과·정책 확장을 모두 live로 관측할 수 있을 때만 가능하다.
+    """
+
+    service, project_id, authority = prepared.service, prepared.project_id, prepared.authority
+    if authority is None:
+        raise QualificationRunError("E2E-15에는 준비 단계의 Core 승인 권위가 필요합니다.")
+    application = EngineApplication(
+        service, runtime=runtime, role_configuration=roles, governance=governance
+    )
+    goal = service.load_active_goal(project_id)
+    with service.ledger.read() as connection:
+        plan = PlanContractRevision.model_validate_json(connection.execute(
+            "SELECT payload_json FROM plan_revisions WHERE id=?", (prepared.plan_revision_id,)
+        ).fetchone()["payload_json"])
+        skeleton = PlanSkeletonCandidate.model_validate_json(connection.execute(
+            "SELECT payload_json FROM skeleton_candidates WHERE project_id=? AND candidate_digest=?",
+            (project_id, plan.definition.source_skeleton_digest),
+        ).fetchone()["payload_json"])
+        project_map_root = connection.execute(
+            "SELECT payload_json FROM project_map_revisions WHERE revision_digest=?",
+            (plan.definition.project_map_digest,),
+        ).fetchone()["payload_json"]
+        budget = GoalBudgetPolicy.model_validate_json(connection.execute(
+            "SELECT payload_json FROM budget_policy_revisions WHERE project_id=? AND scope_key='' "
+            "ORDER BY revision_no DESC LIMIT 1",
+            (project_id,),
+        ).fetchone()["payload_json"])
+        project_root = connection.execute(
+            "SELECT root FROM projects WHERE id=?", (project_id,)
+        ).fetchone()["root"]
+    narrow = GoalOperatingPolicy.model_validate({
+        "planning_budget": plan.definition.planning_budget.model_copy(update={
+            "max_logical_role_calls": plan.definition.planning_budget.max_logical_role_calls - 1,
+        }).model_dump(mode="json"),
+    })
+    steps: list[dict[str, Any]] = []
+
+    def authorize(policy: GoalOperatingPolicy | None) -> dict[str, Any]:
+        capability = authority.issue_goal_authorization(
+            ledger_path=service.ledger.path,
+            target=service.goal_authorization_target(project_id=project_id, operating_policy=policy),
+        )
+        result = application.authorize(
+            project_id,
+            source="qualification user authorization",
+            operating_policy=policy,
+            capability=capability,
+        )
+        return {
+            "authorization": result.authorization.model_dump(mode="json"),
+            "activation_id": result.activation_id,
+        }
+
+    def run_once() -> dict[str, Any]:
+        # run_once만 task gate를 연다. 승인 검사에서 멈춰도 매번 닫는다.
+        try:
+            outcome = application.run_once(project_id)
+        finally:
+            application.close_task_gate()
+        return {
+            "run_once": outcome.model_dump(mode="json"),
+            "error": outcome.detail if outcome.action is RunOnceAction.BLOCKED else None,
+        }
+
+    def step(name: str, action: Any, expected_changes: list[list[str]] | None) -> dict[str, Any]:
+        before = _ledger_rows(service, project_id)
+        journal_before = _journal_operation_counts(runtime.events)
+        record: dict[str, Any] = {"step": name}
+        try:
+            record.update(action())
+        except EngineServiceError as error:
+            record["error"] = str(error)
+        record.setdefault("error", None)
+        record["authorization_changes"] = _authorization_change_fields(record["error"])
+        record["ledger_delta"] = _ledger_delta(before, _ledger_rows(service, project_id))
+        journal_after = _journal_operation_counts(runtime.events)
+        record["effect_count"] = {
+            key: journal_after[key] - journal_before[key] for key in _ZERO_EFFECTS
+        }
+        record["expected_authorization_changes"] = expected_changes
+        record["passed"] = (
+            record["authorization_changes"] == expected_changes
+            and record["effect_count"] == _ZERO_EFFECTS
+            and not set(record["ledger_delta"]) & _EXECUTION_TABLES
+            and "provider_calls" not in record["ledger_delta"]
+        )
+        steps.append(record)
+        return record
+
+    budget_change = [["policy", f"budget.effective.{goal.goal_id}"]]
+    # A: live Plan의 정책보다 좁게 승인하면 활성화되지 않고 승인 기록도 남지 않는다.
+    narrow_step = step(
+        "A_narrow_authorization",
+        lambda: authorize(narrow),
+        [["policy", "planning_budget.max_logical_role_calls"]],
+    )
+    narrow_step["passed"] = narrow_step["passed"] and not narrow_step["ledger_delta"]
+    # B: 내부 Plan ID만으로는 승인 없이 활성화되지 않는다.
+    id_step = step(
+        "B_internal_plan_id_activation",
+        lambda: {"activation_id": service.activate_authorized_plan(
+            plan_revision_id=plan.plan_revision_id
+        )},
+        [["goal", "authorization"]],
+    )
+    id_step["passed"] = id_step["passed"] and not id_step["ledger_delta"]
+    # C: 새 사용자 판단(기본 정책 승인)이면 같은 Plan이 활성화된다.
+    approved = step("C_user_authorization", lambda: authorize(None), None)
+    approved["passed"] = approved["passed"] and (
+        len(approved["ledger_delta"].get("goal_authorizations", {}).get("added", [])) == 1
+        and len(approved["ledger_delta"].get("plan_activations", {}).get("added", [])) == 1
+    )
+    if approved["passed"]:
+        _write_json(
+            cell_root / "plan-activation-receipt.json",
+            {
+                "schema": "flowmarshal.project-e2e.plan-activation-receipt.v2",
+                "evaluation_contract_digest": evaluation_contract_digest,
+                "fixture_digest": fixture_digest,
+                "source": "EngineApplication.authorize (E2E-15 C_user_authorization)",
+                "authorization_id": approved["authorization"]["authorization_id"],
+                "activation_id": approved["activation_id"],
+                "plan_revision_id": plan.plan_revision_id,
+                "activation_digest": plan.activation_digest,
+            },
+        )
+        # D: 승인 뒤 사용자 예산 설정(project budget set)만 넓혀도 실행이 멈춘다.
+        # 설정 변경 자체는 run_once 판정과 따로 원장 증가를 남긴다.
+        setup_before = _ledger_rows(service, project_id)
+        BudgetManager(service).configure(
+            project_id,
+            budget.model_copy(update={"total_tokens": budget.total_tokens * 2}),
+            goal_id=goal.goal_id,
+        )
+        budget_setup = _ledger_delta(setup_before, _ledger_rows(service, project_id))
+        blocked = step("D_budget_expansion_run_once", run_once, budget_change)
+        blocked["budget_setup_ledger_delta"] = budget_setup
+        blocked["passed"] = (
+            blocked["passed"]
+            and not blocked["ledger_delta"]
+            and set(budget_setup) <= {"budget_policy_revisions", "history_events"}
+            and [
+                row["scope_key"]
+                for row in budget_setup.get("budget_policy_revisions", {}).get("added", [])
+            ] == [goal.goal_id]
+            and not budget_setup["budget_policy_revisions"]["changed"]
+            and _history_types(budget_setup) is not None
+        )
+        # E: Core 선택 Plan 재활성화(내부 ID)로는 풀리지 않는다.
+        reselected = step(
+            "E_selected_plan_reactivation",
+            lambda: {
+                "activation_id": service.activate_selected_plan(project_id=project_id),
+                **run_once(),
+            },
+            budget_change,
+        )
+        reselected["passed"] = (
+            reselected["passed"]
+            and not reselected["ledger_delta"]
+            and reselected.get("activation_id") == approved["activation_id"]
+        )
+
+        # F: 새 사용자 승인이 확장된 예산을 받아들이면 같은 활성 Plan이 다시 승인된다.
+        def reauthorize() -> dict[str, Any]:
+            result = authorize(None)
+            service.assert_project_authorized(project_id)
+            return result
+
+        renewed = step("F_user_reauthorization", reauthorize, None)
+        renewed["passed"] = (
+            renewed["passed"]
+            and set(renewed["ledger_delta"]) == {"goal_authorizations", "history_events"}
+            and len(renewed["ledger_delta"]["goal_authorizations"]["added"]) == 1
+            and _history_types(renewed["ledger_delta"]) == ["goal.authorized"]
+            and renewed.get("activation_id") == approved["activation_id"]
+        )
+    authorization_fields = sorted(GoalAuthorization.model_fields)
+    structure = {
+        "authorization_project_root": (
+            None if not approved.get("authorization") else approved["authorization"]["project_root"]
+        ),
+        "project_root": str(Path(project_root).resolve()),
+        "plan_project_map_root": json.loads(project_map_root)["root"],
+        "goal_typed_external_effect_contracts": len(
+            goal.definition.effect_policy.allowed_external_effect_contracts
+        ),
+        "plan_external_effect_count": sum(
+            effect.external for task in plan.definition.tasks for effect in task.expected_effects
+        ),
+        "note": (
+            "live 1.0 경로는 target·효과 확장 후보를 만들 수 없다. 이 값은 구조 관측이며 "
+            "확장 거절 증거가 아니다."
+        ),
+    }
+    cost = {
+        "skeleton_estimated_change_cost": skeleton.estimated_change_cost,
+        "skeleton_estimated_context_tokens": skeleton.estimated_context_tokens,
+        "authorization_fields": authorization_fields,
+        "authorization_has_plan_or_cost_field": any(
+            word in field
+            for field in authorization_fields
+            for word in ("plan", "cost", "estimate")
+        ),
+    }
+    expected_steps = [
+        "A_narrow_authorization",
+        "B_internal_plan_id_activation",
+        "C_user_authorization",
+        "D_budget_expansion_run_once",
+        "E_selected_plan_reactivation",
+        "F_user_reauthorization",
+    ]
+    observed_steps = [item["step"] for item in steps]
+    policy_problems = [
+        *(f"{item['step']}:failed" for item in steps if not item["passed"]),
+        *(f"{name}:not_run" for name in expected_steps if name not in observed_steps),
+        *(["authorization_has_plan_or_cost_field"] if cost["authorization_has_plan_or_cost_field"] else []),
+    ]
+    policy_passed = observed_steps == expected_steps and not policy_problems
+    coverage = {
+        "covered_live": ["policy"],
+        "not_covered_live": ["target", "effect"],
+        "policy_boundary_passed": policy_passed,
+    }
+    _write_json(
+        cell_root / "authorization-observation.json",
+        {
+            "schema": "flowmarshal.project-e2e.authorization-observation.v2",
+            "cell_id": "scope-expansion",
+            "narrow_operating_policy": narrow.model_dump(mode="json"),
+            "authorizations": [
+                item["authorization"] for item in steps if item.get("authorization")
+            ],
+        },
+    )
+    _write_json(
+        cell_root / "scope-check.json",
+        {
+            "schema": "flowmarshal.project-e2e.scope-check.v2",
+            "cell_id": "scope-expansion",
+            "plan_revision_id": plan.plan_revision_id,
+            "plan_planning_budget": plan.definition.planning_budget.model_dump(mode="json"),
+            "measured_tables": sorted(_LEDGER_ROWS),
+            "steps": steps,
+            "structure": structure,
+            "cost_estimate": cost,
+            "coverage": coverage,
+        },
+    )
+    # 둘 다 제품 gap(PRODUCT)이다. 정책 회귀가 있으면 그것을 주 code로 두고 미커버 범위는
+    # coverage에 따로 남긴다. 진짜 PASS는 공개 경로로 target·효과·정책을 모두 live로 볼 때만이다.
+    if policy_passed:
+        failure = _cell_failure(
+            "E2E15_TARGET_EFFECT_NOT_COVERED_LIVE",
+            "live 경로로 target·효과 확장 후보를 만들 수 없어 정책 경계만 live로 관측했다.",
+        )
+    else:
+        failure = _cell_failure(
+            "E2E15_POLICY_BOUNDARY_REGRESSION",
+            "정책 경계 단계 실패: " + ",".join(policy_problems)
+            + "; target·효과는 live로 관측하지 못했다.",
+        )
+    return {
+        "passed": False,
+        "source_fixture_digest": source_digest,
+        **failure,
+        "coverage": coverage,
+        "steps": [
+            {key: item[key] for key in ("step", "passed", "error", "authorization_changes")}
+            for item in steps
+        ],
+        "effect_count": {
+            key: sum(item["effect_count"][key] for item in steps) for key in _ZERO_EFFECTS
+        },
+    }
+
+
 def _complete_task_without_goal_verdict(
     prepared: PreparedE2E,
     runtime: RecordedRuntime,
@@ -3518,6 +4274,20 @@ def _responsibility_outcome(
             ("partial_effect", "binding", "runtime_observation", "validation"),
             (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
         ),
+        # Goal·승인·활성화는 live이고 위반 후보만 scripted plan_expander stub(fake)이다.
+        "prohibited-effect": (
+            "E2E-14",
+            ("effect_policy_check",),
+            ("authorization", "execution_spec", "error", "effect_count"),
+            (EvidenceProvenance.LIVE, EvidenceProvenance.FAKE),
+        ),
+        # live 준비 위의 사용자 승인·예산 판단만 쓴다. target·효과 미커버라 cell은 FAILED다.
+        "scope-expansion": (
+            "E2E-15",
+            ("goal_authorization", "scope_check"),
+            ("authorization", "plan", "finding", "ledger"),
+            (EvidenceProvenance.LIVE,),
+        ),
     }
     responsibility_id, suffix, evidence_kinds, provenance = mapping[scenario]
     artifact_by_kind = {
@@ -3544,6 +4314,8 @@ def _responsibility_outcome(
         "plan": cell_root / "state" / "flowmarshal-engine.sqlite3",
         "reuse_decision": cell_root / "state" / "flowmarshal-engine.sqlite3",
         "fault_injection": cell_root / "fault-injection.json",
+        "authorization": cell_root / "authorization-observation.json",
+        "finding": cell_root / "scope-check.json",
     }
     evidence_records = tuple(
         build_qualification_evidence_record(
@@ -3586,9 +4358,58 @@ def _responsibility_outcome(
         evidence_kinds=evidence_kinds,
         evidence_refs=evidence_refs,
         evidence_records=evidence_records,
-        failure_class=QualificationFailureClass.PRODUCT,
-        failure_code=str(cell.get("failure") or cell.get("error") or "E2E_FAILED")[:500],
+        # _cell_failure로 남긴 cell은 안정된 code·class를, 나머지는 기존 설명 문장을 쓴다.
+        failure_class=QualificationFailureClass(cell.get("failure_class", "product")),
+        failure_code=str(
+            cell.get("failure_code") or cell.get("failure") or cell.get("error") or "E2E_FAILED"
+        )[:500],
     )
+
+
+def _project_e2e_suite(suite: QualificationSuiteManifest) -> QualificationSuiteManifest:
+    """project E2E cell이 판정할 책임이다. E2E-18은 clean install 계약이 따로 증명한다."""
+
+    return QualificationSuiteManifest.model_validate(
+        suite.model_dump(mode="json")
+        | {
+            "e2e_responsibilities": [
+                item.model_dump(mode="json")
+                for item in suite.e2e_responsibilities
+                if item.responsibility_id != CLEAN_INSTALL_RESPONSIBILITY_ID
+            ]
+        }
+    )
+
+
+def _clean_install_anchor(link: CleanInstallLinkResult) -> dict[str, Any] | None:
+    if link.status == "not_run":
+        return None
+    return {
+        "run_root": link.run_root,
+        "report_digest": link.report_digest,
+        "evaluation_contract_digest": link.evaluation_contract_digest,
+    }
+
+
+def _join_clean_install_link(
+    responsibility_report: Any, link: CleanInstallLinkResult
+) -> tuple[tuple[str, ...], dict[str, Any]]:
+    """project E2E 책임 판정에 E2E-18 연결 결과를 더한다.
+
+    clean install evidence를 project E2E 계약으로 다시 결속하지 않고 결과만 합친다.
+    """
+
+    return link.failures, {
+        "responsibility_count": responsibility_report.responsibility_count + 1,
+        "passed_responsibility_count": (
+            responsibility_report.passed_responsibility_count + (link.status == "passed")
+        ),
+        "not_run_responsibility_count": (
+            len(responsibility_report.not_run_responsibility_ids) + (link.status == "not_run")
+        ),
+        "clean_install_link_status": link.status,
+        "clean_install_evaluation_contract_digest": link.evaluation_contract_digest,
+    }
 
 
 def _contract(
@@ -3649,6 +4470,23 @@ def _contract(
                                     "goal_preparation": GOAL_TEST_PREPARATION_INSTRUCTIONS,
                                     "validator": inspect.getsource(EngineDispatcher._role_for_attempt),
                                     "fixture_contract": inspect.getsource(_prepare_from_raw_request),
+                                    "authority_cells": {
+                                        "requests": [_E2E_SOURCE_REQUEST, _PROHIBITED_EFFECT_REQUEST],
+                                        "ledger_rows": _LEDGER_ROWS,
+                                        "sources": [
+                                            inspect.getsource(item)
+                                            for item in (
+                                                _ledger_delta,
+                                                _cell_failure,
+                                                _history_types,
+                                                _plan_expansion_stub,
+                                                _stub_plan_inspection,
+                                                _StubPlanExpanderRunner,
+                                                _prohibited_effect_blocked,
+                                                _scope_expansion_blocked,
+                                            )
+                                        ],
+                                    },
                                     "responsibility_evaluator": inspect.getsource(evaluate_qualification_responsibilities)}),
         output_schema_digest=sha256_digest({
             "preparation": strict_json_output_schema(ProviderExecutionPreparation.model_json_schema()),
@@ -3755,8 +4593,13 @@ def run_project_e2e(
     runtime_selection: RuntimeProviderSelection | None = None,
     governance: Any | None = None,
     release_freeze: Path | str | None = None,
+    clean_install_run_root: Path | str | None = None,
 ) -> tuple[Path, ScopeQualificationReport]:
-    """release project E2E. 실행 Task는 제품 경로와 같은 필수 governance gate를 지난다."""
+    """release project E2E. 실행 Task는 제품 경로와 같은 필수 governance gate를 지난다.
+
+    E2E-18은 이 run이 만들지 않는다. 같은 candidate로 이미 끝난 clean install run root를
+    다시 실행하지 않고 검증해 연결하며, 없으면 NOT_RUN으로 남긴다.
+    """
     if evaluation_policies is None:
         raise QualificationRunError("EVALUATION_POLICY_REQUIRED")
     base = (root or project_root()).resolve(strict=True)
@@ -3789,6 +4632,16 @@ def run_project_e2e(
             "E2E_RELEASE_FREEZE_INVALID:" + ";".join(release_verification.mismatches)
         )
     governance_freeze = release_verification.manifest.governance_plugin
+    # provider 호출 전에 연결을 검증한다. 잘못 준 연결로 campaign 비용을 쓰지 않는다.
+    clean_install_link = verify_clean_install_link(
+        root=base,
+        clean_install_run_root=clean_install_run_root,
+        candidate_binding=candidate_binding,
+    )
+    if clean_install_link.status == "failed":
+        raise QualificationRunError(
+            "E2E_CLEAN_INSTALL_LINK_INVALID:" + ";".join(clean_install_link.failures)
+        )
     preflight_failures = _preflight(base)
     if preflight_failures:
         raise QualificationRunError("; ".join(preflight_failures))
@@ -3832,8 +4685,7 @@ def run_project_e2e(
         )
         _preserve_inventory_observation(audit_path, roles, inventory)
         prior_state = store.state().status
-        if prior_state is EvaluationRunStatus.PAUSED_RATE_LIMIT:
-            store.set_state(EvaluationRunStatus.RUNNING, updated_at=utc_now())
+        # metadata 결속을 먼저 대조한다. 불일치면 pause 상태를 그대로 두고 멈춘다.
         write_immutable_run_metadata(
             destination / "run-metadata.json",
             {
@@ -3846,11 +4698,14 @@ def run_project_e2e(
                 "candidate_wheel_binding_digest": candidate_binding.binding_digest,
                 "release_freeze_path": str(freeze_path.resolve(strict=True)),
                 "release_freeze_digest": release_verification.manifest.freeze_digest,
+                "clean_install_link": _clean_install_anchor(clean_install_link),
                 **governance_observation,
                 **provider_run_metadata(runtime_selection),
             },
             evaluation_policies,
         )
+        if prior_state is EvaluationRunStatus.PAUSED_RATE_LIMIT:
+            store.set_state(EvaluationRunStatus.RUNNING, updated_at=utc_now())
         active_scenario: str | None = None
         try:
             for index, scenario in enumerate(E2E_SCENARIOS):
@@ -3901,9 +4756,11 @@ def run_project_e2e(
                         evaluation_contract_digest=contract.contract_digest,
                         fixture_digest=digest,
                         source_request=(
-                            "app.py의 add 함수가 두 정수의 합을 반환하도록 최소 수정하고 "
-                            "공개 함수 계약을 유지하며 test_app.py 검증을 통과시켜줘."
+                            _PROHIBITED_EFFECT_REQUEST
+                            if scenario == "prohibited-effect"
+                            else _E2E_SOURCE_REQUEST
                         ),
+                        authorize=scenario != "scope-expansion",
                     )
                     _write_prepared_state(
                         cell_root,
@@ -3993,6 +4850,25 @@ def run_project_e2e(
                                 roles=roles,
                                 governance=governance,
                             )
+                        elif scenario == "prohibited-effect":
+                            cell = _prohibited_effect_blocked(
+                                prepared,
+                                recorded,
+                                source_digest,
+                                cell_root=cell_root,
+                                roles=roles,
+                            )
+                        elif scenario == "scope-expansion":
+                            cell = _scope_expansion_blocked(
+                                prepared,
+                                recorded,
+                                source_digest,
+                                cell_root=cell_root,
+                                roles=roles,
+                                evaluation_contract_digest=contract.contract_digest,
+                                fixture_digest=digest,
+                                governance=governance,
+                            )
                         else:
                             raise QualificationRunError(f"알 수 없는 E2E scenario: {scenario}")
                     events = recorded.events
@@ -4046,7 +4922,14 @@ def run_project_e2e(
                     "order_seed": 0,
                     "qualification_plan_activation": {
                         "generated_plan_digest": sha256_bytes(generated_plan.read_bytes()),
-                        "activation_receipt_digest": sha256_bytes(activation_receipt.read_bytes()),
+                        # E2E-15만 사용자 승인 단계가 실패하면 활성화 receipt가 없다.
+                        # 다른 cell은 receipt가 없으면 여기서 멈춘다.
+                        "activation_receipt_digest": (
+                            None
+                            if scenario == "scope-expansion"
+                            and not activation_receipt.is_file()
+                            else sha256_bytes(activation_receipt.read_bytes())
+                        ),
                     },
                     "qualification_outcome": responsibility_outcome.model_dump(
                         mode="json"
@@ -4104,7 +4987,7 @@ def run_project_e2e(
             for item in cells
             if not bool(item.get("passed"))
         )
-        suite = qualification_suite_manifest(base)
+        suite = _project_e2e_suite(qualification_suite_manifest(base))
         responsibility_report = evaluate_qualification_responsibilities(
             suite,
             tuple(
@@ -4132,7 +5015,19 @@ def run_project_e2e(
             destination / "responsibility-qualification-report.json",
             responsibility_report,
         )
-        failures = tuple((*cell_failures, *responsibility_report.failures))
+        # 실행 사이 clean install 산출물이 바뀌지 않았는지 고정한 report digest로 다시 본다.
+        anchor = _clean_install_anchor(clean_install_link)
+        clean_install_link = verify_clean_install_link(
+            root=base,
+            clean_install_run_root=None if anchor is None else anchor["run_root"],
+            candidate_binding=candidate_binding,
+            expected_report_digest=None if anchor is None else anchor["report_digest"],
+        )
+        link_failures, link_metrics = _join_clean_install_link(
+            responsibility_report, clean_install_link
+        )
+        _write_json(destination / "clean-install-link.json", clean_install_link.__dict__)
+        failures = tuple((*cell_failures, *responsibility_report.failures, *link_failures))
         store.set_state(EvaluationRunStatus.COMPLETED, updated_at=utc_now())
         report = ScopeQualificationReport(
             scope=contract.scope,
@@ -4149,13 +5044,7 @@ def run_project_e2e(
                     if item.get("scenario") == "unknown-receipt-no-duplicate"
                     and item.get("thread_create_count") != 1
                 ),
-                "responsibility_count": responsibility_report.responsibility_count,
-                "passed_responsibility_count": (
-                    responsibility_report.passed_responsibility_count
-                ),
-                "not_run_responsibility_count": len(
-                    responsibility_report.not_run_responsibility_ids
-                ),
+                **link_metrics,
             },
             failures=failures,
             generated_at=utc_now(),

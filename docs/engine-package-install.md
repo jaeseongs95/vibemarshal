@@ -96,4 +96,24 @@ $CandidatePython = "C:\absolute\candidate-venv\Scripts\python.exe"
 
 각 단계의 실제 산출물(wheel 사본, 설치 log, import origin, CLI 출력, 동결 bundle, probe·dry-run 관측)은 run root 상대경로·SHA-256·kind·cell·evaluation 계약과 fixture/seed/freeze/wheel binding을 가진 `QualificationEvidenceRecord`로 남는다. harness 생성 시와 `verify_clean_install_report()`의 최종 재검증에서 경로 confinement·존재·digest·결속을 각각 검사하며, 한 축이라도 바뀌면 이전 cell을 재사용하지 않는다.
 
-`eval run --scope project-e2e --pre-provider-dry-run`은 실제 실행과 같은 candidate wheel 결속 함수를 쓰되 provider 연결 전에 멈추는 명시적 fake 경계다. 출력의 `release_pass`는 항상 `false`이고 `stages_not_run`에 실행하지 않은 단계를 남기므로, 이 결과를 release PASS나 책임 evidence로 승격하지 않는다.
+`eval run --scope project-e2e --pre-provider-dry-run`은 실제 실행과 같은 candidate wheel 결속 함수를 쓰되 provider 연결 전에 멈추는 명시적 fake 경계다. 출력의 `release_pass`는 항상 `false`이고 `stages_not_run`에 실행하지 않은 단계를 남기므로, 이 결과를 release PASS나 책임 evidence로 승격하지 않는다. dry invocation은 E2E-18을 연결하지 않으므로 `--clean-install-run-root`와 함께 주면 오류로 멈춘다.
+
+### project-e2e에 E2E-18 연결
+
+release `project-e2e`는 E2E-18 cell을 직접 만들지 않는다. 위 clean 설치 cell이 먼저 끝난 run root를 `--clean-install-run-root`로 넘기면 그 결과를 다시 실행하지 않고 검증해 연결한다. 이 옵션이 없는 release run은 시작하기 전에 멈춘다.
+
+```powershell
+& $CandidatePython "$SourceRoot\scripts\installed_candidate_qualification.py" `
+  --source-root $SourceRoot `
+  --candidate-wheel C:\absolute\dist\flowmarshal_engine-0.2.0a1-py3-none-any.whl `
+  eval run --scope project-e2e `
+  --project-root $SourceRoot `
+  --release-freeze C:\absolute\runs\release-freeze `
+  --clean-install-run-root C:\absolute\runs\clean-install
+```
+
+- `$CandidatePython`은 그 clean 설치 run root 안의 `candidate-venv` Python이어야 하고 `--candidate-wheel`은 clean 설치 때와 같은 원본 wheel 경로여야 한다. 연결은 wheel digest, 설치 환경을 포함한 binding digest, 배포판 이름·버전이 모두 같을 때만 통과한다.
+- provider 호출 전에 clean 설치 report, 독립 evaluation 계약, candidate probe, import origin과 설치 경계, 단계 완료, dry-run 관측을 다시 검사한다. 하나라도 틀리면 campaign을 시작하지 않는다.
+- 통과하면 run root·report digest·clean 설치 evaluation 계약 digest 세 값을 `run-metadata.json`의 `clean_install_link`에 고정한다. run 종료 때와 최종 scope 검증 때 같은 규칙으로 다시 대조하며, 그 사이 clean 설치 산출물이 바뀌면 E2E-18은 실패한다. clean 설치 evidence를 project-e2e 계약으로 다시 결속하거나 `reused`로 표기하지 않는다.
+- rate limit로 멈춘 run을 `eval resume`으로 이어 가면 고정한 연결을 그대로 다시 넘긴다. metadata의 연결 형식이 깨졌으면 provider 전에 오류로 멈춘다. 형식은 맞지만 clean 설치 report가 고정 뒤에 바뀌었으면 model 목록 조회 뒤의 metadata 대조에서 멈추며 turn은 시작하지 않는다. 이 연결 기능 이전에 만든 project-e2e run은 metadata에 연결 값이 없어 resume할 수 없으므로 새 run root로 다시 시작한다.
+- API로 연결 없이 실행한 진단 run에서는 E2E-18이 `NOT_RUN`이며 release PASS가 아니다.

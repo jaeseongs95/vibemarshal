@@ -257,6 +257,76 @@ class EngineQualificationTests(unittest.TestCase):
                 str(release_freeze.resolve()),
                 run_project.call_args.kwargs["release_freeze"],
             )
+            # 연결 없이 시작한 run은 재개해도 연결이 없다.
+            self.assertIsNone(run_project.call_args.kwargs["clean_install_run_root"])
+
+    def test_project_e2e_resume_reuses_anchored_clean_install_link(self) -> None:
+        policies = EvaluationPolicies(
+            budget=GoalBudgetPolicy(total_tokens=1_000_000, call_reservation_tokens=100_000),
+            role_timeouts=RoleTimeoutPolicy(),
+        )
+        linked_root = str((ROOT / "clean-install-run").resolve())
+        cases = (
+            ({"run_root": linked_root, "report_digest": "sha256:" + "a" * 64}, linked_root),
+            ("not-an-object", None),
+            ({"run_root": "relative/clean-install"}, None),
+            ({"run_root": 7}, None),
+            ({}, None),
+        )
+        for link, expected in cases:
+            with self.subTest(link=link), tempfile.TemporaryDirectory() as raw:
+                destination = Path(raw)
+                release_freeze = destination / "release-freeze"
+                release_freeze.mkdir()
+                contract = EvaluationContract(
+                    model_lock_format="flowmarshal-model-lock-v2",
+                    scope=EvaluationScope.PROJECT_E2E,
+                    fixture_digests=("sha256:" + "1" * 64,),
+                    scenario_set_digest="sha256:" + "2" * 64,
+                    order_seeds=(0,),
+                    expected_cell_count=1,
+                    role_configuration_digest="sha256:" + "3" * 64,
+                    source_manifest_digest=source_manifest_digest(ROOT),
+                    rules_digest="sha256:" + "4" * 64,
+                    threshold_digest="sha256:" + "5" * 64,
+                    taxonomy_digest="sha256:" + "6" * 64,
+                    prompt_digest="sha256:" + "7" * 64,
+                    output_schema_digest="sha256:" + "8" * 64,
+                    model_lock_digest="sha256:" + "9" * 64,
+                )
+                _write_json(destination / "evaluation-contract.json", contract)
+                write_immutable_run_metadata(
+                    destination / "run-metadata.json",
+                    {
+                        "scope": "project-e2e",
+                        "project_root": str(ROOT),
+                        "evaluation_contract_digest": contract.contract_digest,
+                        "role_configuration": self.roles.model_dump(mode="json"),
+                        "codex_bin": None,
+                        "candidate_wheel_binding": {"bound": True},
+                        "candidate_wheel_binding_digest": "sha256:" + "b" * 64,
+                        "release_freeze_path": str(release_freeze.resolve()),
+                        "clean_install_link": link,
+                    },
+                    policies,
+                )
+                with patch(
+                    "flowmarshal.engine.qualification.verify_candidate_wheel_metadata",
+                    return_value=SimpleNamespace(wheel_path=destination / "candidate.whl"),
+                ), patch(
+                    "flowmarshal.engine.e2e_qualification.run_project_e2e",
+                    return_value=None,
+                ) as run_project:
+                    if expected is None:
+                        # 깨진 anchor는 provider 전에 명시 오류로 멈춘다.
+                        with self.assertRaisesRegex(QualificationRunError, "clean_install_link"):
+                            resume_run(destination)
+                        run_project.assert_not_called()
+                    else:
+                        resume_run(destination)
+                        self.assertEqual(
+                            expected, run_project.call_args.kwargs["clean_install_run_root"]
+                        )
 
     def setUp(self) -> None:
         self.roles = default_role_configuration(ROOT)
@@ -564,6 +634,7 @@ class EngineQualificationTests(unittest.TestCase):
         parser = build_parser()
         candidate = str((ROOT / "dist" / "candidate.whl").resolve())
         release_freeze = str((ROOT / "release-freeze").resolve())
+        clean_install = str((ROOT / "clean-install-run").resolve())
         arguments = parser.parse_args(
             [
                 "run",
@@ -575,6 +646,8 @@ class EngineQualificationTests(unittest.TestCase):
                 candidate,
                 "--release-freeze",
                 release_freeze,
+                "--clean-install-run-root",
+                clean_install,
                 "--budget-policy",
                 str(ROOT / "config" / "pre-1.0-validation-budget.json"),
                 "--role-timeout-policy",
@@ -600,6 +673,41 @@ class EngineQualificationTests(unittest.TestCase):
             release_freeze,
             run_project.call_args.kwargs["release_freeze"],
         )
+        self.assertEqual(clean_install, run_project.call_args.kwargs["clean_install_run_root"])
+
+    def test_eval_cli_project_e2e_clean_install_link_rules(self) -> None:
+        parser = build_parser()
+        candidate = str((ROOT / "dist" / "candidate.whl").resolve())
+        release_freeze = str((ROOT / "release-freeze").resolve())
+        clean_install = str((ROOT / "clean-install-run").resolve())
+        base = ["run", "--scope", "project-e2e", "--project-root", str(ROOT),
+                "--candidate-wheel", candidate]
+        cases = (
+            # release run은 E2E-18 연결 없이 시작하지 않는다.
+            ([*base, "--release-freeze", release_freeze], "--clean-install-run-root가 필요"),
+            ([*base, "--release-freeze", release_freeze, "--clean-install-run-root",
+              "relative/clean-install"], "절대경로"),
+            # dry invocation과 연결을 함께 주면 조용히 무시하지 않고 거절한다.
+            ([*base, "--pre-provider-dry-run", "--clean-install-run-root", clean_install],
+             "--pre-provider-dry-run에는"),
+            ([
+                "run", "--scope", "deterministic", "--project-root", str(ROOT),
+                "--clean-install-run-root", clean_install,
+            ], "project-e2e scope에서만"),
+        )
+        with patch("flowmarshal.engine.eval_cli.run_project_e2e") as run_project, patch(
+            "flowmarshal.engine.eval_cli.dry_run_project_e2e_pre_provider"
+        ) as dry_run:
+            for argv, message in cases:
+                with self.subTest(argv=argv), self.assertRaisesRegex(QualificationRunError, message):
+                    _run(parser.parse_args(argv))
+            run_project.assert_not_called()
+            dry_run.assert_not_called()
+            # 연결 없는 진단용 dry invocation 계약은 그대로다.
+            with patch("flowmarshal.engine.eval_cli._emit"):
+                self.assertEqual(0, _run(parser.parse_args([*base, "--pre-provider-dry-run"])))
+            dry_run.assert_called_once()
+            run_project.assert_not_called()
 
     def test_eval_cli_role_fixture_passes_only_supported_arguments(self) -> None:
         parser = build_parser()

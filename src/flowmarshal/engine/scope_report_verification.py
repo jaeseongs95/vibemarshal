@@ -8,7 +8,8 @@ from pathlib import Path
 from typing import Any
 
 from ..canonical import sha256_digest
-from .e2e_qualification import E2E_SCENARIOS
+from .clean_install_qualification import CleanInstallLinkResult, verify_clean_install_link
+from .e2e_qualification import E2E_SCENARIOS, _join_clean_install_link, _project_e2e_suite
 from .evaluation import (
     EvaluationCellCheckpoint,
     EvaluationContract,
@@ -285,7 +286,7 @@ def _project_e2e(
         governance_plugin_identity_digest = None
         _error(errors, "SCOPE_REPORT_E2E_GOVERNANCE_PLUGIN_INVALID")
     responsibility_report = evaluate_qualification_responsibilities(
-        qualification_suite_manifest(root),
+        _project_e2e_suite(qualification_suite_manifest(root)),
         tuple(outcomes),
         evaluation_contract_digest=contract.contract_digest,
         run_root=run_root,
@@ -303,17 +304,46 @@ def _project_e2e(
             None if candidate_binding is None else candidate_binding.distribution_version
         ),
     )
-    failures = tuple((*cell_failures, *responsibility_report.failures))
+    # E2E-18은 run 시작 전에 metadata에 고정한 clean install 연결만 다시 검증한다.
+    anchor = metadata.get("clean_install_link")
+    if candidate_binding is None:
+        link = CleanInstallLinkResult(
+            "failed", ("CLEAN_INSTALL_LINK_CANDIDATE_BINDING_UNAVAILABLE",), None, None, None
+        )
+    elif anchor is None:
+        link = verify_clean_install_link(
+            root=root, clean_install_run_root=None, candidate_binding=candidate_binding
+        )
+    elif not isinstance(anchor, dict) or set(anchor) != {
+        "run_root", "report_digest", "evaluation_contract_digest"
+    } or not isinstance(anchor["report_digest"], str):
+        # 깨진 anchor를 연결 없음(NOT_RUN)으로 읽지 않는다.
+        link = CleanInstallLinkResult(
+            "failed", ("CLEAN_INSTALL_LINK_ANCHOR_INVALID",), None, None, None
+        )
+    else:
+        link = verify_clean_install_link(
+            root=root,
+            clean_install_run_root=anchor["run_root"],
+            candidate_binding=candidate_binding,
+            expected_report_digest=anchor["report_digest"],
+        )
+        if anchor["evaluation_contract_digest"] != link.evaluation_contract_digest:
+            link = CleanInstallLinkResult(
+                "failed",
+                (*link.failures, "CLEAN_INSTALL_LINK_ANCHOR_MISMATCH"),
+                link.run_root,
+                link.report_digest,
+                link.evaluation_contract_digest,
+            )
+    link_failures, link_metrics = _join_clean_install_link(responsibility_report, link)
+    failures = tuple((*cell_failures, *responsibility_report.failures, *link_failures))
     metrics = {
         "cell_count": len(raws),
         "passed_cell_count": sum(1 for item in raws if item["passed"]),
         "actual_codex_cell_count": len(raws),
         "duplicate_effect_count": sum(1 for item in raws if item["scenario"] == "unknown-receipt-no-duplicate" and item.get("thread_create_count") != 1),
-        "responsibility_count": responsibility_report.responsibility_count,
-        "passed_responsibility_count": responsibility_report.passed_responsibility_count,
-        "not_run_responsibility_count": len(
-            responsibility_report.not_run_responsibility_ids
-        ),
+        **link_metrics,
     }
     return metrics, failures
 
