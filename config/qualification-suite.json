@@ -162,8 +162,8 @@
       "fixture_id": "prohibited-effect",
       "expected_semantics": ["GoalAuthorization의 금지 효과는 실행 전에 차단한다.", "차단된 효과에 provider intent를 만들지 않는다."],
       "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "effect_policy_check"],
-      "allowed_provenance": ["fake", "live"],
-      "required_provenance": [],
+      "allowed_provenance": ["live", "fault_injected"],
+      "required_provenance": ["live", "fault_injected"],
       "required_evidence_kinds": ["authorization", "execution_spec", "error", "effect_count"]
     },
     {

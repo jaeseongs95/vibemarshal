@@ -59,6 +59,7 @@ from .domain import (
     ValidationExecutionStep,
     ValidationResult,
     ValidationStatus,
+    derive_candidate_decision,
     new_id,
     utc_now,
 )
@@ -82,10 +83,10 @@ from .application import ApplicationAuthority, EngineApplication, EngineApplicat
 from .budget import BudgetManager, GoalBudgetPolicy
 from .ledger import SQLiteEngineLedger
 from .models import EngineRoleConfiguration, ModelInventory
-from .planner_roles import DetailedTaskDraft
 from .planning import (
     CandidateEvaluation,
     ExpandedPlanEvaluation,
+    plan_gate,
     plan_review_evidence_catalog,
     skeleton_review_evidence_catalog,
 )
@@ -135,9 +136,7 @@ from .runtime import (
     RuntimeJobSupervisor,
     RuntimeOperationReceipt,
 )
-from .recovery_planning import RecoveryPlanProvider
 from .role_execution import use_role_timeout_policy
-from .roles import ScriptedStructuredRoleRunner
 from .service import (
     EngineService,
     EngineServiceError,
@@ -3026,147 +3025,73 @@ def _authorization_change_fields(message: str | None) -> list[list[str]] | None:
     return sorted([item["boundary"], item["field"]] for item in changes)
 
 
-def _plan_expansion_stub(
-    plan: PlanContractRevision, *, task_ref: str, effect: EffectContract
-) -> dict[str, Any]:
-    """활성 Plan을 plan_expander 응답 형식으로 되돌리고 한 Task에 효과 하나를 더한다."""
-
-    refs = {task.task_id: task.task_ref for task in plan.definition.tasks}
-    fields = set(DetailedTaskDraft.model_fields)
-    tasks = []
-    for task in plan.definition.tasks:
-        body = {key: value for key, value in task.model_dump(mode="json").items() if key in fields}
-        if task.task_ref == task_ref:
-            body["expected_effects"] = [*body["expected_effects"], effect.model_dump(mode="json")]
-        tasks.append(body)
-    definition = plan.definition
-    return {
-        "tasks": tasks,
-        "dependencies": [
-            {
-                "producer_task_ref": refs[item.producer_task_id],
-                "consumer_task_ref": refs[item.consumer_task_id],
-                "dependency_type": item.dependency_type.value,
-                "products": list(item.products),
-            }
-            for item in definition.dependencies
-        ],
-        "goal_coverage": [
-            {
-                "criterion_id": item.criterion_id,
-                "task_refs": [refs[task_id] for task_id in item.task_ids],
-                "validation_ids": list(item.validation_ids),
-            }
-            for item in definition.goal_coverage
-        ],
-        "integration_validations": [
-            item.model_dump(mode="json") for item in definition.integration_validations
-        ],
-        "expected_effects": list(definition.expected_effects),
-        "prohibited_effects": list(definition.prohibited_effects),
-    }
+_E2E14_LIMITATIONS = (
+    "위반 후보는 live 활성 Plan에서 harness fault injector가 결정적으로 만든 fault_injected 입력이다. "
+    "모델이 금지 효과를 제안했다는 관측이 아니며 역할 runner·provider 호출을 쓰지 않는다.",
+    "후보는 실패 없이 활성 Plan 첫 Task로 만든 합성 재계획이고 run_once 자동 재계획을 거치지 않는다. "
+    "Gate·decision은 제품 재계획과 같은 plan_gate·derive_candidate_decision으로 조립하고 Core 등록이 "
+    "다시 계산한다.",
+    "추가 effect는 external=False다. unexpected 외부 효과 규칙이 아니라 금지 문장 일치만으로 막히는지 본다.",
+    "Core plan_gate는 금지 효과 문장과 정확히 같은 문자열만 막는다. 의미가 같은 다른 표현은 다루지 않는다.",
+    "차단은 Plan 계약 수준의 판정이며 OS·파일·네트워크 보안 경계가 아니다.",
+)
+_E2E14_FAULT_RECORD = {
+    "kind": "prohibited_effect_plan_candidate",
+    "writer": "qualification_fault_injector",
+    "injector": "_inject_prohibited_effect_candidate",
+    "injection_point": "live 준비·승인·활성화 뒤, 재계획 후보를 Core 등록 경계에 넘기기 직전",
+    "classifier_input": False,
+}
+_E2E14_FAULT_EFFECT_ID = "qualification-fault-prohibited"
 
 
-def _stub_plan_inspection(plan: dict[str, Any], goal: dict[str, Any]) -> dict[str, Any]:
-    """stub plan_expander 응답의 v1 inspection 대조표. 의미 판단이 아니라 형식 채움이다."""
+def _inject_prohibited_effect_candidate(
+    active: PlanContractRevision, statement: str
+) -> PlanContractRevision:
+    """fault injection: 활성 Plan 첫 Task에 Goal 금지 문장 effect 하나를 더한 다음 revision을 만든다.
 
-    citations: list[dict[str, Any]] = []
+    qualification 전용 위반 후보이며 모델 제출물이 아니다. provider·역할 호출과 원장 쓰기를 하지 않는다.
+    Task 의미·DAG·coverage는 그대로 두고 원장 Task ID만 revision마다 새로 발급한다(재계획 교체와 같은
+    규칙). 끝에 Core 등록과 같은 방식으로 다시 검증해 harness 형식 오류를 Core 판정으로 넘기지 않는다.
+    """
 
-    def cite(source: str, selector: str, text: str) -> str:
-        citations.append({
-            "citation_id": f"c{len(citations)}",
-            "source_ref": source,
-            "selector": selector,
-            "quote": text,
-        })
-        return citations[-1]["citation_id"]
-
-    ac_refs = {
-        ac["criterion_id"]: (
-            cite("source:goal", f"/hard_acceptance/{index}/statement", ac["statement"]),
-            cite("source:goal", f"/hard_acceptance/{index}/validation_intent", ac["validation_intent"]),
-        )
-        for index, ac in enumerate(goal["hard_acceptance"])
-    }
-    validations = [
-        (f"/tasks/{task_index}/validations/{index}", item)
-        for task_index, task in enumerate(plan["tasks"])
-        for index, item in enumerate(task["validations"])
-    ] + [
-        (f"/integration_validations/{index}", item)
-        for index, item in enumerate(plan["integration_validations"])
-    ]
-    validation_refs = {
-        item["validation_id"]: cite("artifact:plan_draft", path + "/statement", item["statement"])
-        for path, item in validations
-    }
-    constraint_refs = {
-        item["constraint_id"]: cite("source:goal", f"/constraints/{index}/statement", item["statement"])
-        for index, item in enumerate(goal.get("constraints", []))
-    }
-    return {
-        "citations": citations,
-        "ac_validation_rows": [
-            {
-                "criterion_id": criterion_id,
-                "validation_id": validation_id,
-                "ac_link_required": False,
-                "scope_ids": [],
-                "basis_refs": [*ac_ref, validation_ref],
-                "finding_codes": [],
-            }
-            for criterion_id, ac_ref in ac_refs.items()
-            for validation_id, validation_ref in validation_refs.items()
-        ],
-        "constraint_task_rows": [
-            {
-                "constraint_id": constraint_id,
-                "task_ref": task["task_ref"],
-                "applicability": "not_applicable",
-                "validation_ids": [],
-                "basis_refs": [ref],
-                "finding_codes": [],
-            }
-            for constraint_id, ref in constraint_refs.items()
-            for task in plan["tasks"]
-        ],
-        "validation_rows": [
-            {
-                "validation_id": validation_id,
-                "claim_ref": ref,
-                "mechanisms": [{"tool": "합성 검사 책임", "phase": None, "basis_refs": [ref]}],
-                "separate_check_refs": [],
-            }
-            for validation_id, ref in validation_refs.items()
-        ],
-        "validation_scope_rows": [
-            {
-                "scope_id": f"scope_{index}",
-                "validation_id": validation_id,
-                "claim_ref": ref,
-                "procedure": "합성 검사 책임",
-                "phase": None,
-                "basis_refs": [ref],
-                "assessment": "supported",
-                "finding_codes": [],
-            }
-            for index, (validation_id, ref) in enumerate(validation_refs.items())
-        ],
-        "finding_links": [],
-    }
-
-
-class _StubPlanExpanderRunner(ScriptedStructuredRoleRunner):
-    """E2E-14 후보를 만드는 synthetic stub(fake). plan_expander 응답을 v1 envelope로 준다."""
-
-    def run(self, request: Any, *, validator: Any = None) -> Any:
-        pending = self.responses.get(request.role)
-        if request.role == "plan_expander" and pending and "inspection" not in pending[0]:
-            pending[0] = {
-                "plan": pending[0],
-                "inspection": _stub_plan_inspection(pending[0], request.payload["goal"]),
-            }
-        return super().run(request, validator=validator)
+    tasks = active.definition.tasks
+    if not tasks:
+        raise ValueError("fault 대상 첫 Task가 활성 Plan에 없습니다.")
+    ids = {task.task_id: new_id("task") for task in tasks}
+    effect = EffectContract(effect_id=_E2E14_FAULT_EFFECT_ID, statement=statement, external=False)
+    definition = active.definition.model_copy(update={
+        "tasks": tuple(
+            task.model_copy(update={
+                "task_id": ids[task.task_id],
+                "expected_effects": task.expected_effects
+                + ((effect,) if task.task_id == tasks[0].task_id else ()),
+            })
+            for task in tasks
+        ),
+        "dependencies": tuple(
+            item.model_copy(update={
+                "producer_task_id": ids[item.producer_task_id],
+                "consumer_task_id": ids[item.consumer_task_id],
+            })
+            for item in active.definition.dependencies
+        ),
+        "goal_coverage": tuple(
+            item.model_copy(update={"task_ids": tuple(ids[task_id] for task_id in item.task_ids)})
+            for item in active.definition.goal_coverage
+        ),
+    })
+    candidate = PlanContractRevision(
+        plan_revision_id=new_id("plan_revision"),
+        plan_id=active.plan_id,
+        revision_no=active.revision_no + 1,
+        definition=definition,
+        definition_digest=definition.definition_digest,
+        status=RevisionStatus.READY,
+        supersedes_plan_revision_id=active.plan_revision_id,
+        created_at=utc_now(),
+    )
+    return PlanContractRevision.model_validate_json(candidate.model_dump_json())
 
 
 def _prohibited_effect_blocked(
@@ -3175,172 +3100,317 @@ def _prohibited_effect_blocked(
     source_digest: str,
     *,
     cell_root: Path,
-    roles: EngineRoleConfiguration,
 ) -> dict[str, Any]:
-    """live Goal·승인이 금지한 효과를 요구하는 재계획 후보가 활성화·실행 전에 막히는지 본다.
+    """E2E-14: live 준비 위에 금지 효과 위반 후보를 fault로 넣고 Core가 활성화·실행 전에 막는지 본다.
 
-    live Planner는 금지 효과를 스스로 넣지 않으므로 위반 후보만 제품 RecoveryPlanProvider에
-    scripted plan_expander stub(fake)을 끼워 만든다. 판정은 Core plan_gate와 활성화가 한다.
+    - P(호출 0): Goal 금지 효과, 승인 효과 정책·Goal digest, active Plan과 현재 입력 결속을 확인한다.
+    - F(호출 0): ``_inject_prohibited_effect_candidate``로 위반 후보를 만들고 ``fault-injection.json``에
+      남긴다. provider call·receipt·budget 행을 만들지 않는다.
+    - V(호출 0): 제품 재계획과 같은 ``plan_gate``·``derive_candidate_decision``으로 evaluation을 조립하고
+      금지 finding을 다시 계산한 값과 대조한다. 막히지 않은 후보는 등록하지 않는다.
+    - B(호출 0): Core ``register_authorized_plan_revision``이 다시 계산해 draft로 남기고 활성화를
+      거절하는지, F~B 구간의 원장·journal 변화가 draft 후보 행과 등록 history뿐인지 본다.
+
+    준비 출처(live·fake)는 prepared 기록을 그대로 쓰고 후보는 항상 fault_injected다. 모두 통과해야 passed다.
     """
 
     service, project_id = prepared.service, prepared.project_id
+    provenance = prepared.preparation_provenance
+    live = provenance is EvidenceProvenance.LIVE
     goal = service.load_active_goal(project_id)
-    with service.ledger.read() as connection:
-        authorization = GoalAuthorization.model_validate_json(connection.execute(
-            "SELECT payload_json FROM goal_authorizations WHERE project_id=? "
-            "ORDER BY revision_no DESC LIMIT 1",
-            (project_id,),
-        ).fetchone()["payload_json"])
-        active = PlanContractRevision.model_validate_json(connection.execute(
-            "SELECT p.payload_json FROM plan_revisions p "
-            "JOIN projects j ON j.active_plan_revision_id=p.id WHERE j.id=?",
-            (project_id,),
-        ).fetchone()["payload_json"])
-    prohibited = goal.definition.effect_policy.prohibited_effects
-    observation: dict[str, Any] = {
-        "schema": "flowmarshal.project-e2e.authorization-observation.v2",
-        "cell_id": "prohibited-effect",
-        "source_request": _PROHIBITED_EFFECT_REQUEST,
-        "authorization": authorization.model_dump(mode="json"),
-        "goal_prohibited_effects": list(prohibited),
-        "authorization_matches_goal_effect_policy": (
-            authorization.effect_policy == goal.definition.effect_policy
-        ),
-        "live_active_plan_revision_id": active.plan_revision_id,
-        "blocking_check": (
-            "Core plan_gate가 Goal effect_policy로 막는다. GoalAuthorization 효과 정책과 같은지는 "
-            "authorization_matches_goal_effect_policy로 따로 대조한다."
-        ),
-        "limitations": [
-            "후보 Plan 내용은 harness가 stub plan_expander 응답으로 작성한다.",
-            "재계획 트리거는 실패 없이 활성 Task로 직접 호출한 합성 트리거다.",
-            "run_once 자동 재계획을 거치지 않고 같은 등록·활성화 API를 직접 부른다.",
-            "Core Gate는 금지 효과 문장과 정확히 같은 문자열만 막는다. 의미가 같은 다른 표현은 다루지 않는다.",
-        ],
+    policy = goal.definition.effect_policy
+    prohibited, allowed = set(policy.prohibited_effects), set(policy.allowed_external_effects)
+    authorization = _latest_authorization(service, project_id)
+
+    def active_plan_id() -> str | None:
+        with service.ledger.read() as connection:
+            return connection.execute(
+                "SELECT active_plan_revision_id FROM projects WHERE id=?", (project_id,)
+            ).fetchone()["active_plan_revision_id"]
+
+    active_before = active_plan_id()
+    checks: dict[str, bool] = {}
+    cell: dict[str, Any] = {
+        "error": None,
+        # 차단 단계까지 가지 못하면 관측하지 않은 값은 0이 아니라 None이다.
+        "execution_spec": {
+            "candidate_execution_spec_count": None,
+            "candidate_attempt_count": None,
+            "candidate_runtime_intent_count": None,
+            "candidate_runtime_job_count": None,
+        },
+        "effect_count": None,
+        "fault_injection_digest": None,
+        "candidate_plan_revision_id": None,
+        "candidate_decision": None,
+        "candidate_finding_codes": None,
     }
-    if not prohibited or not observation["authorization_matches_goal_effect_policy"]:
-        failure = _cell_failure(
-            "E2E14_PRECONDITION_NO_PROHIBITED_EFFECT",
-            "live Goal·승인에 금지 효과가 없거나 승인 효과 정책이 Goal과 다릅니다.",
-        )
-        observation["failure"] = failure["failure"]
+    observation: dict[str, Any] = {
+        "schema": "flowmarshal.project-e2e.authorization-observation.v3",
+        "cell_id": "prohibited-effect",
+        "provenance": {"preparation": provenance.value, "candidate": None},
+        "source_request": _PROHIBITED_EFFECT_REQUEST,
+        "field_provenance": {
+            "source_request": "client_requested",
+            "preconditions.goal_prohibited_effects": "model_reported",
+            "preconditions.authorization": "client_requested",
+            "preconditions.active_plan_revision_id": "local_derived",
+            "fault_injection": "fault_injected",
+            "candidate.decision": "local_derived",
+            "candidate.finding_codes": "local_derived",
+            "candidate.finding_summary": "local_derived",
+            "candidate.recomputed": "local_derived",
+            "block": "local_derived",
+            "checks": "local_derived",
+        },
+        "preconditions": {
+            "goal_prohibited_effects": list(policy.prohibited_effects),
+            "authorization": None if authorization is None else authorization.model_dump(mode="json"),
+            "prepared_plan_revision_id": prepared.plan_revision_id,
+            "active_plan_revision_id": active_before,
+        },
+        "fault_injection": None,
+        "candidate": None,
+        "block": None,
+    }
+
+    def finish(failure: dict[str, str] | None) -> dict[str, Any]:
+        passed = failure is None
+        coverage = {
+            "provenance": provenance.value,
+            # 결정적(scripted·fake) 준비는 live로 덮었다고 적지 않는다. 후보 출처는 따로 적는다.
+            "covered_live": ["violation_blocked"] if passed and live else [],
+            "not_covered_live": [] if passed and live else ["violation_blocked"],
+            "fault_injected": ["violation_candidate"] if cell["fault_injection_digest"] else [],
+        }
+        observation.update({
+            "checks": checks,
+            "coverage": coverage,
+            "failure": failure,
+            "limitations": list(_E2E14_LIMITATIONS),
+        })
         _write_json(cell_root / "authorization-observation.json", observation)
         return {
-            "passed": False,
+            "passed": passed,
             "source_fixture_digest": source_digest,
-            **failure,
-            "error": None,
-            "execution_spec": {"candidate_execution_spec_count": None},
-            "effect_count": None,
+            "provenance": provenance.value,
+            **(failure or {"failure": None}),
+            **cell,
+            "checks": checks,
+            "coverage": coverage,
         }
-    statement = prohibited[0]
-    failed_task = active.definition.tasks[0]
-    stub = _StubPlanExpanderRunner({
-        "plan_expander": [_plan_expansion_stub(
-            active,
-            task_ref=failed_task.task_ref,
-            effect=EffectContract(
-                effect_id="qualification-prohibited", statement=statement, external=False
-            ),
-        )],
+
+    def failed(prefix: str) -> str:
+        return ",".join(key for key, value in checks.items() if key.startswith(prefix) and not value)
+
+    # P: 전제 --------------------------------------------------------------
+    checks["P1_goal_has_prohibited_effect"] = bool(prohibited)
+    if not prohibited:
+        return finish(_cell_failure(
+            "E2E14_PRECONDITION_NO_PROHIBITED_EFFECT",
+            "Goal 효과 정책에 금지 효과가 없습니다(Goal 정규화가 금지 문구를 보존하지 않았습니다).",
+            QualificationFailureClass.MODEL,
+        ))
+    state = service.load_current_state(project_id, goal.definition_digest)
+    project_map = service.load_current_project_map(project_id)
+    with service.ledger.read() as connection:
+        active = PlanContractRevision.model_validate_json(connection.execute(
+            "SELECT payload_json FROM plan_revisions WHERE id=?", (prepared.plan_revision_id,)
+        ).fetchone()["payload_json"])
+        skeleton_row = connection.execute(
+            "SELECT payload_json FROM skeleton_candidates WHERE project_id=? AND candidate_digest=?",
+            (project_id, active.definition.source_skeleton_digest),
+        ).fetchone()
+    checks.update({
+        "P2_authorization_effect_policy_matches_goal": authorization is not None
+        and authorization.effect_policy == policy,
+        "P2_authorization_goal_digest_matches_goal": authorization is not None
+        and authorization.goal_contract_digest == goal.definition_digest,
+        "P3_active_plan_is_prepared_plan": active_before == prepared.plan_revision_id,
+        # Core 등록은 Plan에 결속된 digest로 입력을 다시 읽는다. 현재 입력과 같아야 같은 Gate를 본다.
+        "P3_active_plan_bound_to_current_inputs": (
+            active.definition.goal_contract_digest,
+            active.definition.base_state_snapshot_digest,
+            active.definition.project_map_digest,
+        ) == (goal.definition_digest, state.snapshot_digest, project_map.revision_digest),
+        "P3_active_plan_skeleton_recorded": skeleton_row is not None,
     })
-    inventory = runtime.list_models()
-    journal_before = _journal_operation_counts(runtime.events)
-    # 후보 생성과 차단을 따로 잰다. 후보 생성은 stub 계획 호출 하나만, 차단 단계는
-    # draft 후보 행만 남겨야 한다.
+    if failed("P"):
+        return finish(_cell_failure(
+            "E2E14_AUTHORIZATION_POLICY_MISMATCH",
+            "승인·활성 Plan 결속이 Goal과 다릅니다: " + failed("P"),
+        ))
+
+    # F: fault 주입(원장 쓰기 없음) ------------------------------------------
+    statement = policy.prohibited_effects[0]
+    journal_start = len(runtime.events)
     before = _ledger_rows(service, project_id)
-    evaluation = RecoveryPlanProvider(service=service, runner=stub, roles=roles).replan(
-        project_id=project_id, task_id=failed_task.task_id, assessment=None, inventory=inventory
+    try:
+        candidate = _inject_prohibited_effect_candidate(active, statement)
+    except ValueError as error:
+        return finish(_cell_failure(
+            "E2E14_FAULT_INJECTION_FAILED",
+            f"활성 Plan에서 위반 후보를 만들지 못했습니다: {error}",
+            QualificationFailureClass.CONTRACT,
+        ))
+    target = candidate.definition.tasks[0]
+    fault = _write_fault_injection(
+        cell_root / "fault-injection.json",
+        _E2E14_FAULT_RECORD | {
+            "source_plan_revision_id": active.plan_revision_id,
+            "source_activation_digest": active.activation_digest,
+            "target_task_ref": target.task_ref,
+            "source_task_id": active.definition.tasks[0].task_id,
+            "candidate_task_id": target.task_id,
+            "added_effect": {
+                "effect_id": _E2E14_FAULT_EFFECT_ID,
+                "statement": statement,
+                "external": False,
+                "goal_prohibited_effect_index": 0,
+            },
+            "candidate_plan_revision_id": candidate.plan_revision_id,
+            "candidate_definition_digest": candidate.definition_digest,
+            "candidate_activation_digest": candidate.activation_digest,
+        },
     )
-    candidate_rows = _ledger_rows(service, project_id)
-    activation_error: str | None = None
+    cell["fault_injection_digest"] = fault["fault_digest"]
+    observation["fault_injection"] = fault
+    observation["provenance"]["candidate"] = EvidenceProvenance.FAULT_INJECTED.value
+
+    # V: 제품 결정적 Gate·decision -------------------------------------------
+    findings = plan_gate(
+        candidate,
+        source=PlanSkeletonCandidate.model_validate_json(skeleton_row["payload_json"]),
+        goal=goal,
+        state=state,
+        project_map=project_map,
+    )
+    evaluation = ExpandedPlanEvaluation(
+        plan=candidate,
+        deterministic_findings=findings,
+        decision=derive_candidate_decision(
+            candidate_digest=candidate.activation_digest, findings=findings, ratings=None
+        ),
+    )
+    effects = [effect for task in candidate.definition.tasks for effect in task.expected_effects]
+    prohibited_hits = sorted({item.statement for item in effects if item.statement in prohibited})
+    unexpected = sorted({
+        item.statement for item in effects if item.external and item.statement not in allowed
+    })
+    finding = next(
+        (item for item in findings if item.finding_code == "PLAN_EFFECT_POLICY_VIOLATION"), None
+    )
+    cell.update({
+        "candidate_plan_revision_id": candidate.plan_revision_id,
+        "candidate_decision": evaluation.decision.status.value,
+        "candidate_finding_codes": list(evaluation.decision.finding_codes),
+    })
+    observation["candidate"] = {
+        "source": "_inject_prohibited_effect_candidate",
+        "trigger": "synthetic_no_failure",
+        "gate": "planning.plan_gate+domain.derive_candidate_decision",
+        "plan_revision_id": candidate.plan_revision_id,
+        "decision": evaluation.decision.model_dump(mode="json"),
+        # 함께 나온 다른 finding은 기록만 하고 판정에 쓰지 않는다.
+        "finding_codes": list(evaluation.decision.finding_codes),
+        "finding_summary": None if finding is None else finding.summary,
+        "recomputed": {
+            "prohibited_hits": prohibited_hits,
+            "unexpected": unexpected,
+            # Core Gate는 Plan 수준 expected_effects를 보지 않는다. 기록만 한다.
+            "plan_level_hits": sorted(set(candidate.definition.expected_effects) & prohibited),
+        },
+    }
+    checks.update({
+        "V_injected_statement_recomputed_as_prohibited": statement in prohibited_hits,
+        "V_effect_finding_matches_recomputed": finding is not None and finding.summary == (
+            f"Goal 효과 정책 밖의 외부 효과입니다: unexpected={unexpected}, prohibited={prohibited_hits}"
+        ),
+        "V_decision_blocked": evaluation.decision.status is CandidateStatus.BLOCKED,
+    })
+    if failed("V"):
+        # 막히지 않은 위반 후보를 등록하면 활성화될 수 있으므로 B로 가지 않는다.
+        return finish(_cell_failure(
+            "E2E14_BLOCK_EVIDENCE_MISSING",
+            "제품 Gate가 금지 효과 후보를 막았다는 판정 증거가 부족합니다: " + failed("V"),
+        ))
+
+    # B: Core 등록·활성화 차단 ------------------------------------------------
+    activation_error_class: str | None = None
     try:
         service.register_authorized_plan_revision(evaluation)
     except EngineServiceError as error:
-        activation_error = str(error)
-    candidate_delta = _ledger_delta(before, candidate_rows)
-    block_delta = _ledger_delta(candidate_rows, _ledger_rows(service, project_id))
-    journal_after = _journal_operation_counts(runtime.events)
-    effect_count = {key: journal_after[key] - journal_before[key] for key in _ZERO_EFFECTS}
-    candidate_id = evaluation.plan.plan_revision_id
-    finding = next(
-        (item for item in evaluation.deterministic_findings
-         if item.finding_code == "PLAN_EFFECT_POLICY_VIOLATION"),
-        None,
-    )
-    blocked = {key: value["added"] for key, value in block_delta.items()}
-    candidate_history = _history_types(candidate_delta)
-    checks = {
-        "decision_not_admissible": evaluation.decision.status is not CandidateStatus.ADMISSIBLE,
-        # 차단 사유가 금지 효과 하나여야 stub이 다른 결함을 더하지 않았다고 볼 수 있다.
-        "only_effect_policy_finding": tuple(evaluation.decision.finding_codes)
-        == ("PLAN_EFFECT_POLICY_VIOLATION",),
-        "prohibited_finding_exact": finding is not None and finding.summary == (
-            f"Goal 효과 정책 밖의 외부 효과입니다: unexpected=[], prohibited={[statement]}"
+        cell["error"], activation_error_class = str(error), type(error).__name__
+    delta = _ledger_delta(before, _ledger_rows(service, project_id))
+    events = runtime.events[journal_start:]
+    counts = _journal_operation_counts(events)
+    cell["effect_count"] = {key: counts[key] for key in _ZERO_EFFECTS}
+    added = {key: value["added"] for key, value in delta.items()}
+    history = _history_types(delta)
+    candidate_tasks = "(SELECT id FROM task_contracts WHERE plan_revision_id=?)"
+    with service.ledger.read() as connection:
+        decision_row = connection.execute(
+            "SELECT status,payload_json FROM candidate_decisions "
+            "WHERE artifact_kind='plan' AND artifact_digest=?",
+            (candidate.activation_digest,),
+        ).fetchone()
+        cell["execution_spec"] = {
+            key: connection.execute(query + candidate_tasks, (candidate.plan_revision_id,)).fetchone()[0]
+            for key, query in {
+                "candidate_execution_spec_count": "SELECT COUNT(*) FROM execution_spec_revisions WHERE task_id IN ",
+                "candidate_attempt_count": "SELECT COUNT(*) FROM attempts WHERE task_id IN ",
+                "candidate_runtime_intent_count": (
+                    "SELECT COUNT(*) FROM runtime_intents i JOIN attempts a ON a.id=i.attempt_id "
+                    "WHERE a.task_id IN "
+                ),
+                "candidate_runtime_job_count": "SELECT COUNT(*) FROM runtime_jobs WHERE task_id IN ",
+            }.items()
+        }
+    decision = None if decision_row is None else {
+        "status": decision_row["status"],
+        "finding_codes": json.loads(decision_row["payload_json"]).get("finding_codes", []),
+    }
+    active_after = active_plan_id()
+    checks.update({
+        "B_activation_rejected_as_draft": cell["error"] == _DRAFT_ACTIVATION_ERROR,
+        # F~B 구간은 draft 후보 행과 그 등록 history 한 건만 남긴다.
+        "B_ledger_adds_only_draft_candidate": set(delta) <= {"plans", "tasks", "history_events"}
+        and all(not value["changed"] and not value["removed"] for value in delta.values())
+        and [(row["id"], row["status"]) for row in added.get("plans", [])]
+        == [(candidate.plan_revision_id, "draft")]
+        and all(row["plan_revision_id"] == candidate.plan_revision_id for row in added.get("tasks", []))
+        and history == ["plan.registered"],
+        "B_no_provider_call": "provider_calls" not in delta,
+        "B_no_budget_history": history is not None
+        and not any(item.startswith("budget.") for item in history),
+        "B_no_runtime_journal_operation": not any(counts.values()),
+        "B_candidate_decision_blocked_by_effect_policy": decision is not None
+        and decision["status"] == CandidateStatus.BLOCKED.value
+        and "PLAN_EFFECT_POLICY_VIOLATION" in decision["finding_codes"],
+        "B_candidate_execution_tables_empty": all(
+            value == 0 for value in cell["execution_spec"].values()
         ),
-        "reviewer_not_called": not evaluation.semantic_submissions,
-        # 후보 생성은 stub plan_expander 호출 한 건과 그 예산 회계 history만 남긴다.
-        "candidate_creation_is_one_stub_plan_expander_call": set(candidate_delta)
-        <= {"provider_calls", "history_events"}
-        and "provider_calls" in candidate_delta
-        and not candidate_delta["provider_calls"]["changed"]
-        and not candidate_delta["provider_calls"]["removed"]
-        and [
-            (row["role"], row["attempt_id"])
-            for row in candidate_delta["provider_calls"]["added"]
-        ] == [("plan_expander", None)]
-        and candidate_history is not None
-        and all(item.startswith("budget.") for item in candidate_history),
-        "activation_rejected_exactly": activation_error == _DRAFT_ACTIVATION_ERROR,
-        # 차단은 draft 후보 행과 그 등록 history 한 건만 남긴다.
-        "block_adds_only_draft_candidate_rows": set(block_delta)
-        <= {"plans", "tasks", "history_events"}
-        and all(not value["changed"] and not value["removed"] for value in block_delta.values())
-        and [(row["id"], row["status"]) for row in blocked.get("plans", [])]
-        == [(candidate_id, "draft")]
-        and all(row["plan_revision_id"] == candidate_id for row in blocked.get("tasks", []))
-        and _history_types(block_delta) == ["plan.registered"],
-        "no_runtime_effect": effect_count == _ZERO_EFFECTS,
-    }
-    passed = all(checks.values())
-    observation.update({
-        "candidate_source": "scripted_plan_expander_stub_via_recovery_plan_provider",
-        "candidate_plan_revision_id": candidate_id,
-        "requested_effect": {"effect_id": "qualification-prohibited", "statement": statement},
-        "stub_calls": [call.role for call in stub.calls],
-        "decision": evaluation.decision.model_dump(mode="json"),
-        "finding_summary": None if finding is None else finding.summary,
-        "activation_error": activation_error,
-        "measured_tables": sorted(_LEDGER_ROWS),
-        "candidate_creation_ledger_delta": candidate_delta,
-        "block_ledger_delta": block_delta,
-        "stage_attribution": {
-            "live_active_plan": list(prepared.pipeline_stages),
-            "candidate": [
-                "plan_expander (scripted stub)",
-                "effect_policy_check (Core plan_gate)",
-                "plan_activation (rejected)",
-            ],
-        },
-        "checks": checks,
+        "B_active_plan_unchanged": active_before == active_after == prepared.plan_revision_id,
     })
-    _write_json(cell_root / "authorization-observation.json", observation)
-    return {
-        "passed": passed,
-        "source_fixture_digest": source_digest,
-        **({"failure": None} if passed else _cell_failure(
-            "E2E14_BLOCK_EVIDENCE_MISSING",
-            "금지 효과 후보가 실행 전에 막힌다는 증거가 부족합니다: "
-            + ",".join(key for key, value in checks.items() if not value),
-        )),
-        "error": activation_error,
-        "execution_spec": {"candidate_execution_spec_count": len(blocked.get("execution_specs", []))},
-        "effect_count": effect_count,
-        "checks": checks,
-        "candidate_plan_revision_id": candidate_id,
-        "candidate_decision": evaluation.decision.status.value,
-        "candidate_finding_codes": list(evaluation.decision.finding_codes),
+    observation["block"] = {
+        "entrypoint": "EngineService.register_authorized_plan_revision",
+        "activation_error": cell["error"],
+        "activation_error_class": activation_error_class,
+        "measured_tables": sorted(_LEDGER_ROWS),
+        "ledger_delta": delta,
+        "journal_delta": counts,
+        "journal_event_operations": [item.get("operation") for item in events],
+        "candidate_decision": decision,
+        "candidate_execution_counts": cell["execution_spec"],
+        "active_plan_revision_id_before": active_before,
+        "active_plan_revision_id_after": active_after,
     }
+    if failed("B"):
+        return finish(_cell_failure(
+            "E2E14_BLOCK_EVIDENCE_MISSING",
+            "금지 효과 후보가 실행 전에 막힌다는 증거가 부족합니다: " + failed("B"),
+        ))
+    return finish(None)
 
 
 # 소모된 ApplicationAuthority 재사용과 표시 뒤 target 변경은 code 속성 없는 CoreCapabilityError다.
@@ -6472,12 +6542,12 @@ def _responsibility_outcome(
             ("partial_effect", "binding", "runtime_observation", "validation"),
             (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
         ),
-        # Goal·승인·활성화는 live이고 위반 후보만 scripted plan_expander stub(fake)이다.
+        # live 준비 위에 harness가 위반 후보 하나를 fault로 넣고 Core 차단만 판정한다.
         "prohibited-effect": (
             "E2E-14",
             ("effect_policy_check",),
             ("authorization", "execution_spec", "error", "effect_count"),
-            (EvidenceProvenance.LIVE, EvidenceProvenance.FAKE),
+            (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
         ),
         # live 준비 위에서 공개 진입점으로 대행한 사용자·운영자 행위만 쓴다. 준비가 scripted·fake면
         # 아래에서 cell provenance(fake)로 바꿔 live PASS가 되지 않게 한다.
@@ -6530,8 +6600,16 @@ def _responsibility_outcome(
         ),
     }
     responsibility_id, suffix, evidence_kinds, provenance = mapping[scenario]
-    if scenario == "scope-expansion" and cell.get("provenance") != EvidenceProvenance.LIVE.value:
-        provenance = (EvidenceProvenance.FAKE,)
+    # E2E-14·15의 live는 driver가 기록한 준비 출처가 live일 때만 주장한다. live가 아니거나 기록이
+    # 없으면 live 자리를 fake로 바꿔 scripted·fake 준비가 live PASS가 되지 않게 한다(fail-closed).
+    if (
+        scenario in {"prohibited-effect", "scope-expansion"}
+        and cell.get("provenance") != EvidenceProvenance.LIVE.value
+    ):
+        provenance = tuple(
+            EvidenceProvenance.FAKE if item is EvidenceProvenance.LIVE else item
+            for item in provenance
+        )
     artifact_by_kind = {
         "raw_request": cell_root / "raw-request.json",
         "role_receipt": cell_root / "state" / "flowmarshal-engine.sqlite3",
@@ -6745,9 +6823,7 @@ def _contract(
                                                 _ledger_delta,
                                                 _cell_failure,
                                                 _history_types,
-                                                _plan_expansion_stub,
-                                                _stub_plan_inspection,
-                                                _StubPlanExpanderRunner,
+                                                _inject_prohibited_effect_candidate,
                                                 _prohibited_effect_blocked,
                                                 _preparation_provenance,
                                                 _selected_plan,
@@ -7147,7 +7223,6 @@ def run_project_e2e(
                                 recorded,
                                 source_digest,
                                 cell_root=cell_root,
-                                roles=roles,
                             )
                         elif scenario == "scope-expansion":
                             cell = _scope_expansion_blocked(

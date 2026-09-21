@@ -40,6 +40,7 @@ from flowmarshal.engine.e2e_qualification import (
     _guard_e2e_partial_resume,
     _in_flight_replan_protection,
     _initialize_workspace_git,
+    _inject_prohibited_effect_candidate,
     _ledger_delta,
     _multi_task_dag,
     _observe_frozen_plugin_identity,
@@ -410,6 +411,9 @@ def _scope_runner(workspace: Path, *, r2_mutation: str = "scoped_change") -> _Re
         required_evidence_kinds=("test",),
     ).model_dump(mode="json")}]
     return _ReadyTaskScriptedRunner(responses)
+
+
+_E2E14_STATEMENT = "원격 저장소에 변경을 push한다."
 
 
 class EngineE2EQualificationTests(unittest.TestCase):
@@ -796,7 +800,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
             # 실제 _prepare_from_raw_request를 scripted 역할로 돌린다(제품 facade 경로 그대로).
             cell = kwargs["state_root"].parent.name
             responses = _responses()
-            responses["goal_normalizer"][0]["prohibited_effects"] = ["원격 저장소에 변경을 push한다."]
+            responses["goal_normalizer"][0]["prohibited_effects"] = [_E2E14_STATEMENT]
             requested[cell] = {
                 "source_request": kwargs["source_request"],
                 "authorize": kwargs.get("authorize", True),
@@ -859,8 +863,14 @@ class EngineE2EQualificationTests(unittest.TestCase):
             requested,
         )
         prohibited = cells["prohibited-effect"]
+        # scripted 준비 위에 위반 후보를 fault로 넣은 E2E-14 cell은 차단을 증명하지만 출처는 fake다.
         self.assertTrue(prohibited["passed"], prohibited)
-        self.assertEqual(["live", "fake"], prohibited["qualification_outcome"]["provenance"])
+        self.assertEqual("fake", prohibited["provenance"])
+        self.assertEqual(
+            ["fake", "fault_injected"], prohibited["qualification_outcome"]["provenance"]
+        )
+        self.assertEqual([], prohibited["coverage"]["covered_live"])
+        self.assertEqual(["violation_candidate"], prohibited["coverage"]["fault_injected"])
         # E2E-15 결정적 실행은 세 축을 모두 관측해 cell은 통과하지만 출처는 fake다.
         scope = cells["scope-expansion"]
         self.assertTrue(scope["passed"], scope)
@@ -875,17 +885,17 @@ class EngineE2EQualificationTests(unittest.TestCase):
             self.assertIsNotNone(item["qualification_plan_activation"]["activation_receipt_digest"])
         self.assertEqual(contract.contract_digest, receipt["evaluation_contract_digest"])
         self.assertEqual(contract.fixture_digests[1], receipt["fixture_digest"])
-        # live만 허용하는 E2E-15 책임은 fake 출처로 PASS가 되지 않는다.
-        for code in ("PROVENANCE_NOT_ALLOWED", "REQUIRED_PROVENANCE_MISSING"):
-            self.assertIn(f"{code}:E2E-15:scope-expansion", report.failures)
-        self.assertFalse(any(item.startswith("PRODUCT_FAILURE:E2E-15") for item in report.failures))
+        # live 준비가 필요한 E2E-14·15 책임은 fake 출처로 PASS가 되지 않고 제품 실패도 아니다.
+        for responsibility in ("E2E-14:prohibited-effect", "E2E-15:scope-expansion"):
+            for code in ("PROVENANCE_NOT_ALLOWED", "REQUIRED_PROVENANCE_MISSING"):
+                self.assertIn(f"{code}:{responsibility}", report.failures)
         self.assertFalse(any(
-            item.startswith("PRODUCT_FAILURE:E2E-14") or item.endswith(":E2E-14:prohibited-effect")
+            item.startswith(("PRODUCT_FAILURE:E2E-14", "PRODUCT_FAILURE:E2E-15"))
             for item in report.failures
         ))
         self.assertEqual("passed", report.metrics["clean_install_link_status"])
-        # E2E-14와 연결된 E2E-18만 PASS다.
-        self.assertEqual(2, report.metrics["passed_responsibility_count"])
+        # 연결된 clean install의 E2E-18만 PASS다.
+        self.assertEqual(1, report.metrics["passed_responsibility_count"])
 
     def test_candidate_wheel_binding_changes_project_e2e_contract(self) -> None:
         fixture_root = ROOT / "tests" / "fixtures" / "engine" / "project-e2e"
@@ -2198,83 +2208,284 @@ class EngineE2EQualificationTests(unittest.TestCase):
         )
         return cell_root, prepared, runtime, source_digest, _roles()
 
-    def test_prohibited_effect_candidate_is_blocked_before_execution(self) -> None:
-        statement = "원격 저장소에 변경을 push한다."
+    def _prohibited_cell(self, raw: str, *, prohibited=(_E2E14_STATEMENT,)):
+        cell_root, prepared, runtime, source_digest, _roles = self._raw_request_cell(
+            raw, prohibited=prohibited
+        )
+        return cell_root, prepared, runtime, source_digest
+
+    @staticmethod
+    def _plan_rows(prepared) -> list[tuple[str, str]]:
+        with prepared.service.ledger.read() as connection:
+            return [
+                tuple(row)
+                for row in connection.execute("SELECT id,status FROM plan_revisions ORDER BY rowid")
+            ]
+
+    @staticmethod
+    def _call_and_budget_rows(prepared) -> dict[str, int]:
+        with prepared.service.ledger.read() as connection:
+            return {
+                "provider_calls": connection.execute("SELECT COUNT(*) FROM provider_calls").fetchone()[0],
+                "budget_history": connection.execute(
+                    "SELECT COUNT(*) FROM history_events WHERE event_type LIKE 'budget.%'"
+                ).fetchone()[0],
+            }
+
+    @staticmethod
+    def _observation(cell_root: Path) -> dict:
+        return json.loads((cell_root / "authorization-observation.json").read_text(encoding="utf-8"))
+
+    def _e2e14_outcome(self, prepared, cell: dict, cell_root: Path, run_root: Path):
+        # 책임 판정 evidence 파일은 run loop가 쓴다. 단위 테스트에서는 cell dict를 직접 둔다.
+        (cell_root / "qualification-observation.json").write_text(
+            json.dumps(cell, ensure_ascii=False), encoding="utf-8"
+        )
+        digest = "sha256:" + "a" * 64
+        return _responsibility_outcome(
+            scenario="prohibited-effect",
+            prepared=prepared,
+            cell=cell,
+            contract=SimpleNamespace(contract_digest=digest),
+            cell_root=cell_root,
+            run_root=run_root,
+            fixture_digest=digest,
+            freeze_bundle_digest=digest,
+            governance_plugin_identity_digest=digest,
+            candidate_wheel_digest=digest,
+            candidate_wheel_binding_digest=digest,
+            candidate_distribution_name="flowmarshal-engine",
+            candidate_distribution_version="1.0.0",
+        )
+
+    def test_prohibited_effect_fault_candidate_is_blocked_before_execution(self) -> None:
+        # scripted 준비 위의 fault 후보도 Core가 막지만 책임 출처는 fake·fault_injected뿐이다.
         with tempfile.TemporaryDirectory() as raw:
-            cell_root, prepared, runtime, source_digest, roles = self._raw_request_cell(
-                raw, prohibited=(statement,)
-            )
+            cell_root, prepared, runtime, source_digest = self._prohibited_cell(raw)
             active_before = prepared.service.status(prepared.project_id)["project"][
                 "active_plan_revision_id"
             ]
+            rows_before = self._call_and_budget_rows(prepared)
+            role_calls_before = len(prepared.structured_runner.calls)
+            journal_before = len(runtime.events)
 
-            result = _prohibited_effect_blocked(
-                prepared, runtime, source_digest, cell_root=cell_root, roles=roles
-            )
+            result = _prohibited_effect_blocked(prepared, runtime, source_digest, cell_root=cell_root)
 
             self.assertTrue(result["passed"], result)
+            self.assertIsNone(result["failure"])
             self.assertTrue(all(result["checks"].values()), result["checks"])
+            self.assertEqual("fake", result["provenance"])
+            self.assertEqual([], result["coverage"]["covered_live"])
+            self.assertEqual(["violation_candidate"], result["coverage"]["fault_injected"])
             self.assertEqual(_DRAFT_ACTIVATION_ERROR, result["error"])
-            self.assertIn("PLAN_EFFECT_POLICY_VIOLATION", result["candidate_finding_codes"])
+            self.assertEqual("blocked", result["candidate_decision"])
+            self.assertEqual(["PLAN_EFFECT_POLICY_VIOLATION"], result["candidate_finding_codes"])
             self.assertEqual({"create_thread": 0, "start_turn": 0, "resume": 0}, result["effect_count"])
-            self.assertEqual(0, result["execution_spec"]["candidate_execution_spec_count"])
+            self.assertEqual(
+                {
+                    "candidate_execution_spec_count": 0,
+                    "candidate_attempt_count": 0,
+                    "candidate_runtime_intent_count": 0,
+                    "candidate_runtime_job_count": 0,
+                },
+                result["execution_spec"],
+            )
+            # 후보 생성·등록 구간에 역할 호출·provider call·예산 기록·runtime 연산이 없다.
+            self.assertEqual(rows_before, self._call_and_budget_rows(prepared))
+            self.assertEqual(role_calls_before, len(prepared.structured_runner.calls))
+            self.assertEqual(journal_before, len(runtime.events))
             self.assertEqual(
                 active_before,
                 prepared.service.status(prepared.project_id)["project"]["active_plan_revision_id"],
             )
-            observation = json.loads(
-                (cell_root / "authorization-observation.json").read_text(encoding="utf-8")
+            self.assertEqual("draft", dict(self._plan_rows(prepared))[result["candidate_plan_revision_id"]])
+            fault = json.loads((cell_root / "fault-injection.json").read_text(encoding="utf-8"))
+            self.assertEqual("flowmarshal.project-e2e.fault-injection.v1", fault["schema"])
+            self.assertEqual("prohibited_effect_plan_candidate", fault["kind"])
+            self.assertEqual("qualification_fault_injector", fault["writer"])
+            self.assertFalse(fault["classifier_input"])
+            self.assertEqual(active_before, fault["source_plan_revision_id"])
+            self.assertEqual(result["candidate_plan_revision_id"], fault["candidate_plan_revision_id"])
+            self.assertEqual(
+                {
+                    "effect_id": "qualification-fault-prohibited",
+                    "statement": _E2E14_STATEMENT,
+                    "external": False,
+                    "goal_prohibited_effect_index": 0,
+                },
+                fault["added_effect"],
+            )
+            self.assertEqual(fault["fault_digest"], result["fault_injection_digest"])
+            observation = self._observation(cell_root)
+            self.assertEqual("flowmarshal.project-e2e.authorization-observation.v3", observation["schema"])
+            self.assertEqual({"preparation": "fake", "candidate": "fault_injected"}, observation["provenance"])
+            self.assertEqual(fault, observation["fault_injection"])
+            self.assertEqual([_E2E14_STATEMENT], observation["preconditions"]["goal_prohibited_effects"])
+            self.assertEqual(
+                [_E2E14_STATEMENT],
+                observation["preconditions"]["authorization"]["effect_policy"]["prohibited_effects"],
+            )
+            candidate = observation["candidate"]
+            self.assertEqual(
+                {"prohibited_hits": [_E2E14_STATEMENT], "unexpected": [], "plan_level_hits": []},
+                candidate["recomputed"],
             )
             self.assertEqual(
-                "scripted_plan_expander_stub_via_recovery_plan_provider",
-                observation["candidate_source"],
+                f"Goal 효과 정책 밖의 외부 효과입니다: unexpected=[], prohibited={[_E2E14_STATEMENT]}",
+                candidate["finding_summary"],
             )
-            self.assertEqual([statement], observation["goal_prohibited_effects"])
-            self.assertEqual([statement], observation["authorization"]["effect_policy"]["prohibited_effects"])
-            self.assertEqual(["plan_expander"], observation["stub_calls"])
-            self.assertEqual(
-                f"Goal 효과 정책 밖의 외부 효과입니다: unexpected=[], prohibited={[statement]}",
-                observation["finding_summary"],
-            )
-            self.assertEqual(["PLAN_EFFECT_POLICY_VIOLATION"], result["candidate_finding_codes"])
-            self.assertIn("history_events", observation["measured_tables"])
-            # 후보 생성은 stub 호출 한 건과 그 예산 회계 history만 남긴다.
-            candidate = observation["candidate_creation_ledger_delta"]
-            self.assertEqual({"provider_calls", "history_events"}, set(candidate))
-            self.assertTrue(all(
-                row["event_type"].startswith("budget.")
-                for row in candidate["history_events"]["added"]
-            ))
-            # 차단 단계에는 provider 호출·실행 행이 없고 draft 후보 행과 등록 history만 생긴다.
-            block = observation["block_ledger_delta"]
-            self.assertLessEqual(set(block), {"plans", "tasks", "history_events"})
+            # 차단 구간에는 draft 후보 행과 등록 history만 생긴다.
+            block = observation["block"]
+            self.assertLessEqual(set(block["ledger_delta"]), {"plans", "tasks", "history_events"})
             self.assertEqual(
                 ["plan.registered"],
-                [row["event_type"] for row in block["history_events"]["added"]],
+                [row["event_type"] for row in block["ledger_delta"]["history_events"]["added"]],
             )
-            with prepared.service.ledger.read() as connection:
-                self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM runtime_intents").fetchone()[0])
-                self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0])
-                self.assertEqual(
-                    0, connection.execute("SELECT COUNT(*) FROM execution_spec_revisions").fetchone()[0]
-                )
+            self.assertEqual("blocked", block["candidate_decision"]["status"])
+            self.assertEqual(0, sum(block["journal_delta"].values()))
+            self.assertEqual(5, len(observation["limitations"]))
+            outcome = self._e2e14_outcome(prepared, result, cell_root, Path(raw))
+            self.assertEqual(QualificationCellStatus.PASSED, outcome.status)
+            self.assertEqual(
+                (EvidenceProvenance.FAKE, EvidenceProvenance.FAULT_INJECTED), outcome.provenance
+            )
 
-    def test_prohibited_effect_cell_needs_live_prohibition(self) -> None:
+    def test_prohibited_effect_live_preparation_projects_live_fault_and_passes_suite(self) -> None:
+        # 판정기 단위 확인이다. 준비 출처만 live로 흉내 내며 실제 live 실행이 아니다.
+        from flowmarshal.engine.qualification_manifest import evaluate_qualification_responsibilities
+
         with tempfile.TemporaryDirectory() as raw:
-            cell_root, prepared, runtime, source_digest, roles = self._raw_request_cell(raw)
+            cell_root, prepared, runtime, source_digest = self._prohibited_cell(raw)
+            prepared.preparation_provenance = EvidenceProvenance.LIVE
 
-            result = _prohibited_effect_blocked(
-                prepared, runtime, source_digest, cell_root=cell_root, roles=roles
+            result = _prohibited_effect_blocked(prepared, runtime, source_digest, cell_root=cell_root)
+
+            self.assertTrue(result["passed"], result)
+            self.assertEqual("live", result["provenance"])
+            self.assertEqual(["violation_blocked"], result["coverage"]["covered_live"])
+            self.assertEqual(
+                {"preparation": "live", "candidate": "fault_injected"},
+                self._observation(cell_root)["provenance"],
             )
+            outcome = self._e2e14_outcome(prepared, result, cell_root, Path(raw))
+            self.assertEqual(
+                (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED), outcome.provenance
+            )
+            suite = QualificationSuiteManifest.load(ROOT / "config" / "qualification-suite.json")
+            only_e2e14 = QualificationSuiteManifest.model_validate(
+                suite.model_dump(mode="json")
+                | {
+                    "e2e_responsibilities": [
+                        item.model_dump(mode="json")
+                        for item in suite.e2e_responsibilities
+                        if item.responsibility_id == "E2E-14"
+                    ]
+                }
+            )
+            digest = "sha256:" + "a" * 64
+            report = evaluate_qualification_responsibilities(
+                only_e2e14,
+                (outcome,),
+                evaluation_contract_digest=digest,
+                run_root=Path(raw),
+                expected_cell_bindings={"prohibited-effect": (digest, 0)},
+                expected_freeze_bundle_digest=digest,
+                expected_governance_plugin_identity_digest=digest,
+                expected_candidate_wheel_digest=digest,
+                expected_candidate_wheel_binding_digest=digest,
+                expected_candidate_distribution_name="flowmarshal-engine",
+                expected_candidate_distribution_version="1.0.0",
+            )
+
+        self.assertEqual((), report.failures)
+        self.assertEqual(1, report.passed_responsibility_count)
+
+    def test_prohibited_effect_cell_needs_goal_prohibition(self) -> None:
+        # Goal에 금지 효과가 없으면 모델 정규화 결과(MODEL)이고 fault를 넣지 않는다.
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root, prepared, runtime, source_digest = self._prohibited_cell(raw, prohibited=())
+            plans_before = self._plan_rows(prepared)
+
+            result = _prohibited_effect_blocked(prepared, runtime, source_digest, cell_root=cell_root)
 
             self.assertFalse(result["passed"])
-            self.assertTrue(result["failure"].startswith("E2E14_PRECONDITION_NO_PROHIBITED_EFFECT"))
+            self.assertEqual("E2E14_PRECONDITION_NO_PROHIBITED_EFFECT", result["failure_code"])
+            self.assertEqual("model", result["failure_class"])
+            self.assertEqual("fake", result["provenance"])
+            self.assertEqual([], result["coverage"]["fault_injected"])
+            self.assertEqual(plans_before, self._plan_rows(prepared))
+            self.assertFalse((cell_root / "fault-injection.json").exists())
+            observation = self._observation(cell_root)
+            self.assertIsNone(observation["fault_injection"])
+            self.assertIsNone(observation["candidate"])
+
+    def test_prohibited_effect_fault_injection_failure_is_contract_failure(self) -> None:
+        # fault 대상이 없으면 injector가 멈추고, cell은 Core에 아무것도 넘기지 않는 CONTRACT 실패다.
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root, prepared, runtime, source_digest = self._prohibited_cell(raw)
             with prepared.service.ledger.read() as connection:
-                roles_called = [
-                    row[0] for row in connection.execute("SELECT role FROM provider_calls ORDER BY rowid")
-                ]
-            # 전제 불충족이면 stub 후보를 만들지 않는다.
-            self.assertEqual(1, roles_called.count("plan_expander"))
+                active = PlanContractRevision.model_validate_json(connection.execute(
+                    "SELECT payload_json FROM plan_revisions WHERE id=?", (prepared.plan_revision_id,)
+                ).fetchone()["payload_json"])
+            # 스키마상 활성 Plan은 Task가 있으므로 검증 없는 복사본으로 guard만 확인한다.
+            without_tasks = active.model_copy(update={
+                "definition": active.definition.model_copy(update={"tasks": ()})
+            })
+            with self.assertRaisesRegex(ValueError, "첫 Task"):
+                _inject_prohibited_effect_candidate(without_tasks, _E2E14_STATEMENT)
+            plans_before = self._plan_rows(prepared)
+            with patch(
+                "flowmarshal.engine.e2e_qualification._inject_prohibited_effect_candidate",
+                side_effect=ValueError("fault 대상 첫 Task가 활성 Plan에 없습니다."),
+            ):
+                result = _prohibited_effect_blocked(
+                    prepared, runtime, source_digest, cell_root=cell_root
+                )
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E14_FAULT_INJECTION_FAILED", result["failure_code"])
+            self.assertEqual("contract", result["failure_class"])
+            self.assertEqual(plans_before, self._plan_rows(prepared))
+            self.assertIsNone(result["effect_count"])
+            self.assertEqual([], result["coverage"]["fault_injected"])
+            self.assertFalse((cell_root / "fault-injection.json").exists())
+
+    def test_prohibited_effect_activation_regression_is_product_failure(self) -> None:
+        # Core가 위반 후보 활성화를 받아 준 회귀를 흉내 내면 PRODUCT다.
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root, prepared, runtime, source_digest = self._prohibited_cell(raw)
+            rows_before = self._call_and_budget_rows(prepared)
+            with patch.object(
+                prepared.service, "register_authorized_plan_revision", return_value="activation_forged"
+            ):
+                result = _prohibited_effect_blocked(
+                    prepared, runtime, source_digest, cell_root=cell_root
+                )
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E14_BLOCK_EVIDENCE_MISSING", result["failure_code"])
+            self.assertEqual("product", result["failure_class"])
+            self.assertIn("B_activation_rejected_as_draft", result["failure"])
+            self.assertIsNone(result["error"])
+            self.assertEqual(rows_before, self._call_and_budget_rows(prepared))
+
+    def test_prohibited_effect_outcome_projects_cell_provenance(self) -> None:
+        # E2E-14 책임 출처의 live는 cell 준비 출처다. live가 아니거나 없으면 fake다(fail-closed).
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root = Path(raw) / "prohibited-effect"
+            (cell_root / "state").mkdir(parents=True)
+            for name in ("authorization-observation.json", "state/flowmarshal-engine.sqlite3"):
+                (cell_root / name).write_text("{}", encoding="utf-8")
+            prepared = SimpleNamespace(pipeline_stages=("prepare",))
+            fault = EvidenceProvenance.FAULT_INJECTED
+            for value, expected in (
+                ("fake", (EvidenceProvenance.FAKE, fault)),
+                (None, (EvidenceProvenance.FAKE, fault)),
+                ("live", (EvidenceProvenance.LIVE, fault)),
+            ):
+                cell = {"passed": True} | ({} if value is None else {"provenance": value})
+                outcome = self._e2e14_outcome(prepared, cell, cell_root, Path(raw))
+                self.assertEqual(expected, outcome.provenance, value)
 
     def _scope_cell(self, raw: str, *, r2_mutation: str = "scoped_change"):
         from tests.engine_helpers import inventory
