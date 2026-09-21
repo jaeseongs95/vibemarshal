@@ -243,7 +243,7 @@ class ScopeQualificationReport(EngineModel):
                 EvaluationScope.DETERMINISTIC: ("check_count", 5),
                 EvaluationScope.ROLE_FIXTURE: ("cell_count", 48),
                 EvaluationScope.FULL_PLANNING_PIPELINE: ("cell_count", 18),
-                EvaluationScope.PROJECT_E2E: ("actual_codex_cell_count", 5),
+                EvaluationScope.PROJECT_E2E: ("actual_codex_cell_count", 7),
             }[self.scope]
             if self.metrics.get(metric) != count:
                 raise ValueError(f"PASS에 필요한 {metric}={count} 증거가 부족합니다.")

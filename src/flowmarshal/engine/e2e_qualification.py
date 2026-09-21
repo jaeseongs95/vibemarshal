@@ -8,6 +8,7 @@ import json
 import inspect
 import shutil
 import sys
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -130,6 +131,8 @@ E2E_SCENARIOS = (
     "stale-after-materialization",
     "stored-turn-restart-resume",
     "unknown-receipt-no-duplicate",
+    "forced-termination-no-duplicate",
+    "absolute-timeout-no-duplicate",
     "cancel-active-job",
 )
 
@@ -165,6 +168,8 @@ class RecordedRuntime:
         self.turn_calls = sum(item["operation"] == "start_turn" for item in self.events)
         self.read_calls = sum(item["operation"] == "read" for item in self.events)
         self.resume_calls = sum(item["operation"] == "resume" for item in self.events)
+        self._completion_forwarding_enabled = True
+        self._completion_forwarding_lock = threading.Lock()
         if callable(getattr(runtime, "register_completion_observer", None)):
             # EngineDispatcher는 getattr로 capability를 탐지하므로 실제 runtime이
             # 지원할 때만 public attribute를 노출한다.
@@ -260,19 +265,28 @@ class RecordedRuntime:
         register = getattr(self.runtime, "register_completion_observer")
 
         def record_and_forward(observation: Any) -> None:
-            request_binding = self._request_binding(
-                "completion_observation",
-                {"thread_id": thread_id, "turn_id": turn_id},
-            )
-            self._append_result_event(
-                "completion_observation",
-                request_binding,
-                observation,
-                deduplicate=True,
-            )
-            observer(observation)
+            with self._completion_forwarding_lock:
+                if not self._completion_forwarding_enabled:
+                    return
+                request_binding = self._request_binding(
+                    "completion_observation",
+                    {"thread_id": thread_id, "turn_id": turn_id},
+                )
+                self._append_result_event(
+                    "completion_observation",
+                    request_binding,
+                    observation,
+                    deduplicate=True,
+                )
+                observer(observation)
 
         register(thread_id=thread_id, turn_id=turn_id, observer=record_and_forward)
+
+    def sever_completion_forwarding(self) -> None:
+        """collector 장애 주입 뒤 이전 callback이 Core 상태를 전진시키지 못하게 한다."""
+
+        with self._completion_forwarding_lock:
+            self._completion_forwarding_enabled = False
 
     def verify_execution_policy(self, cwd: Path | str) -> Any:
         return self._call("verify_execution_policy", cwd=cwd)
@@ -1244,9 +1258,26 @@ def _normal_completion(
     *, roles: EngineRoleConfiguration | None = None,
     governance: Any | None = None,
 ) -> dict[str, Any]:
+    provider = _execution_proposal_provider(prepared, runtime, roles)
+    if provider is None and prepared.proposal is None:
+        raise QualificationRunError(
+            "E2E_EXECUTION_PROPOSAL_PROVIDER_REQUIRED: raw-request E2E는 실제 "
+            "execution_spec_prepare 역할을 사용해야 합니다."
+        )
+    task_gate = _open_e2e_task_gate(prepared, runtime, roles, governance)
+    try:
+        return _drive_normal_completion(prepared, runtime, source_digest, provider, task_gate)
+    finally:
+        task_gate.close()
+
+
+def _execution_proposal_provider(
+    prepared: PreparedE2E,
+    runtime: CodexRuntimePort,
+    roles: EngineRoleConfiguration | None,
+) -> Any | None:
     from .execution import ExecutionProposalAdapter
-    from .governance_gate import MissingGovernanceGate
-    from .roles import CodexStructuredRoleRunner
+
     provider = None
     if roles is not None:
         with prepared.service.ledger.read() as connection:
@@ -1268,21 +1299,24 @@ def _normal_completion(
             ),
             roles,
         )
-    if provider is None and prepared.proposal is None:
-        raise QualificationRunError(
-            "E2E_EXECUTION_PROPOSAL_PROVIDER_REQUIRED: raw-request E2E는 실제 "
-            "execution_spec_prepare 역할을 사용해야 합니다."
-        )
+    return provider
+
+
+def _open_e2e_task_gate(
+    prepared: PreparedE2E,
+    runtime: CodexRuntimePort,
+    roles: EngineRoleConfiguration | None,
+    governance: Any | None,
+) -> Any:
+    from .governance_gate import MissingGovernanceGate
+    from .roles import CodexStructuredRoleRunner
+
     # 실행 Task는 제품 경로와 같은 필수 governance gate를 지난다. 설정이 없으면 GOVERNANCE_GATE_REQUIRED로 멈춘다.
-    task_gate = MissingGovernanceGate() if governance is None else governance.open_gate(
+    return MissingGovernanceGate() if governance is None else governance.open_gate(
         prepared.service, runtime=runtime, roles=roles,
         runner=None if roles is None else CodexStructuredRoleRunner(
             runtime, max_schema_recovery_attempts=0, ephemeral_threads=False),
     )
-    try:
-        return _drive_normal_completion(prepared, runtime, source_digest, provider, task_gate)
-    finally:
-        task_gate.close()
 
 
 def _drive_normal_completion(
@@ -1893,17 +1927,11 @@ def _cancel_active_job(
     if binding is None or binding.turn_id is None or job_id is None:
         raise QualificationRunError("cancel E2E의 active exact turn binding을 확인하지 못했습니다.")
 
-    pre_cancel_observation = runtime.read_stored(
-        thread_id=binding.thread_id,
-        turn_id=binding.turn_id,
-        timeout_seconds=5.0,
+    pre_cancel_observation = _read_active_exact_turn(
+        runtime,
+        binding,
+        scenario="cancel",
     )
-    if (
-        pre_cancel_observation.thread_id != binding.thread_id
-        or pre_cancel_observation.turn_id != binding.turn_id
-        or not pre_cancel_observation.active
-    ):
-        raise QualificationRunError("cancel E2E가 active exact provider turn을 관측하지 못했습니다.")
 
     def ledger_effect_counts() -> dict[str, int]:
         with prepared.service.ledger.read() as connection:
@@ -2062,6 +2090,448 @@ def _cancel_active_job(
     }
 
 
+def _await_active_execution_binding(
+    prepared: PreparedE2E,
+    attempt_id: str,
+    *,
+    timeout_seconds: float,
+) -> tuple[ThreadBinding, str]:
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        with prepared.service.ledger.read() as connection:
+            row = connection.execute(
+                "SELECT a.binding_json,j.id AS job_id,j.status AS job_status "
+                "FROM attempts a JOIN runtime_jobs j ON j.attempt_id=a.id "
+                "WHERE a.id=? ORDER BY j.rowid DESC LIMIT 1",
+                (attempt_id,),
+            ).fetchone()
+        if row is not None and row["binding_json"] is not None:
+            binding = ThreadBinding.model_validate_json(row["binding_json"])
+            if binding.turn_id is not None and row["job_status"] in {
+                "running",
+                "interrupting",
+                "collector_lost",
+                "provider_terminal",
+            }:
+                return binding, row["job_id"]
+        time.sleep(0.05)
+    raise QualificationRunError("E2E fault 주입 전 active exact turn binding을 확인하지 못했습니다.")
+
+
+def _read_active_exact_turn(
+    runtime: RecordedRuntime,
+    binding: ThreadBinding,
+    *,
+    scenario: str,
+) -> Any:
+    """owner connection의 live 상태로 exact turn이 아직 실행 중인지 확인한다."""
+
+    observation = runtime.read(thread_id=binding.thread_id)
+    if (
+        observation.thread_id != binding.thread_id
+        or observation.turn_id != binding.turn_id
+        or not observation.active
+    ):
+        raise QualificationRunError(
+            f"{scenario} fault 주입 전에 active exact provider turn을 관측하지 못했습니다."
+        )
+    return observation
+
+
+def _attempt_effect_counts(prepared: PreparedE2E, attempt_id: str) -> dict[str, int]:
+    with prepared.service.ledger.read() as connection:
+        receipts = connection.execute(
+            "SELECT COUNT(*),COUNT(DISTINCT provider_operation_id) "
+            "FROM runtime_receipts WHERE intent_id IN "
+            "(SELECT id FROM runtime_intents WHERE attempt_id=?)",
+            (attempt_id,),
+        ).fetchone()
+        return {
+            "provider_calls": connection.execute(
+                "SELECT COUNT(*) FROM provider_calls WHERE attempt_id=?", (attempt_id,)
+            ).fetchone()[0],
+            "runtime_intents": connection.execute(
+                "SELECT COUNT(*) FROM runtime_intents WHERE attempt_id=?", (attempt_id,)
+            ).fetchone()[0],
+            "runtime_receipts": receipts[0],
+            "distinct_provider_operation_ids": receipts[1],
+        }
+
+
+def _journal_operation_counts(events: list[dict[str, Any]]) -> dict[str, int]:
+    operations = ("create_thread", "start_turn", "resume", "interrupt", "read", "read_stored")
+    return {
+        operation: sum(item.get("operation") == operation for item in events)
+        for operation in operations
+    }
+
+
+def _write_fault_injection(path: Path, payload: dict[str, Any]) -> dict[str, Any]:
+    document = {
+        "schema": "flowmarshal.project-e2e.fault-injection.v1",
+        **payload,
+    }
+    document["fault_digest"] = sha256_digest(document)
+    _write_json(path, document)
+    return document
+
+
+def _forced_termination_no_duplicate(
+    prepared: PreparedE2E,
+    runtime: RecordedRuntime,
+    source_digest: str,
+    *,
+    roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
+    timeout_seconds: float = 30,
+) -> dict[str, Any]:
+    """collector를 끊고 새 supervisor가 exact turn을 resume 없이 재관측한다."""
+
+    first_supervisor = RuntimeJobSupervisor(
+        prepared.service, runtime, observation_timeout_seconds=5.0
+    )
+    application = EngineApplication(
+        prepared.service,
+        runtime=runtime,
+        role_configuration=roles,
+        governance=governance,
+        supervisor=first_supervisor,
+    )
+    restarted_application: EngineApplication | None = None
+    try:
+        _materialize_with_application(application, prepared, timeout_seconds=timeout_seconds)
+        dispatched = application.run_once(prepared.project_id)
+        if dispatched.action is not RunOnceAction.DISPATCHED or dispatched.attempt_id is None:
+            raise QualificationRunError("forced-termination E2E에서 execution Attempt를 시작하지 못했습니다.")
+        binding, job_id = _await_active_execution_binding(
+            prepared, dispatched.attempt_id, timeout_seconds=timeout_seconds
+        )
+        pre_fault = _read_active_exact_turn(
+            runtime,
+            binding,
+            scenario="forced-termination",
+        )
+
+        effect_counts_before = _attempt_effect_counts(prepared, dispatched.attempt_id)
+        journal_offset = len(runtime.events)
+        runtime.sever_completion_forwarding()
+        fault = _write_fault_injection(
+            runtime.journal.parent / "fault-injection.json",
+            {
+                "kind": "in_process_collector_termination",
+                "injected_at": utc_now().isoformat(),
+                "job_id": job_id,
+                "attempt_id": dispatched.attempt_id,
+                "thread_id": binding.thread_id,
+                "turn_id": binding.turn_id,
+            },
+        )
+        lost = first_supervisor.mark_collector_lost(
+            job_id, reason="E2E-09 injected collector termination"
+        )
+
+        restarted_supervisor = RuntimeJobSupervisor(
+            prepared.service, runtime, observation_timeout_seconds=5.0
+        )
+        restarted_application = EngineApplication(
+            prepared.service,
+            runtime=runtime,
+            role_configuration=roles,
+            governance=governance,
+            supervisor=restarted_supervisor,
+        )
+        observed = restarted_application.observe(prepared.project_id)
+        effect_counts_after = _attempt_effect_counts(prepared, dispatched.attempt_id)
+        restart_counts = _journal_operation_counts(runtime.events[journal_offset:])
+
+        with prepared.service.ledger.read() as connection:
+            job = connection.execute(
+                "SELECT status,thread_id,turn_id,provider_terminal_status,result_digest "
+                "FROM runtime_jobs WHERE id=?",
+                (job_id,),
+            ).fetchone()
+            observations = connection.execute(
+                "SELECT kind,provider_terminal,terminal_status,payload_digest "
+                "FROM runtime_job_observations WHERE job_id=? ORDER BY rowid",
+                (job_id,),
+            ).fetchall()
+            provider_call = connection.execute(
+                "SELECT status,execution_status,new_turn_count FROM provider_calls "
+                "WHERE attempt_id=? ORDER BY rowid DESC LIMIT 1",
+                (dispatched.attempt_id,),
+            ).fetchone()
+            attempt = connection.execute(
+                "SELECT status,failure_class FROM attempts WHERE id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+
+        observation_kinds = [row["kind"] for row in observations]
+        exact_binding_preserved = bool(
+            job is not None
+            and job["thread_id"] == binding.thread_id
+            and job["turn_id"] == binding.turn_id
+        )
+        passed = all(
+            (
+                lost.status.value == "collector_lost",
+                job is not None and job["status"] == "running",
+                attempt is not None and attempt["status"] == "running",
+                exact_binding_preserved,
+                "collector_lost" in observation_kinds,
+                "collector_reattached" in observation_kinds,
+                "provider_progress" in observation_kinds,
+                not any(row["provider_terminal"] for row in observations),
+                restart_counts["read_stored"] >= 1,
+                restart_counts["create_thread"] == 0,
+                restart_counts["start_turn"] == 0,
+                restart_counts["resume"] == 0,
+                restart_counts["interrupt"] == 0,
+                effect_counts_after == effect_counts_before,
+                provider_call is not None,
+            )
+        )
+        return {
+            "passed": passed,
+            "source_fixture_digest": source_digest,
+            "binding": binding.model_dump(mode="json"),
+            "fault_injection": fault,
+            "runtime_job": None if job is None else dict(job),
+            "runtime_observation": [dict(row) for row in observations],
+            "restart_journal": runtime.events[journal_offset:],
+            "exact_binding_preserved": exact_binding_preserved,
+            "effect_count": restart_counts,
+            "ledger": {
+                "attempt_id": dispatched.attempt_id,
+                "attempt_status": None if attempt is None else attempt["status"],
+                "failure_class": None if attempt is None else attempt["failure_class"],
+                "effect_counts_before": effect_counts_before,
+                "effect_counts_after": effect_counts_after,
+                "provider_call": None if provider_call is None else dict(provider_call),
+                "provider_call_counter_semantics": "new_turn_count is settled turns, not started turns",
+            },
+            "last_observe": observed,
+        }
+    finally:
+        application.close_task_gate()
+        if restarted_application is not None:
+            restarted_application.close_task_gate()
+
+
+def _absolute_timeout_no_duplicate(
+    prepared: PreparedE2E,
+    runtime: RecordedRuntime,
+    source_digest: str,
+    *,
+    roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
+    timeout_seconds: float = 30,
+) -> dict[str, Any]:
+    """active exact turn의 job deadline을 만료시켜 중단·재관측·중복 차단을 검증한다."""
+
+    supervisor = RuntimeJobSupervisor(
+        prepared.service, runtime, observation_timeout_seconds=5.0
+    )
+    fault_path = runtime.journal.parent / "fault-injection.json"
+    provider = _execution_proposal_provider(prepared, runtime, roles)
+    task_gate = _open_e2e_task_gate(prepared, runtime, roles, governance)
+    dispatcher = EngineDispatcher(
+        prepared.service,
+        runtime,
+        proposal_provider=provider,
+        supervisor=supervisor,
+        task_gate=task_gate,
+    )
+    if prepared.proposal is None and provider is None:
+        raise QualificationRunError("absolute-timeout E2E에는 execution proposal provider가 필요합니다.")
+
+    try:
+        outcome = dispatcher.run_once(
+            prepared.project_id, proposal=prepared.proposal
+        )
+        materialize_deadline = time.monotonic() + timeout_seconds
+        while (
+            outcome.action is not RunOnceAction.MATERIALIZED
+            and time.monotonic() < materialize_deadline
+        ):
+            if outcome.action is RunOnceAction.BLOCKED:
+                raise QualificationRunError(f"{outcome.blocker_code}: {outcome.detail}")
+            time.sleep(0.01)
+            outcome = dispatcher.run_once(prepared.project_id)
+        if outcome.action is not RunOnceAction.MATERIALIZED:
+            raise QualificationRunError("absolute-timeout E2E execution spec materialize timeout")
+
+        dispatched = dispatcher.run_once(prepared.project_id)
+        if dispatched.action is not RunOnceAction.DISPATCHED or dispatched.attempt_id is None:
+            raise QualificationRunError("absolute-timeout E2E에서 execution Attempt를 시작하지 못했습니다.")
+        binding, job_id = _await_active_execution_binding(
+            prepared, dispatched.attempt_id, timeout_seconds=timeout_seconds
+        )
+        pre_fault = _read_active_exact_turn(
+            runtime,
+            binding,
+            scenario="absolute-timeout",
+        )
+        bound_job = prepared.service.load_runtime_job(job_id)
+        if (
+            bound_job.status.value != "running"
+            or bound_job.thread_id != binding.thread_id
+            or bound_job.turn_id != binding.turn_id
+        ):
+            raise QualificationRunError(
+                "absolute-timeout fault 주입 대상이 active exact turn과 다릅니다."
+            )
+        observed_deadline_at = bound_job.absolute_deadline_at
+        deadline_supervisor = RuntimeJobSupervisor(
+            prepared.service,
+            runtime,
+            observation_timeout_seconds=5.0,
+            clock=lambda: observed_deadline_at,
+        )
+        deadline_dispatcher = EngineDispatcher(
+            prepared.service,
+            runtime,
+            proposal_provider=provider,
+            supervisor=deadline_supervisor,
+            task_gate=task_gate,
+        )
+        fault = _write_fault_injection(
+            fault_path,
+            {
+                "kind": "runtime_job_clock_advanced_to_deadline_after_binding",
+                "injected_at": utc_now().isoformat(),
+                "job_id": job_id,
+                "attempt_id": dispatched.attempt_id,
+                "thread_id": binding.thread_id,
+                "turn_id": binding.turn_id,
+                "absolute_deadline_at": observed_deadline_at.isoformat(),
+                "injected_clock_at": observed_deadline_at.isoformat(),
+                "clock_provenance": "fault_injected",
+                "ledger_observed_at_may_precede_injected_clock": True,
+                "pre_fault_observation_digest": sha256_digest(pre_fault),
+            },
+        )
+
+        effect_counts_before = _attempt_effect_counts(prepared, dispatched.attempt_id)
+        journal_offset = len(runtime.events)
+        attempt_status = None
+        failure_class = None
+        last_outcome = outcome
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            last_outcome = deadline_dispatcher.run_once(prepared.project_id)
+            with prepared.service.ledger.read() as connection:
+                attempt = connection.execute(
+                    "SELECT status,failure_class FROM attempts WHERE id=?",
+                    (dispatched.attempt_id,),
+                ).fetchone()
+            attempt_status = None if attempt is None else attempt["status"]
+            failure_class = None if attempt is None else attempt["failure_class"]
+            if attempt_status == "failed":
+                break
+            time.sleep(0.05)
+        blocked = deadline_dispatcher.run_once(prepared.project_id)
+        effect_counts_after = _attempt_effect_counts(prepared, dispatched.attempt_id)
+        timeout_counts = _journal_operation_counts(runtime.events[journal_offset:])
+
+        with prepared.service.ledger.read() as connection:
+            job = connection.execute(
+                "SELECT status,thread_id,turn_id,provider_terminal_status,result_digest,"
+                "absolute_deadline_at FROM runtime_jobs WHERE id=?",
+                (job_id,),
+            ).fetchone()
+            terminal = connection.execute(
+                "SELECT terminal_status,payload_digest FROM runtime_job_observations "
+                "WHERE job_id=? AND provider_terminal=1 ORDER BY rowid DESC LIMIT 1",
+                (job_id,),
+            ).fetchone()
+            evidence = connection.execute(
+                "SELECT id,source_ref,content_digest,observation FROM evidence_records "
+                "WHERE attempt_id=? AND source_ref LIKE 'runtime-deadline:%' "
+                "ORDER BY rowid DESC LIMIT 1",
+                (dispatched.attempt_id,),
+            ).fetchone()
+            provider_call = connection.execute(
+                "SELECT status,execution_status,new_turn_count FROM provider_calls "
+                "WHERE attempt_id=? ORDER BY rowid DESC LIMIT 1",
+                (dispatched.attempt_id,),
+            ).fetchone()
+            interrupts = connection.execute(
+                "SELECT kind,payload_json FROM runtime_job_observations "
+                "WHERE job_id=? AND kind IN ('interrupt_requested','interrupt_receipt') "
+                "ORDER BY rowid",
+                (job_id,),
+            ).fetchall()
+
+        evidence_observation = (
+            None if evidence is None else json.loads(evidence["observation"])
+        )
+        exact_binding_preserved = bool(
+            job is not None
+            and job["thread_id"] == binding.thread_id
+            and job["turn_id"] == binding.turn_id
+        )
+        local_code = (
+            None
+            if evidence_observation is None
+            else evidence_observation.get("failure_diagnosis", {}).get("local_engine_code")
+        )
+        passed = all(
+            (
+                attempt_status == "failed",
+                failure_class == "environment",
+                job is not None and job["status"] == "consumed",
+                terminal is not None and terminal["terminal_status"] == "interrupted",
+                evidence is not None,
+                local_code == "ABSOLUTE_DEADLINE_EXCEEDED",
+                blocked.action is RunOnceAction.BLOCKED,
+                blocked.blocker_code == "ENVIRONMENT_RECOVERY_REQUIRED",
+                exact_binding_preserved,
+                timeout_counts["create_thread"] == 0,
+                timeout_counts["start_turn"] == 0,
+                timeout_counts["resume"] == 0,
+                timeout_counts["interrupt"] == 1,
+                effect_counts_after == effect_counts_before,
+                provider_call is not None
+                and provider_call["execution_status"] == "terminal"
+                and provider_call["new_turn_count"] == 1,
+                [row["kind"] for row in interrupts]
+                == ["interrupt_requested", "interrupt_receipt"],
+            )
+        )
+        return {
+            "passed": passed,
+            "source_fixture_digest": source_digest,
+            "runtime_job": None if job is None else dict(job),
+            "deadline": fault,
+            "runtime_observation": None if terminal is None else dict(terminal),
+            "binding": binding.model_dump(mode="json"),
+            "exact_binding_preserved": exact_binding_preserved,
+            "run_once_blocker": blocked.blocker_code,
+            "last_action": last_outcome.action.value,
+            "effect_count": timeout_counts,
+            "ledger": {
+                "attempt_id": dispatched.attempt_id,
+                "attempt_status": attempt_status,
+                "failure_class": failure_class,
+                "evidence": None if evidence is None else {
+                    "id": evidence["id"],
+                    "source_ref": evidence["source_ref"],
+                    "content_digest": evidence["content_digest"],
+                    "observation": evidence_observation,
+                },
+                "provider_call": None if provider_call is None else dict(provider_call),
+                "effect_counts_before": effect_counts_before,
+                "effect_counts_after": effect_counts_after,
+                "interrupt_observations": [
+                    {"kind": row["kind"], "payload": json.loads(row["payload_json"])}
+                    for row in interrupts
+                ],
+            },
+        }
+    finally:
+        task_gate.close()
+
+
 def _responsibility_outcome(
     *,
     scenario: str,
@@ -2112,6 +2582,18 @@ def _responsibility_outcome(
             ("intent", "runtime_receipt", "operation_journal", "effect_count"),
             (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
         ),
+        "forced-termination-no-duplicate": (
+            "E2E-09",
+            ("task_execution", "forced_termination", "observe_existing"),
+            ("binding", "restart_journal", "runtime_observation", "effect_count"),
+            (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
+        ),
+        "absolute-timeout-no-duplicate": (
+            "E2E-10",
+            ("task_execution", "timeout", "observe_existing"),
+            ("runtime_job", "deadline", "runtime_observation", "effect_count"),
+            (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
+        ),
         "cancel-active-job": (
             "E2E-16",
             ("task_execution", "cancel", "observe_existing"),
@@ -2136,6 +2618,7 @@ def _responsibility_outcome(
         "intent": cell_root / "state" / "flowmarshal-engine.sqlite3",
         "operation_journal": cell_root / "runtime-receipts.json",
         "runtime_job": cell_root / "qualification-observation.json",
+        "deadline": cell_root / "qualification-observation.json",
         "control_state": cell_root / "qualification-observation.json",
         "runtime_observation": cell_root / "runtime-receipts.json",
     }
@@ -2536,7 +3019,23 @@ def run_project_e2e(
                             cell = _unknown_receipt(
                                 prepared, recorded, source_digest, roles=roles, governance=governance
                             )
-                        else:
+                        elif scenario == "forced-termination-no-duplicate":
+                            cell = _forced_termination_no_duplicate(
+                                prepared,
+                                recorded,
+                                source_digest,
+                                roles=roles,
+                                governance=governance,
+                            )
+                        elif scenario == "absolute-timeout-no-duplicate":
+                            cell = _absolute_timeout_no_duplicate(
+                                prepared,
+                                recorded,
+                                source_digest,
+                                roles=roles,
+                                governance=governance,
+                            )
+                        elif scenario == "cancel-active-job":
                             cell = _cancel_active_job(
                                 prepared,
                                 recorded,
@@ -2544,6 +3043,8 @@ def run_project_e2e(
                                 roles=roles,
                                 governance=governance,
                             )
+                        else:
+                            raise QualificationRunError(f"알 수 없는 E2E scenario: {scenario}")
                     events = recorded.events
                 after_identity = _observe_frozen_plugin_identity(governance, governance_freeze)
                 if after_identity["governance_plugin_identity_digest"] != before_identity[

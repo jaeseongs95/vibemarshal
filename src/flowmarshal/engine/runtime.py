@@ -13,7 +13,7 @@ import time
 from concurrent.futures import Future
 from contextvars import ContextVar
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
@@ -1597,7 +1597,8 @@ class RuntimeJobSupervisor:
                  interrupt_timeout_seconds: float = 5.0,
                  handoff_wait_seconds: float = 0.05,
                  observation_timeout_seconds: float = 0.05,
-                 terminal_observation_grace_seconds: float = 30.0) -> None:
+                 terminal_observation_grace_seconds: float = 30.0,
+                 clock: Callable[[], datetime] = utc_now) -> None:
         if (interrupt_timeout_seconds <= 0 or handoff_wait_seconds < 0
                 or observation_timeout_seconds <= 0
                 or terminal_observation_grace_seconds < 0):
@@ -1608,6 +1609,7 @@ class RuntimeJobSupervisor:
         self.handoff_wait_seconds = handoff_wait_seconds
         self.observation_timeout_seconds = observation_timeout_seconds
         self.terminal_observation_grace_seconds = terminal_observation_grace_seconds
+        self.clock = clock
         self._workers: dict[str, threading.Thread] = {}
         self._results: dict[str, tuple[bool, Any]] = {}
         self._result_events: dict[str, threading.Event] = {}
@@ -1615,6 +1617,12 @@ class RuntimeJobSupervisor:
         self._terminal_progress: dict[str, dict[str, Any]] = {}
         self._owned_job_ids: set[str] = set()
         self._lock = threading.RLock()
+
+    def _now(self) -> datetime:
+        value = self.clock()
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise RuntimePolicyError("RUNTIME_CLOCK_MUST_BE_TIMEZONE_AWARE")
+        return value
 
     @staticmethod
     def _json_value(value: Any) -> Any:
@@ -1634,7 +1642,7 @@ class RuntimeJobSupervisor:
             raise ValueError("runtime job timeout은 양수여야 합니다.")
         job = self.service.schedule_runtime_job(
             project_id=project_id, kind=kind, checkpoint_key=checkpoint_key,
-            request=request, absolute_deadline_at=utc_now() + timedelta(seconds=timeout_seconds),
+            request=request, absolute_deadline_at=self._now() + timedelta(seconds=timeout_seconds),
             attempt_id=attempt_id, task_id=task_id,
         )
         self._owned_job_ids.add(job.job_id)
@@ -1819,14 +1827,14 @@ class RuntimeJobSupervisor:
         checkpointed, _checkpoint_result = self._durable_target_result(job_id)
         if checkpointed:
             return self.reattach(job_id)
-        if datetime.now(timezone.utc) >= job.absolute_deadline_at:
+        if self._now() >= job.absolute_deadline_at:
             self._request_bounded_interrupt(
                 job, reason="absolute_deadline_exceeded",
             )
             job = self.service.load_runtime_job(job_id)
             if job.status is not RuntimeJobStatus.INTERRUPTING:
                 return job
-            if datetime.now(timezone.utc) >= job.absolute_deadline_at + timedelta(
+            if self._now() >= job.absolute_deadline_at + timedelta(
                 seconds=self.terminal_observation_grace_seconds
             ):
                 self.service.record_runtime_job_observation(
@@ -2033,7 +2041,7 @@ class RuntimeJobSupervisor:
         if job.status is not RuntimeJobStatus.CANCELLED:
             return job
         grace_anchor = job.ended_at or job.updated_at
-        grace_elapsed = datetime.now(timezone.utc) >= grace_anchor + timedelta(
+        grace_elapsed = self._now() >= grace_anchor + timedelta(
             seconds=self.terminal_observation_grace_seconds
         )
         if job.thread_id is None or job.turn_id is None:
@@ -2060,7 +2068,7 @@ class RuntimeJobSupervisor:
                 }
             )
             job = self.service.load_runtime_job(job_id)
-            grace_elapsed = datetime.now(timezone.utc) >= (job.ended_at or job.updated_at) + timedelta(
+            grace_elapsed = self._now() >= (job.ended_at or job.updated_at) + timedelta(
                 seconds=self.terminal_observation_grace_seconds
             )
             if definitive or grace_elapsed:

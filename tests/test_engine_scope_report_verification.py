@@ -184,6 +184,8 @@ class ScopeReportVerificationTests(unittest.TestCase):
             "stale-after-materialization": "E2E-11",
             "stored-turn-restart-resume": "E2E-07",
             "unknown-receipt-no-duplicate": "E2E-08",
+            "forced-termination-no-duplicate": "E2E-09",
+            "absolute-timeout-no-duplicate": "E2E-10",
             "cancel-active-job": "E2E-16",
         }
         cells: list[EvaluationCellCheckpoint] = []

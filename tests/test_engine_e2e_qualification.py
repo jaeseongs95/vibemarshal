@@ -12,12 +12,14 @@ from flowmarshal.canonical import sha256_digest
 from flowmarshal.engine.budget import BudgetManager
 from flowmarshal.engine.e2e_qualification import (
     RecordedRuntime,
+    _absolute_timeout_no_duplicate,
     _assert_no_transient_plugin_identity_change,
     _cancel_active_job,
     _checkpoint_model_observation,
     _contract,
     _copy_fixture,
     _e2e_failure_disposition,
+    _forced_termination_no_duplicate,
     _guard_e2e_partial_resume,
     _observe_frozen_plugin_identity,
     _prepare,
@@ -179,6 +181,21 @@ class _CompletionCallbackFakeRuntime(_RequestEchoFakeRuntime):
         )
         self.completion_observer(observation)
         return observation
+
+
+class _StoredNonActiveFakeRuntime(FakeCodexRuntime):
+    """Claude transcript처럼 stored 조회는 active를 표현하지 않는 fake."""
+
+    def read_stored(self, **arguments):
+        observation = super().read_stored(**arguments)
+        if observation.terminal_status is not None:
+            return observation
+        return observation.model_copy(
+            update={
+                "active": False,
+                "payload": observation.payload | {"turn_status": "terminal_unobserved"},
+            }
+        )
 
 
 class EngineE2EQualificationTests(unittest.TestCase):
@@ -600,6 +617,37 @@ class EngineE2EQualificationTests(unittest.TestCase):
                 callbacks[0]["model_observation_reason"],
             )
 
+    def test_severed_collector_drops_late_completion_callback(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root = Path(raw) / "cell"
+            cell_root.mkdir()
+            workspace, _ = _copy_fixture(ROOT, cell_root)
+            prepared = _prepare(
+                workspace=workspace,
+                state_root=cell_root / "state",
+                inventory=self.inventory,
+                roles=self.roles,
+            )
+            underlying = _CompletionCallbackFakeRuntime(self.inventory)
+            runtime = RecordedRuntime(underlying, journal=cell_root / "runtime.json")
+            dispatcher = EngineDispatcher(prepared.service, runtime)
+            dispatcher.run_once(prepared.project_id, proposal=prepared.proposal)
+            dispatched = dispatcher.run_once(prepared.project_id)
+
+            runtime.sever_completion_forwarding()
+            underlying.emit_completion()
+
+            self.assertNotIn(
+                "completion_observation",
+                [event["operation"] for event in runtime.events],
+            )
+            with prepared.service.ledger.read() as connection:
+                provider_call = connection.execute(
+                    "SELECT status,new_turn_count FROM provider_calls WHERE attempt_id=?",
+                    (dispatched.attempt_id,),
+                ).fetchone()
+            self.assertEqual(("reserved", 0), tuple(provider_call))
+
     def test_prepare_preserves_exact_plan_and_driver_activation_evidence(self) -> None:
         contract_digest = sha256_digest({"contract": "project-e2e"})
         fixture_digest = sha256_digest({"fixture": "normal-completion"})
@@ -753,7 +801,8 @@ class EngineE2EQualificationTests(unittest.TestCase):
                 fixture_digest=sha256_digest({"fixture": "cancel-active-job"}),
             )
             runtime = RecordedRuntime(
-                FakeCodexRuntime(self.inventory), journal=cell_root / "runtime-receipts.json"
+                _StoredNonActiveFakeRuntime(self.inventory),
+                journal=cell_root / "runtime-receipts.json",
             )
 
             result = _cancel_active_job(
@@ -799,6 +848,155 @@ class EngineE2EQualificationTests(unittest.TestCase):
             self.assertEqual((EvidenceProvenance.LIVE,), outcome.provenance)
             self.assertEqual(
                 {"runtime_job", "control_state", "runtime_observation", "ledger"},
+                set(outcome.evidence_kinds),
+            )
+
+    def test_forced_collector_termination_reobserves_exact_turn_without_new_effect(self) -> None:
+        policies = load_evaluation_policies(
+            budget_policy_path=ROOT / "config" / "pre-1.0-validation-budget.json",
+            role_timeout_policy_path=ROOT / "config" / "pre-1.0-role-timeouts.json",
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root = Path(raw) / "cell"
+            cell_root.mkdir()
+            workspace, source_digest = _copy_fixture(ROOT, cell_root)
+            prepared = _prepare(
+                workspace=workspace,
+                state_root=cell_root / "state",
+                inventory=self.inventory,
+                roles=self.roles,
+                evaluation_policies=policies,
+                evaluation_contract_digest=sha256_digest({"contract": "termination"}),
+                fixture_digest=sha256_digest({"fixture": "forced-termination"}),
+            )
+            runtime = RecordedRuntime(
+                _StoredNonActiveFakeRuntime(self.inventory),
+                journal=cell_root / "runtime-receipts.json",
+            )
+
+            result = _forced_termination_no_duplicate(
+                prepared,
+                runtime,
+                source_digest,
+                governance=ALLOW_ALL,
+                timeout_seconds=2,
+            )
+
+            self.assertTrue(result["passed"], result)
+            self.assertEqual("in_process_collector_termination", result["fault_injection"]["kind"])
+            self.assertEqual("running", result["runtime_job"]["status"])
+            self.assertTrue(result["exact_binding_preserved"])
+            self.assertEqual(0, result["effect_count"]["create_thread"])
+            self.assertEqual(0, result["effect_count"]["start_turn"])
+            self.assertEqual(0, result["effect_count"]["resume"])
+            self.assertEqual(0, result["effect_count"]["interrupt"])
+            self.assertGreaterEqual(result["effect_count"]["read_stored"], 1)
+            self.assertEqual(
+                result["ledger"]["effect_counts_before"],
+                result["ledger"]["effect_counts_after"],
+            )
+
+            (cell_root / "qualification-observation.json").write_text(
+                json.dumps(result), encoding="utf-8"
+            )
+            digest = sha256_digest({"binding": "forced-termination"})
+            outcome = _responsibility_outcome(
+                scenario="forced-termination-no-duplicate",
+                prepared=prepared,
+                cell=result,
+                contract=SimpleNamespace(contract_digest=digest),
+                cell_root=cell_root,
+                run_root=cell_root.parent,
+                fixture_digest=digest,
+                freeze_bundle_digest=digest,
+                governance_plugin_identity_digest=digest,
+                candidate_wheel_digest=digest,
+                candidate_wheel_binding_digest=digest,
+                candidate_distribution_name="flowmarshal-engine",
+                candidate_distribution_version="1.0.0",
+            )
+            self.assertEqual(("E2E-09",), outcome.responsibility_ids)
+            self.assertEqual(
+                (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
+                outcome.provenance,
+            )
+
+    def test_absolute_timeout_interrupts_exact_turn_and_blocks_duplicate_execution(self) -> None:
+        policies = load_evaluation_policies(
+            budget_policy_path=ROOT / "config" / "pre-1.0-validation-budget.json",
+            role_timeout_policy_path=ROOT / "config" / "pre-1.0-role-timeouts.json",
+        )
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root = Path(raw) / "cell"
+            cell_root.mkdir()
+            workspace, source_digest = _copy_fixture(ROOT, cell_root)
+            prepared = _prepare(
+                workspace=workspace,
+                state_root=cell_root / "state",
+                inventory=self.inventory,
+                roles=self.roles,
+                evaluation_policies=policies,
+                evaluation_contract_digest=sha256_digest({"contract": "timeout"}),
+                fixture_digest=sha256_digest({"fixture": "absolute-timeout"}),
+            )
+            runtime = RecordedRuntime(
+                _StoredNonActiveFakeRuntime(self.inventory),
+                journal=cell_root / "runtime-receipts.json",
+            )
+
+            result = _absolute_timeout_no_duplicate(
+                prepared,
+                runtime,
+                source_digest,
+                governance=ALLOW_ALL,
+                timeout_seconds=3,
+            )
+
+            self.assertTrue(result["passed"], result)
+            self.assertEqual(
+                "runtime_job_clock_advanced_to_deadline_after_binding",
+                result["deadline"]["kind"],
+            )
+            self.assertEqual(
+                result["deadline"]["absolute_deadline_at"],
+                result["deadline"]["injected_clock_at"],
+            )
+            self.assertEqual("failed", result["ledger"]["attempt_status"])
+            self.assertEqual("environment", result["ledger"]["failure_class"])
+            self.assertEqual("ABSOLUTE_DEADLINE_EXCEEDED", result["ledger"]["evidence"]["observation"]["failure_diagnosis"]["local_engine_code"])
+            self.assertEqual("ENVIRONMENT_RECOVERY_REQUIRED", result["run_once_blocker"])
+            self.assertEqual("consumed", result["runtime_job"]["status"])
+            self.assertEqual(0, result["effect_count"]["create_thread"])
+            self.assertEqual(0, result["effect_count"]["start_turn"])
+            self.assertEqual(0, result["effect_count"]["resume"])
+            self.assertEqual(1, result["effect_count"]["interrupt"])
+            self.assertEqual(
+                result["ledger"]["effect_counts_before"],
+                result["ledger"]["effect_counts_after"],
+            )
+
+            (cell_root / "qualification-observation.json").write_text(
+                json.dumps(result), encoding="utf-8"
+            )
+            digest = sha256_digest({"binding": "absolute-timeout"})
+            outcome = _responsibility_outcome(
+                scenario="absolute-timeout-no-duplicate",
+                prepared=prepared,
+                cell=result,
+                contract=SimpleNamespace(contract_digest=digest),
+                cell_root=cell_root,
+                run_root=cell_root.parent,
+                fixture_digest=digest,
+                freeze_bundle_digest=digest,
+                governance_plugin_identity_digest=digest,
+                candidate_wheel_digest=digest,
+                candidate_wheel_binding_digest=digest,
+                candidate_distribution_name="flowmarshal-engine",
+                candidate_distribution_version="1.0.0",
+            )
+            self.assertEqual(("E2E-10",), outcome.responsibility_ids)
+            self.assertEqual(
+                {"runtime_job", "deadline", "runtime_observation", "effect_count"},
                 set(outcome.evidence_kinds),
             )
 
