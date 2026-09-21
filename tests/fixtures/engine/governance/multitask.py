@@ -59,8 +59,8 @@ STEPS = (
          "app.py", "test_total", "artifact:total", ("artifact:fixed-add",)),
 )
 # (producer, consumer, type, products). 같은 프로젝트는 직렬 실행하므로 control 의존성으로 한 줄로 잇는다.
-# ponytail: 독립 Task를 병렬로 두면 bare EngineDispatcher가 둘 다 먼저 materialize하고, 앞 Task 완료가
-# Project Map revision을 올려 다음 Task dispatch가 STALE_EXECUTION_INPUT 예외로 멈춘다(spike 관측).
+# Dispatcher는 준비·실행·검사 중인 Task가 있으면 다음 ready Task를 materialize하지 않으므로 독립 Task도
+# 한 번에 하나씩 준비된다(tests/test_engine_serial_materialize.py). 이 fixture는 기존 chain 형태를 유지한다.
 EDGES = tuple(
     [(a.ref, b.ref, DependencyType.CONTROL, ()) for a, b in zip(STEPS, STEPS[1:])]
     + [(a.ref, b.ref, DependencyType.DATA, b.consumes) for b in STEPS for a in STEPS if set(b.consumes) & {a.produces}]

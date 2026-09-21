@@ -342,8 +342,9 @@ class GovernanceGateTests(MultitaskGateHarness):
     def repair_after_failed_validation(self, gate, before_retry=None) -> None:
         """add Task Worker가 잘못 고쳐 validation이 실패하면 실패 근거로 Task repair 재시도를 연다.
 
-        validation 실패는 자동 분류되지 않으므로(TASK_VALIDATION_RECOVERY_REQUIRED) CLI `attempt retry`처럼
-        RecoveryAssessment를 주어 retry_task를 부른다.
+        기대 밖 종료 코드의 validation 실패는 run_once가 implementation task_repair로 자동 복구하지만,
+        이 helper는 CLI `attempt retry` 같은 사용자 결정 경로를 검사하려고 RecoveryAssessment를 주어
+        retry_task를 직접 부른다.
         """
         from flowmarshal.engine.domain import FailureClass, RecoveryAssessment, RepairAction, new_id
 

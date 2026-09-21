@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import tempfile
 import unittest
 from collections import defaultdict
@@ -8,14 +9,27 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from flowmarshal.canonical import sha256_digest
+from flowmarshal.canonical import sha256_bytes, sha256_digest
 from flowmarshal.engine.budget import BudgetManager
+from flowmarshal.engine.domain import (
+    ExecutionAction,
+    ExecutionContextNeed,
+    ExecutionSpecProposal,
+    PlanContractRevision,
+    RecoveryEnvelope,
+    ResolvedTarget,
+    ValidationExecutionStep,
+)
 from flowmarshal.engine.e2e_qualification import (
+    PreparedE2E,
     RecordedRuntime,
+    UsageWithholdingRuntime,
     _absolute_timeout_no_duplicate,
+    _approved_repair,
     _assert_no_transient_plugin_identity_change,
     _cancel_active_job,
     _checkpoint_model_observation,
+    _context_discovery,
     _contract,
     _DRAFT_ACTIVATION_ERROR,
     _E2E_SOURCE_REQUEST,
@@ -25,7 +39,9 @@ from flowmarshal.engine.e2e_qualification import (
     _forced_termination_no_duplicate,
     _guard_e2e_partial_resume,
     _in_flight_replan_protection,
+    _initialize_workspace_git,
     _ledger_delta,
+    _multi_task_dag,
     _observe_frozen_plugin_identity,
     _partial_write_input_changed,
     _partial_write_resume,
@@ -33,9 +49,12 @@ from flowmarshal.engine.e2e_qualification import (
     _prepare_from_raw_request,
     _preserve_inventory_observation,
     _prohibited_effect_blocked,
+    _project_e2e_fixture_source_digest,
+    _read_only_report,
     _responsibility_outcome,
     _scope_expansion_blocked,
     _unknown_receipt,
+    _usage_missing_late,
     run_project_e2e,
 )
 from flowmarshal.engine.evaluation import EvaluationRunStatus, ImmutableCheckpointStore
@@ -56,6 +75,7 @@ from flowmarshal.engine.qualification_manifest import (
     QualificationFailureClass,
     QualificationSuiteManifest,
 )
+from flowmarshal.engine.roles import ScriptedStructuredRoleRunner
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime, RuntimeObservation
 from tests.fixtures.engine.governance.allow import ALLOW_ALL
 
@@ -151,6 +171,81 @@ class _TurnCompletingFakeRuntime(_RequestEchoFakeRuntime):
             )
             self.complete(arguments["thread_id"], response="완료")
         return receipt
+
+
+class _CompletingFakeRuntime(_RequestEchoFakeRuntime):
+    """turn마다 ``side_effect``를 한 번 부르고 ``provider_payload``를 붙여 바로 완료한다."""
+
+    def __init__(self, inventory, *, side_effect=None, provider_payload=None) -> None:
+        super().__init__(inventory)
+        self.side_effect = side_effect
+        self.provider_payload = provider_payload or {}
+
+    def start_turn(self, **arguments):
+        receipt = super().start_turn(**arguments)
+        if self.side_effect is not None:
+            self.side_effect()
+        self.threads[arguments["thread_id"]].provider_payload = dict(self.provider_payload)
+        self.complete(arguments["thread_id"], response="완료")
+        return receipt
+
+
+def _replace_text(path: Path, old: str, new: str) -> None:
+    path.write_text(path.read_text(encoding="utf-8").replace(old, new), encoding="utf-8")
+
+
+# governance multitask fixture의 Task별 올바른 Worker 편집이다.
+_MULTITASK_EDITS = {
+    "task_fix_add": lambda root: _replace_text(root / "app.py", "left - right", "left + right"),
+    "task_fix_shout": lambda root: _replace_text(root / "text.py", "text.lower()", "text.upper()"),
+    "task_add_total": lambda root: (root / "app.py").write_text(
+        (root / "app.py").read_text(encoding="utf-8")
+        + "\n\ndef total(values: list[int]) -> int:\n    result = 0\n    for value in values:\n"
+        "        result = add(result, value)\n    return result\n",
+        encoding="utf-8",
+    ),
+}
+
+# project-e2e-context fixture의 올바른 구현이다. 규칙 값은 규칙 모듈 상수를 쓴다.
+_SHIPPING_FEE_IMPLEMENTATION = (
+    "from shipping_rules import BASE_FEE_WON, FREE_SHIPPING_MIN_WON, PER_KG_WON\n\n\n"
+    "def shipping_fee(weight_kg: int, order_total_won: int) -> int:\n"
+    "    if weight_kg <= 0:\n"
+    "        raise ValueError(\"무게는 0보다 커야 합니다.\")\n"
+    "    if order_total_won >= FREE_SHIPPING_MIN_WON:\n"
+    "        return 0\n"
+    "    return BASE_FEE_WON + weight_kg * PER_KG_WON\n"
+)
+
+
+class _TaskEditingFakeRuntime(_RequestEchoFakeRuntime):
+    """Worker prompt의 TaskContract task_ref로 Task별 편집을 골라 적용하고 바로 완료한다."""
+
+    def __init__(self, inventory, edits) -> None:
+        super().__init__(inventory)
+        self.edits = edits
+
+    def start_turn(self, **arguments):
+        receipt = super().start_turn(**arguments)
+        for ref, edit in self.edits.items():
+            if f'"task_ref":"{ref}"' in arguments["prompt"]:
+                edit()
+        self.complete(arguments["thread_id"], response="완료")
+        return receipt
+
+
+_TURN_USAGE = {
+    "usage": {
+        "inputTokens": 11,
+        "cachedInputTokens": 2,
+        "outputTokens": 7,
+        "reasoningOutputTokens": 3,
+        "totalTokens": 18,
+    },
+    "usage_scope": "turn",
+    "usage_source": "sdk.turn_result",
+    "duration_ms": 5,
+}
 
 
 class _PartialCreateObservationFakeRuntime(FakeCodexRuntime):
@@ -1419,6 +1514,552 @@ class EngineE2EQualificationTests(unittest.TestCase):
             self.assertEqual(1, runtime.resume_calls)
             self.assertEqual(1, result["validation"]["goal_verdict_count"])
 
+    def test_fixture_source_digest_covers_every_scenario_fixture(self) -> None:
+        import shutil
+
+        with tempfile.TemporaryDirectory() as raw:
+            base = Path(raw)
+            fixtures = base / "tests" / "fixtures" / "engine"
+            for name in (
+                "project-e2e", "project-e2e-read-only", "project-e2e-multi-task", "project-e2e-context",
+            ):
+                shutil.copytree(ROOT / "tests" / "fixtures" / "engine" / name, fixtures / name)
+            original = _project_e2e_fixture_source_digest(base)
+            self.assertEqual(original, _project_e2e_fixture_source_digest(ROOT))
+            (fixtures / "project-e2e-read-only" / "app.py").write_text("changed\n", encoding="utf-8")
+            self.assertNotEqual(original, _project_e2e_fixture_source_digest(base))
+
+    def _read_only_cell(self, raw: str, *, side_effect=None, read_only: bool = True):
+        cell_root = Path(raw) / "cell"
+        cell_root.mkdir()
+        workspace, source_digest = _copy_fixture(ROOT, cell_root, "project-e2e-read-only")
+        # run loop와 같이 prepare 앞에서 기준 commit을 만든다. .git은 트리 digest 밖이다.
+        head = _initialize_workspace_git(workspace)["workspace_git_head"]
+        self.assertRegex(head, r"^[0-9a-f]{40}$")
+        prepared = _prepare(
+            workspace=workspace,
+            state_root=cell_root / "state",
+            inventory=self.inventory,
+            roles=self.roles,
+            read_only=read_only,
+        )
+        runtime = RecordedRuntime(
+            _CompletingFakeRuntime(self.inventory, side_effect=side_effect),
+            journal=cell_root / "runtime-receipts.json",
+        )
+        result = _read_only_report(
+            prepared, runtime, source_digest, cell_root=cell_root, governance=ALLOW_ALL
+        )
+        report = json.loads((cell_root / "final-report.json").read_text(encoding="utf-8"))
+        return prepared, result, report
+
+    def test_read_only_report_completes_without_any_workspace_change(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            prepared, result, report = self._read_only_cell(raw)
+
+            self.assertTrue(result["passed"], result)
+            self.assertTrue(all(result["checks"].values()), result["checks"])
+            self.assertEqual([], result["source_digest"]["changed_paths"])
+            self.assertEqual(3, result["source_digest"]["file_count_before"])
+            self.assertEqual(1, result["goal_verdict_count"])
+            self.assertIsNone(report["reason"])
+            verification = report["final_report"]["read_only_verification"]
+            self.assertTrue(verification["criteria_complete"])
+            self.assertTrue(verification["evidence_grounded"])
+            self.assertTrue(verification["source_unchanged"])
+            self.assertIn("후속 과제", result["known_limitation"])
+
+    def test_read_only_report_fails_on_new_file_that_product_check_misses(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            workspace = Path(raw) / "cell" / "workspace"
+
+            def create_file() -> None:
+                (workspace / "notes.txt").write_text("분석 메모\n", encoding="utf-8")
+
+            _prepared, result, _report = self._read_only_cell(raw, side_effect=create_file)
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E03_WORKSPACE_TREE_CHANGED", result["failure_code"])
+            self.assertEqual("product", result["failure_class"])
+            self.assertEqual(["notes.txt"], result["source_digest"]["changed_paths"])
+            # 제품 source_unchanged는 baseline 밖 새 파일을 못 본다(known limitation 회귀 표식).
+            self.assertTrue(result["checks"]["product_source_unchanged"])
+            self.assertFalse(result["checks"]["workspace_tree_unchanged"])
+
+    def test_read_only_report_does_not_run_when_goal_is_not_read_only(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            prepared, result, report = self._read_only_cell(raw, read_only=False)
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E03_PRECONDITION_NOT_READ_ONLY", result["failure_code"])
+            self.assertEqual("model", result["failure_class"])
+            self.assertEqual(["task_fix_add"], result["precondition"]["change_task_refs"])
+            # 실패 경로에서도 책임 판정용 final report 파일은 null과 이유로 남는다.
+            self.assertIsNone(report["final_report"])
+            self.assertEqual("E2E03_FINAL_REPORT_NOT_PRODUCED", report["reason"])
+            with prepared.service.ledger.read() as connection:
+                self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0])
+
+    def _usage_cell(self, raw: str, *, provider_payload=_TURN_USAGE):
+        cell_root = Path(raw) / "cell"
+        cell_root.mkdir()
+        workspace, source_digest = _copy_fixture(ROOT, cell_root)
+        prepared = _prepare(
+            workspace=workspace,
+            state_root=cell_root / "state",
+            inventory=self.inventory,
+            roles=self.roles,
+        )
+
+        def fix_add() -> None:
+            (workspace / "app.py").write_text(
+                "def add(left: int, right: int) -> int:\n    return left + right\n",
+                encoding="utf-8",
+            )
+
+        runtime = RecordedRuntime(
+            _CompletingFakeRuntime(
+                self.inventory, side_effect=fix_add, provider_payload=provider_payload
+            ),
+            journal=cell_root / "runtime-receipts.json",
+        )
+        result = _usage_missing_late(
+            prepared, runtime, source_digest, cell_root=cell_root, governance=ALLOW_ALL
+        )
+        document = json.loads((cell_root / "usage-observation.json").read_text(encoding="utf-8"))
+        return cell_root, prepared, result, document
+
+    def test_usage_missing_completes_and_late_usage_only_appends_accounting(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root, prepared, result, document = self._usage_cell(raw)
+
+            self.assertTrue(result["passed"], result)
+            self.assertTrue(all(result["missing_checks"].values()), result["missing_checks"])
+            self.assertTrue(all(result["late_checks"].values()), result["late_checks"])
+            self.assertEqual(1, result["goal_verdict_count"])
+            before = document["before_late"]
+            after = document["after_late"]
+            # 누락 동안에는 0이나 추정이 아니라 null/unknown이다.
+            self.assertEqual(
+                (None, None, None, None, None),
+                tuple(
+                    before["usage_record"][key]
+                    for key in (
+                        "input_tokens", "cached_input_tokens", "output_tokens",
+                        "reasoning_tokens", "total_tokens",
+                    )
+                ),
+            )
+            self.assertEqual(
+                UsageWithholdingRuntime.WITHHELD_USAGE_SOURCE, before["usage_record"]["usage_source"]
+            )
+            self.assertEqual(("usage_unknown", None), (
+                before["provider_call"]["status"], before["provider_call"]["actual_tokens"]
+            ))
+            # 늦은 usage는 회계 관측만 더한다. budget_usage 기록과 실행 필드는 그대로다.
+            self.assertEqual(("settled", 18), (
+                after["provider_call"]["status"], after["provider_call"]["actual_tokens"]
+            ))
+            self.assertEqual(before["usage_record"], after["usage_record"])
+            self.assertEqual(
+                [("unavailable", 0), ("measured", 1)],
+                [(item["measurement_status"], item["late"]) for item in after["usage_observations"]],
+            )
+            self.assertEqual(["history_events"], list(document["ledger_delta"]))
+            fault = json.loads((cell_root / "fault-injection.json").read_text(encoding="utf-8"))
+            self.assertEqual("worker_usage_withheld_then_late_delivery", fault["kind"])
+            self.assertTrue(fault["withheld"])
+            self.assertTrue(all("provider_payload" not in item for item in fault["withheld"]))
+            self.assertEqual("completed", prepared.service.status(prepared.project_id)["project"]["run_state"])
+
+    def test_usage_missing_fails_when_missing_usage_is_filled_with_zero(self) -> None:
+        def zero_filled(self, payload):
+            return payload | {
+                "usage": {
+                    "inputTokens": 0,
+                    "cachedInputTokens": 0,
+                    "outputTokens": 0,
+                    "reasoningOutputTokens": 0,
+                    "totalTokens": 0,
+                },
+                "usage_scope": "turn",
+            }
+
+        with tempfile.TemporaryDirectory() as raw, patch.object(
+            UsageWithholdingRuntime, "_withheld_payload", zero_filled
+        ):
+            _cell_root, _prepared, result, document = self._usage_cell(raw)
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E06_MISSING_USAGE_NOT_NULL", result["failure_code"])
+            self.assertEqual("product", result["failure_class"])
+            self.assertFalse(result["missing_checks"]["usage_components_null"])
+            self.assertEqual("E2E06_MISSING_USAGE_NOT_NULL", document["reason"])
+            # 전제가 깨지면 늦은 usage를 전달하지 않는다.
+            self.assertIsNone(document["after_late"])
+            self.assertEqual(1, len(document["before_late"]["usage_observations"]))
+
+    def test_usage_missing_without_provider_usage_is_environment_not_product(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            _cell_root, _prepared, result, document = self._usage_cell(raw, provider_payload={})
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E06_FAULT_NOT_TRIGGERED", result["failure_code"])
+            self.assertEqual("environment", result["failure_class"])
+            self.assertEqual("E2E06_USAGE_OBSERVATION_NOT_PRODUCED", document["reason"])
+
+    def _multitask_cell(self, raw: str):
+        from tests.fixtures.engine.governance import multitask
+
+        cell_root = Path(raw) / "cell"
+        cell_root.mkdir()
+        workspace = multitask.copy_fixture(cell_root)
+        state = multitask.prepare(
+            workspace=workspace, state_root=cell_root / "state",
+            inventory=self.inventory, roles=self.roles,
+        )
+        with state.service.ledger.read() as connection:
+            plan = PlanContractRevision.model_validate_json(connection.execute(
+                "SELECT p.payload_json FROM projects j JOIN plan_revisions p "
+                "ON p.id=j.active_plan_revision_id WHERE j.id=?",
+                (state.project_id,),
+            ).fetchone()[0])
+        prepared = PreparedE2E(
+            service=state.service, project_id=state.project_id,
+            task_id=state.task_ids["task_fix_add"], plan_revision_id=plan.plan_revision_id,
+            activation_digest=plan.activation_digest, proposal=None, workspace=workspace,
+        )
+        # 준비 역할 응답은 provider 형식이다. 대상 digest는 준비 시점 Project Map에서 Core가 채운다.
+        preparations = []
+        for step in multitask.STEPS:
+            test = f"{step.test}.py"
+            proposal = ExecutionSpecProposal(
+                task_id=state.task_ids[step.ref],
+                context_needs=(
+                    ExecutionContextNeed(need_id="source", description="수정 대상 구현", path_hints=(step.write,)),
+                    ExecutionContextNeed(need_id="test", description="고정 회귀 테스트", path_hints=(test,)),
+                ),
+                resolved_targets=(
+                    ResolvedTarget(target_ref="target_source", path=step.write, access="write"),
+                    ResolvedTarget(target_ref="target_test", path=test, access="read"),
+                ),
+                actions=(ExecutionAction(action_ref="action_edit", kind="edit", description=step.objective),),
+                validation_steps=(ValidationExecutionStep(
+                    validation_id=f"validation_{step.test}", method="deterministic",
+                    argv=(sys.executable, "-m", "unittest", step.test),
+                    working_directory=str(workspace), timeout_seconds=60, expected_exit_codes=(0,),
+                    required_evidence_kinds=("test",)),),
+                resource_locks=(f"file:{workspace / step.write}",),
+                timeout_seconds=900, idempotency_hint=f"multitask-{step.ref}",
+            ).model_dump(mode="json")
+            for item in proposal["validation_steps"]:
+                item.pop("method")
+                item.pop("required_evidence_kinds")
+            preparations.append({"proposal": proposal, "context_request": None})
+        runner = ScriptedStructuredRoleRunner({
+            "execution_preparation": preparations,
+            "goal_test_preparation": [{"step": multitask.goal_step(state).model_dump(mode="json")}],
+        })
+        runtime = RecordedRuntime(
+            _TaskEditingFakeRuntime(self.inventory, {
+                ref: (lambda edit=edit: edit(workspace)) for ref, edit in _MULTITASK_EDITS.items()
+            }),
+            journal=cell_root / "runtime-receipts.json",
+        )
+        return prepared, runtime, runner
+
+    def test_multi_task_dag_runs_dependent_tasks_one_at_a_time(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            prepared, runtime, runner = self._multitask_cell(raw)
+
+            result = _multi_task_dag(
+                prepared, runtime, "sha256:" + "0" * 64, roles=self.roles,
+                governance=ALLOW_ALL, structured_runner=runner, timeout_seconds=60,
+            )
+
+            self.assertTrue(result["passed"], result)
+            self.assertTrue(all(result["checks"].values()), result["checks"])
+            self.assertEqual(1, result["max_in_flight"])
+            self.assertTrue(result["edges"])
+            self.assertTrue(all(item["respected"] for item in result["edges"]))
+            # 제품 supervisor 경로로 돈다. 준비 역할은 Task마다 한 번, Goal Test 준비는 한 번이다.
+            self.assertEqual("EngineApplication.run_once+RuntimeJobSupervisor", result["runtime_path"])
+            self.assertEqual(
+                ["execution_preparation"] * 3 + ["goal_test_preparation"],
+                [call.role for call in runner.calls],
+            )
+            completed = [
+                item["task_ref"] for item in result["execution_order"]
+                if item["event_type"] == "task.completed"
+            ]
+            self.assertEqual(["task_fix_add", "task_fix_shout", "task_add_total"], completed)
+
+    def test_multi_task_dag_single_task_plan_fails_without_running(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root = Path(raw) / "cell"
+            cell_root.mkdir()
+            workspace, source_digest = _copy_fixture(ROOT, cell_root)
+            prepared = _prepare(
+                workspace=workspace, state_root=cell_root / "state",
+                inventory=self.inventory, roles=self.roles,
+            )
+            runtime = RecordedRuntime(
+                _CompletingFakeRuntime(self.inventory), journal=cell_root / "runtime-receipts.json"
+            )
+
+            result = _multi_task_dag(prepared, runtime, source_digest, governance=ALLOW_ALL)
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E02_PLAN_NOT_MULTI_TASK_DAG", result["failure_code"])
+            self.assertEqual("model", result["failure_class"])
+            self.assertEqual(["task_fix_add"], result["precondition"]["task_refs"])
+            self.assertEqual(0, runtime.create_calls)
+            with prepared.service.ledger.read() as connection:
+                self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0])
+
+    def _repair_cell(self, raw: str):
+        cell_root = Path(raw) / "cell"
+        cell_root.mkdir()
+        workspace, source_digest = _copy_fixture(ROOT, cell_root)
+        prepared = _prepare(
+            workspace=workspace, state_root=cell_root / "state",
+            inventory=self.inventory, roles=self.roles,
+        )
+
+        def fix_add() -> None:
+            (workspace / "app.py").write_text(
+                "def add(left: int, right: int) -> int:\n    return left + right\n",
+                encoding="utf-8",
+            )
+
+        runtime = RecordedRuntime(
+            _CompletingFakeRuntime(self.inventory, side_effect=fix_add),
+            journal=cell_root / "runtime-receipts.json",
+        )
+        result = _approved_repair(
+            prepared, runtime, source_digest, cell_root=cell_root,
+            governance=ALLOW_ALL, timeout_seconds=60,
+        )
+        fault = json.loads((cell_root / "fault-injection.json").read_text(encoding="utf-8"))
+        return prepared, result, fault
+
+    def _execution_attempts(self, prepared) -> list[tuple[int, str]]:
+        with prepared.service.ledger.read() as connection:
+            return [
+                (row["attempt_no"], row["status"])
+                for row in connection.execute(
+                    "SELECT attempt_no,status FROM attempts WHERE kind='execution' ORDER BY attempt_no"
+                )
+            ]
+
+    def test_approved_repair_classifies_injected_fault_and_repairs_same_task(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            prepared, result, fault = self._repair_cell(raw)
+
+            self.assertTrue(result["passed"], result)
+            self.assertTrue(all(result["checks"].values()), result["checks"])
+            self.assertEqual([(1, "succeeded"), (2, "succeeded")], self._execution_attempts(prepared))
+            chain = result["repair_chain"]
+            self.assertEqual(1, len(chain["retries"]))
+            self.assertEqual(["implementation"], [item["failure_class"] for item in chain["assessments"]])
+            self.assertTrue(chain["direct_failure_evidence_ids"])
+            # fault 기록은 provenance일 뿐 분류기 입력이 아니며 주입기가 되돌리지 않는다.
+            injection = fault["injection"]
+            self.assertTrue(injection["injected"] and injection["effective"])
+            self.assertEqual(["app.py"], [item["path"] for item in injection["targets"]])
+            target = injection["targets"][0]
+            self.assertEqual(target["expected_content_digest"], target["injected_digest"])
+            self.assertNotEqual(target["worker_output_digest"], target["injected_digest"])
+            self.assertFalse(fault["classifier_input"])
+            self.assertFalse(fault["injector_rollback"])
+            self.assertEqual(chain["attempt_id"], injection["attempt_id"])
+            # 최종 파일은 두 번째 Worker가 고친 구현이다.
+            self.assertEqual(
+                target["worker_output_digest"], fault["final_target_digests"]["app.py"]
+            )
+
+    def test_approved_repair_without_retryable_implementation_fails_before_running(self) -> None:
+        def context_only(**_arguments):
+            return RecoveryEnvelope(retryable_failure_classes=("context",))
+
+        with tempfile.TemporaryDirectory() as raw, patch(
+            "flowmarshal.engine.e2e_qualification.RecoveryEnvelope", context_only
+        ):
+            prepared, result, fault = self._repair_cell(raw)
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E04_PRECONDITION_IMPLEMENTATION_NOT_RETRYABLE", result["failure_code"])
+            self.assertEqual("model", result["failure_class"])
+            self.assertEqual([], self._execution_attempts(prepared))
+            self.assertIsNone(fault["injection"])
+            self.assertEqual("E2E04_FAULT_NOT_INJECTED", fault["reason"])
+
+    def test_approved_repair_unclassified_failure_stops_without_repair(self) -> None:
+        from flowmarshal.engine.recovery import EvidenceFirstFailureClassifier, FailureDiagnosis
+
+        def unclassified(cls, signal):
+            return FailureDiagnosis(
+                evidence_ids=signal.evidence_ids, rationale="직접 근거 없음", source="unclassified"
+            )
+
+        with tempfile.TemporaryDirectory() as raw, patch.object(
+            EvidenceFirstFailureClassifier, "classify", classmethod(unclassified)
+        ):
+            prepared, result, fault = self._repair_cell(raw)
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E04_RUN_BLOCKED", result["failure_code"])
+            self.assertEqual("product", result["failure_class"])
+            self.assertIn("TASK_VALIDATION_RECOVERY_REQUIRED", result["failure"])
+            self.assertTrue(fault["injection"]["effective"])
+            self.assertEqual([], result["repair_chain"]["assessments"])
+            self.assertEqual([(1, "succeeded")], self._execution_attempts(prepared))
+
+    def _context_cell(self, raw: str, *, request_context: bool, unmapped_need: bool = False):
+        cell_root = Path(raw) / "cell"
+        cell_root.mkdir()
+        workspace, source_digest = _copy_fixture(ROOT, cell_root, "project-e2e-context")
+        prepared = _prepare(
+            workspace=workspace, state_root=cell_root / "state",
+            inventory=self.inventory, roles=self.roles,
+        )
+        proposal = prepared.proposal.model_dump(mode="json")
+        for item in proposal["validation_steps"]:
+            item.pop("method")
+            item.pop("required_evidence_kinds")
+        need = {
+            "need_id": "shipping_rules",
+            "description": "app.py가 가져오는 배송비 규칙 모듈 본문",
+            "path_hints": ["shipping_rules.py"],
+            "symbol_hints": [],
+            "tag_hints": [],
+            "required": True,
+        }
+        context_request = {
+            "proposal": None,
+            "context_request": {
+                "task_id": prepared.task_id,
+                "missing_needs": [need],
+                "reason": "규칙 모듈이 초기 Project Map에 없습니다.",
+            },
+        }
+        # ContextRequest 대신 proposal의 context_needs에 Map 밖 경로를 바로 적은 경우.
+        unmapped = {
+            "proposal": {**proposal, "context_needs": [*proposal["context_needs"], need]},
+            "context_request": None,
+        }
+        runner = ScriptedStructuredRoleRunner({
+            "execution_preparation": (
+                [context_request] if request_context else []
+            ) + ([unmapped] if unmapped_need else []) + [
+                {"proposal": proposal, "context_request": None}
+            ],
+            "goal_test_preparation": [{"step": prepared.proposal.validation_steps[0].model_copy(
+                update={"validation_id": "validation_goal"}).model_dump(mode="json")}],
+        })
+
+        def implement() -> None:
+            (workspace / "app.py").write_text(_SHIPPING_FEE_IMPLEMENTATION, encoding="utf-8")
+
+        runtime = RecordedRuntime(
+            _CompletingFakeRuntime(self.inventory, side_effect=implement),
+            journal=cell_root / "runtime-receipts.json",
+        )
+        result = _context_discovery(
+            prepared, runtime, source_digest, cell_root=cell_root, roles=self.roles,
+            governance=ALLOW_ALL, structured_runner=runner, timeout_seconds=60,
+        )
+        document = json.loads((cell_root / "context-discovery.json").read_text(encoding="utf-8"))
+        return prepared, result, document, runner
+
+    def test_context_discovery_resolves_unmapped_rule_module_through_supervisor(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            prepared, result, document, runner = self._context_cell(raw, request_context=True)
+
+            self.assertTrue(result["passed"], result)
+            self.assertTrue(all(result["checks"].values()), result["checks"])
+            self.assertNotIn("shipping_rules.py", document["initial_project_map_paths"])
+            [job] = document["context_jobs"]
+            self.assertTrue(all(job["checks"].values()), job["checks"])
+            self.assertEqual("provider_context_request", job["request_origin"])
+            self.assertEqual(["shipping_rules.py"], [item["source_ref"] for item in job["resolution"]])
+            digest = sha256_bytes((prepared.workspace / "shipping_rules.py").read_bytes())
+            self.assertEqual(digest, job["resolution"][0]["content_digest"])
+            self.assertEqual(digest, job["prompt_bindings"][0]["fragment_content_digest"])
+            self.assertTrue(job["prompt_bindings"][0]["body_bound"])
+            self.assertIsNone(document["reason"])
+            # 첫 준비 job과 후속 job이 각각 역할 turn 하나를 쓴다.
+            self.assertEqual(
+                ["execution_preparation", "execution_preparation", "goal_test_preparation"],
+                [call.role for call in runner.calls],
+            )
+
+    def test_context_discovery_resolves_unmapped_context_need_in_proposal(self) -> None:
+        """준비 역할이 ContextRequest 없이 Map 밖 경로를 context_needs에 적어도 같은 후속 job으로 해소한다."""
+
+        with tempfile.TemporaryDirectory() as raw:
+            _prepared, result, document, runner = self._context_cell(
+                raw, request_context=False, unmapped_need=True
+            )
+
+            self.assertTrue(result["passed"], result)
+            [job] = document["context_jobs"]
+            self.assertTrue(all(job["checks"].values()), job["checks"])
+            self.assertEqual("provider_proposal_context_needs", job["request_origin"])
+            self.assertEqual(["shipping_rules.py"], [item["source_ref"] for item in job["resolution"]])
+            self.assertEqual(
+                ["execution_preparation", "execution_preparation", "goal_test_preparation"],
+                [call.role for call in runner.calls],
+            )
+
+    def test_context_discovery_without_context_request_is_not_observed(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            _prepared, result, document, _runner = self._context_cell(raw, request_context=False)
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E05_CONTEXT_REQUEST_NOT_OBSERVED", result["failure_code"])
+            self.assertEqual("model", result["failure_class"])
+            self.assertEqual([], document["context_jobs"])
+            self.assertEqual("E2E05_CONTEXT_REQUEST_NOT_OBSERVED", document["reason"])
+
+    def test_new_drivers_require_raw_request_pipeline_stages(self) -> None:
+        from flowmarshal.engine.qualification_manifest import _ordered_contains
+
+        suite = QualificationSuiteManifest.load(ROOT / "config" / "qualification-suite.json")
+        requirements = {item.fixture_id: item for item in suite.e2e_responsibilities}
+        digest = "sha256:" + "b" * 64
+        with tempfile.TemporaryDirectory() as raw:
+            for scenario in ("multi-task-dag", "approved-repair", "context-discovery"):
+                requirement = requirements[scenario]
+                required = tuple(requirement.required_pipeline_stages)
+                raw_stages = required[: required.index("plan_activation") + 1]
+                cell_root = Path(raw) / scenario
+                (cell_root / "state").mkdir(parents=True)
+                for name in (
+                    "state/flowmarshal-engine.sqlite3", "runtime-receipts.json",
+                    "context-discovery.json",
+                ):
+                    (cell_root / name).write_text("{}", encoding="utf-8")
+                # 합성 준비(pipeline_stages=())로는 책임 단계를 채울 수 없다.
+                for stages, expected in (((), False), (raw_stages, True)):
+                    outcome = _responsibility_outcome(
+                        scenario=scenario,
+                        prepared=SimpleNamespace(pipeline_stages=stages),
+                        cell={"passed": True},
+                        contract=SimpleNamespace(contract_digest=digest),
+                        cell_root=cell_root,
+                        run_root=Path(raw),
+                        fixture_digest=digest,
+                        freeze_bundle_digest=digest,
+                        governance_plugin_identity_digest=digest,
+                        candidate_wheel_digest=digest,
+                        candidate_wheel_binding_digest=digest,
+                        candidate_distribution_name="flowmarshal-engine",
+                        candidate_distribution_version="1.0.0",
+                    )
+                    self.assertEqual((requirement.responsibility_id,), outcome.responsibility_ids)
+                    self.assertEqual(expected, _ordered_contains(outcome.pipeline_stages, required))
+
     def _raw_request_cell(self, raw: str, *, prohibited: tuple[str, ...] = (), authorize: bool = True):
         from tests.engine_helpers import inventory
         from tests.engine_inspection_helpers import InspectionScriptedRunner
@@ -1633,12 +2274,19 @@ class EngineE2EQualificationTests(unittest.TestCase):
             for scenario, responsibility_id, code in (
                 ("prohibited-effect", "E2E-14", "E2E14_BLOCK_EVIDENCE_MISSING"),
                 ("scope-expansion", "E2E-15", "E2E15_TARGET_EFFECT_NOT_COVERED_LIVE"),
+                ("read-only-report", "E2E-03", "E2E03_WORKSPACE_TREE_CHANGED"),
+                ("usage-missing-late", "E2E-06", "E2E06_MISSING_USAGE_NOT_NULL"),
+                ("multi-task-dag", "E2E-02", "E2E02_DAG_EXECUTION_NOT_VERIFIED"),
+                ("approved-repair", "E2E-04", "E2E04_REPAIR_CHAIN_INCOMPLETE"),
+                ("context-discovery", "E2E-05", "E2E05_CONTEXT_BINDING_NOT_VERIFIED"),
             ):
                 cell_root = Path(raw) / scenario
                 (cell_root / "state").mkdir(parents=True)
                 for name in (
                     "authorization-observation.json", "qualification-observation.json",
                     "scope-check.json", "state/flowmarshal-engine.sqlite3",
+                    "final-report.json", "usage-observation.json", "runtime-receipts.json",
+                    "context-discovery.json",
                 ):
                     (cell_root / name).write_text("{}", encoding="utf-8")
                 outcome = _responsibility_outcome(
@@ -1660,6 +2308,9 @@ class EngineE2EQualificationTests(unittest.TestCase):
                 # 동결 suite가 허용·요구하는 출처 안에서만 주장한다.
                 self.assertLessEqual(set(outcome.provenance), set(requirement.allowed_provenance))
                 self.assertLessEqual(set(requirement.required_provenance), set(outcome.provenance))
+                self.assertEqual(
+                    set(requirement.required_evidence_kinds), set(outcome.evidence_kinds)
+                )
                 self.assertEqual(QualificationCellStatus.FAILED, outcome.status)
                 # 책임 판정에는 설명 문장이 아니라 안정된 code와 class가 들어간다.
                 self.assertEqual(code, outcome.failure_code)

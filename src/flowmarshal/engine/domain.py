@@ -1135,13 +1135,23 @@ class ValidationContract(EngineModel):
 class RecoveryEnvelope(EngineModel):
     max_same_failure_replans: int = Field(default=2, ge=0, le=10)
     max_goal_replans: int = Field(default=5, ge=0, le=20)
-    retryable_failure_classes: tuple[str, ...] = ()
+    retryable_failure_classes: tuple[FailureClass, ...] = Field(
+        default=(),
+        description=(
+            "이 Task에서 자동 복구를 허용할 실패 분류. FailureClass 값을 그대로 쓰며 "
+            "대문자·다른 표기는 정규화하지 않고 거부한다. Worker 구현 결함을 같은 Task에서 "
+            "다시 시도할 수 있으면 implementation을 넣고, 자동 복구를 허용하지 않으면 빈 "
+            "목록을 쓴다. unclassified는 자동 복구 경로가 없으므로 넣지 않는다."
+        ),
+    )
     requires_new_evidence: bool = True
     resume_strategy: Literal["existing_binding_first", "new_attempt_only"] = "existing_binding_first"
 
     @field_validator("retryable_failure_classes")
     @classmethod
-    def failure_classes_are_unique(cls, value: tuple[str, ...]) -> tuple[str, ...]:
+    def failure_classes_are_unique(
+        cls, value: tuple[FailureClass, ...]
+    ) -> tuple[FailureClass, ...]:
         return _unique(value, "recovery failure class")
 
 

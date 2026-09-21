@@ -302,7 +302,21 @@ class ExecutionProposalAdapter:
         # operation.completed 재생도 최초 role 출력과 같은 계약으로 검증한다.
         return output_validator(result["payload"])
 
-    def prepare_task(self, *, project_id: str, task_id: str, inventory: ModelInventory) -> ExecutionPreparation:
+    def prepare_task(
+        self,
+        *,
+        project_id: str,
+        task_id: str,
+        inventory: ModelInventory,
+        context_request: AdditionalContextRequest | None = None,
+    ) -> ExecutionPreparation:
+        """ready Task 하나의 운영 상세를 준비한다.
+
+        ``context_request``는 비동기 후속 준비 job 경로다. Core가 직전 job의
+        ContextRequest를 해소해 Project Map에 lazy로 추가한 뒤이므로, 이 job은
+        확장된 Map에서 다시 해소한 본문을 받는 role turn 하나만 쓴다.
+        """
+        followup = context_request is not None
         context = execution_context(self.service, project_id)
         plan = PlanContractRevision.model_validate(context["plan"])
         task = next((item for item in plan.definition.tasks if item.task_id == task_id), None)
@@ -317,27 +331,32 @@ class ExecutionProposalAdapter:
             compile_task_preparation(raw, task)
             return raw
 
-        raw = self._run(
-            project_id,
-            inventory,
-            context,
-            ProviderExecutionPreparation,
-            "execution_preparation",
-            payload=payload,
-            validator=validate_task_preparation,
-        )
-        if raw.context_request is not None:
-            resolution = resolve_additional_context_request(
-                project_map=ProjectMapRevision.model_validate(context["project_map"]),
-                request=raw.context_request,
-                token_budget=12_000,
+        raw = None
+        if not followup:
+            raw = self._run(
+                project_id,
+                inventory,
+                context,
+                ProviderExecutionPreparation,
+                "execution_preparation",
+                payload=payload,
+                validator=validate_task_preparation,
             )
             # RuntimeJob 하나는 exact provider turn 하나만 소유한다. 비동기 준비
             # 경계에서는 후속 role call을 같은 job 안에서 시작하지 않고 ContextRequest를
-            # Core에 돌려 다음 materialization 입력으로 명시적으로 처리하게 한다.
+            # Core에 돌려 해소·Map 확장 뒤 후속 준비 job 하나로 처리하게 한다.
             from .runtime import active_runtime_job_id
 
-            if resolution.resolved and active_runtime_job_id() is None:
+            if active_runtime_job_id() is None:
+                context_request = raw.context_request
+        resolution = None
+        if context_request is not None:
+            resolution = resolve_additional_context_request(
+                project_map=ProjectMapRevision.model_validate(context["project_map"]),
+                request=context_request,
+                token_budget=12_000,
+            )
+            if resolution.resolved:
                 payload = payload | {
                     "additional_context": [
                         item.model_dump(mode="json") for item in resolution.resolved
@@ -362,7 +381,27 @@ class ExecutionProposalAdapter:
                     ),
                     validator=validate_task_preparation,
                 )
+        if raw is None:
+            # 확장한 Map에서도 해소할 source가 없으면 원 요청을 질문 경계로 돌려준다.
+            raw = ProviderExecutionPreparation(context_request=context_request)
         result = compile_task_preparation(raw, task)
+        if followup and resolution.resolved and result.proposal is not None:
+            # Core가 해소한 need를 Execution Spec의 Context 선택 입력에 결속한다. 확장한
+            # Map에서 ContextSelector가 같은 본문과 전체 파일 digest를 fragment로 고른다.
+            skipped = {item.need_id for item in result.proposal.context_needs} | {
+                item.need_id
+                for item in (
+                    () if resolution.unresolved_request is None
+                    else resolution.unresolved_request.missing_needs
+                )
+            }
+            proposal = result.proposal.model_dump(mode="json")
+            proposal["context_needs"] += [
+                item.model_dump(mode="json")
+                for item in context_request.missing_needs
+                if item.need_id not in skipped
+            ]
+            result = ExecutionPreparation(proposal=ExecutionSpecProposal.model_validate(proposal))
         # 모델 호출 사이 원장 revision·관찰이 바뀌면 이전 응답을 새 snapshot에 세탁하지 않는다.
         current = execution_context(self.service, project_id)
         current["predecessor_outputs"] = self._predecessor_outputs(PlanContractRevision.model_validate(current["plan"]), task)

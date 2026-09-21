@@ -1722,6 +1722,8 @@ class EngineApplication:
             },
             evidence_ids=evidence_ids,
             evidence_documents=documents,
+            failed_attempt_id=validation_failure["attempt_id"],
+            failed_validation_id=validation_failure["validation_id"],
         ))
         return (
             {

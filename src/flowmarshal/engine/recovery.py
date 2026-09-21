@@ -16,11 +16,53 @@ from typing import Any, Iterable, Mapping
 from pydantic import Field, ValidationError
 
 from ..canonical import sha256_digest
-from .domain import EngineModel, FailureClass, RepairAction
+from .domain import (
+    DeterministicValidationObservation,
+    EngineModel,
+    FailureClass,
+    RepairAction,
+)
 
 
 _CODE_PATTERN = re.compile(r"\b([A-Z][A-Z0-9_]{2,99})\b")
 _CODE_KEYS = frozenset({"blocker_code", "code", "error_code", "failure_code"})
+
+#: Engine이 직접 실행해 관측한 결정적 검사 evidence 종류.
+_DETERMINISTIC_VALIDATION_EVIDENCE_KINDS = frozenset({"test", "command", "build"})
+
+
+def _deterministic_validation_observation(
+    document: Mapping[str, Any],
+    signal: "FailureSignal",
+) -> DeterministicValidationObservation | None:
+    """검사 evidence 하나를 strict 관측으로 읽고 결속이 맞을 때만 돌려준다.
+
+    evidence 본문은 기록 한도에서 잘릴 수 있으므로 절단·불완전 JSON은 분류하지 않는다.
+    evidence record가 스스로 밝힌 Task·Attempt·validation 결속이 안의 관측이나 실패한
+    Attempt·validation과 다르면 다른 Attempt나 다른 검사의 관측이므로 분류 근거로 쓰지 않는다.
+    """
+
+    if signal.failed_attempt_id is None or signal.failed_validation_id is None:
+        return None
+    if str(document.get("kind", "")).casefold() not in _DETERMINISTIC_VALIDATION_EVIDENCE_KINDS:
+        return None
+    observation = document.get("observation")
+    if not isinstance(observation, str):
+        return None
+    try:
+        parsed = DeterministicValidationObservation.model_validate_json(observation)
+    except ValidationError:
+        return None
+    if (
+        document.get("attempt_id") != signal.failed_attempt_id
+        or parsed.validation_id != signal.failed_validation_id
+        or document.get("task_id") != parsed.task_id
+    ):
+        return None
+    if document.get("source_ref") != f"validation:{parsed.validation_id}:{parsed.argv[0]}":
+        return None
+    return parsed
+
 
 #: `FailureClass` → `RepairAction`의 유일한 결정적 routing 표.
 #:
@@ -80,6 +122,9 @@ class FailureSignal:
     evidence_ids: tuple[str, ...] = ()
     evidence_documents: tuple[dict[str, Any], ...] = ()
     local_engine_codes: tuple[str, ...] = ()
+    # Task validation FAIL을 분류할 때만 채운다. 직접 검사 evidence는 이 둘과 결속돼야 한다.
+    failed_attempt_id: str | None = None
+    failed_validation_id: str | None = None
 
 
 class EvidenceFirstFailureClassifier:
@@ -232,30 +277,25 @@ class EvidenceFirstFailureClassifier:
                 model_reported_codes=model_reported_codes,
             )
 
-        # 직접 test/diff evidence는 의미 추측 없이 그 관측 필드로만 판정한다.
+        # Engine이 직접 실행한 결정적 검사 evidence는 의미 추측 없이 typed 관측 필드로만
+        # 판정한다. timeout·실행 실패 같은 환경 증거와 구조가 불완전한 관측은 분류하지
+        # 않고 environment/unclassified 경계에 남긴다.
         for document in signal.evidence_documents:
-            kind = str(document.get("kind", "")).casefold()
-            observation = document.get("observation", document)
-            if isinstance(observation, str):
-                try:
-                    observation = json.loads(observation)
-                except ValueError:
-                    observation = {"text": observation}
-            rendered = json.dumps(observation, ensure_ascii=False).casefold()
-            if kind in {"test", "diff", "file"} and (
-                '"passed": false' in rendered
-                or '"exit_code": 1' in rendered
-                or "target contract violation" in rendered
-                or "구현 실패" in rendered
-            ):
-                return FailureDiagnosis(
-                    failure_class=FailureClass.IMPLEMENTATION,
-                    repair_action=RepairAction.TASK_REPAIR,
-                    evidence_ids=signal.evidence_ids,
-                    rationale="Task에 직접 결속된 test/file/diff 실패 evidence가 구현 결함을 입증합니다.",
-                    source="direct_evidence",
-                    model_reported_codes=model_reported_codes,
-                )
+            observation = _deterministic_validation_observation(document, signal)
+            if observation is None or observation.timed_out or observation.passed:
+                continue
+            return FailureDiagnosis(
+                failure_class=FailureClass.IMPLEMENTATION,
+                repair_action=RepairAction.TASK_REPAIR,
+                evidence_ids=signal.evidence_ids,
+                rationale=(
+                    f"직접 실행한 검사 {observation.validation_id}의 종료 코드 "
+                    f"{observation.actual_exit_code}가 기대 "
+                    f"{list(observation.expected_exit_codes)} 밖입니다."
+                ),
+                source="direct_evidence",
+                model_reported_codes=model_reported_codes,
+            )
 
         return FailureDiagnosis(
             evidence_ids=signal.evidence_ids,

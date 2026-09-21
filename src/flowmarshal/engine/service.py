@@ -586,8 +586,15 @@ class EngineService:
         project_id: str,
         *,
         force_state_revision: bool = False,
+        observed_paths: Iterable[str] = (),
+        requested_symbols: dict[str, Iterable[str]] | None = None,
     ) -> tuple[ProjectMapRevision, StateSnapshot]:
-        """등록 source를 포함해 Project Map과 Goal 관련 파일 상태를 다시 관측한다."""
+        """등록 source를 포함해 Project Map과 Goal 관련 파일 상태를 다시 관측한다.
+
+        ``observed_paths``·``requested_symbols``에는 Core가 ContextRequest 해소로 실제로
+        읽은 source·symbol만 넘긴다. 이렇게 lazy로 추가한 entry는 기존 Map 관측 범위에
+        남아 이후 재관측에서도 유지된다.
+        """
 
         from .context import (
             ProjectMapper,
@@ -622,6 +629,10 @@ class EngineService:
             if map_row is None
             else ProjectMapRevision.model_validate_json(map_row["payload_json"])
         )
+        scope = project_map_reobservation_scope(current_map)
+        symbols = dict(scope["requested_symbols"])
+        for path, names in (requested_symbols or {}).items():
+            symbols[path] = tuple(sorted({*symbols.get(path, ()), *names}))
         observed_map = ProjectMapper().build(
             project_id=project_id,
             root=project["root"],
@@ -638,7 +649,9 @@ class EngineService:
             ),
             source_requests=(goal.definition.source_request,),
             excluded_paths=excluded_paths,
-            **project_map_reobservation_scope(current_map),
+            observed_paths=(*scope["observed_paths"], *observed_paths),
+            requested_symbols=symbols,
+            observed_links=scope["observed_links"],
         )
         if current_map is None or observed_map.semantic_digest != current_map.semantic_digest:
             project_map = observed_map
@@ -4290,6 +4303,9 @@ class EngineService:
                 continue
             try:
                 actual_digest = sha256_bytes(path.read_bytes())
+            except FileNotFoundError:
+                # 없어진 입력은 부재로 바뀐 입력(digest null)이다. 있지만 읽을 수 없는 파일만 재확인 오류다.
+                actual_digest = None
             except OSError as error:
                 raise EngineServiceError(f"{_INPUT_UNREADABLE}: {raw_path}") from error
             if actual_digest != expected_digest:

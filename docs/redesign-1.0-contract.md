@@ -75,11 +75,17 @@ Validator의 독립성은 Worker와 다른 model/effort 문자열만으로 충�
 
 재시작은 저장된 intent·binding·receipt와 provider 상태를 재개 없이 먼저 관측한 뒤, 실제 후속 turn이 필요한 경우에만 새 turn을 만든다. 허용된 부분 쓰기 후 resume와 immutable 입력 변경을 구분한다. cancel과 실행 중 재계획도 기존 효과를 지우거나 중복 생성하는 우회로가 될 수 없다. scope 밖 자동 rollback·완전한 exactly-once를 보장하지 않는다.
 
+같은 프로젝트는 직렬로 실행한다. 준비(`materialized`)·예약·실행·검사 중인 Task가 있으면 Dispatcher는 다음 ready Task의 Execution Spec을 materialize하지 않는다. 앞 Task의 쓰기가 미리 준비한 다음 Task의 입력을 stale로 만들지 않도록 하기 위해서다. 그래도 materialize 뒤 입력이 바뀌면, dispatch 전 검사와 gate 뒤 Attempt 예약 검사 어느 쪽에서든 `run_once`가 예외 대신 `BLOCKED`·`STALE_EXECUTION_INPUT`과 바뀐 입력을 돌려주고 Task 상태와 Attempt는 바꾸지 않는다. 없어진 입력도 부재로 바뀐 입력으로 같게 다룬다. 있지만 읽을 수 없는 입력은 stale 판정이 아니라 재확인 오류로 남는다.
+
 ## D09. 근거 기반 복구와 ContextRequest — planned
 
 실패 분류는 provider가 구조화해 반환한 code, 로컬 Engine이 직접 관측해 만든 code와 직접 evidence가 우선이다. 모델 응답에 적힌 error code·원인·효과 상태는 `model_reported` 진단 가설이며 provider/local code로 승격하거나 자동 복구의 단독 근거로 쓰지 않는다. `implementation`, `context`, `task_contract`, `dependency`, `environment`, `requirement_change`, `external_unknown`을 원인에 맞게 사용하며 모든 failed terminal을 implementation으로 분류하지 않는다. 의미가 불명확할 때 진단 모델을 쓰고 근거가 부족하면 `unclassified`를 유지한다.
 
+성공한 Worker 뒤 Task validation FAIL을 직접 evidence만으로 `implementation`(`task_repair`)에 분류하는 조건은 다음을 모두 만족할 때다. evidence 종류가 `test`·`command`·`build`이고, 본문이 strict `DeterministicValidationObservation`으로 파싱되며(기록 한도에서 잘린 본문은 제외), timeout이 아니고, 실제 종료 코드가 `expected_exit_codes` 밖이며, evidence record의 Attempt·Task·`source_ref`가 실패한 Attempt·validation과 일치한다. 본문 문자열 검색, file·diff 불일치만의 FAIL, 모델이 자칭한 code는 이 분류의 근거가 아니며 그런 FAIL은 `TASK_VALIDATION_RECOVERY_REQUIRED`로 사용자 결정에 남는다. 자동 repair는 Task의 `recovery.retryable_failure_classes`에 `implementation`이 있을 때만 시작하고, 원장에서 센 같은 실패 복구가 `max_same_failure_replans`(기본 2)에 닿으면 `SAME_FAILURE_RECOVERY_LIMIT`으로 멈춘다. 종료 코드만으로는 import 실패 같은 환경 원인을 구현 결함과 구분하지 못하므로, 그런 FAIL도 `implementation`으로 분류돼 이 한도까지 repair될 수 있는 known limitation이 있다. `retryable_failure_classes`는 새 writer에서 strict `FailureClass` 값만 받고 대소문자·다른 표기를 정규화하지 않는다. E2E-04의 통제된 로컬 fault 주입 기록은 qualification provenance일 뿐 분류 입력이 아니며, 실제 사용자 실행과 같은 원장 evidence로 분류한다.
+
 허용된 로컬 `ContextRequest`는 필요한 source·selector·이유를 기록하고 초기 sample 밖까지 자동 탐색하여 해소한다. 접근 불가 사실·사용자 취향·승인 경계 확장에만 질문한다. 1.0은 이 로컬 Context 해소, `external_unknown`의 observe-first 처리와 직접 evidence에 결속한 실제 Task repair 또는 subgraph replan 한 경로를 끝까지 검증한다. 나머지 분류에는 typed vocabulary와 명시적 정지·Execution Spec/Plan/Goal revision routing을 보존하되 범용 자율 복구기를 필수 범위로 확대하지 않는다. 원인·새 근거 없는 반복 복구를 중단한다. 실패 관측에 결속한 복구는 실패 원태스크의 성공을 선행조건으로 삼지 않는다. 같은 Task repair(`task_repair`·`continue`)는 현재 Execution Spec 입력이 그대로면 같은 spec으로 다시 연다. 직전 Attempt가 쓰기 target을 바꿔 입력이 stale하면, 바뀐 경로가 모두 쓰기 target이고 그 Attempt의 최신 쓰기 관측(file·diff evidence `after_digest`)과 같거나 Worker가 기록 없이 실패한 경우에만 Task를 `ready`로 되돌려 재관측 뒤 새 Execution Spec revision으로 준비한다. 읽기 target·context 원본의 변경이나 관측과 다른 쓰기 target(사용자 편집)은 재관측으로 흡수하지 않고 `REPAIR_INPUT_CHANGED`로 멈춘다. reserve의 mutable target 허용은 같은 Worker의 resume에만 쓴다. 실패한 Worker가 선언 밖 파일에 남긴 변경은 재관측이 흡수하는 known limitation이다. 없어진 입력도 바뀐 경로로 같은 규칙을 따른다(쓰기 관측의 `after_digest` null이 부재와 같다). `REPAIR_INPUT_CHANGED`로 멈춘 뒤에는 바뀐 입력을 직전 상태로 되돌리면 다음 `run_once`가 repair를 이어 가고, 변경을 유지하려면 Goal revision·재계획 경로로 간다. 삭제 뒤 `ready`로 열린 Task가 Goal 완료까지 가는지는 새 Execution Spec 준비 결과에 달려 있다.
+
+RuntimeJob 하나는 provider turn 하나만 소유하므로 supervisor 경로의 Task 준비 job은 같은 job 안에서 역할을 다시 부르지 않는다. 준비 결과가 `ContextRequest`이거나, proposal의 `context_needs`가 Map 밖 source를 가리켜 Execution Spec compile이 Context를 요구하면 Core가 로컬에서 해소하고, 실제로 읽은 source·symbol을 Project Map에 lazy로 추가한 뒤 후속 준비 job 하나를 예약한다. 후속 job의 checkpoint와 request는 원 요청과 해소 결과(source·selector·content digest)에 결속하므로 재시작 뒤에도 같은 후속 job을 이어 가고 같은 해소를 반복하지 않는다. 후속 준비는 해소한 need를 Execution Spec의 Context 선택 입력에 결속해, Worker PromptBundle이 확장된 Map에서 고른 실제 본문과 전체 파일 digest를 담게 한다. 후속 응답이 다시 `ContextRequest`이거나 compile에서 다시 Context를 요구하거나 해소할 로컬 source가 없으면(사용자 취향·승인 경계 확장·접근 불가 사실 포함) 자동 해소를 반복하지 않고 `CONTEXT_REQUIRED` 질문으로 멈춘다. 이 탐색은 활성화 뒤 Task 준비 단계에서 일어나므로 qualification의 `context_discovery` stage는 `plan_activation`과 `task_execution` 사이에 둔다.
 
 ## D10. Planning과 ProjectMap의 정확한 범위 — planned
 
@@ -162,7 +168,7 @@ Engine schema 4는 별도의 새 DB로 만든다. schema 3/raw receipt/history �
 | 스케줄러 tick 신속 반환·supervisor 책임·배정 결속 | FM-04, FM-08 | FM-11, FM-14 |
 | 깨끗한 non-editable install | FM-10 | FM-12, FM-14 |
 
-각 책임마다 실제 provider, synthetic stub, fault injection, 과거 evidence 재사용을 구분해 기록한다. 소수의 고정 case 수만으로 책임 충족을 주장하지 않는다. source/fixture/prompt/schema/lock/evaluator digest를 실행 전에 고정하며 판정 후 oracle·threshold를 낮추지 않는다. 공통 계약이 바뀐 이번 최초 qualification의 실제 역할·Planning 평가는 새로 수행한다. 이후 재사용은 보수적 영향 매트릭스로 유효성이 확인된 evidence에만 허용한다.
+각 책임마다 실제 provider, synthetic stub, fault injection, 과거 evidence 재사용을 구분해 기록한다. 소수의 고정 case 수만으로 책임 충족을 주장하지 않는다. read_only 무변경 cell은 실행 전후 workspace 전체 트리 digest로 판정한다. 이 digest는 Project Map 기본 무시 디렉터리(VCS·가상환경·`node_modules`·캐시·`dist`·`build`·Engine artifact 경로) 안의 변경을 보지 않는다. 제품의 `source_unchanged` 검사는 baseline Project Map이 관측한 경로만 다시 읽어 그 밖의 새 파일을 보지 못하는 known limitation이 있고, 제품 new-file 검출은 후속 과제다. source/fixture/prompt/schema/lock/evaluator digest를 실행 전에 고정하며 판정 후 oracle·threshold를 낮추지 않는다. 공통 계약이 바뀐 이번 최초 qualification의 실제 역할·Planning 평가는 새로 수행한다. 이후 재사용은 보수적 영향 매트릭스로 유효성이 확인된 evidence에만 허용한다.
 
 ## V03. 비차단 후속 범위와 효과 제한
 

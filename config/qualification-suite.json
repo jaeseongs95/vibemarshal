@@ -71,7 +71,7 @@
       "name": "초기 sample 밖 로컬 context 탐색",
       "fixture_id": "context-discovery",
       "expected_semantics": ["필수 로컬 ContextRequest를 승인된 project root에서 자동 해소한다.", "탐색한 실제 본문과 전체 파일 digest를 결속한다."],
-      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "context_discovery", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "task_execution", "independent_validation", "goal_verdict"],
+      "required_pipeline_stages": ["raw_request", "goal_normalizer", "goal_reviewer", "skeleton_generator", "skeleton_reviewer", "plan_expander", "plan_reviewer", "goal_authorization", "plan_activation", "context_discovery", "task_execution", "independent_validation", "goal_verdict"],
       "allowed_provenance": ["live"],
       "required_provenance": ["live"],
       "required_evidence_kinds": ["context_request", "file", "prompt_binding", "validation"]

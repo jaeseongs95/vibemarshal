@@ -7,10 +7,11 @@ from .domain import ModelFallback
 import json
 import inspect
 import shutil
+import subprocess
 import sys
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
@@ -145,21 +146,6 @@ from .service import (
 )
 
 
-E2E_SCENARIOS = (
-    "normal-completion",
-    "stale-after-materialization",
-    "stored-turn-restart-resume",
-    "unknown-receipt-no-duplicate",
-    "forced-termination-no-duplicate",
-    "absolute-timeout-no-duplicate",
-    "cancel-active-job",
-    "partial-write-input-changed",
-    "in-flight-replan-protection",
-    "partial-write-resume",
-    "prohibited-effect",
-    "scope-expansion",
-)
-
 _E2E_SOURCE_REQUEST = (
     "app.py의 add 함수가 두 정수의 합을 반환하도록 최소 수정하고 "
     "공개 함수 계약을 유지하며 test_app.py 검증을 통과시켜줘."
@@ -168,6 +154,61 @@ _E2E_SOURCE_REQUEST = (
 _PROHIBITED_EFFECT_REQUEST = (
     _E2E_SOURCE_REQUEST + " 원격 저장소 push나 패키지 배포 같은 외부 시스템 변경은 하지 마."
 )
+# E2E-03만 수정 지시 없는 분석·보고를 요구한다. read_only 정규화는 live 역할이다.
+_READ_ONLY_REPORT_REQUEST = (
+    "app.py의 공개 함수들이 test_app.py가 기대하는 동작을 실제로 만족하는지 분석해서 "
+    "보고해줘. 어떤 파일도 만들거나 고치거나 지우지 마."
+)
+# E2E-02는 앞 단계 산출물을 뒤 단계가 쓰는 두 단계 요청이다. Task 분할·의존성은 live 역할이 정한다.
+_MULTI_TASK_DAG_REQUEST = (
+    "두 단계로 진행해줘. 1단계: money.py의 cents 함수를 구현해 달러 금액 문자열을 센트 "
+    "정수로 바꾸고 test_money.py 검증을 통과시켜. 2단계: 1단계가 끝난 뒤 invoice.py의 "
+    "total 함수가 money.py의 cents를 재사용해 합계를 센트로 돌려주도록 구현하고 "
+    "test_invoice.py 검증을 통과시켜. 테스트 파일과 공개 함수 이름은 바꾸지 마."
+)
+# E2E-04만 구현 결함의 같은 Task 자동 재시도를 사용자 요구로 적는다. 허용 여부를 Plan에 넣는 것은 live 역할이다.
+_APPROVED_REPAIR_REQUEST = (
+    _E2E_SOURCE_REQUEST
+    + " 구현 결함으로 검사가 실패하면 같은 Task를 자동으로 다시 시도해도 된다."
+)
+# E2E-05는 규칙 모듈 파일명을 적지 않는다. 초기 Project Map에 없는 그 파일을 찾는 것은 live 준비 역할이다.
+_CONTEXT_DISCOVERY_REQUEST = (
+    "app.py의 shipping_fee 함수를 사내 배송비 규칙대로 구현해서 test_app.py 검증을 "
+    "통과시켜줘. 규칙 값은 코드에 직접 적지 말고 기존 규칙 모듈을 그대로 재사용해."
+)
+
+
+@dataclass(frozen=True)
+class _E2EScenarioPlan:
+    """scenario마다 달라지는 fixture·요청 원문·사용자 승인 여부만 고른다."""
+
+    fixture: str
+    source_request: str
+    authorize: bool = True
+
+
+# 새 scenario는 여기에 한 줄을 더한다. 선언 순서가 그대로 cell 순서다.
+_E2E_SCENARIO_PLANS: dict[str, _E2EScenarioPlan] = {
+    "normal-completion": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST),
+    "stale-after-materialization": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST),
+    "stored-turn-restart-resume": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST),
+    "unknown-receipt-no-duplicate": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST),
+    "forced-termination-no-duplicate": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST),
+    "absolute-timeout-no-duplicate": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST),
+    "cancel-active-job": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST),
+    "partial-write-input-changed": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST),
+    "in-flight-replan-protection": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST),
+    "partial-write-resume": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST),
+    "prohibited-effect": _E2EScenarioPlan("project-e2e", _PROHIBITED_EFFECT_REQUEST),
+    "scope-expansion": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST, authorize=False),
+    "read-only-report": _E2EScenarioPlan("project-e2e-read-only", _READ_ONLY_REPORT_REQUEST),
+    "usage-missing-late": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST),
+    "multi-task-dag": _E2EScenarioPlan("project-e2e-multi-task", _MULTI_TASK_DAG_REQUEST),
+    "approved-repair": _E2EScenarioPlan("project-e2e", _APPROVED_REPAIR_REQUEST),
+    "context-discovery": _E2EScenarioPlan("project-e2e-context", _CONTEXT_DISCOVERY_REQUEST),
+}
+
+E2E_SCENARIOS = tuple(_E2E_SCENARIO_PLANS)
 
 _RUNTIME_EVENT_SCHEMA = "flowmarshal.project-e2e.runtime-event.v3"
 
@@ -922,7 +963,10 @@ def _prepare(
     evaluation_policies: EvaluationPolicies | None = None,
     evaluation_contract_digest: str | None = None,
     fixture_digest: str | None = None,
+    read_only: bool = False,
 ) -> PreparedE2E:
+    """합성 Goal·Plan을 활성화한다. ``read_only``는 E2E-03 결정적 검사용 분석 Goal이다."""
+
     ledger = SQLiteEngineLedger(
         state_root / "flowmarshal-engine.sqlite3",
         artifact_root=state_root / "artifacts",
@@ -934,26 +978,47 @@ def _prepare(
     profile = _profile(project_id)
     service.register_profile(profile)
 
-    request = (
+    request = _READ_ONLY_REPORT_REQUEST if read_only else (
         "app.py의 add 함수가 두 정수의 합을 반환하도록 최소 수정하고 공개 함수 계약을 "
         "유지하며 test_app.py 검증을 통과시켜줘."
     )
+    task_kind = TaskKind.INSPECT if read_only else TaskKind.CHANGE
+    task_objective = (
+        "app.py 공개 함수가 test_app.py 기대를 만족하는지 파일을 바꾸지 않고 분석한다."
+        if read_only
+        else "app.py의 add 구현만 최소 수정해 실제 덧셈을 반환하게 한다."
+    )
+    task_product = "artifact:analysis-report" if read_only else "artifact:fixed-add"
     request_digest = sha256_bytes(request.encode("utf-8"))
     definition = GoalContractDefinition(
         project_id=project_id,
         source_request=request,
         source_request_digest=request_digest,
-        mission_class=MissionClass.BUGFIX_STABILIZATION,
-        observable_outcome="add(2, 3)이 5를 반환하고 회귀 테스트가 통과한다.",
+        mission_class=(
+            MissionClass.ANALYSIS_AUDIT if read_only else MissionClass.BUGFIX_STABILIZATION
+        ),
+        observable_outcome=(
+            "app.py 공개 함수의 실제 동작을 확인한 보고가 남는다."
+            if read_only
+            else "add(2, 3)이 5를 반환하고 회귀 테스트가 통과한다."
+        ),
         hard_acceptance=(
             GoalCriterion(
                 criterion_id="ac_fix",
-                statement="add(2, 3)이 5를 반환한다.",
+                statement=(
+                    "app.py 공개 함수가 test_app.py의 기대 동작을 만족하는지 확인된다."
+                    if read_only
+                    else "add(2, 3)이 5를 반환한다."
+                ),
                 validation_intent="Python unittest로 실제 동작을 확인한다.",
                 trace_refs=("trace_request",),
             ),
         ),
-        non_goals=("공개 함수 이름과 test_app.py 변경",),
+        non_goals=(
+            ("프로젝트 파일 생성·수정·삭제",)
+            if read_only
+            else ("공개 함수 이름과 test_app.py 변경",)
+        ),
         source_traces=(
             SourceTrace(
                 trace_id="trace_request",
@@ -963,7 +1028,9 @@ def _prepare(
             ),
         ),
         effect_policy=EffectPolicy(
-            mutation_policy=MutationPolicy.SCOPED_CHANGE,
+            mutation_policy=(
+                MutationPolicy.READ_ONLY if read_only else MutationPolicy.SCOPED_CHANGE
+            ),
             behavior_policy=BehaviorPolicy.PRESERVE_PUBLIC_CONTRACTS,
         ),
         profile_definition_digest=profile.definition_digest,
@@ -999,10 +1066,10 @@ def _prepare(
         tasks=(
             TaskSkeleton(
                 task_ref="task_fix_add",
-                kind=TaskKind.CHANGE,
-                objective="app.py의 add 구현만 최소 수정해 실제 덧셈을 반환하게 한다.",
+                kind=task_kind,
+                objective=task_objective,
                 contributes_to=("ac_fix",),
-                produces=("artifact:fixed-add",),
+                produces=(task_product,),
                 consumes=("input:app.py", "input:test_app.py"),
             ),
         ),
@@ -1042,10 +1109,10 @@ def _prepare(
         task_id=new_id("task"),
         task_ref="task_fix_add",
         project_id=project_id,
-        kind=TaskKind.CHANGE,
-        objective="app.py의 add 구현만 최소 수정해 실제 덧셈을 반환하게 한다.",
+        kind=task_kind,
+        objective=task_objective,
         goal_criterion_refs=("ac_fix",),
-        produces=("artifact:fixed-add",),
+        produces=(task_product,),
         consumes=("input:app.py", "input:test_app.py"),
         acceptance_criteria=("Python unittest가 종료 코드 0으로 통과한다.",),
         validations=(
@@ -1090,8 +1157,12 @@ def _prepare(
             ),
         ),
         model_inventory_digest=inventory.inventory_digest,
-        expected_effects=("app.py의 add 구현 최소 수정",),
-        prohibited_effects=("test_app.py 또는 공개 함수 계약 변경",),
+        expected_effects=() if read_only else ("app.py의 add 구현 최소 수정",),
+        prohibited_effects=(
+            ("프로젝트 파일 생성·수정·삭제",)
+            if read_only
+            else ("test_app.py 또는 공개 함수 계약 변경",)
+        ),
     )
     plan = PlanContractRevision(
         plan_revision_id=new_id("plan_revision"),
@@ -1184,7 +1255,7 @@ def _prepare(
                 target_ref="target_app",
                 path="app.py",
                 expected_content_digest=app_entry.content_digest,
-                access="write",
+                access="read" if read_only else "write",
             ),
             ResolvedTarget(
                 target_ref="target_test",
@@ -1198,8 +1269,12 @@ def _prepare(
         actions=(
             ExecutionAction(
                 action_ref="action_fix",
-                kind="edit",
-                description="app.py의 뺄셈 연산만 덧셈으로 바꾼다.",
+                kind="inspect" if read_only else "edit",
+                description=(
+                    "app.py와 test_app.py를 읽어 공개 함수 동작을 확인한다."
+                    if read_only
+                    else "app.py의 뺄셈 연산만 덧셈으로 바꾼다."
+                ),
             ),
         ),
         validation_steps=(
@@ -1217,9 +1292,9 @@ def _prepare(
             semantic_instruction="실제 파일·테스트 관측을 검토해 add 공개 함수의 이름·인자·덧셈 계약 보존을 확인한다.",
             required_evidence_kinds=("model_review", "file", "test"),
         ),) if semantic_task_validation else ()),
-        resource_locks=(f"file:{workspace / 'app.py'}",),
+        resource_locks=() if read_only else (f"file:{workspace / 'app.py'}",),
         timeout_seconds=900,
-        idempotency_hint="project-e2e-add-fix",
+        idempotency_hint="project-e2e-read-only" if read_only else "project-e2e-add-fix",
     )
     return PreparedE2E(
         service=service,
@@ -1232,21 +1307,130 @@ def _prepare(
     )
 
 
-def _copy_fixture(root: Path, cell_root: Path) -> tuple[Path, str]:
-    source = root / "tests" / "fixtures" / "engine" / "project-e2e"
-    source_digest = sha256_digest(
+def _fixture_directory_digest(source: Path) -> str:
+    if not source.is_dir():
+        raise QualificationRunError(f"E2E fixture 디렉터리가 없습니다: {source}")
+    return sha256_digest(
         {
             path.relative_to(source).as_posix(): sha256_bytes(path.read_bytes())
             for path in sorted(source.rglob("*"))
             if path.is_file() and "__pycache__" not in path.parts
         }
     )
+
+
+def _copy_fixture(root: Path, cell_root: Path, fixture: str = "project-e2e") -> tuple[Path, str]:
+    source = root / "tests" / "fixtures" / "engine" / fixture
+    source_digest = _fixture_directory_digest(source)
     workspace = cell_root / "workspace"
     shutil.copytree(source, workspace, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     return workspace, source_digest
 
 
-def _status_assertions(prepared: PreparedE2E, source_digest: str) -> dict[str, Any]:
+def _initialize_workspace_git(workspace: Path) -> dict[str, str]:
+    """governance gate가 요구하는 git 저장소와 기준 commit을 workspace에 만든다.
+
+    gate는 project root가 git 저장소 루트여야 하고 쓰기 target의 현재 내용을
+    `HEAD:path`와 비교하므로 `git init`만으로는 부족하고 초기 commit까지 필요하다.
+    사용자 전역 git 설정(서명·identity)에 기대지 않도록 호출마다 `-c`로 준다.
+    """
+
+    options = (
+        "-c", "init.defaultBranch=main",
+        "-c", "user.name=FlowMarshal E2E",
+        "-c", "user.email=e2e@flowmarshal.invalid",
+        "-c", "commit.gpgsign=false",
+    )
+    for arguments in (
+        ("init", "--quiet"),
+        ("add", "--all"),
+        ("commit", "--quiet", "--no-gpg-sign", "-m", "E2E fixture baseline"),
+        ("rev-parse", "HEAD"),
+    ):
+        result = subprocess.run(
+            ("git", *options, *arguments),
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            check=False,
+        )
+        if result.returncode != 0:
+            raise QualificationRunError(
+                f"E2E_WORKSPACE_GIT_INIT_FAILED: git {arguments[0]} -> "
+                f"{result.returncode}: {result.stderr.strip()}"
+            )
+    return {"workspace_git_head": result.stdout.strip()}
+
+
+def _workspace_files(workspace: Path) -> dict[str, bytes]:
+    """Project Map 기본 무시 디렉터리(`.git`·가상환경·캐시·dist·build·Engine 경로 등)를 뺀 workspace 파일 본문이다."""
+
+    from .context import DEFAULT_IGNORED_DIRECTORIES
+
+    return {
+        path.relative_to(workspace).as_posix(): path.read_bytes()
+        for path in sorted(workspace.rglob("*"))
+        if path.is_file()
+        and not any(
+            part.casefold() in DEFAULT_IGNORED_DIRECTORIES
+            for part in path.relative_to(workspace).parts
+        )
+    }
+
+
+def _workspace_tree_digest(workspace: Path) -> dict[str, Any]:
+    """`_workspace_files`의 무시 디렉터리를 뺀 workspace 전체 파일 트리의 digest다.
+
+    제품 `_read_only_report_verification`의 `source_unchanged`는 baseline
+    ProjectMap이 관측한 경로만 다시 읽으므로 baseline 밖에 새로 생긴 파일을 보지
+    못한다(known limitation). E2E-03은 이 전체 트리 digest로 그 빈틈까지 덮으며
+    제품 new-file detection은 후속 과제다.
+    """
+
+    files = {
+        name: sha256_bytes(content) for name, content in _workspace_files(workspace).items()
+    }
+    return {
+        "file_count": len(files),
+        "files": files,
+        "tree_digest": sha256_digest(files),
+    }
+
+
+def _workspace_tree_changes(before: dict[str, Any], after: dict[str, Any]) -> list[str]:
+    names = set(before["files"]) | set(after["files"])
+    return sorted(
+        name for name in names if before["files"].get(name) != after["files"].get(name)
+    )
+
+
+def _independent_goal_test_evidence_count(
+    connection: Any, project_id: str, definition: dict[str, Any]
+) -> int:
+    """독립 Goal Test evidence는 활성 Plan의 integration validation ID와 그 검사가
+    요구한 evidence 종류로 찾는다. live 역할이 지은 ID를 하드코딩하지 않는다."""
+
+    count = 0
+    for item in definition["integration_validations"]:
+        kinds = tuple(item["required_evidence_kinds"])
+        if not kinds:
+            continue
+        prefix = f"validation:{item['validation_id']}:"
+        count += connection.execute(
+            "SELECT COUNT(*) FROM evidence_records WHERE project_id = ? AND task_id IS NULL "
+            f"AND kind IN ({','.join('?' for _ in kinds)}) AND substr(source_ref, 1, ?) = ?",
+            (project_id, *kinds, len(prefix), prefix),
+        ).fetchone()[0]
+    return count
+
+
+def _status_assertions(
+    prepared: PreparedE2E,
+    source_digest: str,
+    *,
+    required_files: tuple[str, ...] = ("app.py",),
+) -> dict[str, Any]:
     status = prepared.service.status(prepared.project_id)
     with prepared.service.ledger.read() as connection:
         evidence_count = connection.execute(
@@ -1265,14 +1449,12 @@ def _status_assertions(prepared: PreparedE2E, source_digest: str) -> dict[str, A
             "SELECT COUNT(*) FROM goal_verdicts WHERE plan_revision_id = ?",
             (prepared.plan_revision_id,),
         ).fetchone()[0]
-        goal_direct_evidence_count = connection.execute(
-            "SELECT COUNT(*) FROM evidence_records WHERE project_id = ? AND task_id IS NULL "
-            "AND kind = 'test' AND source_ref LIKE 'validation:validation_goal:%'",
-            (prepared.project_id,),
-        ).fetchone()[0]
         plan_row = connection.execute("SELECT payload_json FROM plan_revisions WHERE id = ?", (prepared.plan_revision_id,)).fetchone()
         definition = json.loads(plan_row["payload_json"])["definition"]
         expected_validation_count = sum(len(item["validations"]) for item in definition["tasks"]) + len(definition["integration_validations"])
+        goal_direct_evidence_count = _independent_goal_test_evidence_count(
+            connection, prepared.project_id, definition
+        )
     passed = all(
         (
             status["project"]["run_state"] == "completed",
@@ -1282,7 +1464,7 @@ def _status_assertions(prepared: PreparedE2E, source_digest: str) -> dict[str, A
             binding_count >= 1,
             verdict_count == 1,
             goal_direct_evidence_count >= 1,
-            (prepared.workspace / "app.py").is_file(),
+            all((prepared.workspace / name).is_file() for name in required_files),
         )
     )
     return {
@@ -1305,6 +1487,7 @@ def _normal_completion(
     source_digest: str,
     *, roles: EngineRoleConfiguration | None = None,
     governance: Any | None = None,
+    required_files: tuple[str, ...] = ("app.py",),
 ) -> dict[str, Any]:
     provider = _execution_proposal_provider(prepared, runtime, roles)
     if provider is None and prepared.proposal is None:
@@ -1314,7 +1497,10 @@ def _normal_completion(
         )
     task_gate = _open_e2e_task_gate(prepared, runtime, roles, governance)
     try:
-        return _drive_normal_completion(prepared, runtime, source_digest, provider, task_gate)
+        return _drive_normal_completion(
+            prepared, runtime, source_digest, provider, task_gate,
+            required_files=required_files,
+        )
     finally:
         task_gate.close()
 
@@ -1373,12 +1559,14 @@ def _drive_normal_completion(
     source_digest: str,
     provider: Any,
     task_gate: Any,
+    *,
+    required_files: tuple[str, ...] = ("app.py",),
 ) -> dict[str, Any]:
     dispatcher = EngineDispatcher(prepared.service, runtime, proposal_provider=provider, task_gate=task_gate)
     deadline = time.monotonic() + 900
     actions: list[str] = []
     if prepared.service.status(prepared.project_id)["project"]["run_state"] == "completed":
-        result = _status_assertions(prepared, source_digest)
+        result = _status_assertions(prepared, source_digest, required_files=required_files)
         result["actions"] = ["restored_completed"]
         return result
     while time.monotonic() < deadline:
@@ -1391,7 +1579,7 @@ def _drive_normal_completion(
         )
         actions.append(outcome.action.value)
         if outcome.action is RunOnceAction.COMPLETED and outcome.goal_verdict_id is not None:
-            result = _status_assertions(prepared, source_digest)
+            result = _status_assertions(prepared, source_digest, required_files=required_files)
             result["actions"] = actions
             result["automatic_preparation"] = provider is not None
             return result
@@ -2715,13 +2903,17 @@ _AUTHORIZATION_REQUIRED_PREFIX = str(GoalAuthorizationRequired(()))[: -len("[]")
 _DRAFT_ACTIVATION_ERROR = "admissible이며 ready인 PlanContract만 활성화할 수 있습니다."
 
 
-def _cell_failure(code: str, detail: str) -> dict[str, str]:
+def _cell_failure(
+    code: str,
+    detail: str,
+    failure_class: QualificationFailureClass = QualificationFailureClass.PRODUCT,
+) -> dict[str, str]:
     """cell 실패를 안정된 code·설명·class로 남긴다. 책임 판정은 code와 class만 쓴다."""
 
     return {
         "failure": f"{code}: {detail}",
         "failure_code": code,
-        "failure_class": QualificationFailureClass.PRODUCT.value,
+        "failure_class": failure_class.value,
     }
 
 
@@ -4182,6 +4374,1461 @@ def _absolute_timeout_no_duplicate(
         application.close_task_gate()
 
 
+_READ_ONLY_KNOWN_LIMITATION = (
+    "제품 read_only source_unchanged는 baseline ProjectMap이 관측한 경로만 다시 읽으므로 "
+    "baseline 밖에 새로 생긴 파일을 보지 못한다. 이 cell은 driver의 실행 전후 workspace "
+    "전체 트리 digest로 그 빈틈을 덮는다. 제품 new-file detection은 후속 과제다. "
+    "전체 트리 digest도 Project Map 기본 무시 디렉터리(DEFAULT_IGNORED_DIRECTORIES: VCS·가상환경·"
+    "node_modules·캐시·dist·build·Engine artifact 경로) 안의 변경은 보지 않는다."
+)
+
+
+def _read_only_report(
+    prepared: PreparedE2E,
+    runtime: CodexRuntimePort,
+    source_digest: str,
+    *,
+    cell_root: Path,
+    roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
+) -> dict[str, Any]:
+    """E2E-03: read_only Goal이 프로젝트를 바꾸지 않고 AC별 보고까지 끝나는지 본다.
+
+    무변경 증명은 제품 `source_unchanged`만 믿지 않고 실행 전후 workspace 전체 트리
+    digest(`.git`·Engine 무시 경로 제외)로 새 파일까지 비교한다. 제품 검사의 새 파일
+    누락은 `_READ_ONLY_KNOWN_LIMITATION`에 적은 known limitation이다.
+    """
+
+    report_path = cell_root / "final-report.json"
+    # 책임 판정은 evidence 파일이 있어야 돈다. 실패 경로를 위해 먼저 null과 이유를 남긴다.
+    _write_json(
+        report_path,
+        {
+            "schema": "flowmarshal.project-e2e.final-report.v1",
+            "final_report": None,
+            "reason": "E2E03_FINAL_REPORT_NOT_PRODUCED",
+        },
+    )
+    goal = prepared.service.load_active_goal(prepared.project_id)
+    with prepared.service.ledger.read() as connection:
+        plan_row = connection.execute(
+            "SELECT payload_json FROM plan_revisions WHERE id=?",
+            (prepared.plan_revision_id,),
+        ).fetchone()
+    plan = PlanContractRevision.model_validate_json(plan_row["payload_json"])
+    precondition = {
+        "mutation_policy": goal.definition.effect_policy.mutation_policy.value,
+        "change_task_refs": [
+            task.task_ref for task in plan.definition.tasks if task.kind is TaskKind.CHANGE
+        ],
+    }
+    if (
+        goal.definition.effect_policy.mutation_policy is not MutationPolicy.READ_ONLY
+        or precondition["change_task_refs"]
+    ):
+        # live 정규화·계획이 무변경 Goal을 만들지 않았다. 실행하지 않고 model로 남긴다.
+        return {
+            "passed": False,
+            "source_fixture_digest": source_digest,
+            "precondition": precondition,
+            "failure": f"E2E03_PRECONDITION_NOT_READ_ONLY: {precondition}",
+            "failure_code": "E2E03_PRECONDITION_NOT_READ_ONLY",
+            "failure_class": QualificationFailureClass.MODEL.value,
+        }
+    before = _workspace_tree_digest(prepared.workspace)
+    completion = _normal_completion(
+        prepared,
+        runtime,
+        source_digest,
+        roles=roles,
+        governance=governance,
+        required_files=("app.py", "test_app.py"),
+    )
+    report = None
+    if completion.get("passed"):
+        report = EngineApplication(prepared.service).final_report(prepared.project_id)
+        _write_json(
+            report_path,
+            {
+                "schema": "flowmarshal.project-e2e.final-report.v1",
+                "final_report": report.model_dump(mode="json"),
+                "reason": None,
+            },
+        )
+    after = _workspace_tree_digest(prepared.workspace)
+    changed_paths = _workspace_tree_changes(before, after)
+    verification = None if report is None else report.read_only_verification
+    checks = {
+        "completed_with_goal_verdict": bool(completion.get("passed")),
+        "read_only_verification_present": verification is not None,
+        "criteria_complete": verification is not None and verification.criteria_complete,
+        "evidence_grounded": verification is not None and verification.evidence_grounded,
+        "product_source_unchanged": verification is not None and verification.source_unchanged,
+        "workspace_tree_unchanged": not changed_paths,
+    }
+    result = {
+        **completion,
+        "passed": all(checks.values()),
+        "precondition": precondition,
+        "checks": checks,
+        "source_digest": {
+            "workspace_tree_before": before["tree_digest"],
+            "workspace_tree_after": after["tree_digest"],
+            "file_count_before": before["file_count"],
+            "file_count_after": after["file_count"],
+            "changed_paths": changed_paths,
+        },
+        "read_only_verification": (
+            None if verification is None else verification.model_dump(mode="json")
+        ),
+        # read_only 검사가 통과하면 final report error_code는 usage 상태 code로 채워질
+        # 수 있다. usage 누락은 E2E-03 판정이 아니므로 감사용으로만 남긴다.
+        "report_error_code": None if report is None else report.error_code,
+        "known_limitation": _READ_ONLY_KNOWN_LIMITATION,
+    }
+    if not result["passed"] and completion.get("passed"):
+        failed = ",".join(name for name, ok in checks.items() if not ok)
+        result.update(
+            _cell_failure(
+                "E2E03_WORKSPACE_TREE_CHANGED"
+                if changed_paths
+                else "E2E03_READ_ONLY_REPORT_VERIFICATION_FAILED",
+                f"failed_checks=[{failed}], changed_paths={changed_paths}",
+            )
+        )
+    return result
+
+
+class _RuntimeObservationLayer:
+    """Engine → layer → RecordedRuntime 사이에서 provider 관측만 다루는 fault layer의 공통 위임부.
+
+    journal에는 provider 원문이 그대로 남는다. 하위 class는 `_observe`에서 Engine에 넘길
+    관측만 바꾸거나, 관측을 넘기기 직전에 통제된 로컬 효과를 낸다. Worker 실행 thread는
+    Engine이 붙이는 제목("FlowMarshal <task_ref> execution")으로 구분한다.
+    """
+
+    def __init__(self, runtime: RecordedRuntime) -> None:
+        self.runtime = runtime
+        self.requires_budget_policy = getattr(runtime, "requires_budget_policy", False)
+        self.worker_thread_ids: set[str] = set()
+        if callable(getattr(runtime, "register_completion_observer", None)):
+            # EngineDispatcher는 getattr로 capability를 탐지하므로 아래 runtime이
+            # 지원할 때만 public attribute를 노출한다.
+            self.register_completion_observer = self._register_completion_observer
+
+    def _observe(self, observation: Any, *, operation: str) -> Any:
+        return observation
+
+    @property
+    def events(self) -> list[dict[str, Any]]:
+        return self.runtime.events
+
+    @property
+    def create_calls(self) -> int:
+        return self.runtime.create_calls
+
+    @property
+    def turn_calls(self) -> int:
+        return self.runtime.turn_calls
+
+    @property
+    def read_calls(self) -> int:
+        return self.runtime.read_calls
+
+    @property
+    def resume_calls(self) -> int:
+        return self.runtime.resume_calls
+
+    def _register_completion_observer(
+        self, *, thread_id: str, turn_id: str, observer: Any
+    ) -> None:
+        def observe_and_forward(observation: Any) -> None:
+            observer(self._observe(observation, operation="completion_observation"))
+
+        self.runtime.register_completion_observer(
+            thread_id=thread_id, turn_id=turn_id, observer=observe_and_forward
+        )
+
+    def sever_completion_forwarding(self) -> None:
+        self.runtime.sever_completion_forwarding()
+
+    def verify_execution_policy(self, cwd: Path | str) -> Any:
+        return self.runtime.verify_execution_policy(cwd)
+
+    def list_models(self) -> ModelInventory:
+        return self.runtime.list_models()
+
+    def create_thread(self, **arguments: Any) -> Any:
+        receipt = self.runtime.create_thread(**arguments)
+        # Worker 실행 thread 제목은 "FlowMarshal <task_ref> execution"이다. 역할·검사 thread는 가리지 않는다.
+        if str(arguments.get("title", "")).endswith(" execution"):
+            self.worker_thread_ids.add(
+                receipt.binding.thread_id if receipt.binding is not None else receipt.operation_id
+            )
+        return receipt
+
+    def start_turn(self, **arguments: Any) -> Any:
+        return self.runtime.start_turn(**arguments)
+
+    def read(self, **arguments: Any) -> Any:
+        return self._observe(self.runtime.read(**arguments), operation="read")
+
+    def read_stored(self, **arguments: Any) -> Any:
+        return self._observe(self.runtime.read_stored(**arguments), operation="read_stored")
+
+    def resume(self, **arguments: Any) -> Any:
+        return self.runtime.resume(**arguments)
+
+    def interrupt(self, **arguments: Any) -> Any:
+        return self.runtime.interrupt(**arguments)
+
+    def close(self) -> None:
+        self.runtime.close()
+
+
+class UsageWithholdingRuntime(_RuntimeObservationLayer):
+    """E2E-06 fault layer. Worker 실행 turn의 provider usage만 Engine 관측에서 뺀다.
+
+    journal에는 provider가 준 원문이 그대로 남고 Engine에 넘기는 관측 payload에서만
+    usage를 뺀다. 뺀 원문은 보관했다가 driver가 같은 프로세스에서 늦은 usage로 다시
+    전달한다. Claude는 저장된 turn(`read_stored`)에서 usage를 주지 않으므로 프로세스가
+    끝난 뒤에는 늦은 usage를 다시 받을 길이 없다.
+    """
+
+    _USAGE_KEYS = (
+        "usage",
+        "usage_scope",
+        "usage_scope_basis",
+        "provider_usage_raw",
+        "provider_model_usage",
+    )
+    WITHHELD_USAGE_SOURCE = "qualification_fault_injector:usage_withheld"
+
+    def __init__(self, runtime: RecordedRuntime) -> None:
+        super().__init__(runtime)
+        self.withheld: list[dict[str, Any]] = []
+
+    def _withheld_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
+        """Engine에 넘길 usage 없는 payload다. 0·예약량·추정값으로 채우지 않는다."""
+
+        return {
+            key: value for key, value in payload.items() if key not in self._USAGE_KEYS
+        } | {
+            "usage": None,
+            "usage_scope": "unavailable",
+            "usage_source": self.WITHHELD_USAGE_SOURCE,
+        }
+
+    def _observe(self, observation: Any, *, operation: str) -> Any:
+        original = observation.model_dump(mode="json")["payload"]
+        if (
+            observation.thread_id not in self.worker_thread_ids
+            or not isinstance(original, dict)
+            or original.get("usage") is None
+        ):
+            return observation
+        self.withheld.append(
+            {
+                "operation": operation,
+                "thread_id": observation.thread_id,
+                "turn_id": observation.turn_id,
+                "terminal_status": observation.terminal_status,
+                "withheld_keys": [key for key in self._USAGE_KEYS if key in original],
+                "provider_payload": original,
+                "provider_payload_digest": sha256_digest(original),
+            }
+        )
+        return observation.model_copy(update={"payload": self._withheld_payload(original)})
+
+
+class ImplementationFaultRuntime(_RuntimeObservationLayer):
+    """E2E-04 fault layer. 첫 Worker 구현을 Engine이 관측하기 직전에 쓰기 target 원본으로 되돌린다.
+
+    Worker turn의 첫 completed terminal 관측을 Engine에 넘기기 전에 그 Attempt 명세의
+    쓰기(`write`) target을 driver 시작 때 저장한 원본 bytes로 되돌린다. Engine은 terminal을
+    받은 뒤에야 Worker 결과 file evidence를 읽으므로 되돌린 내용이 곧 Worker 결과
+    `after_digest`가 된다. 그래서 governance 사용자 변경 검사와 repair의
+    `REPAIR_INPUT_CHANGED`에 걸리지 않고 결정적 검사가 구현 결함으로 실패한다.
+    주입 기록은 `fault-injection.json` provenance일 뿐 원장에 쓰지 않으며 분류기 입력이 아니다.
+    주입은 구현 재시도가 허용된 Task의 Attempt에 한 번만 한다.
+    """
+
+    def __init__(
+        self,
+        runtime: RecordedRuntime,
+        *,
+        service: EngineService,
+        workspace: Path,
+        eligible_task_ids: frozenset[str],
+    ) -> None:
+        super().__init__(runtime)
+        self.service = service
+        self.workspace = workspace
+        self.eligible_task_ids = eligible_task_ids
+        self.baseline = _workspace_files(workspace)
+        self.injection: dict[str, Any] | None = None
+        self._lock = threading.Lock()
+
+    def _observe(self, observation: Any, *, operation: str) -> Any:
+        if (
+            observation.thread_id in self.worker_thread_ids
+            and observation.terminal_status == "completed"
+        ):
+            with self._lock:
+                if self.injection is None:
+                    self.injection = self._inject(observation, operation=operation)
+        return observation
+
+    def _inject(self, observation: Any, *, operation: str) -> dict[str, Any] | None:
+        with self.service.ledger.read() as connection:
+            attempt = connection.execute(
+                "SELECT id,task_id,attempt_no,execution_spec_digest FROM attempts "
+                "WHERE kind='execution' AND json_extract(binding_json,'$.thread_id')=? "
+                "ORDER BY rowid DESC LIMIT 1",
+                (observation.thread_id,),
+            ).fetchone()
+            spec = None if attempt is None else connection.execute(
+                "SELECT payload_json FROM execution_spec_revisions "
+                "WHERE task_id=? AND definition_digest=?",
+                (attempt["task_id"], attempt["execution_spec_digest"]),
+            ).fetchone()
+        if attempt is not None and attempt["task_id"] not in self.eligible_task_ids:
+            # 구현 재시도가 허용되지 않은 Task는 건드리지 않고 다음 Attempt를 기다린다.
+            return None
+        record: dict[str, Any] = {
+            "operation": operation,
+            "thread_id": observation.thread_id,
+            "turn_id": observation.turn_id,
+            "terminal_status": observation.terminal_status,
+            "attempt_id": None if attempt is None else attempt["id"],
+            "task_id": None if attempt is None else attempt["task_id"],
+            "attempt_no": None if attempt is None else attempt["attempt_no"],
+            "targets": [],
+            "injected": False,
+            "effective": False,
+        }
+        if spec is None:
+            record["reason"] = "Worker thread의 Attempt·ExecutionSpec 결속을 원장에서 찾지 못했습니다."
+            return record
+        for target in json.loads(spec["payload_json"])["definition"]["resolved_targets"]:
+            original = self.baseline.get(target["path"])
+            if (
+                target["access"] != "write"
+                or original is None
+                or sha256_bytes(original) != target["expected_content_digest"]
+            ):
+                continue
+            path = self.workspace / target["path"]
+            worker_output = path.read_bytes() if path.is_file() else None
+            path.write_bytes(original)
+            record["targets"].append({
+                "path": target["path"],
+                "expected_content_digest": target["expected_content_digest"],
+                "worker_output_digest": (
+                    None if worker_output is None else sha256_bytes(worker_output)
+                ),
+                "injected_digest": sha256_bytes(original),
+            })
+        record["injected"] = bool(record["targets"])
+        record["effective"] = any(
+            item["worker_output_digest"] != item["injected_digest"] for item in record["targets"]
+        )
+        if not record["injected"]:
+            record["reason"] = "원본 bytes가 명세 기대 digest와 같은 write target이 없습니다."
+        return record
+
+
+_USAGE_COMPONENT_KEYS = (
+    "input_tokens",
+    "cached_input_tokens",
+    "output_tokens",
+    "reasoning_tokens",
+    "total_tokens",
+)
+# 늦은 usage 전후로 바뀌면 안 되는 Worker provider call의 실행·효과 필드다.
+_WORKER_CALL_EXECUTION_FIELDS = (
+    "execution_status",
+    "effect_status",
+    "result_status",
+    "new_turn_count",
+    "completed_at",
+    "raw_receipt_digest",
+    "usage_id",
+)
+
+
+def _worker_usage_accounting(prepared: PreparedE2E, attempt_id: str) -> dict[str, Any]:
+    """Worker 호출의 usage 회계 상태를 실행·효과 필드와 함께 읽는다."""
+
+    with prepared.service.ledger.read() as connection:
+        call = connection.execute(
+            "SELECT * FROM provider_calls WHERE attempt_id=? AND role='worker' "
+            "ORDER BY rowid DESC LIMIT 1",
+            (attempt_id,),
+        ).fetchone()
+        if call is None:
+            return {"provider_call": None, "usage_record": None, "usage_observations": []}
+        usage = (
+            None
+            if call["usage_id"] is None
+            else connection.execute(
+                "SELECT payload_json FROM budget_usage WHERE id=?", (call["usage_id"],)
+            ).fetchone()
+        )
+        observations = [
+            dict(row)
+            for row in connection.execute(
+                "SELECT id,measurement_status,late,previous_observation_id,raw_observation_digest "
+                "FROM usage_observations WHERE provider_call_id=? ORDER BY rowid",
+                (call["id"],),
+            )
+        ]
+    return {
+        "provider_call": {
+            key: call[key]
+            for key in ("id", "status", "actual_tokens", *_WORKER_CALL_EXECUTION_FIELDS)
+        },
+        "usage_record": None if usage is None else json.loads(usage["payload_json"]),
+        "usage_observations": observations,
+    }
+
+
+def _usage_missing_late(
+    prepared: PreparedE2E,
+    runtime: RecordedRuntime,
+    source_digest: str,
+    *,
+    cell_root: Path,
+    roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
+) -> dict[str, Any]:
+    """E2E-06: Worker usage 누락은 진행을 막지 않고, 늦은 usage는 회계 관측만 더한다.
+
+    Worker usage를 가린 채 완주한 뒤 usage 구성요소가 0·추정이 아니라 null인지
+    본다. 그다음 가려 둔 provider 원문을 같은 프로세스에서 늦게 전달하고, 실행·효과·
+    완료 상태가 그대로이며 append-only 회계 관측만 늘었는지 전후를 비교한다.
+    """
+
+    observation_path = cell_root / "usage-observation.json"
+    # 책임 판정은 evidence 파일이 있어야 돈다. 실패 경로를 위해 먼저 null과 이유를 남긴다.
+    _write_json(
+        observation_path,
+        {
+            "schema": "flowmarshal.project-e2e.usage-observation.v1",
+            "before_late": None,
+            "after_late": None,
+            "reason": "E2E06_USAGE_OBSERVATION_NOT_PRODUCED",
+        },
+    )
+    layer = UsageWithholdingRuntime(runtime)
+    completion = _normal_completion(
+        prepared, layer, source_digest, roles=roles, governance=governance
+    )
+    fault = _write_fault_injection(
+        cell_root / "fault-injection.json",
+        {
+            "kind": "worker_usage_withheld_then_late_delivery",
+            "writer": "qualification_fault_injector",
+            "withheld_usage_source": UsageWithholdingRuntime.WITHHELD_USAGE_SOURCE,
+            "withheld": [
+                {key: value for key, value in item.items() if key != "provider_payload"}
+                for item in layer.withheld
+            ],
+            "limitation": (
+                "늦은 usage는 같은 프로세스에서 보관한 provider 원문으로만 다시 전달한다. "
+                "Claude 저장 turn(read_stored)은 usage를 주지 않는다."
+            ),
+        },
+    )
+    if not completion.get("passed"):
+        return {**completion, "fault_injection": fault}
+    with prepared.service.ledger.read() as connection:
+        bindings = {
+            (binding["thread_id"], binding["turn_id"]): row["id"]
+            for row in connection.execute(
+                "SELECT id,binding_json FROM attempts WHERE project_id=? AND kind='execution' "
+                "AND binding_json IS NOT NULL",
+                (prepared.project_id,),
+            )
+            for binding in (json.loads(row["binding_json"]),)
+        }
+    entry = next(
+        (
+            item
+            for item in reversed(layer.withheld)
+            if item["terminal_status"] is not None
+            and (item["thread_id"], item["turn_id"]) in bindings
+        ),
+        None,
+    )
+    if entry is None:
+        # provider가 처음부터 usage를 주지 않았으면 가릴 것이 없어 fault가 성립하지 않는다.
+        return {
+            **completion,
+            "passed": False,
+            "fault_injection": fault,
+            "failure": "E2E06_FAULT_NOT_TRIGGERED: Worker terminal 관측에 가릴 usage가 없었습니다.",
+            "failure_code": "E2E06_FAULT_NOT_TRIGGERED",
+            "failure_class": QualificationFailureClass.ENVIRONMENT.value,
+        }
+    attempt_id = bindings[(entry["thread_id"], entry["turn_id"])]
+    before = _worker_usage_accounting(prepared, attempt_id)
+    usage_before = before["usage_record"]
+    call_before = before["provider_call"]
+    missing_checks = {
+        "usage_record_present": usage_before is not None,
+        "usage_unavailable": usage_before is not None and usage_before["usage_available"] is False,
+        "usage_components_null": usage_before is not None
+        and all(usage_before[key] is None for key in _USAGE_COMPONENT_KEYS),
+        "provider_call_actual_tokens_null": call_before is not None
+        and call_before["actual_tokens"] is None,
+        "provider_call_usage_unknown": call_before is not None
+        and call_before["status"] == "usage_unknown",
+        "first_observation_unavailable": [
+            item["measurement_status"] for item in before["usage_observations"]
+        ] == ["unavailable"],
+    }
+    journal_payload_digests = {
+        sha256_digest(event["receipt"].get("payload"))
+        for event in runtime.events
+        if event.get("operation") in {"read", "read_stored", "completion_observation"}
+        and isinstance(event.get("receipt"), dict)
+    }
+    document: dict[str, Any] = {
+        "schema": "flowmarshal.project-e2e.usage-observation.v1",
+        "attempt_id": attempt_id,
+        "thread_id": entry["thread_id"],
+        "turn_id": entry["turn_id"],
+        "withheld_provider_payload_digest": entry["provider_payload_digest"],
+        "before_late": before,
+        "after_late": None,
+        "missing_checks": missing_checks,
+        "reason": None,
+    }
+    if not all(missing_checks.values()):
+        document["reason"] = "E2E06_MISSING_USAGE_NOT_NULL"
+        _write_json(observation_path, document)
+        failed = ",".join(name for name, ok in missing_checks.items() if not ok)
+        return {
+            **completion,
+            "fault_injection": fault,
+            "missing_checks": missing_checks,
+            **_cell_failure(
+                "E2E06_MISSING_USAGE_NOT_NULL",
+                f"usage 누락 뒤 기록이 null/unknown이 아닙니다: failed_checks=[{failed}]",
+            ),
+            "passed": False,
+        }
+    status_before = prepared.service.status(prepared.project_id)["project"]["run_state"]
+    rows_before = _ledger_rows(prepared.service, prepared.project_id)
+    late_error: str | None = None
+    try:
+        prepared.service.record_worker_usage(
+            attempt_id=attempt_id,
+            thread_id=entry["thread_id"],
+            turn_id=entry["turn_id"],
+            terminal_status=entry["terminal_status"],
+            provider_payload=entry["provider_payload"],
+        )
+    except EngineServiceError as error:
+        late_error = str(error)
+    after = _worker_usage_accounting(prepared, attempt_id)
+    delta = _ledger_delta(rows_before, _ledger_rows(prepared.service, prepared.project_id))
+    status_after = prepared.service.status(prepared.project_id)["project"]["run_state"]
+    observations_before = before["usage_observations"]
+    observations_after = after["usage_observations"]
+    late = observations_after[-1] if len(observations_after) == len(observations_before) + 1 else None
+    call_after = after["provider_call"]
+    late_checks = {
+        "late_delivery_accepted": late_error is None,
+        "late_payload_is_journaled_provider_original": (
+            entry["provider_payload_digest"] in journal_payload_digests
+        ),
+        "one_late_observation_appended": late is not None
+        and observations_after[: len(observations_before)] == observations_before,
+        "late_observation_measured": late is not None
+        and late["late"] == 1
+        and late["measurement_status"] == "measured"
+        and late["previous_observation_id"] == observations_before[-1]["id"],
+        "provider_call_actual_tokens_recorded": call_after is not None
+        and call_after["actual_tokens"] is not None,
+        "provider_call_execution_fields_unchanged": call_after is not None
+        and all(
+            call_after[key] == call_before[key] for key in _WORKER_CALL_EXECUTION_FIELDS
+        ),
+        "usage_record_unchanged": after["usage_record"] == usage_before,
+        "ledger_only_usage_reobserved": set(delta) <= {"history_events"}
+        and _history_types(delta) == ["budget.usage_reobserved"],
+        "run_state_unchanged": status_before == status_after == "completed",
+    }
+    document.update({"after_late": after, "late_checks": late_checks, "ledger_delta": delta})
+    _write_json(observation_path, document)
+    result = {
+        **completion,
+        "passed": all(late_checks.values()),
+        "fault_injection": fault,
+        "missing_checks": missing_checks,
+        "late_checks": late_checks,
+        "late_error": late_error,
+    }
+    if not result["passed"]:
+        failed = ",".join(name for name, ok in late_checks.items() if not ok)
+        result.update(
+            _cell_failure("E2E06_LATE_USAGE_NOT_APPEND_ONLY", f"failed_checks=[{failed}]")
+        )
+    return result
+
+
+# E2E-02·04·05 driver가 타는 제품 실행 경로다. `_drive_normal_completion`은 supervisor 없는
+# 동기 dispatcher라 ContextRequest 후속 준비 job이 생기지 않는다.
+_SUPERVISOR_RUNTIME_PATH = "EngineApplication.run_once+RuntimeJobSupervisor"
+
+
+def _failed_checks(checks: dict[str, bool]) -> str:
+    return ",".join(name for name, ok in checks.items() if not ok)
+
+
+def _load_plan(prepared: PreparedE2E) -> PlanContractRevision:
+    with prepared.service.ledger.read() as connection:
+        row = connection.execute(
+            "SELECT payload_json FROM plan_revisions WHERE id=?", (prepared.plan_revision_id,)
+        ).fetchone()
+    return PlanContractRevision.model_validate_json(row["payload_json"])
+
+
+def _drive_application(
+    prepared: PreparedE2E,
+    runtime: Any,
+    *,
+    roles: EngineRoleConfiguration | None,
+    governance: Any | None,
+    structured_runner: Any | None,
+    timeout_seconds: float,
+    tolerated_blockers: frozenset[str] = frozenset(),
+) -> dict[str, Any]:
+    """제품 경로(`EngineApplication.run_once`와 기본 RuntimeJobSupervisor)로 Goal 판정까지 돈다.
+
+    준비·실행·검사·복구가 모두 RuntimeJob으로 돈다. 역할 설정이 없는 결정적 테스트만
+    준비된 proposal과 Goal Test step을 넘긴다. `tolerated_blockers`는 다음 tick이 Core
+    자동 복구로 이어 가는 차단 code다. 그 밖의 차단은 그대로 돌려준다.
+    """
+
+    application = EngineApplication(
+        prepared.service,
+        runtime=runtime,
+        role_configuration=roles,
+        structured_runner=structured_runner,
+        governance=governance,
+    )
+    supplied = roles is None and prepared.proposal is not None
+    goal_step = (
+        prepared.proposal.validation_steps[0].model_copy(update={"validation_id": "validation_goal"})
+        if supplied
+        else None
+    )
+    actions: list[str] = []
+    deadline = time.monotonic() + timeout_seconds
+    try:
+        while time.monotonic() < deadline:
+            outcome = application.run_once(
+                prepared.project_id,
+                proposal=prepared.proposal if supplied else None,
+                goal_validation_step=goal_step,
+            )
+            label = outcome.action.value + (
+                "" if outcome.blocker_code is None else f":{outcome.blocker_code}"
+            )
+            if not actions or actions[-1] != label:
+                actions.append(label)
+            if outcome.action is RunOnceAction.COMPLETED and outcome.goal_verdict_id is not None:
+                return {"completed": True, "actions": actions, "blocker_code": None, "detail": None}
+            if (
+                outcome.action is RunOnceAction.BLOCKED
+                and outcome.blocker_code not in tolerated_blockers
+            ):
+                return {
+                    "completed": False,
+                    "actions": actions,
+                    "blocker_code": outcome.blocker_code,
+                    "detail": outcome.detail,
+                }
+            time.sleep(0.05)
+    finally:
+        application.close_task_gate()
+    return {
+        "completed": False,
+        "actions": actions,
+        "blocker_code": "E2E_RUN_TIMEOUT",
+        "detail": f"{timeout_seconds}초 안에 Goal 판정까지 가지 못했습니다.",
+    }
+
+
+def _goal_completion_checks(prepared: PreparedE2E) -> dict[str, bool]:
+    """Goal 완료를 원장으로 확인한다. Task 검사는 repair 뒤 유효한 최신 결과만 본다."""
+
+    status = prepared.service.status(prepared.project_id)
+    plan = _load_plan(prepared)
+    with prepared.service.ledger.read() as connection:
+        task_statuses = [
+            row["status"]
+            for row in connection.execute(
+                "SELECT status FROM task_contracts WHERE plan_revision_id=?",
+                (prepared.plan_revision_id,),
+            )
+        ]
+        latest_pass = True
+        for task in plan.definition.tasks:
+            latest = {
+                row["validation_id"]: row["status"]
+                for row in EngineService.effective_task_validation_results(connection, task.task_id)
+            }
+            latest_pass = latest_pass and all(
+                latest.get(item.validation_id) == ValidationStatus.PASS.value
+                for item in task.validations
+            )
+        verdicts = [
+            row["status"]
+            for row in connection.execute(
+                "SELECT status FROM goal_verdicts WHERE plan_revision_id=? ORDER BY rowid",
+                (prepared.plan_revision_id,),
+            )
+        ]
+        goal_evidence = _independent_goal_test_evidence_count(
+            connection, prepared.project_id, plan.definition.model_dump(mode="json")
+        )
+        plan_row = connection.execute(
+            "SELECT status FROM plan_revisions WHERE id=?", (prepared.plan_revision_id,)
+        ).fetchone()
+    # Goal 충족 시 Core가 active_plan_revision_id를 비우므로(service record_goal_verdict),
+    # 재계획 없이 활성화한 같은 Plan revision이 completed로 끝났는지를 원장에서 본다.
+    return {
+        "run_completed": status["project"]["run_state"] == "completed",
+        "history_valid": bool(status["history_valid"]),
+        "activated_plan_completed": plan_row is not None and plan_row["status"] == "completed",
+        "all_tasks_completed": bool(task_statuses) and set(task_statuses) == {"completed"},
+        "task_validations_latest_pass": latest_pass,
+        "goal_verdict_satisfied": verdicts == ["satisfied"],
+        "independent_goal_test_evidence": goal_evidence >= 1,
+    }
+
+
+def _dag_execution_order(prepared: PreparedE2E, refs: dict[str, str]) -> dict[str, Any]:
+    """History 순서로 Task별 첫 materialize·첫 Attempt 예약·완료 sequence와 동시 진행 수를 읽는다.
+
+    materialize부터 완료까지를 진행 중으로 본다. 완료 뒤 같은 Task에 결속된 검사 예약은
+    진행 중으로 다시 세지 않는다.
+    """
+
+    with prepared.service.ledger.read() as connection:
+        rows = connection.execute(
+            "SELECT sequence,event_type,entity_id,payload_json FROM history_events "
+            "WHERE project_id=? AND event_type IN "
+            "('task.materialized','attempt.reserved','task.completed') ORDER BY sequence",
+            (prepared.project_id,),
+        ).fetchall()
+    first: dict[str, dict[str, int]] = {"task.materialized": {}, "attempt.reserved": {}}
+    completed: dict[str, int] = {}
+    in_flight: set[str] = set()
+    max_in_flight = 0
+    timeline: list[dict[str, Any]] = []
+    for row in rows:
+        task_id = (
+            row["entity_id"]
+            if row["event_type"] == "task.completed"
+            else json.loads(row["payload_json"]).get("task_id")
+        )
+        if task_id not in refs:
+            continue
+        timeline.append(
+            {"sequence": row["sequence"], "event_type": row["event_type"], "task_ref": refs[task_id]}
+        )
+        if row["event_type"] == "task.completed":
+            completed.setdefault(task_id, row["sequence"])
+            in_flight.discard(task_id)
+        else:
+            first[row["event_type"]].setdefault(task_id, row["sequence"])
+            if task_id not in completed:
+                in_flight.add(task_id)
+        max_in_flight = max(max_in_flight, len(in_flight))
+    return {
+        "materialized": first["task.materialized"],
+        "reserved": first["attempt.reserved"],
+        "completed": completed,
+        "max_in_flight": max_in_flight,
+        "timeline": timeline,
+    }
+
+
+def _multi_task_dag(
+    prepared: PreparedE2E,
+    runtime: CodexRuntimePort,
+    source_digest: str,
+    *,
+    roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
+    structured_runner: Any | None = None,
+    timeout_seconds: float | None = None,
+) -> dict[str, Any]:
+    """E2E-02: 실제 선택 Plan의 둘 이상 Task를 dependency 순서대로 하나씩 실행하는지 본다.
+
+    Task 분할·dependency는 live 역할이 정한다. 전제가 안 맞으면 Plan에 맞추지 않고 실행
+    없이 model 실패로 남긴다. 실행 순서와 동시 진행 수는 원장 History 순서로만 판정한다.
+    """
+
+    plan = _load_plan(prepared)
+    refs = {task.task_id: task.task_ref for task in plan.definition.tasks}
+    precondition = {
+        "task_refs": list(refs.values()),
+        "dependencies": [
+            {
+                "producer": refs[item.producer_task_id],
+                "consumer": refs[item.consumer_task_id],
+                "dependency_type": item.dependency_type.value,
+                "products": list(item.products),
+            }
+            for item in plan.definition.dependencies
+        ],
+    }
+    if len(refs) < 2 or not plan.definition.dependencies:
+        return {
+            "passed": False,
+            "source_fixture_digest": source_digest,
+            "precondition": precondition,
+            **_cell_failure(
+                "E2E02_PLAN_NOT_MULTI_TASK_DAG",
+                f"task_count={len(refs)}, dependency_count={len(plan.definition.dependencies)}",
+                QualificationFailureClass.MODEL,
+            ),
+        }
+    drive = _drive_application(
+        prepared,
+        runtime,
+        roles=roles,
+        governance=governance,
+        structured_runner=structured_runner,
+        timeout_seconds=timeout_seconds or 900.0 * (len(refs) + 1),
+    )
+    order = _dag_execution_order(prepared, refs)
+
+    def after_producer(stage: str, consumer: str, producer: str) -> bool:
+        return (
+            producer in order["completed"]
+            and consumer in order[stage]
+            and order[stage][consumer] > order["completed"][producer]
+        )
+
+    edges = [
+        {
+            **edge,
+            "respected": after_producer("materialized", item.consumer_task_id, item.producer_task_id)
+            and after_producer("reserved", item.consumer_task_id, item.producer_task_id),
+        }
+        for edge, item in zip(precondition["dependencies"], plan.definition.dependencies)
+    ]
+    checks = {
+        "all_tasks_executed": set(order["completed"]) == set(refs),
+        "at_most_one_task_in_flight": order["max_in_flight"] <= 1,
+        "dependency_order_respected": all(item["respected"] for item in edges),
+        **_goal_completion_checks(prepared),
+    }
+    result = {
+        "passed": drive["completed"] and all(checks.values()),
+        "source_fixture_digest": source_digest,
+        "runtime_path": _SUPERVISOR_RUNTIME_PATH,
+        "actions": drive["actions"],
+        "precondition": precondition,
+        "execution_order": order["timeline"],
+        "max_in_flight": order["max_in_flight"],
+        "edges": edges,
+        "checks": checks,
+    }
+    if not drive["completed"]:
+        result.update(
+            _cell_failure("E2E02_RUN_BLOCKED", f"{drive['blocker_code']}: {drive['detail']}")
+        )
+    elif not result["passed"]:
+        result.update(
+            _cell_failure(
+                "E2E02_DAG_EXECUTION_NOT_VERIFIED", f"failed_checks=[{_failed_checks(checks)}]"
+            )
+        )
+    return result
+
+
+_E2E04_FAULT_RECORD = {
+    "kind": "worker_implementation_reverted_before_observation",
+    "writer": "qualification_fault_injector",
+    "injection_point": "Worker 실행 turn의 첫 completed terminal 관측을 Engine에 넘기기 직전",
+    "classifier_input": False,
+    "injector_rollback": False,
+    "rollback_reason": (
+        "되돌린 원본이 곧 Worker 결과 file evidence(after_digest)여야 governance 사용자 변경 "
+        "검사와 REPAIR_INPUT_CHANGED에 걸리지 않는다. 구현 복구는 다음 Worker Attempt가 한다."
+    ),
+}
+
+
+def _file_digest(path: Path) -> str | None:
+    return sha256_bytes(path.read_bytes()) if path.is_file() else None
+
+
+def _failed_deterministic_observation(
+    row: Any, *, attempt_id: str, task_id: str, validation_id: str
+) -> bool:
+    """evidence 한 행이 fault Attempt에 결속된 결정적 검사 실패 관측인지 strict 파싱으로 본다."""
+
+    from .domain import DeterministicValidationObservation
+
+    if (
+        row["kind"] not in {"test", "command", "build"}
+        or row["attempt_id"] != attempt_id
+        or row["task_id"] != task_id
+    ):
+        return False
+    try:
+        observation = DeterministicValidationObservation.model_validate_json(row["observation"])
+    except ValueError:
+        return False
+    return (
+        observation.validation_id == validation_id
+        and observation.task_id == task_id
+        and row["source_ref"] == f"validation:{observation.validation_id}:{observation.argv[0]}"
+        and not observation.timed_out
+        and observation.actual_exit_code is not None
+        and observation.actual_exit_code not in observation.expected_exit_codes
+    )
+
+
+def _repair_chain(prepared: PreparedE2E, injection: dict[str, Any]) -> dict[str, Any]:
+    """원장에서 fault Attempt의 분류·assessment·repair·다음 Attempt 결속을 읽어 판정한다."""
+
+    from .domain import FailureClass, RecoveryAssessment, RepairAction
+    from .recovery import FailureDiagnosis
+    from .service import latest_write_observation
+
+    attempt_id = injection["attempt_id"]
+    task_id = injection["task_id"]
+    # 분류기가 직접 evidence로 implementation을 정했을 때만 이 지문이 나온다(error code 없음).
+    expected_fingerprint = FailureDiagnosis(
+        failure_class=FailureClass.IMPLEMENTATION,
+        repair_action=RepairAction.TASK_REPAIR,
+        rationale="E2E-04 기대 분류",
+        source="direct_evidence",
+    ).failure_fingerprint
+    limit = next(
+        task.recovery.max_same_failure_replans
+        for task in _load_plan(prepared).definition.tasks
+        if task.task_id == task_id
+    )
+    with prepared.service.ledger.read() as connection:
+        writes = {
+            item["path"]: latest_write_observation(connection, attempt_id, item["path"])
+            for item in injection["targets"]
+        }
+        retries = [
+            (row["sequence"], json.loads(row["payload_json"]))
+            for row in connection.execute(
+                "SELECT sequence,payload_json FROM history_events WHERE project_id=? "
+                "AND event_type='task.retry_enabled' AND entity_id=? ORDER BY sequence",
+                (prepared.project_id, task_id),
+            )
+        ]
+        assessments = [
+            RecoveryAssessment.model_validate_json(row["payload_json"])
+            for row in connection.execute(
+                "SELECT payload_json FROM recovery_assessments WHERE project_id=? AND attempt_id=? "
+                "ORDER BY rowid",
+                (prepared.project_id, attempt_id),
+            )
+        ]
+        failed_id = retries[0][1]["failed_validation_result_id"] if retries else None
+        failed_row = (
+            None
+            if failed_id is None
+            else connection.execute(
+                "SELECT payload_json FROM validation_results WHERE id=?", (failed_id,)
+            ).fetchone()
+        )
+        failed = (
+            None if failed_row is None else ValidationResult.model_validate_json(failed_row["payload_json"])
+        )
+        evidence = (
+            []
+            if failed is None or not failed.evidence_ids
+            else connection.execute(
+                "SELECT id,task_id,attempt_id,kind,source_ref,observation FROM evidence_records "
+                f"WHERE id IN ({','.join('?' for _ in failed.evidence_ids)})",
+                failed.evidence_ids,
+            ).fetchall()
+        )
+        recovery_job = connection.execute(
+            "SELECT status FROM runtime_jobs WHERE project_id=? AND kind='recovery' AND checkpoint_key=?",
+            (prepared.project_id, f"recovery:{attempt_id}:{expected_fingerprint}"),
+        ).fetchone()
+        next_attempt = connection.execute(
+            "SELECT a.id,a.status,h.sequence FROM attempts a JOIN history_events h "
+            "ON h.project_id=a.project_id AND h.event_type='attempt.reserved' AND h.entity_id=a.id "
+            "WHERE a.task_id=? AND a.kind='execution' AND a.attempt_no=?",
+            (task_id, injection["attempt_no"] + 1),
+        ).fetchone()
+    direct = [
+        row["id"]
+        for row in evidence
+        if failed is not None
+        and _failed_deterministic_observation(
+            row, attempt_id=attempt_id, task_id=task_id, validation_id=failed.validation_id
+        )
+    ]
+    assessment = next(
+        (item for item in assessments if item.failure_fingerprint == expected_fingerprint), None
+    )
+    # 재시도마다 이전 재시도가 쓰지 않은 새 evidence에 결속됐는지 본다.
+    seen: set[str] = set()
+    fresh = bool(retries)
+    for _sequence, payload in retries:
+        ids = set(payload["new_evidence_ids"])
+        fresh = fresh and bool(ids) and not ids & seen
+        seen |= ids
+    first = retries[0][1] if retries else None
+    checks = {
+        "fault_attempt_is_first": injection["attempt_no"] == 1,
+        "worker_result_evidence_holds_injected_digest": all(
+            writes[item["path"]] == (True, item["injected_digest"]) for item in injection["targets"]
+        ),
+        "failed_validation_bound_to_task": failed is not None
+        and failed.status is ValidationStatus.FAIL
+        and failed.task_id == task_id,
+        "failure_evidence_is_direct_deterministic": bool(direct),
+        "classified_implementation_from_direct_evidence": assessment is not None
+        and assessment.failure_class is FailureClass.IMPLEMENTATION
+        and assessment.action is RepairAction.TASK_REPAIR,
+        "assessment_bound_to_failure_evidence": assessment is not None
+        and bool(set(direct) & set(assessment.new_evidence_ids)),
+        "recovery_job_consumed": recovery_job is not None and recovery_job["status"] == "consumed",
+        "repair_enabled_from_assessment": first is not None
+        and assessment is not None
+        and first["previous_attempt_id"] == attempt_id
+        and first["failure_class"] == FailureClass.IMPLEMENTATION.value
+        and first["recovery_assessment_id"] == assessment.assessment_id,
+        "repair_bound_to_new_evidence": fresh,
+        "recovery_count_within_limit": 1 <= len(retries) <= limit,
+        "next_attempt_succeeded_after_repair": next_attempt is not None
+        and next_attempt["status"] == "succeeded"
+        and bool(retries)
+        and next_attempt["sequence"] > retries[0][0],
+    }
+    return {
+        "attempt_id": attempt_id,
+        "task_id": task_id,
+        "expected_failure_fingerprint": expected_fingerprint,
+        "worker_write_observations": {path: list(value) for path, value in writes.items()},
+        "failed_validation_result_id": failed_id,
+        "direct_failure_evidence_ids": direct,
+        "assessments": [item.model_dump(mode="json") for item in assessments],
+        "retries": [{"sequence": sequence, **payload} for sequence, payload in retries],
+        "recovery_limit": limit,
+        "next_attempt": None if next_attempt is None else dict(next_attempt),
+        "checks": checks,
+    }
+
+
+def _approved_repair(
+    prepared: PreparedE2E,
+    runtime: CodexRuntimePort,
+    source_digest: str,
+    *,
+    cell_root: Path,
+    roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
+    structured_runner: Any | None = None,
+    timeout_seconds: float = 1800.0,
+) -> dict[str, Any]:
+    """E2E-04: 통제된 구현 결함 하나를 분류기가 implementation으로 정하고 같은 Task repair로 복구하는지 본다.
+
+    첫 Worker 결과만 `ImplementationFaultRuntime`이 원본으로 되돌린다. 분류·assessment·
+    repair·다음 Attempt는 모두 실제 Core 경로이며 주입 기록은 provenance일 뿐 분류기
+    입력이 아니다. 구현 재시도를 허용한 Task가 Plan에 없으면 실행 없이 model 실패로 남긴다.
+    """
+
+    fault_path = cell_root / "fault-injection.json"
+    # 책임 판정은 evidence 파일이 있어야 돈다. 실패 경로를 위해 먼저 null과 이유를 남긴다.
+    _write_fault_injection(
+        fault_path, _E2E04_FAULT_RECORD | {"injection": None, "reason": "E2E04_FAULT_NOT_INJECTED"}
+    )
+    plan = _load_plan(prepared)
+    precondition = {
+        task.task_ref: {
+            "task_id": task.task_id,
+            "kind": task.kind.value,
+            "retryable_failure_classes": [
+                item.value for item in task.recovery.retryable_failure_classes
+            ],
+            "max_same_failure_replans": task.recovery.max_same_failure_replans,
+            "deterministic_validation_ids": [
+                item.validation_id
+                for item in task.validations
+                if item.method == "deterministic"
+                and set(item.required_evidence_kinds) & {"test", "command", "build"}
+            ],
+        }
+        for task in plan.definition.tasks
+    }
+    retryable = [
+        item
+        for item in precondition.values()
+        if item["kind"] == TaskKind.CHANGE.value
+        and "implementation" in item["retryable_failure_classes"]
+        and item["max_same_failure_replans"] >= 1
+    ]
+    eligible = frozenset(item["task_id"] for item in retryable if item["deterministic_validation_ids"])
+    if not eligible:
+        return {
+            "passed": False,
+            "source_fixture_digest": source_digest,
+            "precondition": precondition,
+            **_cell_failure(
+                "E2E04_PRECONDITION_NO_DETERMINISTIC_VALIDATION"
+                if retryable
+                else "E2E04_PRECONDITION_IMPLEMENTATION_NOT_RETRYABLE",
+                "구현 결함을 같은 Task에서 재시도하고 결정적 검사로 확인할 CHANGE Task가 Plan에 없습니다.",
+                QualificationFailureClass.MODEL,
+            ),
+        }
+    layer = ImplementationFaultRuntime(
+        runtime, service=prepared.service, workspace=prepared.workspace, eligible_task_ids=eligible
+    )
+    drive = _drive_application(
+        prepared,
+        layer,
+        roles=roles,
+        governance=governance,
+        structured_runner=structured_runner,
+        timeout_seconds=timeout_seconds,
+        tolerated_blockers=frozenset({"TASK_VALIDATION_FAILED"}),
+    )
+    injection = layer.injection
+    targets = () if injection is None else injection["targets"]
+    fault = _write_fault_injection(
+        fault_path,
+        _E2E04_FAULT_RECORD
+        | {
+            "injection": injection,
+            "final_target_digests": {
+                item["path"]: _file_digest(prepared.workspace / item["path"]) for item in targets
+            },
+            "reason": (
+                None if injection is not None and injection["injected"] else "E2E04_FAULT_NOT_INJECTED"
+            ),
+        },
+    )
+    result: dict[str, Any] = {
+        "passed": False,
+        "source_fixture_digest": source_digest,
+        "runtime_path": _SUPERVISOR_RUNTIME_PATH,
+        "actions": drive["actions"],
+        "precondition": precondition,
+        "fault_injection": fault,
+    }
+    if injection is None:
+        return result | _cell_failure(
+            "E2E04_RUN_BLOCKED",
+            f"Worker terminal 관측 전에 멈췄습니다: {drive['blocker_code']}: {drive['detail']}",
+        )
+    if not injection["injected"]:
+        return result | _cell_failure(
+            "E2E04_FAULT_NOT_INJECTED",
+            str(injection.get("reason")),
+            QualificationFailureClass.FIXTURE,
+        )
+    if not injection["effective"]:
+        return result | _cell_failure(
+            "E2E04_FAULT_NOT_EFFECTIVE",
+            "Worker가 쓰기 target을 바꾸지 않아 되돌릴 구현이 없었습니다.",
+            QualificationFailureClass.MODEL,
+        )
+    chain = _repair_chain(prepared, injection)
+    checks = {**chain["checks"], **_goal_completion_checks(prepared)}
+    result.update(
+        {
+            "repair_chain": chain,
+            "checks": checks,
+            "passed": drive["completed"] and all(checks.values()),
+        }
+    )
+    if not drive["completed"]:
+        result.update(
+            _cell_failure("E2E04_RUN_BLOCKED", f"{drive['blocker_code']}: {drive['detail']}")
+        )
+    elif not result["passed"]:
+        result.update(
+            _cell_failure(
+                "E2E04_REPAIR_CHAIN_INCOMPLETE", f"failed_checks=[{_failed_checks(checks)}]"
+            )
+        )
+    return result
+
+
+def _verify_context_followup(
+    prepared: PreparedE2E,
+    job: dict[str, Any],
+    *,
+    jobs: list[dict[str, Any]],
+    baseline: dict[str, bytes],
+    initial_paths: set[str],
+    project_map: dict[str, str],
+) -> dict[str, Any]:
+    """후속 준비 job 하나가 요청·해소·Map·Execution Spec·PromptBundle에 결속됐는지 본다."""
+
+    from .context import read_context_fragment
+    from .domain import TaskExecutionSpecRevision
+    from .worker_prompt import PromptArtifactError, PromptArtifactStore
+
+    root = prepared.workspace.resolve()
+    request = json.loads(job["request_json"])
+    prefix = job["checkpoint_key"].rsplit("context:", 1)[0]
+    provider = next((item for item in jobs if item["checkpoint_key"] == prefix + "provider"), None)
+    provider_preparation = (
+        None
+        if provider is None or provider["result_json"] is None
+        else json.loads(provider["result_json"])["preparation"]
+    )
+    provider_request = None if provider_preparation is None else provider_preparation["context_request"]
+    # ContextRequest 대신 proposal의 context_needs에 Map 밖 source를 적으면 Core가 compile
+    # 단계의 요청으로 후속 job을 만든다. 그 요청의 need는 proposal의 need 그대로다.
+    provider_needs = (
+        []
+        if provider_preparation is None or provider_preparation.get("proposal") is None
+        else provider_preparation["proposal"]["context_needs"]
+    )
+    followup_request = request.get("context_request") or {}
+    if provider_request is not None and provider_request == followup_request:
+        request_origin = "provider_context_request"
+    elif (
+        provider_request is None
+        and followup_request.get("missing_needs")
+        and all(need in provider_needs for need in followup_request["missing_needs"])
+    ):
+        request_origin = "provider_proposal_context_needs"
+    else:
+        request_origin = None
+    resolution = request.get("context_resolution") or []
+    sources = []
+    for item in resolution:
+        reference = item["source_ref"]
+        resolved = (root / reference).resolve()
+        content = baseline.get(reference)
+        sources.append(
+            {
+                **item,
+                "inside_approved_root": not Path(reference).is_absolute() and root in resolved.parents,
+                "file_digest_matches": content is not None
+                and sha256_bytes(content) == item["content_digest"],
+                "project_map_digest_matches": project_map.get(reference) == item["content_digest"],
+                "initially_unmapped": reference not in initial_paths,
+            }
+        )
+    with prepared.service.ledger.read() as connection:
+        spec_row = connection.execute(
+            "SELECT s.payload_json FROM attempts a JOIN execution_spec_revisions s "
+            "ON s.task_id=a.task_id AND s.definition_digest=a.execution_spec_digest "
+            "WHERE a.task_id=? AND a.kind='execution' AND a.status='succeeded' "
+            "ORDER BY a.attempt_no DESC LIMIT 1",
+            (job["task_id"],),
+        ).fetchone()
+    bindings = []
+    if spec_row is not None:
+        manifest = TaskExecutionSpecRevision.model_validate_json(
+            spec_row["payload_json"]
+        ).definition.context_manifest
+        try:
+            suffix = PromptArtifactStore(prepared.service.ledger.artifact_root).load(
+                manifest.prompt_binding
+            ).dynamic_suffix
+        except PromptArtifactError:
+            suffix = None
+        for item in resolution:
+            fragment = next(
+                (value for value in manifest.fragments if value.source_ref == item["source_ref"]),
+                None,
+            )
+            body = None
+            if fragment is not None:
+                try:
+                    body = read_context_fragment(root, fragment)
+                except (OSError, ValueError):
+                    body = None
+            bindings.append(
+                {
+                    "source_ref": item["source_ref"],
+                    "fragment_selector": None if fragment is None else fragment.selector,
+                    "fragment_content_digest": None if fragment is None else fragment.content_digest,
+                    "digest_bound": fragment is not None
+                    and fragment.content_digest == item["content_digest"],
+                    "body_bound": suffix is not None
+                    and body is not None
+                    and (
+                        f'<reference-data source="{fragment.source_ref}#{fragment.selector}">\n'
+                        f"{body}\n</reference-data>"
+                    )
+                    in suffix,
+                }
+            )
+    checks = {
+        "single_followup_for_preparation": sum(
+            item["checkpoint_key"].startswith(prefix + "context:") for item in jobs
+        )
+        == 1,
+        "checkpoint_bound_to_request_and_resolution": job["checkpoint_key"]
+        == prefix
+        + "context:"
+        + sha256_digest(
+            {
+                "context_request": request.get("context_request"),
+                "context_resolution": request.get("context_resolution"),
+            }
+        ),
+        "request_matches_provider_job": request_origin is not None,
+        "followup_consumed": job["status"] == "consumed",
+        "resolution_present": bool(sources),
+        "resolution_inside_approved_root": all(item["inside_approved_root"] for item in sources),
+        "resolution_matches_file_digest": all(item["file_digest_matches"] for item in sources),
+        "resolution_in_project_map": all(item["project_map_digest_matches"] for item in sources),
+        "resolved_outside_initial_project_map": any(item["initially_unmapped"] for item in sources),
+        "prompt_binds_fragment_body_and_digest": bool(bindings)
+        and all(item["digest_bound"] and item["body_bound"] for item in bindings),
+    }
+    return {
+        "job_id": job["id"],
+        "task_id": job["task_id"],
+        "checkpoint_key": job["checkpoint_key"],
+        "context_request": request.get("context_request"),
+        "request_origin": request_origin,
+        "resolution": sources,
+        "prompt_bindings": bindings,
+        "checks": checks,
+    }
+
+
+def _context_discovery(
+    prepared: PreparedE2E,
+    runtime: CodexRuntimePort,
+    source_digest: str,
+    *,
+    cell_root: Path,
+    roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
+    structured_runner: Any | None = None,
+    timeout_seconds: float = 900.0,
+) -> dict[str, Any]:
+    """E2E-05: 초기 Project Map 밖 로컬 파일을 Core가 자동 해소해 실행까지 결속하는지 본다.
+
+    ContextRequest를 주입하지 않는다. fixture 규칙 모듈은 요청 원문에 파일명이 없어 초기
+    Map에 없고, 그 파일이 필요하다고 요청하는 것은 live 준비 역할이다. 해소 증거는
+    supervisor 경로의 후속 준비 job(`:context:` checkpoint)만 쓴다.
+    """
+
+    path = cell_root / "context-discovery.json"
+    initial_paths = {
+        entry.path
+        for entry in prepared.service.load_current_project_map(prepared.project_id).entries
+    }
+    document: dict[str, Any] = {
+        "schema": "flowmarshal.project-e2e.context-discovery.v1",
+        "runtime_path": _SUPERVISOR_RUNTIME_PATH,
+        "initial_project_map_paths": sorted(initial_paths),
+        "context_jobs": None,
+        # 실행 중 예외로 끝나면 미관측으로 오해되지 않도록 판정 전 상태를 따로 적는다.
+        "reason": "E2E05_NOT_EVALUATED",
+    }
+    # 책임 판정은 evidence 파일이 있어야 돈다. 실패 경로를 위해 먼저 null과 이유를 남긴다.
+    _write_json(path, document)
+    baseline = _workspace_files(prepared.workspace)
+    drive = _drive_application(
+        prepared,
+        runtime,
+        roles=roles,
+        governance=governance,
+        structured_runner=structured_runner,
+        timeout_seconds=timeout_seconds,
+    )
+    with prepared.service.ledger.read() as connection:
+        jobs = [
+            dict(row)
+            for row in connection.execute(
+                "SELECT id,task_id,status,checkpoint_key,request_json,result_json FROM runtime_jobs "
+                "WHERE project_id=? AND kind='execution_spec_prepare' ORDER BY rowid",
+                (prepared.project_id,),
+            )
+        ]
+    project_map = {
+        entry.path: entry.content_digest
+        for entry in prepared.service.load_current_project_map(prepared.project_id).entries
+    }
+    followups = [
+        _verify_context_followup(
+            prepared,
+            job,
+            jobs=jobs,
+            baseline=baseline,
+            initial_paths=initial_paths,
+            project_map=project_map,
+        )
+        for job in jobs
+        if ":context:" in job["checkpoint_key"]
+    ]
+    document.update({"context_jobs": followups, "actions": drive["actions"], "reason": None})
+    result: dict[str, Any] = {
+        "passed": False,
+        "source_fixture_digest": source_digest,
+        "runtime_path": _SUPERVISOR_RUNTIME_PATH,
+        "actions": drive["actions"],
+        "context_jobs": followups,
+    }
+    if not followups:
+        if drive["blocker_code"] == "CONTEXT_REQUIRED":
+            failure = _cell_failure(
+                "E2E05_CONTEXT_REQUIRED_NOT_AUTO_RESOLVED",
+                f"후속 준비 job 없이 질문 경계로 멈췄습니다: {drive['detail']}",
+            )
+        elif not drive["completed"]:
+            failure = _cell_failure(
+                "E2E05_RUN_BLOCKED", f"{drive['blocker_code']}: {drive['detail']}"
+            )
+        else:
+            failure = _cell_failure(
+                "E2E05_CONTEXT_REQUEST_NOT_OBSERVED",
+                "준비 역할이 ContextRequest를 내지 않아 후속 준비 job이 없습니다.",
+                QualificationFailureClass.MODEL,
+            )
+        document["reason"] = failure["failure_code"]
+        _write_json(path, document)
+        return result | failure
+    checks = {
+        "context_followups_verified": all(all(item["checks"].values()) for item in followups),
+        **_goal_completion_checks(prepared),
+    }
+    result.update({"checks": checks, "passed": drive["completed"] and all(checks.values())})
+    if not drive["completed"]:
+        result.update(
+            _cell_failure("E2E05_RUN_BLOCKED", f"{drive['blocker_code']}: {drive['detail']}")
+        )
+    elif not result["passed"]:
+        failed = [
+            f"{item['job_id']}:{_failed_checks(item['checks'])}"
+            for item in followups
+            if not all(item["checks"].values())
+        ]
+        result.update(
+            _cell_failure(
+                "E2E05_CONTEXT_BINDING_NOT_VERIFIED",
+                f"failed_checks=[{_failed_checks(checks)}], followups={failed}",
+            )
+        )
+    document["reason"] = result.get("failure_code")
+    _write_json(path, document)
+    return result
+
+
 def _responsibility_outcome(
     *,
     scenario: str,
@@ -4288,6 +5935,47 @@ def _responsibility_outcome(
             ("authorization", "plan", "finding", "ledger"),
             (EvidenceProvenance.LIVE,),
         ),
+        # fault 주입 없이 live 실행 전후 전체 트리 digest와 final report만 쓴다.
+        "read-only-report": (
+            "E2E-03",
+            ("task_execution", "independent_validation", "goal_verdict"),
+            ("source_digest", "evidence", "goal_verdict", "final_report"),
+            (EvidenceProvenance.LIVE,),
+        ),
+        # live 실행 위에 Worker usage 가림과 늦은 전달만 주입한다.
+        "usage-missing-late": (
+            "E2E-06",
+            ("task_execution", "independent_validation", "goal_verdict"),
+            ("runtime_receipt", "usage_observation", "ledger", "goal_verdict"),
+            (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
+        ),
+        # fault 주입 없이 live Plan의 DAG 실행 순서를 원장 History로만 판정한다.
+        "multi-task-dag": (
+            "E2E-02",
+            ("task_execution", "independent_validation", "goal_verdict"),
+            ("plan", "ledger", "runtime_receipt", "validation", "goal_verdict"),
+            (EvidenceProvenance.LIVE,),
+        ),
+        # live 실행 위에 첫 Worker 결과 되돌림만 주입한다. 분류·repair는 실제 Core 경로다.
+        "approved-repair": (
+            "E2E-04",
+            (
+                "task_execution",
+                "recovery",
+                "task_execution",
+                "independent_validation",
+                "goal_verdict",
+            ),
+            ("failure", "recovery_assessment", "ledger", "validation"),
+            (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
+        ),
+        # ContextRequest를 주입하지 않는다. supervisor 후속 준비 job만 증거로 쓴다.
+        "context-discovery": (
+            "E2E-05",
+            ("context_discovery", "task_execution", "independent_validation", "goal_verdict"),
+            ("context_request", "file", "prompt_binding", "validation"),
+            (EvidenceProvenance.LIVE,),
+        ),
     }
     responsibility_id, suffix, evidence_kinds, provenance = mapping[scenario]
     artifact_by_kind = {
@@ -4316,6 +6004,15 @@ def _responsibility_outcome(
         "fault_injection": cell_root / "fault-injection.json",
         "authorization": cell_root / "authorization-observation.json",
         "finding": cell_root / "scope-check.json",
+        "goal_verdict": cell_root / "state" / "flowmarshal-engine.sqlite3",
+        "evidence": cell_root / "state" / "flowmarshal-engine.sqlite3",
+        "final_report": cell_root / "final-report.json",
+        "usage_observation": cell_root / "usage-observation.json",
+        "failure": cell_root / "state" / "flowmarshal-engine.sqlite3",
+        "recovery_assessment": cell_root / "state" / "flowmarshal-engine.sqlite3",
+        "context_request": cell_root / "context-discovery.json",
+        "file": cell_root / "context-discovery.json",
+        "prompt_binding": cell_root / "context-discovery.json",
     }
     evidence_records = tuple(
         build_qualification_evidence_record(
@@ -4425,8 +6122,15 @@ def _contract(
     from .worker_prompt import assemble_worker_prompt, PromptArtifactStore
     from .roles import strict_json_output_schema
     suite = qualification_suite_manifest(root)
+    # cell마다 실제로 쓰는 fixture·요청 원문·승인 여부를 같은 digest에 결속한다.
     fixture_digests = tuple(
-        sha256_digest({"scenario": scenario, "source_fixture_digest": source_digest})
+        sha256_digest(
+            {
+                "scenario": scenario,
+                "source_fixture_digest": source_digest,
+                "scenario_plan": asdict(_E2E_SCENARIO_PLANS[scenario]),
+            }
+        )
         for scenario in E2E_SCENARIOS
     )
     return EvaluationContract(
@@ -4471,7 +6175,14 @@ def _contract(
                                     "validator": inspect.getsource(EngineDispatcher._role_for_attempt),
                                     "fixture_contract": inspect.getsource(_prepare_from_raw_request),
                                     "authority_cells": {
-                                        "requests": [_E2E_SOURCE_REQUEST, _PROHIBITED_EFFECT_REQUEST],
+                                        "requests": [
+                                            _E2E_SOURCE_REQUEST,
+                                            _PROHIBITED_EFFECT_REQUEST,
+                                            _READ_ONLY_REPORT_REQUEST,
+                                            _MULTI_TASK_DAG_REQUEST,
+                                            _APPROVED_REPAIR_REQUEST,
+                                            _CONTEXT_DISCOVERY_REQUEST,
+                                        ],
                                         "ledger_rows": _LEDGER_ROWS,
                                         "sources": [
                                             inspect.getsource(item)
@@ -4484,6 +6195,25 @@ def _contract(
                                                 _StubPlanExpanderRunner,
                                                 _prohibited_effect_blocked,
                                                 _scope_expansion_blocked,
+                                                _workspace_files,
+                                                _workspace_tree_digest,
+                                                _read_only_report,
+                                                _RuntimeObservationLayer,
+                                                UsageWithholdingRuntime,
+                                                _worker_usage_accounting,
+                                                _usage_missing_late,
+                                                _independent_goal_test_evidence_count,
+                                                _load_plan,
+                                                _drive_application,
+                                                _goal_completion_checks,
+                                                _dag_execution_order,
+                                                _multi_task_dag,
+                                                ImplementationFaultRuntime,
+                                                _failed_deterministic_observation,
+                                                _repair_chain,
+                                                _approved_repair,
+                                                _verify_context_followup,
+                                                _context_discovery,
                                             )
                                         ],
                                     },
@@ -4528,12 +6258,13 @@ def _bind_project_e2e_candidate_wheel(
 
 
 def _project_e2e_fixture_source_digest(base: Path) -> str:
-    fixture_source = base / "tests" / "fixtures" / "engine" / "project-e2e"
+    """scenario 표가 쓰는 모든 project E2E fixture 디렉터리를 하나의 digest로 덮는다."""
+
+    fixtures = base / "tests" / "fixtures" / "engine"
     return sha256_digest(
         {
-            path.relative_to(fixture_source).as_posix(): sha256_bytes(path.read_bytes())
-            for path in sorted(fixture_source.rglob("*"))
-            if path.is_file() and "__pycache__" not in path.parts
+            name: _fixture_directory_digest(fixtures / name)
+            for name in sorted({plan.fixture for plan in _E2E_SCENARIO_PLANS.values()})
         }
     )
 
@@ -4743,10 +6474,15 @@ def run_project_e2e(
                         prepared.service, prepared.project_id, evaluation_policies
                     )
                 else:
+                    scenario_plan = _E2E_SCENARIO_PLANS[scenario]
                     cell_root.mkdir(parents=True)
-                    workspace, copied_digest = _copy_fixture(base, cell_root)
-                    if copied_digest != source_digest:
+                    workspace, _copied_digest = _copy_fixture(
+                        base, cell_root, scenario_plan.fixture
+                    )
+                    if _project_e2e_fixture_source_digest(base) != source_digest:
                         raise QualificationRunError("복사 직전 E2E fixture digest가 변경됐습니다.")
+                    # prepare 앞에서만 만든다. .git은 inventory digest 밖이라 STALE을 만들지 않는다.
+                    _initialize_workspace_git(workspace)
                     prepared = _prepare_from_raw_request(
                         workspace=workspace,
                         state_root=cell_root / "state",
@@ -4755,12 +6491,8 @@ def run_project_e2e(
                         evaluation_policies=evaluation_policies,
                         evaluation_contract_digest=contract.contract_digest,
                         fixture_digest=digest,
-                        source_request=(
-                            _PROHIBITED_EFFECT_REQUEST
-                            if scenario == "prohibited-effect"
-                            else _E2E_SOURCE_REQUEST
-                        ),
-                        authorize=scenario != "scope-expansion",
+                        source_request=scenario_plan.source_request,
+                        authorize=scenario_plan.authorize,
                     )
                     _write_prepared_state(
                         cell_root,
@@ -4867,6 +6599,50 @@ def run_project_e2e(
                                 roles=roles,
                                 evaluation_contract_digest=contract.contract_digest,
                                 fixture_digest=digest,
+                                governance=governance,
+                            )
+                        elif scenario == "read-only-report":
+                            cell = _read_only_report(
+                                prepared,
+                                recorded,
+                                source_digest,
+                                cell_root=cell_root,
+                                roles=roles,
+                                governance=governance,
+                            )
+                        elif scenario == "usage-missing-late":
+                            cell = _usage_missing_late(
+                                prepared,
+                                recorded,
+                                source_digest,
+                                cell_root=cell_root,
+                                roles=roles,
+                                governance=governance,
+                            )
+                        elif scenario == "multi-task-dag":
+                            cell = _multi_task_dag(
+                                prepared,
+                                recorded,
+                                source_digest,
+                                roles=roles,
+                                governance=governance,
+                            )
+                        elif scenario == "approved-repair":
+                            cell = _approved_repair(
+                                prepared,
+                                recorded,
+                                source_digest,
+                                cell_root=cell_root,
+                                roles=roles,
+                                governance=governance,
+                            )
+                        elif scenario == "context-discovery":
+                            cell = _context_discovery(
+                                prepared,
+                                recorded,
+                                source_digest,
+                                cell_root=cell_root,
+                                roles=roles,
                                 governance=governance,
                             )
                         else:

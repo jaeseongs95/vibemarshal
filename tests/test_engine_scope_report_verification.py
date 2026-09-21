@@ -196,6 +196,11 @@ class ScopeReportVerificationTests(unittest.TestCase):
             "partial-write-resume": "E2E-12",
             "prohibited-effect": "E2E-14",
             "scope-expansion": "E2E-15",
+            "read-only-report": "E2E-03",
+            "usage-missing-late": "E2E-06",
+            "multi-task-dag": "E2E-02",
+            "approved-repair": "E2E-04",
+            "context-discovery": "E2E-05",
         }
         cells: list[EvaluationCellCheckpoint] = []
         first_evidence_path: Path | None = None

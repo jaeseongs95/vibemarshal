@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import nullcontext
 from .capabilities import role_execution_scope
 
+import functools
 import json
 import hashlib
 import inspect
@@ -61,7 +62,12 @@ from .operation_trace import (
     current_operation_trace_scope,
     use_operation_trace_scope,
 )
-from .service import ContextRequiredError, EngineService, EngineServiceError
+from .service import (
+    ContextRequiredError,
+    EngineService,
+    EngineServiceError,
+    StaleExecutionInputError,
+)
 from .recovery import (
     FAILURE_DIAGNOSIS_PROVENANCE,
     FAILURE_REPAIR_ACTIONS,
@@ -2731,15 +2737,24 @@ class EngineDispatcher:
                 "ORDER BY position LIMIT 1",
                 (project_id,),
             ).fetchone()
+            # 같은 프로젝트는 직렬 실행한다. 이미 준비·실행·검사 중인 Task가 있으면
+            # 다음 ready Task의 Execution Spec을 materialize하지 않는다. 독립 Task를
+            # 미리 materialize하면 앞 Task의 쓰기가 그 입력을 stale로 만든다.
+            in_flight = connection.execute(
+                "SELECT id FROM task_contracts WHERE project_id = ? "
+                "AND status IN ('materialized','reserved','running','validating') LIMIT 1",
+                (project_id,),
+            ).fetchone()
             plan_row = connection.execute(
                 "SELECT payload_json FROM plan_revisions WHERE id = ?",
                 (project["active_plan_revision_id"],),
             ).fetchone()
         if validating is not None:
             return self._advance_validation(validating)
-        if ready is not None:
+        if ready is not None and in_flight is None:
             self.service.assert_project_authorized(project_id)
             inventory = None
+            context_followup = None
             existing_preparation_job = None
             if self.supervisor is not None:
                 with self.service.ledger.read() as connection:
@@ -2778,7 +2793,7 @@ class EngineDispatcher:
                                 f"{job.job_id if job else 'terminal'}"
                             ),
                         )
-                    prepared_spec, inventory = prepared
+                    prepared_spec, inventory, context_followup = prepared
                     if prepared_spec.context_request is not None:
                         return RunOnceOutcome(
                             action=RunOnceAction.BLOCKED, project_id=project_id, task_id=ready["id"],
@@ -2846,6 +2861,14 @@ class EngineDispatcher:
             try:
                 spec = self.service.compile_execution_spec(proposal, inventory=inventory)
             except ContextRequiredError as error:
+                # 준비 역할이 ContextRequest 대신 Map 밖 source를 context_needs에 바로 적은
+                # 경우도 같은 로컬 해소·후속 job 한 번으로 처리한다.
+                if context_followup is not None and context_followup(request=error.request):
+                    return RunOnceOutcome(
+                        action=RunOnceAction.DISPATCHED, project_id=project_id,
+                        task_id=ready["id"],
+                        detail="Map 밖 context need를 해소하고 후속 준비 job을 예약했습니다.",
+                    )
                 return RunOnceOutcome(
                     action=RunOnceAction.BLOCKED, project_id=project_id, task_id=ready["id"],
                     blocker_code="CONTEXT_REQUIRED", detail=error.request.model_dump_json(),
@@ -2860,7 +2883,23 @@ class EngineDispatcher:
         if materialized is not None:
             # stale 입력은 steward를 포함한 어떤 provider 효과보다 먼저 차단한다.
             # gate 뒤 reserve_attempt도 같은 검사를 반복해 TOCTOU를 막는다.
-            self.service.assert_execution_inputs_current(materialized["id"])
+            def stale_blocked(error: StaleExecutionInputError) -> RunOnceOutcome:
+                # stale 입력을 묵시적으로 재승인하지 않되, 예외를 run_once 밖으로
+                # 내보내 run 전체를 끝내지도 않는다. 효과 전 preflight 차단과 같은
+                # 형태로 정확한 blocker와 바뀐 입력을 돌려준다.
+                changed = ", ".join(sorted({
+                    str(item.get("path") or item["kind"]) for item in error.changes
+                }))
+                return RunOnceOutcome(
+                    action=RunOnceAction.BLOCKED, project_id=project_id,
+                    task_id=materialized["id"], blocker_code=error.code,
+                    detail=f"{error}: {changed}"[:5000],
+                )
+
+            try:
+                self.service.assert_execution_inputs_current(materialized["id"])
+            except StaleExecutionInputError as error:
+                return stale_blocked(error)
             gated = self._task_gate_decision("before_execution", materialized)
             if isinstance(gated, RunOnceOutcome):
                 return gated
@@ -2870,7 +2909,11 @@ class EngineDispatcher:
                                                     detail=gated)
                 return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=project_id,
                     task_id=materialized["id"], blocker_code="GOVERNANCE_GATE_BLOCKED", detail=gated)
-            attempt = self.service.reserve_attempt(task_id=materialized["id"])
+            try:
+                attempt = self.service.reserve_attempt(task_id=materialized["id"])
+            except StaleExecutionInputError as error:
+                # gate(steward) 사이에 입력이 바뀐 TOCTOU도 같은 BLOCKED로 돌려준다.
+                return stale_blocked(error)
             try:
                 if self.supervisor is None:
                     self._dispatch_reserved(attempt.attempt_id)
@@ -2979,6 +3022,8 @@ class EngineDispatcher:
                     },
                     evidence_ids=evidence_ids,
                     evidence_documents=documents,
+                    failed_attempt_id=validation_failure["attempt_id"],
+                    failed_validation_id=validation_failure["validation_id"],
                 ))
                 automatic = self._automatic_recovery(
                     project_id=project_id,
@@ -3462,8 +3507,12 @@ class EngineDispatcher:
         project_id: str,
         task_id: str,
         supplied_proposal: ExecutionSpecProposal | None,
-    ) -> tuple[Any, ModelInventory] | None:
-        """inventory와 preparation 역할을 job에서 관측하고 다음 tick이 소비한다."""
+    ) -> tuple[Any, ModelInventory, Callable[..., bool] | None] | None:
+        """inventory와 preparation 역할을 job에서 관측하고 다음 tick이 소비한다.
+
+        셋째 값은 이 준비 결과로 아직 Context 후속 job을 쓸 수 있을 때의 예약 함수다.
+        후속 job 결과나 caller가 준 proposal이면 None이다.
+        """
         from .execution import ExecutionPreparation
         with self.service.ledger.read() as connection:
             task = connection.execute(
@@ -3541,10 +3590,102 @@ class EngineDispatcher:
         if job.status not in {RuntimeJobStatus.PROVIDER_TERMINAL, RuntimeJobStatus.CONSUMED}:
             return None
         result = self.service.consume_runtime_job_required_result(job.job_id)
-        return (
-            ExecutionPreparation.model_validate(result["preparation"]),
-            ModelInventory.model_validate(result["model_inventory"]),
+        preparation = ExecutionPreparation.model_validate(result["preparation"])
+        # 후속 준비 job의 응답이 다시 Context를 요구하면 다시 해소하지 않고 질문 경계로 멈춘다.
+        context_followup = (
+            None
+            if supplied_proposal is not None or job.checkpoint_key.startswith(prefix + "context:")
+            else functools.partial(
+                self._schedule_context_followup,
+                project_id=project_id, task_id=task_id, prefix=prefix,
+            )
         )
+        if (
+            preparation.context_request is not None
+            and context_followup is not None
+            and context_followup(request=preparation.context_request)
+        ):
+            return None
+        return (
+            preparation,
+            ModelInventory.model_validate(result["model_inventory"]),
+            context_followup,
+        )
+
+    def _schedule_context_followup(
+        self, *, project_id: str, task_id: str, prefix: str, request: Any,
+    ) -> bool:
+        """허용된 로컬 ContextRequest를 Core가 해소하고 후속 준비 job 하나를 예약한다.
+
+        RuntimeJob 하나는 exact provider turn 하나만 소유하므로 같은 job에서 역할을
+        다시 부르지 않는다. 해소는 로컬 파일 읽기뿐이다. 해소한 source·symbol은 후속
+        job 시작 전에 Project Map에 lazy로 추가해, 후속 준비 입력과 이후 Execution
+        Spec·Worker Prompt가 같은 본문과 전체 파일 digest에 결속되게 한다. checkpoint는
+        요청과 해소 결과 digest에 결속해 재시작 뒤 같은 후속 job을 이어 간다.
+        해소할 source가 없으면(선호·승인 확장 요청 포함) False를 돌려 질문 경계를 유지한다.
+        """
+
+        from .context import resolve_additional_context_request
+
+        resolution = resolve_additional_context_request(
+            project_map=self.service.load_current_project_map(project_id),
+            request=request,
+            token_budget=12_000,
+        )
+        if not resolution.resolved:
+            return False
+        paths = sorted({
+            item.source_ref for item in resolution.resolved
+            if not Path(item.source_ref).is_absolute()
+        })
+        symbols = sorted({hint for need in request.missing_needs for hint in need.symbol_hints})
+        self.service.reobserve_project(
+            project_id,
+            observed_paths=paths,
+            requested_symbols={path: symbols for path in paths} if symbols else None,
+        )
+        followup = {
+            "context_request": request.model_dump(mode="json"),
+            "context_resolution": sorted(
+                (
+                    {
+                        "source_ref": item.source_ref,
+                        "selector": item.selector,
+                        "content_digest": item.content_digest,
+                    }
+                    for item in resolution.resolved
+                ),
+                key=lambda item: (item["source_ref"], item["selector"]),
+            ),
+        }
+
+        def prepare() -> dict[str, Any]:
+            inventory = self.runtime.list_models()
+            result = self.proposal_provider.prepare_task(
+                project_id=project_id,
+                task_id=task_id,
+                inventory=inventory,
+                context_request=request,
+            )
+            return {
+                "preparation": result.model_dump(mode="json"),
+                "model_inventory": inventory.model_dump(mode="json"),
+            }
+
+        self.supervisor.schedule(
+            project_id=project_id, kind=RuntimeJobKind.EXECUTION_SPEC_PREPARE,
+            checkpoint_key=prefix + "context:" + sha256_digest(followup),
+            request={
+                "task_id": task_id,
+                "supplied_proposal_digest": None,
+                "inventory_observation": "runtime_job_owned",
+                **followup,
+            },
+            timeout_seconds=900,
+            target=prepare,
+            task_id=task_id,
+        )
+        return True
 
     def _verify_policy(self, cwd: Path) -> None:
         policy = self.runtime.verify_execution_policy(cwd)

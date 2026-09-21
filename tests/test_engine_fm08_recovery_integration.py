@@ -22,6 +22,7 @@ from flowmarshal.engine.cli import main
 from flowmarshal.engine.domain import (
     ApprovalClass,
     DependencyType,
+    FailureClass,
     IntegrationValidationContract,
     PlanContractDefinition,
     PlanContractRevision,
@@ -298,10 +299,11 @@ class EngineFm08RecoveryIntegrationTests(unittest.TestCase):
         )
 
     def _queue_goal_validation(self, task_id: str) -> None:
+        # 실패한 앞 Attempt의 검사 evidence가 아니라 마지막(통과한) 검사 evidence를 쓴다.
         with self.service.ledger.read() as connection:
             evidence_id = connection.execute(
                 "SELECT id FROM evidence_records WHERE task_id=? AND kind='test' "
-                "ORDER BY rowid LIMIT 1",
+                "ORDER BY rowid DESC LIMIT 1",
                 (task_id,),
             ).fetchone()[0]
         self.runner.responses.setdefault("goal_test_preparation", []).append(
@@ -873,12 +875,18 @@ class EngineFm08RecoveryIntegrationTests(unittest.TestCase):
         self.assertEqual("unclassified", recovery["classification"]["failure_class"])
         self.assertEqual("user_decision", recovery["next_action"]["mode"])
 
-    def test_worker_completion_claim_without_evidence_does_not_complete_the_task(self) -> None:
-        """Worker의 완료 선언은 Task 완료가 아니며 복구 근거는 직접 검사 evidence다."""
+    def test_worker_completion_claim_is_not_completion_and_failed_check_exit_routes_to_repair(self) -> None:
+        """Worker의 완료 선언은 Task 완료가 아니며 복구 근거는 직접 검사 evidence다.
+
+        E2E-04 결정으로 기대값이 바뀌었다. 예전에는 이 자리에서
+        TASK_VALIDATION_RECOVERY_REQUIRED(unclassified)로 멈췄다. 이제는 Engine이 직접
+        실행한 검사의 종료 코드가 기대 밖이라는 typed 관측을 implementation 직접 근거로
+        보고 자동 task_repair로 간다. 완료 자칭 응답은 여전히 근거가 아니다.
+        """
 
         task_id = self._prepare()
         self._authorize()
-        _attempt, binding = self._dispatch_worker(task_id)
+        attempt_id, binding = self._dispatch_worker(task_id)
         # 파일을 바꾸지 않고 완료만 자칭한다.
         self.runtime.complete(
             binding.thread_id, response='{"status": "completed", "result": "done"}'
@@ -901,24 +909,186 @@ class EngineFm08RecoveryIntegrationTests(unittest.TestCase):
         self.assertIn("fail", [row["status"] for row in results])
         self.assertEqual(0, self._ledger_counts()["assessments"])
 
-        # Worker의 완료 선언은 provider code도 직접 실패 근거도 아니므로 자동 복구를
-        # 시작하지 않고 실패 validation 근거를 요구하는 사용자 결정으로 멈춘다.
-        stopped = self.application.run_once(self.project_id)
-        self.assertEqual(RunOnceAction.BLOCKED, stopped.action, stopped)
-        self.assertEqual("TASK_VALIDATION_RECOVERY_REQUIRED", stopped.blocker_code)
+        # Worker의 완료 선언은 provider code도 직접 실패 근거도 아니다. 자동 복구를 여는
+        # 근거는 직접 실행한 검사의 기대 밖 종료 코드 관측이다(E2E-04 결정 전에는
+        # 여기서 TASK_VALIDATION_RECOVERY_REQUIRED로 멈췄다).
         recovery = self.application.status(self.project_id)["recovery"]
         self.assertIsNotNone(recovery["classification"])
-        self.assertEqual("unclassified", recovery["classification"]["basis"])
+        self.assertEqual("implementation", recovery["classification"]["failure_class"])
+        self.assertEqual("direct_evidence", recovery["classification"]["basis"])
+        self.assertEqual(attempt_id, recovery["classification"]["attempt_id"])
         self.assertEqual(
-            stopped.validation_result_id,
+            validated.validation_result_id,
             recovery["classification"]["validation_result_id"],
         )
         self.assertEqual([], self._codes(recovery, "model_reported"))
-        self.assertEqual("user_decision", recovery["next_action"]["mode"])
-        self.assertEqual(
-            "TASK_VALIDATION_RECOVERY_REQUIRED", recovery["next_action"]["blocker_code"]
-        )
+        self.assertEqual("automatic", recovery["next_action"]["mode"])
+        self.assertEqual("task_repair", recovery["next_action"]["suggested_repair_action"])
         self.assertEqual(0, self._ledger_counts()["recovery_history"])
+
+        recovered = self._run_until(RunOnceAction.RECOVERED)
+        self.assertEqual(attempt_id, recovered.attempt_id)
+        self.assertEqual(validated.validation_result_id, recovered.validation_result_id)
+        self.assertEqual(1, self._ledger_counts()["recovery_history"])
+
+    # --- E2E-04: 직접 검사 실패의 implementation 분류와 자동 repair ----
+
+    def _complete_without_change(self, binding: ThreadBinding):
+        """Worker가 파일을 바꾸지 않고 성공 종료해 Task 검사가 exit 1로 FAIL하게 한다."""
+
+        self.runtime.complete(binding.thread_id, response='{"status": "completed"}')
+        validated = self._run_until(RunOnceAction.VALIDATED)
+        failed = self.application.run_once(self.project_id)
+        self.assertEqual(RunOnceAction.BLOCKED, failed.action, failed)
+        self.assertEqual("TASK_VALIDATION_FAILED", failed.blocker_code)
+        return validated
+
+    def test_failed_validation_exit_code_repairs_automatically_and_goal_is_satisfied(self) -> None:
+        """Worker 성공 → 결정적 검사 FAIL → 자동 repair → Attempt 2 → Task·Goal 완료."""
+
+        task_id = self._prepare()
+        self._authorize()
+        first_attempt, first_binding = self._dispatch_worker(task_id)
+        validated = self._complete_without_change(first_binding)
+
+        recovered = self._run_until(RunOnceAction.RECOVERED)
+        self.assertEqual(first_attempt, recovered.attempt_id)
+        self.assertEqual(validated.validation_result_id, recovered.validation_result_id)
+        # 바뀐 입력이 없으므로 같은 ExecutionSpec으로 새 Worker Attempt를 연다. 파일은
+        # repair 입력 보호를 건드리지 않도록 새 Attempt dispatch 뒤에만 고친다.
+        second = self.application.run_once(self.project_id)
+        self.assertEqual(RunOnceAction.DISPATCHED, second.action, second)
+        self.assertNotEqual(first_attempt, second.attempt_id)
+        second_binding = self._worker_binding(second.attempt_id)
+        self.app_file.write_text("value = 2\n", encoding="utf-8")
+        self.runtime.complete(second_binding.thread_id, response="repair complete")
+        self._run_until(RunOnceAction.VALIDATED)
+        self._queue_goal_validation(task_id)
+        completed = self._run_until(RunOnceAction.COMPLETED)
+        if completed.goal_verdict_id is None:
+            completed = self._run_until(RunOnceAction.COMPLETED)
+        report = self.application.final_report(
+            self.project_id, goal_verdict_id=completed.goal_verdict_id
+        )
+        self.assertEqual("satisfied", report.verdict.status.value)
+
+        with self.service.ledger.read() as connection:
+            attempts = connection.execute(
+                "SELECT id,attempt_no,status,failure_class FROM attempts "
+                "WHERE task_id=? AND kind='execution' ORDER BY attempt_no",
+                (task_id,),
+            ).fetchall()
+            assessments = [
+                json.loads(row["payload_json"]) for row in connection.execute(
+                    "SELECT payload_json FROM recovery_assessments WHERE project_id=?",
+                    (self.project_id,),
+                )
+            ]
+            validations = [row["status"] for row in connection.execute(
+                "SELECT status FROM validation_results WHERE task_id=? ORDER BY rowid",
+                (task_id,),
+            )]
+            failed_evidence = json.loads(connection.execute(
+                "SELECT payload_json FROM validation_results WHERE id=?",
+                (validated.validation_result_id,),
+            ).fetchone()["payload_json"])["evidence_ids"]
+            task_status = connection.execute(
+                "SELECT status FROM task_contracts WHERE id=?", (task_id,)
+            ).fetchone()[0]
+        self.assertEqual(
+            [(first_attempt, 1, "succeeded", None), (second.attempt_id, 2, "succeeded", None)],
+            [tuple(row) for row in attempts],
+        )
+        self.assertEqual(
+            [(first_attempt, "task_repair", "implementation")],
+            [(item["attempt_id"], item["action"], item["failure_class"]) for item in assessments],
+        )
+        # assessment 근거는 실패한 검사 결과에 결속된 직접 evidence뿐이다.
+        self.assertTrue(assessments[0]["new_evidence_ids"])
+        self.assertLessEqual(set(assessments[0]["new_evidence_ids"]), set(failed_evidence))
+        self.assertEqual(["fail", "pass"], validations)
+        self.assertEqual("completed", task_status)
+
+    def test_repeated_failed_validation_stops_at_the_same_failure_recovery_limit(self) -> None:
+        """같은 검사 실패가 반복되면 Task recovery 한도 2회 뒤 SAME_FAILURE_RECOVERY_LIMIT로 멈춘다."""
+
+        task_id = self._prepare()
+        self._authorize()
+        attempt_id, binding = self._dispatch_worker(task_id)
+        for ordinal in (1, 2, 3):
+            self._complete_without_change(binding)
+            outcome = self._settle()
+            if ordinal < 3:
+                self.assertEqual(RunOnceAction.RECOVERED, outcome.action, outcome)
+                self.assertEqual(attempt_id, outcome.attempt_id)
+                dispatched = self.application.run_once(self.project_id)
+                self.assertEqual(RunOnceAction.DISPATCHED, dispatched.action, dispatched)
+                attempt_id = dispatched.attempt_id
+                binding = self._worker_binding(attempt_id)
+            else:
+                self.assertEqual(RunOnceAction.BLOCKED, outcome.action, outcome)
+                self.assertEqual("SAME_FAILURE_RECOVERY_LIMIT", outcome.blocker_code)
+        again = self.application.run_once(self.project_id)
+        self.assertEqual("SAME_FAILURE_RECOVERY_LIMIT", again.blocker_code, again)
+
+        recovery = self.application.status(self.project_id)["recovery"]
+        self.assertEqual("user_decision_required", recovery["state"])
+        self.assertEqual("implementation", recovery["classification"]["failure_class"])
+        self.assertEqual(
+            "SAME_FAILURE_RECOVERY_LIMIT", recovery["next_action"]["blocker_code"]
+        )
+        with self.service.ledger.read() as connection:
+            attempts = connection.execute(
+                "SELECT status,failure_class FROM attempts WHERE task_id=? "
+                "AND kind='execution' ORDER BY attempt_no",
+                (task_id,),
+            ).fetchall()
+            validations = [row["status"] for row in connection.execute(
+                "SELECT status FROM validation_results WHERE task_id=? ORDER BY rowid",
+                (task_id,),
+            )]
+        self.assertEqual([("succeeded", None)] * 3, [tuple(row) for row in attempts])
+        self.assertEqual(["fail", "fail", "fail"], validations)
+        counts = self._ledger_counts()
+        self.assertEqual(2, counts["assessments"])
+        self.assertEqual(2, counts["recovery_history"])
+
+    def test_failed_validation_repair_requires_implementation_to_be_retryable(self) -> None:
+        """Plan이 implementation 자동 복구를 허용하지 않으면 분류돼도 자동 repair를 열지 않는다."""
+
+        plan = self.runner.responses["plan_expander"][0]
+        plan["tasks"][0]["recovery"]["retryable_failure_classes"] = ["context"]
+        task_id = self._prepare()
+        self._authorize()
+        _attempt, binding = self._dispatch_worker(task_id)
+        self._complete_without_change(binding)
+
+        blocked = self._settle()
+        self.assertEqual(RunOnceAction.BLOCKED, blocked.action, blocked)
+        self.assertEqual("RECOVERY_NOT_AUTHORIZED", blocked.blocker_code)
+        recovery = self.application.status(self.project_id)["recovery"]
+        self.assertEqual("implementation", recovery["classification"]["failure_class"])
+        self.assertEqual("RECOVERY_NOT_AUTHORIZED", recovery["next_action"]["blocker_code"])
+        counts = self._ledger_counts()
+        self.assertEqual(0, counts["assessments"])
+        self.assertEqual(0, counts["recovery_history"])
+
+    def test_plan_expander_request_carries_strict_retryable_failure_class_rules(self) -> None:
+        """plan_expander 지침과 provider schema가 retryable_failure_classes의 허용 값을 명시한다."""
+
+        self._prepare()
+        call = next(item for item in self.runner.calls if item.role == "plan_expander")
+        self.assertIn("recovery.retryable_failure_classes", call.instructions)
+        self.assertIn("implementation을 넣고", call.instructions)
+        rendered = json.dumps(call.output_schema, ensure_ascii=False)
+        failure_class_enums = [
+            node["enum"] for node in call.output_schema.get("$defs", {}).values()
+            if isinstance(node, dict) and node.get("title") == "FailureClass"
+        ]
+        self.assertEqual(
+            [[item.value for item in FailureClass]], failure_class_enums
+        )
+        self.assertIn("대문자·다른 표기는 정규화하지 않고 거부한다", rendered)
 
     # --- 반복 차단 -----------------------------------------------------
 
