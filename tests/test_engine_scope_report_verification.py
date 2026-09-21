@@ -187,6 +187,9 @@ class ScopeReportVerificationTests(unittest.TestCase):
             "forced-termination-no-duplicate": "E2E-09",
             "absolute-timeout-no-duplicate": "E2E-10",
             "cancel-active-job": "E2E-16",
+            "partial-write-input-changed": "E2E-13",
+            "in-flight-replan-protection": "E2E-17",
+            "partial-write-resume": "E2E-12",
         }
         cells: list[EvaluationCellCheckpoint] = []
         first_evidence_path: Path | None = None

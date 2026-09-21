@@ -191,16 +191,33 @@ def reuse_completed_tasks(service: Any, tx: Any, plan: PlanContractRevision, pre
                 continue
             origin = tx.maybe_one("SELECT * FROM task_completion_reuse WHERE task_id = ?", (old.task_id,))
             source_task_id = old.task_id if origin is None else origin["source_task_id"]
+
+            def reject(reason: str) -> None:
+                tx.history(
+                    task.project_id,
+                    "task.completion_reuse_rejected",
+                    "task_contract",
+                    task.task_id,
+                    {
+                        "source_task_id": source_task_id,
+                        "source_plan_revision_id": previous_id,
+                        "reason": reason,
+                    },
+                )
+
             completion = tx.maybe_one("SELECT payload_json FROM history_events WHERE entity_id = ? "
                                      "AND event_type = 'task.completed' ORDER BY sequence DESC LIMIT 1", (source_task_id,))
             if completion is None:
+                reject("COMPLETION_EVENT_MISSING")
                 continue
             checkpoint = json.loads(completion["payload_json"]).get("reuse_checkpoint")
             if checkpoint is None or observation_checkpoint(service, tx.connection, source_task_id) != checkpoint:
+                reject("REUSE_CHECKPOINT_STALE_OR_MISSING")
                 continue
             validations = service.effective_task_validation_results(tx.connection, source_task_id)
             latest = {row["validation_id"]: row for row in validations}
             if set(latest) != {item.validation_id for item in task.validations}:
+                reject("VALIDATION_SET_MISMATCH")
                 continue
             if origin is not None:
                 inherited = {row["validation_id"]: row for row in
@@ -210,6 +227,7 @@ def reuse_completed_tasks(service: Any, tx: Any, plan: PlanContractRevision, pre
                 bound_ids = set(json.loads(origin["validation_ids_json"]))
                 if ({row["id"] for row in inherited.values()} != bound_ids
                         or {row["id"] for row in latest.values()} != bound_ids):
+                    reject("INHERITED_VALIDATION_BINDING_MISMATCH")
                     continue
             evidence_ids: set[str] = set()
             valid = True
@@ -228,6 +246,7 @@ def reuse_completed_tasks(service: Any, tx: Any, plan: PlanContractRevision, pre
                     break
                 evidence_ids.update(result.evidence_ids)
             if not valid:
+                reject("EVIDENCE_INVALID_OR_INSUFFICIENT")
                 continue
             # 후속 Task에 필요한 현재 Worker 파일만 연결한다. 실패 시도·미검증 보고서는 제외한다.
             evidence_ids.update(_verified_worker_files(service, tx.connection, source_task_id, checkpoint))

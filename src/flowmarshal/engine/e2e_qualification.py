@@ -53,6 +53,8 @@ from .domain import (
     ThreadBinding,
     ValidationContract,
     ValidationExecutionStep,
+    ValidationResult,
+    ValidationStatus,
     new_id,
     utc_now,
 )
@@ -123,7 +125,7 @@ from .runtime import (
     RuntimeOperationReceipt,
 )
 from .role_execution import use_role_timeout_policy
-from .service import EngineService, EngineServiceError
+from .service import EngineService, EngineServiceError, PlanStateSnapshotStaleError
 
 
 E2E_SCENARIOS = (
@@ -134,6 +136,9 @@ E2E_SCENARIOS = (
     "forced-termination-no-duplicate",
     "absolute-timeout-no-duplicate",
     "cancel-active-job",
+    "partial-write-input-changed",
+    "in-flight-replan-protection",
+    "partial-write-resume",
 )
 
 _RUNTIME_EVENT_SCHEMA = "flowmarshal.project-e2e.runtime-event.v3"
@@ -2140,6 +2145,12 @@ def _read_active_exact_turn(
 
 def _attempt_effect_counts(prepared: PreparedE2E, attempt_id: str) -> dict[str, int]:
     with prepared.service.ledger.read() as connection:
+        calls = connection.execute(
+            "SELECT COUNT(*),COALESCE(SUM(new_turn_count),0),"
+            "COALESCE(SUM(CASE WHEN execution_status='reserved' THEN 1 ELSE 0 END),0) "
+            "FROM provider_calls WHERE attempt_id=?",
+            (attempt_id,),
+        ).fetchone()
         receipts = connection.execute(
             "SELECT COUNT(*),COUNT(DISTINCT provider_operation_id) "
             "FROM runtime_receipts WHERE intent_id IN "
@@ -2147,9 +2158,9 @@ def _attempt_effect_counts(prepared: PreparedE2E, attempt_id: str) -> dict[str, 
             (attempt_id,),
         ).fetchone()
         return {
-            "provider_calls": connection.execute(
-                "SELECT COUNT(*) FROM provider_calls WHERE attempt_id=?", (attempt_id,)
-            ).fetchone()[0],
+            "provider_calls": calls[0],
+            "provider_new_turn_count": calls[1],
+            "provider_reserved_calls": calls[2],
             "runtime_intents": connection.execute(
                 "SELECT COUNT(*) FROM runtime_intents WHERE attempt_id=?", (attempt_id,)
             ).fetchone()[0],
@@ -2174,6 +2185,805 @@ def _write_fault_injection(path: Path, payload: dict[str, Any]) -> dict[str, Any
     document["fault_digest"] = sha256_digest(document)
     _write_json(path, document)
     return document
+
+
+def _execution_fault_paths(prepared: PreparedE2E) -> tuple[Path, Path, dict[str, Any]]:
+    """현재 spec에서 쓰기 target과 별도 immutable 파일을 고른다."""
+
+    with prepared.service.ledger.read() as connection:
+        row = connection.execute(
+            "SELECT payload_json FROM execution_spec_revisions "
+            "WHERE task_id=? AND is_current=1",
+            (prepared.task_id,),
+        ).fetchone()
+    if row is None:
+        raise QualificationRunError("E2E_EXECUTION_SPEC_MISSING")
+    spec = json.loads(row["payload_json"])
+    definition = spec["definition"]
+    mutable = {
+        item["path"]
+        for item in definition["resolved_targets"]
+        if item["access"] in {"write", "create", "delete"}
+    }
+    if not mutable:
+        raise QualificationRunError("E2E_MUTABLE_TARGET_MISSING")
+    mutable_ref = sorted(mutable)[0]
+    immutable_refs = [
+        item["source_ref"]
+        for item in definition["context_manifest"]["fragments"]
+        if item["source_ref"] not in mutable
+        and (prepared.workspace / item["source_ref"]).is_file()
+    ]
+    if not immutable_refs:
+        raise QualificationRunError("E2E_IMMUTABLE_CONTEXT_MISSING")
+    immutable_ref = (
+        "AGENTS.md" if "AGENTS.md" in immutable_refs else sorted(immutable_refs)[0]
+    )
+    return (
+        prepared.workspace / mutable_ref,
+        prepared.workspace / immutable_ref,
+        spec,
+    )
+
+
+def _await_terminal_after_fault(
+    runtime: RecordedRuntime,
+    binding: ThreadBinding,
+    *,
+    timeout_seconds: float,
+) -> Any:
+    deadline = time.monotonic() + timeout_seconds
+    observation = runtime.read(thread_id=binding.thread_id)
+    while observation.active and time.monotonic() < deadline:
+        time.sleep(0.05)
+        observation = runtime.read(thread_id=binding.thread_id)
+    if observation.active or observation.terminal_status is None:
+        raise QualificationRunError("E2E fault 뒤 exact provider turn terminal을 확인하지 못했습니다.")
+    return observation
+
+
+def _partial_write_input_changed(
+    prepared: PreparedE2E,
+    runtime: RecordedRuntime,
+    source_digest: str,
+    *,
+    cell_root: Path,
+    roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
+    timeout_seconds: float = 30,
+) -> dict[str, Any]:
+    """부분 쓰기 뒤 immutable 입력 변경을 구조화해 막고 효과 0을 증명한다."""
+
+    application = EngineApplication(
+        prepared.service,
+        runtime=runtime,
+        role_configuration=roles,
+        governance=governance,
+        supervisor=RuntimeJobSupervisor(
+            prepared.service, runtime, observation_timeout_seconds=5.0
+        ),
+    )
+    try:
+        _materialize_with_application(application, prepared, timeout_seconds=timeout_seconds)
+        dispatched = application.run_once(prepared.project_id)
+        if dispatched.action is not RunOnceAction.DISPATCHED or dispatched.attempt_id is None:
+            raise QualificationRunError("E2E-13 active execution Attempt를 시작하지 못했습니다.")
+        binding, _job_id = _await_active_execution_binding(
+            prepared, dispatched.attempt_id, timeout_seconds=timeout_seconds
+        )
+        _read_active_exact_turn(runtime, binding, scenario="partial-write-input-changed")
+        mutable_path, immutable_path, spec = _execution_fault_paths(prepared)
+        immutable_original = immutable_path.read_bytes()
+        mutable_before = sha256_bytes(mutable_path.read_bytes())
+        runtime.interrupt(thread_id=binding.thread_id, turn_id=binding.turn_id)
+        terminal = _await_terminal_after_fault(
+            runtime, binding, timeout_seconds=timeout_seconds
+        )
+        mutable_path.write_bytes(mutable_path.read_bytes() + b"\n# injected partial write\n")
+        immutable_path.write_bytes(immutable_original + b"\n# injected immutable change\n")
+        fault = _write_fault_injection(
+            cell_root / "fault-injection.json",
+            {
+                "kind": "partial_write_then_immutable_input_change",
+                "attempt_id": dispatched.attempt_id,
+                "thread_id": binding.thread_id,
+                "turn_id": binding.turn_id,
+                "mutable_path": str(mutable_path.relative_to(prepared.workspace)),
+                "mutable_before_digest": mutable_before,
+                "mutable_after_digest": sha256_bytes(mutable_path.read_bytes()),
+                "immutable_path": str(immutable_path.relative_to(prepared.workspace)),
+                "immutable_before_digest": sha256_bytes(immutable_original),
+                "immutable_after_digest": sha256_bytes(immutable_path.read_bytes()),
+                "writer": "qualification_fault_injector",
+            },
+        )
+        before = _journal_operation_counts(runtime.events)
+        effects_before = _attempt_effect_counts(prepared, dispatched.attempt_id)
+        blocked = application.run_once(prepared.project_id)
+        deadline = time.monotonic() + timeout_seconds
+        while (
+            not (
+                blocked.action is RunOnceAction.BLOCKED
+                and blocked.blocker_code == "STALE_EXECUTION_INPUT"
+            )
+            and time.monotonic() < deadline
+        ):
+            time.sleep(0.05)
+            blocked = application.run_once(prepared.project_id)
+        middle = _journal_operation_counts(runtime.events)
+        effects_after_block = _attempt_effect_counts(
+            prepared, dispatched.attempt_id
+        )
+        repeated = application.run_once(prepared.project_id)
+        after = _journal_operation_counts(runtime.events)
+        effects_after_repeat = _attempt_effect_counts(
+            prepared, dispatched.attempt_id
+        )
+        with prepared.service.ledger.read() as connection:
+            attempt = connection.execute(
+                "SELECT status,binding_json FROM attempts WHERE id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+            marker = connection.execute(
+                "SELECT payload_json FROM history_events "
+                "WHERE entity_id IN (SELECT id FROM runtime_intents WHERE attempt_id=?) "
+                "AND event_type='runtime.effect_not_started' "
+                "ORDER BY sequence DESC LIMIT 1",
+                (dispatched.attempt_id,),
+            ).fetchone()
+        marker_payload = None if marker is None else json.loads(marker["payload_json"])
+        changes = () if marker_payload is None else tuple(marker_payload.get("changes", ()))
+        immutable_ref = str(immutable_path.relative_to(prepared.workspace))
+        mutable_ref = str(mutable_path.relative_to(prepared.workspace))
+        passed = all((
+            blocked.action is RunOnceAction.BLOCKED,
+            blocked.blocker_code == "STALE_EXECUTION_INPUT",
+            repeated.action is RunOnceAction.BLOCKED,
+            repeated.blocker_code == "STALE_EXECUTION_INPUT",
+            attempt is not None
+            and attempt["status"] in {"reserved", "starting", "running"},
+            attempt is not None and attempt["binding_json"] is not None,
+            marker_payload is not None,
+            any(
+                item.get("kind") == "immutable_input_changed"
+                and item.get("path") == immutable_ref
+                for item in changes
+            ),
+            any(
+                item.get("kind") == "mutable_target_observation"
+                and item.get("path") == mutable_ref
+                and item.get("changed") is True
+                for item in changes
+            ),
+            middle == after,
+            middle["create_thread"] == before["create_thread"],
+            middle["start_turn"] == before["start_turn"],
+            middle["resume"] == before["resume"],
+            effects_after_repeat == effects_after_block,
+            effects_after_block["runtime_receipts"]
+            == effects_before["runtime_receipts"],
+        ))
+        return {
+            "passed": passed,
+            "source_fixture_digest": source_digest,
+            "partial_effect": fault,
+            "source_digest": {
+                "execution_spec_digest": spec["definition_digest"],
+                "immutable_before": fault["immutable_before_digest"],
+                "immutable_after": fault["immutable_after_digest"],
+            },
+            "error": marker_payload,
+            "effect_count": {
+                "provider_operations": {
+                    key: after[key] - before[key]
+                    for key in ("create_thread", "start_turn", "resume")
+                },
+                "attempt_before_preflight": effects_before,
+                "attempt_after_first_block": effects_after_block,
+                "attempt_after_repeated_block": effects_after_repeat,
+            },
+            "runtime_observation": terminal.model_dump(mode="json"),
+            "repeated_blocker": repeated.blocker_code,
+        }
+    finally:
+        application.close_task_gate()
+
+
+def _partial_write_resume(
+    prepared: PreparedE2E,
+    runtime: RecordedRuntime,
+    source_digest: str,
+    *,
+    cell_root: Path,
+    roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
+    timeout_seconds: float = 30,
+) -> dict[str, Any]:
+    """부분 쓰기 뒤 immutable 입력이 같을 때 같은 thread를 한 번만 재개한다."""
+
+    application = EngineApplication(
+        prepared.service,
+        runtime=runtime,
+        role_configuration=roles,
+        governance=governance,
+        supervisor=RuntimeJobSupervisor(
+            prepared.service, runtime, observation_timeout_seconds=5.0
+        ),
+    )
+    try:
+        _materialize_with_application(application, prepared, timeout_seconds=timeout_seconds)
+        dispatched = application.run_once(prepared.project_id)
+        if dispatched.action is not RunOnceAction.DISPATCHED or dispatched.attempt_id is None:
+            raise QualificationRunError("E2E-12 active execution Attempt를 시작하지 못했습니다.")
+        binding, _job_id = _await_active_execution_binding(
+            prepared, dispatched.attempt_id, timeout_seconds=timeout_seconds
+        )
+        _read_active_exact_turn(runtime, binding, scenario="partial-write-resume")
+        mutable_path, _immutable_path, _spec = _execution_fault_paths(prepared)
+        before_digest = sha256_bytes(mutable_path.read_bytes())
+        runtime.interrupt(thread_id=binding.thread_id, turn_id=binding.turn_id)
+        _await_terminal_after_fault(runtime, binding, timeout_seconds=timeout_seconds)
+        mutable_path.write_bytes(mutable_path.read_bytes() + b"\n# injected partial write\n")
+        fault = _write_fault_injection(
+            cell_root / "fault-injection.json",
+            {
+                "kind": "partial_write_with_immutable_inputs_preserved",
+                "attempt_id": dispatched.attempt_id,
+                "thread_id": binding.thread_id,
+                "turn_id": binding.turn_id,
+                "mutable_path": str(mutable_path.relative_to(prepared.workspace)),
+                "mutable_before_digest": before_digest,
+                "mutable_after_digest": sha256_bytes(mutable_path.read_bytes()),
+                "writer": "qualification_fault_injector",
+            },
+        )
+        effect_counts_before = _attempt_effect_counts(
+            prepared, dispatched.attempt_id
+        )
+        before = _journal_operation_counts(runtime.events)
+        resumed = application.run_once(prepared.project_id)
+        deadline = time.monotonic() + timeout_seconds
+        while runtime.resume_calls == before["resume"] and time.monotonic() < deadline:
+            time.sleep(0.05)
+            resumed = application.run_once(prepared.project_id)
+        with prepared.service.ledger.read() as connection:
+            row = connection.execute(
+                "SELECT binding_json FROM attempts WHERE id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+            dispatching = connection.execute(
+                "SELECT payload_json FROM history_events "
+                "WHERE project_id=? AND event_type='runtime.effect_dispatching' "
+                "AND json_extract(payload_json,'$.attempt_id')=? "
+                "AND json_extract(payload_json,'$.mutable_target_resume')=1 "
+                "ORDER BY sequence DESC LIMIT 1",
+                (prepared.project_id, dispatched.attempt_id),
+            ).fetchone()
+        resumed_binding = ThreadBinding.model_validate_json(row["binding_json"])
+        after_resume = _journal_operation_counts(runtime.events)
+    finally:
+        application.close_task_gate()
+
+    completion = _normal_completion(
+        prepared,
+        runtime,
+        source_digest,
+        roles=roles,
+        governance=governance,
+    )
+    after = _journal_operation_counts(runtime.events)
+    effect_counts_after = _attempt_effect_counts(prepared, dispatched.attempt_id)
+    passed = bool(completion.get("passed")) and all((
+        resumed.action is RunOnceAction.DISPATCHED,
+        resumed_binding.thread_id == binding.thread_id,
+        resumed_binding.turn_id != binding.turn_id,
+        after_resume["create_thread"] == before["create_thread"],
+        after_resume["resume"] == before["resume"] + 1,
+        after["resume"] == before["resume"] + 1,
+        effect_counts_after["runtime_receipts"]
+        == effect_counts_after["distinct_provider_operation_ids"],
+        dispatching is not None,
+    ))
+    return {
+        **completion,
+        "passed": passed,
+        "partial_effect": fault,
+        "binding": {
+            "before": binding.model_dump(mode="json"),
+            "after": resumed_binding.model_dump(mode="json"),
+        },
+        "runtime_observation": {
+            "resume_action": resumed.action.value,
+            "operation_counts_before": before,
+            "operation_counts_after_resume": after_resume,
+            "operation_counts_after_completion": after,
+            "attempt_effect_counts_before": effect_counts_before,
+            "attempt_effect_counts_after": effect_counts_after,
+        },
+        "validation": {
+            "pass_validation_count": completion.get("pass_validation_count"),
+            "goal_verdict_count": completion.get("goal_verdict_count"),
+        },
+    }
+
+
+def _register_equivalent_plan_revision(
+    prepared: PreparedE2E,
+    *,
+    base_plan_revision_id: str | None = None,
+) -> tuple[PlanContractRevision, TaskContract]:
+    service = prepared.service
+    goal = service.load_active_goal(prepared.project_id)
+    project_map = service.load_current_project_map(prepared.project_id)
+    state = service.load_current_state(prepared.project_id, goal.definition_digest)
+    with service.ledger.read() as connection:
+        project = connection.execute(
+            "SELECT active_plan_revision_id FROM projects WHERE id=?",
+            (prepared.project_id,),
+        ).fetchone()
+        plan_revision_id = (
+            base_plan_revision_id
+            or project["active_plan_revision_id"]
+            or prepared.plan_revision_id
+        )
+        active = connection.execute(
+            "SELECT payload_json FROM plan_revisions WHERE id=?",
+            (plan_revision_id,),
+        ).fetchone()
+    current = PlanContractRevision.model_validate_json(active["payload_json"])
+    if len(current.definition.tasks) != 1:
+        raise QualificationRunError("E2E-17 requires a single-task source plan")
+    previous_task = current.definition.tasks[0]
+    task = previous_task.model_copy(update={"task_id": new_id("task")})
+    definition = current.definition.model_copy(update={
+        "base_state_snapshot_digest": state.snapshot_digest,
+        "project_map_digest": project_map.revision_digest,
+        "tasks": (task,),
+        "goal_coverage": tuple(
+            item.model_copy(update={"task_ids": (task.task_id,)})
+            for item in current.definition.goal_coverage
+        ),
+    })
+    revision = PlanContractRevision(
+        plan_revision_id=new_id("plan_revision"),
+        plan_id=current.plan_id,
+        revision_no=current.revision_no + 1,
+        definition=definition,
+        definition_digest=definition.definition_digest,
+        status=RevisionStatus.READY,
+        supersedes_plan_revision_id=current.plan_revision_id,
+        created_at=utc_now(),
+    )
+    review = ReviewerSubmission(
+        reviewer_role="qualification-plan-reviewer",
+        candidate_digest=revision.activation_digest,
+        ratings=ReviewRatings(
+            goal_fit=4,
+            grounding=4,
+            engineering=4,
+            verification=4,
+            execution_safety=4,
+        ),
+        evidence_catalog_digest=sha256_digest(
+            plan_review_evidence_catalog(revision, goal, state, project_map)
+        ),
+    )
+    service.register_plan_evaluation(
+        ExpandedPlanEvaluation(
+            plan=revision,
+            semantic_submissions=(review,),
+            decision=CandidateDecision(
+                candidate_digest=revision.activation_digest,
+                status=CandidateStatus.ADMISSIBLE,
+                fitness_score=100,
+                weakest_dimension="engineering",
+            ),
+        )
+    )
+    return revision, task
+
+
+def _replacement_state(service: EngineService, project_id: str) -> dict[str, Any]:
+    with service.ledger.read() as connection:
+        return {
+            "project": dict(connection.execute(
+                "SELECT active_plan_revision_id,run_state FROM projects WHERE id=?",
+                (project_id,),
+            ).fetchone()),
+            "plans": [dict(row) for row in connection.execute(
+                "SELECT id,status FROM plan_revisions WHERE project_id=? ORDER BY revision_no",
+                (project_id,),
+            )],
+            "tasks": [dict(row) for row in connection.execute(
+                "SELECT id,plan_revision_id,status FROM task_contracts WHERE project_id=? ORDER BY rowid",
+                (project_id,),
+            )],
+            "attempts": [dict(row) for row in connection.execute(
+                "SELECT id,plan_revision_id,task_id,status,binding_json FROM attempts "
+                "WHERE project_id=? ORDER BY rowid",
+                (project_id,),
+            )],
+            "intents": [dict(row) for row in connection.execute(
+                "SELECT i.id,i.attempt_id,i.kind,i.status FROM runtime_intents i "
+                "JOIN attempts a ON a.id=i.attempt_id WHERE a.project_id=? ORDER BY i.rowid",
+                (project_id,),
+            )],
+            "receipts": [dict(row) for row in connection.execute(
+                "SELECT r.id,r.intent_id,r.provider_operation_id FROM runtime_receipts r "
+                "JOIN runtime_intents i ON i.id=r.intent_id JOIN attempts a ON a.id=i.attempt_id "
+                "WHERE a.project_id=? ORDER BY r.rowid",
+                (project_id,),
+            )],
+            "plan_activations": [dict(row) for row in connection.execute(
+                "SELECT plan_revision_id,authorization_id,activation_digest "
+                "FROM plan_activations WHERE project_id=? ORDER BY rowid",
+                (project_id,),
+            )],
+            "replacement_history": [dict(row) for row in connection.execute(
+                "SELECT sequence,event_type,entity_type,entity_id FROM history_events "
+                "WHERE project_id=? AND (event_type LIKE 'plan.%' "
+                "OR event_type LIKE 'project.%' OR event_type LIKE 'task.%' "
+                "OR event_type LIKE 'attempt.%') ORDER BY sequence",
+                (project_id,),
+            )],
+        }
+
+
+def _complete_task_without_goal_verdict(
+    prepared: PreparedE2E,
+    runtime: RecordedRuntime,
+    *,
+    roles: EngineRoleConfiguration | None,
+    governance: Any | None,
+    timeout_seconds: float,
+) -> dict[str, Any]:
+    provider = _execution_proposal_provider(prepared, runtime, roles)
+    if provider is None and prepared.proposal is None:
+        raise QualificationRunError("E2E_EXECUTION_PROPOSAL_PROVIDER_REQUIRED")
+    task_gate = _open_e2e_task_gate(prepared, runtime, roles, governance)
+    try:
+        dispatcher = EngineDispatcher(
+            prepared.service,
+            runtime,
+            proposal_provider=provider,
+            task_gate=task_gate,
+        )
+        deadline = time.monotonic() + timeout_seconds
+        actions: list[str] = []
+        while time.monotonic() < deadline:
+            outcome = dispatcher.run_once(
+                prepared.project_id,
+                proposal=prepared.proposal if provider is None else None,
+            )
+            actions.append(outcome.action.value)
+            with prepared.service.ledger.read() as connection:
+                status = connection.execute(
+                    "SELECT status FROM task_contracts WHERE id=?",
+                    (prepared.task_id,),
+                ).fetchone()[0]
+            if status == "completed":
+                return {"passed": True, "actions": actions, "task_status": status}
+            if outcome.action is RunOnceAction.BLOCKED:
+                return {
+                    "passed": False,
+                    "actions": actions,
+                    "task_status": status,
+                    "failure": f"{outcome.blocker_code}: {outcome.detail}",
+                }
+            time.sleep(0.05)
+        return {
+            "passed": False,
+            "actions": actions,
+            "task_status": None,
+            "failure": "Task completion timeout",
+        }
+    finally:
+        task_gate.close()
+
+
+def _in_flight_replan_protection(
+    prepared: PreparedE2E,
+    runtime: RecordedRuntime,
+    source_digest: str,
+    *,
+    cell_root: Path,
+    roles: EngineRoleConfiguration | None = None,
+    governance: Any | None = None,
+    timeout_seconds: float = 30,
+) -> dict[str, Any]:
+    """무효 evidence 재사용 거부와 active Attempt의 Plan 교체 보류를 함께 증명한다."""
+
+    completed = _complete_task_without_goal_verdict(
+        prepared,
+        runtime,
+        roles=roles,
+        governance=governance,
+        timeout_seconds=timeout_seconds,
+    )
+    if not completed.get("passed"):
+        return {**completed, "passed": False}
+    prepared.service.reobserve_project(prepared.project_id, force_state_revision=True)
+    revision, task = _register_equivalent_plan_revision(prepared)
+    with prepared.service.ledger.read() as connection:
+        latest = connection.execute(
+            "SELECT payload_json FROM validation_results WHERE task_id=? "
+            "ORDER BY evaluated_at DESC,rowid DESC LIMIT 1",
+            (prepared.task_id,),
+        ).fetchone()
+    prior = ValidationResult.model_validate_json(latest["payload_json"])
+    invalidating_result = ValidationResult(
+        validation_result_id=new_id("validation_result"),
+        validation_id=prior.validation_id,
+        task_id=prepared.task_id,
+        status=ValidationStatus.FAIL,
+        evidence_ids=prior.evidence_ids,
+        rationale="qualification fault: 완료 뒤 새 관측이 기존 evidence 유효성을 부정함",
+        evaluated_at=utc_now(),
+    )
+    prepared.service.record_validation(
+        project_id=prepared.project_id,
+        plan_revision_id=prepared.plan_revision_id,
+        result=invalidating_result,
+    )
+    first_activation_id = prepared.service.activate_authorized_plan(
+        plan_revision_id=revision.plan_revision_id
+    )
+    with prepared.service.ledger.read() as connection:
+        reuse = connection.execute(
+            "SELECT payload_json FROM history_events "
+            "WHERE entity_id=? AND event_type='task.completion_reuse_rejected' "
+            "ORDER BY sequence DESC LIMIT 1",
+            (task.task_id,),
+        ).fetchone()
+        task_status = connection.execute(
+            "SELECT status FROM task_contracts WHERE id=?", (task.task_id,)
+        ).fetchone()[0]
+    current_map = prepared.service.load_current_project_map(prepared.project_id)
+    current_digests = {item.path: item.content_digest for item in current_map.entries}
+    next_proposal = (
+        None
+        if prepared.proposal is None
+        else prepared.proposal.model_copy(update={
+            "task_id": task.task_id,
+            "resolved_targets": tuple(
+                item.model_copy(update={
+                    "expected_content_digest": current_digests.get(item.path)
+                })
+                for item in prepared.proposal.resolved_targets
+            ),
+        })
+    )
+    next_prepared = PreparedE2E(
+        service=prepared.service,
+        project_id=prepared.project_id,
+        task_id=task.task_id,
+        plan_revision_id=revision.plan_revision_id,
+        activation_digest=revision.activation_digest,
+        proposal=next_proposal,
+        workspace=prepared.workspace,
+        preparation_provenance=prepared.preparation_provenance,
+        pipeline_stages=prepared.pipeline_stages,
+        preparation_evidence_refs=prepared.preparation_evidence_refs,
+    )
+    application = EngineApplication(
+        prepared.service,
+        runtime=runtime,
+        role_configuration=roles,
+        governance=governance,
+        supervisor=RuntimeJobSupervisor(
+            prepared.service, runtime, observation_timeout_seconds=5.0
+        ),
+    )
+    activation_id: str | None = None
+    activation_error: str | None = None
+    activation_exception: EngineServiceError | None = None
+    stale_activation_error: str | None = None
+    fresh_replacement: PlanContractRevision | None = None
+    attempt_status: str | None = None
+    settlement_actions: list[str] = []
+    terminal_observation: Any | None = None
+    quiescence_before: dict[str, int] | None = None
+    quiescence_after: dict[str, int] | None = None
+    quiescence_effects_before: dict[str, int] | None = None
+    quiescence_effects_after: dict[str, int] | None = None
+    try:
+        _materialize_with_application(application, next_prepared, timeout_seconds=timeout_seconds)
+        dispatched = application.run_once(prepared.project_id)
+        if dispatched.action is not RunOnceAction.DISPATCHED or dispatched.attempt_id is None:
+            raise QualificationRunError("E2E-17 active execution Attempt를 시작하지 못했습니다.")
+        binding, _job_id = _await_active_execution_binding(
+            next_prepared, dispatched.attempt_id, timeout_seconds=timeout_seconds
+        )
+        replacement, _replacement_task = _register_equivalent_plan_revision(next_prepared)
+        before = _replacement_state(prepared.service, prepared.project_id)
+        error: str | None = None
+        try:
+            prepared.service.activate_authorized_plan(
+                plan_revision_id=replacement.plan_revision_id
+            )
+        except EngineServiceError as caught:
+            error = str(caught)
+        after = _replacement_state(prepared.service, prepared.project_id)
+
+        quiescence_before = _journal_operation_counts(runtime.events)
+        quiescence_effects_before = _attempt_effect_counts(
+            prepared, dispatched.attempt_id
+        )
+        terminal_observation = _await_terminal_after_fault(
+            runtime, binding, timeout_seconds=timeout_seconds
+        )
+        deadline = time.monotonic() + timeout_seconds
+        while time.monotonic() < deadline:
+            with prepared.service.ledger.read() as connection:
+                attempt_status = connection.execute(
+                    "SELECT status FROM attempts WHERE id=?", (dispatched.attempt_id,)
+                ).fetchone()[0]
+            if attempt_status in {"interrupted", "failed", "succeeded"}:
+                break
+            settled = application.run_once(prepared.project_id)
+            settlement_actions.append(settled.action.value)
+            time.sleep(0.05)
+        quiescence_after = _journal_operation_counts(runtime.events)
+        quiescence_effects_after = _attempt_effect_counts(
+            prepared, dispatched.attempt_id
+        )
+        if attempt_status in {"interrupted", "failed", "succeeded"}:
+            while time.monotonic() < deadline and activation_id is None:
+                try:
+                    activation_id = prepared.service.activate_authorized_plan(
+                        plan_revision_id=replacement.plan_revision_id
+                    )
+                except EngineServiceError as caught:
+                    activation_exception = caught
+                    activation_error = str(caught)
+                    if not activation_error.startswith("PLAN_REPLACEMENT_IN_FLIGHT:"):
+                        break
+                    settled = application.run_once(prepared.project_id)
+                    settlement_actions.append(settled.action.value)
+                    time.sleep(0.05)
+            if activation_id is not None:
+                activation_error = None
+            elif isinstance(activation_exception, PlanStateSnapshotStaleError):
+                stale_activation_error = activation_error
+                prepared.service.reobserve_project(
+                    prepared.project_id, force_state_revision=True
+                )
+                fresh_replacement, _fresh_task = _register_equivalent_plan_revision(
+                    next_prepared,
+                    base_plan_revision_id=replacement.plan_revision_id,
+                )
+                try:
+                    activation_id = prepared.service.activate_authorized_plan(
+                        plan_revision_id=fresh_replacement.plan_revision_id
+                    )
+                except EngineServiceError as caught:
+                    activation_error = str(caught)
+                else:
+                    activation_error = None
+    finally:
+        application.close_task_gate()
+    reuse_payload = None if reuse is None else json.loads(reuse["payload_json"])
+    activation_calls: list[dict[str, Any]] = [
+        {
+            "plan_revision_id": revision.plan_revision_id,
+            "activation_id": first_activation_id,
+            "purpose": "observe_invalid_reuse",
+        },
+        {
+            "plan_revision_id": replacement.plan_revision_id,
+            "error": error,
+            "purpose": "reject_while_attempt_active",
+        },
+    ]
+    if stale_activation_error is not None:
+        activation_calls.append({
+            "plan_revision_id": replacement.plan_revision_id,
+            "activation_id": None,
+            "error": stale_activation_error,
+            "purpose": "reject_stale_revision_after_attempt_quiescence",
+        })
+    if fresh_replacement is not None:
+        activation_calls.append({
+            "plan_revision_id": fresh_replacement.plan_revision_id,
+            "activation_id": activation_id,
+            "error": activation_error,
+            "purpose": "activate_fresh_revision_after_attempt_quiescence",
+        })
+    fault = _write_fault_injection(
+        cell_root / "fault-injection.json",
+        {
+            "kind": "equivalent_revision_with_invalidated_completion_evidence",
+            "replan_source": "qualification_fixture_equivalent_revision",
+            "proves_product_replan_pipeline": False,
+            "deferred_responsibility_ids": ["E2E-05", "E2E-14", "E2E-15"],
+            "source_task_id": prepared.task_id,
+            "invalidating_validation_result_id": (
+                invalidating_result.validation_result_id
+            ),
+            "equivalent_plan_revision_id": revision.plan_revision_id,
+            "replacement_plan_revision_id": replacement.plan_revision_id,
+            "fresh_replacement_plan_revision_id": (
+                None
+                if fresh_replacement is None
+                else fresh_replacement.plan_revision_id
+            ),
+            "activation_calls": activation_calls,
+        },
+    )
+    passed = all((
+        task_status == "ready",
+        reuse_payload is not None,
+        reuse_payload is not None
+        and reuse_payload.get("reason") == "EVIDENCE_INVALID_OR_INSUFFICIENT",
+        error is not None and error.startswith("PLAN_REPLACEMENT_IN_FLIGHT:"),
+        before == after,
+        binding.thread_id is not None and binding.turn_id is not None,
+        attempt_status == "succeeded",
+        activation_error is None,
+        bool(activation_id),
+        quiescence_before is not None,
+        quiescence_after is not None,
+        quiescence_before is not None
+        and quiescence_after is not None
+        and all(
+            quiescence_after[key] == quiescence_before[key]
+            for key in ("create_thread", "start_turn", "resume", "interrupt")
+        ),
+        quiescence_effects_before is not None,
+        quiescence_effects_after is not None,
+        quiescence_effects_before is not None
+        and quiescence_effects_after is not None
+        and all(
+            quiescence_effects_after[key] == quiescence_effects_before[key]
+            for key in (
+                "provider_calls",
+                "runtime_intents",
+                "runtime_receipts",
+                "distinct_provider_operation_ids",
+            )
+        ),
+    ))
+    return {
+        "passed": passed,
+        "source_fixture_digest": source_digest,
+        "attempt": {
+            "attempt_id": dispatched.attempt_id,
+            "status_after_cleanup": attempt_status,
+        },
+        "binding": binding.model_dump(mode="json"),
+        "fault_injection": fault,
+        "plan": {
+            "blocked_revision_id": replacement.plan_revision_id,
+            "fresh_revision_id": (
+                None
+                if fresh_replacement is None
+                else fresh_replacement.plan_revision_id
+            ),
+            "active_before": before["project"]["active_plan_revision_id"],
+            "activation_id_after_quiescence": activation_id,
+        },
+        "reuse_decision": reuse_payload,
+        "in_flight_error": error,
+        "state_unchanged_during_rejection": before == after,
+        "quiescence": {
+            "settlement_actions": settlement_actions,
+            "terminal_observation": (
+                None
+                if terminal_observation is None
+                else terminal_observation.model_dump(mode="json")
+            ),
+            "activation_error": activation_error,
+            "operation_counts_before": quiescence_before,
+            "operation_counts_after": quiescence_after,
+            "attempt_effect_counts_before": quiescence_effects_before,
+            "attempt_effect_counts_after": quiescence_effects_after,
+            "automatic_resume_occurred": bool(
+                quiescence_before is not None
+                and quiescence_after is not None
+                and quiescence_after["resume"] != quiescence_before["resume"]
+            ),
+        },
+    }
 
 
 def _forced_termination_no_duplicate(
@@ -2565,7 +3375,15 @@ def _absolute_timeout_no_duplicate(
                 timeout_counts["start_turn"] == 0,
                 timeout_counts["resume"] == 0,
                 timeout_counts["interrupt"] == 1,
-                effect_counts_after == effect_counts_before,
+                all(
+                    effect_counts_after[key] == effect_counts_before[key]
+                    for key in (
+                        "provider_calls",
+                        "runtime_intents",
+                        "runtime_receipts",
+                        "distinct_provider_operation_ids",
+                    )
+                ),
                 provider_call is not None
                 and provider_call["execution_status"] == "terminal"
                 and provider_call["new_turn_count"] == 1,
@@ -2676,6 +3494,30 @@ def _responsibility_outcome(
             ("runtime_job", "control_state", "runtime_observation", "ledger"),
             (EvidenceProvenance.LIVE,),
         ),
+        "partial-write-input-changed": (
+            "E2E-13",
+            ("task_execution", "partial_write", "freshness_check"),
+            ("partial_effect", "source_digest", "error", "effect_count"),
+            (EvidenceProvenance.FAULT_INJECTED,),
+        ),
+        "in-flight-replan-protection": (
+            "E2E-17",
+            ("task_execution", "replan", "in_flight_protection"),
+            ("attempt", "binding", "plan", "reuse_decision", "fault_injection"),
+            (EvidenceProvenance.FAULT_INJECTED,),
+        ),
+        "partial-write-resume": (
+            "E2E-12",
+            (
+                "task_execution",
+                "partial_write",
+                "observe_existing",
+                "resume",
+                "independent_validation",
+            ),
+            ("partial_effect", "binding", "runtime_observation", "validation"),
+            (EvidenceProvenance.LIVE, EvidenceProvenance.FAULT_INJECTED),
+        ),
     }
     responsibility_id, suffix, evidence_kinds, provenance = mapping[scenario]
     artifact_by_kind = {
@@ -2697,6 +3539,11 @@ def _responsibility_outcome(
         "deadline": cell_root / "qualification-observation.json",
         "control_state": cell_root / "qualification-observation.json",
         "runtime_observation": cell_root / "runtime-receipts.json",
+        "partial_effect": cell_root / "fault-injection.json",
+        "attempt": cell_root / "state" / "flowmarshal-engine.sqlite3",
+        "plan": cell_root / "state" / "flowmarshal-engine.sqlite3",
+        "reuse_decision": cell_root / "state" / "flowmarshal-engine.sqlite3",
+        "fault_injection": cell_root / "fault-injection.json",
     }
     evidence_records = tuple(
         build_qualification_evidence_record(
@@ -3116,6 +3963,33 @@ def run_project_e2e(
                                 prepared,
                                 recorded,
                                 source_digest,
+                                roles=roles,
+                                governance=governance,
+                            )
+                        elif scenario == "partial-write-input-changed":
+                            cell = _partial_write_input_changed(
+                                prepared,
+                                recorded,
+                                source_digest,
+                                cell_root=cell_root,
+                                roles=roles,
+                                governance=governance,
+                            )
+                        elif scenario == "in-flight-replan-protection":
+                            cell = _in_flight_replan_protection(
+                                prepared,
+                                recorded,
+                                source_digest,
+                                cell_root=cell_root,
+                                roles=roles,
+                                governance=governance,
+                            )
+                        elif scenario == "partial-write-resume":
+                            cell = _partial_write_resume(
+                                prepared,
+                                recorded,
+                                source_digest,
+                                cell_root=cell_root,
                                 roles=roles,
                                 governance=governance,
                             )

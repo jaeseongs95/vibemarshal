@@ -7,6 +7,7 @@ import json
 import hashlib
 import inspect
 import os
+import re
 import subprocess
 import threading
 import time
@@ -2591,8 +2592,11 @@ class EngineDispatcher:
                     intent = connection.execute("SELECT * FROM runtime_intents WHERE id = ?", (prepared[0]["id"],)).fetchone()
                 if marker is not None and marker["event_type"] == "runtime.effect_not_started":
                     marker_payload = json.loads(marker["payload_json"])
-                    if marker_payload.get("code") == "GOAL_AUTHORIZATION_REQUIRED":
-                        return self._retry_authorization_blocked_effect(intent)
+                    if marker_payload.get("code") in {
+                        "GOAL_AUTHORIZATION_REQUIRED",
+                        "STALE_EXECUTION_INPUT",
+                    }:
+                        return self._retry_preflight_blocked_effect(intent)
                     return RunOnceOutcome(
                         action=RunOnceAction.BLOCKED,
                         project_id=project_id,
@@ -3791,30 +3795,68 @@ class EngineDispatcher:
         except ValueError as error:
             raise RuntimePolicyError(str(error)) from error
 
-    def _retry_authorization_blocked_effect(self, intent: Any) -> RunOnceOutcome:
-        self.service.assert_attempt_authorized(intent["attempt_id"])
+    def _retry_preflight_blocked_effect(self, intent: Any) -> RunOnceOutcome:
+        """효과가 시작되지 않은 동일 intent를 현재 승인·freshness로 다시 검사한다."""
+
         row, spec = self._attempt_context(intent["attempt_id"])
-        with self.service.ledger.read() as connection:
-            state = connection.execute("SELECT run_state FROM projects WHERE id = ?", (row["project_id"],)).fetchone()[0]
-        if state != "active":
-            return RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=row["project_id"],
-                                  blocker_code="PROJECT_NOT_ACTIVE", detail="프로젝트가 active일 때만 미실행 intent를 다시 실행합니다.")
-        validation_id = self._next_semantic_validation_id(row["task_id"]) if row["kind"] == "validation" else None
-        if intent["kind"] == "create_thread":
-            self._dispatch_reserved(row["id"], validation_id=validation_id,
-                                    existing_call_id=self._attempt_provider_call_id(row["id"]))
-        elif intent["kind"] == "start_turn":
-            binding = ThreadBinding.model_validate_json(row["binding_json"])
-            attempt_key = intent["idempotency_key"].removesuffix(":turn")
-            self._start_turn(row=row, spec=spec, thread_id=binding.thread_id, attempt_key=attempt_key,
-                             validation_id=validation_id, resumed=attempt_key.endswith(":resumed"),
-                             provider_call_id=self._attempt_provider_call_id(row["id"]))
-        elif intent["kind"] == "resume_turn":
-            self._resume_bound_attempt(row, spec)
-        else:
-            raise EngineServiceError("자동 재개할 수 없는 승인 차단 effect입니다.")
+        try:
+            self.service.assert_attempt_authorized(intent["attempt_id"])
+            with self.service.ledger.read() as connection:
+                state = connection.execute(
+                    "SELECT run_state FROM projects WHERE id = ?",
+                    (row["project_id"],),
+                ).fetchone()[0]
+            if state != "active":
+                return RunOnceOutcome(
+                    action=RunOnceAction.BLOCKED,
+                    project_id=row["project_id"],
+                    blocker_code="PROJECT_NOT_ACTIVE",
+                    detail="프로젝트가 active일 때만 미실행 intent를 다시 실행합니다.",
+                )
+            validation_id = (
+                self._next_semantic_validation_id(row["task_id"])
+                if row["kind"] == "validation"
+                else None
+            )
+            if intent["kind"] == "create_thread":
+                self._dispatch_reserved(row["id"], validation_id=validation_id,
+                                        existing_call_id=self._attempt_provider_call_id(row["id"]))
+            elif intent["kind"] == "start_turn":
+                binding = ThreadBinding.model_validate_json(row["binding_json"])
+                attempt_key = intent["idempotency_key"].removesuffix(":turn")
+                self._start_turn(row=row, spec=spec, thread_id=binding.thread_id, attempt_key=attempt_key,
+                                 validation_id=validation_id, resumed=attempt_key.endswith(":resumed"),
+                                 provider_call_id=self._attempt_provider_call_id(row["id"]))
+            elif intent["kind"] == "resume_turn":
+                self._resume_bound_attempt(row, spec)
+            else:
+                raise EngineServiceError("자동 재개할 수 없는 preflight 차단 effect입니다.")
+        except EngineServiceError as error:
+            from .budget import BudgetBlocked
+            if isinstance(error, BudgetBlocked):
+                raise
+            code = getattr(error, "code", None)
+            if not isinstance(code, str) or re.fullmatch(
+                r"[A-Z][A-Z0-9_]{1,99}", code
+            ) is None:
+                prefix = re.match(
+                    r"^([A-Z][A-Z0-9_]{1,99}):(?:\s|$)", str(error)
+                )
+                code = (
+                    prefix.group(1)
+                    if prefix is not None
+                    else "RUNTIME_EFFECT_PREFLIGHT_FAILED"
+                )
+            return RunOnceOutcome(
+                action=RunOnceAction.BLOCKED,
+                project_id=row["project_id"],
+                task_id=row["task_id"],
+                attempt_id=row["id"],
+                blocker_code=code,
+                detail=str(error),
+            )
         return RunOnceOutcome(action=RunOnceAction.DISPATCHED, project_id=row["project_id"], task_id=row["task_id"],
-                              attempt_id=row["id"], detail="미실행이 기록된 동일 intent를 갱신된 승인 범위에서 실행했습니다.")
+                              attempt_id=row["id"], detail="미실행이 기록된 동일 intent를 현재 승인·freshness에서 실행했습니다.")
 
     def _reconcile_prepared_intent_from_trace(self, intent: Any) -> RuntimeOperationReceipt | None:
         """DB receipt 유실 시 trace의 exact response만 복원하고 effect는 재호출하지 않는다."""

@@ -245,7 +245,14 @@ class ScopeQualificationReport(EngineModel):
                 EvaluationScope.FULL_PLANNING_PIPELINE: ("cell_count", 18),
                 EvaluationScope.PROJECT_E2E: ("actual_codex_cell_count", 7),
             }[self.scope]
-            if self.metrics.get(metric) != count:
+            actual = self.metrics.get(metric)
+            if self.scope is EvaluationScope.PROJECT_E2E:
+                # 역사 7-cell 보고서와 확장된 suite를 함께 읽는다. 현재 계약의
+                # 정확한 cell 수는 EvaluationContract와 scope verifier가 검사한다.
+                valid_count = type(actual) is int and actual >= count
+            else:
+                valid_count = actual == count
+            if not valid_count:
                 raise ValueError(f"PASS에 필요한 {metric}={count} 증거가 부족합니다.")
         return self
 

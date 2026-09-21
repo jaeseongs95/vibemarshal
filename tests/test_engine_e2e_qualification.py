@@ -21,7 +21,10 @@ from flowmarshal.engine.e2e_qualification import (
     _e2e_failure_disposition,
     _forced_termination_no_duplicate,
     _guard_e2e_partial_resume,
+    _in_flight_replan_protection,
     _observe_frozen_plugin_identity,
+    _partial_write_input_changed,
+    _partial_write_resume,
     _prepare,
     _prepare_from_raw_request,
     _preserve_inventory_observation,
@@ -123,6 +126,23 @@ class _RequestEchoFakeRuntime(FakeCodexRuntime):
                 }
             }
         )
+
+
+class _TurnCompletingFakeRuntime(_RequestEchoFakeRuntime):
+    def __init__(self, inventory, workspace: Path, *, completion_turns: set[int]):
+        super().__init__(inventory)
+        self.workspace = workspace
+        self.completion_turns = completion_turns
+
+    def start_turn(self, **arguments):
+        receipt = super().start_turn(**arguments)
+        if self.turn_calls in self.completion_turns:
+            (self.workspace / "app.py").write_text(
+                "def add(left: int, right: int) -> int:\n    return left + right\n",
+                encoding="utf-8",
+            )
+            self.complete(arguments["thread_id"], response="완료")
+        return receipt
 
 
 class _PartialCreateObservationFakeRuntime(FakeCodexRuntime):
@@ -989,10 +1009,19 @@ class EngineE2EQualificationTests(unittest.TestCase):
             self.assertEqual(0, result["effect_count"]["start_turn"])
             self.assertEqual(0, result["effect_count"]["resume"])
             self.assertEqual(1, result["effect_count"]["interrupt"])
-            self.assertEqual(
-                result["ledger"]["effect_counts_before"],
-                result["ledger"]["effect_counts_after"],
-            )
+            before = result["ledger"]["effect_counts_before"]
+            after = result["ledger"]["effect_counts_after"]
+            for key in (
+                "provider_calls",
+                "runtime_intents",
+                "runtime_receipts",
+                "distinct_provider_operation_ids",
+            ):
+                self.assertEqual(before[key], after[key])
+            self.assertEqual(0, before["provider_new_turn_count"])
+            self.assertEqual(1, after["provider_new_turn_count"])
+            self.assertEqual(1, before["provider_reserved_calls"])
+            self.assertEqual(0, after["provider_reserved_calls"])
 
             (cell_root / "qualification-observation.json").write_text(
                 json.dumps(result), encoding="utf-8"
@@ -1017,6 +1046,180 @@ class EngineE2EQualificationTests(unittest.TestCase):
             self.assertEqual(
                 {"runtime_job", "deadline", "runtime_observation", "effect_count"},
                 set(outcome.evidence_kinds),
+            )
+
+    def test_partial_write_input_change_blocks_resume_and_records_residual_target(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root = Path(raw) / "cell"
+            cell_root.mkdir()
+            workspace, source_digest = _copy_fixture(ROOT, cell_root)
+            prepared = _prepare(
+                workspace=workspace,
+                state_root=cell_root / "state",
+                inventory=self.inventory,
+                roles=self.roles,
+            )
+            runtime = RecordedRuntime(
+                _RequestEchoFakeRuntime(self.inventory),
+                journal=cell_root / "runtime-receipts.json",
+            )
+
+            result = _partial_write_input_changed(
+                prepared,
+                runtime,
+                source_digest,
+                cell_root=cell_root,
+                governance=ALLOW_ALL,
+                timeout_seconds=3,
+            )
+
+            self.assertTrue(result["passed"], result)
+            self.assertEqual("STALE_EXECUTION_INPUT", result["error"]["code"])
+            self.assertEqual(
+                {"create_thread": 0, "start_turn": 0, "resume": 0},
+                result["effect_count"]["provider_operations"],
+            )
+            before_effect = result["effect_count"]["attempt_before_preflight"]
+            first_block = result["effect_count"]["attempt_after_first_block"]
+            self.assertEqual(
+                first_block,
+                result["effect_count"]["attempt_after_repeated_block"],
+            )
+            self.assertEqual(
+                before_effect["runtime_receipts"], first_block["runtime_receipts"]
+            )
+            self.assertTrue(any(
+                item["kind"] == "mutable_target_observation"
+                and item["changed"]
+                for item in result["error"]["changes"]
+            ))
+
+            (cell_root / "qualification-observation.json").write_text(
+                json.dumps(result), encoding="utf-8"
+            )
+            digest = sha256_digest({"binding": "partial-write-input-changed"})
+            outcome = _responsibility_outcome(
+                scenario="partial-write-input-changed",
+                prepared=prepared,
+                cell=result,
+                contract=SimpleNamespace(contract_digest=digest),
+                cell_root=cell_root,
+                run_root=cell_root.parent,
+                fixture_digest=digest,
+                freeze_bundle_digest=digest,
+                governance_plugin_identity_digest=digest,
+                candidate_wheel_digest=digest,
+                candidate_wheel_binding_digest=digest,
+                candidate_distribution_name="flowmarshal-engine",
+                candidate_distribution_version="1.0.0",
+            )
+            self.assertEqual(("E2E-13",), outcome.responsibility_ids)
+            self.assertEqual(
+                (EvidenceProvenance.FAULT_INJECTED,), outcome.provenance
+            )
+
+    def test_partial_write_resume_keeps_thread_and_reaches_independent_validation(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root = Path(raw) / "cell"
+            cell_root.mkdir()
+            workspace, source_digest = _copy_fixture(ROOT, cell_root)
+            prepared = _prepare(
+                workspace=workspace,
+                state_root=cell_root / "state",
+                inventory=self.inventory,
+                roles=self.roles,
+            )
+            runtime = RecordedRuntime(
+                _TurnCompletingFakeRuntime(
+                    self.inventory, workspace, completion_turns={2}
+                ),
+                journal=cell_root / "runtime-receipts.json",
+            )
+
+            result = _partial_write_resume(
+                prepared,
+                runtime,
+                source_digest,
+                cell_root=cell_root,
+                governance=ALLOW_ALL,
+                timeout_seconds=3,
+            )
+
+            self.assertTrue(result["passed"], result)
+            self.assertEqual(
+                result["binding"]["before"]["thread_id"],
+                result["binding"]["after"]["thread_id"],
+            )
+            self.assertNotEqual(
+                result["binding"]["before"]["turn_id"],
+                result["binding"]["after"]["turn_id"],
+            )
+            self.assertEqual(1, runtime.resume_calls)
+            self.assertEqual(1, result["validation"]["goal_verdict_count"])
+
+    def test_in_flight_replan_rejects_invalid_reuse_and_preserves_active_binding(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root = Path(raw) / "cell"
+            cell_root.mkdir()
+            workspace, source_digest = _copy_fixture(ROOT, cell_root)
+            prepared = _prepare(
+                workspace=workspace,
+                state_root=cell_root / "state",
+                inventory=self.inventory,
+                roles=self.roles,
+            )
+            runtime = RecordedRuntime(
+                _TurnCompletingFakeRuntime(
+                    self.inventory, workspace, completion_turns={1, 2}
+                ),
+                journal=cell_root / "runtime-receipts.json",
+            )
+
+            result = _in_flight_replan_protection(
+                prepared,
+                runtime,
+                source_digest,
+                cell_root=cell_root,
+                governance=ALLOW_ALL,
+                timeout_seconds=3,
+            )
+
+            self.assertTrue(result["passed"], result)
+            self.assertTrue(result["state_unchanged_during_rejection"])
+            self.assertTrue(result["in_flight_error"].startswith(
+                "PLAN_REPLACEMENT_IN_FLIGHT:"
+            ))
+            self.assertEqual(
+                "EVIDENCE_INVALID_OR_INSUFFICIENT",
+                result["reuse_decision"]["reason"],
+            )
+            self.assertEqual(
+                "qualification_fixture_equivalent_revision",
+                result["fault_injection"]["replan_source"],
+            )
+            self.assertFalse(
+                result["fault_injection"]["proves_product_replan_pipeline"]
+            )
+            self.assertFalse(result["quiescence"]["automatic_resume_occurred"])
+            self.assertEqual(
+                result["quiescence"]["operation_counts_before"]["start_turn"],
+                result["quiescence"]["operation_counts_after"]["start_turn"],
+            )
+            self.assertEqual(
+                result["quiescence"]["attempt_effect_counts_before"]["provider_calls"],
+                result["quiescence"]["attempt_effect_counts_after"]["provider_calls"],
+            )
+            activation_calls = result["fault_injection"]["activation_calls"]
+            stale_call = next(
+                item
+                for item in activation_calls
+                if item["purpose"] == "reject_stale_revision_after_attempt_quiescence"
+            )
+            self.assertTrue(stale_call["error"].startswith(
+                "PLAN_STATE_SNAPSHOT_STALE:"
+            ))
+            self.assertEqual(
+                "running", prepared.service.workflow_control_state(prepared.project_id)
             )
 
     def test_journal_tamper_and_nonresumable_cell_are_explicitly_rejected(self) -> None:

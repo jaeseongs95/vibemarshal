@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from unittest.mock import patch
 
 from flowmarshal.engine.domain import RunOnceAction, ThreadBinding, new_id, utc_now
 from flowmarshal.engine.runtime import (
@@ -337,7 +338,9 @@ class EngineEffectCheckpointRecoveryTests(unittest.TestCase):
                 runtime.interrupt(
                     thread_id=binding.thread_id, turn_id=binding.turn_id
                 )
-                (prepared.workspace / changed_path).write_text(
+                changed_file = prepared.workspace / changed_path
+                original = changed_file.read_bytes()
+                changed_file.write_text(
                     "Worker partial write\n" if allowed else "immutable policy changed\n",
                     encoding="utf-8",
                 )
@@ -353,6 +356,79 @@ class EngineEffectCheckpointRecoveryTests(unittest.TestCase):
                     self.assertEqual("STALE_EXECUTION_INPUT", result.blocker_code)
                     self.assertEqual(0, runtime.resume_calls)
                     self.assertEqual(1, runtime.turn_calls)
+                    with prepared.service.ledger.read() as connection:
+                        marker = connection.execute(
+                            "SELECT payload_json FROM history_events "
+                            "WHERE event_type='runtime.effect_not_started' "
+                            "ORDER BY sequence DESC LIMIT 1"
+                        ).fetchone()
+                        marker_count = connection.execute(
+                            "SELECT COUNT(*) FROM history_events "
+                            "WHERE event_type='runtime.effect_not_started'"
+                        ).fetchone()[0]
+                    changes = json.loads(marker[0])["changes"]
+                    self.assertTrue(any(
+                        item["kind"] == "immutable_input_changed"
+                        and item["path"] == "AGENTS.md"
+                        for item in changes
+                    ))
+                    residual = next(
+                        item for item in changes
+                        if item["kind"] == "mutable_target_observation"
+                    )
+                    self.assertEqual("app.py", residual["path"])
+                    self.assertFalse(residual["changed"])
+
+                    still_blocked = EngineDispatcher(
+                        EngineService(prepared.service.ledger), runtime
+                    ).run_once(prepared.project_id)
+                    self.assertEqual(RunOnceAction.BLOCKED, still_blocked.action)
+                    self.assertEqual("STALE_EXECUTION_INPUT", still_blocked.blocker_code)
+                    self.assertEqual(0, runtime.resume_calls)
+                    with prepared.service.ledger.read() as connection:
+                        self.assertEqual(
+                            marker_count,
+                            connection.execute(
+                                "SELECT COUNT(*) FROM history_events "
+                                "WHERE event_type='runtime.effect_not_started'"
+                            ).fetchone()[0],
+                        )
+
+                    with patch.object(
+                        EngineService,
+                        "assert_attempt_authorized",
+                        side_effect=EngineServiceError(
+                            "PROMPT_BINDING_MISMATCH: 저장 prompt binding이 다릅니다."
+                        ),
+                    ):
+                        prefixed = EngineDispatcher(
+                            EngineService(prepared.service.ledger), runtime
+                        ).run_once(prepared.project_id)
+                    self.assertEqual(RunOnceAction.BLOCKED, prefixed.action)
+                    self.assertEqual(
+                        "PROMPT_BINDING_MISMATCH", prefixed.blocker_code
+                    )
+
+                    with patch.object(
+                        EngineService,
+                        "assert_attempt_authorized",
+                        side_effect=EngineServiceError("구조화되지 않은 preflight 실패"),
+                    ):
+                        sanitized = EngineDispatcher(
+                            EngineService(prepared.service.ledger), runtime
+                        ).run_once(prepared.project_id)
+                    self.assertEqual(RunOnceAction.BLOCKED, sanitized.action)
+                    self.assertEqual(
+                        "RUNTIME_EFFECT_PREFLIGHT_FAILED", sanitized.blocker_code
+                    )
+
+                    changed_file.write_bytes(original)
+                    resumed = EngineDispatcher(
+                        EngineService(prepared.service.ledger), runtime
+                    ).run_once(prepared.project_id)
+                    self.assertEqual(RunOnceAction.DISPATCHED, resumed.action, resumed)
+                    self.assertEqual(1, runtime.resume_calls)
+                    self.assertEqual(2, runtime.turn_calls)
 
 
 if __name__ == "__main__":

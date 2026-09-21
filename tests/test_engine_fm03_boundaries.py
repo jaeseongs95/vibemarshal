@@ -82,6 +82,18 @@ class FM03MinimalEvidenceTests(EngineServiceFixture):
         self.assertEqual("ready", self.status_of(task.task_id))
         self.assertEqual("completed", self.status_of(self.task.task_id))
         self.assertEqual(before, self.source_rows())
+        with self.ledger.read() as connection:
+            decision = connection.execute(
+                "SELECT payload_json FROM history_events "
+                "WHERE entity_id=? AND event_type='task.completion_reuse_rejected' "
+                "ORDER BY sequence DESC LIMIT 1",
+                (task.task_id,),
+            ).fetchone()
+        self.assertIsNotNone(decision)
+        self.assertEqual(
+            "EVIDENCE_INVALID_OR_INSUFFICIENT",
+            json.loads(decision[0])["reason"],
+        )
 
 
 if __name__ == "__main__":

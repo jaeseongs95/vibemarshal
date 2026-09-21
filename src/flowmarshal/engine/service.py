@@ -108,6 +108,27 @@ class EngineServiceError(RuntimeError):
     pass
 
 
+class StaleExecutionInputError(EngineServiceError):
+    """효과 전 freshness 거부와 현재 쓰기 target 관측을 함께 보존한다."""
+
+    code = "STALE_EXECUTION_INPUT"
+    effects_started = False
+
+    def __init__(self, detail: str, changes: tuple[dict[str, Any], ...]) -> None:
+        self.changes = changes
+        super().__init__(f"{self.code}: {detail}")
+
+
+class PlanStateSnapshotStaleError(EngineServiceError):
+    code = "PLAN_STATE_SNAPSHOT_STALE"
+    effects_started = False
+
+    def __init__(self) -> None:
+        super().__init__(
+            f"{self.code}: Plan의 기준 StateSnapshot이 stale입니다. 재검토가 필요합니다."
+        )
+
+
 class GoalAuthorizationRequired(EngineServiceError):
     code = "GOAL_AUTHORIZATION_REQUIRED"
     effects_started = False
@@ -2605,7 +2626,7 @@ class EngineService:
             (payload.definition.base_state_snapshot_digest,),
         )
         if state["is_current"] != 1:
-            raise EngineServiceError("Plan의 기준 StateSnapshot이 stale입니다. 재검토가 필요합니다.")
+            raise PlanStateSnapshotStaleError()
         project_map = tx.one(
             "SELECT is_current FROM project_map_revisions WHERE revision_digest = ?",
             (payload.definition.project_map_digest,),
@@ -4211,18 +4232,23 @@ class EngineService:
             "SELECT revision_digest FROM project_map_revisions WHERE project_id = ? AND is_current = 1",
             (task["project_id"],),
         )
+        changes: list[dict[str, Any]] = []
         if current_map["revision_digest"] != spec.definition.project_map_digest:
-            raise EngineServiceError(
-                "STALE_EXECUTION_INPUT: ExecutionSpec 이후 Project Map이 변경됐습니다."
-            )
+            changes.append({
+                "kind": "project_map_changed",
+                "expected_digest": spec.definition.project_map_digest,
+                "observed_digest": current_map["revision_digest"],
+            })
         snapshot = tx.maybe_one(
             "SELECT is_current FROM state_snapshots WHERE project_id = ? AND snapshot_digest = ?",
             (task["project_id"], spec.definition.snapshot_digest),
         )
         if snapshot is None or snapshot["is_current"] != 1:
-            raise EngineServiceError(
-                "STALE_EXECUTION_INPUT: ExecutionSpec 이후 StateSnapshot이 변경됐습니다."
-            )
+            changes.append({
+                "kind": "state_snapshot_changed",
+                "expected_digest": spec.definition.snapshot_digest,
+                "observed_current": False,
+            })
         root = Path(project["root"])
         checks: dict[str, str] = {}
         absent: set[str] = set()
@@ -4250,9 +4276,12 @@ class EngineService:
             if allow_mutable_targets and path.resolve() in mutable_paths:
                 continue
             if path.exists():
-                raise EngineServiceError(
-                    f"STALE_EXECUTION_INPUT: create target이 실행 전에 생겼습니다: {raw_path}"
-                )
+                changes.append({
+                    "kind": "create_target_appeared",
+                    "path": raw_path,
+                    "expected_state": "absent",
+                    "observed_state": "present",
+                })
         for raw_path, expected_digest in checks.items():
             path = Path(raw_path)
             if not path.is_absolute():
@@ -4264,9 +4293,45 @@ class EngineService:
             except OSError as error:
                 raise EngineServiceError(f"{_INPUT_UNREADABLE}: {raw_path}") from error
             if actual_digest != expected_digest:
-                raise EngineServiceError(
-                    f"STALE_EXECUTION_INPUT: materialization 이후 파일이 바뀌었습니다: {raw_path}"
-                )
+                changes.append({
+                    "kind": "immutable_input_changed",
+                    "path": raw_path,
+                    "expected_digest": expected_digest,
+                    "observed_digest": actual_digest,
+                })
+        if changes:
+            if allow_mutable_targets:
+                for target in spec.definition.resolved_targets:
+                    target_path = Path(target.path)
+                    path = (
+                        target_path.resolve()
+                        if target_path.is_absolute()
+                        else (root / target_path).resolve()
+                    )
+                    if path not in mutable_paths:
+                        continue
+                    try:
+                        observed_digest = sha256_bytes(path.read_bytes())
+                        observed_state = "file"
+                    except FileNotFoundError:
+                        observed_digest = None
+                        observed_state = "absent"
+                    except OSError:
+                        observed_digest = None
+                        observed_state = "unreadable"
+                    changes.append({
+                        "kind": "mutable_target_observation",
+                        "path": target.path,
+                        "access": target.access,
+                        "expected_digest": target.expected_content_digest,
+                        "observed_digest": observed_digest,
+                        "observed_state": observed_state,
+                        "changed": observed_digest != target.expected_content_digest,
+                    })
+            raise StaleExecutionInputError(
+                "materialization 이후 immutable 실행 입력이 바뀌었습니다",
+                tuple(changes),
+            )
 
     def _assert_attempt_authorized(self, tx: Any, attempt: Any) -> None:
         project = tx.one("SELECT * FROM projects WHERE id = ?", (attempt["project_id"],))
@@ -4336,8 +4401,13 @@ class EngineService:
                 (attempt["task_id"],),
             )
             if attempt["execution_spec_digest"] != spec_row["definition_digest"]:
-                raise EngineServiceError(
-                    "STALE_EXECUTION_INPUT: Attempt와 current ExecutionSpec이 다릅니다."
+                raise StaleExecutionInputError(
+                    "Attempt와 current ExecutionSpec이 다릅니다",
+                    ({
+                        "kind": "execution_spec_changed",
+                        "expected_digest": attempt["execution_spec_digest"],
+                        "observed_digest": spec_row["definition_digest"],
+                    },),
                 )
             self._verify_execution_inputs(
                 tx,
@@ -4395,17 +4465,29 @@ class EngineService:
                 "SELECT id FROM runtime_intents WHERE id = ? AND attempt_id = ? AND status = 'prepared'",
                 (intent_id, attempt_id),
             )
+            payload = {
+                "attempt_id": attempt_id,
+                "code": code,
+                "detail": detail,
+                "changes": changes,
+            }
+            latest = tx.maybe_one(
+                "SELECT payload_json FROM history_events "
+                "WHERE entity_type='runtime_intent' AND entity_id=? "
+                "AND event_type='runtime.effect_not_started' "
+                "ORDER BY sequence DESC LIMIT 1",
+                (intent_id,),
+            )
+            if latest is not None and canonical_json(
+                json.loads(latest["payload_json"])
+            ) == canonical_json(payload):
+                return
             tx.history(
                 attempt["project_id"],
                 "runtime.effect_not_started",
                 "runtime_intent",
                 intent_id,
-                {
-                    "attempt_id": attempt_id,
-                    "code": code,
-                    "detail": detail,
-                    "changes": changes,
-                },
+                payload,
             )
 
     def prepare_runtime_intent(
