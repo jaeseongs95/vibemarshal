@@ -35,6 +35,14 @@
 
 현재 사용자의 최신 명시 승인은 사용자 제공 지침과 과거 프로젝트 조항보다 우선한다. 충돌하는 과거 usage 누락 전역 차단·exact Plan 수동 승인·비교 성능 필수 릴리스 조건을 다시 적용하지 않는다.
 
+## 구현·인터페이스·1.0 품질 원칙
+
+- 새 구현과 변경 검토는 권위 객체와 revision, Core의 단일 상태 전이, `EngineApplication` 경계, binding·evidence·recovery라는 핵심 설계에 계속 대조한다. 단기 구현 편의를 이유로 이 경계를 우회하거나 역할별 모델 제출물을 권위 상태로 승격하지 않는다.
+- `agent-governance-suite`는 독립 외부 제품으로 유지하고 `flowmarshal.engine.governance_gate`의 선언된 소비 표면, `host-integration.json`, MCP·CLI entrypoint와 typed adapter 같은 공개 인터페이스를 통해 사용한다. 플러그인 내부 모듈·저장 형식·비공개 구현을 import·복제하거나 직접 결합하지 않는다.
+- 외부 연동 인터페이스는 provider·버전·entrypoint 교체와 새 adapter 추가가 기존 Core 계약을 바꾸지 않도록 좁고 명시적인 port, capability preflight와 typed request·receipt로 확장한다. 다만 1.0에 필요하지 않은 provider나 범용화를 예상해 추상화·설정·의존성을 미리 늘리지 않는다.
+- 역할 runner의 provider 관측 polling 기본값과 짧은 tick 반환 검증 상한은 1.0에서 `0.25`초로 두며 세부 권위는 코드와 회귀 검사다. 이는 hard real-time SLA나 단독 release Gate가 아니며 환경 변동이 있는 특정 소수점 수치만 맞추는 최적화를 우선하지 않는다. `run_once`가 provider 작업을 기다리지 않고 신속히 반환한다는 계약, 중복 효과 방지와 deadline·cancel·restart의 정확성을 우선한다.
+- 성능 미세 최적화는 1.0 필수 기능·안전·복구·설치·실제 요청 E2E를 충족한 뒤 수행할 수 있다. 그렇더라도 알려진 핵심 경로 실패, 완료 불가, 과도한 대기나 실제 설치 불가를 비차단으로 낮추지 않는다. 1.0은 대표 사용자 흐름을 실제 설치 환경에서 끝낼 수 있고 실패 시 안전하게 멈추거나 복구할 수 있는 상태여야 한다.
+
 ## 제품 목적과 경계
 
 FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정규화하고, Skeleton-first planning, 역할별 모델 배정, 계획 활성화, Task 생성·재개·관찰, 검증, 실패 분류, 제한 재시도와 최종 Goal 판정을 추적하는 로컬 Workflow Orchestrator다. revision 원장, 상태 전이, thread·turn binding, evidence와 recovery로 중복·유실·오완료를 막는다.

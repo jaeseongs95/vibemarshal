@@ -2219,11 +2219,14 @@ def _forced_termination_no_duplicate(
             runtime.journal.parent / "fault-injection.json",
             {
                 "kind": "in_process_collector_termination",
+                "scope": "collector callback forwarding only",
+                "not_proven": ("operating_system_process_termination",),
                 "injected_at": utc_now().isoformat(),
                 "job_id": job_id,
                 "attempt_id": dispatched.attempt_id,
                 "thread_id": binding.thread_id,
                 "turn_id": binding.turn_id,
+                "pre_fault_observation_digest": sha256_digest(pre_fault),
             },
         )
         lost = first_supervisor.mark_collector_lost(
@@ -2241,11 +2244,17 @@ def _forced_termination_no_duplicate(
             supervisor=restarted_supervisor,
         )
         observed = restarted_application.observe(prepared.project_id)
-        effect_counts_after = _attempt_effect_counts(prepared, dispatched.attempt_id)
+        repeated_tick_outcomes = tuple(
+            restarted_application.run_once(prepared.project_id)
+            for _ in range(3)
+        )
+        effect_counts_after_repeated_ticks = _attempt_effect_counts(
+            prepared, dispatched.attempt_id
+        )
         restart_counts = _journal_operation_counts(runtime.events[journal_offset:])
 
         with prepared.service.ledger.read() as connection:
-            job = connection.execute(
+            observed_job = connection.execute(
                 "SELECT status,thread_id,turn_id,provider_terminal_status,result_digest "
                 "FROM runtime_jobs WHERE id=?",
                 (job_id,),
@@ -2267,14 +2276,14 @@ def _forced_termination_no_duplicate(
 
         observation_kinds = [row["kind"] for row in observations]
         exact_binding_preserved = bool(
-            job is not None
-            and job["thread_id"] == binding.thread_id
-            and job["turn_id"] == binding.turn_id
+            observed_job is not None
+            and observed_job["thread_id"] == binding.thread_id
+            and observed_job["turn_id"] == binding.turn_id
         )
-        passed = all(
+        observation_window_passed = all(
             (
                 lost.status.value == "collector_lost",
-                job is not None and job["status"] == "running",
+                observed_job is not None and observed_job["status"] == "running",
                 attempt is not None and attempt["status"] == "running",
                 exact_binding_preserved,
                 "collector_lost" in observation_kinds,
@@ -2286,28 +2295,102 @@ def _forced_termination_no_duplicate(
                 restart_counts["start_turn"] == 0,
                 restart_counts["resume"] == 0,
                 restart_counts["interrupt"] == 0,
-                effect_counts_after == effect_counts_before,
+                effect_counts_after_repeated_ticks == effect_counts_before,
                 provider_call is not None,
+                all(
+                    outcome.action is RunOnceAction.OBSERVED
+                    for outcome in repeated_tick_outcomes
+                ),
             )
         )
+
+        # qualification evidence를 봉인한 뒤에도 live turn이나 재개 가능한 workflow를
+        # 남겨 두지 않는다. 정리는 중복 방지 관측 창과 분리한다.
+        cleanup_offset = len(runtime.events)
+        restarted_supervisor.request_interrupt(
+            job_id, reason="qualification_cell_cleanup"
+        )
+        cleanup_deadline = time.monotonic() + timeout_seconds
+        cleanup_statuses = []
+        cleanup_job = prepared.service.load_runtime_job(job_id)
+        cleanup_attempt = attempt
+        while time.monotonic() < cleanup_deadline:
+            cleanup_job = restarted_supervisor.tick(job_id)
+            cleanup_statuses.append(cleanup_job.status.value)
+            with prepared.service.ledger.read() as connection:
+                cleanup_attempt = connection.execute(
+                    "SELECT status,failure_class FROM attempts WHERE id=?",
+                    (dispatched.attempt_id,),
+                ).fetchone()
+            if cleanup_job.status.value == "provider_terminal":
+                break
+            time.sleep(0.05)
+        terminal_cleanup_job = cleanup_job
+        cleanup_control = restarted_application.cancel(
+            prepared.project_id,
+            reason="qualification cell cleanup after sealed observation window",
+        )
+        cleanup_observe = restarted_application.observe(prepared.project_id)
+        cleanup_job = prepared.service.load_runtime_job(job_id)
+        with prepared.service.ledger.read() as connection:
+            cleanup_attempt = connection.execute(
+                "SELECT status,failure_class FROM attempts WHERE id=?",
+                (dispatched.attempt_id,),
+            ).fetchone()
+        cleanup_counts = _journal_operation_counts(runtime.events[cleanup_offset:])
+        cleanup_passed = all(
+            (
+                terminal_cleanup_job.status.value == "provider_terminal",
+                terminal_cleanup_job.provider_terminal_status is not None,
+                cleanup_control["control_state"] == "cancelled",
+                cleanup_job.status.value == "consumed",
+                cleanup_attempt is not None,
+                cleanup_attempt["status"] == "interrupted",
+                cleanup_counts["create_thread"] == 0,
+                cleanup_counts["start_turn"] == 0,
+                cleanup_counts["resume"] == 0,
+                cleanup_counts["interrupt"] in {0, 1},
+            )
+        )
+        passed = observation_window_passed and cleanup_passed
         return {
             "passed": passed,
             "source_fixture_digest": source_digest,
             "binding": binding.model_dump(mode="json"),
             "fault_injection": fault,
-            "runtime_job": None if job is None else dict(job),
+            "runtime_job": None if observed_job is None else dict(observed_job),
             "runtime_observation": [dict(row) for row in observations],
-            "restart_journal": runtime.events[journal_offset:],
+            "restart_journal": runtime.events[journal_offset:cleanup_offset],
             "exact_binding_preserved": exact_binding_preserved,
+            "repeated_tick_actions": tuple(
+                outcome.action.value for outcome in repeated_tick_outcomes
+            ),
             "effect_count": restart_counts,
             "ledger": {
                 "attempt_id": dispatched.attempt_id,
                 "attempt_status": None if attempt is None else attempt["status"],
                 "failure_class": None if attempt is None else attempt["failure_class"],
                 "effect_counts_before": effect_counts_before,
-                "effect_counts_after": effect_counts_after,
+                "effect_counts_after": effect_counts_after_repeated_ticks,
                 "provider_call": None if provider_call is None else dict(provider_call),
                 "provider_call_counter_semantics": "new_turn_count is settled turns, not started turns",
+            },
+            "cleanup": {
+                "passed": cleanup_passed,
+                "terminal_job": terminal_cleanup_job.model_dump(mode="json"),
+                "final_job": cleanup_job.model_dump(mode="json"),
+                "control": cleanup_control,
+                "final_observe": cleanup_observe,
+                "attempt_status": (
+                    None if cleanup_attempt is None else cleanup_attempt["status"]
+                ),
+                "failure_class": (
+                    None if cleanup_attempt is None else cleanup_attempt["failure_class"]
+                ),
+                "effect_count": cleanup_counts,
+                "journal": runtime.events[cleanup_offset:],
+                "job_statuses": tuple(cleanup_statuses),
+                "post_cell_reuse_policy": "workflow_cancelled_and_attempt_terminal",
             },
             "last_observe": observed,
         }
@@ -2328,24 +2411,26 @@ def _absolute_timeout_no_duplicate(
 ) -> dict[str, Any]:
     """active exact turn의 job deadline을 만료시켜 중단·재관측·중복 차단을 검증한다."""
 
+    clock_state = {"override": None}
     supervisor = RuntimeJobSupervisor(
-        prepared.service, runtime, observation_timeout_seconds=5.0
-    )
-    fault_path = runtime.journal.parent / "fault-injection.json"
-    provider = _execution_proposal_provider(prepared, runtime, roles)
-    task_gate = _open_e2e_task_gate(prepared, runtime, roles, governance)
-    dispatcher = EngineDispatcher(
         prepared.service,
         runtime,
-        proposal_provider=provider,
-        supervisor=supervisor,
-        task_gate=task_gate,
+        observation_timeout_seconds=5.0,
+        clock=lambda: clock_state["override"] or utc_now(),
     )
-    if prepared.proposal is None and provider is None:
+    fault_path = runtime.journal.parent / "fault-injection.json"
+    application = EngineApplication(
+        prepared.service,
+        runtime=runtime,
+        role_configuration=roles,
+        governance=governance,
+        supervisor=supervisor,
+    )
+    if prepared.proposal is None and roles is None:
         raise QualificationRunError("absolute-timeout E2E에는 execution proposal provider가 필요합니다.")
 
     try:
-        outcome = dispatcher.run_once(
+        outcome = application.run_once(
             prepared.project_id, proposal=prepared.proposal
         )
         materialize_deadline = time.monotonic() + timeout_seconds
@@ -2356,11 +2441,11 @@ def _absolute_timeout_no_duplicate(
             if outcome.action is RunOnceAction.BLOCKED:
                 raise QualificationRunError(f"{outcome.blocker_code}: {outcome.detail}")
             time.sleep(0.01)
-            outcome = dispatcher.run_once(prepared.project_id)
+            outcome = application.run_once(prepared.project_id)
         if outcome.action is not RunOnceAction.MATERIALIZED:
             raise QualificationRunError("absolute-timeout E2E execution spec materialize timeout")
 
-        dispatched = dispatcher.run_once(prepared.project_id)
+        dispatched = application.run_once(prepared.project_id)
         if dispatched.action is not RunOnceAction.DISPATCHED or dispatched.attempt_id is None:
             raise QualificationRunError("absolute-timeout E2E에서 execution Attempt를 시작하지 못했습니다.")
         binding, job_id = _await_active_execution_binding(
@@ -2381,19 +2466,7 @@ def _absolute_timeout_no_duplicate(
                 "absolute-timeout fault 주입 대상이 active exact turn과 다릅니다."
             )
         observed_deadline_at = bound_job.absolute_deadline_at
-        deadline_supervisor = RuntimeJobSupervisor(
-            prepared.service,
-            runtime,
-            observation_timeout_seconds=5.0,
-            clock=lambda: observed_deadline_at,
-        )
-        deadline_dispatcher = EngineDispatcher(
-            prepared.service,
-            runtime,
-            proposal_provider=provider,
-            supervisor=deadline_supervisor,
-            task_gate=task_gate,
-        )
+        clock_state["override"] = observed_deadline_at
         fault = _write_fault_injection(
             fault_path,
             {
@@ -2406,6 +2479,8 @@ def _absolute_timeout_no_duplicate(
                 "absolute_deadline_at": observed_deadline_at.isoformat(),
                 "injected_clock_at": observed_deadline_at.isoformat(),
                 "clock_provenance": "fault_injected",
+                "clock_before_fault": "utc_now",
+                "terminal_observation_grace_exercised": False,
                 "ledger_observed_at_may_precede_injected_clock": True,
                 "pre_fault_observation_digest": sha256_digest(pre_fault),
             },
@@ -2418,7 +2493,7 @@ def _absolute_timeout_no_duplicate(
         last_outcome = outcome
         deadline = time.monotonic() + timeout_seconds
         while time.monotonic() < deadline:
-            last_outcome = deadline_dispatcher.run_once(prepared.project_id)
+            last_outcome = application.run_once(prepared.project_id)
             with prepared.service.ledger.read() as connection:
                 attempt = connection.execute(
                     "SELECT status,failure_class FROM attempts WHERE id=?",
@@ -2429,7 +2504,7 @@ def _absolute_timeout_no_duplicate(
             if attempt_status == "failed":
                 break
             time.sleep(0.05)
-        blocked = deadline_dispatcher.run_once(prepared.project_id)
+        blocked = application.run_once(prepared.project_id)
         effect_counts_after = _attempt_effect_counts(prepared, dispatched.attempt_id)
         timeout_counts = _journal_operation_counts(runtime.events[journal_offset:])
 
@@ -2508,6 +2583,7 @@ def _absolute_timeout_no_duplicate(
             "exact_binding_preserved": exact_binding_preserved,
             "run_once_blocker": blocked.blocker_code,
             "last_action": last_outcome.action.value,
+            "supervisor_reused_across_deadline": True,
             "effect_count": timeout_counts,
             "ledger": {
                 "attempt_id": dispatched.attempt_id,
@@ -2529,7 +2605,7 @@ def _absolute_timeout_no_duplicate(
             },
         }
     finally:
-        task_gate.close()
+        application.close_task_gate()
 
 
 def _responsibility_outcome(

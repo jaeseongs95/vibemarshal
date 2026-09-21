@@ -891,10 +891,28 @@ class EngineE2EQualificationTests(unittest.TestCase):
             self.assertEqual(0, result["effect_count"]["resume"])
             self.assertEqual(0, result["effect_count"]["interrupt"])
             self.assertGreaterEqual(result["effect_count"]["read_stored"], 1)
+            self.assertEqual(("observed", "observed", "observed"), result["repeated_tick_actions"])
             self.assertEqual(
                 result["ledger"]["effect_counts_before"],
                 result["ledger"]["effect_counts_after"],
             )
+            self.assertTrue(result["cleanup"]["passed"], result["cleanup"])
+            self.assertEqual("provider_terminal", result["cleanup"]["terminal_job"]["status"])
+            self.assertEqual(
+                "interrupted",
+                result["cleanup"]["terminal_job"]["provider_terminal_status"],
+            )
+            self.assertEqual("consumed", result["cleanup"]["final_job"]["status"])
+            self.assertEqual("cancelled", result["cleanup"]["control"]["control_state"])
+            self.assertEqual("interrupted", result["cleanup"]["attempt_status"])
+            self.assertEqual(
+                "workflow_cancelled_and_attempt_terminal",
+                result["cleanup"]["post_cell_reuse_policy"],
+            )
+            self.assertEqual(0, result["cleanup"]["effect_count"]["create_thread"])
+            self.assertEqual(0, result["cleanup"]["effect_count"]["start_turn"])
+            self.assertEqual(0, result["cleanup"]["effect_count"]["resume"])
+            self.assertEqual(1, result["cleanup"]["effect_count"]["interrupt"])
 
             (cell_root / "qualification-observation.json").write_text(
                 json.dumps(result), encoding="utf-8"
@@ -966,6 +984,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
             self.assertEqual("ABSOLUTE_DEADLINE_EXCEEDED", result["ledger"]["evidence"]["observation"]["failure_diagnosis"]["local_engine_code"])
             self.assertEqual("ENVIRONMENT_RECOVERY_REQUIRED", result["run_once_blocker"])
             self.assertEqual("consumed", result["runtime_job"]["status"])
+            self.assertTrue(result["supervisor_reused_across_deadline"])
             self.assertEqual(0, result["effect_count"]["create_thread"])
             self.assertEqual(0, result["effect_count"]["start_turn"])
             self.assertEqual(0, result["effect_count"]["resume"])
