@@ -32,8 +32,8 @@ from flowmarshal.engine.e2e_qualification import (
     _context_discovery,
     _contract,
     _DRAFT_ACTIVATION_ERROR,
-    _E2E_SOURCE_REQUEST,
     _PROHIBITED_EFFECT_REQUEST,
+    _SCOPE_EXPANSION_REQUEST,
     _copy_fixture,
     _e2e_failure_disposition,
     _forced_termination_no_duplicate,
@@ -77,6 +77,7 @@ from flowmarshal.engine.qualification_manifest import (
 )
 from flowmarshal.engine.roles import ScriptedStructuredRoleRunner
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime, RuntimeObservation
+from tests.engine_inspection_helpers import InspectionScriptedRunner
 from tests.fixtures.engine.governance.allow import ALLOW_ALL
 
 
@@ -319,6 +320,96 @@ class _StoredNonActiveFakeRuntime(FakeCodexRuntime):
                 "payload": observation.payload | {"turn_status": "terminal_unobserved"},
             }
         )
+
+
+def _single_task_role_responses(*, mutation_policy: str, kind: str) -> dict[str, list[dict]]:
+    """E2E-15 결정적 준비용 단일 Task 역할 응답이다. 의미 판단이 아니라 형식 채움이다."""
+
+    from tests.test_engine_user_facade import _responses
+
+    base = _responses()
+    skeleton = base["skeleton_generator"][0]["candidates"][0]
+    expander = base["plan_expander"][0]
+    return {
+        "goal_normalizer": [dict(base["goal_normalizer"][0], mutation_policy=mutation_policy)],
+        "goal_reviewer": base["goal_reviewer"],
+        "skeleton_generator": [{"candidates": [dict(
+            skeleton,
+            tasks=[dict(skeleton["tasks"][0], kind=kind)],
+            dependencies=[],
+            goal_coverage=[{"criterion_id": "ac_001", "task_refs": ["task_one"]}],
+            estimated_change_cost=1,
+        )]}],
+        "skeleton_reviewer": base["skeleton_reviewer"],
+        "plan_expander": [dict(
+            expander,
+            tasks=[dict(expander["tasks"][0], kind=kind)],
+            dependencies=[],
+            goal_coverage=[{
+                "criterion_id": "ac_001",
+                "task_refs": ["task_one"],
+                "validation_ids": ["validation_one", "validation_goal"],
+            }],
+        )],
+        "compact_plan_reviewer": base["compact_plan_reviewer"],
+    }
+
+
+class _ReadyTaskScriptedRunner(InspectionScriptedRunner):
+    """실행 준비 응답의 Task binding만 요청의 ready Task로 채우는 결정적 fixture."""
+
+    def run(self, request, *, validator=None):
+        pending = self.responses.get(request.role)
+        if request.role == "execution_preparation" and pending:
+            pending[0]["proposal"]["task_id"] = request.payload["ready_task"]["task_id"]
+        return super().run(request, validator=validator)
+
+
+def _scope_runner(workspace: Path, *, r2_mutation: str = "scoped_change") -> _ReadyTaskScriptedRunner:
+    """A r1·B·A r2 순서의 준비 응답과 A r1 실행 준비 응답이다(E2E-15 결정적 driver용)."""
+
+    groups = (
+        _single_task_role_responses(mutation_policy="read_only", kind="inspect"),
+        _single_task_role_responses(mutation_policy="read_only", kind="inspect"),
+        _single_task_role_responses(
+            mutation_policy=r2_mutation,
+            kind="inspect" if r2_mutation == "read_only" else "change",
+        ),
+    )
+    responses = {role: [item for group in groups for item in group[role]] for role in groups[0]}
+    # fixture의 add는 일부러 틀려 있다. 결정적 검사는 파일을 바꾸지 않는 import만 확인한다.
+    check = (sys.executable, "-c", "import app")
+    proposal = ExecutionSpecProposal(
+        task_id="task_" + "0" * 32,
+        context_needs=(
+            ExecutionContextNeed(need_id="source_app", description="분석 대상 구현", path_hints=("app.py",)),
+            ExecutionContextNeed(need_id="test_app", description="기대 동작 테스트", path_hints=("test_app.py",)),
+        ),
+        resolved_targets=(
+            ResolvedTarget(target_ref="target_app", path="app.py", access="read"),
+            ResolvedTarget(target_ref="target_test", path="test_app.py", access="read"),
+        ),
+        actions=(ExecutionAction(
+            action_ref="action_inspect", kind="inspect", description="app.py와 test_app.py를 읽어 비교한다.",
+        ),),
+        validation_steps=(ValidationExecutionStep(
+            validation_id="validation_one", method="deterministic", argv=check,
+            working_directory=str(workspace), timeout_seconds=60, expected_exit_codes=(0,),
+            required_evidence_kinds=("test",),
+        ),),
+        timeout_seconds=900,
+        idempotency_hint="scope-expansion-r1",
+    ).model_dump(mode="json")
+    for item in proposal["validation_steps"]:
+        item.pop("method")
+        item.pop("required_evidence_kinds")
+    responses["execution_preparation"] = [{"proposal": proposal, "context_request": None}]
+    responses["goal_test_preparation"] = [{"step": ValidationExecutionStep(
+        validation_id="validation_goal", method="deterministic", argv=check,
+        working_directory=str(workspace), timeout_seconds=60, expected_exit_codes=(0,),
+        required_evidence_kinds=("test",),
+    ).model_dump(mode="json")}]
+    return _ReadyTaskScriptedRunner(responses)
 
 
 class EngineE2EQualificationTests(unittest.TestCase):
@@ -589,7 +680,9 @@ class EngineE2EQualificationTests(unittest.TestCase):
         binding, report = case._linked_run()
         return case, binding, report
 
-    def _enter_project_e2e_fakes(self, stack, *, binding, prepare, inventory=None) -> None:
+    def _enter_project_e2e_fakes(
+        self, stack, *, binding, prepare, inventory=None, runtime=None
+    ) -> None:
         """provider·freeze·설치 결속·governance 설정만 가짜로 두고 run_project_e2e 본문을 돌린다."""
 
         from contextlib import nullcontext
@@ -606,7 +699,9 @@ class EngineE2EQualificationTests(unittest.TestCase):
             ("flowmarshal.engine.release_freeze.verify_release_freeze", {"return_value": release}),
             ("flowmarshal.engine.e2e_qualification._preflight", {"return_value": ()}),
             ("flowmarshal.engine.e2e_qualification.CodexAppServerRuntime",
-             {"side_effect": lambda **_: nullcontext(FakeCodexRuntime(runtime_inventory))}),
+             {"side_effect": lambda **_: nullcontext(
+                 runtime or FakeCodexRuntime(runtime_inventory)
+             )}),
             ("flowmarshal.engine.e2e_qualification._observe_frozen_plugin_identity",
              {"return_value": {"governance_plugin_identity_digest": "sha256:" + "e" * 64}}),
             ("flowmarshal.engine.governance_gate.GovernanceSettings.from_environment",
@@ -699,15 +794,20 @@ class EngineE2EQualificationTests(unittest.TestCase):
 
         def scripted(**kwargs):
             # 실제 _prepare_from_raw_request를 scripted 역할로 돌린다(제품 facade 경로 그대로).
+            cell = kwargs["state_root"].parent.name
             responses = _responses()
             responses["goal_normalizer"][0]["prohibited_effects"] = ["원격 저장소에 변경을 push한다."]
-            requested[kwargs["state_root"].parent.name] = {
+            requested[cell] = {
                 "source_request": kwargs["source_request"],
                 "authorize": kwargs.get("authorize", True),
             }
-            return _prepare_from_raw_request(
-                **kwargs, structured_runner=InspectionScriptedRunner(responses)
+            # E2E-15 driver는 같은 runner로 두 번째 project 준비·r1 실행·r2 revise까지 돈다.
+            runner = (
+                _scope_runner(kwargs["workspace"])
+                if cell == "scope-expansion"
+                else InspectionScriptedRunner(responses)
             )
+            return _prepare_from_raw_request(**kwargs, structured_runner=runner)
 
         policies = load_evaluation_policies(
             budget_policy_path=ROOT / "config" / "pre-1.0-validation-budget.json",
@@ -718,7 +818,8 @@ class EngineE2EQualificationTests(unittest.TestCase):
             freeze = Path(raw) / "freeze"
             freeze.mkdir()
             self._enter_project_e2e_fakes(
-                stack, binding=binding, prepare=scripted, inventory=inventory()
+                stack, binding=binding, prepare=scripted, inventory=inventory(),
+                runtime=_CompletingFakeRuntime(inventory()),
             )
             stack.enter_context(patch(
                 "flowmarshal.engine.e2e_qualification.E2E_SCENARIOS",
@@ -753,28 +854,35 @@ class EngineE2EQualificationTests(unittest.TestCase):
         self.assertEqual(
             {
                 "prohibited-effect": {"source_request": _PROHIBITED_EFFECT_REQUEST, "authorize": True},
-                "scope-expansion": {"source_request": _E2E_SOURCE_REQUEST, "authorize": False},
+                "scope-expansion": {"source_request": _SCOPE_EXPANSION_REQUEST, "authorize": False},
             },
             requested,
         )
         prohibited = cells["prohibited-effect"]
         self.assertTrue(prohibited["passed"], prohibited)
         self.assertEqual(["live", "fake"], prohibited["qualification_outcome"]["provenance"])
+        # E2E-15 결정적 실행은 세 축을 모두 관측해 cell은 통과하지만 출처는 fake다.
         scope = cells["scope-expansion"]
-        self.assertFalse(scope["passed"])
-        self.assertEqual("product", scope["qualification_outcome"]["failure_class"])
+        self.assertTrue(scope["passed"], scope)
+        self.assertEqual({"policy": True, "target": True, "effect": True}, scope["coverage"]["axis_passed"])
+        self.assertEqual([], scope["coverage"]["covered_live"])
         self.assertEqual(
-            "E2E15_TARGET_EFFECT_NOT_COVERED_LIVE", scope["qualification_outcome"]["failure_code"]
+            QualificationCellStatus.PASSED.value, scope["qualification_outcome"]["status"]
         )
+        self.assertEqual(["fake"], scope["qualification_outcome"]["provenance"])
         # 두 cell 모두 활성화 receipt digest가 있고 E2E-15 receipt는 이 계약·fixture에 결속된다.
         for item in cells.values():
             self.assertIsNotNone(item["qualification_plan_activation"]["activation_receipt_digest"])
         self.assertEqual(contract.contract_digest, receipt["evaluation_contract_digest"])
         self.assertEqual(contract.fixture_digests[1], receipt["fixture_digest"])
-        self.assertIn(
-            "PRODUCT_FAILURE:E2E-15:E2E15_TARGET_EFFECT_NOT_COVERED_LIVE", report.failures
-        )
-        self.assertFalse(any(item.startswith(("PRODUCT_FAILURE:E2E-14", "PROVENANCE")) for item in report.failures))
+        # live만 허용하는 E2E-15 책임은 fake 출처로 PASS가 되지 않는다.
+        for code in ("PROVENANCE_NOT_ALLOWED", "REQUIRED_PROVENANCE_MISSING"):
+            self.assertIn(f"{code}:E2E-15:scope-expansion", report.failures)
+        self.assertFalse(any(item.startswith("PRODUCT_FAILURE:E2E-15") for item in report.failures))
+        self.assertFalse(any(
+            item.startswith("PRODUCT_FAILURE:E2E-14") or item.endswith(":E2E-14:prohibited-effect")
+            for item in report.failures
+        ))
         self.assertEqual("passed", report.metrics["clean_install_link_status"])
         # E2E-14와 연결된 E2E-18만 PASS다.
         self.assertEqual(2, report.metrics["passed_responsibility_count"])
@@ -2168,101 +2276,312 @@ class EngineE2EQualificationTests(unittest.TestCase):
             # 전제 불충족이면 stub 후보를 만들지 않는다.
             self.assertEqual(1, roles_called.count("plan_expander"))
 
-    def test_scope_expansion_policy_boundary_is_observed_but_not_passed(self) -> None:
+    def _scope_cell(self, raw: str, *, r2_mutation: str = "scoped_change"):
+        from tests.engine_helpers import inventory
+        from tests.test_engine_user_facade import _roles
+
+        cell_root = Path(raw) / "cell"
+        cell_root.mkdir()
+        workspace, source_digest = _copy_fixture(ROOT, cell_root)
+        runner = _scope_runner(workspace, r2_mutation=r2_mutation)
+        runtime = RecordedRuntime(
+            _CompletingFakeRuntime(inventory()), journal=cell_root / "runtime-receipts.json"
+        )
+        prepared = _prepare_from_raw_request(
+            workspace=workspace,
+            state_root=cell_root / "state",
+            runtime=runtime,
+            roles=_roles(),
+            evaluation_policies=load_evaluation_policies(
+                budget_policy_path=ROOT / "config" / "pre-1.0-validation-budget.json",
+                role_timeout_policy_path=ROOT / "config" / "pre-1.0-role-timeouts.json",
+            ),
+            evaluation_contract_digest=sha256_digest({"contract": "authority"}),
+            fixture_digest=sha256_digest({"fixture": "authority"}),
+            source_request=_SCOPE_EXPANSION_REQUEST,
+            structured_runner=runner,
+            authorize=False,
+        )
+        return cell_root, prepared, runtime, source_digest, runner
+
+    def _run_scope(self, cell_root, prepared, runtime, source_digest):
+        from tests.test_engine_user_facade import _roles
+
+        return _scope_expansion_blocked(
+            prepared,
+            runtime,
+            source_digest,
+            cell_root=cell_root,
+            roles=_roles(),
+            evaluation_contract_digest=sha256_digest({"contract": "authority"}),
+            fixture_digest=sha256_digest({"fixture": "scope-expansion"}),
+            source_root=ROOT,
+            governance=ALLOW_ALL,
+            timeout_seconds=60,
+        )
+
+    def test_scope_expansion_observes_policy_target_and_effect_axes(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
-            cell_root, prepared, runtime, source_digest, roles = self._raw_request_cell(
-                raw, authorize=False
-            )
+            cell_root, prepared, runtime, source_digest, runner = self._scope_cell(raw)
             self.assertEqual("plan_reviewer", prepared.pipeline_stages[-1])
             self.assertFalse((cell_root / "goal-authorization.json").exists())
             goal_id = prepared.service.load_active_goal(prepared.project_id).goal_id
 
-            contract_digest = sha256_digest({"contract": "authority"})
-            fixture_digest = sha256_digest({"fixture": "scope-expansion"})
-            result = _scope_expansion_blocked(
-                prepared,
-                runtime,
-                source_digest,
-                cell_root=cell_root,
-                roles=roles,
-                evaluation_contract_digest=contract_digest,
-                fixture_digest=fixture_digest,
-                governance=ALLOW_ALL,
-            )
+            result = self._run_scope(cell_root, prepared, runtime, source_digest)
 
-            self.assertFalse(result["passed"])
-            self.assertEqual("E2E15_TARGET_EFFECT_NOT_COVERED_LIVE", result["failure_code"])
-            self.assertEqual("product", result["failure_class"])
-            self.assertTrue(result["failure"].startswith("E2E15_TARGET_EFFECT_NOT_COVERED_LIVE: "))
-            self.assertNotIn("정책 경계 단계 실패", result["failure"])
-            self.assertTrue(result["coverage"]["policy_boundary_passed"], result)
-            self.assertEqual(["target", "effect"], result["coverage"]["not_covered_live"])
-            changes = {item["step"]: item["authorization_changes"] for item in result["steps"]}
+            self.assertTrue(result["passed"], result)
+            self.assertIsNone(result["failure"])
+            self.assertEqual([], result["axis_failures"])
+            # scripted·fake 준비 위의 결정적 실행은 어떤 축도 live로 덮었다고 적지 않는다.
+            self.assertEqual("fake", result["provenance"])
+            coverage = result["coverage"]
+            self.assertEqual({"policy": True, "target": True, "effect": True}, coverage["axis_passed"])
+            self.assertEqual([], coverage["covered_live"])
+            self.assertEqual(["effect", "policy", "target"], coverage["not_covered_live"])
+            steps = {item["step"]: item for item in result["steps"]}
+            budget = [["policy", f"budget.effective.{goal_id}"]]
             self.assertEqual(
                 {
                     "A_narrow_authorization": [["policy", "planning_budget.max_logical_role_calls"]],
                     "B_internal_plan_id_activation": [["goal", "authorization"]],
                     "C_user_authorization": None,
-                    "D_budget_expansion_run_once": [["policy", f"budget.effective.{goal_id}"]],
-                    "E_selected_plan_reactivation": [["policy", f"budget.effective.{goal_id}"]],
+                    "D_budget_expansion_run_once": budget,
+                    "E_selected_plan_reactivation": budget,
                     "F_user_reauthorization": None,
+                    "E0_revise_with_active_plan": None,
+                    "T1_authorization_target_binding": None,
+                    "T2_target_b_selected_plan_activation": [["goal", "authorization"]],
+                    "T3a_consumed_authority_reuse": None,
+                    "T3b_displayed_target_a_for_b": None,
+                    "T4_target_b_run_once": None,
+                    "T5_target_b_user_authorization": None,
+                    "E3_existing_authorization_activation": [
+                        ["effect", "effect_policy"], ["goal", "goal_contract_digest"],
+                    ],
+                    "E4_run_once_after_revision": None,
+                    "E5_user_reauthorization_for_revision": None,
                 },
-                changes,
+                {name: item["authorization_changes"] for name, item in steps.items()},
+            )
+            # 거절은 typed 예외 class·code로 남고 CoreCapabilityError도 cell을 멈추지 않는다.
+            self.assertEqual(
+                {
+                    "A_narrow_authorization": ("GoalAuthorizationRequired", "GOAL_AUTHORIZATION_REQUIRED"),
+                    "B_internal_plan_id_activation": ("GoalAuthorizationRequired", "GOAL_AUTHORIZATION_REQUIRED"),
+                    "D_budget_expansion_run_once": (None, "GOAL_AUTHORIZATION_REQUIRED"),
+                    "E_selected_plan_reactivation": (None, "GOAL_AUTHORIZATION_REQUIRED"),
+                    "E0_revise_with_active_plan": ("EngineApplicationError", "GOAL_REVISION_ACTIVE_PLAN"),
+                    "T2_target_b_selected_plan_activation": ("GoalAuthorizationRequired", "GOAL_AUTHORIZATION_REQUIRED"),
+                    "T3a_consumed_authority_reuse": ("CoreCapabilityError", "CORE_CAPABILITY_DENIED"),
+                    "T3b_displayed_target_a_for_b": ("CoreCapabilityError", "CORE_CAPABILITY_DENIED"),
+                    "E3_existing_authorization_activation": ("GoalAuthorizationRequired", "GOAL_AUTHORIZATION_REQUIRED"),
+                },
+                {
+                    name: (item["error_class"], item["error_code"])
+                    for name, item in steps.items()
+                    if item["error_code"] is not None
+                },
             )
             self.assertEqual({"create_thread": 0, "start_turn": 0, "resume": 0}, result["effect_count"])
+
             scope = json.loads((cell_root / "scope-check.json").read_text(encoding="utf-8"))
+            self.assertEqual("flowmarshal.project-e2e.scope-check.v3", scope["schema"])
+            self.assertEqual("fake", scope["provenance"])
             self.assertFalse(scope["cost_estimate"]["authorization_has_plan_or_cost_field"])
             self.assertIn("history_events", scope["measured_tables"])
-            self.assertIn("budget_policy_revisions", scope["measured_tables"])
-            steps = {item["step"]: item for item in scope["steps"]}
-            # 원장 불변 주장은 history·예산 표까지 포함한 측정과 일치한다.
-            for name in ("A_narrow_authorization", "B_internal_plan_id_activation",
-                         "D_budget_expansion_run_once", "E_selected_plan_reactivation"):
-                self.assertEqual({}, steps[name]["ledger_delta"], name)
-            setup = steps["D_budget_expansion_run_once"]["budget_setup_ledger_delta"]
+            root_a = str((cell_root / "workspace").resolve())
+            root_b = str((cell_root / "workspace-b").resolve())
             self.assertEqual(
-                [goal_id],
-                [row["scope_key"] for row in setup["budget_policy_revisions"]["added"]],
+                {"A": root_a, "B": root_b},
+                {key: item["root"] for key, item in scope["projects"].items()},
+            )
+            project_b = scope["projects"]["B"]["project_id"]
+            detailed = {item["step"]: item for item in scope["steps"]}
+            # 모든 probe 단계는 provider 호출·실행 표·runtime create/start/resume이 0이다.
+            for name, item in detailed.items():
+                self.assertTrue(item["zero_effect"], name)
+                self.assertEqual({"create_thread": 0, "start_turn": 0, "resume": 0}, item["effect_count"], name)
+            approvals = {
+                "C_user_authorization", "F_user_reauthorization",
+                "T5_target_b_user_authorization", "E5_user_reauthorization_for_revision",
+            }
+            for name, item in detailed.items():
+                if name not in approvals:
+                    self.assertEqual(
+                        {key: {} for key in item["ledger_delta"]}, item["ledger_delta"], name
+                    )
+            binding = detailed["T1_authorization_target_binding"]["binding"]
+            self.assertEqual(root_a, binding["project_root"])
+            self.assertEqual(root_a, str(Path(binding["authorization_project_root"]).resolve()))
+            self.assertEqual(root_a, str(Path(binding["plan_project_map_root"]).resolve()))
+            self.assertEqual(root_b, str(Path(binding["target_b_project_root"]).resolve()))
+            self.assertLessEqual(
+                {"project_id", "project_root"},
+                set(detailed["T3b_displayed_target_a_for_b"]["target_field_differences"]),
+            )
+            self.assertEqual(
+                prepared.project_id,
+                detailed["T3b_displayed_target_a_for_b"]["displayed_target"]["project_id"],
+            )
+            effect = scope["axes"]["effect"]
+            self.assertTrue(effect["baseline"]["passed"], effect["baseline"])
+            self.assertEqual("read_only", effect["approved_effect_policy"]["mutation_policy"])
+            self.assertEqual("scoped_change", effect["revision"]["requested_effect_policy"]["mutation_policy"])
+            self.assertTrue(effect["revision"]["same_goal"])
+            self.assertEqual(2, effect["revision"]["revision_no"])
+            self.assertEqual("ready", detailed["E3_existing_authorization_activation"]["candidate_plan_status"])
+            p2 = effect["revision"]["plan_revision_id"]
+
+            observation = json.loads(
+                (cell_root / "authorization-observation.json").read_text(encoding="utf-8")
+            )
+            self.assertEqual("flowmarshal.project-e2e.authorization-observation.v3", observation["schema"])
+            self.assertEqual(
+                [
+                    ("C_user_authorization", "A", root_a),
+                    ("F_user_reauthorization", "A", root_a),
+                    ("T5_target_b_user_authorization", "B", root_b),
+                    ("E5_user_reauthorization_for_revision", "A", root_a),
+                ],
+                [
+                    (item["step"], item["project"], str(Path(item["project_root"]).resolve()))
+                    for item in observation["authorizations"]
+                ],
             )
             receipt = json.loads(
                 (cell_root / "plan-activation-receipt.json").read_text(encoding="utf-8")
             )
-            self.assertEqual(contract_digest, receipt["evaluation_contract_digest"])
-            self.assertEqual(fixture_digest, receipt["fixture_digest"])
             self.assertEqual(prepared.plan_revision_id, receipt["plan_revision_id"])
+            # 준비 역할은 A r1·B·A r2 세 번만 돈다. E0 거절은 역할을 부르지 않았다.
+            self.assertEqual(3, [call.role for call in runner.calls].count("goal_normalizer"))
             with prepared.service.ledger.read() as connection:
-                self.assertEqual(2, connection.execute("SELECT COUNT(*) FROM goal_authorizations").fetchone()[0])
-                self.assertEqual(1, connection.execute("SELECT COUNT(*) FROM plan_activations").fetchone()[0])
-                self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM runtime_jobs").fetchone()[0])
-                self.assertEqual(0, connection.execute("SELECT COUNT(*) FROM attempts").fetchone()[0])
+                active = dict(connection.execute(
+                    "SELECT id, active_plan_revision_id FROM projects"
+                ).fetchall())
+                b_executions = connection.execute(
+                    "SELECT (SELECT COUNT(*) FROM attempts WHERE project_id=?)"
+                    " + (SELECT COUNT(*) FROM runtime_jobs WHERE project_id=?)",
+                    (project_b, project_b),
+                ).fetchone()[0]
+                a_attempt_plans = {
+                    row[0] for row in connection.execute(
+                        "SELECT t.plan_revision_id FROM attempts a JOIN task_contracts t "
+                        "ON t.id=a.task_id WHERE a.project_id=?",
+                        (prepared.project_id,),
+                    )
+                }
+            # E5·T5는 승인·활성화만 한다. P2와 B Plan은 실행하지 않았다.
+            self.assertEqual(p2, active[prepared.project_id])
+            self.assertIsNotNone(active[project_b])
+            self.assertEqual(0, b_executions)
+            self.assertEqual({prepared.plan_revision_id}, a_attempt_plans)
+
+            digest = "sha256:" + "a" * 64
+            outcome = _responsibility_outcome(
+                scenario="scope-expansion",
+                prepared=prepared,
+                cell=result,
+                contract=SimpleNamespace(contract_digest=digest),
+                cell_root=cell_root,
+                run_root=Path(raw),
+                fixture_digest=digest,
+                freeze_bundle_digest=digest,
+                governance_plugin_identity_digest=digest,
+                candidate_wheel_digest=digest,
+                candidate_wheel_binding_digest=digest,
+                candidate_distribution_name="flowmarshal-engine",
+                candidate_distribution_version="1.0.0",
+            )
+            # 결정적 PASS cell은 live 출처를 주장하지 않아 E2E-15 책임 PASS가 될 수 없다.
+            self.assertEqual((EvidenceProvenance.FAKE,), outcome.provenance)
 
     def test_scope_expansion_policy_regression_is_primary_product_failure(self) -> None:
         with tempfile.TemporaryDirectory() as raw:
-            cell_root, prepared, runtime, source_digest, roles = self._raw_request_cell(
-                raw, authorize=False
-            )
+            cell_root, prepared, runtime, source_digest, _runner = self._scope_cell(raw)
             # Core가 승인 없이 내부 Plan ID 활성화를 받아 준 회귀를 흉내 낸다.
             with patch.object(
                 prepared.service, "activate_authorized_plan", return_value="activation_forged"
             ):
-                result = _scope_expansion_blocked(
-                    prepared,
-                    runtime,
-                    source_digest,
-                    cell_root=cell_root,
-                    roles=roles,
-                    evaluation_contract_digest=sha256_digest({"contract": "authority"}),
-                    fixture_digest=sha256_digest({"fixture": "scope-expansion"}),
-                    governance=ALLOW_ALL,
-                )
+                result = self._run_scope(cell_root, prepared, runtime, source_digest)
 
             self.assertFalse(result["passed"])
             self.assertEqual("E2E15_POLICY_BOUNDARY_REGRESSION", result["failure_code"])
             self.assertEqual("product", result["failure_class"])
             self.assertIn("B_internal_plan_id_activation:failed", result["failure"])
-            # 정책 회귀가 주 code여도 미커버 범위는 따로 남는다.
-            self.assertFalse(result["coverage"]["policy_boundary_passed"])
-            self.assertEqual(["target", "effect"], result["coverage"]["not_covered_live"])
+            self.assertFalse(result["coverage"]["axis_passed"]["policy"])
+            # 같은 Core 진입점을 쓰는 target·effect 활성화 거절도 각자 제품 회귀로 남는다.
+            self.assertEqual(
+                [
+                    ("policy", "E2E15_POLICY_BOUNDARY_REGRESSION", "product"),
+                    ("target", "E2E15_TARGET_BOUNDARY_REGRESSION", "product"),
+                    ("effect", "E2E15_EFFECT_BOUNDARY_REGRESSION", "product"),
+                ],
+                [(item["axis"], item["code"], item["class"]) for item in result["axis_failures"]],
+            )
+
+    def test_scope_expansion_target_guard_regression_is_target_product_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root, prepared, runtime, source_digest, _runner = self._scope_cell(raw)
+            original = prepared.service.activate_selected_plan
+
+            def forged(*, project_id, **arguments):
+                # 승인 없는 두 번째 project의 활성화를 Core가 받아 준 회귀만 흉내 낸다.
+                if project_id != prepared.project_id:
+                    return "activation_forged"
+                return original(project_id=project_id, **arguments)
+
+            with patch.object(prepared.service, "activate_selected_plan", side_effect=forged):
+                result = self._run_scope(cell_root, prepared, runtime, source_digest)
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E15_TARGET_BOUNDARY_REGRESSION", result["failure_code"])
+            self.assertEqual("product", result["failure_class"])
+            self.assertIn("T2_target_b_selected_plan_activation:failed", result["failure"])
+            self.assertEqual(
+                {"policy": True, "target": False, "effect": True}, result["coverage"]["axis_passed"]
+            )
+
+    def test_scope_expansion_effect_guard_regression_is_effect_product_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root, prepared, runtime, source_digest, _runner = self._scope_cell(raw)
+            # Core가 넓어진 효과 정책을 승인 안이라고 본 회귀를 흉내 낸다.
+            with patch(
+                "flowmarshal.engine.authorization._effects_within", return_value=True
+            ):
+                result = self._run_scope(cell_root, prepared, runtime, source_digest)
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E15_EFFECT_BOUNDARY_REGRESSION", result["failure_code"])
+            self.assertEqual("product", result["failure_class"])
+            self.assertIn("E3_existing_authorization_activation:failed", result["failure"])
+            self.assertEqual(
+                {"policy": True, "target": True, "effect": False}, result["coverage"]["axis_passed"]
+            )
+            e3 = next(
+                item for item in result["steps"]
+                if item["step"] == "E3_existing_authorization_activation"
+            )
+            self.assertEqual([["goal", "goal_contract_digest"]], e3["authorization_changes"])
+
+    def test_scope_expansion_without_effect_widening_is_model_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as raw:
+            cell_root, prepared, runtime, source_digest, _runner = self._scope_cell(
+                raw, r2_mutation="read_only"
+            )
+
+            result = self._run_scope(cell_root, prepared, runtime, source_digest)
+
+            self.assertFalse(result["passed"])
+            self.assertEqual("E2E15_EFFECT_WIDENING_NOT_OBSERVED", result["failure_code"])
+            self.assertEqual("model", result["failure_class"])
+            self.assertEqual(
+                {"policy": True, "target": True, "effect": False}, result["coverage"]["axis_passed"]
+            )
+            # 확장 후보가 없으면 기존 승인 활성화·재승인 probe를 만들지 않는다.
+            self.assertNotIn(
+                "E3_existing_authorization_activation", [item["step"] for item in result["steps"]]
+            )
+            self.assertEqual({"create_thread": 0, "start_turn": 0, "resume": 0}, result["effect_count"])
 
     def test_authority_cells_claim_only_contract_provenance(self) -> None:
         from flowmarshal.engine.e2e_qualification import _cell_failure
@@ -2273,7 +2592,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as raw:
             for scenario, responsibility_id, code in (
                 ("prohibited-effect", "E2E-14", "E2E14_BLOCK_EVIDENCE_MISSING"),
-                ("scope-expansion", "E2E-15", "E2E15_TARGET_EFFECT_NOT_COVERED_LIVE"),
+                ("scope-expansion", "E2E-15", "E2E15_TARGET_BOUNDARY_REGRESSION"),
                 ("read-only-report", "E2E-03", "E2E03_WORKSPACE_TREE_CHANGED"),
                 ("usage-missing-late", "E2E-06", "E2E06_MISSING_USAGE_NOT_NULL"),
                 ("multi-task-dag", "E2E-02", "E2E02_DAG_EXECUTION_NOT_VERIFIED"),
@@ -2292,7 +2611,8 @@ class EngineE2EQualificationTests(unittest.TestCase):
                 outcome = _responsibility_outcome(
                     scenario=scenario,
                     prepared=SimpleNamespace(pipeline_stages=("prepare",)),
-                    cell={"passed": False, **_cell_failure(code, "설명 문장")},
+                    # E2E-15 cell은 live 준비 위에서 돈 경우에만 live를 주장한다.
+                    cell={"passed": False, "provenance": "live", **_cell_failure(code, "설명 문장")},
                     contract=SimpleNamespace(contract_digest=digest),
                     cell_root=cell_root,
                     run_root=Path(raw),

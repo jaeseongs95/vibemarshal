@@ -969,8 +969,9 @@ class EngineService:
             if project["active_goal_revision_id"] != goal["id"]:
                 raise EngineServiceError("Planning search가 active Goal과 다릅니다.")
             state = tx.one(
-                "SELECT snapshot_digest FROM state_snapshots WHERE project_id = ? AND is_current = 1",
-                (project_id,),
+                "SELECT snapshot_digest FROM state_snapshots WHERE project_id = ? "
+                "AND goal_contract_digest = ? AND is_current = 1",
+                (project_id, outcome.goal_contract_digest),
             )
             if state["snapshot_digest"] != outcome.state_snapshot_digest:
                 raise EngineServiceError("Planning search가 current StateSnapshot과 다릅니다.")

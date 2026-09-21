@@ -1247,6 +1247,18 @@ def _cmd_prepare(arguments: argparse.Namespace) -> None:
     _emit(result)
 
 
+def _cmd_revise(arguments: argparse.Namespace) -> None:
+    if arguments.role_config is None:
+        raise EngineApplicationError("ROLE_CONFIGURATION_REQUIRED")
+    with _runtime(arguments) as runtime:
+        result = _application(arguments, runtime=runtime).revise(
+            arguments.project_id,
+            source_request=arguments.request,
+            candidate_count=arguments.candidate_count,
+        )
+    _emit(result)
+
+
 def _cmd_observe(arguments: argparse.Namespace) -> None:
     with _runtime(arguments) as runtime:
         result = _application(arguments, runtime=runtime).observe(arguments.project_id)
@@ -1348,6 +1360,22 @@ def build_parser() -> argparse.ArgumentParser:
         default=PLAN_INSPECTION_PROVIDER_V1,
     )
     prepare.set_defaults(handler=_cmd_prepare)
+
+    revise_facade = commands.add_parser(
+        "revise",
+        help="최신 Goal의 다음 revision을 실제 정규화·독립 review·Planning으로 준비(활성화는 authorize)",
+    )
+    revise_facade.add_argument("--project-id", required=True)
+    revise_facade.add_argument("--request", required=True)
+    revise_facade.add_argument("--role-config", required=True)
+    revise_facade.add_argument("--codex-bin")
+    revise_facade.add_argument("--candidate-count", type=int, choices=(1, 2, 3))
+    revise_facade.add_argument(
+        "--inspection-contract",
+        choices=(PLAN_INSPECTION_PROVIDER_V1, PLAN_INSPECTION_PROVIDER_V2),
+        default=PLAN_INSPECTION_PROVIDER_V1,
+    )
+    revise_facade.set_defaults(handler=_cmd_revise)
 
     authorize_facade = commands.add_parser(
         "authorize", help="목표·범위·효과·운영 정책을 승인하고 선택 Plan을 활성화"

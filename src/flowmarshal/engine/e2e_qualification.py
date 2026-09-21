@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from .capabilities import CoreActionAuthority
+from .capabilities import CoreActionAuthority, CoreCapabilityError
 
 from .domain import ModelFallback
 
@@ -78,7 +78,7 @@ from .evaluation_budget import (
     verify_service_budget_policy,
     write_immutable_run_metadata,
 )
-from .application import EngineApplication
+from .application import ApplicationAuthority, EngineApplication, EngineApplicationError
 from .budget import BudgetManager, GoalBudgetPolicy
 from .ledger import SQLiteEngineLedger
 from .models import EngineRoleConfiguration, ModelInventory
@@ -176,6 +176,13 @@ _CONTEXT_DISCOVERY_REQUEST = (
     "app.py의 shipping_fee 함수를 사내 배송비 규칙대로 구현해서 test_app.py 검증을 "
     "통과시켜줘. 규칙 값은 코드에 직접 적지 말고 기존 규칙 모듈을 그대로 재사용해."
 )
+# E2E-15 r1은 수정 없는 분석 요청이다. read_only 정규화는 live 역할이다. 같은 Goal의 r2는
+# 수정 요청(_E2E_SOURCE_REQUEST)이라 승인된 효과 정책보다 넓다. fixture의 add는 일부러 틀려
+# 있으므로 테스트 실패를 그대로 보고하는 것도 r1 완료로 본다고 원문에 적는다.
+_SCOPE_EXPANSION_REQUEST = (
+    "app.py의 add 함수가 test_app.py가 기대하는 동작을 실제로 만족하는지 분석해서 보고해줘. "
+    "테스트가 실패하면 그 결과를 그대로 보고하면 되고, 어떤 파일도 만들거나 고치거나 지우지 마."
+)
 
 
 @dataclass(frozen=True)
@@ -200,7 +207,7 @@ _E2E_SCENARIO_PLANS: dict[str, _E2EScenarioPlan] = {
     "in-flight-replan-protection": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST),
     "partial-write-resume": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST),
     "prohibited-effect": _E2EScenarioPlan("project-e2e", _PROHIBITED_EFFECT_REQUEST),
-    "scope-expansion": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST, authorize=False),
+    "scope-expansion": _E2EScenarioPlan("project-e2e", _SCOPE_EXPANSION_REQUEST, authorize=False),
     "read-only-report": _E2EScenarioPlan("project-e2e-read-only", _READ_ONLY_REPORT_REQUEST),
     "usage-missing-late": _E2EScenarioPlan("project-e2e", _E2E_SOURCE_REQUEST),
     "multi-task-dag": _E2EScenarioPlan("project-e2e-multi-task", _MULTI_TASK_DAG_REQUEST),
@@ -654,6 +661,8 @@ class PreparedE2E:
     pipeline_stages: tuple[str, ...] = ()
     preparation_evidence_refs: tuple[str, ...] = ()
     authority: CoreActionAuthority | None = None
+    # 준비에 쓴 역할 runner. None이면 live runtime 역할이다. 재개 상태에는 저장하지 않는다.
+    structured_runner: Any | None = None
 
 
 _CELL_STATE_SCHEMA = "flowmarshal.project-e2e.cell-state.v1"
@@ -777,6 +786,72 @@ def _assignment(roles: EngineRoleConfiguration) -> ModelAssignmentContract:
     )
 
 
+def _preparation_provenance(
+    runtime: CodexRuntimePort, structured_runner: Any | None
+) -> EvidenceProvenance:
+    """역할이 scripted runner나 fake runtime으로 돌았으면 준비 출처를 LIVE로 적지 않는다."""
+
+    return (
+        EvidenceProvenance.LIVE
+        if structured_runner is None
+        and not isinstance(getattr(runtime, "runtime", runtime), FakeCodexRuntime)
+        else EvidenceProvenance.FAKE
+    )
+
+
+def _selected_plan(preparation: Any) -> PlanContractRevision | None:
+    """준비 결과의 Core 선택 Plan이다. 승인 후보가 없으면 None이다."""
+
+    if (
+        preparation.status != "ready_for_authorization"
+        or preparation.planning is None
+        or preparation.planning.selected_activation_digest is None
+    ):
+        return None
+    selected_digest = preparation.planning.selected_activation_digest
+    selected = [
+        item.plan
+        for item in preparation.planning.plan_evaluations
+        if item.plan.activation_digest == selected_digest
+    ]
+    if len(selected) != 1:
+        raise QualificationRunError("E2E_SELECTED_PLAN_CARDINALITY_MISMATCH")
+    return selected[0]
+
+
+def _register_and_prepare_project(
+    service: EngineService,
+    *,
+    name: str,
+    workspace: Path,
+    runtime: CodexRuntimePort,
+    roles: EngineRoleConfiguration,
+    budget: GoalBudgetPolicy,
+    source_request: str,
+    structured_runner: Any | None,
+) -> tuple[str, EngineApplication, Any]:
+    """프로젝트 등록·Profile·예산 설정 뒤 공개 ``EngineApplication.prepare``로 승인 후보를 만든다.
+
+    준비 결과가 승인 후보인지의 판정은 호출자가 한다.
+    """
+
+    project_id = service.create_project(name=name, root=workspace)
+    service.register_profile(_profile(project_id))
+    BudgetManager(service).configure(project_id, budget)
+    application = EngineApplication(
+        service,
+        runtime=runtime,
+        role_configuration=roles,
+        structured_runner=structured_runner,
+    )
+    preparation = application.prepare(
+        project_id,
+        source_request=source_request,
+        candidate_count=1,
+    )
+    return project_id, application, preparation
+
+
 def _prepare_from_raw_request(
     *,
     workspace: Path,
@@ -803,38 +878,22 @@ def _prepare_from_raw_request(
     authority = CoreActionAuthority()
     service = EngineService(ledger, action_authority=authority)
     service.initialize()
-    project_id = service.create_project(name="Engine raw-request E2E", root=workspace)
-    service.register_profile(_profile(project_id))
-    BudgetManager(service).configure(project_id, evaluation_policies.budget)
-    application = EngineApplication(
+    project_id, application, preparation = _register_and_prepare_project(
         service,
+        name="Engine raw-request E2E",
+        workspace=workspace,
         runtime=runtime,
-        role_configuration=roles,
+        roles=roles,
+        budget=evaluation_policies.budget,
+        source_request=source_request,
         structured_runner=structured_runner,
     )
-    preparation = application.prepare(
-        project_id,
-        source_request=source_request,
-        candidate_count=1,
-    )
-    if (
-        preparation.status != "ready_for_authorization"
-        or preparation.planning is None
-        or preparation.planning.selected_activation_digest is None
-    ):
+    plan = _selected_plan(preparation)
+    if plan is None:
         raise QualificationRunError(
             "E2E_RAW_REQUEST_PIPELINE_NOT_READY: 실제 Goal/Planning 결과가 승인 후보를 "
             "만들지 못했습니다."
         )
-    selected_digest = preparation.planning.selected_activation_digest
-    selected = [
-        item.plan
-        for item in preparation.planning.plan_evaluations
-        if item.plan.activation_digest == selected_digest
-    ]
-    if len(selected) != 1:
-        raise QualificationRunError("E2E_SELECTED_PLAN_CARDINALITY_MISMATCH")
-    plan = selected[0]
     authorization = None if not authorize else application.authorize(
         project_id,
         source="qualification user authorization",
@@ -918,12 +977,7 @@ def _prepare_from_raw_request(
         activation_digest=plan.activation_digest,
         proposal=None,
         workspace=workspace,
-        preparation_provenance=(
-            EvidenceProvenance.LIVE
-            if structured_runner is None
-            and not isinstance(getattr(runtime, "runtime", runtime), FakeCodexRuntime)
-            else EvidenceProvenance.FAKE
-        ),
+        preparation_provenance=_preparation_provenance(runtime, structured_runner),
         pipeline_stages=(
             "raw_request",
             "goal_normalizer",
@@ -949,6 +1003,7 @@ def _prepare_from_raw_request(
             )
         ),
         authority=authority,
+        structured_runner=structured_runner,
     )
 
 
@@ -1319,10 +1374,15 @@ def _fixture_directory_digest(source: Path) -> str:
     )
 
 
-def _copy_fixture(root: Path, cell_root: Path, fixture: str = "project-e2e") -> tuple[Path, str]:
+def _copy_fixture(
+    root: Path,
+    cell_root: Path,
+    fixture: str = "project-e2e",
+    workspace_name: str = "workspace",
+) -> tuple[Path, str]:
     source = root / "tests" / "fixtures" / "engine" / fixture
     source_digest = _fixture_directory_digest(source)
-    workspace = cell_root / "workspace"
+    workspace = cell_root / workspace_name
     shutil.copytree(source, workspace, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     return workspace, source_digest
 
@@ -3283,6 +3343,45 @@ def _prohibited_effect_blocked(
     }
 
 
+# 소모된 ApplicationAuthority 재사용과 표시 뒤 target 변경은 code 속성 없는 CoreCapabilityError다.
+_CONSUMED_AUTHORITY_ERROR = "CORE_CAPABILITY_DENIED: Application 승인 요청은 이미 소모됐습니다."
+_DISPLAYED_TARGET_CHANGED_ERROR = "CORE_CAPABILITY_DENIED: 표시 후 승인 target이 변경됐습니다."
+_E2E15_LIMITATIONS = (
+    "실행 중 Goal revision은 현재 미해결 제품 gap이라 effect 축은 r1 완료(SATISFIED) 뒤의 좁은 "
+    "경로로 관측한다.",
+    "live 공개 경로는 같은 project의 root를 바꾸지 못하므로 target 축은 같은 원장의 두 번째 "
+    "project로 관측한다. authorization_changes의 project 경계 항목은 결정적 테스트에서만 닿는다.",
+)
+
+
+def _error_code(error: Exception) -> str | None:
+    """typed ``code``가 없으면 ``CODE: 설명`` 문구의 대문자 접두어를 쓴다(console host와 같은 규칙)."""
+
+    code = getattr(error, "code", None)
+    if code:
+        return str(code)
+    prefix = str(error).split(":", 1)[0]
+    return prefix if prefix.isupper() and " " not in prefix else None
+
+
+def _latest_authorization(service: EngineService, project_id: str) -> GoalAuthorization | None:
+    with service.ledger.read() as connection:
+        row = connection.execute(
+            "SELECT payload_json FROM goal_authorizations WHERE project_id=? "
+            "ORDER BY revision_no DESC LIMIT 1",
+            (project_id,),
+        ).fetchone()
+    return None if row is None else GoalAuthorization.model_validate_json(row["payload_json"])
+
+
+def _plan_status(service: EngineService, plan_revision_id: str) -> str | None:
+    with service.ledger.read() as connection:
+        row = connection.execute(
+            "SELECT status FROM plan_revisions WHERE id=?", (plan_revision_id,)
+        ).fetchone()
+    return None if row is None else str(row["status"])
+
+
 def _scope_expansion_blocked(
     prepared: PreparedE2E,
     runtime: RecordedRuntime,
@@ -3292,125 +3391,216 @@ def _scope_expansion_blocked(
     roles: EngineRoleConfiguration,
     evaluation_contract_digest: str,
     fixture_digest: str,
+    source_root: Path,
     governance: Any | None = None,
+    timeout_seconds: float | None = None,
 ) -> dict[str, Any]:
-    """승인 범위를 넘는 운영 정책은 새 사용자 승인 없이 활성화·실행되지 않는지 본다.
+    """E2E-15: 좁은 기존 승인 뒤의 policy·target·effect 확장 후보가 새 사용자 판단 없이는
+    활성화·실행되지 않는지 공개 경로로 관측한다.
 
-    live 1.0 경로는 target·효과 확장 후보를 만들 수 없다(project root 불변, live Goal에
-    typed 외부 효과 승인 경로 없음). 그 두 경계는 구조 관측만 남기고 이 cell을 PASS로
-    내지 않는다(target·effect NOT_COVERED_LIVE, PRODUCT). PASS는 공개 EngineApplication
-    경로로 target·효과·정책 확장을 모두 live로 관측할 수 있을 때만 가능하다.
+    - policy(A~F): 운영 정책·예산 확장.
+    - target(T1~T5): 같은 원장에 root가 다른 두 번째 live project B를 준비하고, A의 승인·A에
+      표시한 target·이미 소모된 승인 권위가 B를 승인·활성화하지 못하는지 본다.
+    - effect(E0~E5): read_only r1을 완료한 뒤 같은 Goal을 수정 요청 r2로 revise하고, 기존 승인으로는
+      넓어진 효과 정책의 Plan이 활성화되지 않는지 본다(`_E2E15_LIMITATIONS` 참고).
+
+    사용자 승인은 결정마다 같은 원장의 새 service·EngineApplication·ApplicationAuthority로 한다.
+    판정은 Core가 하고 harness는 typed 예외·원장 행·runtime journal만 기록한다. 세 축이 모두
+    통과해야 passed다. scripted·fake 준비 위의 실행은 provenance를 fake로 남긴다.
     """
 
-    service, project_id, authority = prepared.service, prepared.project_id, prepared.authority
-    if authority is None:
-        raise QualificationRunError("E2E-15에는 준비 단계의 Core 승인 권위가 필요합니다.")
+    service, project_a = prepared.service, prepared.project_id
+    runner = prepared.structured_runner
+    provenance = prepared.preparation_provenance
     application = EngineApplication(
-        service, runtime=runtime, role_configuration=roles, governance=governance
+        service,
+        runtime=runtime,
+        role_configuration=roles,
+        structured_runner=runner,
+        governance=governance,
     )
-    goal = service.load_active_goal(project_id)
+    goal = service.load_active_goal(project_a)
     with service.ledger.read() as connection:
         plan = PlanContractRevision.model_validate_json(connection.execute(
             "SELECT payload_json FROM plan_revisions WHERE id=?", (prepared.plan_revision_id,)
         ).fetchone()["payload_json"])
         skeleton = PlanSkeletonCandidate.model_validate_json(connection.execute(
             "SELECT payload_json FROM skeleton_candidates WHERE project_id=? AND candidate_digest=?",
-            (project_id, plan.definition.source_skeleton_digest),
+            (project_a, plan.definition.source_skeleton_digest),
         ).fetchone()["payload_json"])
-        project_map_root = connection.execute(
+        project_map_root = json.loads(connection.execute(
             "SELECT payload_json FROM project_map_revisions WHERE revision_digest=?",
             (plan.definition.project_map_digest,),
-        ).fetchone()["payload_json"]
+        ).fetchone()["payload_json"])["root"]
         budget = GoalBudgetPolicy.model_validate_json(connection.execute(
             "SELECT payload_json FROM budget_policy_revisions WHERE project_id=? AND scope_key='' "
             "ORDER BY revision_no DESC LIMIT 1",
-            (project_id,),
+            (project_a,),
         ).fetchone()["payload_json"])
-        project_root = connection.execute(
-            "SELECT root FROM projects WHERE id=?", (project_id,)
+        project_root_a = connection.execute(
+            "SELECT root FROM projects WHERE id=?", (project_a,)
         ).fetchone()["root"]
     narrow = GoalOperatingPolicy.model_validate({
         "planning_budget": plan.definition.planning_budget.model_copy(update={
             "max_logical_role_calls": plan.definition.planning_budget.max_logical_role_calls - 1,
         }).model_dump(mode="json"),
     })
+    projects = {"A": project_a}
+    roots = {"A": str(Path(project_root_a).resolve())}
     steps: list[dict[str, Any]] = []
+    authorities: dict[str, ApplicationAuthority] = {}
+    authorizations: list[dict[str, Any]] = []
+    failures: list[dict[str, str]] = []
 
-    def authorize(policy: GoalOperatingPolicy | None) -> dict[str, Any]:
-        capability = authority.issue_goal_authorization(
-            ledger_path=service.ledger.path,
-            target=service.goal_authorization_target(project_id=project_id, operating_policy=policy),
-        )
-        result = application.authorize(
-            project_id,
-            source="qualification user authorization",
-            operating_policy=policy,
-            capability=capability,
-        )
-        return {
-            "authorization": result.authorization.model_dump(mode="json"),
-            "activation_id": result.activation_id,
-        }
-
-    def run_once() -> dict[str, Any]:
+    def run_once(key: str) -> dict[str, Any]:
         # run_once만 task gate를 연다. 승인 검사에서 멈춰도 매번 닫는다.
         try:
-            outcome = application.run_once(project_id)
+            outcome = application.run_once(projects[key])
         finally:
             application.close_task_gate()
+        blocked = outcome.action is RunOnceAction.BLOCKED
         return {
             "run_once": outcome.model_dump(mode="json"),
-            "error": outcome.detail if outcome.action is RunOnceAction.BLOCKED else None,
+            "error": outcome.detail if blocked else None,
+            "error_code": outcome.blocker_code if blocked else None,
         }
 
-    def step(name: str, action: Any, expected_changes: list[list[str]] | None) -> dict[str, Any]:
-        before = _ledger_rows(service, project_id)
+    def authorize(
+        record: dict[str, Any],
+        name: str,
+        key: str,
+        policy: GoalOperatingPolicy | None = None,
+        *,
+        displayed_key: str | None = None,
+        authority: ApplicationAuthority | None = None,
+    ) -> dict[str, Any]:
+        # 사용자 결정마다 같은 원장의 새 service·application·authority다(console host와 같은 경계).
+        if authority is None:
+            authority = ApplicationAuthority(EngineApplication(EngineService(service.ledger)))
+        authorities[name] = authority
+        target = authority.authorization_target(
+            projects[displayed_key or key], operating_policy=policy
+        )
+        record["displayed_target"] = {
+            "project_id": target.project_id,
+            "project_root": target.project_root,
+            "goal_revision_id": target.goal_revision_id,
+            "plan_revision_id": target.plan_revision_id,
+            "effect_policy": target.effect_policy.model_dump(mode="json"),
+            "target_digest": target.target_digest,
+        }
+        result = authority.authorize(
+            projects[key],
+            target=target,
+            source="qualification user authorization",
+            operating_policy=policy,
+        )
+        authorization = result.authorization.model_dump(mode="json")
+        authorizations.append({
+            "step": name,
+            "project": key,
+            "project_id": result.authorization.project_id,
+            "project_root": result.authorization.project_root,
+            "activation_id": result.activation_id,
+            "target_digest": target.target_digest,
+            "authorization": authorization,
+        })
+        return {"authorization": authorization, "activation_id": result.activation_id}
+
+    def step(
+        axis: str,
+        name: str,
+        entrypoint: str,
+        actor: str,
+        action: Any,
+        expected_changes: list[list[str]] | None = None,
+    ) -> dict[str, Any]:
+        before = {key: _ledger_rows(service, value) for key, value in projects.items()}
         journal_before = _journal_operation_counts(runtime.events)
-        record: dict[str, Any] = {"step": name}
+        record: dict[str, Any] = {
+            "axis": axis,
+            "step": name,
+            "entrypoint": entrypoint,
+            "actor": actor,
+            "error": None,
+            "error_class": None,
+            "error_code": None,
+            "authorization_changes": None,
+        }
         try:
-            record.update(action())
-        except EngineServiceError as error:
-            record["error"] = str(error)
-        record.setdefault("error", None)
-        record["authorization_changes"] = _authorization_change_fields(record["error"])
-        record["ledger_delta"] = _ledger_delta(before, _ledger_rows(service, project_id))
+            record.update(action(record) or {})
+        except (EngineServiceError, EngineApplicationError, CoreCapabilityError) as error:
+            record.update(
+                error=str(error),
+                error_class=type(error).__name__,
+                error_code=_error_code(error),
+                authorization_changes=(
+                    sorted([item["boundary"], item["field"]] for item in error.changes)
+                    if isinstance(error, GoalAuthorizationRequired)
+                    else None
+                ),
+            )
+        if record["authorization_changes"] is None:
+            # run_once 차단은 예외가 아니라 detail 문구로 온다.
+            record["authorization_changes"] = _authorization_change_fields(record["error"])
         journal_after = _journal_operation_counts(runtime.events)
         record["effect_count"] = {
             key: journal_after[key] - journal_before[key] for key in _ZERO_EFFECTS
         }
+        record["ledger_delta"] = {
+            key: _ledger_delta(before[key], _ledger_rows(service, value))
+            for key, value in projects.items()
+        }
         record["expected_authorization_changes"] = expected_changes
+        # provider 호출·실행 표 행과 runtime create/start/resume이 모두 없어야 한다.
+        record["zero_effect"] = record["effect_count"] == _ZERO_EFFECTS and not any(
+            set(delta) & (_EXECUTION_TABLES | {"provider_calls"})
+            for delta in record["ledger_delta"].values()
+        )
         record["passed"] = (
-            record["authorization_changes"] == expected_changes
-            and record["effect_count"] == _ZERO_EFFECTS
-            and not set(record["ledger_delta"]) & _EXECUTION_TABLES
-            and "provider_calls" not in record["ledger_delta"]
+            record["zero_effect"] and record["authorization_changes"] == expected_changes
         )
         steps.append(record)
         return record
 
+    def unchanged(record: dict[str, Any], *keys: str) -> bool:
+        return all(not record["ledger_delta"][key] for key in keys or record["ledger_delta"])
+
+    def added(record: dict[str, Any], key: str, table: str) -> list[dict[str, Any]]:
+        return record["ledger_delta"][key].get(table, {}).get("added", [])
+
+    def resolved(value: Any) -> str | None:
+        return None if not value else str(Path(value).resolve())
+
+    # policy 축 ---------------------------------------------------------------
     budget_change = [["policy", f"budget.effective.{goal.goal_id}"]]
     # A: live Plan의 정책보다 좁게 승인하면 활성화되지 않고 승인 기록도 남지 않는다.
     narrow_step = step(
-        "A_narrow_authorization",
-        lambda: authorize(narrow),
+        "policy", "A_narrow_authorization", "ApplicationAuthority.authorize", "user",
+        lambda record: authorize(record, "A_narrow_authorization", "A", narrow),
         [["policy", "planning_budget.max_logical_role_calls"]],
     )
-    narrow_step["passed"] = narrow_step["passed"] and not narrow_step["ledger_delta"]
+    narrow_step["passed"] = narrow_step["passed"] and unchanged(narrow_step)
     # B: 내부 Plan ID만으로는 승인 없이 활성화되지 않는다.
     id_step = step(
-        "B_internal_plan_id_activation",
-        lambda: {"activation_id": service.activate_authorized_plan(
+        "policy", "B_internal_plan_id_activation", "EngineService.activate_authorized_plan",
+        "operator",
+        lambda _record: {"activation_id": service.activate_authorized_plan(
             plan_revision_id=plan.plan_revision_id
         )},
         [["goal", "authorization"]],
     )
-    id_step["passed"] = id_step["passed"] and not id_step["ledger_delta"]
+    id_step["passed"] = id_step["passed"] and unchanged(id_step)
     # C: 새 사용자 판단(기본 정책 승인)이면 같은 Plan이 활성화된다.
-    approved = step("C_user_authorization", lambda: authorize(None), None)
-    approved["passed"] = approved["passed"] and (
-        len(approved["ledger_delta"].get("goal_authorizations", {}).get("added", [])) == 1
-        and len(approved["ledger_delta"].get("plan_activations", {}).get("added", [])) == 1
+    approved = step(
+        "policy", "C_user_authorization", "ApplicationAuthority.authorize", "user",
+        lambda record: authorize(record, "C_user_authorization", "A"),
     )
+    approved["passed"] = approved["passed"] and (
+        len(added(approved, "A", "goal_authorizations")) == 1
+        and len(added(approved, "A", "plan_activations")) == 1
+    )
+    renewed: dict[str, Any] | None = None
     if approved["passed"]:
         _write_json(
             cell_root / "plan-activation-receipt.json",
@@ -3418,7 +3608,7 @@ def _scope_expansion_blocked(
                 "schema": "flowmarshal.project-e2e.plan-activation-receipt.v2",
                 "evaluation_contract_digest": evaluation_contract_digest,
                 "fixture_digest": fixture_digest,
-                "source": "EngineApplication.authorize (E2E-15 C_user_authorization)",
+                "source": "ApplicationAuthority.authorize (E2E-15 C_user_authorization)",
                 "authorization_id": approved["authorization"]["authorization_id"],
                 "activation_id": approved["activation_id"],
                 "plan_revision_id": plan.plan_revision_id,
@@ -3427,18 +3617,21 @@ def _scope_expansion_blocked(
         )
         # D: 승인 뒤 사용자 예산 설정(project budget set)만 넓혀도 실행이 멈춘다.
         # 설정 변경 자체는 run_once 판정과 따로 원장 증가를 남긴다.
-        setup_before = _ledger_rows(service, project_id)
+        setup_before = _ledger_rows(service, project_a)
         BudgetManager(service).configure(
-            project_id,
+            project_a,
             budget.model_copy(update={"total_tokens": budget.total_tokens * 2}),
             goal_id=goal.goal_id,
         )
-        budget_setup = _ledger_delta(setup_before, _ledger_rows(service, project_id))
-        blocked = step("D_budget_expansion_run_once", run_once, budget_change)
+        budget_setup = _ledger_delta(setup_before, _ledger_rows(service, project_a))
+        blocked = step(
+            "policy", "D_budget_expansion_run_once", "EngineApplication.run_once", "operator",
+            lambda _record: run_once("A"), budget_change,
+        )
         blocked["budget_setup_ledger_delta"] = budget_setup
         blocked["passed"] = (
             blocked["passed"]
-            and not blocked["ledger_delta"]
+            and unchanged(blocked)
             and set(budget_setup) <= {"budget_policy_revisions", "history_events"}
             and [
                 row["scope_key"]
@@ -3449,51 +3642,38 @@ def _scope_expansion_blocked(
         )
         # E: Core 선택 Plan 재활성화(내부 ID)로는 풀리지 않는다.
         reselected = step(
-            "E_selected_plan_reactivation",
-            lambda: {
-                "activation_id": service.activate_selected_plan(project_id=project_id),
-                **run_once(),
+            "policy", "E_selected_plan_reactivation",
+            "EngineService.activate_selected_plan+EngineApplication.run_once", "operator",
+            lambda _record: {
+                "activation_id": service.activate_selected_plan(project_id=project_a),
+                **run_once("A"),
             },
             budget_change,
         )
         reselected["passed"] = (
             reselected["passed"]
-            and not reselected["ledger_delta"]
+            and unchanged(reselected)
             and reselected.get("activation_id") == approved["activation_id"]
         )
 
         # F: 새 사용자 승인이 확장된 예산을 받아들이면 같은 활성 Plan이 다시 승인된다.
-        def reauthorize() -> dict[str, Any]:
-            result = authorize(None)
-            service.assert_project_authorized(project_id)
+        def reauthorize(record: dict[str, Any]) -> dict[str, Any]:
+            result = authorize(record, "F_user_reauthorization", "A")
+            service.assert_project_authorized(project_a)
             return result
 
-        renewed = step("F_user_reauthorization", reauthorize, None)
+        renewed = step(
+            "policy", "F_user_reauthorization", "ApplicationAuthority.authorize", "user",
+            reauthorize,
+        )
         renewed["passed"] = (
             renewed["passed"]
-            and set(renewed["ledger_delta"]) == {"goal_authorizations", "history_events"}
-            and len(renewed["ledger_delta"]["goal_authorizations"]["added"]) == 1
-            and _history_types(renewed["ledger_delta"]) == ["goal.authorized"]
+            and set(renewed["ledger_delta"]["A"]) == {"goal_authorizations", "history_events"}
+            and len(added(renewed, "A", "goal_authorizations")) == 1
+            and _history_types(renewed["ledger_delta"]["A"]) == ["goal.authorized"]
             and renewed.get("activation_id") == approved["activation_id"]
         )
     authorization_fields = sorted(GoalAuthorization.model_fields)
-    structure = {
-        "authorization_project_root": (
-            None if not approved.get("authorization") else approved["authorization"]["project_root"]
-        ),
-        "project_root": str(Path(project_root).resolve()),
-        "plan_project_map_root": json.loads(project_map_root)["root"],
-        "goal_typed_external_effect_contracts": len(
-            goal.definition.effect_policy.allowed_external_effect_contracts
-        ),
-        "plan_external_effect_count": sum(
-            effect.external for task in plan.definition.tasks for effect in task.expected_effects
-        ),
-        "note": (
-            "live 1.0 경로는 target·효과 확장 후보를 만들 수 없다. 이 값은 구조 관측이며 "
-            "확장 거절 증거가 아니다."
-        ),
-    }
     cost = {
         "skeleton_estimated_change_cost": skeleton.estimated_change_cost,
         "skeleton_estimated_context_tokens": skeleton.estimated_context_tokens,
@@ -3504,7 +3684,7 @@ def _scope_expansion_blocked(
             for word in ("plan", "cost", "estimate")
         ),
     }
-    expected_steps = [
+    policy_names = [
         "A_narrow_authorization",
         "B_internal_plan_id_activation",
         "C_user_authorization",
@@ -3512,63 +3692,434 @@ def _scope_expansion_blocked(
         "E_selected_plan_reactivation",
         "F_user_reauthorization",
     ]
-    observed_steps = [item["step"] for item in steps]
+    policy_steps = [item for item in steps if item["axis"] == "policy"]
+    observed_policy = [item["step"] for item in policy_steps]
     policy_problems = [
-        *(f"{item['step']}:failed" for item in steps if not item["passed"]),
-        *(f"{name}:not_run" for name in expected_steps if name not in observed_steps),
+        *(f"{item['step']}:failed" for item in policy_steps if not item["passed"]),
+        *(f"{name}:not_run" for name in policy_names if name not in observed_policy),
         *(["authorization_has_plan_or_cost_field"] if cost["authorization_has_plan_or_cost_field"] else []),
     ]
-    policy_passed = observed_steps == expected_steps and not policy_problems
+    policy_passed = observed_policy == policy_names and not policy_problems
+    if not policy_passed:
+        failures.append({
+            "axis": "policy",
+            "code": "E2E15_POLICY_BOUNDARY_REGRESSION",
+            "class": QualificationFailureClass.PRODUCT.value,
+            "detail": ",".join(policy_problems),
+        })
+
+    target_passed = effect_passed = False
+    target_setup: dict[str, Any] | None = None
+    effect_record: dict[str, Any] = {}
+    not_run: list[str] = []
+    # target·effect 축은 A의 기존 승인(C·F)이 있어야 의미가 있다. 없으면 실행하지 않는다.
+    if renewed is None or not renewed["passed"]:
+        not_run = ["target", "effect"]
+    else:
+        # E0: active Plan이 있는 동안 확장 후보(r2)가 승인 없이 등록되지 않는지 본다. 현재 제품은
+        # 모델 호출·원장 기록 전에 GOAL_REVISION_ACTIVE_PLAN으로 거절한다. 이것은 현재 동작의 관측이며
+        # 실행 중 Goal revision gap(`_E2E15_LIMITATIONS`)의 최종 계약 동작이라는 뜻이 아니다.
+        e0 = step(
+            "effect", "E0_revise_with_active_plan", "EngineApplication.revise", "operator",
+            lambda _record: {"revision_status": application.revise(
+                project_a, source_request=_E2E_SOURCE_REQUEST, candidate_count=1
+            ).status},
+        )
+        e0["passed"] = (
+            e0["passed"]
+            and unchanged(e0)
+            and e0["error_class"] == EngineApplicationError.__name__
+            and e0["error_code"] == "GOAL_REVISION_ACTIVE_PLAN"
+        )
+
+        # target 축 ------------------------------------------------------------
+        # B는 A root 밖의 형제 디렉터리이며 같은 원장에 live 준비로 등록한다. 실행하지 않는다.
+        workspace_b, fixture_b_digest = _copy_fixture(
+            source_root, cell_root, "project-e2e", "workspace-b"
+        )
+        project_b, _application_b, preparation_b = _register_and_prepare_project(
+            service,
+            name="Engine raw-request E2E target B",
+            workspace=workspace_b,
+            runtime=runtime,
+            roles=roles,
+            budget=budget,
+            source_request=_SCOPE_EXPANSION_REQUEST,
+            structured_runner=runner,
+        )
+        if _preparation_provenance(runtime, runner) is not EvidenceProvenance.LIVE:
+            provenance = EvidenceProvenance.FAKE
+        plan_b = _selected_plan(preparation_b)
+        projects["B"] = project_b
+        roots["B"] = str(workspace_b.resolve())
+        target_setup = {
+            "entrypoint": "EngineService.create_project+EngineApplication.prepare",
+            "actor": "operator",
+            "project_id": project_b,
+            "root": roots["B"],
+            "source_request": _SCOPE_EXPANSION_REQUEST,
+            "source_fixture_digest": fixture_b_digest,
+            "preparation_status": preparation_b.status,
+            "planning_search_id": preparation_b.planning_search_id,
+            "plan_revision_id": None if plan_b is None else plan_b.plan_revision_id,
+        }
+        target_steps: list[dict[str, Any]] = []
+        if plan_b is None:
+            failures.append({
+                "axis": "target",
+                "code": "E2E15_TARGET_PREPARATION_NOT_READY",
+                "class": QualificationFailureClass.MODEL.value,
+                "detail": f"B 준비 결과가 승인 후보가 아닙니다: status={preparation_b.status}",
+            })
+        else:
+            # T1: A의 승인 root = A projects.root = A 선택 Plan의 ProjectMap root이고 B root와 다르다.
+            def target_binding(_record: dict[str, Any]) -> dict[str, Any]:
+                authorization = _latest_authorization(service, project_a)
+                return {"binding": {
+                    "authorization_project_root": (
+                        None if authorization is None else authorization.project_root
+                    ),
+                    "project_root": roots["A"],
+                    "plan_project_map_root": project_map_root,
+                    "target_b_project_root": service.status(project_b)["project"]["root"],
+                }}
+
+            t1 = step(
+                "target", "T1_authorization_target_binding", "ledger read", "observer",
+                target_binding,
+            )
+            binding = t1.get("binding") or {}
+            t1["passed"] = (
+                t1["passed"]
+                and unchanged(t1)
+                and resolved(binding.get("authorization_project_root")) == roots["A"]
+                and resolved(binding.get("plan_project_map_root")) == roots["A"]
+                and resolved(binding.get("target_b_project_root")) == roots["B"]
+                and roots["A"] != roots["B"]
+            )
+            # T2: 승인 없는 B의 Core 선택 Plan 활성화는 goal/authorization으로 막힌다.
+            t2 = step(
+                "target", "T2_target_b_selected_plan_activation",
+                "EngineService.activate_selected_plan", "operator",
+                lambda _record: {
+                    "activation_id": service.activate_selected_plan(project_id=project_b)
+                },
+                [["goal", "authorization"]],
+            )
+            t2["passed"] = t2["passed"] and unchanged(t2)
+            # T3a: A에서 이미 쓴 승인 권위로 B를 승인할 수 없다.
+            t3a = step(
+                "target", "T3a_consumed_authority_reuse", "ApplicationAuthority.authorize", "user",
+                lambda record: authorize(
+                    record, "T3a_consumed_authority_reuse", "B",
+                    authority=authorities["F_user_reauthorization"],
+                ),
+            )
+            t3a["reused_authority_step"] = "F_user_reauthorization"
+            t3a["passed"] = (
+                t3a["passed"] and unchanged(t3a) and t3a["error"] == _CONSUMED_AUTHORITY_ERROR
+            )
+
+            # T3b: 새 권위가 A에 표시한 target을 B 승인에 넘기면 표시 뒤 target 변경으로 막힌다.
+            def displayed_target_a_for_b(record: dict[str, Any]) -> dict[str, Any]:
+                authority = ApplicationAuthority(EngineApplication(EngineService(service.ledger)))
+                shown, own = (
+                    authority.authorization_target(projects[key]).model_dump(mode="json")
+                    for key in ("A", "B")
+                )
+                record["target_field_differences"] = sorted(
+                    field for field in shown if shown[field] != own[field]
+                )
+                return authorize(
+                    record, "T3b_displayed_target_a_for_b", "B",
+                    displayed_key="A", authority=authority,
+                )
+
+            t3b = step(
+                "target", "T3b_displayed_target_a_for_b", "ApplicationAuthority.authorize", "user",
+                displayed_target_a_for_b,
+            )
+            t3b["passed"] = (
+                t3b["passed"]
+                and unchanged(t3b)
+                and t3b["error"] == _DISPLAYED_TARGET_CHANGED_ERROR
+                and {"project_id", "project_root"} <= set(t3b.get("target_field_differences", ()))
+            )
+            # T4: 승인·활성화가 없는 B의 run_once는 아무것도 실행하지 않는다.
+            t4 = step(
+                "target", "T4_target_b_run_once", "EngineApplication.run_once", "operator",
+                lambda _record: run_once("B"),
+            )
+            t4["passed"] = (
+                t4["passed"]
+                and unchanged(t4)
+                and t4.get("run_once", {}).get("action") == RunOnceAction.IDLE.value
+            )
+            # T5: B 자신에게 표시한 target을 새 사용자 판단으로 승인하면 B만 승인·활성화된다.
+            t5 = step(
+                "target", "T5_target_b_user_authorization", "ApplicationAuthority.authorize", "user",
+                lambda record: authorize(record, "T5_target_b_user_authorization", "B"),
+            )
+            t5["passed"] = (
+                t5["passed"]
+                and unchanged(t5, "A")
+                and len(added(t5, "B", "goal_authorizations")) == 1
+                and [row["plan_revision_id"] for row in added(t5, "B", "plan_activations")]
+                == [plan_b.plan_revision_id]
+                and resolved((t5.get("authorization") or {}).get("project_root")) == roots["B"]
+            )
+            target_steps = [t1, t2, t3a, t3b, t4, t5]
+            target_passed = all(item["passed"] for item in target_steps)
+            if not target_passed:
+                failures.append({
+                    "axis": "target",
+                    "code": "E2E15_TARGET_BOUNDARY_REGRESSION",
+                    "class": QualificationFailureClass.PRODUCT.value,
+                    "detail": ",".join(
+                        f"{item['step']}:failed" for item in target_steps if not item["passed"]
+                    ),
+                })
+
+        # effect 축 ------------------------------------------------------------
+        approved_effect = _latest_authorization(service, project_a).effect_policy  # type: ignore[union-attr]
+        effect_record["approved_effect_policy"] = approved_effect.model_dump(mode="json")
+        effect_record["r1_goal_revision_id"] = service.load_active_goal(project_a).goal_revision_id
+        effect_steps: list[dict[str, Any]] = [e0]
+
+        def effect_failure(code: str, failure_class: QualificationFailureClass, detail: str) -> None:
+            failures.append(
+                {"axis": "effect", "code": code, "class": failure_class.value, "detail": detail}
+            )
+
+        if not e0["passed"]:
+            effect_failure(
+                "E2E15_EFFECT_BOUNDARY_REGRESSION",
+                QualificationFailureClass.PRODUCT,
+                "E0_revise_with_active_plan:failed",
+            )
+        elif approved_effect.mutation_policy is not MutationPolicy.READ_ONLY:
+            # 기존 승인이 좁지 않으면 넓어진 후보를 관측할 수 없다(r1 정규화는 live 역할).
+            effect_failure(
+                "E2E15_EFFECT_WIDENING_NOT_OBSERVED",
+                QualificationFailureClass.MODEL,
+                f"r1 승인 효과 정책이 read_only가 아닙니다: {approved_effect.mutation_policy.value}",
+            )
+        else:
+            # E1: r1을 제품 경로로 Goal 판정(SATISFIED)까지 실행한다. 완료되면 active Plan이 빈다.
+            drive = _drive_application(
+                prepared,
+                runtime,
+                roles=roles,
+                governance=governance,
+                structured_runner=runner,
+                timeout_seconds=timeout_seconds or 900.0 * (len(plan.definition.tasks) + 1),
+            )
+            baseline_checks = {
+                **_goal_completion_checks(prepared),
+                "active_plan_cleared": service.status(project_a)["project"][
+                    "active_plan_revision_id"
+                ] is None,
+            }
+            effect_record["baseline"] = {
+                "step": "E1_r1_completion",
+                "entrypoint": _SUPERVISOR_RUNTIME_PATH,
+                "actor": "operator",
+                "actions": drive["actions"],
+                "blocker_code": drive["blocker_code"],
+                "detail": drive["detail"],
+                "checks": baseline_checks,
+                "passed": drive["completed"] and all(baseline_checks.values()),
+            }
+            if not effect_record["baseline"]["passed"]:
+                effect_failure(
+                    "E2E15_EFFECT_BASELINE_NOT_COMPLETED",
+                    QualificationFailureClass.MODEL,
+                    f"{drive['blocker_code']}: {drive['detail']}; "
+                    f"failed_checks=[{_failed_checks(baseline_checks)}]",
+                )
+            else:
+                # E2: 같은 Goal의 수정 요청 r2를 공개 revise로 준비한다. 활성화는 하지 않는다.
+                revision = application.revise(
+                    project_a, source_request=_E2E_SOURCE_REQUEST, candidate_count=1
+                )
+                plan_2 = _selected_plan(revision)
+                goal_2 = revision.goal_preparation.goal_contract
+                requested_effect = goal_2.definition.effect_policy
+                effect_record["revision"] = {
+                    "step": "E2_revise_r2",
+                    "entrypoint": "EngineApplication.revise",
+                    "actor": "operator",
+                    "source_request": _E2E_SOURCE_REQUEST,
+                    "status": revision.status,
+                    "planning_search_id": revision.planning_search_id,
+                    "goal_id": goal_2.goal_id,
+                    "goal_revision_id": goal_2.goal_revision_id,
+                    "revision_no": goal_2.revision_no,
+                    "same_goal": goal_2.goal_id == goal.goal_id,
+                    "requested_effect_policy": requested_effect.model_dump(mode="json"),
+                    "plan_revision_id": None if plan_2 is None else plan_2.plan_revision_id,
+                }
+                if plan_2 is None or not effect_record["revision"]["same_goal"]:
+                    effect_failure(
+                        "E2E15_EFFECT_REVISION_NOT_READY",
+                        QualificationFailureClass.MODEL,
+                        f"r2 준비 결과가 같은 Goal의 승인 후보가 아닙니다: status={revision.status}",
+                    )
+                elif requested_effect.mutation_policy is MutationPolicy.READ_ONLY:
+                    effect_failure(
+                        "E2E15_EFFECT_WIDENING_NOT_OBSERVED",
+                        QualificationFailureClass.MODEL,
+                        "r2 정규화 효과 정책이 여전히 read_only입니다.",
+                    )
+                else:
+                    # E3: 기존 승인으로 Core 선택 Plan(P2)을 활성화하면 효과·Goal 경계로 막힌다.
+                    required = [["effect", "effect_policy"], ["goal", "goal_contract_digest"]]
+                    e3 = step(
+                        "effect", "E3_existing_authorization_activation",
+                        "EngineService.activate_selected_plan", "operator",
+                        lambda _record: {
+                            "activation_id": service.activate_selected_plan(project_id=project_a)
+                        },
+                    )
+                    changes = e3["authorization_changes"] or []
+                    e3["expected_authorization_changes"] = {
+                        "required": required,
+                        "forbidden_boundaries": ["project"],
+                    }
+                    e3["candidate_plan_status"] = _plan_status(service, plan_2.plan_revision_id)
+                    e3["passed"] = (
+                        e3["zero_effect"]
+                        and unchanged(e3)
+                        and e3["error_class"] == GoalAuthorizationRequired.__name__
+                        and all(item in changes for item in required)
+                        and not any(boundary == "project" for boundary, _field in changes)
+                        and e3["candidate_plan_status"] == RevisionStatus.READY.value
+                    )
+                    # E4: 활성 Plan이 없으므로 run_once는 아무것도 실행하지 않는다.
+                    e4 = step(
+                        "effect", "E4_run_once_after_revision", "EngineApplication.run_once",
+                        "operator", lambda _record: run_once("A"),
+                    )
+                    e4["passed"] = (
+                        e4["passed"]
+                        and unchanged(e4)
+                        and e4.get("run_once", {}).get("action") == RunOnceAction.IDLE.value
+                    )
+                    # E5: r2 효과 정책을 표시한 새 사용자 승인이면 P2만 승인·활성화된다. 실행하지 않는다.
+                    e5 = step(
+                        "effect", "E5_user_reauthorization_for_revision",
+                        "ApplicationAuthority.authorize", "user",
+                        lambda record: authorize(record, "E5_user_reauthorization_for_revision", "A"),
+                    )
+                    shown = e5.get("displayed_target") or {}
+                    e5["passed"] = (
+                        e5["passed"]
+                        and unchanged(e5, "B")
+                        and shown.get("effect_policy") == requested_effect.model_dump(mode="json")
+                        and shown.get("plan_revision_id") == plan_2.plan_revision_id
+                        and len(added(e5, "A", "goal_authorizations")) == 1
+                        and [row["plan_revision_id"] for row in added(e5, "A", "plan_activations")]
+                        == [plan_2.plan_revision_id]
+                    )
+                    effect_steps += [e3, e4, e5]
+                    effect_passed = all(item["passed"] for item in effect_steps)
+                    if not effect_passed:
+                        effect_failure(
+                            "E2E15_EFFECT_BOUNDARY_REGRESSION",
+                            QualificationFailureClass.PRODUCT,
+                            ",".join(
+                                f"{item['step']}:failed"
+                                for item in effect_steps
+                                if not item["passed"]
+                            ),
+                        )
+
+    axis_passed = {"policy": policy_passed, "target": target_passed, "effect": effect_passed}
+    live = provenance is EvidenceProvenance.LIVE
     coverage = {
-        "covered_live": ["policy"],
-        "not_covered_live": ["target", "effect"],
-        "policy_boundary_passed": policy_passed,
+        "provenance": provenance.value,
+        "axis_passed": axis_passed,
+        "not_run": not_run,
+        # 결정적(scripted·fake) 실행은 어떤 축도 live로 덮었다고 적지 않는다.
+        "covered_live": sorted(axis for axis, ok in axis_passed.items() if ok and live),
+        "not_covered_live": sorted(axis for axis, ok in axis_passed.items() if not (ok and live)),
+    }
+    project_bindings = {
+        key: {"project_id": projects[key], "root": roots[key]} for key in projects
     }
     _write_json(
         cell_root / "authorization-observation.json",
         {
-            "schema": "flowmarshal.project-e2e.authorization-observation.v2",
+            "schema": "flowmarshal.project-e2e.authorization-observation.v3",
             "cell_id": "scope-expansion",
+            "provenance": provenance.value,
+            "projects": project_bindings,
             "narrow_operating_policy": narrow.model_dump(mode="json"),
-            "authorizations": [
-                item["authorization"] for item in steps if item.get("authorization")
-            ],
+            "authorizations": authorizations,
         },
     )
     _write_json(
         cell_root / "scope-check.json",
         {
-            "schema": "flowmarshal.project-e2e.scope-check.v2",
+            "schema": "flowmarshal.project-e2e.scope-check.v3",
             "cell_id": "scope-expansion",
+            "provenance": provenance.value,
+            "projects": project_bindings,
             "plan_revision_id": plan.plan_revision_id,
             "plan_planning_budget": plan.definition.planning_budget.model_dump(mode="json"),
+            "narrow_operating_policy": narrow.model_dump(mode="json"),
             "measured_tables": sorted(_LEDGER_ROWS),
+            "axes": {
+                "policy": {"steps": policy_names, "passed": policy_passed},
+                "target": {
+                    "setup": target_setup,
+                    "steps": [item["step"] for item in steps if item["axis"] == "target"],
+                    "passed": target_passed,
+                },
+                "effect": {
+                    **effect_record,
+                    "steps": [item["step"] for item in steps if item["axis"] == "effect"],
+                    "passed": effect_passed,
+                },
+            },
             "steps": steps,
-            "structure": structure,
             "cost_estimate": cost,
             "coverage": coverage,
+            "failures": failures,
+            "limitations": list(_E2E15_LIMITATIONS),
         },
     )
-    # 둘 다 제품 gap(PRODUCT)이다. 정책 회귀가 있으면 그것을 주 code로 두고 미커버 범위는
-    # coverage에 따로 남긴다. 진짜 PASS는 공개 경로로 target·효과·정책을 모두 live로 볼 때만이다.
-    if policy_passed:
+    passed = all(axis_passed.values())
+    # 주 code는 제품 회귀(PRODUCT)를 모델 결과(MODEL)보다 앞에 둔다. 나머지는 axis_failures에 남긴다.
+    primary = sorted(
+        failures, key=lambda item: item["class"] != QualificationFailureClass.PRODUCT.value
+    )[:1]
+    if passed:
+        failure: dict[str, Any] = {"failure": None}
+    elif primary:
         failure = _cell_failure(
-            "E2E15_TARGET_EFFECT_NOT_COVERED_LIVE",
-            "live 경로로 target·효과 확장 후보를 만들 수 없어 정책 경계만 live로 관측했다.",
+            primary[0]["code"],
+            "; ".join(f"{item['axis']}:{item['code']}:{item['detail']}" for item in failures)
+            + (f"; not_run={not_run}" if not_run else ""),
+            QualificationFailureClass(primary[0]["class"]),
         )
     else:
+        # 모든 축이 기록 없이 통과하지 못한 경우는 없어야 한다. 남으면 제품 결함으로 본다.
         failure = _cell_failure(
-            "E2E15_POLICY_BOUNDARY_REGRESSION",
-            "정책 경계 단계 실패: " + ",".join(policy_problems)
-            + "; target·효과는 live로 관측하지 못했다.",
+            "E2E15_AXIS_NOT_OBSERVED", f"axis_passed={axis_passed}; not_run={not_run}"
         )
     return {
-        "passed": False,
+        "passed": passed,
         "source_fixture_digest": source_digest,
+        "provenance": provenance.value,
         **failure,
         "coverage": coverage,
+        "axis_failures": failures,
         "steps": [
-            {key: item[key] for key in ("step", "passed", "error", "authorization_changes")}
+            {
+                key: item[key]
+                for key in ("axis", "step", "passed", "error_class", "error_code", "authorization_changes")
+            }
             for item in steps
         ],
         "effect_count": {
@@ -5928,7 +6479,8 @@ def _responsibility_outcome(
             ("authorization", "execution_spec", "error", "effect_count"),
             (EvidenceProvenance.LIVE, EvidenceProvenance.FAKE),
         ),
-        # live 준비 위의 사용자 승인·예산 판단만 쓴다. target·효과 미커버라 cell은 FAILED다.
+        # live 준비 위에서 공개 진입점으로 대행한 사용자·운영자 행위만 쓴다. 준비가 scripted·fake면
+        # 아래에서 cell provenance(fake)로 바꿔 live PASS가 되지 않게 한다.
         "scope-expansion": (
             "E2E-15",
             ("goal_authorization", "scope_check"),
@@ -5978,6 +6530,8 @@ def _responsibility_outcome(
         ),
     }
     responsibility_id, suffix, evidence_kinds, provenance = mapping[scenario]
+    if scenario == "scope-expansion" and cell.get("provenance") != EvidenceProvenance.LIVE.value:
+        provenance = (EvidenceProvenance.FAKE,)
     artifact_by_kind = {
         "raw_request": cell_root / "raw-request.json",
         "role_receipt": cell_root / "state" / "flowmarshal-engine.sqlite3",
@@ -6182,6 +6736,7 @@ def _contract(
                                             _MULTI_TASK_DAG_REQUEST,
                                             _APPROVED_REPAIR_REQUEST,
                                             _CONTEXT_DISCOVERY_REQUEST,
+                                            _SCOPE_EXPANSION_REQUEST,
                                         ],
                                         "ledger_rows": _LEDGER_ROWS,
                                         "sources": [
@@ -6194,6 +6749,10 @@ def _contract(
                                                 _stub_plan_inspection,
                                                 _StubPlanExpanderRunner,
                                                 _prohibited_effect_blocked,
+                                                _preparation_provenance,
+                                                _selected_plan,
+                                                _register_and_prepare_project,
+                                                _error_code,
                                                 _scope_expansion_blocked,
                                                 _workspace_files,
                                                 _workspace_tree_digest,
@@ -6599,6 +7158,7 @@ def run_project_e2e(
                                 roles=roles,
                                 evaluation_contract_digest=contract.contract_digest,
                                 fixture_digest=digest,
+                                source_root=base,
                                 governance=governance,
                             )
                         elif scenario == "read-only-report":
@@ -6698,8 +7258,8 @@ def run_project_e2e(
                     "order_seed": 0,
                     "qualification_plan_activation": {
                         "generated_plan_digest": sha256_bytes(generated_plan.read_bytes()),
-                        # E2E-15만 사용자 승인 단계가 실패하면 활성화 receipt가 없다.
-                        # 다른 cell은 receipt가 없으면 여기서 멈춘다.
+                        # E2E-15는 준비 뒤 C_user_authorization이 첫 활성화 receipt를 쓴다. 그 단계가
+                        # 실패하면 receipt가 없다. 다른 cell은 receipt가 없으면 여기서 멈춘다.
                         "activation_receipt_digest": (
                             None
                             if scenario == "scope-expansion"

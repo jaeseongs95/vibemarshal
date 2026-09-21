@@ -819,11 +819,58 @@ class EngineApplication:
 
         if not source_request.strip():
             raise EngineApplicationError("SOURCE_REQUEST_REQUIRED")
+        return self._prepare_goal_revision(
+            project_id,
+            source_request=source_request,
+            candidate_count=candidate_count,
+            goal_id=new_id("goal"),
+        )
+
+    def revise(
+        self,
+        project_id: str,
+        *,
+        source_request: str,
+        candidate_count: int | None = None,
+    ) -> EnginePreparationResult:
+        """최신 Goal의 다음 revision을 prepare와 같은 역할로 준비한다. Plan은 활성화하지 않는다."""
+
+        if not source_request.strip():
+            raise EngineApplicationError("SOURCE_REQUEST_REQUIRED")
+        # active Plan 중 Goal revision은 아직 지원하지 않는다(미해결 gap).
+        # register_goal이 교체를 막으므로 역할·runtime 호출과 원장 쓰기 전에 먼저 거절한다.
+        active_plan_revision_id = self._project_row(project_id)["active_plan_revision_id"]
+        if active_plan_revision_id is not None:
+            raise EngineApplicationError(
+                "GOAL_REVISION_ACTIVE_PLAN: active Plan "
+                f"{active_plan_revision_id}이 있는 동안의 Goal revision은 아직 지원하지 않습니다."
+            )
+        latest = self.service.load_latest_goal(project_id)
+        return self._prepare_goal_revision(
+            project_id,
+            source_request=source_request,
+            candidate_count=candidate_count,
+            goal_id=latest.goal_id,
+            revision_no=latest.revision_no + 1,
+            supersedes_goal_revision_id=latest.goal_revision_id,
+        )
+
+    def _prepare_goal_revision(
+        self,
+        project_id: str,
+        *,
+        source_request: str,
+        candidate_count: int | None,
+        goal_id: str,
+        revision_no: int = 1,
+        supersedes_goal_revision_id: str | None = None,
+    ) -> EnginePreparationResult:
+        """prepare·revise가 공유하는 Goal 준비·등록·Planning. 활성화는 authorize만 한다."""
+
         runtime, roles, base_runner = self._execution_components()
         inventory = runtime.list_models()
         roles.validate_inventory(inventory)
         profile = self.service.load_active_profile(project_id)
-        goal_id = new_id("goal")
 
         from .budget import BudgetManager, BudgetedRoleRunner
         from .goal import GoalNormalizerAdapter, GoalPreparationPipeline, GoalReviewerAdapter
@@ -857,6 +904,8 @@ class EngineApplication:
         ).prepare(
             project_id=project_id,
             goal_id=goal_id,
+            revision_no=revision_no,
+            supersedes_goal_revision_id=supersedes_goal_revision_id,
             profile=profile,
             source_request=source_request,
             observed_facts=self.service.observe_goal_inputs(project_id, source_request),

@@ -28,7 +28,7 @@
 
 ## D03. 응용 명령과 짧은 tick — planned
 
-`EngineApplication`은 `prepare / authorize / run_once / observe / pause / cancel / status / final-report`의 명령 경계를 연결한다. CLI는 이 응용 계층을 호출하며 별도 상태 권위를 만들지 않는다. 명령 이름은 설계 경계이며 현재 CLI에서 모두 제공된다는 뜻은 아니다.
+`EngineApplication`은 `prepare / revise / authorize / run_once / observe / pause / cancel / status / final-report`의 명령 경계를 연결한다. CLI는 이 응용 계층을 호출하며 별도 상태 권위를 만들지 않는다. 명령 이름은 설계 경계이며 현재 CLI에서 모두 제공된다는 뜻은 아니다. `revise`는 같은 Goal의 다음 revision을 실제 Goal 역할로 준비하고 Planning까지 수행하지만 Plan을 활성화하지 않는다. 새 revision의 Plan은 기존 승인으로 자동 활성화되지 않고, 새 Goal target을 표시한 `authorize`로만 활성화된다.
 
 `RuntimeJobSupervisor`는 활성 job 동안만 provider 연결·stream·receipt·terminal·usage·절대 deadline을 관리한다. `run_once`는 job 예약/시작 또는 이미 도착한 관측 결과 소비 후 신속히 반환한다. 스케줄 tick 안에서 전체 모델 turn 종료를 기다리지 않는다. 전역 상주 daemon은 필수 의존성이 아니다. supervisor는 관측을 저장하고 Core가 상태 전이·검사·완료를 결정한다. 재시작이나 새 tick이 기존 job의 절대 deadline을 초기화하지 않도록 결속한다.
 

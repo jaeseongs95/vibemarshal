@@ -36,6 +36,15 @@ flowmarshal-engine --db $Database --artifacts $Artifacts authorize `
   --source cli-user
 ```
 
+요구를 바꾸거나 늘릴 때는 `revise`로 같은 Goal의 다음 revision을 준비한다. `revise`는 실제 Goal 역할과 Planning을 수행하지만 Plan을 활성화하지 않는다. 새 revision의 Plan은 기존 승인으로 실행되지 않으므로 `authorize`로 새 승인 target을 다시 확인해야 실행된다.
+
+```powershell
+flowmarshal-engine --db $Database --artifacts $Artifacts revise `
+  --project-id <project-id> `
+  --request "수정한 요구를 적어 주세요." `
+  --role-config $RoleConfig
+```
+
 관측 token 정책은 선택 사항이다. 설정하지 않아도 승인된 provider 호출 수와 절대 deadline은 적용된다. `project budget set`은 사용자가 별도로 선택한 best-effort token 중단 정책에만 사용한다.
 
 ## 수동 실행

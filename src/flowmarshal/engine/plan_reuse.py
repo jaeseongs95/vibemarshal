@@ -59,8 +59,13 @@ def observation_checkpoint(service: Any, connection: Any, task_id: str) -> dict[
             if not target.is_file():
                 return None
             files[str(target)] = sha256_bytes(target.read_bytes())
-        state_row = connection.execute("SELECT payload_json FROM state_snapshots WHERE project_id = ? AND is_current = 1",
-                                       (task["project_id"],)).fetchone()
+        # current StateSnapshot은 Goal digest마다 따로 있다. task가 결속된 Plan의 Goal 것만 본다.
+        state_row = connection.execute(
+            "SELECT payload_json FROM state_snapshots WHERE project_id = ? AND is_current = 1 "
+            "AND goal_contract_digest = (SELECT json_extract(payload_json, '$.definition.goal_contract_digest') "
+            "FROM plan_revisions WHERE id = ?)",
+            (task["project_id"], task["plan_revision_id"]),
+        ).fetchone()
         if state_row is None:
             return None
         state = json.loads(state_row["payload_json"])
