@@ -2160,6 +2160,80 @@ _FAILURE_OBSERVATION_LIMIT = 10_000
 _FAILURE_DIAGNOSIS_PROVENANCE = FAILURE_DIAGNOSIS_PROVENANCE
 
 
+def replan_candidate_blocker(
+    service: EngineService, *, project_id: str, assessment_id: str,
+) -> tuple[str, str] | None:
+    """자동 재계획 후보의 원장 판정을 읽기 전용으로 계산해 (blocker_code, detail)을 돌려준다.
+
+    run_once와 status가 같은 판정을 쓰도록 한 곳에 둔다. 소비된 replanning 결과가 없거나
+    후보가 아직 원장에 없거나 이미 활성화됐거나 활성화 전제조건을 모두 통과하면 None이다.
+    전제조건은 `_activate_plan_in_transaction`과 같은 순서의 service 판정을 쓰기 없이 다시
+    실행한다. 후보가 결속한 StateSnapshot이 current가 아니면 다른 새 state에서도 통과하지 않는다.
+    """
+
+    from .domain import CandidateStatus
+    from .ledger import EngineLedgerError, EngineTransaction
+    from .planning import ExpandedPlanEvaluation
+    from .service import GoalAuthorizationRequired, PlanStateSnapshotStaleError
+
+    with service.ledger.read() as connection:
+        job = connection.execute(
+            "SELECT result_json FROM runtime_jobs WHERE project_id=? AND checkpoint_key=? "
+            "AND status='consumed'",
+            (project_id, f"replanning:{assessment_id}"),
+        ).fetchone()
+        if job is None or job["result_json"] is None:
+            return None
+        try:
+            evaluation = ExpandedPlanEvaluation.model_validate(json.loads(job["result_json"]))
+        except ValueError:
+            return None
+        plan = evaluation.plan
+        try:
+            if not service._registered_replan_candidate(connection, plan, evaluation.decision):
+                return None
+        except EngineServiceError as error:
+            return "REPLAN_CANDIDATE_BINDING_MISMATCH", str(error)
+        if connection.execute(
+            "SELECT 1 FROM plan_activations WHERE plan_revision_id=?", (plan.plan_revision_id,)
+        ).fetchone() is not None:
+            return None
+        # binding 검사로 evaluation.decision은 Core가 원장에 쓴 decision과 같다.
+        decision = evaluation.decision
+        if decision.status is not CandidateStatus.ADMISSIBLE:
+            return "REPLAN_CANDIDATE_NOT_ADMISSIBLE", (
+                f"재계획 후보 {plan.plan_revision_id}의 Core decision이 {decision.status.value}입니다"
+                f"(finding_codes={list(decision.finding_codes)}). 후보는 draft로 보존하고 활성화하지 않습니다."
+            )
+        tx = EngineTransaction(connection, service.ledger.clock)
+        project = tx.one("SELECT * FROM projects WHERE id=?", (project_id,))
+        active_plan_id = project["active_plan_revision_id"]
+        try:
+            service._plan_authorization(tx, project, plan)
+            if active_plan_id is not None:
+                service._assert_plan_replacement_quiescent(tx, project_id)
+                ancestor = plan.supersedes_plan_revision_id
+                while ancestor is not None and ancestor != active_plan_id:
+                    prior = tx.one(
+                        "SELECT plan_id, supersedes_id FROM plan_revisions WHERE id=?", (ancestor,)
+                    )
+                    if prior["plan_id"] != plan.plan_id:
+                        break
+                    ancestor = prior["supersedes_id"]
+                active_plan = tx.one("SELECT plan_id FROM plan_revisions WHERE id=?", (active_plan_id,))
+                if ancestor != active_plan_id or plan.plan_id != active_plan["plan_id"]:
+                    return "REPLAN_CANDIDATE_ACTIVATION_BLOCKED", (
+                        "active Plan을 교체하려면 같은 plan_id의 immutable supersedes 계보가 "
+                        "현재 revision으로 이어져야 합니다."
+                    )
+            service._assert_plan_inputs_current(tx, project, plan)
+        except (GoalAuthorizationRequired, PlanStateSnapshotStaleError) as error:
+            return error.code, str(error)
+        except (EngineServiceError, EngineLedgerError) as error:
+            return "REPLAN_CANDIDATE_ACTIVATION_BLOCKED", str(error)
+    return None
+
+
 class TaskGatePending(RuntimeError):
     """task gate가 아직 판정하지 못했다. Task 상태를 바꾸지 않고 다음 tick에 다시 묻는다."""
 
@@ -3475,6 +3549,7 @@ class EngineDispatcher:
                 attempt_id=attempt_id,
                 detail="Plan subgraph 재계획·독립 review job을 예약·관측했습니다.",
             )
+        from .operations import ExternalOperationUnknown
         try:
             result = self.service.consume_runtime_job_required_result(job.job_id)
         except ExternalOperationUnknown as error:
@@ -3489,9 +3564,50 @@ class EngineDispatcher:
                 checkpoint_required=True,
                 detail=str(error),
             )
+        from .ledger import EngineLedgerError
         from .planning import ExpandedPlanEvaluation
         evaluation = ExpandedPlanEvaluation.model_validate(result)
-        self.service.register_authorized_plan_revision(evaluation)
+        plan_revision_id = evaluation.plan.plan_revision_id
+        try:
+            # 후보는 원장에 없을 때만 Core 검증·decision 기록으로 한 번 등록한다.
+            self.service._ensure_replan_candidate_registered(evaluation)
+        except EngineServiceError as error:
+            if not str(error).startswith("REPLAN_CANDIDATE_BINDING_MISMATCH"):
+                raise
+
+        def blocker_and_activated() -> tuple[tuple[str, str] | None, bool]:
+            blocker = replan_candidate_blocker(
+                self.service, project_id=project_id, assessment_id=assessment.assessment_id,
+            )
+            with self.service.ledger.read() as connection:
+                activated = connection.execute(
+                    "SELECT 1 FROM plan_activations WHERE plan_revision_id=?", (plan_revision_id,)
+                ).fetchone() is not None
+            return blocker, activated
+
+        blocker, activated = blocker_and_activated()
+        if blocker is None and not activated:
+            try:
+                self.service.activate_authorized_plan(plan_revision_id=plan_revision_id)
+            except (EngineServiceError, EngineLedgerError):
+                # 활성화는 한 transaction이라 실패하면 원장 변화가 없다. 같은 판정으로 typed 차단하거나
+                # 동시 run_once가 먼저 끝낸 같은 후보의 활성화를 멱등 관측한다.
+                blocker, activated = blocker_and_activated()
+                if blocker is None and not activated:
+                    raise
+        if blocker is not None:
+            return RunOnceOutcome(
+                action=RunOnceAction.BLOCKED,
+                project_id=project_id,
+                task_id=task_id,
+                attempt_id=attempt_id,
+                evidence_ids=assessment.new_evidence_ids,
+                blocker_code=blocker[0],
+                failure_class=assessment.failure_class,
+                suggested_repair_action=RepairAction.SUBGRAPH_REPLAN,
+                checkpoint_required=True,
+                detail=blocker[1][:5000],
+            )
         return RunOnceOutcome(
             action=RunOnceAction.RECOVERED,
             project_id=project_id,

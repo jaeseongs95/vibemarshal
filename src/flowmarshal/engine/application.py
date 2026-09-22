@@ -32,6 +32,7 @@ from .domain import (
     MutationPolicy,
     PlanContractRevision,
     RecoveryAssessment,
+    RepairAction,
     RevisionStatus,
     RoleAssignmentPolicy,
     RunOnceAction,
@@ -1852,8 +1853,9 @@ class EngineApplication:
     def recovery_explanation(self, project_id: str) -> RecoveryExplanation:
         """분류 근거·보존/폐기 범위·다음 동작을 원장에서 읽기 전용으로 설명한다.
 
-        실행 경로(`EngineDispatcher`)와 같은 `recovery_route`·`recovery_limit_decision`을
-        사용하므로 표시된 다음 동작과 실제 다음 `run_once` 결과가 갈라지지 않는다.
+        실행 경로(`EngineDispatcher`)와 같은 `recovery_route`·`recovery_limit_decision`·
+        `replan_candidate_blocker`를 사용하므로 표시된 다음 동작과 실제 다음 `run_once`
+        결과가 갈라지지 않는다.
         """
 
         project = self._project_row(project_id)
@@ -1891,7 +1893,10 @@ class EngineApplication:
         )
         limits = None
         limit_detail = None
+        replan_blocker = None
         if route.mode == "automatic":
+            from .runtime import replan_candidate_blocker
+
             with self.service.ledger.read() as connection:
                 observation = recovery_limit_decision(
                     connection,
@@ -1904,6 +1909,10 @@ class EngineApplication:
                 observation.model_dump(mode="json")
             )
             limit_detail = observation.detail
+            # 소비된 재계획 후보의 차단 판정도 run_once와 같은 helper로 읽는다.
+            replan_blocker = replan_candidate_blocker(
+                self.service, project_id=project_id, assessment_id=observation.assessment_id,
+            )
         classification = RecoveryClassification(
             task_id=target["task_id"],
             attempt_id=target["attempt_id"],
@@ -1961,6 +1970,15 @@ class EngineApplication:
                 ),
                 checkpoint_required=True,
                 detail=limit_detail or "원장 복구 한도에 도달했습니다.",
+            )
+            state = "user_decision_required"
+        elif replan_blocker is not None:
+            next_action = RecoveryNextAction(
+                mode="user_decision",
+                blocker_code=replan_blocker[0],
+                suggested_repair_action=RepairAction.SUBGRAPH_REPLAN.value,
+                checkpoint_required=True,
+                detail=replan_blocker[1][:2000],
             )
             state = "user_decision_required"
         else:

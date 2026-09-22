@@ -215,6 +215,11 @@ Task 실행이 실패하면 Core는 원장에 남은 직접 근거로만 원인�
 | `NEW_RECOVERY_EVIDENCE_REQUIRED` | 첫 복구 이후 새 근거 없이 같은 복구를 반복할 수 없다 |
 | `TASK_VALIDATION_RECOVERY_REQUIRED` | 성공한 Worker 뒤 Task validation이 FAIL이다. 실패 결과와 직접 evidence로 원인을 분류한 `RecoveryAssessment`를 명시해 재시도한다 |
 | `REPLAN_PROVIDER_REQUIRED` | 현재 호출에 역할 설정이 없어 재계획 후보와 독립 검토를 만들 수 없다. `--role-config`를 지정한다 |
+| `REPLAN_CANDIDATE_NOT_ADMISSIBLE` | Core가 자동 재계획 후보를 비적격으로 판정했다. 후보는 draft로 남고, 같은 후보를 활성화하거나 자동으로 다시 계획하지 않으며 `user_decision_required`로 멈춘다. 다음 `run-once`는 원장을 바꾸지 않고 같은 결과를 다시 보여 준다. `detail`에서 decision과 finding_codes를 확인한다. 현재 공개 CLI에는 이 차단 상태를 같은 project 안에서 해소하는 recovery 명령이 없다. 원장을 직접 고치지 않는다 |
+| `REPLAN_CANDIDATE_BINDING_MISMATCH` | 재계획 job 결과와 원장에 등록된 후보가 다르다. 자동으로 덮어쓰지 않는다. 원장 후보와 job 결과를 대조해 원인을 확인한다 |
+| `PLAN_STATE_SNAPSHOT_STALE` | 적격 후보가 결속한 StateSnapshot이 더는 current가 아니다. StateSnapshot은 새 관측마다 새 revision으로 기록되고 이전 snapshot이 다시 current가 되지 않으므로, 같은 후보를 활성화하거나 자동으로 다시 계획하지 않으며 `user_decision_required`로 멈춘다. 현재 공개 CLI에는 이 차단 상태를 같은 project 안에서 해소하는 recovery 명령이 없다. 원장을 직접 고치지 않는다 |
+| `GOAL_AUTHORIZATION_REQUIRED` | 적격 후보를 활성화하려면 새 승인이 필요하다. `detail`의 changes를 확인해 새 target을 승인하면 다음 `run-once`가 같은 후보의 활성화를 한 번 시도한다. 승인 판정을 먼저 하므로 승인 뒤에 `PLAN_STATE_SNAPSHOT_STALE` 같은 다른 사전 조건이 드러날 수 있다 |
+| `REPLAN_CANDIDATE_ACTIVATION_BLOCKED` | 그 밖의 활성화 사전 조건이 맞지 않는다. 진행 중인 Plan 교체처럼 끝나면 풀리는 조건은 해소된 뒤 다음 `run-once`가 같은 후보의 활성화를 한 번 시도한다. supersedes 계보 불일치나 현재가 아닌 Project Map·Goal은 같은 후보로는 풀리지 않는다. 풀리기 전까지 `run-once`는 원장을 바꾸지 않고 같은 결과를 보여 준다 |
 
 `codes`의 `provenance`는 값의 출처를 구분한다. `provider_observed`와 `local_derived`만 `authoritative=true`이며 자동 복구를 시작할 수 있다. 모델 응답 본문이 `IMPLEMENTATION_ERROR: ...`처럼 스스로 코드를 보고해도 provider payload에 error code가 없으면 `model_reported`로만 남고 복구는 시작되지 않는다. Worker가 완료를 자칭해도 Task는 검사 결과로만 완료된다.
 

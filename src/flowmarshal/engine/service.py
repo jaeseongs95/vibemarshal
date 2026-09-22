@@ -14,6 +14,7 @@ from .capabilities import (
 
 import json
 import re
+from contextlib import nullcontext
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Iterable
@@ -1219,6 +1220,59 @@ class EngineService:
         return search_id
 
     def register_plan_evaluation(self, evaluation: ExpandedPlanEvaluation) -> None:
+        self._register_plan_evaluation(evaluation)
+
+    @staticmethod
+    def _registered_replan_candidate(
+        connection: Any, plan: PlanContractRevision, decision: CandidateDecision,
+    ) -> bool:
+        """자동 재계획 후보가 같은 binding으로 원장에 있으면 True, 없으면 False다.
+
+        ID·(plan_id, revision_no)·activation/definition digest가 겹치는 다른 행이 있거나 저장
+        payload·decision이 다르면 멱등이 아니므로 REPLAN_CANDIDATE_BINDING_MISMATCH로 막는다.
+        """
+        rows = connection.execute(
+            "SELECT id, activation_digest, payload_json FROM plan_revisions WHERE id = ? "
+            "OR (plan_id = ? AND revision_no = ?) OR activation_digest = ? "
+            "OR (project_id = ? AND definition_digest = ?)",
+            (plan.plan_revision_id, plan.plan_id, plan.revision_no, plan.activation_digest,
+             plan.definition.project_id, plan.definition_digest),
+        ).fetchall()
+        if not rows:
+            return False
+        stored = connection.execute(
+            "SELECT payload_json FROM candidate_decisions WHERE artifact_kind = 'plan' "
+            "AND artifact_digest = ?",
+            (plan.activation_digest,),
+        ).fetchone()
+        if (
+            [row["id"] for row in rows] != [plan.plan_revision_id]
+            or rows[0]["activation_digest"] != plan.activation_digest
+            or rows[0]["payload_json"] != canonical_json(plan)
+            or stored is None
+            or stored["payload_json"] != canonical_json(decision)
+        ):
+            raise EngineServiceError(
+                "REPLAN_CANDIDATE_BINDING_MISMATCH: 재계획 job 결과와 원장 Plan 후보의 "
+                "plan_revision_id·activation digest·payload·decision 결속이 다릅니다: "
+                f"{plan.plan_revision_id}"
+            )
+        return True
+
+    def _ensure_replan_candidate_registered(self, evaluation: ExpandedPlanEvaluation) -> bool:
+        """자동 SUBGRAPH_REPLAN 후보를 한 write transaction 안에서 정확히 한 번 등록한다.
+
+        ledger transaction은 `BEGIN IMMEDIATE`로 시작 시점에 쓰기 잠금을 잡으므로 동시 호출은
+        존재 확인부터 직렬화된다. 행이 없으면 `register_plan_evaluation`과 같은 Core 검증과
+        decision 기록으로 등록하고 True, 같은 binding의 행이 있으면 쓰지 않고 False다.
+        """
+        with self.ledger.transaction() as tx:
+            if self._registered_replan_candidate(tx.connection, evaluation.plan, evaluation.decision):
+                return False
+            self._register_plan_evaluation(evaluation, tx=tx)
+            return True
+
+    def _register_plan_evaluation(self, evaluation: ExpandedPlanEvaluation, *, tx: Any = None) -> None:
         # typed 입력도 model_copy로 검증을 우회할 수 있으므로 중첩 계약까지 다시 검사한다.
         try:
             evaluation = ExpandedPlanEvaluation.model_validate_json(evaluation.model_dump_json())
@@ -1314,6 +1368,7 @@ class EngineService:
             reviews=all_reviews,
             adjudication=evaluation.adjudication,
             original_decision=evaluation.original_evaluation().decision if evaluation.adjudication else None,
+            tx=tx,
         )
 
     def _register_plan(
@@ -1324,11 +1379,12 @@ class EngineService:
         reviews: Iterable[Any] = (),
         adjudication: Any = None,
         original_decision: CandidateDecision | None = None,
+        tx: Any = None,
     ) -> None:
         definition = plan.definition
         if decision.candidate_digest != plan.activation_digest:
             raise EngineServiceError("Plan decision이 activation digest에 결속되지 않았습니다.")
-        with self.ledger.transaction() as tx:
+        with nullcontext(tx) if tx is not None else self.ledger.transaction() as tx:
             project = tx.one("SELECT * FROM projects WHERE id = ?", (definition.project_id,))
             if project["active_goal_revision_id"] is None:
                 raise EngineServiceError("active GoalContract가 없습니다.")
