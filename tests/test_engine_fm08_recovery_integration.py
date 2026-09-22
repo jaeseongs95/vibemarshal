@@ -54,6 +54,11 @@ from tests.engine_helpers import assignment, inventory, profile
 from tests.engine_inspection_helpers import InspectionScriptedRunner
 
 
+#: teardown이 supervisor worker 종료를 기다리는 상한. 관측된 준비 worker 수명(수십 ms)보다
+#: 충분히 길고, 끝나지 않는 worker는 테스트 실패로 드러낼 만큼 짧다.
+_WORKER_JOIN_SECONDS = 10.0
+
+
 def _ratings() -> dict[str, int]:
     return {
         "goal_fit": 4,
@@ -221,9 +226,22 @@ class EngineFm08RecoveryIntegrationTests(unittest.TestCase):
         self.addCleanup(self._close_supervisors)
 
     def _close_supervisors(self) -> None:
+        workers = []
         for supervisor in self.supervisors:
             if supervisor is not None:
                 supervisor.close(timeout_seconds=0.1)
+                # close는 job을 collector_lost로 표시할 뿐 worker thread를 기다리지 않는다.
+                # temp dir 정리 전에 이 테스트가 띄운 worker가 원장 연결을 닫고 끝나야 한다.
+                workers.extend(supervisor._workers.values())
+        deadline = time.monotonic() + _WORKER_JOIN_SECONDS
+        for worker in workers:
+            worker.join(max(0.0, deadline - time.monotonic()))
+        alive = sorted(worker.name for worker in workers if worker.is_alive())
+        if alive:
+            self.fail(
+                f"supervisor close 뒤 {_WORKER_JOIN_SECONDS}초 안에 끝나지 않은 "
+                f"worker {len(alive)}개: {alive}"
+            )
 
     # --- harness -------------------------------------------------------
 
