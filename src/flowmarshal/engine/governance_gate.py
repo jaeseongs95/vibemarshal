@@ -812,7 +812,11 @@ class GovernanceSettings:
     def from_environment(cls, state_dir: Path) -> "GovernanceSettings | None":
         root = os.environ.get(PLUGIN_ROOT_ENV)
         classes = os.environ.get(MODEL_CLASSES_ENV)
-        return None if not root else cls(Path(root), state_dir, Path(classes) if classes else None)
+        if not root:
+            return None
+        from .ags_observation_producer import _load_installed_producer
+
+        return cls(Path(root), state_dir, Path(classes) if classes else None, _load_installed_producer())
 
     def check_conformance(self) -> dict[str, Any]:
         """E2E preflight가 cell 실행 전에 부르는 적합성 검사."""

@@ -6,14 +6,20 @@ workspace 파일이나 MCP 인자는 키를 만들거나 선택할 수 없다.
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
 import json
+import os
+import re
 import secrets
+import stat
+import subprocess
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Callable
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, load_der_private_key
 
 from ..canonical import sha256_digest
 from .model_observation import authoritative_receipt_model_observation
@@ -27,6 +33,179 @@ _HOST_ID = "flowmarshal-engine"
 _DOMAIN = "vm-provider-terminal-to-governance"
 _TERMINAL_STATUSES = frozenset({"succeeded", "completed"})
 _SAFE_INTEGER = 2**53 - 1
+_KEY_PATH = (Path(r"C:\ProgramData\flowmarshal\ags-producer-key.json") if os.name == "nt"
+             else Path("/etc/flowmarshal/ags-producer-key.json"))
+_PIN_PATH = (Path(r"C:\ProgramData\agent-governance-suite\vm-operator-policy.json") if os.name == "nt"
+             else Path("/etc/agent-governance-suite/vm-operator-policy.json"))
+_DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
+_PRIVILEGED_SIDS = frozenset({"S-1-5-18", "S-1-5-32-544"})
+_WINDOWS_READ_RIGHTS = 0x1200A9
+_WINDOWS_POWERSHELL = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+
+
+def _same_file(before: os.stat_result, after: os.stat_result) -> bool:
+    return all(getattr(before, name) == getattr(after, name) for name in (
+        "st_dev", "st_ino", "st_mode", "st_uid", "st_gid"))
+
+
+def _windows_protected(path: Path, *, secret: bool, is_file: bool) -> bool:
+    script = (
+        "$ErrorActionPreference='Stop'; $p=[Console]::In.ReadToEnd(); "
+        "$a=if ([IO.Directory]::Exists($p)) { [IO.Directory]::GetAccessControl($p) } "
+        "else { [IO.File]::GetAccessControl($p) }; "
+        "$owner=$a.GetOwner([Security.Principal.SecurityIdentifier]).Value; "
+        "$rules=@($a.GetAccessRules($true,$true,[Security.Principal.SecurityIdentifier]) | "
+        "ForEach-Object { @{ sid=$_.IdentityReference.Value; rights=[int]$_.FileSystemRights; "
+        "type=$_.AccessControlType.ToString() } }); "
+        "@{ owner=$owner; rules=$rules } | ConvertTo-Json -Compress -Depth 4"
+    )
+    try:
+        result = subprocess.run(
+            [_WINDOWS_POWERSHELL, "-NoProfile", "-NonInteractive", "-Command", script],
+            input=str(path), text=True, capture_output=True, timeout=5, check=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        acl = json.loads(result.stdout)
+        if not isinstance(acl, dict) or acl.get("owner") not in _PRIVILEGED_SIDS:
+            return False
+        rules = acl.get("rules")
+        if not isinstance(rules, list):
+            return False
+        for rule in rules:
+            if (not isinstance(rule, dict) or not isinstance(rule.get("sid"), str)
+                    or type(rule.get("rights")) is not int or rule.get("type") not in {"Allow", "Deny"}):
+                return False
+            if rule["type"] == "Allow" and rule["sid"] not in _PRIVILEGED_SIDS:
+                allowed = 0 if secret and is_file else _WINDOWS_READ_RIGHTS
+                if rule["rights"] & ~allowed:
+                    return False
+        return True
+    except (OSError, ValueError, subprocess.SubprocessError):
+        return False
+
+
+def _protected(path: Path, status: os.stat_result, *, secret: bool, is_file: bool) -> bool:
+    if os.name == "nt":
+        return _windows_protected(path, secret=secret, is_file=is_file)
+    allowed = 0o077 if secret and is_file else 0o022
+    return status.st_uid == 0 and status.st_mode & allowed == 0
+
+
+def _read_protected_json(
+    path: Path, *, secret: bool,
+    protection: Callable[[Path, os.stat_result, bool, bool], bool] | None = None,
+    after_validation: Callable[[], None] | None = None,
+) -> dict[str, Any]:
+    """운영 경로는 보호 검사 기본값만 사용한다. 콜백은 합성 fixture 전용이다."""
+    if not path.is_absolute() or os.path.normpath(str(path)) != str(path):
+        raise ProducerUnavailable("VM_PRODUCER_PROTECTED_PATH_INVALID")
+    parts = path.parts
+    targets = [Path(parts[0])]
+    for part in parts[1:]:
+        targets.append(targets[-1] / part)
+    snapshots: list[os.stat_result] = []
+    for index, target in enumerate(targets):
+        try:
+            current = target.lstat()
+            is_file = index == len(targets) - 1
+            if (stat.S_ISLNK(current.st_mode)
+                    or (os.name == "nt" and getattr(current, "st_file_attributes", 0) & 0x400)
+                    or (not stat.S_ISREG(current.st_mode) if is_file else not stat.S_ISDIR(current.st_mode))):
+                raise ProducerUnavailable("VM_PRODUCER_PROTECTED_PATH_INVALID")
+            checker = protection or (lambda p, s, sec, file: _protected(p, s, secret=sec, is_file=file))
+            if not checker(target, current, secret, is_file):
+                raise ProducerUnavailable("VM_PRODUCER_PROTECTED_PERMISSIONS_INVALID")
+            if not _same_file(current, target.lstat()):
+                raise ProducerUnavailable("VM_PRODUCER_PROTECTED_PATH_CHANGED")
+            snapshots.append(current)
+        except OSError as error:
+            raise ProducerUnavailable("VM_PRODUCER_PROTECTED_PATH_UNAVAILABLE") from error
+    if after_validation is not None:
+        after_validation()
+    try:
+        fd = os.open(path, os.O_RDONLY | getattr(os, "O_BINARY", 0)
+                     | (getattr(os, "O_NOFOLLOW", 0) if os.name != "nt" else 0))
+    except OSError as error:
+        raise ProducerUnavailable("VM_PRODUCER_PROTECTED_PATH_CHANGED") from error
+    with os.fdopen(fd, "rb") as stream:
+        if not _same_file(snapshots[-1], os.fstat(stream.fileno())):
+            raise ProducerUnavailable("VM_PRODUCER_PROTECTED_PATH_CHANGED")
+        raw = stream.read(1_048_577)
+        if len(raw) > 1_048_576:
+            raise ProducerUnavailable("VM_PRODUCER_PROTECTED_FILE_TOO_LARGE")
+        if not _same_file(snapshots[-1], os.fstat(stream.fileno())):
+            raise ProducerUnavailable("VM_PRODUCER_PROTECTED_PATH_CHANGED")
+        for target, original in zip(targets, snapshots):
+            try:
+                if not _same_file(original, target.lstat()):
+                    raise ProducerUnavailable("VM_PRODUCER_PROTECTED_PATH_CHANGED")
+            except OSError as error:
+                raise ProducerUnavailable("VM_PRODUCER_PROTECTED_PATH_CHANGED") from error
+    def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        if len({key for key, _ in pairs}) != len(pairs):
+            raise ValueError("duplicate")
+        return dict(pairs)
+    try:
+        parsed = json.loads(raw, object_pairs_hook=unique)
+    except (UnicodeDecodeError, ValueError) as error:
+        raise ProducerUnavailable("VM_PRODUCER_PROTECTED_JSON_INVALID") from error
+    if not isinstance(parsed, dict):
+        raise ProducerUnavailable("VM_PRODUCER_PROTECTED_JSON_INVALID")
+    return parsed
+
+
+def _load_installed_producer(
+    key_path: Path = _KEY_PATH, pin_path: Path = _PIN_PATH,
+    *, protection: Callable[[Path, os.stat_result, bool, bool], bool] | None = None,
+) -> "AGSObservationProducer":
+    def load() -> tuple[Ed25519PrivateKey, str, str]:
+        key = _read_protected_json(key_path, secret=True, protection=protection)
+        policy = _read_protected_json(pin_path, secret=False, protection=protection)
+        if (set(key) != {"version", "installationId", "keyId", "hostId", "modelPolicyVersion", "privateKeyPkcs8"}
+                or type(key["version"]) is not int or key["version"] != 1 or key["hostId"] != _HOST_ID
+                or any(not isinstance(key[name], str) or not key[name]
+                       for name in ("installationId", "keyId", "modelPolicyVersion", "privateKeyPkcs8"))
+                or set(policy) != {"version", "modelPolicyVersion", "pins", "hostBuilds", "models"}
+                or type(policy["version"]) is not int or policy["version"] != 1
+                or not isinstance(policy["modelPolicyVersion"], str)
+                or not isinstance(policy["pins"], list)
+                or key["modelPolicyVersion"] != policy["modelPolicyVersion"]):
+            raise ProducerUnavailable("VM_PRODUCER_INSTALLATION_POLICY_MISMATCH")
+        pins = [pin for pin in policy["pins"] if isinstance(pin, dict) and pin.get("keyId") == key["keyId"]]
+        if len(pins) != 1:
+            raise ProducerUnavailable("VM_PRODUCER_PIN_UNAVAILABLE")
+        pin = pins[0]
+        if (set(pin) != {"keyId", "installationId", "hostId", "publicKeySpki", "hostBuildDigest", "modelPolicyVersion", "status"}
+                or pin["installationId"] != key["installationId"] or pin["hostId"] != _HOST_ID
+                or pin["modelPolicyVersion"] != key["modelPolicyVersion"] or pin["status"] != "active"
+                or not isinstance(pin["hostBuildDigest"], str) or not _DIGEST.fullmatch(pin["hostBuildDigest"])
+                or not isinstance(pin["publicKeySpki"], str)):
+            raise ProducerUnavailable("VM_PRODUCER_PIN_MISMATCH")
+        try:
+            encoded = base64.b64decode(key["privateKeyPkcs8"], validate=True)
+            private = load_der_private_key(encoded, password=None)
+            public = base64.b64decode(pin["publicKeySpki"], validate=True)
+        except (ValueError, TypeError, binascii.Error) as error:
+            raise ProducerUnavailable("VM_PRODUCER_KEY_INVALID") from error
+        if (not isinstance(private, Ed25519PrivateKey)
+                or private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo) != public):
+            raise ProducerUnavailable("VM_PRODUCER_KEY_PIN_MISMATCH")
+        return private, key["installationId"], key["keyId"]
+
+    private, installation_id, key_id = load()
+
+    def current() -> None:
+        refreshed, current_installation, current_key = load()
+        if (current_installation != installation_id or current_key != key_id
+                or refreshed.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+                != private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)):
+            raise ProducerUnavailable("VM_PRODUCER_INSTALLATION_CHANGED")
+
+    return AGSObservationProducer(
+        private_key=private, installation_id=installation_id, key_id=key_id,
+        instance_id="vm-instance-" + secrets.token_hex(16),
+        session_id="vm-session-" + secrets.token_hex(16), pin_check=current,
+    )
 
 
 def _required(value: Any, name: str) -> str:
@@ -192,6 +371,7 @@ class AGSObservationProducer:
         clock: Callable[[], datetime] | None = None,
         nonce: Callable[[], str] | None = None,
         invocation_id: Callable[[], str] | None = None,
+        pin_check: Callable[[], None] | None = None,
     ) -> None:
         if not isinstance(private_key, Ed25519PrivateKey):
             raise ProducerUnavailable("VM_PRODUCER_KEY_UNAVAILABLE")
@@ -203,6 +383,11 @@ class AGSObservationProducer:
         self._clock = clock or (lambda: datetime.now(timezone.utc))
         self._nonce = nonce or (lambda: secrets.token_urlsafe(24))
         self._invocation_id = invocation_id or (lambda: "vm-invocation-" + secrets.token_hex(16))
+        self._pin_check = pin_check
+
+    def check_installed_pin(self) -> None:
+        if self._pin_check is not None:
+            self._pin_check()
 
     def public_key_spki(self) -> bytes:
         """운영자 pin 절차에 전달할 공개키 DER. private key bytes는 내보내지 않는다."""
@@ -215,6 +400,7 @@ class AGSObservationProducer:
         transport: Any | None = None,
     ) -> Any:
         """Core prepared operation와 완료 terminal을 다시 읽은 직후 새 invocation을 서명한다."""
+        self.check_installed_pin()
         if ((stage in {"bootstrap", "baseline"} and attempt_id is not None)
                 or (stage in {"implementation", "scope", "acceptance"} and attempt_id is None)
                 or stage not in {"bootstrap", "baseline", "implementation", "scope", "acceptance"}):
