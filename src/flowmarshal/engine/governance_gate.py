@@ -28,6 +28,7 @@ import hashlib
 import json
 import os
 import queue
+from contextlib import nullcontext
 import subprocess
 import tempfile
 import threading
@@ -383,6 +384,7 @@ class McpStdioClient:
         self._pump_thread = threading.Thread(target=self._pump, daemon=True)
         self._pump_thread.start()
         self.sequence = 0
+        self._request_lock = threading.RLock()
         try:
             initialized = self._request("initialize", {
                 "protocolVersion": "2025-03-26", "capabilities": {},
@@ -409,13 +411,22 @@ class McpStdioClient:
         except OSError as error:
             raise GovernanceUnavailable(f"MCP_SERVER_EXITED: {error}") from error
 
-    def _request(self, method: str, params: dict[str, Any]) -> dict[str, Any]:
+    def _request(self, method: str, params: dict[str, Any], *, request_id: str | None = None) -> dict[str, Any]:
+        # 한 pipe의 응답 queue를 요청별로 직렬화한다. 예약 ID는 숫자 namespace와 분리된다.
+        with getattr(self, "_request_lock", nullcontext()):
+            return McpStdioClient._request_locked(self, method, params, request_id=request_id)
+
+    def _request_locked(self, method: str, params: dict[str, Any], *, request_id: str | None) -> dict[str, Any]:
         if self.deadline is not None and self.deadline <= time.monotonic():
             raise GovernanceTimeout(
                 f"GOVERNANCE_TIMEOUT: MCP {method}: absolute deadline"
             )
-        self.sequence += 1
-        self._send({"jsonrpc": "2.0", "id": self.sequence, "method": method, "params": params})
+        if request_id is None:
+            self.sequence += 1
+            request_id = self.sequence
+        elif not request_id:
+            raise GovernanceUnavailable("VM_DISPATCH_CALL_ID_INVALID")
+        self._send({"jsonrpc": "2.0", "id": request_id, "method": method, "params": params})
         while True:
             timeout = self.timeout
             if self.deadline is not None:
@@ -432,7 +443,7 @@ class McpStdioClient:
                 message = json.loads(line)
             except ValueError:
                 continue  # JSON-RPC가 아닌 stdout 줄은 건너뛴다. 응답이 끝내 없으면 timeout으로 끝난다.
-            if isinstance(message, dict) and message.get("id") == self.sequence:
+            if isinstance(message, dict) and message.get("id") == request_id:
                 if "error" in message:
                     raise GovernanceContractMismatch(f"mcp_protocol:{method}", "result", message["error"])
                 return message.get("result")
@@ -445,6 +456,9 @@ class McpStdioClient:
     def call(self, tool: str, arguments: dict[str, Any]) -> Any:
         """tools/call의 JSON-RPC result 원문을 그대로 돌려준다. 형태 해석은 호출자가 한다."""
         return self._request("tools/call", {"name": tool, "arguments": arguments})
+
+    def call_reserved(self, call_id: str, tool: str, arguments: dict[str, Any]) -> Any:
+        return self._request("tools/call", {"name": tool, "arguments": arguments}, request_id=call_id)
 
     def close(self) -> None:
         errors: list[str] = []
@@ -493,6 +507,8 @@ class GovernancePlugin:
                     "AGENT_GOVERNANCE_DB_PATH": str(state_dir / "workflows.sqlite3"),
                     "AGENT_GOVERNANCE_CONTINUITY_DB_PATH": str(state_dir / "continuity.sqlite3")}
         self._mcp: McpStdioClient | None = None
+        self._dispatch: Any | None = None
+        self._dispatch_lock = threading.Lock()
         self._node_version: str | None = None
         self._entries: dict[str, Path] = {}
         self._model_classes: dict[str, str] = {}
@@ -611,13 +627,12 @@ class GovernancePlugin:
         return self._mcp
 
     def call(self, tool: str, arguments: dict[str, Any], observation: dict[str, Any] | None) -> Any:
-        """VM producer receipt가 있으면 그대로 전달하고, 아니면 기존 signer CLI 경로를 쓴다."""
-        client = self._client()
+        """일반 호출 경로. VM producer receipt는 예약된 전용 dispatch에서만 전달한다."""
         producer_receipt = None if observation is None else observation.get("_vmProducerReceipt")
         if producer_receipt is not None:
-            # V03만 이 독립 producer receipt를 검증한다. 기존 caller-input signer CLI의 token을 섞지 않는다.
-            arguments = {**arguments, "_hostAttestation": producer_receipt}
-        elif observation is not None:
+            raise GovernanceContractMismatch("vm_dispatch", "authenticated reservation", "caller receipt")
+        client = self._client()
+        if observation is not None:
             model_class = self._model_classes.get(observation["model"])
             if model_class is None:
                 raise GovernanceContractMismatch("model_class", "대응표에 선언된 모델", observation["model"])
@@ -635,6 +650,18 @@ class GovernancePlugin:
             arguments = {**arguments, "_hostAttestation": token}
         return client.call(tool, arguments)
 
+    def authenticated_dispatch(self) -> Any:
+        from .ags_invocation_transport import AuthenticatedDispatchTransport
+
+        with self._dispatch_lock:
+            if self._dispatch is None:
+                self._dispatch = AuthenticatedDispatchTransport(self._client())
+            return self._dispatch
+
+    def call_authenticated(self, ticket: Any, receipt: dict[str, str], tool: str,
+                           arguments: dict[str, Any]) -> Any:
+        return self.authenticated_dispatch().call(ticket, receipt, tool, arguments)
+
     def script(self, entry_id: str, request_path: Path) -> dict[str, Any]:
         """읽기 전용 skill 스크립트를 실행하고 JSON 출력을 돌려준다. 읽히지 않으면 None이며 형태는 gate가 확인한다."""
         args = ["--input", str(request_path)] if entry_id == "acceptance-cli" else [str(request_path)]
@@ -647,9 +674,11 @@ class GovernancePlugin:
         return _json(result.stdout)
 
     def close(self) -> None:
-        if self._mcp is not None:
-            self._mcp.close()
-            self._mcp = None
+        with self._dispatch_lock:
+            if self._mcp is not None:
+                self._mcp.close()
+                self._mcp = None
+            self._dispatch = None
 
 
 def _active_goal(service: Any, project_id: str) -> Any:
@@ -913,7 +942,6 @@ class GovernanceTaskGate:
             task["project_id"], GATE_KIND, {"key": run.key, "step": step, **request})[1]
 
         def execute() -> dict[str, Any]:
-            supplied = observation
             if self.producer is not None and observation is not None:
                 from .ags_observation_producer import ProducerUnavailable
 
@@ -922,16 +950,18 @@ class GovernanceTaskGate:
                         "SELECT id FROM attempts WHERE task_id=? AND kind='execution' AND attempt_no=?",
                         (task["id"], run.key["attempt_no"])).fetchone()
                 try:
-                    receipt = self.producer.issue(
+                    receipt, ticket = self.producer.issue(
                         service=self.service, project_id=task["project_id"], task_id=task["id"],
                         envelope_task_id=run.envelope["taskId"], run_id=run.run_id or None,
                         attempt_id=None if row is None else row["id"], stage=observation["stage"],
                         operation_id=operation_id, tool=tool, arguments=arguments,
-                        terminal_ref=observation["terminalRef"])
+                        terminal_ref=observation["terminalRef"],
+                        transport=self.plugin.authenticated_dispatch())
                 except (ProducerUnavailable, KeyError) as error:
                     raise GovernanceRejected(f"VM_PRODUCER_UNAVAILABLE: {error}") from error
-                supplied = {**observation, "_vmProducerReceipt": receipt}
-            raw = self.plugin.call(tool, arguments, supplied)
+                raw = self.plugin.call_authenticated(ticket, receipt, tool, arguments)
+            else:
+                raw = self.plugin.call(tool, arguments, observation)
             envelope = mcp_envelope(raw)
             if isinstance(envelope, dict) and envelope.get("ok") is False:
                 # 거절된 호출은 플러그인 상태를 바꾸지 않는다(플러그인 provider 테스트가 보호). 확정 결과로 굳히지
