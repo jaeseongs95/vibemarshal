@@ -507,6 +507,7 @@ class GovernancePlugin:
                     "AGENT_GOVERNANCE_DB_PATH": str(state_dir / "workflows.sqlite3"),
                     "AGENT_GOVERNANCE_CONTINUITY_DB_PATH": str(state_dir / "continuity.sqlite3")}
         self._mcp: McpStdioClient | None = None
+        self._control_mcp: McpStdioClient | None = None
         self._dispatch: Any | None = None
         self._dispatch_lock = threading.Lock()
         self._node_version: str | None = None
@@ -658,6 +659,18 @@ class GovernancePlugin:
                 self._dispatch = AuthenticatedDispatchTransport(self._client())
             return self._dispatch
 
+    def approved_slot_control(self) -> Any:
+        from .ags_invocation_transport import ApprovedSlotControlTransport
+
+        with self._dispatch_lock:
+            if self._control_mcp is None:
+                self._node()
+                self._control_mcp = McpStdioClient(
+                    ["node", str(self._entries["mcp-server"])], cwd=self.root, env=self.env,
+                    stderr_path=self.state_dir / "approved-slot-control.stderr.log", deadline=self._deadline,
+                )
+            return ApprovedSlotControlTransport(self._control_mcp)
+
     def call_authenticated(self, ticket: Any, receipt: dict[str, str], tool: str,
                            arguments: dict[str, Any]) -> Any:
         return self.authenticated_dispatch().call(ticket, receipt, tool, arguments)
@@ -675,6 +688,9 @@ class GovernancePlugin:
 
     def close(self) -> None:
         with self._dispatch_lock:
+            if self._control_mcp is not None:
+                self._control_mcp.close()
+                self._control_mcp = None
             if self._mcp is not None:
                 self._mcp.close()
                 self._mcp = None
@@ -882,6 +898,19 @@ class GovernanceTaskGate:
 
     def close(self) -> None:
         self.plugin.close()
+
+    def register_approved_role_slot_source(self, project_id: str, task_id: str,
+                                           expected: dict[str, Any] | None = None) -> Any:
+        """R16 전용 control pipe에 Core의 현재 승인 snapshot을 전달한다."""
+        if self.producer is None:
+            raise GovernanceContractMismatch("approved_slot_producer", "installed signer", "unavailable")
+        from .ags_approved_slot_producer import ApprovedSlotProducer
+
+        self.plugin.preflight()
+        return ApprovedSlotProducer(self.producer).register(
+            service=self.service, project_id=project_id, task_id=task_id,
+            expected=expected, transport=self.plugin.approved_slot_control(),
+        )
 
     # ------------------------------------------------------------ hook
     def before_execution(self, task: Any) -> str | None:

@@ -69,3 +69,27 @@ class AuthenticatedDispatchTransport:
         except (KeyError, TypeError, ValueError, binascii.Error, UnicodeDecodeError) as error:
             raise DispatchUnavailable("VM_DISPATCH_RECEIPT_MISMATCH") from error
         return self._client.call_reserved(ticket.call_id, tool, {**arguments, "_hostAttestation": receipt})
+
+
+class ApprovedSlotControlTransport:
+    """승인 source를 tools/call과 분리된 자식 MCP pipe의 control RPC로 보낸다."""
+
+    def __init__(self, client: Any) -> None:
+        self._client = client
+
+    def register(self, sign: Any) -> Any:
+        hello = self._client._request("vm/hello", {})
+        epoch = hello.get("serverEpoch") if isinstance(hello, dict) else None
+        if not isinstance(epoch, str) or len(epoch) < 32:
+            raise DispatchUnavailable("VM_APPROVED_SLOT_EPOCH_INVALID")
+        invocation_id = "vm-approved-slot-" + secrets.token_urlsafe(24)
+        receipt, snapshot_digest = sign(epoch, invocation_id)
+        result = self._client._request(
+            "vm/register_approved_slot", {"signedSource": receipt}, request_id=invocation_id,
+        )
+        if (not isinstance(result, dict) or result.get("accepted") is not True
+                or result.get("invocationId") != invocation_id
+                or result.get("serverEpoch") != epoch
+                or result.get("snapshotDigest") != snapshot_digest):
+            raise DispatchUnavailable("VM_APPROVED_SLOT_CONTROL_RESPONSE_INVALID")
+        return result
