@@ -212,8 +212,13 @@ class AGSObservationProducer:
         self, *, service: Any, project_id: str, task_id: str, envelope_task_id: str,
         run_id: str | None, attempt_id: str | None, stage: str, operation_id: str,
         tool: str, arguments: dict[str, Any], terminal_ref: dict[str, str],
-    ) -> dict[str, str]:
+        transport: Any | None = None,
+    ) -> Any:
         """Core prepared operation와 완료 terminal을 다시 읽은 직후 새 invocation을 서명한다."""
+        if ((stage in {"bootstrap", "baseline"} and attempt_id is not None)
+                or (stage in {"implementation", "scope", "acceptance"} and attempt_id is None)
+                or stage not in {"bootstrap", "baseline", "implementation", "scope", "acceptance"}):
+            raise ProducerUnavailable("VM_PRODUCER_STAGE_ATTEMPT_MISMATCH")
         with service.ledger.transaction() as tx:
             connection = tx.connection
             core = connection.execute(
@@ -348,6 +353,8 @@ class AGSObservationProducer:
                     (project_id, operation_id, previous["sequence"]),
                 ).fetchone()
                 if no_effect is None or prepared["sequence"] <= no_effect["sequence"]:
+                    if transport is not None:
+                        raise ProducerUnavailable("VM_PRODUCER_OUTCOME_UNKNOWN")
                     return payload["receipt"]
             issued = self._clock()
             if issued.tzinfo is None or _time(terminal["observedAt"]) >= issued.astimezone(timezone.utc):
@@ -355,28 +362,53 @@ class AGSObservationProducer:
             input_value = {key: value for key, value in arguments.items() if key != "_hostAttestation"}
             input_digest = "sha256:" + hashlib.sha256(_canonical(input_value).encode("utf-8")).hexdigest()
             timestamp = _utc(issued)
+            encode = lambda value: base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
+            producer = {"installationId": self.installation_id, "keyId": self.key_id,
+                        "hostId": _HOST_ID, "instanceId": self.instance_id}
+            binding = {"turnId": terminal["turnId"], "taskId": envelope_task_id,
+                       "runId": run_id, "attemptId": attempt_id, "hostId": _HOST_ID,
+                       "sessionId": self.session_id, "instanceId": self.instance_id}
+            invocation = {"tool": _required(tool, "tool"), "inputDigest": input_digest,
+                          "observedAt": timestamp}
+            ticket = None
+            transport_binding = None
+            if transport is not None:
+                registration_body = {
+                    "version": 1, "domain": "ags-vm-dispatch-registration-v1",
+                    "serverEpoch": transport.epoch, "nonce": _required(self._nonce(), "nonce"),
+                    "issuedAt": timestamp, "expiresAt": _utc(issued + timedelta(seconds=60)),
+                    "producer": producer, "binding": binding,
+                    "terminal": terminal,
+                    "core": {"goalRevision": core["goal_revision"], "taskRevision": core["task_revision"],
+                             "attemptOrdinal": attempt_ordinal, "gateOperationKey": operation_id,
+                             "stage": _required(stage, "stage")},
+                    "invocation": invocation,
+                }
+                registration_data = _canonical(registration_body).encode("utf-8")
+                ticket = transport.reserve({"body": encode(registration_data),
+                                            "signature": encode(self._key.sign(registration_data)),
+                                            "keyId": self.key_id})
+                transport_binding = {"serverEpoch": ticket.epoch,
+                                     "registrationDigest": "sha256:" + hashlib.sha256(registration_data).hexdigest()}
             body = {
-                "version": 1, "domain": _DOMAIN,
-                "producer": {"installationId": self.installation_id, "keyId": self.key_id,
-                             "hostId": _HOST_ID, "instanceId": self.instance_id},
-                "binding": {"invocationId": _required(self._invocation_id(), "invocationId"),
-                            "turnId": terminal["turnId"], "taskId": envelope_task_id,
-                            "runId": run_id, "attemptId": attempt_id, "hostId": _HOST_ID,
-                            "sessionId": self.session_id, "instanceId": self.instance_id},
+                "version": 2 if ticket is not None else 1, "domain": _DOMAIN,
+                "producer": producer,
+                "binding": {"invocationId": ticket.call_id if ticket is not None else _required(
+                    self._invocation_id(), "invocationId"), **binding},
                 "terminal": terminal,
                 "core": {"goalRevision": core["goal_revision"], "taskRevision": core["task_revision"],
                          "attemptOrdinal": attempt_ordinal, "gateOperationKey": operation_id,
                          "stage": _required(stage, "stage")},
-                "invocation": {"tool": _required(tool, "tool"), "inputDigest": input_digest,
-                               "observedAt": timestamp},
+                "invocation": invocation,
                 "nonce": _required(self._nonce(), "nonce"), "issuedAt": timestamp,
                 "expiresAt": _utc(issued + timedelta(seconds=60)),
             }
+            if transport_binding is not None:
+                body["transport"] = transport_binding
             data = _canonical(body).encode("utf-8")
-            encode = lambda value: base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
             receipt = {"body": encode(data), "signature": encode(self._key.sign(data)), "keyId": self.key_id}
             tx.history(project_id, "vm_observation.issued", "core_operation", operation_id, {
                 "receipt": receipt, "terminal": terminal, "tool": tool,
                 "argumentsDigest": sha256_digest(arguments),
             })
-            return receipt
+            return (receipt, ticket) if ticket is not None else receipt

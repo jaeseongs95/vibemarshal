@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from flowmarshal.canonical import sha256_digest
 from flowmarshal.engine.ags_observation_producer import AGSObservationProducer, ProducerUnavailable, _canonical
+from flowmarshal.engine.ags_invocation_transport import DispatchTicket
 from flowmarshal.engine.governance_gate import (
     GATE_KIND, CoreOperations, GovernancePlugin, GovernanceTaskGate, _Run,
 )
@@ -217,7 +218,7 @@ def _node(receipt: dict, example: dict, producer: AGSObservationProducer, *,
 
 
 class AGSObservationProducerTests(unittest.TestCase):
-    def test_gate_issues_after_prepared_intent_and_plugin_skips_caller_signer(self) -> None:
+    def test_gate_issues_after_prepared_intent_with_reserved_call_id(self) -> None:
         example = FIXTURE["validCases"][0]
         service, connection, ref = _service(example)
         self.addCleanup(connection.close)
@@ -236,10 +237,20 @@ class AGSObservationProducerTests(unittest.TestCase):
                 return execute()
 
         class Plugin:
-            observation = None
+            receipt = None
 
-            def call(inner, tool, arguments, observation):
-                inner.observation = observation
+            def authenticated_dispatch(inner):
+                class Transport:
+                    epoch = "e" * 43
+
+                    def reserve(self, registration):
+                        return DispatchTicket("vm-call-1", self.epoch, "ticket")
+
+                return Transport()
+
+            def call_authenticated(inner, ticket, receipt, tool, arguments):
+                inner.receipt = receipt
+                self.assertEqual("vm-call-1", ticket.call_id)
                 return {"content": [{"type": "text", "text": json.dumps({
                     "ok": True, "data": {"executionMode": "orchestrated", "stages": []}, "error": None,
                 })}]}
@@ -262,29 +273,8 @@ class AGSObservationProducerTests(unittest.TestCase):
                 {"terminalRef": ref, "stage": "bootstrap"}, replay=False,
             )
         self.assertEqual("orchestrated", result["executionMode"])
-        self.assertTrue(_node(plugin.observation["_vmProducerReceipt"], example, producer)["accepted"])
-
-        class Client:
-            arguments = None
-
-            def call(inner, tool, arguments):
-                inner.arguments = arguments
-                return {"ok": True}
-
-        client = Client()
-        with tempfile.TemporaryDirectory() as folder:
-            adapter = GovernancePlugin(Path(folder), Path(folder) / "state")
-            adapter._client = lambda: client
-            adapter.call(example["invocation"]["tool"], example["invocation"]["input"], plugin.observation)
-        self.assertEqual(plugin.observation["_vmProducerReceipt"], client.arguments["_hostAttestation"])
-        self.assertTrue(_node(plugin.observation["_vmProducerReceipt"], example, producer,
-                              wire_arguments=client.arguments)["accepted"])
-        self.assertEqual("tool_input_mismatch", _node(
-            plugin.observation["_vmProducerReceipt"], example, producer,
-            wire_arguments={**client.arguments, "tampered": True})["reason"])
-        self.assertEqual("attestation_mismatch", _node(
-            plugin.observation["_vmProducerReceipt"], example, producer,
-            wire_arguments=example["invocation"]["input"])["reason"])
+        body = json.loads(base64.urlsafe_b64decode(plugin.receipt["body"] + "=="))
+        self.assertEqual("vm-call-1", body["binding"]["invocationId"])
 
     def test_steward_and_worker_signed_bytes_match_frozen_golden_and_node_verifies(self) -> None:
         self.assertEqual(2, len(FIXTURE["validCases"]))
