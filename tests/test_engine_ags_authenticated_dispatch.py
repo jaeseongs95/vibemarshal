@@ -5,27 +5,41 @@ import base64
 import hashlib
 import json
 import os
+import sqlite3
 import sys
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
 from flowmarshal.engine.ags_invocation_transport import (
     AuthenticatedDispatchTransport, DispatchUnavailable,
 )
-from flowmarshal.engine.ags_observation_producer import AGSObservationProducer, ProducerUnavailable
+from flowmarshal.engine.ags_observation_producer import AGSObservationProducer, ProducerUnavailable, _canonical
 from flowmarshal.engine.governance_gate import GovernanceContractMismatch, GovernancePlugin, McpStdioClient
-from test_engine_ags_observation_producer import FIXTURE, _service
+from test_engine_ags_observation_producer import FIXTURE, _Ledger, _service
 
 
 SERVER = r'''
-import base64, json, secrets, sys
+import base64, hashlib, json, secrets, sys
+from datetime import datetime, timezone
+from pathlib import Path
+from cryptography.hazmat.primitives.serialization import load_der_public_key
 epoch = secrets.token_urlsafe(32)
 pending = {}
 seen_nonces = set()
+def decode(signed):
+    raw = base64.urlsafe_b64decode(signed["body"] + "==")
+    return raw, json.loads(raw)
+def live(body):
+    now = datetime.now(timezone.utc)
+    issued = datetime.fromisoformat(body["issuedAt"].replace("Z", "+00:00"))
+    expires = datetime.fromisoformat(body["expiresAt"].replace("Z", "+00:00"))
+    return issued <= now < expires and (expires - issued).total_seconds() <= 60
 for line in sys.stdin:
     request = json.loads(line)
     if "id" not in request:
@@ -39,26 +53,44 @@ for line in sys.stdin:
         result = {"serverEpoch": epoch}
     elif method == "vm/reserve_dispatch":
         registration = params["registration"]
-        body = json.loads(base64.urlsafe_b64decode(registration["body"] + "=="))
-        if body["serverEpoch"] != epoch or body["nonce"] in seen_nonces:
+        try:
+            raw, body = decode(registration)
+            pin = json.loads(Path("pin.json").read_text(encoding="utf-8"))
+            key = load_der_public_key(base64.b64decode(pin["spki"]))
+            key.verify(base64.urlsafe_b64decode(registration["signature"] + "=="), raw)
+            valid = (registration["keyId"] == pin["keyId"]
+                     and pin.get("revoked") is not True
+                     and body["producer"]["keyId"] == pin["keyId"]
+                     and body["producer"]["installationId"] == pin["installationId"]
+                     and body["producer"]["hostId"] == pin["hostId"]
+                     and body["domain"] == "ags-vm-dispatch-registration-v1"
+                     and body["serverEpoch"] == epoch and body["nonce"] not in seen_nonces
+                     and live(body))
+        except Exception:
+            valid = False
+        if not valid:
             result = {"callId": "", "serverEpoch": epoch}
         else:
             seen_nonces.add(body["nonce"])
             call_id = "vm-call-" + secrets.token_hex(12)
-            pending[call_id] = registration
+            pending[call_id] = (registration, pin["spki"])
             result = {"callId": call_id, "serverEpoch": epoch}
     elif method == "tools/call":
         arguments = params["arguments"]
         receipt = arguments.get("_hostAttestation", {})
         try:
-            body = json.loads(base64.urlsafe_b64decode(receipt["body"] + "=="))
-            registration = pending[rid]
-            reg_body = json.loads(base64.urlsafe_b64decode(registration["body"] + "=="))
+            raw, body = decode(receipt)
+            registration, spki = pending[rid]
+            load_der_public_key(base64.b64decode(spki)).verify(
+                base64.urlsafe_b64decode(receipt["signature"] + "=="), raw)
+            reg_raw, reg_body = decode(registration)
             accepted = (body["binding"]["invocationId"] == rid
                         and body["transport"]["serverEpoch"] == epoch
+                        and body["transport"]["registrationDigest"] == "sha256:" + hashlib.sha256(reg_raw).hexdigest()
                         and body["terminal"] == reg_body["terminal"]
-                        and body["invocation"]["inputDigest"] == reg_body["invocation"]["inputDigest"])
-        except (KeyError, TypeError, ValueError):
+                        and body["invocation"]["inputDigest"] == reg_body["invocation"]["inputDigest"]
+                        and body["invocation"]["tool"] == params["name"] and live(body))
+        except Exception:
             accepted, registration = False, None
         result = {"accepted": accepted, "actualCallId": rid,
                   "registration": registration if accepted else None}
@@ -74,6 +106,22 @@ for line in sys.stdin:
 
 def _decode(signed: dict[str, str]) -> dict:
     return json.loads(base64.urlsafe_b64decode(signed["body"] + "=="))
+
+
+def _signed_registration(producer: AGSObservationProducer, receipt: dict[str, str],
+                         epoch: str, nonce: str, **changes) -> dict[str, str]:
+    body = _decode(receipt)
+    registration = {"version": 1, "domain": "ags-vm-dispatch-registration-v1",
+                    "serverEpoch": epoch, "nonce": nonce,
+                    "issuedAt": body["issuedAt"], "expiresAt": body["expiresAt"],
+                    "producer": body["producer"],
+                    "binding": {k: v for k, v in body["binding"].items() if k != "invocationId"},
+                    "terminal": body["terminal"], "core": body["core"],
+                    "invocation": body["invocation"], **changes}
+    raw = _canonical(registration).encode("utf-8")
+    encode = lambda value: base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
+    return {"body": encode(raw), "signature": encode(producer._key.sign(raw)),
+            "keyId": producer.key_id}
 
 
 class AuthenticatedDispatchTests(unittest.TestCase):
@@ -96,9 +144,13 @@ class AuthenticatedDispatchTests(unittest.TestCase):
             private_key=key, installation_id=example["producer"]["installationId"],
             key_id=example["producer"]["keyId"], instance_id=example["producer"]["instanceId"],
             session_id=example["binding"]["sessionId"],
-            clock=lambda: __import__("datetime").datetime.fromisoformat(
-                example["issuedAt"].replace("Z", "+00:00")),
+            clock=lambda: datetime.now(timezone.utc),
         )
+        (Path(self.folder.name) / "pin.json").write_text(json.dumps({
+            "keyId": producer.key_id, "installationId": producer.installation_id,
+            "hostId": "flowmarshal-engine",
+            "spki": base64.b64encode(producer.public_key_spki()).decode("ascii"),
+        }), encoding="utf-8")
         kwargs = dict(service=service, project_id="project-1", task_id="core-task-1",
                       envelope_task_id=example["binding"]["taskId"],
                       run_id=example["binding"]["runId"], attempt_id=example["binding"]["attemptId"],
@@ -164,13 +216,42 @@ class AuthenticatedDispatchTests(unittest.TestCase):
         self.assertNotEqual(_decode(receipt_a)["nonce"], _decode(receipt_b)["nonce"])
         self.assertTrue(self.transport.call(ticket_b, receipt_b, kwargs["tool"], kwargs["arguments"])["accepted"])
 
+    def test_registration_authentication_failure_does_not_issue_context(self) -> None:
+        example = FIXTURE["validCases"][0]
+        producer, kwargs = self._issue(example)
+        pin_path = Path(self.folder.name) / "pin.json"
+        pin = json.loads(pin_path.read_text(encoding="utf-8"))
+        pin_path.write_text(json.dumps({**pin, "revoked": True}), encoding="utf-8")
+        with self.assertRaises(DispatchUnavailable):
+            producer.issue(**kwargs)
+        self.assertEqual(0, kwargs["service"].ledger.connection.execute(
+            "SELECT COUNT(*) FROM history_events WHERE event_type='vm_observation.issued'"
+        ).fetchone()[0])
+        pin_path.write_text(json.dumps(pin), encoding="utf-8")
+        receipt, ticket = producer.issue(**kwargs)
+        self.assertTrue(self.transport.call(ticket, receipt, kwargs["tool"], kwargs["arguments"])["accepted"])
+
+    def test_invalid_signature_epoch_and_ttl_reject_reservation(self) -> None:
+        example = FIXTURE["validCases"][0]
+        producer, kwargs = self._issue(example)
+        receipt, _ = producer.issue(**kwargs)
+        valid = _signed_registration(producer, receipt, self.transport.epoch, "forged-signature")
+        invalid = [
+            {**valid, "signature": "AA"},
+            _signed_registration(producer, receipt, "wrong-epoch", "wrong-epoch"),
+            _signed_registration(producer, receipt, self.transport.epoch, "expired",
+                                 expiresAt="2000-01-01T00:00:00.000Z"),
+        ]
+        for registration in invalid:
+            with self.subTest(body=_decode(registration).get("nonce")):
+                with self.assertRaises(DispatchUnavailable):
+                    self.transport.reserve(registration)
+
     def test_same_input_other_call_id_rejects_a_receipt_and_preserves_a(self) -> None:
         example = FIXTURE["validCases"][0]
         producer, kwargs = self._issue(example)
         receipt_a, ticket_a = producer.issue(**kwargs)
-        signed_b = {"body": base64.urlsafe_b64encode(json.dumps({
-            "serverEpoch": self.transport.epoch, "nonce": "b-nonce"}).encode()).rstrip(b"=").decode(),
-                    "signature": "AA", "keyId": "other"}
+        signed_b = _signed_registration(producer, receipt_a, self.transport.epoch, "b-nonce")
         ticket_b = self.transport.reserve(signed_b)
         with self.assertRaises(DispatchUnavailable):
             self.transport.reserve(signed_b)
@@ -258,6 +339,37 @@ class AuthenticatedDispatchTests(unittest.TestCase):
         with self.assertRaises(GovernanceContractMismatch):
             plugin.call(kwargs["tool"], kwargs["arguments"], {"_vmProducerReceipt": receipt})
 
+    def test_reopened_core_ledger_cannot_reissue_unknown_dispatch(self) -> None:
+        example = FIXTURE["validCases"][0]
+        producer, kwargs = self._issue(example)
+        receipt, ticket = producer.issue(**kwargs)
+        root = Path(self.folder.name)
+        database = root / "restarted-ledger.sqlite3"
+        disk = sqlite3.connect(database)
+        kwargs["service"].ledger.connection.backup(disk)
+        disk.close()
+        reopened = sqlite3.connect(database)
+        reopened.row_factory = sqlite3.Row
+        self.addCleanup(reopened.close)
+        restarted_service = SimpleNamespace(ledger=_Ledger(reopened))
+        replacement = McpStdioClient([sys.executable, str(root / "server.py")], cwd=root,
+                                    env=dict(os.environ), stderr_path=root / "reopened.stderr.log")
+        self.addCleanup(replacement.close)
+        fresh = AuthenticatedDispatchTransport(replacement)
+        self.assertNotEqual(ticket.epoch, fresh.epoch)
+        restarted_producer = AGSObservationProducer(
+            private_key=producer._key, installation_id=producer.installation_id,
+            key_id=producer.key_id, instance_id=producer.instance_id,
+            session_id=producer.session_id)
+        with self.assertRaisesRegex(ProducerUnavailable, "OUTCOME_UNKNOWN"):
+            restarted_producer.issue(**{**kwargs, "service": restarted_service, "transport": fresh})
+        self.assertEqual(1, reopened.execute(
+            "SELECT COUNT(*) FROM history_events WHERE event_type='vm_observation.issued'"
+        ).fetchone()[0])
+        self.assertEqual(receipt, json.loads(reopened.execute(
+            "SELECT payload_json FROM history_events WHERE event_type='vm_observation.issued'"
+        ).fetchone()[0])["receipt"])
+
     def test_concurrent_plugin_access_reuses_one_transport(self) -> None:
         root = Path(self.folder.name)
         plugin = GovernancePlugin(root, root / "concurrent-state")
@@ -265,6 +377,44 @@ class AuthenticatedDispatchTests(unittest.TestCase):
         with ThreadPoolExecutor(max_workers=8) as pool:
             transports = list(pool.map(lambda _: plugin.authenticated_dispatch(), range(32)))
         self.assertTrue(all(item is transports[0] for item in transports))
+
+    def test_concurrent_reserve_and_call_keep_each_signed_call_id(self) -> None:
+        example = FIXTURE["validCases"][0]
+        producer, kwargs = self._issue(example)
+        first_receipt, first_ticket = producer.issue(**kwargs)
+        registrations = [_signed_registration(producer, first_receipt, self.transport.epoch,
+                                              f"parallel-{index}") for index in range(8)]
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            tickets = list(pool.map(self.transport.reserve, registrations))
+        self.assertEqual(8, len({ticket.call_id for ticket in tickets}))
+
+        def dispatch(pair):
+            registration, ticket = pair
+            body = _decode(first_receipt)
+            body["binding"]["invocationId"] = ticket.call_id
+            reg_raw = base64.urlsafe_b64decode(registration["body"] + "==")
+            body["transport"]["registrationDigest"] = "sha256:" + hashlib.sha256(reg_raw).hexdigest()
+            body["nonce"] = "receipt-" + ticket.call_id
+            raw = _canonical(body).encode("utf-8")
+            encode = lambda value: base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
+            receipt = {"body": encode(raw), "signature": encode(producer._key.sign(raw)),
+                       "keyId": producer.key_id}
+            return self.transport.call(ticket, receipt, kwargs["tool"], kwargs["arguments"])
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            results = list(pool.map(dispatch, zip(registrations, tickets)))
+        self.assertTrue(all(result["accepted"] for result in results))
+        self.assertEqual({ticket.call_id for ticket in tickets},
+                         {result["actualCallId"] for result in results})
+        def replay_first(_):
+            try:
+                return self.transport.call(first_ticket, first_receipt,
+                                           kwargs["tool"], kwargs["arguments"])["accepted"]
+            except DispatchUnavailable:
+                return False
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            self.assertEqual([False, True], sorted(pool.map(replay_first, range(2))))
 
     def test_unsupported_control_rpc_fails_closed(self) -> None:
         class Unsupported:
