@@ -291,6 +291,44 @@ CREATE TABLE goal_authorizations (
     UNIQUE(project_id, revision_no)
 ) STRICT;
 
+CREATE TABLE approved_role_slot_sources (
+    activation_id TEXT PRIMARY KEY REFERENCES plan_activations(id) ON DELETE RESTRICT,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE RESTRICT,
+    plan_revision_id TEXT NOT NULL UNIQUE REFERENCES plan_revisions(id) ON DELETE RESTRICT,
+    authorization_id TEXT NOT NULL REFERENCES goal_authorizations(id) ON DELETE RESTRICT,
+    stages_json TEXT NOT NULL,
+    participation_complete INTEGER NOT NULL CHECK (participation_complete IN (0,1)),
+    revoked_at TEXT,
+    revoked_reason TEXT,
+    created_at TEXT NOT NULL
+) STRICT;
+
+CREATE TABLE approved_role_slot_authorizations (
+    authorization_id TEXT PRIMARY KEY REFERENCES goal_authorizations(id) ON DELETE RESTRICT,
+    activation_id TEXT NOT NULL REFERENCES approved_role_slot_sources(activation_id) ON DELETE RESTRICT,
+    created_at TEXT NOT NULL
+) STRICT;
+
+CREATE TABLE role_slot_participation (
+    id TEXT PRIMARY KEY,
+    project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE RESTRICT,
+    plan_revision_id TEXT NOT NULL REFERENCES plan_revisions(id) ON DELETE RESTRICT,
+    task_id TEXT NOT NULL REFERENCES task_contracts(id) ON DELETE RESTRICT,
+    attempt_id TEXT UNIQUE REFERENCES attempts(id) ON DELETE RESTRICT,
+    actor_id TEXT NOT NULL,
+    host TEXT NOT NULL,
+    session_id TEXT NOT NULL,
+    receipt_digest TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE(project_id, plan_revision_id, task_id, actor_id, host, session_id),
+    UNIQUE(receipt_digest)
+) STRICT;
+
+CREATE TRIGGER tr_engine_role_participation_no_update BEFORE UPDATE ON role_slot_participation
+BEGIN SELECT RAISE(ABORT, 'ENGINE_ROLE_PARTICIPATION_APPEND_ONLY'); END;
+CREATE TRIGGER tr_engine_role_participation_no_delete BEFORE DELETE ON role_slot_participation
+BEGIN SELECT RAISE(ABORT, 'ENGINE_ROLE_PARTICIPATION_APPEND_ONLY'); END;
+
 CREATE TABLE task_completion_reuse (
     task_id TEXT PRIMARY KEY REFERENCES task_contracts(id),
     source_task_id TEXT NOT NULL REFERENCES task_contracts(id),
@@ -775,7 +813,9 @@ class SQLiteEngineLedger:
                         "SQLiteEngineHistoryReader를 사용하세요."
                     )
                 raise EngineLedgerError("지원하지 않는 Engine schema revision입니다.")
-            required_current_tables = {"runtime_jobs", "runtime_job_observations", "usage_observations"}
+            required_current_tables = {"runtime_jobs", "runtime_job_observations", "usage_observations",
+                                       "approved_role_slot_sources", "approved_role_slot_authorizations",
+                                       "role_slot_participation"}
             if not required_current_tables.issubset(tables):
                 raise EngineLedgerError(
                     "현재 Engine schema 4 계약의 필수 테이블이 없습니다. "

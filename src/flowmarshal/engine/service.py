@@ -46,6 +46,7 @@ from .domain import (
     GoalVerdictStatus,
     ManualValidationObservation,
     ExternalValidationObservation,
+    MutationPolicy,
     PlanContractRevision,
     PlanSkeletonCandidate,
     PROVIDER_TERMINAL_STATUSES,
@@ -83,7 +84,7 @@ from .domain import (
     utc_now,
     validate_reviewer_submission_evidence,
 )
-from .ledger import EngineLedgerError, SQLiteEngineLedger
+from .ledger import EngineLedgerError, EngineTransaction, SQLiteEngineLedger
 from .models import AssignmentResolver, ModelInventory
 from .planning import (
     CandidateEvaluation,
@@ -2246,7 +2247,186 @@ class EngineService:
                     "reason": reason,
                 },
             )
+            if state == "cancelled":
+                self._revoke_approved_role_slots_in_transaction(tx, project_id, reason)
         return state
+
+    @staticmethod
+    def _revoke_approved_role_slots_in_transaction(tx: Any, project_id: str, reason: str) -> None:
+        project = tx.one("SELECT active_plan_revision_id FROM projects WHERE id=?", (project_id,))
+        if project["active_plan_revision_id"] is None:
+            return
+        source = tx.maybe_one(
+            "SELECT activation_id FROM approved_role_slot_sources "
+            "WHERE project_id=? AND plan_revision_id=? AND revoked_at IS NULL",
+            (project_id, project["active_plan_revision_id"]),
+        )
+        if source is None:
+            return
+        tx.connection.execute(
+            "UPDATE approved_role_slot_sources SET revoked_at=?,revoked_reason=? WHERE activation_id=?",
+            (tx.now, reason, source["activation_id"]),
+        )
+        tx.history(project_id, "role_slot.revoked", "plan_activation", source["activation_id"],
+                   {"reason": reason})
+
+    def revoke_approved_role_slots(self, project_id: str, *, reason: str) -> None:
+        """Core의 현재 슬롯 승인을 별도 철회한다. 같은 Plan 재승인은 철회를 되돌리지 않는다."""
+        require_host_execution()
+        if not reason.strip():
+            raise EngineServiceError("RoleSlot 철회 이유가 필요합니다.")
+        with self.ledger.transaction() as tx:
+            self._revoke_approved_role_slots_in_transaction(tx, project_id, reason)
+
+    def read_current_approved_role_slot_source(
+        self, project_id: str, task_id: str, expected: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """활성 Plan과 최신 GoalAuthorization에서만 RoleSlot source를 읽는다."""
+        require_host_execution()
+        with self.ledger.read() as connection:
+            connection.execute("BEGIN")
+            tx = EngineTransaction(connection, self.ledger.clock)
+            project = tx.one("SELECT * FROM projects WHERE id=?", (project_id,))
+            plan_revision_id = project["active_plan_revision_id"]
+            if plan_revision_id is None or project["run_state"] != "active":
+                raise EngineServiceError("ROLE_SLOT_SOURCE_UNAVAILABLE: active Plan이 없습니다.")
+            plan_row = tx.one("SELECT * FROM plan_revisions WHERE id=? AND project_id=?",
+                              (plan_revision_id, project_id))
+            if plan_row["status"] != "active":
+                raise EngineServiceError("ROLE_SLOT_SOURCE_UNAVAILABLE: Plan이 active가 아닙니다.")
+            plan = PlanContractRevision.model_validate_json(plan_row["payload_json"])
+            if (plan.plan_revision_id != plan_revision_id
+                    or plan.activation_digest != plan_row["activation_digest"]
+                    or plan.definition_digest != plan_row["definition_digest"]):
+                raise EngineServiceError("ROLE_SLOT_SOURCE_INVALID: Plan 원장 결속이 다릅니다.")
+            task_row = tx.maybe_one(
+                "SELECT status FROM task_contracts WHERE id=? AND project_id=? AND plan_revision_id=?",
+                (task_id, project_id, plan_revision_id),
+            )
+            if task_row is None or task_row["status"] in {"superseded", "completed"}:
+                raise EngineServiceError("ROLE_SLOT_SOURCE_UNAVAILABLE: Task가 현재 실행 대상이 아닙니다.")
+            activation = tx.one(
+                "SELECT * FROM plan_activations WHERE project_id=? AND plan_revision_id=?",
+                (project_id, plan_revision_id),
+            )
+            if activation["activation_digest"] != plan.activation_digest:
+                raise EngineServiceError("ROLE_SLOT_SOURCE_INVALID: activation digest 결속이 다릅니다.")
+            source = tx.maybe_one(
+                "SELECT * FROM approved_role_slot_sources WHERE activation_id=? "
+                "AND project_id=? AND plan_revision_id=?",
+                (activation["id"], project_id, plan_revision_id),
+            )
+            if (source is None or source["revoked_at"] is not None
+                    or source["authorization_id"] != activation["authorization_id"]
+                    or plan.definition.role_stages is None):
+                raise EngineServiceError("ROLE_SLOT_SOURCE_UNAVAILABLE: 승인 슬롯이 없거나 철회됐습니다.")
+            stages = tuple(stage.model_dump(mode="json", by_alias=True)
+                           for stage in plan.definition.role_stages)
+            if canonical_json(stages) != source["stages_json"]:
+                raise EngineServiceError("ROLE_SLOT_SOURCE_INVALID: 승인 stage 원문이 Plan과 다릅니다.")
+            selected_stages = tuple(stage for stage in stages if stage["taskId"] == task_id)
+            if not selected_stages:
+                raise EngineServiceError("ROLE_SLOT_SOURCE_UNAVAILABLE: Task에 승인 stage가 없습니다.")
+            control_rows = tx.all(
+                "SELECT event_type,payload_json FROM history_events WHERE project_id=? "
+                "AND event_type IN ('workflow.paused','workflow.resumed','workflow.cancelled') "
+                "ORDER BY sequence DESC", (project_id,),
+            )
+            for row in control_rows:
+                if json.loads(row["payload_json"]).get("goal_revision_id") == project["active_goal_revision_id"]:
+                    if row["event_type"] == "workflow.cancelled":
+                        raise EngineServiceError("ROLE_SLOT_SOURCE_UNAVAILABLE: Goal이 취소됐습니다.")
+                    break
+            authorization = self._plan_authorization(tx, project, plan)
+            if (authorization.absolute_deadline_at is not None
+                    and _dt(tx.now) >= authorization.absolute_deadline_at):
+                raise EngineServiceError("ROLE_SLOT_SOURCE_UNAVAILABLE: GoalAuthorization이 만료됐습니다.")
+            scope = tx.maybe_one(
+                "SELECT activation_id FROM approved_role_slot_authorizations "
+                "WHERE authorization_id=?", (authorization.authorization_id,),
+            )
+            if scope is None or scope["activation_id"] != activation["id"]:
+                raise EngineServiceError("ROLE_SLOT_SOURCE_STALE: 최신 GoalAuthorization이 이 activation에 결속되지 않았습니다.")
+            lineage = tx.all(
+                "SELECT a.id,s.participation_complete FROM plan_activations a "
+                "JOIN plan_revisions p ON p.id=a.plan_revision_id "
+                "LEFT JOIN approved_role_slot_sources s ON s.activation_id=a.id "
+                "WHERE a.project_id=? AND p.plan_id=?", (project_id, plan.plan_id),
+            )
+            if any(row["participation_complete"] != 1 for row in lineage):
+                raise EngineServiceError("ROLE_SLOT_PARTICIPATION_INCOMPLETE: Plan 계보 기록이 부족합니다.")
+            unrecorded = tx.maybe_one(
+                "SELECT a.id FROM attempts a JOIN plan_revisions p ON p.id=a.plan_revision_id "
+                "LEFT JOIN role_slot_participation h ON h.attempt_id=a.id "
+                "WHERE a.project_id=? AND p.plan_id=? AND h.id IS NULL LIMIT 1",
+                (project_id, plan.plan_id),
+            )
+            if unrecorded is not None:
+                raise EngineServiceError("ROLE_SLOT_PARTICIPATION_INCOMPLETE: 기록 없는 Attempt가 있습니다.")
+            participants = tx.all(
+                "SELECT h.actor_id,h.host,h.session_id,h.attempt_id,h.task_id,h.plan_revision_id "
+                "FROM role_slot_participation h "
+                "JOIN plan_revisions p ON p.id=h.plan_revision_id "
+                "WHERE h.project_id=? AND p.plan_id=? ORDER BY h.created_at,h.id",
+                (project_id, plan.plan_id),
+            )
+            if len(participants) > 256:
+                raise EngineServiceError("ROLE_SLOT_PARTICIPATION_LIMIT: 참여 이력이 256개를 넘습니다.")
+            entries = tuple({"actorId": row["actor_id"], "host": row["host"],
+                             "sessionId": row["session_id"]} for row in participants)
+            for row in participants:
+                if row["attempt_id"] is not None:
+                    attempt = tx.maybe_one(
+                        "SELECT project_id,plan_revision_id,task_id FROM attempts WHERE id=?",
+                        (row["attempt_id"],),
+                    )
+                    if (attempt is None or attempt["project_id"] != project_id
+                            or attempt["plan_revision_id"] != row["plan_revision_id"]
+                            or attempt["task_id"] != row["task_id"]):
+                        raise EngineServiceError("ROLE_SLOT_PARTICIPATION_INVALID: Attempt 결속이 다릅니다.")
+            identifier = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$")
+            if (len({(item["actorId"], item["host"], item["sessionId"]) for item in entries}) != len(entries)
+                    or any(not all(identifier.fullmatch(item[key]) for key in ("actorId", "host", "sessionId"))
+                           or "/" in item["host"] or "/" in item["sessionId"] for item in entries)):
+                raise EngineServiceError("ROLE_SLOT_PARTICIPATION_INVALID: 참여자 신원 기록이 유효하지 않습니다.")
+            actors = {item["actorId"] for item in entries}
+            sessions = {f'{item["host"]}/{item["sessionId"]}' for item in entries}
+            for stage in plan.definition.role_stages:
+                for assignment in stage.assignments:
+                    if assignment.routing_role == "independent-audit" and (
+                        len(actors | set(assignment.requirements.excluded_actors)) > 128
+                        or len(sessions | set(assignment.requirements.excluded_sessions)) > 128
+                    ):
+                        raise EngineServiceError("ROLE_SLOT_PARTICIPATION_LIMIT: 감사 제외 목록이 128개를 넘습니다.")
+            watermark = tx.one(
+                "SELECT COALESCE(MAX(sequence),0) AS revision FROM history_events WHERE project_id=?",
+                (project_id,),
+            )["revision"]
+            run_id = "approval_" + sha256_digest({"activation_id": activation["id"],
+                                                  "authorization_id": authorization.authorization_id})[7:]
+            snapshot = {
+                "owner": "flowmarshal-engine", "project_id": project_id, "task_id": task_id,
+                "run_id": run_id,
+                "plan_revision_id": plan_revision_id, "plan_id": plan.plan_id,
+                "revision_no": plan.revision_no, "definition_digest": plan.definition_digest,
+                "activation_digest": plan.activation_digest, "activation_id": activation["id"],
+                "activation_authorization_id": activation["authorization_id"],
+                "authorization_id": authorization.authorization_id,
+                "authorization_revision_no": authorization.revision_no,
+                "authorization_digest": authorization.authorization_digest,
+                "revoked": False, "stages": selected_stages,
+                "participation": {"entries": entries, "complete": True, "watermark": watermark},
+                "source_revision": watermark,
+            }
+            snapshot["snapshot_digest"] = sha256_digest(snapshot)
+            allowed = {"run_id", "plan_revision_id", "activation_id", "authorization_id",
+                       "authorization_digest", "source_revision", "snapshot_digest"}
+            if expected is not None:
+                if not isinstance(expected, dict) or set(expected) - allowed:
+                    raise EngineServiceError("ROLE_SLOT_SOURCE_EXPECTED_INVALID")
+                if any(snapshot[key] != value for key, value in expected.items()):
+                    raise EngineServiceError("ROLE_SLOT_SOURCE_STALE: 승인 source가 변경됐습니다.")
+            return snapshot
 
     @staticmethod
     def _insert_review(tx: Any, project_id: str, artifact_kind: str, review: Any) -> None:
@@ -2542,6 +2722,18 @@ class EngineService:
                     "SELECT id FROM plan_activations WHERE plan_revision_id = ? "
                     "ORDER BY activated_at DESC LIMIT 1", (selected.plan_revision_id,),
                 )
+                source_row = tx.maybe_one(
+                    "SELECT activation_id FROM approved_role_slot_sources WHERE activation_id=? "
+                    "AND revoked_at IS NULL", (activation["id"],),
+                )
+                if source_row is not None:
+                    tx.connection.execute(
+                        "INSERT INTO approved_role_slot_authorizations "
+                        "(authorization_id,activation_id,created_at) VALUES (?,?,?)",
+                        (authorization.authorization_id, activation["id"], tx.now),
+                    )
+                    tx.history(project_id, "role_slot.reauthorized", "plan_activation", activation["id"],
+                               {"authorization_id": authorization.authorization_id})
                 return authorization, activation["id"]
             activation_id = self._activate_plan_in_transaction(
                 tx, plan_revision_id=selected.plan_revision_id,
@@ -2622,6 +2814,23 @@ class EngineService:
             raise GoalAuthorizationRequired(changes)
         if payload.definition.goal_contract_digest != goal.definition_digest:
             raise EngineServiceError("active GoalContract가 Plan의 승인 기준과 달라졌습니다.")
+        if payload.definition.role_stages is not None:
+            tasks_by_id = {task.task_id: task for task in payload.definition.tasks}
+            for stage in payload.definition.role_stages:
+                task = tasks_by_id[stage.task_id]
+                for assignment in stage.assignments:
+                    if (authorization.effect_policy.mutation_policy is MutationPolicy.READ_ONLY
+                            and assignment.requirements.filesystem == "write"):
+                        raise EngineServiceError("READ_ONLY Goal에는 쓰기 RoleSlot을 승인할 수 없습니다.")
+                    if assignment.requirements.filesystem == "write" and not any(
+                        not effect.external for effect in task.expected_effects
+                    ):
+                        raise EngineServiceError("Task 내부 변경 효과가 없는 쓰기 RoleSlot은 승인할 수 없습니다.")
+                    if not set(assignment.requirements.tools).issubset(task.required_capabilities):
+                        raise EngineServiceError("Task에 선언되지 않은 RoleSlot tool은 승인할 수 없습니다.")
+                    if (assignment.requirements.allow_nested_delegation
+                            and "nested_delegation" not in task.required_capabilities):
+                        raise EngineServiceError("Task에 선언되지 않은 nested delegation은 승인할 수 없습니다.")
         return authorization
 
     @staticmethod
@@ -2773,6 +2982,24 @@ class EngineService:
             (activation_id, plan["project_id"], plan_revision_id, activation_digest,
              authorization.authorization_id, source, now),
         )
+        if payload.definition.role_stages is not None:
+            tx.connection.execute(
+                "INSERT INTO approved_role_slot_sources "
+                "(activation_id,project_id,plan_revision_id,authorization_id,stages_json,"
+                "participation_complete,created_at) VALUES (?,?,?,?,?,1,?)",
+                (activation_id, plan["project_id"], plan_revision_id,
+                 authorization.authorization_id,
+                 canonical_json(tuple(stage.model_dump(mode="json", by_alias=True)
+                                      for stage in payload.definition.role_stages)), now),
+            )
+            tx.connection.execute(
+                "INSERT INTO approved_role_slot_authorizations "
+                "(authorization_id,activation_id,created_at) VALUES (?,?,?)",
+                (authorization.authorization_id, activation_id, now),
+            )
+            tx.history(plan["project_id"], "role_slot.approved", "plan_activation", activation_id,
+                       {"plan_revision_id": plan_revision_id,
+                        "authorization_id": authorization.authorization_id})
         self._refresh_ready(tx, plan_revision_id)
         tx.history(
             plan["project_id"],

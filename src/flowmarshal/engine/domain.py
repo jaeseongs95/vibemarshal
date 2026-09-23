@@ -1187,6 +1187,72 @@ class ModelAssignmentContract(EngineModel):
         return self
 
 
+class RoleSlotRequirements(EngineModel):
+    """AGS ModelSelectionRequest.v2의 필수 requirements 전체."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid", populate_by_name=True)
+
+    input_modalities: tuple[Literal["text", "image", "audio", "video"], ...] = Field(alias="inputModalities", max_length=128)
+    tools: tuple[str, ...] = Field(max_length=128)
+    filesystem: Literal["none", "read", "write"]
+    allowed_surfaces: tuple[Literal["local-subagent", "peer-session", "headless"], ...] = Field(alias="allowedSurfaces", max_length=128)
+    allowed_runtime_modes: tuple[str, ...] = Field(alias="allowedRuntimeModes", max_length=128)
+    allow_nested_delegation: bool = Field(alias="allowNestedDelegation")
+    require_observable: tuple[Literal["model", "reasoning", "runtimeMode"], ...] = Field(alias="requireObservable", max_length=128)
+    excluded_actors: tuple[str, ...] = Field(alias="excludedActors", max_length=128)
+    excluded_sessions: tuple[str, ...] = Field(alias="excludedSessions", max_length=128)
+    context_mode: Literal["limited", "full-history"] = Field(alias="contextMode")
+
+    @model_validator(mode="after")
+    def requirements_are_bounded(self) -> "RoleSlotRequirements":
+        import re
+
+        identifier = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$")
+        for name in ("input_modalities", "tools", "allowed_surfaces", "allowed_runtime_modes",
+                     "require_observable", "excluded_actors", "excluded_sessions"):
+            values = getattr(self, name)
+            _unique(values, f"RoleSlot {name}")
+        for value in self.tools + self.allowed_runtime_modes + self.excluded_actors:
+            if not identifier.fullmatch(value):
+                raise ValueError("RoleSlot requirements 식별자가 유효하지 않습니다.")
+        if any(not value or len(value) > 200 for value in self.excluded_sessions):
+            raise ValueError("RoleSlot excludedSessions 길이가 유효하지 않습니다.")
+        return self
+
+
+class RoleSlotAssignment(EngineModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", populate_by_name=True)
+
+    assignment_id: str = Field(alias="assignmentId", pattern=r"^[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$")
+    purpose: str = Field(min_length=1, max_length=1000)
+    routing_role: Literal["discovery", "general-implementation", "complex-reasoning", "independent-audit"] = Field(alias="routingRole")
+    risk_level: RiskLevel = Field(alias="riskLevel")
+    high_risk: bool = Field(alias="highRisk")
+    independence_required: bool = Field(alias="independenceRequired")
+    requirements: RoleSlotRequirements
+
+    @model_validator(mode="after")
+    def risk_and_independence_are_consistent(self) -> "RoleSlotAssignment":
+        if len(self.purpose.encode("utf-8")) > 1000 or "\0" in self.purpose:
+            raise ValueError("RoleSlot purpose 길이가 유효하지 않습니다.")
+        high_risk = self.risk_level in {RiskLevel.HIGH, RiskLevel.CRITICAL} or self.routing_role == "independent-audit"
+        if self.high_risk != high_risk:
+            raise ValueError("RoleSlot highRisk와 riskLevel/routingRole이 다릅니다.")
+        if self.routing_role == "independent-audit" and (
+            not self.independence_required or self.requirements.context_mode != "limited"
+        ):
+            raise ValueError("독립 감사 RoleSlot에는 독립성 및 limited context가 필요합니다.")
+        return self
+
+
+class RoleStage(EngineModel):
+    model_config = ConfigDict(frozen=True, extra="forbid", populate_by_name=True)
+
+    task_id: str = Field(alias="taskId", pattern=_ENTITY_ID_PATTERN)
+    stage_id: str = Field(alias="stageId", pattern=r"^[A-Za-z0-9][A-Za-z0-9._:/@+\-]{0,199}$")
+    assignments: tuple[RoleSlotAssignment, ...] = Field(min_length=1, max_length=64)
+
+
 class TaskContract(EngineModel):
     task_id: str = Field(pattern=_ENTITY_ID_PATTERN)
     task_ref: str = Field(pattern=_LOCAL_ID_PATTERN)
@@ -1351,6 +1417,7 @@ class PlanContractDefinition(EngineModel):
     project_map_digest: str = Field(pattern=_DIGEST_PATTERN)
     source_skeleton_digest: str = Field(pattern=_DIGEST_PATTERN)
     tasks: tuple[TaskContract, ...] = Field(min_length=1)
+    role_stages: tuple[RoleStage, ...] | None = Field(default=None, min_length=1, exclude_if=lambda value: value is None)
     dependencies: tuple[PlanDependency, ...] = ()
     goal_coverage: tuple[PlanGoalCoverage, ...] = Field(min_length=1)
     integration_validations: tuple[IntegrationValidationContract, ...] = Field(min_length=1)
@@ -1385,6 +1452,20 @@ class PlanContractDefinition(EngineModel):
         if any(item.project_id != self.project_id for item in self.tasks):
             raise ValueError("PlanContract의 모든 Task는 같은 project에 속해야 합니다.")
         known_tasks = set(task_ids)
+        if self.role_stages is not None:
+            _unique(tuple(stage.stage_id for stage in self.role_stages), "RoleStage ID")
+            assignments = tuple(assignment for stage in self.role_stages for assignment in stage.assignments)
+            _unique(tuple(item.assignment_id for item in assignments), "RoleSlot assignment ID")
+            if len(self.role_stages) > 64 or len(assignments) > 64:
+                raise ValueError("RoleSlot은 Plan당 최대 64개입니다.")
+            risk_order = tuple(RiskLevel)
+            for stage in self.role_stages:
+                if stage.task_id not in known_tasks:
+                    raise ValueError("RoleStage가 알 수 없는 Task를 참조합니다.")
+                task = next(item for item in self.tasks if item.task_id == stage.task_id)
+                for assignment in stage.assignments:
+                    if risk_order.index(assignment.risk_level) < risk_order.index(task.risk_level):
+                        raise ValueError("RoleSlot riskLevel이 Task 위험도를 낮춥니다.")
         edges: list[tuple[str, str]] = []
         edge_keys: list[tuple[str, str, DependencyType]] = []
         task_by_id = {item.task_id: item for item in self.tasks}

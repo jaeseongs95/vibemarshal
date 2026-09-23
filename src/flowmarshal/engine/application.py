@@ -1056,6 +1056,15 @@ class EngineApplication:
             operating_policy=operating_policy,
         )
 
+    def read_current_approved_role_slot_source(
+        self, project_id: str, task_id: str, expected: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """VM Core의 현재 승인 snapshot을 trusted adapter에 제공한다."""
+        return self.service.read_current_approved_role_slot_source(project_id, task_id, expected)
+
+    def revoke_approved_role_slots(self, project_id: str, *, reason: str) -> None:
+        self.service.revoke_approved_role_slots(project_id, reason=reason)
+
     def _dispatcher(self):
         if self.runtime is None:
             raise EngineApplicationError("RUNTIME_REQUIRED")
