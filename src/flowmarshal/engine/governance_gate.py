@@ -611,9 +611,13 @@ class GovernancePlugin:
         return self._mcp
 
     def call(self, tool: str, arguments: dict[str, Any], observation: dict[str, Any] | None) -> Any:
-        """MCP 도구를 부르고 JSON-RPC result 원문을 돌려준다. 관측이 있으면 호출마다 새 token을 서명한다."""
+        """VM producer receipt가 있으면 그대로 전달하고, 아니면 기존 signer CLI 경로를 쓴다."""
         client = self._client()
-        if observation is not None:
+        producer_receipt = None if observation is None else observation.get("_vmProducerReceipt")
+        if producer_receipt is not None:
+            # V03만 이 독립 producer receipt를 검증한다. 기존 caller-input signer CLI의 token을 섞지 않는다.
+            arguments = {**arguments, "_hostAttestation": producer_receipt}
+        elif observation is not None:
             model_class = self._model_classes.get(observation["model"])
             if model_class is None:
                 raise GovernanceContractMismatch("model_class", "대응표에 선언된 모델", observation["model"])
@@ -706,7 +710,8 @@ class RoleSteward:
             binding_provenance=receipt.binding_provenance)
         observation = None if model is None else {
             "model": model, "effort": effort, "source": (receipt.binding_provenance or {}).get("observed"),
-            "actorId": f"flowmarshal-engine:steward:{stage}:{receipt.thread_id}"}
+            "actorId": f"flowmarshal-engine:steward:{stage}:{receipt.thread_id}",
+            "terminalRef": {"kind": "steward", "callId": receipt.call_id}, "stage": stage}
         return {"decision": result.payload, "observation": observation, "failure": None, "callId": receipt.call_id}
 
     def _record_usage(self, project_id: str, goal_digest: str, receipt: Any) -> None:
@@ -731,26 +736,21 @@ class RoleSteward:
 
 
 def ledger_worker_observation(service: Any, attempt_id: str) -> dict[str, Any] | None:
-    """Worker Attempt의 원장 usage에 기록된 권위 관측을 돌려준다. 없으면 None."""
+    """정확한 Attempt의 완료 terminal 사건과 usage가 일치할 때만 관측을 돌려준다."""
+    from .ags_observation_producer import ProducerUnavailable, _worker_terminal
+
     with service.ledger.read() as connection:
-        attempt = connection.execute("SELECT project_id, binding_json FROM attempts WHERE id = ?",
+        attempt = connection.execute("SELECT project_id FROM attempts WHERE id = ? AND kind = 'execution'",
                                      (attempt_id,)).fetchone()
-        if attempt is None or not attempt["binding_json"]:
+        if attempt is None:
             return None
-        thread_id = json.loads(attempt["binding_json"]).get("thread_id")
-        rows = connection.execute(
-            "SELECT payload_json FROM budget_usage WHERE project_id = ? AND stage = 'execution' "
-            "AND json_extract(payload_json, '$.thread_id') = ? ORDER BY recorded_at DESC, rowid DESC",
-            (attempt["project_id"], thread_id)).fetchall()
-    for row in rows:
-        payload = json.loads(row["payload_json"])
-        model, effort = authoritative_receipt_model_observation(
-            observed_model=payload.get("observed_model"), observed_effort=payload.get("observed_effort"),
-            binding_provenance=payload.get("binding_provenance"))
-        if model is not None:
-            return {"model": model, "effort": effort, "source": payload["binding_provenance"]["observed"],
-                    "actorId": f"flowmarshal-engine:worker:{attempt_id}"}
-    return None
+        try:
+            terminal = _worker_terminal(connection, attempt["project_id"], attempt_id)
+        except ProducerUnavailable:
+            return None
+    return {"model": terminal["model"], "effort": terminal["effort"], "source": terminal["provenance"],
+            "actorId": f"flowmarshal-engine:worker:{attempt_id}",
+            "terminalRef": {"kind": "worker", "attemptId": attempt_id}, "stage": "implementation"}
 
 
 class MissingGovernanceGate:
@@ -772,11 +772,12 @@ class MissingGovernanceGate:
 
 @dataclass(frozen=True)
 class GovernanceSettings:
-    """제품 경로가 필수 gate를 만드는 입력. 플러그인 위치, gate 산출물 폴더, model class 대응표 파일을 받는다."""
+    """필수 gate 입력. producer 키는 환경·manifest가 아닌 신뢰된 host가 객체로 주입한다."""
 
     plugin_root: Path
     state_dir: Path
     model_classes: Path | None = None
+    observation_producer: Any | None = None
 
     @classmethod
     def from_environment(cls, state_dir: Path) -> "GovernanceSettings | None":
@@ -809,7 +810,8 @@ class GovernanceSettings:
             service, plugin=GovernancePlugin(self.plugin_root, self.state_dir / "plugin", self.model_classes),
             steward=RoleSteward(service, runtime=runtime, roles=roles, runner=runner,
                                 cwd=self.state_dir / "steward-cwd"),
-            state_dir=self.state_dir, conformance=self.check_conformance, conformance_check_set=CHECK_SET_DIGEST)
+            state_dir=self.state_dir, conformance=self.check_conformance, conformance_check_set=CHECK_SET_DIGEST,
+            producer=self.observation_producer)
 
 
 @dataclass
@@ -832,8 +834,15 @@ class GovernanceTaskGate:
     def __init__(self, service: Any, *, plugin: Any, steward: Any, state_dir: Path,
                  observe_worker: Callable[[str], dict[str, Any] | None] | None = None,
                  operations: CoreOperations | None = None,
-                 conformance: Callable[[], dict[str, Any]] | None = None, conformance_check_set: str = "") -> None:
+                 conformance: Callable[[], dict[str, Any]] | None = None, conformance_check_set: str = "",
+                 producer: Any | None = None) -> None:
+        if producer is not None:
+            from .ags_observation_producer import AGSObservationProducer
+
+            if not isinstance(producer, AGSObservationProducer):
+                raise TypeError("trusted AGSObservationProducer instance required")
         self.service, self.plugin, self.steward, self.state_dir = service, plugin, steward, state_dir
+        self.producer = producer
         self.conformance, self.conformance_check_set = conformance, conformance_check_set
         self.observe_worker = observe_worker or (lambda attempt_id: ledger_worker_observation(service, attempt_id))
         self.operations = operations or CoreOperations(service)
@@ -891,8 +900,38 @@ class GovernanceTaskGate:
 
     def _mcp(self, task: Any, run: _Run, step: str, tool: str, arguments: dict[str, Any],
              observation: dict[str, Any] | None, *, replay: bool) -> dict[str, Any]:
+        request = {"tool": tool, "arguments": arguments, "observation": observation}
+        if self.producer is not None and observation is not None:
+            with self.service.ledger.read() as connection:
+                project = connection.execute(
+                    "SELECT active_goal_revision_id FROM projects WHERE id=?", (task["project_id"],)
+                ).fetchone()
+            if project is None:
+                raise GovernanceRejected("VM_PRODUCER_CORE_STALE: project missing")
+            request["goalRevisionId"] = project["active_goal_revision_id"]
+        operation_id = CoreOperations._operation_id(
+            task["project_id"], GATE_KIND, {"key": run.key, "step": step, **request})[1]
+
         def execute() -> dict[str, Any]:
-            raw = self.plugin.call(tool, arguments, observation)
+            supplied = observation
+            if self.producer is not None and observation is not None:
+                from .ags_observation_producer import ProducerUnavailable
+
+                with self.service.ledger.read() as connection:
+                    row = connection.execute(
+                        "SELECT id FROM attempts WHERE task_id=? AND kind='execution' AND attempt_no=?",
+                        (task["id"], run.key["attempt_no"])).fetchone()
+                try:
+                    receipt = self.producer.issue(
+                        service=self.service, project_id=task["project_id"], task_id=task["id"],
+                        envelope_task_id=run.envelope["taskId"], run_id=run.run_id or None,
+                        attempt_id=None if row is None else row["id"], stage=observation["stage"],
+                        operation_id=operation_id, tool=tool, arguments=arguments,
+                        terminal_ref=observation["terminalRef"])
+                except (ProducerUnavailable, KeyError) as error:
+                    raise GovernanceRejected(f"VM_PRODUCER_UNAVAILABLE: {error}") from error
+                supplied = {**observation, "_vmProducerReceipt": receipt}
+            raw = self.plugin.call(tool, arguments, supplied)
             envelope = mcp_envelope(raw)
             if isinstance(envelope, dict) and envelope.get("ok") is False:
                 # 거절된 호출은 플러그인 상태를 바꾸지 않는다(플러그인 provider 테스트가 보호). 확정 결과로 굳히지
@@ -903,7 +942,7 @@ class GovernanceTaskGate:
             # 효과가 있었을 수 있는 응답은 원문 그대로 저장한다. 형태 검증은 저장 뒤 execute 밖에서 한다.
             return {"raw": raw}
 
-        stored = self._op(task, run, step, {"tool": tool, "arguments": arguments, "observation": observation},
+        stored = self._op(task, run, step, request,
                           execute, replay=replay)
         return mcp_data(tool, stored.get("raw") if isinstance(stored, dict) else None)
 

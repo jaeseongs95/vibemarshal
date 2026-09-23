@@ -1,0 +1,607 @@
+{
+  "schemaVersion": "1.0.0",
+  "kind": "vm-observation-producer-contract-fixture",
+  "fixtureDomain": "contract-only-no-credential",
+  "cryptographicEvidence": "not-included",
+  "pinnedRefs": {
+    "AGS": "f52f37b0492f3572d1859b6fe8f8fefb7a33c953",
+    "VM": "ffe3dfa7afc8037adb7199527b6befb56f5d9744"
+  },
+  "sources": [
+    {
+      "repository": "AGS",
+      "path": "mcp-server/src/host-integration/observation-challenge.ts",
+      "sha256": "6fb509fcb6fe5dbca75d6eb4416b8cd6f67c35dfdd2ae2fc1673c5e0c94f69ba"
+    },
+    {
+      "repository": "AGS",
+      "path": "mcp-server/src/workflow-store.ts",
+      "sha256": "ac4df9f07b3f4a0bfaded413b7468353b435e696a98d1a29ef29ec76502a10cd"
+    },
+    {
+      "repository": "AGS",
+      "path": "mcp-server/src/convergence-logic.ts",
+      "sha256": "d27d6edd0767a333cdf818552bd6d41a01f173ae6a16317fa8ec47526ad6074a"
+    },
+    {
+      "repository": "AGS",
+      "path": "mcp-server/src/host-attestation.ts",
+      "sha256": "34255700dd13eee27c068143b02b668393bec552f9b2098670ba5a5c4881c49d"
+    },
+    {
+      "repository": "AGS",
+      "path": "mcp-server/src/runtime-config.ts",
+      "sha256": "4d0a08a848d718d87d4e82536a77632544548c1e0513303ae78728bf34dedb46"
+    },
+    {
+      "repository": "VM",
+      "path": "src/flowmarshal/engine/governance_gate.py",
+      "sha256": "cc5fca4ebb467865018e1064c736df55c10f10730cbc58d143aaa368a794d0bf"
+    },
+    {
+      "repository": "VM",
+      "path": "src/flowmarshal/engine/roles.py",
+      "sha256": "a333f2c79cb0afb5aa0fda7ef8daaed4ad91b65b0fdb0b131b2e2e5f47944994"
+    },
+    {
+      "repository": "VM",
+      "path": "src/flowmarshal/engine/runtime.py",
+      "sha256": "48cccdc21440f40ec24a112f998846957fc81d642eecec21c962c516042a53d1"
+    },
+    {
+      "repository": "VM",
+      "path": "src/flowmarshal/engine/model_observation.py",
+      "sha256": "b7156c76701ccc57fe9907de3e09b40d7886a965b41f00122460d9b3165ca378"
+    },
+    {
+      "repository": "VM",
+      "path": "src/flowmarshal/engine/claude_runtime.py",
+      "sha256": "435a92aa7709568d928d68c58c7c3a09c8c71b772ea6155532a93073031b8640"
+    },
+    {
+      "repository": "VM",
+      "path": "src/flowmarshal/canonical.py",
+      "sha256": "64b74f58b66f513bdcd124d49c8cc9da64eb1df28182225d502cdede10f09282"
+    }
+  ],
+  "bindingFields": [
+    "invocationId",
+    "turnId",
+    "taskId",
+    "runId",
+    "attemptId",
+    "hostId",
+    "sessionId",
+    "instanceId"
+  ],
+  "canonicalVectors": [
+    {
+      "id": "steward-bootstrap",
+      "value": {
+        "schemaVersion": "1.0.0",
+        "taskEnvelope": {
+          "taskId": "fixture-task-1",
+          "criterion": "한국어🙂",
+          "revision": 2
+        }
+      },
+      "canonicalJson": "{\"schemaVersion\":\"1.0.0\",\"taskEnvelope\":{\"criterion\":\"한국어🙂\",\"revision\":2,\"taskId\":\"fixture-task-1\"}}",
+      "digest": "sha256:f4607973f52df7048dcd077f3a9f9ca046ef3b774b53af3d12ca21f895a79a4a"
+    },
+    {
+      "id": "worker-implementation",
+      "value": {
+        "schemaVersion": "1.0.0",
+        "runId": "fixture-ags-run-1",
+        "expectedRevision": 3,
+        "stageId": "implementation",
+        "notes": [
+          "완료",
+          "검사"
+        ]
+      },
+      "canonicalJson": "{\"expectedRevision\":3,\"notes\":[\"완료\",\"검사\"],\"runId\":\"fixture-ags-run-1\",\"schemaVersion\":\"1.0.0\",\"stageId\":\"implementation\"}",
+      "digest": "sha256:858c2ce5750cbe914245efd561c8f5432109e374d6406a16d93032ee8f39f840"
+    }
+  ],
+  "validCases": [
+    {
+      "id": "steward-bootstrap",
+      "kind": "steward",
+      "producer": {
+        "installationId": "fixture-vm-installation-a",
+        "keyId": "fixture-key-a",
+        "hostId": "flowmarshal-engine",
+        "instanceId": "fixture-instance-a"
+      },
+      "binding": {
+        "invocationId": "fixture-invocation-steward-1",
+        "turnId": "fixture-turn-steward-1",
+        "taskId": "fixture-task-1",
+        "runId": null,
+        "attemptId": null,
+        "hostId": "flowmarshal-engine",
+        "sessionId": "fixture-session-a",
+        "instanceId": "fixture-instance-a"
+      },
+      "terminal": {
+        "eventId": "fixture-terminal-steward-1",
+        "callId": "fixture-role-call-1",
+        "threadId": "fixture-thread-steward-1",
+        "turnId": "fixture-turn-steward-1",
+        "status": "succeeded",
+        "observedAt": "2026-09-23T00:00:00.000Z",
+        "model": "fixture-model-steward",
+        "effort": "high",
+        "provenance": "claude_session_transcript",
+        "digest": "sha256:2fb0533515d5dbc179f4b5deaa845932eb2a864ef6fae25c6169be74911fed65"
+      },
+      "core": {
+        "goalRevision": 1,
+        "taskRevision": 2,
+        "attemptOrdinal": null,
+        "gateOperationKey": "fixture-gate-bootstrap-1",
+        "stage": "bootstrap"
+      },
+      "invocation": {
+        "tool": "plan_workflow",
+        "input": {
+          "schemaVersion": "1.0.0",
+          "taskEnvelope": {
+            "taskId": "fixture-task-1",
+            "criterion": "한국어🙂",
+            "revision": 2
+          }
+        },
+        "inputDigest": "sha256:f4607973f52df7048dcd077f3a9f9ca046ef3b774b53af3d12ca21f895a79a4a",
+        "observedAt": "2026-09-23T00:00:05.000Z"
+      },
+      "nonce": "fixture-nonce-steward-1",
+      "issuedAt": "2026-09-23T00:00:05.000Z",
+      "expiresAt": "2026-09-23T00:01:05.000Z"
+    },
+    {
+      "id": "worker-implementation",
+      "kind": "worker",
+      "producer": {
+        "installationId": "fixture-vm-installation-a",
+        "keyId": "fixture-key-a",
+        "hostId": "flowmarshal-engine",
+        "instanceId": "fixture-instance-a"
+      },
+      "binding": {
+        "invocationId": "fixture-invocation-worker-1",
+        "turnId": "fixture-turn-worker-1",
+        "taskId": "fixture-task-1",
+        "runId": "fixture-ags-run-1",
+        "attemptId": "fixture-attempt-1",
+        "hostId": "flowmarshal-engine",
+        "sessionId": "fixture-session-a",
+        "instanceId": "fixture-instance-a"
+      },
+      "terminal": {
+        "eventId": "fixture-terminal-worker-1",
+        "callId": "fixture-worker-call-1",
+        "threadId": "fixture-thread-worker-1",
+        "turnId": "fixture-turn-worker-1",
+        "status": "completed",
+        "observedAt": "2026-09-23T00:01:00.000Z",
+        "model": "fixture-model-worker",
+        "effort": "medium",
+        "provenance": "provider_raw_response",
+        "digest": "sha256:42ec7a89777024854bbb52948d7d8e5c8205057e6a3834d9c69184380d39ebbd"
+      },
+      "core": {
+        "goalRevision": 1,
+        "taskRevision": 2,
+        "attemptOrdinal": 1,
+        "gateOperationKey": "fixture-gate-implementation-1",
+        "stage": "implementation"
+      },
+      "invocation": {
+        "tool": "record_stage_result",
+        "input": {
+          "schemaVersion": "1.0.0",
+          "runId": "fixture-ags-run-1",
+          "expectedRevision": 3,
+          "stageId": "implementation",
+          "notes": [
+            "완료",
+            "검사"
+          ]
+        },
+        "inputDigest": "sha256:858c2ce5750cbe914245efd561c8f5432109e374d6406a16d93032ee8f39f840",
+        "observedAt": "2026-09-23T00:01:04.000Z"
+      },
+      "nonce": "fixture-nonce-worker-1",
+      "issuedAt": "2026-09-23T00:01:04.000Z",
+      "expiresAt": "2026-09-23T00:02:04.000Z"
+    }
+  ],
+  "rejectCases": [
+    {
+      "id": "cross-invocationId",
+      "base": "steward-bootstrap",
+      "changes": [
+        {
+          "path": "binding.invocationId",
+          "value": "other-invocationId"
+        }
+      ],
+      "signaturePrecondition": "valid-for-mutated-body",
+      "expectedDisposition": "binding_mismatch"
+    },
+    {
+      "id": "cross-turnId",
+      "base": "steward-bootstrap",
+      "changes": [
+        {
+          "path": "binding.turnId",
+          "value": "other-turnId"
+        }
+      ],
+      "signaturePrecondition": "valid-for-mutated-body",
+      "expectedDisposition": "binding_mismatch"
+    },
+    {
+      "id": "cross-taskId",
+      "base": "steward-bootstrap",
+      "changes": [
+        {
+          "path": "binding.taskId",
+          "value": "other-taskId"
+        }
+      ],
+      "signaturePrecondition": "valid-for-mutated-body",
+      "expectedDisposition": "binding_mismatch"
+    },
+    {
+      "id": "cross-runId",
+      "base": "steward-bootstrap",
+      "changes": [
+        {
+          "path": "binding.runId",
+          "value": "other-runId"
+        }
+      ],
+      "signaturePrecondition": "valid-for-mutated-body",
+      "expectedDisposition": "binding_mismatch"
+    },
+    {
+      "id": "cross-attemptId",
+      "base": "steward-bootstrap",
+      "changes": [
+        {
+          "path": "binding.attemptId",
+          "value": "other-attemptId"
+        }
+      ],
+      "signaturePrecondition": "valid-for-mutated-body",
+      "expectedDisposition": "binding_mismatch"
+    },
+    {
+      "id": "cross-hostId",
+      "base": "steward-bootstrap",
+      "changes": [
+        {
+          "path": "binding.hostId",
+          "value": "other-hostId"
+        }
+      ],
+      "signaturePrecondition": "valid-for-mutated-body",
+      "expectedDisposition": "binding_mismatch"
+    },
+    {
+      "id": "cross-sessionId",
+      "base": "steward-bootstrap",
+      "changes": [
+        {
+          "path": "binding.sessionId",
+          "value": "other-sessionId"
+        }
+      ],
+      "signaturePrecondition": "valid-for-mutated-body",
+      "expectedDisposition": "binding_mismatch"
+    },
+    {
+      "id": "cross-instanceId",
+      "base": "steward-bootstrap",
+      "changes": [
+        {
+          "path": "binding.instanceId",
+          "value": "other-instanceId"
+        }
+      ],
+      "signaturePrecondition": "valid-for-mutated-body",
+      "expectedDisposition": "binding_mismatch"
+    },
+    {
+      "id": "signed-other-host",
+      "base": "worker-implementation",
+      "changes": [
+        {
+          "path": "producer.keyId",
+          "value": "fixture-key-b"
+        },
+        {
+          "path": "producer.hostId",
+          "value": "other-host"
+        },
+        {
+          "path": "binding.hostId",
+          "value": "other-host"
+        }
+      ],
+      "signaturePrecondition": "valid-under-other-pinned-host-key",
+      "expectedDisposition": "host_mismatch"
+    },
+    {
+      "id": "other-tool",
+      "base": "steward-bootstrap",
+      "changes": [
+        {
+          "path": "invocation.tool",
+          "value": "record_stage_result"
+        }
+      ],
+      "signaturePrecondition": "valid-for-mutated-body",
+      "expectedDisposition": "tool_input_mismatch"
+    },
+    {
+      "id": "other-input",
+      "base": "steward-bootstrap",
+      "changes": [
+        {
+          "path": "invocation.input.taskEnvelope.revision",
+          "value": 3
+        }
+      ],
+      "signaturePrecondition": "valid-for-mutated-body",
+      "expectedDisposition": "tool_input_mismatch"
+    },
+    {
+      "id": "requested-only-model",
+      "base": "worker-implementation",
+      "changes": [
+        {
+          "path": "terminal.provenance",
+          "value": "client_requested"
+        }
+      ],
+      "signaturePrecondition": "valid-for-mutated-body",
+      "expectedDisposition": "model_observation_unavailable"
+    },
+    {
+      "id": "incomplete-terminal",
+      "base": "worker-implementation",
+      "changes": [
+        {
+          "path": "terminal.status",
+          "value": "active"
+        }
+      ],
+      "signaturePrecondition": "valid-for-mutated-body",
+      "expectedDisposition": "terminal_incomplete"
+    },
+    {
+      "id": "caller-json",
+      "base": "steward-bootstrap",
+      "changes": [],
+      "authoritySource": "caller-json",
+      "signaturePrecondition": "absent",
+      "expectedDisposition": "untrusted_source"
+    },
+    {
+      "id": "source-string",
+      "base": "steward-bootstrap",
+      "changes": [],
+      "authoritySource": "source-string",
+      "signaturePrecondition": "absent",
+      "expectedDisposition": "untrusted_source"
+    },
+    {
+      "id": "signer-cli",
+      "base": "steward-bootstrap",
+      "changes": [],
+      "authoritySource": "caller-signer-cli",
+      "signaturePrecondition": "absent",
+      "expectedDisposition": "untrusted_source"
+    },
+    {
+      "id": "claude-hook",
+      "base": "steward-bootstrap",
+      "changes": [],
+      "authoritySource": "claude-code-hook",
+      "signaturePrecondition": "not-vm-key",
+      "expectedDisposition": "untrusted_source"
+    },
+    {
+      "id": "expired",
+      "base": "steward-bootstrap",
+      "changes": [],
+      "verificationAt": "2026-09-23T00:01:05.000Z",
+      "signaturePrecondition": "valid-for-base-body",
+      "expectedDisposition": "expired"
+    },
+    {
+      "id": "replay",
+      "base": "worker-implementation",
+      "changes": [],
+      "verificationAttempt": 2,
+      "signaturePrecondition": "valid-for-base-body",
+      "expectedDisposition": "already_consumed"
+    },
+    {
+      "id": "revoked-key",
+      "base": "worker-implementation",
+      "changes": [],
+      "trustRegistryState": "key-revoked",
+      "signaturePrecondition": "valid-for-base-body",
+      "expectedDisposition": "key_not_trusted"
+    },
+    {
+      "id": "stale-core-revision",
+      "base": "worker-implementation",
+      "changes": [
+        {
+          "path": "core.taskRevision",
+          "value": 1
+        }
+      ],
+      "signaturePrecondition": "valid-for-mutated-body",
+      "expectedDisposition": "state_stale"
+    },
+    {
+      "id": "outer-key-id-mismatch",
+      "base": "steward-bootstrap",
+      "changes": [
+        {
+          "path": "transport.keyId",
+          "value": "fixture-key-b"
+        }
+      ],
+      "signaturePrecondition": "valid-for-base-body",
+      "expectedDisposition": "key_not_trusted"
+    }
+  ],
+  "bodyGolden": [
+    {
+      "caseId": "steward-bootstrap",
+      "body": {
+        "version": 1,
+        "domain": "vm-provider-terminal-to-governance",
+        "producer": {
+          "installationId": "fixture-vm-installation-a",
+          "keyId": "fixture-key-a",
+          "hostId": "flowmarshal-engine",
+          "instanceId": "fixture-instance-a"
+        },
+        "binding": {
+          "invocationId": "fixture-invocation-steward-1",
+          "turnId": "fixture-turn-steward-1",
+          "taskId": "fixture-task-1",
+          "runId": null,
+          "attemptId": null,
+          "hostId": "flowmarshal-engine",
+          "sessionId": "fixture-session-a",
+          "instanceId": "fixture-instance-a"
+        },
+        "terminal": {
+          "eventId": "fixture-terminal-steward-1",
+          "callId": "fixture-role-call-1",
+          "threadId": "fixture-thread-steward-1",
+          "turnId": "fixture-turn-steward-1",
+          "status": "succeeded",
+          "observedAt": "2026-09-23T00:00:00.000Z",
+          "model": "fixture-model-steward",
+          "effort": "high",
+          "provenance": "claude_session_transcript",
+          "digest": "sha256:2fb0533515d5dbc179f4b5deaa845932eb2a864ef6fae25c6169be74911fed65"
+        },
+        "core": {
+          "goalRevision": 1,
+          "taskRevision": 2,
+          "attemptOrdinal": null,
+          "gateOperationKey": "fixture-gate-bootstrap-1",
+          "stage": "bootstrap"
+        },
+        "invocation": {
+          "tool": "plan_workflow",
+          "inputDigest": "sha256:f4607973f52df7048dcd077f3a9f9ca046ef3b774b53af3d12ca21f895a79a4a",
+          "observedAt": "2026-09-23T00:00:05.000Z"
+        },
+        "nonce": "fixture-nonce-steward-1",
+        "issuedAt": "2026-09-23T00:00:05.000Z",
+        "expiresAt": "2026-09-23T00:01:05.000Z"
+      },
+      "canonicalJson": "{\"binding\":{\"attemptId\":null,\"hostId\":\"flowmarshal-engine\",\"instanceId\":\"fixture-instance-a\",\"invocationId\":\"fixture-invocation-steward-1\",\"runId\":null,\"sessionId\":\"fixture-session-a\",\"taskId\":\"fixture-task-1\",\"turnId\":\"fixture-turn-steward-1\"},\"core\":{\"attemptOrdinal\":null,\"gateOperationKey\":\"fixture-gate-bootstrap-1\",\"goalRevision\":1,\"stage\":\"bootstrap\",\"taskRevision\":2},\"domain\":\"vm-provider-terminal-to-governance\",\"expiresAt\":\"2026-09-23T00:01:05.000Z\",\"invocation\":{\"inputDigest\":\"sha256:f4607973f52df7048dcd077f3a9f9ca046ef3b774b53af3d12ca21f895a79a4a\",\"observedAt\":\"2026-09-23T00:00:05.000Z\",\"tool\":\"plan_workflow\"},\"issuedAt\":\"2026-09-23T00:00:05.000Z\",\"nonce\":\"fixture-nonce-steward-1\",\"producer\":{\"hostId\":\"flowmarshal-engine\",\"installationId\":\"fixture-vm-installation-a\",\"instanceId\":\"fixture-instance-a\",\"keyId\":\"fixture-key-a\"},\"terminal\":{\"callId\":\"fixture-role-call-1\",\"digest\":\"sha256:2fb0533515d5dbc179f4b5deaa845932eb2a864ef6fae25c6169be74911fed65\",\"effort\":\"high\",\"eventId\":\"fixture-terminal-steward-1\",\"model\":\"fixture-model-steward\",\"observedAt\":\"2026-09-23T00:00:00.000Z\",\"provenance\":\"claude_session_transcript\",\"status\":\"succeeded\",\"threadId\":\"fixture-thread-steward-1\",\"turnId\":\"fixture-turn-steward-1\"},\"version\":1}",
+      "sha256": "5aaa37ecc1ef6a6a7e0316144ba87a209418b3f5a74ac845af14cca36a4c8ad0",
+      "bodyBase64url": "eyJiaW5kaW5nIjp7ImF0dGVtcHRJZCI6bnVsbCwiaG9zdElkIjoiZmxvd21hcnNoYWwtZW5naW5lIiwiaW5zdGFuY2VJZCI6ImZpeHR1cmUtaW5zdGFuY2UtYSIsImludm9jYXRpb25JZCI6ImZpeHR1cmUtaW52b2NhdGlvbi1zdGV3YXJkLTEiLCJydW5JZCI6bnVsbCwic2Vzc2lvbklkIjoiZml4dHVyZS1zZXNzaW9uLWEiLCJ0YXNrSWQiOiJmaXh0dXJlLXRhc2stMSIsInR1cm5JZCI6ImZpeHR1cmUtdHVybi1zdGV3YXJkLTEifSwiY29yZSI6eyJhdHRlbXB0T3JkaW5hbCI6bnVsbCwiZ2F0ZU9wZXJhdGlvbktleSI6ImZpeHR1cmUtZ2F0ZS1ib290c3RyYXAtMSIsImdvYWxSZXZpc2lvbiI6MSwic3RhZ2UiOiJib290c3RyYXAiLCJ0YXNrUmV2aXNpb24iOjJ9LCJkb21haW4iOiJ2bS1wcm92aWRlci10ZXJtaW5hbC10by1nb3Zlcm5hbmNlIiwiZXhwaXJlc0F0IjoiMjAyNi0wOS0yM1QwMDowMTowNS4wMDBaIiwiaW52b2NhdGlvbiI6eyJpbnB1dERpZ2VzdCI6InNoYTI1NjpmNDYwNzk3M2Y1MmRmNzA0OGRjZDA3N2YzYTlmOWNhMDQ2ZWYzYjc3NGI1M2FmM2QxMmNhMjFmODk1YTc5YTRhIiwib2JzZXJ2ZWRBdCI6IjIwMjYtMDktMjNUMDA6MDA6MDUuMDAwWiIsInRvb2wiOiJwbGFuX3dvcmtmbG93In0sImlzc3VlZEF0IjoiMjAyNi0wOS0yM1QwMDowMDowNS4wMDBaIiwibm9uY2UiOiJmaXh0dXJlLW5vbmNlLXN0ZXdhcmQtMSIsInByb2R1Y2VyIjp7Imhvc3RJZCI6ImZsb3dtYXJzaGFsLWVuZ2luZSIsImluc3RhbGxhdGlvbklkIjoiZml4dHVyZS12bS1pbnN0YWxsYXRpb24tYSIsImluc3RhbmNlSWQiOiJmaXh0dXJlLWluc3RhbmNlLWEiLCJrZXlJZCI6ImZpeHR1cmUta2V5LWEifSwidGVybWluYWwiOnsiY2FsbElkIjoiZml4dHVyZS1yb2xlLWNhbGwtMSIsImRpZ2VzdCI6InNoYTI1NjoyZmIwNTMzNTE1ZDVkYmMxNzlmNGI1ZGVhYTg0NTkzMmViMmE4NjRlZjZmYWUyNWM2MTY5YmU3NDkxMWZlZDY1IiwiZWZmb3J0IjoiaGlnaCIsImV2ZW50SWQiOiJmaXh0dXJlLXRlcm1pbmFsLXN0ZXdhcmQtMSIsIm1vZGVsIjoiZml4dHVyZS1tb2RlbC1zdGV3YXJkIiwib2JzZXJ2ZWRBdCI6IjIwMjYtMDktMjNUMDA6MDA6MDAuMDAwWiIsInByb3ZlbmFuY2UiOiJjbGF1ZGVfc2Vzc2lvbl90cmFuc2NyaXB0Iiwic3RhdHVzIjoic3VjY2VlZGVkIiwidGhyZWFkSWQiOiJmaXh0dXJlLXRocmVhZC1zdGV3YXJkLTEiLCJ0dXJuSWQiOiJmaXh0dXJlLXR1cm4tc3Rld2FyZC0xIn0sInZlcnNpb24iOjF9",
+      "expectedObservation": {
+        "binding": {
+          "invocationId": "fixture-invocation-steward-1",
+          "turnId": "fixture-turn-steward-1",
+          "taskId": "fixture-task-1",
+          "runId": null,
+          "attemptId": null,
+          "hostId": "flowmarshal-engine",
+          "sessionId": "fixture-session-a",
+          "instanceId": "fixture-instance-a"
+        },
+        "observationId": "vm-producer-v1:5aaa37ecc1ef6a6a7e0316144ba87a209418b3f5a74ac845af14cca36a4c8ad0",
+        "observedAt": "2026-09-23T00:00:05.000Z",
+        "model": "fixture-model-steward",
+        "reasoningEffort": "high"
+      }
+    },
+    {
+      "caseId": "worker-implementation",
+      "body": {
+        "version": 1,
+        "domain": "vm-provider-terminal-to-governance",
+        "producer": {
+          "installationId": "fixture-vm-installation-a",
+          "keyId": "fixture-key-a",
+          "hostId": "flowmarshal-engine",
+          "instanceId": "fixture-instance-a"
+        },
+        "binding": {
+          "invocationId": "fixture-invocation-worker-1",
+          "turnId": "fixture-turn-worker-1",
+          "taskId": "fixture-task-1",
+          "runId": "fixture-ags-run-1",
+          "attemptId": "fixture-attempt-1",
+          "hostId": "flowmarshal-engine",
+          "sessionId": "fixture-session-a",
+          "instanceId": "fixture-instance-a"
+        },
+        "terminal": {
+          "eventId": "fixture-terminal-worker-1",
+          "callId": "fixture-worker-call-1",
+          "threadId": "fixture-thread-worker-1",
+          "turnId": "fixture-turn-worker-1",
+          "status": "completed",
+          "observedAt": "2026-09-23T00:01:00.000Z",
+          "model": "fixture-model-worker",
+          "effort": "medium",
+          "provenance": "provider_raw_response",
+          "digest": "sha256:42ec7a89777024854bbb52948d7d8e5c8205057e6a3834d9c69184380d39ebbd"
+        },
+        "core": {
+          "goalRevision": 1,
+          "taskRevision": 2,
+          "attemptOrdinal": 1,
+          "gateOperationKey": "fixture-gate-implementation-1",
+          "stage": "implementation"
+        },
+        "invocation": {
+          "tool": "record_stage_result",
+          "inputDigest": "sha256:858c2ce5750cbe914245efd561c8f5432109e374d6406a16d93032ee8f39f840",
+          "observedAt": "2026-09-23T00:01:04.000Z"
+        },
+        "nonce": "fixture-nonce-worker-1",
+        "issuedAt": "2026-09-23T00:01:04.000Z",
+        "expiresAt": "2026-09-23T00:02:04.000Z"
+      },
+      "canonicalJson": "{\"binding\":{\"attemptId\":\"fixture-attempt-1\",\"hostId\":\"flowmarshal-engine\",\"instanceId\":\"fixture-instance-a\",\"invocationId\":\"fixture-invocation-worker-1\",\"runId\":\"fixture-ags-run-1\",\"sessionId\":\"fixture-session-a\",\"taskId\":\"fixture-task-1\",\"turnId\":\"fixture-turn-worker-1\"},\"core\":{\"attemptOrdinal\":1,\"gateOperationKey\":\"fixture-gate-implementation-1\",\"goalRevision\":1,\"stage\":\"implementation\",\"taskRevision\":2},\"domain\":\"vm-provider-terminal-to-governance\",\"expiresAt\":\"2026-09-23T00:02:04.000Z\",\"invocation\":{\"inputDigest\":\"sha256:858c2ce5750cbe914245efd561c8f5432109e374d6406a16d93032ee8f39f840\",\"observedAt\":\"2026-09-23T00:01:04.000Z\",\"tool\":\"record_stage_result\"},\"issuedAt\":\"2026-09-23T00:01:04.000Z\",\"nonce\":\"fixture-nonce-worker-1\",\"producer\":{\"hostId\":\"flowmarshal-engine\",\"installationId\":\"fixture-vm-installation-a\",\"instanceId\":\"fixture-instance-a\",\"keyId\":\"fixture-key-a\"},\"terminal\":{\"callId\":\"fixture-worker-call-1\",\"digest\":\"sha256:42ec7a89777024854bbb52948d7d8e5c8205057e6a3834d9c69184380d39ebbd\",\"effort\":\"medium\",\"eventId\":\"fixture-terminal-worker-1\",\"model\":\"fixture-model-worker\",\"observedAt\":\"2026-09-23T00:01:00.000Z\",\"provenance\":\"provider_raw_response\",\"status\":\"completed\",\"threadId\":\"fixture-thread-worker-1\",\"turnId\":\"fixture-turn-worker-1\"},\"version\":1}",
+      "sha256": "d1f5798c8bd093a86751b6ea318ed52b05657ac3eb67109057349409ed677043",
+      "bodyBase64url": "eyJiaW5kaW5nIjp7ImF0dGVtcHRJZCI6ImZpeHR1cmUtYXR0ZW1wdC0xIiwiaG9zdElkIjoiZmxvd21hcnNoYWwtZW5naW5lIiwiaW5zdGFuY2VJZCI6ImZpeHR1cmUtaW5zdGFuY2UtYSIsImludm9jYXRpb25JZCI6ImZpeHR1cmUtaW52b2NhdGlvbi13b3JrZXItMSIsInJ1bklkIjoiZml4dHVyZS1hZ3MtcnVuLTEiLCJzZXNzaW9uSWQiOiJmaXh0dXJlLXNlc3Npb24tYSIsInRhc2tJZCI6ImZpeHR1cmUtdGFzay0xIiwidHVybklkIjoiZml4dHVyZS10dXJuLXdvcmtlci0xIn0sImNvcmUiOnsiYXR0ZW1wdE9yZGluYWwiOjEsImdhdGVPcGVyYXRpb25LZXkiOiJmaXh0dXJlLWdhdGUtaW1wbGVtZW50YXRpb24tMSIsImdvYWxSZXZpc2lvbiI6MSwic3RhZ2UiOiJpbXBsZW1lbnRhdGlvbiIsInRhc2tSZXZpc2lvbiI6Mn0sImRvbWFpbiI6InZtLXByb3ZpZGVyLXRlcm1pbmFsLXRvLWdvdmVybmFuY2UiLCJleHBpcmVzQXQiOiIyMDI2LTA5LTIzVDAwOjAyOjA0LjAwMFoiLCJpbnZvY2F0aW9uIjp7ImlucHV0RGlnZXN0Ijoic2hhMjU2Ojg1OGMyY2U1NzUwY2JlOTE0MjQ1ZWZkNTYxYzhmNTQzMjEwOWUzNzRkNjQwNmExNmQ5MzAzMmVlOGYzOWY4NDAiLCJvYnNlcnZlZEF0IjoiMjAyNi0wOS0yM1QwMDowMTowNC4wMDBaIiwidG9vbCI6InJlY29yZF9zdGFnZV9yZXN1bHQifSwiaXNzdWVkQXQiOiIyMDI2LTA5LTIzVDAwOjAxOjA0LjAwMFoiLCJub25jZSI6ImZpeHR1cmUtbm9uY2Utd29ya2VyLTEiLCJwcm9kdWNlciI6eyJob3N0SWQiOiJmbG93bWFyc2hhbC1lbmdpbmUiLCJpbnN0YWxsYXRpb25JZCI6ImZpeHR1cmUtdm0taW5zdGFsbGF0aW9uLWEiLCJpbnN0YW5jZUlkIjoiZml4dHVyZS1pbnN0YW5jZS1hIiwia2V5SWQiOiJmaXh0dXJlLWtleS1hIn0sInRlcm1pbmFsIjp7ImNhbGxJZCI6ImZpeHR1cmUtd29ya2VyLWNhbGwtMSIsImRpZ2VzdCI6InNoYTI1Njo0MmVjN2E4OTc3NzAyNDg1NGJiYjUyOTQ4ZDdkOGU1YzgyMDUwNTdlNmEzODM0ZDljNjkxODQzODBkMzllYmJkIiwiZWZmb3J0IjoibWVkaXVtIiwiZXZlbnRJZCI6ImZpeHR1cmUtdGVybWluYWwtd29ya2VyLTEiLCJtb2RlbCI6ImZpeHR1cmUtbW9kZWwtd29ya2VyIiwib2JzZXJ2ZWRBdCI6IjIwMjYtMDktMjNUMDA6MDE6MDAuMDAwWiIsInByb3ZlbmFuY2UiOiJwcm92aWRlcl9yYXdfcmVzcG9uc2UiLCJzdGF0dXMiOiJjb21wbGV0ZWQiLCJ0aHJlYWRJZCI6ImZpeHR1cmUtdGhyZWFkLXdvcmtlci0xIiwidHVybklkIjoiZml4dHVyZS10dXJuLXdvcmtlci0xIn0sInZlcnNpb24iOjF9",
+      "expectedObservation": {
+        "binding": {
+          "invocationId": "fixture-invocation-worker-1",
+          "turnId": "fixture-turn-worker-1",
+          "taskId": "fixture-task-1",
+          "runId": "fixture-ags-run-1",
+          "attemptId": "fixture-attempt-1",
+          "hostId": "flowmarshal-engine",
+          "sessionId": "fixture-session-a",
+          "instanceId": "fixture-instance-a"
+        },
+        "observationId": "vm-producer-v1:d1f5798c8bd093a86751b6ea318ed52b05657ac3eb67109057349409ed677043",
+        "observedAt": "2026-09-23T00:01:04.000Z",
+        "model": "fixture-model-worker",
+        "reasoningEffort": "medium"
+      }
+    }
+  ]
+}

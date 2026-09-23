@@ -4,7 +4,7 @@
 
 `flowmarshal-engine` wheel은 사용자 CLI `flowmarshal-engine`과 `flowmarshal.engine`, 필요한 canonical/time helper를 제공한다. Gate 0A~0C, R1~R3.1 prototype, VM handoff와 benchmark/qualification CLI는 사용자 entrypoint가 아니다. 설치된 사용자 환경은 source checkout이나 형제 prototype 경로를 찾아 설정을 보완하지 않는다.
 
-지원 Python은 `>=3.10`이다. 런타임 의존성은 `openai-codex==0.147.0`과 `pydantic==2.13.5`로 고정한다. 현재 프리릴리스 wheel은 다음처럼 non-editable로 설치한다.
+지원 Python은 `>=3.10`이다. 런타임 의존성은 `cryptography==50.0.1`, `openai-codex==0.147.0`, `pydantic==2.13.5`로 고정한다. 현재 프리릴리스 wheel은 다음처럼 non-editable로 설치한다.
 
 ```powershell
 python -m venv C:\absolute\flowmarshal-venv
