@@ -199,22 +199,17 @@ class InstalledProducerBootstrapTests(unittest.TestCase):
         self.assertFalse(check("S-1-5-18", 197055, secret=True, is_file=False))
         self.assertFalse(check("S-1-5-21-1", 0, secret=True, is_file=True))
 
-    def test_product_settings_use_installed_loader_without_caller_key_fallback(self) -> None:
+    def test_product_settings_never_load_the_protected_vm_producer(self) -> None:
+        # 제품 설정은 명시 A2 profile만 읽는다(F06). 보호 VM producer는 설치돼 있어도 자동으로 고르지 않는다.
         environment = {"FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT": str(self.root),
                        "FLOWMARSHAL_VM_PRODUCER_KEY_PATH": str(self.key_path)}
-        with patch.dict(os.environ, environment), patch(
-            "flowmarshal.engine.ags_observation_producer._load_installed_producer",
-            side_effect=ProducerUnavailable("VM_PRODUCER_PIN_UNAVAILABLE"),
+        with patch.dict(os.environ, environment), patch.dict(os.environ, {}, clear=False) as env, patch(
+            "flowmarshal.engine.ags_observation_producer._load_installed_producer", return_value=self._bootstrap(),
         ) as loader:
-            with self.assertRaisesRegex(ProducerUnavailable, "PIN_UNAVAILABLE"):
-                GovernanceSettings.from_environment(self.root / "state")
-            loader.assert_called_once_with()
-        producer = self._bootstrap()
-        with patch.dict(os.environ, environment), patch(
-            "flowmarshal.engine.ags_observation_producer._load_installed_producer", return_value=producer,
-        ):
+            env.pop("FLOWMARSHAL_GOVERNANCE_A2_PROFILE", None)
             settings = GovernanceSettings.from_environment(self.root / "state")
-        self.assertIs(settings.observation_producer, producer)
+        loader.assert_not_called()
+        self.assertIsNone(settings.observation_producer)
 
 
 if __name__ == "__main__":

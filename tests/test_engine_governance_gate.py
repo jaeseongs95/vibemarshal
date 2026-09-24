@@ -972,7 +972,15 @@ class RuntimeConformanceTests(MultitaskGateHarness):
         from flowmarshal.engine.governance_conformance import CHECK_SET_DIGEST
         from flowmarshal.engine.governance_gate import GovernanceSettings
 
-        settings = GovernanceSettings(self.base / "plugin-root", self.base / "governance-state")
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+
+        from flowmarshal.engine.ags_observation_producer import A2_PROFILE, AGSObservationProducer
+
+        producer = AGSObservationProducer(private_key=Ed25519PrivateKey.generate(), installation_id="a2",
+                                          key_id="key-1", instance_id="instance", session_id="session",
+                                          profile=A2_PROFILE, freeze_identity="sha256:" + "0" * 64)
+        settings = GovernanceSettings(self.base / "plugin-root", self.base / "governance-state",
+                                      observation_producer=producer)
         gate = settings.open_gate(self.prepared.service, runtime=self.runtime, roles=object(), runner=object())
         self.assertIsInstance(gate, GovernanceTaskGate)
         self.assertTrue(callable(gate.conformance))
@@ -986,7 +994,8 @@ class RuntimeConformanceTests(MultitaskGateHarness):
 class PluginSurfaceTests(unittest.TestCase):
     """GovernancePlugin은 manifest로 진입점을 찾고 preflight로 실행 전에 계약·환경을 확인한다(node·플러그인 없이 검사)."""
 
-    PATHS = {"mcp-server": "dist/server.mjs", "host-attestation-cli": "dist/sign.mjs",
+    # 호스트 중립 서명 CLI(host-attestation-cli)는 소비 표면이 아니다. manifest에 없어도 preflight가 통과한다.
+    PATHS = {"mcp-server": "dist/server.mjs",
              "scope-baseline": "moved/baseline.mjs", "scope-compare": "moved/compare.mjs",
              "acceptance-cli": "moved/cli.mjs"}
 
@@ -1033,8 +1042,7 @@ class PluginSurfaceTests(unittest.TestCase):
 
     def fake_run(self, command, **kwargs):
         self.runs.append((command, kwargs))
-        output = self.node_version if command[1] == "--version" else json.dumps(
-            {"token": "signed"} if command[1].endswith("sign.mjs") else {"ran": command[1:]}).encode("utf-8")
+        output = self.node_version if command[1] == "--version" else json.dumps({"ran": command[1:]}).encode("utf-8")
         return subprocess.CompletedProcess(command, 0, output, b"")
 
     def write_classes(self, classes, **extra) -> None:
@@ -1063,7 +1071,7 @@ class PluginSurfaceTests(unittest.TestCase):
                          summary["manifest_sha256"])
         self.assertEqual("sha256:" + hashlib.sha256(self.classes.read_bytes()).hexdigest(),
                          summary["model_class_table_digest"])
-        self.assertEqual(("local_derived", 6, "v24.0.0"),
+        self.assertEqual(("local_derived", 5, "v24.0.0"),
                          (summary["provenance"], summary["file_count"], summary["node_version"]))
         self.assertEqual([{"source": "plugin_manifest_file", "plugin": {"id": "fake", "version": "9.9.9"}},
                           {"source": "mcp_server_info", "serverInfo": {"name": "stub-server", "version": "0"}}],
@@ -1084,23 +1092,18 @@ class PluginSurfaceTests(unittest.TestCase):
         self.assertEqual({"ran": [str(self.root / "moved/cli.mjs"), "--input", str(request)]},
                          plugin.script("acceptance-cli", request))
 
-    def test_signing_submits_the_host_and_the_class_from_the_injected_table(self) -> None:
+    def test_observed_calls_are_refused_without_the_a2_producer_and_no_cli_signs(self) -> None:
         plugin = self.plugin()
         plugin.preflight()
+        self.assertEqual({"observed-model": "deep"}, plugin.model_classes())
+        runs = len(self.runs)
         observation = {"model": "observed-model", "effort": "high", "actorId": "actor"}
-        result = plugin.call("plan_workflow", {"a": 1}, observation)
-        self.assertEqual({"a": 1, "_hostAttestation": "signed"}, result["arguments"])
-        command, options = self.runs[-1]
-        self.assertEqual(["node", str(self.root / "dist/sign.mjs")], command)
-        self.assertEqual({"host": "flowmarshal-engine", "tool": "plan_workflow", "input": {"a": 1},
-                          "model": "observed-model", "modelClass": "deep", "reasoningEffort": "high",
-                          "actorId": "actor"}, json.loads(options["input"]))
-        signed = len(self.runs)
         with self.assertRaises(GovernanceContractMismatch) as raised:
-            plugin.call("plan_workflow", {}, {**observation, "model": "undeclared-model"})
-        self.assertIn("GOVERNANCE_CONTRACT_MISMATCH: model_class:", str(raised.exception))
-        self.assertIn("undeclared-model", str(raised.exception))
-        self.assertEqual(signed, len(self.runs))
+            plugin.call("plan_workflow", {"a": 1}, observation)
+        self.assertIn("GOVERNANCE_CONTRACT_MISMATCH: a2_profile:", str(raised.exception))
+        self.assertIs(False, raised.exception.effects_started)
+        self.assertEqual(runs, len(self.runs))
+        self.assertEqual({"a": 1}, plugin.call("plan_workflow", {"a": 1}, None)["arguments"])
 
     def test_refused_or_malformed_signing_and_failed_scripts_are_effect_free_mismatches(self) -> None:
         plugin = self.plugin()
@@ -1108,9 +1111,7 @@ class PluginSurfaceTests(unittest.TestCase):
         observation = {"model": "observed-model", "effort": "high", "actorId": "actor"}
         request = self.base / "request.json"
         request.write_text("{}", encoding="utf-8")
-        cases = (("host_attestation_output", 0, b'{"signed": "no token field"}', lambda: plugin.call("plan_workflow", {}, observation)),
-                 ("host_attestation_output", 0, b"not json", lambda: plugin.call("plan_workflow", {}, observation)),
-                 ("host_attestation:", 1, b"", lambda: plugin.call("plan_workflow", {}, observation)),
+        cases = (("a2_profile", 0, b"", lambda: plugin.call("plan_workflow", {}, observation)),
                  ("script_exit:scope-compare", 2, b"", lambda: plugin.script("scope-compare", request)))
         for check, code, output, act in cases:
             with self.subTest(check=check, output=output):
@@ -1125,9 +1126,9 @@ class PluginSurfaceTests(unittest.TestCase):
     def test_preflight_names_the_failed_check(self) -> None:
         cases = {
             "manifest_format": lambda: self.manifest.update(format="agent-governance-suite.host-integration.v2"),
-            "entry_point:scope-compare": lambda: self.manifest["entryPoints"].pop(3),
+            "entry_point:scope-compare": lambda: self.manifest["entryPoints"].pop(2),
             "entry_point:mcp-server": lambda: self.manifest["entryPoints"][0].pop("executionClosure"),
-            "entry_point:acceptance-cli": lambda: self.manifest["entryPoints"][4].update(id=["acceptance-cli"]),
+            "entry_point:acceptance-cli": lambda: self.manifest["entryPoints"][3].update(id=["acceptance-cli"]),
             "entry_points": lambda: self.manifest.update(entryPoints=7),
             "closure_file": lambda: self.manifest["entryPoints"][1]["executionClosure"].append("missing.json"),
             "node_version": lambda: setattr(self, "node_version", b"v23.11.1\n"),

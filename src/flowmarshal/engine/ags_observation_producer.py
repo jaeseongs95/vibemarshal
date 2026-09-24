@@ -1,7 +1,13 @@
-"""VM Core의 완료 provider turn을 뒤따르는 AGS 호출에 결속해 서명한다.
+"""Core의 완료 provider turn을 뒤따르는 AGS 호출에 결속해 서명한다.
 
-서명 키는 Engine을 띄우는 신뢰 경계가 객체로 주입한다. CLI, 환경 변수,
-workspace 파일이나 MCP 인자는 키를 만들거나 선택할 수 없다.
+서명 키는 Engine을 띄우는 신뢰 경계가 객체로 주입한다. CLI, workspace 파일이나 MCP 인자는 키를 만들거나
+선택할 수 없다. 제품 경로는 명시 A2 profile(``flowmarshal-same-user-v1``) 설정 파일 하나로만 producer를
+만든다(``_load_a2_producer``). 보호 VM producer(``_load_installed_producer``)는 후속 B 경로이며 제품 설정이
+자동으로 고르지 않는다.
+
+A2는 같은 OS 사용자 경계다. 같은 사용자는 FM 원장, Claude transcript, producer key와 A2 설정을 조작할 수 있으므로
+A2 서명은 "선택한 FM producer가 이 내용을 냈고 현재 호출에 결속됐다"만 보인다. 원래 관측의 진실성, OS 격리나
+보호 VM ``strong`` 근거가 아니다. model class와 actor는 FM 서명 주장이다.
 """
 from __future__ import annotations
 
@@ -41,6 +47,17 @@ _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _PRIVILEGED_SIDS = frozenset({"S-1-5-18", "S-1-5-32-544"})
 _WINDOWS_READ_RIGHTS = 0x1200A9
 _WINDOWS_POWERSHELL = r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
+# AGS F01 계약(host-integration.v1.schema.json $defs/trustProfile)의 A2 profile. 값 하나라도 다르면 A2가 아니다.
+A2_PROFILE_ID = "flowmarshal-same-user-v1"
+A2_PROFILE = {
+    "profileId": A2_PROFILE_ID, "assuranceTier": "same-user", "hostId": "flowmarshal",
+    "receiptDomain": "fm-same-user-provider-terminal-to-governance-v1",
+    "dispatchDomain": "ags-fm-same-user-dispatch-registration-v1",
+    "modelClassSource": "flowmarshal-signed-assertion", "actorSource": "flowmarshal-signed-assertion",
+    "keyNamespace": A2_PROFILE_ID, "pinNamespace": A2_PROFILE_ID, "stateNamespace": A2_PROFILE_ID,
+}
+A2_CONFIG_FORMAT = "flowmarshal-governance-a2-profile-v1"
+_VM_DISPATCH_DOMAIN = "ags-vm-dispatch-registration-v1"
 
 
 def _same_file(before: os.stat_result, after: os.stat_result) -> bool:
@@ -208,6 +225,110 @@ def _load_installed_producer(
     )
 
 
+def _a2_digest(value: Any) -> str:
+    """AGS canonicalJson UTF-8 bytes의 SHA-256(F01 freezeIdentity·pinSetDigest·resourceBindingDigest 계산식)."""
+    return "sha256:" + hashlib.sha256(_canonical(value).encode("utf-8")).hexdigest()
+
+
+def _read_a2_json(path: Any, code: str) -> dict[str, Any]:
+    """same-user 파일을 읽는다. OS 보호는 검사·주장하지 않고 경로 형태·링크·크기·중복 key만 닫는다."""
+    if (not isinstance(path, str) or not os.path.isabs(path) or os.path.normpath(path) != path
+            or Path(path) in (_KEY_PATH, _PIN_PATH)):
+        raise ProducerUnavailable(f"A2_PRODUCER_{code}_PATH_INVALID")
+    try:
+        status = Path(path).lstat()
+        if (stat.S_ISLNK(status.st_mode) or not stat.S_ISREG(status.st_mode)
+                or getattr(status, "st_file_attributes", 0) & 0x400):
+            raise ProducerUnavailable(f"A2_PRODUCER_{code}_PATH_INVALID")
+        raw = Path(path).read_bytes()
+    except OSError as error:
+        raise ProducerUnavailable(f"A2_PRODUCER_{code}_UNAVAILABLE") from error
+
+    def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+        if len({key for key, _ in pairs}) != len(pairs):
+            raise ValueError("duplicate")
+        return dict(pairs)
+    try:
+        if len(raw) > 1_048_576:
+            raise ValueError("too large")
+        parsed = json.loads(raw, object_pairs_hook=unique)
+    except (UnicodeDecodeError, ValueError) as error:
+        raise ProducerUnavailable(f"A2_PRODUCER_{code}_JSON_INVALID") from error
+    if not isinstance(parsed, dict):
+        raise ProducerUnavailable(f"A2_PRODUCER_{code}_JSON_INVALID")
+    return parsed
+
+
+def _load_a2_producer(config_path: Path) -> "AGSObservationProducer":
+    """명시 A2 profile 설정 하나로 producer를 만든다. 어긋나면 ProducerUnavailable이며 다른 profile로 넘어가지 않는다.
+
+    설정은 ``{"format", "selection", "resources"}``다. ``selection``은 AGS 서버가 고정하는 F01 ``serverProfileSelection``
+    과 같은 객체이고 ``resources``는 그 ``resourceBindingDigest``의 입력이다. key·pin 파일은 A2 namespace여야 하며
+    digest와 freezeIdentity를 다시 계산해 대조한다. state는 AGS 서버의 자원이라 FM은 digest 결속만 확인한다.
+    """
+    def load() -> tuple[Ed25519PrivateKey, str, str]:
+        config = _read_a2_json(str(config_path), "CONFIG")
+        selection, resources = config.get("selection"), config.get("resources")
+        if (set(config) != {"format", "selection", "resources"} or config["format"] != A2_CONFIG_FORMAT
+                or not isinstance(selection, dict) or not isinstance(resources, dict)
+                or set(selection) != {"source", "profile", "pinSetDigest", "resourceBindingDigest", "freezeIdentity"}
+                or selection["source"] != "server-local-operator-config"
+                or selection["profile"] != A2_PROFILE or set(resources) != {"key", "pin", "state"}):
+            raise ProducerUnavailable("A2_PRODUCER_PROFILE_MISMATCH")
+        for kind in ("key", "pin", "state"):
+            item = resources[kind]
+            if (not isinstance(item, dict) or set(item) != {"namespace", "location"}
+                    or item["namespace"] != A2_PROFILE[f"{kind}Namespace"]):
+                raise ProducerUnavailable("A2_PRODUCER_NAMESPACE_MISMATCH")
+        if selection["resourceBindingDigest"] != _a2_digest(resources):
+            raise ProducerUnavailable("A2_PRODUCER_RESOURCE_BINDING_MISMATCH")
+        if selection["freezeIdentity"] != _a2_digest(
+                {name: value for name, value in selection.items() if name != "freezeIdentity"}):
+            raise ProducerUnavailable("A2_PRODUCER_FREEZE_IDENTITY_MISMATCH")
+        key = _read_a2_json(resources["key"]["location"], "KEY")
+        pins = _read_a2_json(resources["pin"]["location"], "PIN")
+        if (set(key) != {"version", "namespace", "keyId", "hostId", "privateKeyPkcs8"}
+                or type(key["version"]) is not int or key["version"] != 1
+                or key["namespace"] != A2_PROFILE["keyNamespace"] or key["hostId"] != A2_PROFILE["hostId"]
+                or not isinstance(key["keyId"], str) or not key["keyId"]
+                or not isinstance(key["privateKeyPkcs8"], str)):
+            raise ProducerUnavailable("A2_PRODUCER_KEY_MISMATCH")
+        if (set(pins) != {"namespace", "pins"} or pins["namespace"] != A2_PROFILE["pinNamespace"]
+                or not isinstance(pins["pins"], list)):
+            raise ProducerUnavailable("A2_PRODUCER_PIN_MISMATCH")
+        if selection["pinSetDigest"] != _a2_digest(pins):
+            raise ProducerUnavailable("A2_PRODUCER_PIN_SET_DIGEST_MISMATCH")
+        matched = [pin for pin in pins["pins"] if isinstance(pin, dict) and pin.get("keyId") == key["keyId"]]
+        if (len(matched) != 1 or set(matched[0]) != {"keyId", "publicKeySpki", "status"}
+                or matched[0]["status"] != "active" or not isinstance(matched[0]["publicKeySpki"], str)):
+            raise ProducerUnavailable("A2_PRODUCER_PIN_UNAVAILABLE")
+        try:
+            private = load_der_private_key(base64.b64decode(key["privateKeyPkcs8"], validate=True), password=None)
+            public = base64.b64decode(matched[0]["publicKeySpki"], validate=True)
+        except (ValueError, TypeError, binascii.Error) as error:
+            raise ProducerUnavailable("A2_PRODUCER_KEY_INVALID") from error
+        if (not isinstance(private, Ed25519PrivateKey)
+                or private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo) != public):
+            raise ProducerUnavailable("A2_PRODUCER_KEY_PIN_MISMATCH")
+        return private, key["keyId"], selection["freezeIdentity"]
+
+    private, key_id, freeze_identity = load()
+
+    def current() -> None:
+        refreshed, current_key, current_freeze = load()
+        if (current_key != key_id or current_freeze != freeze_identity
+                or refreshed.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
+                != private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)):
+            raise ProducerUnavailable("A2_PRODUCER_PROFILE_CHANGED")
+
+    # A2에는 operator installation이 없다. producer 식별은 profile·freezeIdentity·keyId다.
+    return AGSObservationProducer(
+        private_key=private, installation_id=f"{A2_PROFILE_ID}:{freeze_identity}", key_id=key_id,
+        instance_id="fm-instance-" + secrets.token_hex(16), session_id="fm-session-" + secrets.token_hex(16),
+        pin_check=current, profile=A2_PROFILE, freeze_identity=freeze_identity,
+    )
+
+
 def _required(value: Any, name: str) -> str:
     if not isinstance(value, str) or not value:
         raise ProducerUnavailable(f"VM_PRODUCER_{name.upper()}_MISSING")
@@ -363,7 +484,7 @@ def _worker_terminal(connection: Any, project_id: str, attempt_id: str) -> dict[
 
 
 class AGSObservationProducer:
-    """신뢰된 Engine bootstrap이 만든 signer. 미설정이면 gate는 기존 unsupported 경로다."""
+    """신뢰된 Engine bootstrap이 만든 signer. 제품 gate는 명시 A2 profile로 만든 것만 받고, 없으면 dispatch를 막는다."""
 
     def __init__(
         self, *, private_key: Ed25519PrivateKey, installation_id: str, key_id: str,
@@ -372,9 +493,21 @@ class AGSObservationProducer:
         nonce: Callable[[], str] | None = None,
         invocation_id: Callable[[], str] | None = None,
         pin_check: Callable[[], None] | None = None,
+        profile: dict[str, str] | None = None, freeze_identity: str | None = None,
     ) -> None:
         if not isinstance(private_key, Ed25519PrivateKey):
             raise ProducerUnavailable("VM_PRODUCER_KEY_UNAVAILABLE")
+        # profile이 없으면 기존 보호 VM domain이다. A2는 F01 profile 전체와 freezeIdentity가 함께 있어야 한다.
+        if profile is None and freeze_identity is None:
+            self.profile_id = None
+            self._host_id, self._domain, self._dispatch_domain = _HOST_ID, _DOMAIN, _VM_DISPATCH_DOMAIN
+        elif profile == A2_PROFILE and isinstance(freeze_identity, str) and _DIGEST.fullmatch(freeze_identity):
+            self.profile_id = A2_PROFILE_ID
+            self._host_id, self._domain = profile["hostId"], profile["receiptDomain"]
+            self._dispatch_domain = profile["dispatchDomain"]
+        else:
+            raise ProducerUnavailable("A2_PRODUCER_PROFILE_MISMATCH")
+        self.freeze_identity = freeze_identity
         self._key = private_key
         self.installation_id = _required(installation_id, "installationId")
         self.key_id = _required(key_id, "keyId")
@@ -397,9 +530,13 @@ class AGSObservationProducer:
         self, *, service: Any, project_id: str, task_id: str, envelope_task_id: str,
         run_id: str | None, attempt_id: str | None, stage: str, operation_id: str,
         tool: str, arguments: dict[str, Any], terminal_ref: dict[str, str],
-        transport: Any | None = None,
+        transport: Any | None = None, model_classes: dict[str, str] | None = None,
     ) -> Any:
-        """Core prepared operation와 완료 terminal을 다시 읽은 직후 새 invocation을 서명한다."""
+        """Core prepared operation와 완료 terminal을 다시 읽은 직후 새 invocation을 서명한다.
+
+        A2는 원장에서 다시 읽은 terminal model을 호출자 대응표(model_classes)로 class에 대응시키고, actor를 terminal에서
+        유도해 둘 다 FM 서명 주장으로 body에 넣는다. 대응표에 없는 model이면 서명하지 않는다.
+        """
         self.check_installed_pin()
         if ((stage in {"bootstrap", "baseline"} and attempt_id is not None)
                 or (stage in {"implementation", "scope", "acceptance"} and attempt_id is None)
@@ -550,17 +687,26 @@ class AGSObservationProducer:
             timestamp = _utc(issued)
             encode = lambda value: base64.urlsafe_b64encode(value).rstrip(b"=").decode("ascii")
             producer = {"installationId": self.installation_id, "keyId": self.key_id,
-                        "hostId": _HOST_ID, "instanceId": self.instance_id}
+                        "hostId": self._host_id, "instanceId": self.instance_id}
             binding = {"turnId": terminal["turnId"], "taskId": envelope_task_id,
-                       "runId": run_id, "attemptId": attempt_id, "hostId": _HOST_ID,
+                       "runId": run_id, "attemptId": attempt_id, "hostId": self._host_id,
                        "sessionId": self.session_id, "instanceId": self.instance_id}
             invocation = {"tool": _required(tool, "tool"), "inputDigest": input_digest,
                           "observedAt": timestamp}
+            a2: dict[str, Any] = {}
+            if self.profile_id is not None:
+                model_class = (model_classes or {}).get(terminal["model"])
+                if model_class is None:
+                    raise ProducerUnavailable("A2_PRODUCER_MODEL_CLASS_UNDECLARED")
+                actor = (f"flowmarshal-engine:steward:{stage}:{terminal['threadId']}"
+                         if terminal_ref.get("kind") == "steward" else f"flowmarshal-engine:worker:{attempt_id}")
+                a2 = {"profileBinding": {"profileId": self.profile_id, "freezeIdentity": self.freeze_identity},
+                      "assertions": {"modelClass": model_class, "actorId": actor}}
             ticket = None
             transport_binding = None
             if transport is not None:
                 registration_body = {
-                    "version": 1, "domain": "ags-vm-dispatch-registration-v1",
+                    "version": 1, "domain": self._dispatch_domain, **a2,
                     "serverEpoch": transport.epoch, "nonce": _required(self._nonce(), "nonce"),
                     "issuedAt": timestamp, "expiresAt": _utc(issued + timedelta(seconds=60)),
                     "producer": producer, "binding": binding,
@@ -577,7 +723,7 @@ class AGSObservationProducer:
                 transport_binding = {"serverEpoch": ticket.epoch,
                                      "registrationDigest": "sha256:" + hashlib.sha256(registration_data).hexdigest()}
             body = {
-                "version": 2 if ticket is not None else 1, "domain": _DOMAIN,
+                "version": 2 if ticket is not None else 1, "domain": self._domain, **a2,
                 "producer": producer,
                 "binding": {"invocationId": ticket.call_id if ticket is not None else _required(
                     self._invocation_id(), "invocationId"), **binding},

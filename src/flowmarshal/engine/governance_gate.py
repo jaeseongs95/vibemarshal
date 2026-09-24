@@ -19,6 +19,9 @@ Task validation·semantic Validator·Goal Test가 아니며 Core evidence로 세
   진입점을 id로 찾고, 두 단계 맨 앞의 preflight로 실행 가능 여부를 확인한다. 계약·환경 불일치는
   GOVERNANCE_CONTRACT_MISMATCH 하나로 드러내며 Task 상태를 바꾸지 않고 원장에 확정 결과로 굳히지 않는다.
   실행에 쓴 플러그인 bytes의 identity는 Engine이 manifest closure 경로로 계산해 남긴다(local_derived).
+- 서명: 관측이 붙는 호출은 명시 A2 profile(flowmarshal-same-user-v1) producer의 인증 dispatch로만 보낸다. 호스트 중립
+  서명 CLI(host-attestation-cli) 경로는 없고, A2 profile이 없거나 어긋나면 dispatch를 막는다. 보호 VM producer(B)나
+  CLI(A1)로 자동 대체하지 않는다. A2는 같은 OS 사용자 경계라 원장·transcript·key 조작을 막지 못한다.
 - 적합성: 제품 경로의 gate는 이 프로젝트 원장에서 처음 보는 plugin identity면 Worker·steward 호출 전에
   governance_conformance의 검사를 한 번 실행하고 CoreOperations 기록으로 재생한다.
 """
@@ -53,7 +56,7 @@ MODEL_CLASSES = ("lightweight", "general", "deep", "frontier")
 # 소비 표면 선언: Engine이 플러그인에 기대는 진입점 id, MCP 도구와 그 data에서 읽는 필드, 스크립트 출력에서
 # 읽는 필드다. Engine의 의존이 바뀔 때만 바뀐다. 플러그인 버전·digest는 여기 두지 않는다.
 CONSUMED_SURFACE: dict[str, Any] = {
-    "entry_points": ["mcp-server", "host-attestation-cli", "scope-baseline", "scope-compare", "acceptance-cli"],
+    "entry_points": ["mcp-server", "scope-baseline", "scope-compare", "acceptance-cli"],
     "mcp_tools": {
         "plan_workflow": {"executionMode": "str", "stages": "list"},
         "open_convergence_root": {"rootId": "str", "revision": "int"},
@@ -335,6 +338,10 @@ def user_change_overlap(root: Path, writes: list[str], goal_start: dict[str, Any
 
 PLUGIN_ROOT_ENV = "FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT"
 MODEL_CLASSES_ENV = "FLOWMARSHAL_GOVERNANCE_MODEL_CLASSES"
+# 명시 A2 profile 설정 파일(flowmarshal-governance-a2-profile-v1) 경로. 없으면 실행 Task dispatch를 막는다.
+A2_PROFILE_ENV = "FLOWMARSHAL_GOVERNANCE_A2_PROFILE"
+# ags_observation_producer.A2_PROFILE_ID와 같은 값이다(그 모듈은 cryptography를 쓰므로 여기서 지연 import한다).
+A2_PROFILE_ID = "flowmarshal-same-user-v1"
 
 
 def load_model_classes(path: Path | None) -> tuple[dict[str, str], str]:
@@ -493,7 +500,7 @@ class McpStdioClient:
 
 
 class GovernancePlugin:
-    """플러그인 manifest가 선언한 MCP 서버·서명 CLI·skill 스크립트 실행기.
+    """플러그인 manifest가 선언한 MCP 서버·skill 스크립트 실행기.
 
     진입점 경로는 manifest에서 id로 찾는다. preflight가 실행 가능 여부를 확인하고 실행에 쓸 bytes의 identity를
     계산한다. 플러그인의 .git, 버전, 기대 digest는 보지 않는다.
@@ -628,28 +635,16 @@ class GovernancePlugin:
         return self._mcp
 
     def call(self, tool: str, arguments: dict[str, Any], observation: dict[str, Any] | None) -> Any:
-        """일반 호출 경로. VM producer receipt는 예약된 전용 dispatch에서만 전달한다."""
-        producer_receipt = None if observation is None else observation.get("_vmProducerReceipt")
-        if producer_receipt is not None:
-            raise GovernanceContractMismatch("vm_dispatch", "authenticated reservation", "caller receipt")
-        client = self._client()
+        """관측 없는 일반 호출 경로. 관측이 붙는 호출은 A2 producer의 인증 dispatch(call_authenticated)로만 보낸다."""
         if observation is not None:
-            model_class = self._model_classes.get(observation["model"])
-            if model_class is None:
-                raise GovernanceContractMismatch("model_class", "대응표에 선언된 모델", observation["model"])
-            signed = _run(["node", str(self._entries["host-attestation-cli"])],
-                          timeout=self._timeout(SCRIPT_TIMEOUT_SECONDS, "host attestation"),
-                          code="GOVERNANCE_ATTESTATION", effects_started=False, env=self.env,
-                          input=json.dumps({"host": HOST_ID, "tool": tool, "input": arguments,
-                                            "model": observation["model"], "modelClass": model_class,
-                                            "reasoningEffort": observation["effort"],
-                                            "actorId": observation["actorId"]}, ensure_ascii=False).encode("utf-8"))
-            if signed.returncode != 0:
-                raise GovernanceContractMismatch("host_attestation", "token",
-                                                 signed.stderr.decode("utf-8", "replace").strip())
-            token = _fields("host_attestation_output", _json(signed.stdout), {"token": "str"})["token"]
-            arguments = {**arguments, "_hostAttestation": token}
-        return client.call(tool, arguments)
+            # 호스트 중립 서명 CLI 경로는 없다. producer 없이 서명을 만들거나 다른 경로로 넘어가지 않는다.
+            raise GovernanceContractMismatch("a2_profile", f"{A2_PROFILE_ID} producer의 인증 dispatch",
+                                             "producer 없는 관측 호출")
+        return self._client().call(tool, arguments)
+
+    def model_classes(self) -> dict[str, str]:
+        """preflight가 읽은 「관측 model → class」 대응표. A2 서명의 modelClass 주장은 여기서만 나온다."""
+        return dict(self._model_classes)
 
     def authenticated_dispatch(self) -> Any:
         from .ags_invocation_transport import AuthenticatedDispatchTransport
@@ -817,7 +812,7 @@ class MissingGovernanceGate:
 
 @dataclass(frozen=True)
 class GovernanceSettings:
-    """필수 gate 입력. producer 키는 환경·manifest가 아닌 신뢰된 host가 객체로 주입한다."""
+    """필수 gate 입력. producer는 명시 A2 profile 설정으로만 만들며 manifest·MCP 인자가 고르지 않는다."""
 
     plugin_root: Path
     state_dir: Path
@@ -830,9 +825,14 @@ class GovernanceSettings:
         classes = os.environ.get(MODEL_CLASSES_ENV)
         if not root:
             return None
-        from .ags_observation_producer import _load_installed_producer
+        profile = os.environ.get(A2_PROFILE_ENV)
+        producer = None
+        if profile:
+            from .ags_observation_producer import _load_a2_producer
 
-        return cls(Path(root), state_dir, Path(classes) if classes else None, _load_installed_producer())
+            # 명시 설정이 어긋나면 ProducerUnavailable로 시작을 막는다. 보호 VM producer는 자동으로 읽지 않는다.
+            producer = _load_a2_producer(Path(profile))
+        return cls(Path(root), state_dir, Path(classes) if classes else None, producer)
 
     def check_conformance(self) -> dict[str, Any]:
         """E2E preflight가 cell 실행 전에 부르는 적합성 검사."""
@@ -852,6 +852,10 @@ class GovernanceSettings:
         if roles is None or runner is None:
             return MissingGovernanceGate(
                 "GOVERNANCE_ROLE_CONFIGURATION_REQUIRED: steward binding에 쓸 역할 설정이 필요합니다.")
+        if getattr(self.observation_producer, "profile_id", None) != A2_PROFILE_ID:
+            return MissingGovernanceGate(
+                f"GOVERNANCE_A2_PROFILE_REQUIRED: 실행 Task는 명시 {A2_PROFILE_ID} profile producer로 서명해야 합니다. "
+                f"{A2_PROFILE_ENV}를 지정하십시오. 보호 VM·CLI 서명으로 대체하지 않습니다.")
         from .governance_conformance import CHECK_SET_DIGEST
 
         # 제품 경로의 gate에는 항상 런타임 적합성 분기를 결속한다.
@@ -901,9 +905,16 @@ class GovernanceTaskGate:
 
     def register_approved_role_slot_source(self, project_id: str, task_id: str,
                                            expected: dict[str, Any] | None = None) -> Any:
-        """R16 전용 control pipe에 Core의 현재 승인 snapshot을 전달한다."""
+        """R16 전용 control pipe에 Core의 현재 승인 snapshot을 전달한다.
+
+        R16 승인 슬롯은 보호 VM signer 전용이며 1.0 canary에서 미검증 후속 과제다. A2 key로 VM domain을 서명하지
+        않도록 A2 producer도 거부한다. producer가 없으면 성공하거나 건너뛰지 않고 막는다.
+        """
         if self.producer is None:
             raise GovernanceContractMismatch("approved_slot_producer", "installed signer", "unavailable")
+        if self.producer.profile_id is not None:
+            raise GovernanceContractMismatch("approved_slot_producer", "vm-protected-v1 signer(R16 후속)",
+                                             self.producer.profile_id)
         from .ags_approved_slot_producer import ApprovedSlotProducer
 
         self.plugin.preflight()
@@ -989,8 +1000,15 @@ class GovernanceTaskGate:
                         attempt_id=None if row is None else row["id"], stage=observation["stage"],
                         operation_id=operation_id, tool=tool, arguments=arguments,
                         terminal_ref=observation["terminalRef"],
-                        transport=self.plugin.authenticated_dispatch())
-                except (ProducerUnavailable, KeyError) as error:
+                        transport=self.plugin.authenticated_dispatch(),
+                        model_classes=getattr(self.plugin, "model_classes", dict)())
+                except ProducerUnavailable as error:
+                    if str(error) == "A2_PRODUCER_MODEL_CLASS_UNDECLARED":
+                        # 대응표 누락은 Task 잘못이 아닌 설정 결함이다. 서명 전에 계약 불일치로 멈춘다.
+                        raise GovernanceContractMismatch("model_class", "대응표에 선언된 모델",
+                                                         observation.get("model")) from error
+                    raise GovernanceRejected(f"VM_PRODUCER_UNAVAILABLE: {error}") from error
+                except KeyError as error:
                     raise GovernanceRejected(f"VM_PRODUCER_UNAVAILABLE: {error}") from error
                 raw = self.plugin.call_authenticated(ticket, receipt, tool, arguments)
             else:

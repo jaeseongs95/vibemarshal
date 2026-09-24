@@ -9,6 +9,9 @@ manifest와 preflight는 플러그인이 실행 가능한지만 확인한다. �
 - 합성 attestation: probe의 서명은 임시 state의 키로만 한다(제품 run의 state에서는 검증되지 않는다). model 이름과
   class는 probe 전용 값을 호스트의 주장으로 직접 제출하며 실제 모델 이름을 쓰지 않는다. 결과는 local_derived이고
   usage·steward 관측·stage evidence·Task validation 근거가 아니다.
+- A2 전환 중: 호스트 중립 서명 CLI 경로가 없어져 probe의 서명 호출(``signed=True``)은 ``a2_profile`` 계약 불일치로
+  그 검사가 FAIL이 된다. 16검사를 임시 A2 profile 서명·예약·현재 호출 경로로 바꾸는 일은 별도 작업(F07)이며, 그
+  전까지 이 검사는 PASS를 내지 않는다(fail-closed).
 - 분류: 플러그인이 기대와 다르게 동작하면 그 검사를 FAIL로 돌려준다(결정적 결과). timeout·프로세스 시작 실패·git
   실패 같은 환경성 실패는 결과가 아니라 GovernanceUnavailable(effects_started=False)로 던져 호출자가 다시 시도한다.
 """
