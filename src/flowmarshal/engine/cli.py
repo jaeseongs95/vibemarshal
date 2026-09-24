@@ -8,6 +8,7 @@ import sys
 import tempfile
 import time
 import uuid
+from datetime import timedelta
 from pathlib import Path
 from typing import Any
 
@@ -978,17 +979,36 @@ def _run_once_owned(arguments: argparse.Namespace, result_path: Path) -> None:
         published = True
         supervisor = application.supervisor
         job_id = outcome.runtime_job_id
-        if supervisor is not None and job_id is not None:
+        # owner 규칙은 binding 없는 job에만 적용한다. 이 process의 supervisor가 lease를 쥐었거나 worker가
+        # 살아 있는 unbound job만 따라가고, 비소유 run-once는 결과를 게시하고 곧바로 끝난다. binding된
+        # job의 loop·close는 기존 동작 그대로다(살아 있는 turn을 조기 close로 끊지 않는다).
+        # ponytail: owner 판정 API가 없는 주입 supervisor(duck type)는 이전처럼 job을 따라간다.
+        owns = getattr(supervisor, "owns_runtime_job", None)
+        if supervisor is not None and job_id is not None and (
+            owns is None
+            or owns(job_id)
+            or application.service.load_runtime_job(job_id).thread_id is not None
+        ):
             while True:
                 job = application.service.load_runtime_job(job_id)
                 if job.status in {
                     RuntimeJobStatus.PROVIDER_TERMINAL,
                     RuntimeJobStatus.CONSUMED,
                     RuntimeJobStatus.CANCELLED,
-                    RuntimeJobStatus.COLLECTOR_LOST,
                 }:
                     break
-                if (job.absolute_deadline_at - utc_now()).total_seconds() <= 0:
+                if job.status is RuntimeJobStatus.COLLECTOR_LOST:
+                    # binding 없는 자기 job은 자기 worker가 살아 있으면 deadline+grace 전에는 끝내지 않는다.
+                    if (
+                        job.thread_id is not None
+                        or owns is None
+                        or not supervisor.runtime_job_worker_alive(job_id)
+                        or utc_now() >= job.absolute_deadline_at + timedelta(
+                            seconds=supervisor.terminal_observation_grace_seconds
+                        )
+                    ):
+                        break
+                elif (job.absolute_deadline_at - utc_now()).total_seconds() <= 0:
                     supervisor.request_interrupt(job_id)
                 supervisor.tick(job_id, wait_seconds=0.05)
                 time.sleep(0.01)
@@ -1009,6 +1029,11 @@ def _run_once_owned(arguments: argparse.Namespace, result_path: Path) -> None:
 
 def _cmd_run_status(arguments: argparse.Namespace) -> None:
     _emit(_application(arguments).status(arguments.project_id))
+
+
+def _cmd_replan(arguments: argparse.Namespace) -> None:
+    # Core 기록만 한다. 역할 호출은 다음 run-once의 replanning RuntimeJob이 한다.
+    _emit(_application(arguments).replan(arguments.project_id, rationale=arguments.rationale))
 
 
 def _cmd_attempt_show(arguments: argparse.Namespace) -> None:
@@ -1419,6 +1444,14 @@ def build_parser() -> argparse.ArgumentParser:
     status_facade = commands.add_parser("status", help="Core·control·job 상태 표시")
     status_facade.add_argument("--project-id", required=True)
     status_facade.set_defaults(handler=_cmd_run_status)
+
+    replan_facade = commands.add_parser(
+        "replan",
+        help="차단된 재계획 후보에 새 subgraph 재계획 시도를 기록(역할 호출은 다음 run-once)",
+    )
+    replan_facade.add_argument("--project-id", required=True)
+    replan_facade.add_argument("--rationale", required=True)
+    replan_facade.set_defaults(handler=_cmd_replan)
 
     final_report_facade = commands.add_parser(
         "final-report", help="GoalVerdict에 결속된 최종 보고 표시"

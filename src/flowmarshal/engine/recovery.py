@@ -321,6 +321,50 @@ def stable_recovery_assessment_id(attempt_id: str, failure_fingerprint: str) -> 
     return f"recovery_assessment_{digest[:32]}"
 
 
+def replan_retry_assessment_id(
+    attempt_id: str, failure_fingerprint: str, blocked_plan_revision_id: str
+) -> str:
+    """차단 재계획 후보 하나에 대한 사용자 재시도 assessment ID. 후보당 하나로 결정적이다."""
+
+    digest = hashlib.sha256(
+        f"{attempt_id}:{failure_fingerprint}:{blocked_plan_revision_id}".encode("utf-8")
+    ).hexdigest()
+    return f"recovery_assessment_{digest[:32]}"
+
+
+def current_replan_assessment(
+    connection: Any, *, project_id: str, attempt_id: str, failure_fingerprint: str,
+) -> str:
+    """run_once·status·replan 명령·재승인 target이 함께 쓰는 재계획 head assessment ID.
+
+    같은 Attempt·실패 지문의 stable assessment에서 시작한다. 그 `replanning:{ID}` checkpoint에서
+    소비된 후보에 대해 Core가 기록한 재시도 행이 있으면 그 행으로 옮겨 가고, 없으면 멈춘다.
+    재시도 행이 없으면 stable ID 그대로이므로 기존 자동 경로의 checkpoint는 바뀌지 않는다.
+    읽기 전용이다.
+    """
+
+    head = stable_recovery_assessment_id(attempt_id, failure_fingerprint)
+    seen: set[str] = set()
+    while head not in seen:
+        seen.add(head)
+        job = connection.execute(
+            "SELECT result_json FROM runtime_jobs WHERE project_id=? AND checkpoint_key=? "
+            "AND status='consumed'",
+            (project_id, f"replanning:{head}"),
+        ).fetchone()
+        try:
+            blocked = json.loads(job["result_json"])["plan"]["plan_revision_id"]
+        except (TypeError, KeyError, ValueError):
+            return head
+        retry = replan_retry_assessment_id(attempt_id, failure_fingerprint, blocked)
+        if connection.execute(
+            "SELECT 1 FROM recovery_assessments WHERE id=? AND project_id=?", (retry, project_id)
+        ).fetchone() is None:
+            return head
+        head = retry
+    return head
+
+
 def terminal_failure_diagnosis(
     documents: tuple[dict[str, Any], ...],
     *,
@@ -485,16 +529,23 @@ def recovery_limit_decision(
     task_id: str,
     attempt_id: str,
     diagnosis: FailureDiagnosis,
+    assessment_id: str | None = None,
+    basis_sequence: int | None = None,
 ) -> RecoveryLimitObservation:
     """TaskContract·GoalAuthorization 한도와 새 evidence 요구를 원장에서 계산한다.
 
     읽기 전용이며 실행 경로와 사용자 status 표시가 같은 결과를 쓰도록 한 곳에 둔다.
+    기본 대상은 head assessment다. 사용자 재시도는 아직 없는 재시도 ID를 넘겨 기록 전 한도를
+    계산하며, 그때 새 근거는 EvidenceRecord가 아니라 Core가 결속한 typed basis의 History
+    순번(`basis_sequence`)으로만 판정한다.
     """
 
     action = diagnosis.repair_action
-    assessment_id = stable_recovery_assessment_id(
-        attempt_id, diagnosis.failure_fingerprint
-    )
+    if assessment_id is None:
+        assessment_id = current_replan_assessment(
+            connection, project_id=project_id, attempt_id=attempt_id,
+            failure_fingerprint=diagnosis.failure_fingerprint,
+        )
     task = connection.execute(
         "SELECT payload_json FROM task_contracts WHERE id=?", (task_id,)
     ).fetchone()
@@ -550,6 +601,8 @@ def recovery_limit_decision(
         and diagnosis.failure_class.value
         in set(task_recovery["retryable_failure_classes"])
     )
+    if basis_sequence is not None:
+        newest_evidence = basis_sequence
     has_new_evidence = not (
         last_recovery is not None
         and (newest_evidence is None or int(newest_evidence) <= int(last_recovery))
@@ -604,4 +657,113 @@ def recovery_limit_decision(
         detail = "첫 복구 이후에는 이전 checkpoint 뒤에 기록된 새 evidence가 필요합니다."
     return RecoveryLimitObservation.model_validate(
         observation | {"limit_code": limit_code, "detail": detail}
+    )
+
+
+def _failure_evidence_documents(
+    service: Any, attempt_id: str, *, evidence_ids: tuple[str, ...] = (),
+) -> tuple[tuple[str, ...], tuple[dict[str, Any], ...]]:
+    """실패 evidence 원문을 읽기 전용으로 읽는다. 실행 경로와 같은 순서를 쓴다."""
+
+    with service.ledger.read() as connection:
+        if evidence_ids:
+            placeholders = ",".join("?" for _ in evidence_ids)
+            rows = connection.execute(
+                f"SELECT id,payload_json FROM evidence_records WHERE id IN ({placeholders}) "
+                "ORDER BY observed_at,rowid",
+                tuple(evidence_ids),
+            ).fetchall()
+        else:
+            rows = connection.execute(
+                "SELECT id,payload_json FROM evidence_records WHERE attempt_id=? "
+                "ORDER BY observed_at,rowid",
+                (attempt_id,),
+            ).fetchall()
+    return (
+        tuple(row["id"] for row in rows),
+        tuple(json.loads(row["payload_json"]) for row in rows),
+    )
+
+
+def current_failure_diagnosis(
+    service: Any, *, project_id: str, plan_revision_id: str | None,
+) -> tuple[dict[str, Any], FailureDiagnosis] | None:
+    """현재 미해결 실패 하나와 그 원장 분류를 실행 경로와 같은 규칙으로 읽는다.
+
+    status와 replan 명령이 같은 대상·실패 지문을 쓰도록 한 곳에 둔다. 읽기 전용이다.
+    """
+
+    if plan_revision_id is None:
+        return None
+    classifier = EvidenceFirstFailureClassifier()
+    with service.ledger.read() as connection:
+        failed = connection.execute(
+            "SELECT t.id AS task_id, a.id AS attempt_id, a.failure_class, a.failure_detail "
+            "FROM task_contracts t JOIN attempts a ON a.id = ("
+            "SELECT latest.id FROM attempts latest WHERE latest.task_id = t.id "
+            "AND latest.kind = 'execution' "
+            "ORDER BY latest.attempt_no DESC, latest.rowid DESC LIMIT 1"
+            ") WHERE t.plan_revision_id = ? AND t.status IN ('failed','blocked') "
+            "AND a.failure_class IS NOT NULL "
+            "ORDER BY t.position LIMIT 1",
+            (plan_revision_id,),
+        ).fetchone()
+    if failed is not None:
+        failure_class = FailureClass(failed["failure_class"])
+        evidence_ids, documents = _failure_evidence_documents(service, failed["attempt_id"])
+        observed = terminal_failure_diagnosis(documents, classifier=classifier)
+        matched = observed is not None and observed.failure_class is failure_class
+        diagnosis = FailureDiagnosis(
+            failure_class=failure_class,
+            repair_action=FAILURE_REPAIR_ACTIONS[failure_class],
+            provider_error_code=observed.provider_error_code if matched else None,
+            local_engine_code=observed.local_engine_code if matched else None,
+            evidence_ids=evidence_ids,
+            rationale=failed["failure_detail"] or "원장에 기록된 Attempt 실패",
+            source=(
+                "unclassified"
+                if failure_class is FailureClass.UNCLASSIFIED
+                else "direct_evidence"
+            ),
+            model_reported_codes=(
+                () if observed is None else observed.model_reported_codes
+            ),
+            transient=bool(matched and observed.transient),
+        )
+        return (
+            {
+                "task_id": failed["task_id"],
+                "attempt_id": failed["attempt_id"],
+                "validation_result_id": None,
+            },
+            diagnosis,
+        )
+    validation_failure = service.task_validation_recovery_blocker(
+        project_id, plan_revision_id=plan_revision_id
+    )
+    if validation_failure is None:
+        return None
+    evidence_ids, documents = _failure_evidence_documents(
+        service,
+        validation_failure["attempt_id"],
+        evidence_ids=tuple(validation_failure["evidence_ids"]),
+    )
+    diagnosis = classifier.classify(FailureSignal(
+        terminal_status="validation_failed",
+        final_response=None,
+        provider_payload={
+            "validation_result_id": validation_failure["validation_result_id"]
+        },
+        evidence_ids=evidence_ids,
+        evidence_documents=documents,
+        failed_attempt_id=validation_failure["attempt_id"],
+        failed_validation_id=validation_failure["validation_id"],
+    ))
+    return (
+        {
+            "task_id": validation_failure["task_id"],
+            "attempt_id": validation_failure["attempt_id"],
+            "validation_result_id": validation_failure["validation_result_id"],
+        },
+        diagnosis,
     )

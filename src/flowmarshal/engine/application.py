@@ -48,12 +48,10 @@ from .models import EngineRoleConfiguration, ModelInventory
 from .goal import GoalPreparationOutcome
 from .planning import PlanningSearchOutcome
 from .recovery import (
-    EvidenceFirstFailureClassifier,
     FailureDiagnosis,
-    FailureSignal,
+    current_failure_diagnosis,
     recovery_limit_decision,
     recovery_route,
-    terminal_failure_diagnosis,
 )
 from .read_models import (
     AttemptDetail,
@@ -1056,6 +1054,24 @@ class EngineApplication:
             operating_policy=operating_policy,
         )
 
+    def recovery_provider_available(self) -> bool:
+        """run_once가 RecoveryPlanProvider를 연결하는지 정하는 유일한 판정.
+
+        `_dispatcher`와 status(`recovery_explanation`)가 이 판정 하나를 함께 쓴다. CLI에서는
+        `run-once --role-config`가 이 판정을 참으로 만든다.
+        """
+
+        return self.role_configuration is not None
+
+    def replan(self, project_id: str, *, rationale: str) -> dict[str, Any]:
+        """차단된 재계획 후보에 새 SUBGRAPH_REPLAN 시도를 Core에 기록한다.
+
+        역할·provider 호출과 runtime job 예약은 하지 않는다. 다음 run_once가 RuntimeJob으로
+        재계획 역할을 호출한다. 내부 식별자·파일 입력은 받지 않는다.
+        """
+
+        return self.service.request_subgraph_replan_retry(project_id, rationale=rationale)
+
     def _dispatcher(self):
         if self.runtime is None:
             raise EngineApplicationError("RUNTIME_REQUIRED")
@@ -1066,17 +1082,19 @@ class EngineApplication:
         if self.role_configuration is not None:
             _runtime, roles, runner = self._execution_components()
             from .execution import ExecutionProposalAdapter
-            from .recovery_planning import RecoveryPlanProvider
 
             provider = ExecutionProposalAdapter(self.service, runner, roles)
-            # 역할 설정이 있을 때만 실제 Plan subgraph 재계획·독립 검토를 연결한다.
-            # 설정이 없으면 Core는 REPLAN_PROVIDER_REQUIRED로 명시 정지한다.
-            recovery_provider = RecoveryPlanProvider(
-                self.service,
-                runner,
-                roles,
-                inspection_contract=self.inspection_contract,
-            )
+            if self.recovery_provider_available():
+                from .recovery_planning import RecoveryPlanProvider
+
+                # 실제 Plan subgraph 재계획·독립 검토는 이 판정이 참일 때만 연결한다. 거짓이면
+                # Core는 REPLAN_PROVIDER_REQUIRED로 명시 정지하고 status도 같은 판정을 표시한다.
+                recovery_provider = RecoveryPlanProvider(
+                    self.service,
+                    runner,
+                    roles,
+                    inspection_contract=self.inspection_contract,
+                )
         return EngineDispatcher(
             self.service,
             self.runtime,
@@ -1619,6 +1637,7 @@ class EngineApplication:
         stale: bool,
         external_unknown: bool,
         has_goal_verdict: bool,
+        owner_verdict: Any = None,
     ) -> tuple[str, str, str]:
         if control_state == "cancelled":
             return "cancelled", "현재 Goal workflow가 사용자 요청으로 취소됐습니다.", "새 Goal을 prepare하십시오."
@@ -1649,7 +1668,9 @@ class EngineApplication:
             return (
                 stages.get(active_job.kind.value, "observing_runtime_job"),
                 f"{active_job.kind.value} RuntimeJob이 {active_job.status.value} 상태입니다.",
-                "observe로 같은 RuntimeJob을 먼저 관측하십시오.",
+                # binding 없는 활성 job은 run_once 라우터와 같은 분류 결과의 문구를 쓴다(AC18).
+                "observe로 같은 RuntimeJob을 먼저 관측하십시오."
+                if owner_verdict is None else owner_verdict.status_detail,
             )
         if project.get("run_state") == "completed" or has_goal_verdict:
             return "completed", "Core가 GoalVerdict를 기록해 workflow가 terminal 상태입니다.", "final-report를 확인하십시오."
@@ -1681,107 +1702,14 @@ class EngineApplication:
         "모델 자기보고 code는 진단 가설이며 자동 복구를 시작하는 근거가 아닙니다."
     )
 
-    def _recovery_evidence_documents(
-        self, attempt_id: str, *, evidence_ids: tuple[str, ...] = (),
-    ) -> tuple[tuple[str, ...], tuple[dict[str, Any], ...]]:
-        """실패 evidence 원문을 읽기 전용으로 읽는다. 실행 경로와 같은 순서를 쓴다."""
-
-        with self.service.ledger.read() as connection:
-            if evidence_ids:
-                placeholders = ",".join("?" for _ in evidence_ids)
-                rows = connection.execute(
-                    f"SELECT id,payload_json FROM evidence_records WHERE id IN ({placeholders}) "
-                    "ORDER BY observed_at,rowid",
-                    tuple(evidence_ids),
-                ).fetchall()
-            else:
-                rows = connection.execute(
-                    "SELECT id,payload_json FROM evidence_records WHERE attempt_id=? "
-                    "ORDER BY observed_at,rowid",
-                    (attempt_id,),
-                ).fetchall()
-        return (
-            tuple(row["id"] for row in rows),
-            tuple(json.loads(row["payload_json"]) for row in rows),
-        )
-
     def _recovery_failure(
         self, project_id: str, *, plan_revision_id: str | None,
     ) -> tuple[dict[str, Any], FailureDiagnosis] | None:
         """현재 미해결 실패 하나와 그 원장 분류를 실행 경로와 같은 규칙으로 읽는다."""
 
-        if plan_revision_id is None:
-            return None
-        classifier = EvidenceFirstFailureClassifier()
-        with self.service.ledger.read() as connection:
-            failed = connection.execute(
-                "SELECT t.id AS task_id, a.id AS attempt_id, a.failure_class, a.failure_detail "
-                "FROM task_contracts t JOIN attempts a ON a.id = ("
-                "SELECT latest.id FROM attempts latest WHERE latest.task_id = t.id "
-                "AND latest.kind = 'execution' "
-                "ORDER BY latest.attempt_no DESC, latest.rowid DESC LIMIT 1"
-                ") WHERE t.plan_revision_id = ? AND t.status IN ('failed','blocked') "
-                "AND a.failure_class IS NOT NULL "
-                "ORDER BY t.position LIMIT 1",
-                (plan_revision_id,),
-            ).fetchone()
-        if failed is not None:
-            failure_class = FailureClass(failed["failure_class"])
-            evidence_ids, documents = self._recovery_evidence_documents(failed["attempt_id"])
-            observed = terminal_failure_diagnosis(documents, classifier=classifier)
-            matched = observed is not None and observed.failure_class is failure_class
-            diagnosis = FailureDiagnosis(
-                failure_class=failure_class,
-                repair_action=self.service.repair_action_for(failure_class),
-                provider_error_code=observed.provider_error_code if matched else None,
-                local_engine_code=observed.local_engine_code if matched else None,
-                evidence_ids=evidence_ids,
-                rationale=failed["failure_detail"] or "원장에 기록된 Attempt 실패",
-                source=(
-                    "unclassified"
-                    if failure_class is FailureClass.UNCLASSIFIED
-                    else "direct_evidence"
-                ),
-                model_reported_codes=(
-                    () if observed is None else observed.model_reported_codes
-                ),
-                transient=bool(matched and observed.transient),
-            )
-            return (
-                {
-                    "task_id": failed["task_id"],
-                    "attempt_id": failed["attempt_id"],
-                    "validation_result_id": None,
-                },
-                diagnosis,
-            )
-        validation_failure = self.service.task_validation_recovery_blocker(
-            project_id, plan_revision_id=plan_revision_id
-        )
-        if validation_failure is None:
-            return None
-        evidence_ids, documents = self._recovery_evidence_documents(
-            validation_failure["attempt_id"],
-            evidence_ids=tuple(validation_failure["evidence_ids"]),
-        )
-        diagnosis = classifier.classify(FailureSignal(
-            terminal_status="validation_failed",
-            final_response=None,
-            provider_payload={
-                "validation_result_id": validation_failure["validation_result_id"]
-            },
-            evidence_ids=evidence_ids,
-            evidence_documents=documents,
-            failed_attempt_id=validation_failure["attempt_id"],
-            failed_validation_id=validation_failure["validation_id"],
-        ))
-        return (
-            {
-                "task_id": validation_failure["task_id"],
-                "attempt_id": validation_failure["attempt_id"],
-                "validation_result_id": validation_failure["validation_result_id"],
-            },
-            diagnosis,
+        # replan Core 명령도 같은 대상·실패 지문을 쓰도록 recovery 모듈의 공유 구현을 쓴다.
+        return current_failure_diagnosis(
+            self.service, project_id=project_id, plan_revision_id=plan_revision_id,
         )
 
     def _recovery_scope(self, project_id: str, *, active_plan_revision_id: str | None) -> RecoveryScope:
@@ -1850,15 +1778,89 @@ class EngineApplication:
             ))
         return tuple(codes)
 
-    def recovery_explanation(self, project_id: str) -> RecoveryExplanation:
+    def _unbound_job_verdict(self, job: RuntimeJob | None) -> Any:
+        """binding 없는 활성 job을 run_once 라우터와 같은 분류 함수로 판정한다(AC18).
+
+        읽기 전용 probe(lock 파일을 만들지 않고 registry·원장에 쓰지 않음)와 AC1 predicate만 넘긴다.
+        bound job이거나 활성 job이 없으면 None이다.
+        """
+
+        if job is None or job.thread_id is not None:
+            return None
+        from .domain import utc_now
+        from .runtime import (
+            RuntimeOwnerLockUnavailable,
+            classify_unbound_runtime_job,
+            probe_owner_lock,
+            runtime_owner_lock_path,
+        )
+
+        try:
+            lock_state = probe_owner_lock(
+                runtime_owner_lock_path(self.service, job.project_id, job.checkpoint_key),
+                holder=self.supervisor,
+            )
+        except RuntimeOwnerLockUnavailable as error:
+            lock_state = error
+        supervisor = self.supervisor
+        timing = {"now": utc_now()} if supervisor is None else {
+            "now": supervisor._now(), "grace_seconds": supervisor.terminal_observation_grace_seconds,
+        }
+        return classify_unbound_runtime_job(
+            self.service, job, lock_state=lock_state,
+            provider_available=self.recovery_provider_available(), **timing,
+        )
+
+    @staticmethod
+    def _platform_blocker(project: Any) -> RecoveryNextAction | None:
+        """활성 Plan이 있는 POSIX 프로젝트는 run_once가 job 생성 전에 막는다. status도 같은 blocker를 보인다(AC19)."""
+
+        from .runtime import (
+            RUNTIME_OWNER_PLATFORM_GUIDANCE,
+            RUNTIME_OWNER_PLATFORM_UNSUPPORTED,
+            RuntimeOwnerLockUnavailable,
+            owner_lock_platform_supported,
+        )
+
+        if project["active_plan_revision_id"] is None or owner_lock_platform_supported():
+            return None
+        return RecoveryNextAction(
+            mode="user_decision", blocker_code=RuntimeOwnerLockUnavailable.code,
+            detail=f"{RUNTIME_OWNER_PLATFORM_UNSUPPORTED} {RUNTIME_OWNER_PLATFORM_GUIDANCE}",
+        )
+
+    _OWNER_VERDICT_NOT_READ = object()
+
+    def recovery_explanation(
+        self, project_id: str, *, owner_verdict: Any = _OWNER_VERDICT_NOT_READ,
+    ) -> RecoveryExplanation:
         """분류 근거·보존/폐기 범위·다음 동작을 원장에서 읽기 전용으로 설명한다.
 
         실행 경로(`EngineDispatcher`)와 같은 `recovery_route`·`recovery_limit_decision`·
         `replan_candidate_blocker`를 사용하므로 표시된 다음 동작과 실제 다음 `run_once`
-        결과가 갈라지지 않는다.
+        결과가 갈라지지 않는다. binding 없는 활성 job이 있으면 state·next_action은 run_once
+        라우터와 같은 분류 결과(``owner_verdict``, status가 한 번 계산해 넘긴다)를 따른다.
         """
 
+        if owner_verdict is self._OWNER_VERDICT_NOT_READ:
+            owner_verdict = self._unbound_job_verdict(self.service.active_runtime_job(project_id))
+        owner_action = None if owner_verdict is None else (
+            owner_verdict.status_state,
+            RecoveryNextAction(
+                mode=owner_verdict.status_mode,
+                blocker_code=owner_verdict.blocker_code,
+                suggested_repair_action=(
+                    None if owner_verdict.repair_action is None else owner_verdict.repair_action.value
+                ),
+                checkpoint_required=owner_verdict.checkpoint_required,
+                detail=owner_verdict.status_detail,
+            ),
+        )
         project = self._project_row(project_id)
+        platform = self._platform_blocker(project)
+        if platform is not None:
+            # run_once의 첫 판정(플랫폼)이 활성 job 판정보다 앞선다.
+            owner_action = ("user_decision_required", platform)
         plan_revision_id = project["active_plan_revision_id"]
         scope = self._recovery_scope(project_id, active_plan_revision_id=plan_revision_id)
         with self.service.ledger.read() as connection:
@@ -1871,6 +1873,11 @@ class EngineApplication:
                 )
             )
         failure = self._recovery_failure(project_id, plan_revision_id=plan_revision_id)
+        if failure is None and owner_action is not None:
+            # 실패가 없어도 binding 없는 활성 job의 판정(또는 플랫폼 blocker)을 보인다(J2, AC19).
+            return RecoveryExplanation(
+                state=owner_action[0], scope=scope, assessments=assessments, next_action=owner_action[1],
+            )
         if failure is None:
             recovered = bool(assessments) or bool(scope.superseded_plan_revision_ids)
             return RecoveryExplanation(
@@ -1895,9 +1902,10 @@ class EngineApplication:
         limit_detail = None
         replan_blocker = None
         if route.mode == "automatic":
-            from .runtime import replan_candidate_blocker
+            from .runtime import REPLAN_PROVIDER_REQUIRED_DETAIL, replan_candidate_blocker
 
             with self.service.ledger.read() as connection:
+                # assessment_id는 run_once와 같은 head(`current_replan_assessment`)다.
                 observation = recovery_limit_decision(
                     connection,
                     project_id=project_id,
@@ -1905,6 +1913,10 @@ class EngineApplication:
                     attempt_id=target["attempt_id"],
                     diagnosis=diagnosis,
                 )
+                replan_job = connection.execute(
+                    "SELECT 1 FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
+                    (project_id, f"replanning:{observation.assessment_id}"),
+                ).fetchone()
             limits = RecoveryLimitStatus.model_validate(
                 observation.model_dump(mode="json")
             )
@@ -1913,6 +1925,15 @@ class EngineApplication:
             replan_blocker = replan_candidate_blocker(
                 self.service, project_id=project_id, assessment_id=observation.assessment_id,
             )
+            if (
+                replan_blocker is None
+                and diagnosis.repair_action is RepairAction.SUBGRAPH_REPLAN
+                and observation.assessment_recorded
+                and replan_job is None
+                and not self.recovery_provider_available()
+            ):
+                # run_once는 새 replanning job을 예약해야 할 때 provider가 없으면 멈춘다.
+                replan_blocker = ("REPLAN_PROVIDER_REQUIRED", REPLAN_PROVIDER_REQUIRED_DETAIL)
         classification = RecoveryClassification(
             task_id=target["task_id"],
             attempt_id=target["attempt_id"],
@@ -1972,6 +1993,16 @@ class EngineApplication:
                 detail=limit_detail or "원장 복구 한도에 도달했습니다.",
             )
             state = "user_decision_required"
+        elif replan_blocker is not None and replan_blocker[0] == "EXTERNAL_EFFECT_UNKNOWN":
+            # 재계획 job_error는 run_once와 같이 observe-first다. 자동·수동 replan 대상이 아니다.
+            next_action = RecoveryNextAction(
+                mode="observe_first",
+                blocker_code=replan_blocker[0],
+                suggested_repair_action=RepairAction.WAIT_EXTERNAL.value,
+                checkpoint_required=True,
+                detail=replan_blocker[1][:2000],
+            )
+            state = "observe_first_required"
         elif replan_blocker is not None:
             next_action = RecoveryNextAction(
                 mode="user_decision",
@@ -1995,6 +2026,9 @@ class EngineApplication:
                 ),
             )
             state = "automatic_pending"
+        if owner_action is not None:
+            # 분류·한도·범위는 원장 사실대로 두고 state·next_action만 run_once 라우터 판정을 따른다.
+            state, next_action = owner_action
         return RecoveryExplanation(
             state=state,
             classification=classification,
@@ -2040,6 +2074,8 @@ class EngineApplication:
             usage=usage,
             goal_id=None if goal_row is None else goal_row["goal_id"],
         )
+        # 활성 job 안내와 recovery explanation이 probe 한 번의 같은 판정을 쓴다.
+        owner_verdict = self._unbound_job_verdict(active_job)
         stage, reason, next_action = self._status_stage(
             project=project,
             control_state=control_state,
@@ -2049,8 +2085,9 @@ class EngineApplication:
             stale=stale,
             external_unknown=execution_summary.external_effect_unknown,
             has_goal_verdict=verdict_row is not None,
+            owner_verdict=owner_verdict,
         )
-        recovery = self.recovery_explanation(project_id)
+        recovery = self.recovery_explanation(project_id, owner_verdict=owner_verdict)
         if stage == "recovery_required" and recovery.classification is not None:
             # 일반 문구 대신 원장 분류 근거와 실제 다음 동작을 그대로 노출한다.
             reason = (
@@ -2058,6 +2095,9 @@ class EngineApplication:
                 f"근거={recovery.classification.basis}. "
                 f"{recovery.classification.rationale or ''}"
             ).strip()
+            next_action = recovery.next_action.detail
+        if control_state == "running" and self._platform_blocker(project) is not None:
+            # 활성 job이 없어도 run_once는 job 생성 전에 같은 blocker로 멈춘다(AC19).
             next_action = recovery.next_action.detail
         return snapshot | {
             "current_stage": stage,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import nullcontext
 from .capabilities import role_execution_scope
 
+import errno
 import functools
 import json
 import hashlib
@@ -16,6 +17,7 @@ from concurrent.futures import Future
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
+from enum import Enum
 from pathlib import Path
 from typing import Any, Callable, Protocol
 
@@ -66,6 +68,7 @@ from .service import (
     ContextRequiredError,
     EngineService,
     EngineServiceError,
+    GoalAuthorizationRequired,
     StaleExecutionInputError,
 )
 from .recovery import (
@@ -74,9 +77,9 @@ from .recovery import (
     EvidenceFirstFailureClassifier,
     FailureDiagnosis,
     FailureSignal,
+    current_replan_assessment,
     recovery_limit_decision,
     recovery_route,
-    stable_recovery_assessment_id,
     terminal_failure_diagnosis,
 )
 
@@ -90,6 +93,169 @@ from .model_lock import RUNTIME_CAPABILITIES, parse_inventory_models, verify_bin
 
 class RuntimePolicyError(RuntimeError):
     pass
+
+
+class RuntimeOwnerLockUnavailable(RuntimeError):
+    """owner lock 계층의 충돌 외 오류다. job 행을 만들거나 바꾸기 전에 fail-closed한다."""
+
+    code = "RUNTIME_OWNER_LOCK_UNAVAILABLE"
+
+
+class OwnerLockState(str, Enum):
+    """owner lease 한 번 시도의 결과. HELD_SELF는 획득이 아니며 owner 부재 증거로 쓰지 않는다."""
+
+    FREE = "free"  # 이 호출이 lease를 얻었다. 다른 holder가 없다.
+    HELD_SELF = "held_self"  # 같은 supervisor가 이미 쥐고 있다.
+    HELD_OTHER = "held_other"  # 다른 supervisor나 다른 process가 쥐고 있다.
+    ABSENT = "absent"  # lock 파일(owner proof)이 없다.
+
+
+@dataclass(eq=False)
+class _OwnerLease:
+    path: str
+    holder: object
+    fd: int | None
+    # holder가 시작 CAS 단계를 끝내거나 lease를 놓으면 set된다. 같은 process 패자가 기다린다.
+    settled: threading.Event = field(default_factory=threading.Event)
+
+
+# process 전역 registry. 같은 process의 supervisor끼리는 파일을 열기 전에 여기서 충돌을 가린다.
+_OWNER_LEASES: dict[str, _OwnerLease] = {}
+_OWNER_LEASES_LOCK = threading.Lock()
+RUNTIME_OWNER_PLATFORM_UNSUPPORTED = (
+    "RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix"
+)
+#: POSIX fail-closed의 사용자 안내. 판정 0행과 활성 job 없는 status가 함께 쓴다(AC19).
+RUNTIME_OWNER_PLATFORM_GUIDANCE = "1.0 RuntimeJob 실행은 Windows 전용입니다(Linux·macOS·WSL 지원은 1.0 이후)."
+
+
+def owner_lock_platform_supported() -> bool:
+    """1.0 RuntimeJob owner lock은 Windows 전용이다. POSIX는 fail-closed한다(결정 D1)."""
+
+    return os.name == "nt"
+
+
+def _project_artifact_root(service: EngineService, project_id: str) -> str:
+    with service.ledger.read() as connection:
+        row = connection.execute(
+            "SELECT artifact_root FROM projects WHERE id=?", (project_id,)
+        ).fetchone()
+    if row is None:
+        raise EngineServiceError("프로젝트를 찾을 수 없습니다.")
+    return row["artifact_root"]
+
+
+def _owner_lock_file(artifact_root: str, checkpoint_key: str) -> Path:
+    name = hashlib.sha256(checkpoint_key.encode("utf-8")).hexdigest() + ".lock"
+    return Path(artifact_root) / "runtime-owners" / name
+
+
+def runtime_owner_lock_path(service: EngineService, project_id: str, checkpoint_key: str) -> Path:
+    """원장의 projects.artifact_root 문자열에서 계산해 --artifacts·cwd·DB 경로 표기와 무관하게 같다."""
+
+    return _owner_lock_file(_project_artifact_root(service, project_id), checkpoint_key)
+
+
+def _os_owner_lock(path: Path, *, create: bool) -> tuple[OwnerLockState, int | None]:
+    """offset 0의 1바이트를 msvcrt로 non-blocking 잠근다. registry를 보지 않는 raw backend다."""
+
+    import msvcrt
+
+    try:
+        if create:
+            path.parent.mkdir(parents=True, exist_ok=True)
+        # 기본 os.open fd는 상속되지 않아 자식 process가 lock을 물려받지 않는다.
+        fd = os.open(path, os.O_RDWR | (os.O_CREAT if create else 0))
+    except FileNotFoundError as error:
+        if not create:
+            return OwnerLockState.ABSENT, None
+        raise RuntimeOwnerLockUnavailable(
+            f"RUNTIME_OWNER_LOCK_UNAVAILABLE: {type(error).__name__}: {error}"
+        ) from error
+    except OSError as error:
+        raise RuntimeOwnerLockUnavailable(
+            f"RUNTIME_OWNER_LOCK_UNAVAILABLE: {type(error).__name__}: {error}"
+        ) from error
+    try:
+        if os.fstat(fd).st_size == 0:
+            os.write(fd, b"\0")
+        os.lseek(fd, 0, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+    except OSError as error:
+        os.close(fd)
+        if error.errno in {errno.EACCES, errno.EDEADLK}:
+            return OwnerLockState.HELD_OTHER, None
+        raise RuntimeOwnerLockUnavailable(
+            f"RUNTIME_OWNER_LOCK_UNAVAILABLE: {type(error).__name__}: {error}"
+        ) from error
+    return OwnerLockState.FREE, fd
+
+
+def _os_owner_unlock(fd: int) -> None:
+    import msvcrt
+
+    try:
+        os.lseek(fd, 0, os.SEEK_SET)
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+    except OSError:
+        # ponytail: 해제 오류는 삼킨다. close가 handle의 lock을 OS에 돌려준다(해제 시점은 OS에 달림).
+        pass
+    finally:
+        os.close(fd)
+
+
+def _acquire_owner_lease(
+    path: Path, holder: object, *, create: bool,
+) -> tuple[OwnerLockState, _OwnerLease | None]:
+    """owner lease를 한 번 non-blocking으로 시도한다. 테스트 double은 이 함수 하나만 바꾼다.
+
+    ``create``는 새 job 행을 예약하는 owner만 쓴다. prober는 파일을 만들지 않고 없으면 ABSENT다.
+    HELD_SELF·HELD_OTHER이면 현재 holder의 lease를 함께 돌려준다(다른 process면 None).
+    """
+
+    if not owner_lock_platform_supported():
+        raise RuntimeOwnerLockUnavailable(RUNTIME_OWNER_PLATFORM_UNSUPPORTED)
+    key = str(path)
+    with _OWNER_LEASES_LOCK:
+        current = _OWNER_LEASES.get(key)
+        if current is not None:
+            state = OwnerLockState.HELD_SELF if current.holder is holder else OwnerLockState.HELD_OTHER
+            return state, current
+        state, fd = _os_owner_lock(path, create=create)
+        if state is not OwnerLockState.FREE:
+            return state, None
+        lease = _OwnerLease(key, holder, fd)
+        _OWNER_LEASES[key] = lease
+        return state, lease
+
+
+def _release_owner_lease(lease: _OwnerLease) -> None:
+    """LK_UNLCK → close → registry 제거 순서로 놓는다. 여러 번 불러도 같다."""
+
+    with _OWNER_LEASES_LOCK:
+        fd, lease.fd = lease.fd, None
+        try:
+            if fd is not None:
+                _os_owner_unlock(fd)
+        finally:
+            if _OWNER_LEASES.get(lease.path) is lease:
+                del _OWNER_LEASES[lease.path]
+            lease.settled.set()
+
+
+def probe_owner_lock(path: Path, holder: object | None = None) -> OwnerLockState:
+    """status용 읽기 전용 probe. 파일을 만들지 않고, 잡았다면 곧바로 놓으며 registry에 남기지 않는다."""
+
+    if not owner_lock_platform_supported():
+        raise RuntimeOwnerLockUnavailable(RUNTIME_OWNER_PLATFORM_UNSUPPORTED)
+    with _OWNER_LEASES_LOCK:
+        current = _OWNER_LEASES.get(str(path))
+        if current is not None:
+            return OwnerLockState.HELD_SELF if current.holder is holder else OwnerLockState.HELD_OTHER
+        state, fd = _os_owner_lock(path, create=False)
+        if fd is not None:
+            _os_owner_unlock(fd)
+        return state
 
 
 _ACTIVE_RUNTIME_JOB: ContextVar[tuple["RuntimeJobSupervisor", str] | None] = ContextVar(
@@ -1593,6 +1759,477 @@ class FakeCodexRuntime:
         )
 
 
+_ROLE_TERMINAL_EVENTS = frozenset({"role_terminal_observed", "terminal_observed_after_interrupt"})
+_ROLE_EFFECT_EVENTS = frozenset({"role_requested", "thread_created"})
+_ACTIVE_JOB_STATUSES = frozenset({
+    RuntimeJobStatus.SCHEDULED, RuntimeJobStatus.RUNNING,
+    RuntimeJobStatus.INTERRUPTING, RuntimeJobStatus.COLLECTOR_LOST,
+})
+#: provider 효과 직전 preflight 거절 가운데 원래 code를 그대로 쓰는 것. 나머지는 RUNTIME_EFFECT_PREFLIGHT_FAILED다.
+_RUNTIME_EFFECT_PREFLIGHT_CODES = frozenset({
+    "STALE_EXECUTION_INPUT",
+    "RUNTIME_INTENT_BINDING_MISMATCH",
+    "PROMPT_BINDING_MISMATCH",
+    "PROMPT_ARTIFACT_INVALID",
+    "MODEL_BINDING_CHANGED",
+    "PERMISSION_POLICY_MISMATCH",
+    "TARGET_BINDING_CHANGED",
+    "EFFECT_CHECKPOINT_STALE",
+    "WORKFLOW_CANCELLED",
+    "WORKFLOW_PAUSED",
+})
+OWNER_PROOF_MISSING_DETAIL = "owner proof missing: lock file absent"
+_OWNER_RUNNING_DETAIL = "owner 실행 중: 다음 run-once·observe는 관측만 합니다."
+_OWNER_UNRESPONSIVE_DETAIL = "owner가 deadline 뒤에도 lock을 쥐고 있음(응답 없음)"
+
+
+@dataclass(frozen=True)
+class UnboundJobVerdict:
+    """binding 없는 활성 RuntimeJob 하나의 판정(설계 4.3 표의 행). run_once·tick·status가 같이 읽는다.
+
+    ``status_state``·``status_mode``는 기존 RecoveryExplanation.state·RecoveryNextAction.mode 값이다.
+    """
+
+    row: str
+    job_id: str
+    blocker_code: str | None
+    detail: str
+    failure_class: FailureClass | None
+    writes_ledger: bool
+    status_state: str
+    status_mode: str
+    status_detail: str
+    repair_action: RepairAction | None = None
+    checkpoint_required: bool = False
+    # S·6행에서만 쓴다: 재시작 claim payload와 재시작 전에 닫을 귀속 예약(provider_call ID).
+    restart: dict[str, Any] | None = None
+    release_call_ids: tuple[str, ...] = ()
+
+
+def _has_target_result_checkpoint(service: EngineService, job_id: str) -> bool:
+    with service.ledger.read() as connection:
+        rows = connection.execute(
+            "SELECT payload_json FROM runtime_job_observations WHERE job_id=? AND kind=?",
+            (job_id, RuntimeJobObservationKind.PROVIDER_PROGRESS.value),
+        ).fetchall()
+    return any(
+        json.loads(row["payload_json"]).get("target_result_checkpoint_version") == "1.0"
+        for row in rows
+    )
+
+
+def classify_unbound_runtime_job(
+    service: EngineService,
+    job: RuntimeJob,
+    *,
+    lock_state: OwnerLockState | RuntimeOwnerLockUnavailable,
+    provider_available: bool,
+    now: datetime,
+    grace_seconds: float = 30.0,
+) -> UnboundJobVerdict | None:
+    """binding 없는 활성 job을 원장과 lock 상태로 판정한다(설계 4.1·4.3). 원장을 읽기만 한다.
+
+    ``lock_state``가 FREE이면 호출자가 lease를 쥔 채 다시 읽은 job을 넘긴다(status는 읽기 전용 probe 값).
+    판정 순서는 0 → 0p → 1 → 2 → K → C → S → 3 → 4 → 7g → 8 → 5 → 7d → 7j → 7 → 7k → 6p/6e → 6이다.
+    ``provider_available``은 kind별 provider 존재다(REPLANNING은 recovery, EXECUTION_SPEC_PREPARE는
+    proposal provider). bound이거나 활성이 아닌 job은 None이다.
+    """
+
+    verdict = _classify_owner_rows(
+        service, job, lock_state=lock_state, now=now, grace_seconds=grace_seconds,
+    )
+    if (
+        verdict is not None
+        or lock_state is not OwnerLockState.FREE
+        or job.thread_id is not None
+        or job.status not in {RuntimeJobStatus.COLLECTOR_LOST, RuntimeJobStatus.SCHEDULED}
+    ):
+        return verdict
+    return _classify_routing_rows(service, job, provider_available=provider_available, now=now)
+
+
+def _classify_owner_rows(
+    service: EngineService,
+    job: RuntimeJob,
+    *,
+    lock_state: OwnerLockState | RuntimeOwnerLockUnavailable,
+    now: datetime,
+    grace_seconds: float,
+) -> UnboundJobVerdict | None:
+    """0·0p·1·2·K·C행. tick(observe)은 이 행만 쓰므로 tick의 원장 읽기가 늘지 않는다."""
+
+    if job.thread_id is not None or job.status not in _ACTIVE_JOB_STATUSES:
+        return None
+    if isinstance(lock_state, RuntimeOwnerLockUnavailable):
+        detail = str(lock_state)
+        guidance = (
+            " " + RUNTIME_OWNER_PLATFORM_GUIDANCE
+            if detail == RUNTIME_OWNER_PLATFORM_UNSUPPORTED else ""
+        )
+        return UnboundJobVerdict(
+            "0", job.job_id, RuntimeOwnerLockUnavailable.code, detail, None, False,
+            "user_decision_required", "user_decision", detail + guidance,
+        )
+    if lock_state is OwnerLockState.ABSENT:
+        return UnboundJobVerdict(
+            "0p", job.job_id, RuntimeOwnerLockUnavailable.code, OWNER_PROOF_MISSING_DETAIL, None, False,
+            "observe_first_required", "observe_first",
+            OWNER_PROOF_MISSING_DETAIL + ". 구버전 owner나 supervisor 없는 예약일 수 있어 run-once는 원장을 "
+            "바꾸지 않습니다. 옛 owner·scheduler process가 끝났는지 확인하십시오(cold upgrade 규칙).",
+        )
+    if lock_state in {OwnerLockState.HELD_SELF, OwnerLockState.HELD_OTHER}:
+        # 살아 있는 owner다. 재진입(HELD_SELF)도 owner 부재 증거가 아니다.
+        deadline_passed = now >= job.absolute_deadline_at
+        unresponsive = lock_state is OwnerLockState.HELD_OTHER and now >= (
+            job.absolute_deadline_at + timedelta(seconds=grace_seconds)
+        )
+        detail = _OWNER_UNRESPONSIVE_DETAIL if unresponsive else _OWNER_RUNNING_DETAIL
+        return UnboundJobVerdict(
+            "1" if lock_state is OwnerLockState.HELD_SELF else "2", job.job_id, None, detail, None,
+            lock_state is OwnerLockState.HELD_SELF
+            or (deadline_passed and job.status is RuntimeJobStatus.RUNNING),
+            "none", "none", detail,
+        )
+    if _has_target_result_checkpoint(service, job.job_id):
+        return UnboundJobVerdict(
+            "K", job.job_id, None, "저장된 성공 결과를 재부착한다.", None, True,
+            "automatic_pending", "automatic", "run-once가 한 단계를 진행합니다(저장된 성공 결과 재부착).",
+        )
+    if job.status in {RuntimeJobStatus.RUNNING, RuntimeJobStatus.INTERRUPTING}:
+        return UnboundJobVerdict(
+            "C", job.job_id, None, "owner lock을 얻어 owner 소실을 기록한다.", None, True,
+            "automatic_pending", "automatic", "run-once가 한 단계를 진행합니다(owner 소실 기록).",
+        )
+    return None
+
+
+RUNTIME_JOB_OWNER_LOST = "RUNTIME_JOB_OWNER_LOST"
+_DISPATCH_JOB_KINDS = frozenset({RuntimeJobKind.WORKER_TURN, RuntimeJobKind.TASK_SEMANTIC_VALIDATE})
+#: 자기 Attempt를 실행 대상으로 갖는 kind. 그 Attempt의 prepared intent는 기존 cancel·prepared 경로다(3.3).
+#: REPLANNING·RECOVERY는 실패한 앞 Attempt의 ID를 가지므로 제외한다.
+_PREPARED_RECOVERY_JOB_KINDS = _DISPATCH_JOB_KINDS | {RuntimeJobKind.GOAL_SEMANTIC_VALIDATE}
+_GOAL_JOB_KINDS = frozenset({RuntimeJobKind.GOAL_TEST_PREPARE, RuntimeJobKind.GOAL_SEMANTIC_VALIDATE})
+_ROLE_JOB_KINDS = frozenset({RuntimeJobKind.REPLANNING, RuntimeJobKind.EXECUTION_SPEC_PREPARE})
+
+
+@dataclass(frozen=True)
+class _UnboundEvidence:
+    """설계 4.2의 durable 근거. 재시작 횟수 외에는 현재 epoch 시작(s0) 이후만 본다."""
+
+    epoch_sequence: int  # s0: 최신 started·collector_reattached History sequence, 없으면 scheduled
+    failure: Any  # F: 현재 epoch 결속 실패 checkpoint의 error(없으면 None)
+    failure_retryable: bool  # F가 GAR·STALE이고 그 뒤 새 승인·state 관측이 있다
+    prepared: bool  # P
+    receipt_only: bool  # R: create receipt만 있고 start intent 없음
+    effects: tuple[str, ...]  # 8행 근거 종류(Q·U·O·intent·marker)
+    last_role_event: str | None
+    restarts: int  # N
+    approval_deadline: datetime | None  # D
+    release_call_ids: tuple[str, ...]  # 역할 job의 귀속 예약
+
+
+def _worker_error_code(error: Any) -> str:
+    """worker 자체 오류의 code. 효과 직전 preflight와 같은 typed 목록이고 GAR은 재시작 예외를 위해 둔다."""
+
+    message = error.get("error") if isinstance(error, dict) else None
+    prefix = str(message or "").partition(":")[0]
+    if prefix.startswith("MODEL_LOCK_"):
+        return "MODEL_BINDING_CHANGED"
+    if prefix in _RUNTIME_EFFECT_PREFLIGHT_CODES or prefix == GoalAuthorizationRequired.code:
+        return prefix
+    return "RUNTIME_EFFECT_PREFLIGHT_FAILED"
+
+
+def _unbound_job_evidence(service: EngineService, job: RuntimeJob) -> _UnboundEvidence:
+    """binding 없는 job의 durable 근거를 읽기 연결 하나에서 모은다. 원장을 쓰지 않는다."""
+
+    project, attempt = job.project_id, job.attempt_id
+    with service.ledger.read() as connection:
+        def scalar(query: str, *parameters: Any) -> Any:
+            row = connection.execute(query, parameters).fetchone()
+            return None if row is None else row[0]
+
+        observations = connection.execute(
+            "SELECT rowid AS sequence,id,kind,payload_json FROM runtime_job_observations "
+            "WHERE job_id=? ORDER BY rowid",
+            (job.job_id,),
+        ).fetchall()
+        epoch, epoch_row, restarts = None, 0, 0
+        for row in observations:
+            if row["kind"] in {
+                RuntimeJobObservationKind.STARTED.value,
+                RuntimeJobObservationKind.COLLECTOR_REATTACHED.value,
+            }:
+                payload = json.loads(row["payload_json"])
+                if payload.get("thread_id") is None:
+                    epoch, epoch_row = row["id"], row["sequence"]
+                restarts += "restart" in payload
+        failure, failure_id, last_role_event = None, None, None
+        for row in observations:
+            if row["sequence"] <= epoch_row or row["kind"] != RuntimeJobObservationKind.PROVIDER_PROGRESS.value:
+                continue
+            payload = json.loads(row["payload_json"])
+            progress = payload.get("role_progress")
+            if isinstance(progress, dict):
+                # 모든 역할 progress는 create 직전의 role_requested 뒤에만 생긴다(Q).
+                last_role_event = str(progress.get("event"))
+            if (
+                epoch is not None
+                and payload.get("target_failure_checkpoint_version") == "1.0"
+                and payload.get("epoch_observation_id") == epoch
+                and payload.get("job_request_digest") == job.request_digest
+                and payload.get("attempt_id") == job.attempt_id
+            ):
+                failure, failure_id = payload.get("error"), row["id"]
+        s0 = scalar(
+            "SELECT MAX(sequence) FROM history_events WHERE project_id=? AND entity_id=? "
+            "AND event_type IN ('runtime_job.started','runtime_job.collector_reattached')",
+            project, job.job_id,
+        )
+        if s0 is None:
+            s0 = scalar(
+                "SELECT MIN(sequence) FROM history_events WHERE project_id=? AND entity_id=? "
+                "AND event_type='runtime_job.scheduled'",
+                project, job.job_id,
+            ) or 0
+        retryable = False
+        if failure is not None and _worker_error_code(failure) in {
+            GoalAuthorizationRequired.code, StaleExecutionInputError.code,
+        }:
+            recorded = scalar(
+                "SELECT MAX(sequence) FROM history_events WHERE project_id=? AND entity_id=? "
+                "AND event_type='runtime_job.provider_progress' "
+                "AND json_extract(payload_json,'$.observation_id')=?",
+                project, job.job_id, failure_id,
+            )
+            retryable = recorded is not None and scalar(
+                "SELECT 1 FROM history_events WHERE project_id=? AND sequence>? "
+                "AND event_type IN ('goal.authorized','state.observed') LIMIT 1",
+                project, recorded,
+            ) is not None
+        effects: list[str] = []
+        prepared = receipt_only = False
+        release: list[str] = []
+        if job.kind in _PREPARED_RECOVERY_JOB_KINDS and attempt is not None:
+            intents = {
+                (row["kind"], row["status"])
+                for row in connection.execute(
+                    "SELECT kind,status FROM runtime_intents WHERE attempt_id=?", (attempt,),
+                )
+            }
+            prepared = any(status == "prepared" for _kind, status in intents)
+            if job.kind in _DISPATCH_JOB_KINDS and not prepared:
+                # create·start·resume은 intent 없이 호출되지 않는다. intent가 없고 marker도 없어야 무효과다.
+                receipt_only = intents == {(RuntimeIntentKind.CREATE_THREAD.value, "received")}
+                if intents and not receipt_only:
+                    effects.append("runtime_intent")
+                if not intents and scalar(
+                    "SELECT 1 FROM history_events WHERE project_id=? AND sequence>? "
+                    "AND event_type='runtime.effect_dispatching' "
+                    "AND json_extract(payload_json,'$.attempt_id')=? LIMIT 1",
+                    project, s0, attempt,
+                ) is not None:
+                    effects.append("effect_dispatching")
+                if any(
+                    row["status"] not in {"reserved", "released"}
+                    or row["execution_status"] not in {"reserved", "released"}
+                    or row["effect_status"] in {"pending", "unknown"}
+                    for row in connection.execute(
+                        "SELECT status,execution_status,effect_status FROM provider_calls WHERE attempt_id=?",
+                        (attempt,),
+                    )
+                ):
+                    effects.append("provider_call")
+        if job.kind in _ROLE_JOB_KINDS:
+            if last_role_event is not None:
+                effects.append("role_requested")
+            for row in connection.execute(
+                "SELECT c.id,c.attempt_id,c.status,c.receipt_json,c.execution_status,c.effect_status,"
+                "(SELECT MAX(h.sequence) FROM history_events h WHERE h.project_id=c.project_id "
+                "AND h.entity_id=c.id AND h.event_type='budget.call_reserved') AS reserved_sequence "
+                "FROM provider_calls c WHERE c.project_id=? AND ("
+                "c.execution_status IN ('reserved','started','unknown') "
+                "OR c.effect_status IN ('pending','unknown') OR c.id IN ("
+                "SELECT entity_id FROM history_events WHERE project_id=? AND sequence>? "
+                "AND event_type='budget.call_reserved'))",
+                (project, project, s0),
+            ):
+                if (
+                    row["attempt_id"] is None
+                    and row["status"] == "reserved"
+                    and row["receipt_json"] is None
+                    and row["execution_status"] == "reserved"
+                    and row["effect_status"] == "not_started"
+                    and (row["reserved_sequence"] or 0) > s0
+                ):
+                    release.append(row["id"])  # 귀속 예약: 재시작 전에 release_before_effect로 닫는다.
+                elif row["status"] != "released":
+                    # 귀속 규칙 밖 미해결 행이나 이 epoch에서 정산된 역할 호출은 효과 근거다.
+                    effects.append("provider_call")
+        # ponytail: 미완료 CoreOperation(O)은 operations.py:294-317과 같은 식을 project 단위로 읽는다.
+        # job 단위가 아니라 보수적(8행)일 수 있다. job 결속 operation 표지가 생기면 좁힌다.
+        if scalar(
+            "SELECT 1 FROM history_events p WHERE p.project_id=? AND p.sequence>? "
+            "AND p.event_type='operation.prepared' AND NOT EXISTS ("
+            "SELECT 1 FROM history_events c WHERE c.project_id=p.project_id "
+            "AND c.entity_id=p.entity_id AND c.sequence>p.sequence "
+            "AND c.event_type IN ('operation.completed','operation.no_effect','operation.failed')) LIMIT 1",
+            project, s0,
+        ) is not None:
+            effects.append("core_operation")
+        deadline = scalar(
+            "SELECT json_extract(payload_json,'$.absolute_deadline_at') FROM goal_authorizations "
+            "WHERE project_id=? ORDER BY revision_no DESC LIMIT 1",
+            project,
+        )
+    return _UnboundEvidence(
+        epoch_sequence=int(s0),
+        failure=failure,
+        failure_retryable=retryable,
+        prepared=prepared,
+        receipt_only=receipt_only,
+        effects=tuple(dict.fromkeys(effects)),
+        last_role_event=last_role_event,
+        restarts=restarts,
+        approval_deadline=(
+            None if deadline is None else datetime.fromisoformat(deadline.replace("Z", "+00:00"))
+        ),
+        release_call_ids=tuple(release),
+    )
+
+
+def _classify_routing_rows(
+    service: EngineService,
+    job: RuntimeJob,
+    *,
+    provider_available: bool,
+    now: datetime,
+) -> UnboundJobVerdict:
+    """lease를 얻은(FREE) collector_lost·SCHEDULED job의 S·3·4·7g·8·5·7d·7j·7·7k·6p·6e·6행."""
+
+    evidence = _unbound_job_evidence(service, job)
+    kind = job.kind
+    supplied = (
+        kind is RuntimeJobKind.EXECUTION_SPEC_PREPARE
+        and job.request.get("supplied_proposal_digest") is not None
+    )
+    restartable = not supplied and kind in (
+        {RuntimeJobKind.RECOVERY, RuntimeJobKind.REPLANNING, RuntimeJobKind.EXECUTION_SPEC_PREPARE}
+        | _DISPATCH_JOB_KINDS
+    )
+
+    def stop(row: str, code: str, detail: str, state: str, mode: str, guidance: str, *,
+             unknown: bool = False) -> UnboundJobVerdict:
+        return UnboundJobVerdict(
+            row, job.job_id, code, detail, FailureClass.EXTERNAL_UNKNOWN if unknown else None, False,
+            state, mode, f"{detail.rstrip('.')}. {guidance}"[:2000],
+            RepairAction.WAIT_EXTERNAL if unknown else None, unknown,
+        )
+
+    def owner_lost(reason: str) -> UnboundJobVerdict:
+        return stop(
+            reason, RUNTIME_JOB_OWNER_LOST,
+            "effect_state=none_proven; reason=" + {
+                "7": "restart_limit", "7j": "job_deadline_elapsed", "7k": "not_reconstructable",
+            }[reason],
+            "user_decision_required", "user_decision",
+            f"RuntimeJob {job.job_id}의 owner가 사라졌고 자동으로 이어 갈 수 없습니다. "
+            + REPLAN_JOB_ERROR_NO_PUBLIC_ESCAPE,
+        )
+
+    def restart_block() -> UnboundJobVerdict | None:
+        if evidence.approval_deadline is not None and now >= evidence.approval_deadline:
+            return stop(
+                "7d", "GOAL_ABSOLUTE_DEADLINE_EXCEEDED",
+                f"승인된 절대 deadline을 지났습니다: {evidence.approval_deadline.isoformat()}",
+                "user_decision_required", "user_decision", "새 승인 없이 job을 다시 시작하지 않습니다.",
+            )
+        if now >= job.absolute_deadline_at:
+            return owner_lost("7j")  # 재시작해도 job deadline을 늘리지 않는다(결정 D2).
+        if evidence.restarts:
+            return owner_lost("7")
+        if supplied:
+            return owner_lost("7k")  # request에 proposal digest만 있어 본문을 되살릴 수 없다.
+        if not provider_available and kind is RuntimeJobKind.REPLANNING:
+            return stop(
+                "6p", "REPLAN_PROVIDER_REQUIRED", REPLAN_PROVIDER_REQUIRED_DETAIL,
+                "user_decision_required", "user_decision", "역할 설정을 주면 같은 job을 한 번 재시작합니다.",
+            )
+        if not provider_available and kind is RuntimeJobKind.EXECUTION_SPEC_PREPARE:
+            return stop(
+                "6e", "EXECUTION_SPEC_PROPOSAL_REQUIRED",
+                "Execution Spec 준비 job을 다시 시작할 준비 역할 provider가 필요합니다. "
+                "CLI에서는 run-once에 --role-config를 지정합니다.",
+                "user_decision_required", "user_decision", "역할 설정을 주면 같은 job을 한 번 재시작합니다.",
+            )
+        return None
+
+    def restart(row: str) -> UnboundJobVerdict:
+        proof = {
+            "epoch_sequence": evidence.epoch_sequence, "failure": evidence.failure,
+            "effects": list(evidence.effects), "restarts": evidence.restarts,
+            "release_call_ids": list(evidence.release_call_ids), "request_digest": job.request_digest,
+        }
+        return UnboundJobVerdict(
+            row, job.job_id, None, "owner 소실과 효과 미시작을 확인해 같은 job을 한 번 재시작한다.", None, True,
+            "automatic_pending", "automatic", "run-once가 한 단계를 진행합니다(같은 job을 한 번 재시작).",
+            restart={
+                "reason": "owner_lost_no_effect_proven",
+                "epoch_sequence": evidence.epoch_sequence,
+                "evidence_digest": sha256_digest(proof),
+                "restart_no": evidence.restarts + 1,
+            },
+            release_call_ids=evidence.release_call_ids,
+        )
+
+    if job.status is RuntimeJobStatus.SCHEDULED and restartable and restart_block() is None:
+        return restart("S")  # claim이 없었으므로 효과가 없다.
+    lost = job.status is RuntimeJobStatus.COLLECTOR_LOST
+    if lost and kind in _PREPARED_RECOVERY_JOB_KINDS and evidence.prepared:
+        return UnboundJobVerdict(
+            "3", job.job_id, None, "prepared intent를 기존 cancel·prepared 복구 경로로 넘긴다.", None, True,
+            "automatic_pending", "automatic", "run-once가 한 단계를 진행합니다(기존 prepared 복구 경로로 넘김).",
+        )
+    if lost and kind in _DISPATCH_JOB_KINDS and evidence.receipt_only:
+        return UnboundJobVerdict(
+            "4", job.job_id, None, "생성된 thread를 같은 Attempt의 기존 재개 경로로 넘긴다.", None, True,
+            "automatic_pending", "automatic", "run-once가 한 단계를 진행합니다(기존 thread 재개 경로로 넘김).",
+        )
+    if kind in _GOAL_JOB_KINDS:
+        # 이 경로는 provider를 직접 부르고 effect_dispatching marker를 쓰지 않는다(결정 D4).
+        return stop(
+            "7g", RUNTIME_JOB_OWNER_LOST, f"effect_state=unknown; kind={kind.value}",
+            "observe_first_required", "observe_first",
+            "효과 여부를 확정할 수 없어 자동으로 다시 호출하지 않습니다. " + REPLAN_JOB_ERROR_NO_PUBLIC_ESCAPE,
+            unknown=True,
+        )
+    if evidence.effects:
+        return stop(
+            "8", "EXTERNAL_EFFECT_UNKNOWN",
+            f"binding 없는 RuntimeJob {job.job_id}의 효과가 시작됐을 수 있어 unknown으로 보존합니다: "
+            f"evidence={','.join(evidence.effects)}; last_role_event={evidence.last_role_event or 'none'}",
+            "observe_first_required", "observe_first", "새 provider 호출을 만들지 않습니다.",
+            unknown=True,
+        )
+    if evidence.failure is not None and not evidence.failure_retryable:
+        error = evidence.failure
+        text = (
+            f"{error.get('error_type')}: {error.get('error')}" if isinstance(error, dict) else str(error)
+        )
+        code = _worker_error_code(error)
+        return stop(
+            "5", code,
+            f"binding 없는 RuntimeJob {job.job_id}의 worker가 효과 근거 없이 자기 오류로 끝났습니다: {text}"[:1500],
+            "user_decision_required", "user_decision",
+            "새 승인을 기록하면 다음 run-once가 같은 job을 한 번 재시작합니다."
+            if code == GoalAuthorizationRequired.code
+            else "입력을 다시 관측하면 다음 run-once가 같은 job을 한 번 재시작합니다."
+            if code == StaleExecutionInputError.code
+            else "같은 오류를 자동으로 반복하지 않습니다.",
+        )
+    return restart_block() or restart("6" if lost else "S")
+
+
 class RuntimeJobSupervisor:
     """활성 RuntimeJob 동안만 SDK 연결과 관측 수명을 소유한다.
 
@@ -1618,12 +2255,55 @@ class RuntimeJobSupervisor:
         self.terminal_observation_grace_seconds = terminal_observation_grace_seconds
         self.clock = clock
         self._workers: dict[str, threading.Thread] = {}
-        self._results: dict[str, tuple[bool, Any]] = {}
+        self._results: dict[str, tuple[str | None, tuple[bool, Any]]] = {}
         self._result_events: dict[str, threading.Event] = {}
         self._complete_on_return: dict[str, bool] = {}
         self._terminal_progress: dict[str, dict[str, Any]] = {}
         self._owned_job_ids: set[str] = set()
+        # 시작 claim을 이겨 이 supervisor가 쥔 owner lease. epoch 결과가 durable해진 뒤에만 놓는다.
+        self._leases: dict[str, _OwnerLease] = {}
+        # projects.artifact_root는 프로젝트 생성 때 한 번 기록되고 바뀌지 않는다. tick마다 다시 읽지 않는다.
+        self._artifact_roots: dict[str, str] = {}
         self._lock = threading.RLock()
+
+    def _owner_lock_path(self, project_id: str, checkpoint_key: str) -> Path:
+        root = self._artifact_roots.get(project_id)
+        if root is None:
+            root = self._artifact_roots.setdefault(
+                project_id, _project_artifact_root(self.service, project_id),
+            )
+        return _owner_lock_file(root, checkpoint_key)
+
+    def runtime_job_worker_alive(self, job_id: str) -> bool:
+        worker = self._workers.get(job_id)
+        return worker is not None and worker.is_alive()
+
+    def owns_runtime_job(self, job_id: str) -> bool:
+        """이 supervisor가 job의 owner lease를 쥐었거나 그 worker가 살아 있다."""
+
+        return job_id in self._leases or self.runtime_job_worker_alive(job_id)
+
+    def _job_lease(self, job: RuntimeJob) -> tuple[OwnerLockState, _OwnerLease | None]:
+        """prober 쪽 lease 시도. lock 파일을 만들지 않는다.
+
+        기록 전 local 결과를 가진 supervisor는 lease를 놓았어도 그 job의 local owner다. worker는 결과를
+        넣은 뒤에 lease를 놓으므로 lease 시도 뒤에 결과를 확인해야 그 사이의 경합을 놓치지 않는다.
+        """
+
+        state, lease = _acquire_owner_lease(
+            self._owner_lock_path(job.project_id, job.checkpoint_key), self, create=False,
+        )
+        if job.job_id in self._results:
+            if state is OwnerLockState.FREE:
+                _release_owner_lease(lease)
+            return OwnerLockState.HELD_SELF, None
+        return state, lease
+
+    def _release_job_lease(self, job_id: str) -> None:
+        with self._lock:
+            lease = self._leases.pop(job_id, None)
+        if lease is not None:
+            _release_owner_lease(lease)
 
     def _now(self) -> datetime:
         value = self.clock()
@@ -1647,14 +2327,44 @@ class RuntimeJobSupervisor:
                  complete_on_return: bool = True) -> RuntimeJob:
         if timeout_seconds <= 0:
             raise ValueError("runtime job timeout은 양수여야 합니다.")
-        job = self.service.schedule_runtime_job(
-            project_id=project_id, kind=kind, checkpoint_key=checkpoint_key,
-            request=request, absolute_deadline_at=self._now() + timedelta(seconds=timeout_seconds),
-            attempt_id=attempt_id, task_id=task_id,
-        )
-        self._owned_job_ids.add(job.job_id)
-        if job.status is RuntimeJobStatus.SCHEDULED:
-            job = self._start_worker(job, target, complete_on_return=complete_on_return)
+        path = self._owner_lock_path(project_id, checkpoint_key)
+        with self.service.ledger.read() as connection:
+            reserved = connection.execute(
+                "SELECT 1 FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
+                (project_id, checkpoint_key),
+            ).fetchone() is not None
+        # owner lease는 job 행 생성보다 먼저 잡는다. lock 파일(owner proof)은 새 행을 예약하는
+        # owner만 만들고, 행이 이미 있으면 만들지 않는다(구버전 행을 r4 행으로 위장하지 않는다).
+        for attempt in range(5):
+            state, lease = _acquire_owner_lease(path, self, create=not reserved)
+            if state is not OwnerLockState.HELD_OTHER or lease is not None or attempt == 4:
+                break
+            # ponytail: 다른 process의 순간 probe만 흡수하는 약 5회×10ms 재시도다. 늘리면 tick이 길어진다.
+            time.sleep(0.01)
+        try:
+            job = self.service.schedule_runtime_job(
+                project_id=project_id, kind=kind, checkpoint_key=checkpoint_key,
+                request=request, absolute_deadline_at=self._now() + timedelta(seconds=timeout_seconds),
+                attempt_id=attempt_id, task_id=task_id,
+            )
+        except BaseException:
+            if state is OwnerLockState.FREE:
+                _release_owner_lease(lease)
+            raise
+        if state is OwnerLockState.FREE:
+            if job.status is RuntimeJobStatus.SCHEDULED:
+                # 소유(close 시 collector_lost 표시)는 lease와 시작 claim을 모두 이긴 쪽만 갖는다.
+                return self._start_worker(
+                    job, target, complete_on_return=complete_on_return, lease=lease,
+                )
+            _release_owner_lease(lease)
+        elif lease is not None and state is OwnerLockState.HELD_OTHER and (
+            job.status is RuntimeJobStatus.SCHEDULED
+        ):
+            # 같은 process 패자: holder가 시작 CAS 단계를 끝낼 때까지 짧게 기다린 뒤 다시 읽는다.
+            # 소유 표시·local 상태·worker는 만들지 않는다.
+            lease.settled.wait(0.05)
+            job = self.service.load_runtime_job(job.job_id)
         # 예약/시작 tick에서는 빠른 target의 결과도 소비하지 않는다. 다음 tick이
         # 정확히 한 관측을 durable 상태로 옮긴다.
         return job
@@ -1665,11 +2375,42 @@ class RuntimeJobSupervisor:
         target: Callable[[], Any],
         *,
         complete_on_return: bool,
+        lease: _OwnerLease,
+        restart: dict[str, Any] | None = None,
     ) -> RuntimeJob:
+        """owner lease를 쥔 호출만 온다. lease → durable CAS → local 상태·worker 순서다.
+
+        ``restart``는 run_once 라우터가 owner 소실과 효과 미시작을 확인한 뒤 넘기는 재시작 표지다.
+        이때는 같은 transaction에서 조건을 다시 검사하는 재시작 claim을 쓴다.
+        """
+
         with self._lock:
             current = self._workers.get(job.job_id)
             if current is not None and current.is_alive():
+                self._owned_job_ids.add(job.job_id)
+                _release_owner_lease(lease)
                 return job
+            # durable CAS가 권위다. 이 호출이 scheduled·collector_lost → running 전이를 실제로
+            # 만든 경우에만 local 상태와 worker를 만든다. 다른 supervisor·process가 먼저 잡았으면
+            # 현재 job만 돌려주고 target을 부르지 않는다. supervisor lock은 process 안만 막는다.
+            try:
+                job, claimed, epoch = (
+                    self.service._claim_runtime_job_start_epoch(job.job_id)
+                    if restart is None
+                    else self.service._claim_runtime_job_restart(job.job_id, restart=restart)
+                )
+            except BaseException:
+                # 예약 뒤 claim 자체가 실패하면 기존처럼 이 supervisor가 close 때 collector_lost로 남긴다.
+                # lease도 놓지 않는다(close가 표시한 뒤 놓는다).
+                self._owned_job_ids.add(job.job_id)
+                self._leases[job.job_id] = lease
+                lease.settled.set()
+                raise
+            if not claimed:
+                _release_owner_lease(lease)
+                return job
+            self._owned_job_ids.add(job.job_id)
+            self._leases[job.job_id] = lease
             event = threading.Event()
             self._result_events[job.job_id] = event
             self._complete_on_return[job.job_id] = complete_on_return
@@ -1707,16 +2448,42 @@ class RuntimeJobSupervisor:
                                 "stage": "target_result_checkpoint",
                             },
                         )
+                # 성공 checkpoint, dispatch의 intent·receipt·binding, 또는 epoch 결속 실패
+                # checkpoint 중 하나가 durable해진 뒤에만 lease를 놓는다.
+                durable = outcome[0]
+                if not outcome[0]:
+                    try:
+                        current = self.service.load_runtime_job(job.job_id)
+                        self.service.record_runtime_job_observation(
+                            job.job_id,
+                            kind=RuntimeJobObservationKind.PROVIDER_PROGRESS,
+                            payload={
+                                "target_failure_checkpoint_version": "1.0",
+                                "epoch_observation_id": epoch,
+                                "error": outcome[1],
+                                "job_request_digest": current.request_digest,
+                                "attempt_id": current.attempt_id,
+                            },
+                        )
+                        durable = True
+                    except BaseException:
+                        # 기록하지 못하면 lease를 쥔 채 in-memory 결과를 owner tick·close에 맡긴다.
+                        pass
                 with self._lock:
                     if not outcome[0] or complete_on_return:
-                        self._results[job.job_id] = outcome
+                        self._results[job.job_id] = (epoch, outcome)
                     event.set()
+                if durable:
+                    self._release_job_lease(job.job_id)
 
-            job = self.service.start_runtime_job(job.job_id)
             worker = threading.Thread(target=execute,
                 name=f"flowmarshal-{job.kind.value}-{job.job_id[-8:]}", daemon=True)
             self._workers[job.job_id] = worker
-            worker.start()
+            try:
+                worker.start()
+            finally:
+                # 시작 실패여도 lease는 놓지 않는다. owner tick이 소실을 기록한 뒤 놓는다.
+                lease.settled.set()
             return job
 
     def record_role_progress(self, job_id: str, event: dict[str, Any]) -> None:
@@ -1732,10 +2499,11 @@ class RuntimeJobSupervisor:
         payload = {"role_progress": self._json_value(event)}
         self.service.record_runtime_job_observation(
             job_id, kind=RuntimeJobObservationKind.PROVIDER_PROGRESS, payload=payload,
+            # F2: create 직전(role_requested)·start 직전(thread_created) 기록은 같은 transaction에서
+            # job이 아직 실행 가능할 때만 남긴다. 거절되면 역할 runner는 그 효과를 시작하지 않는다.
+            require_runnable=event_name in _ROLE_EFFECT_EVENTS,
         )
-        if event_name in {
-            "role_terminal_observed", "terminal_observed_after_interrupt"
-        }:
+        if event_name in _ROLE_TERMINAL_EVENTS:
             with self._lock:
                 self._terminal_progress[job_id] = event
 
@@ -1807,34 +2575,44 @@ class RuntimeJobSupervisor:
             event.wait(min(wait_seconds, self.handoff_wait_seconds))
         with self._lock:
             outcome = self._results.pop(job_id, None)
-        if outcome is not None:
-            succeeded, value = outcome
+        # 재시작으로 epoch가 바뀐 뒤 도착한 이전 epoch의 결과는 기록하지 않고 버린다(I8).
+        if outcome is not None and outcome[0] == self._current_epoch(job_id)[1]:
+            succeeded, value = outcome[1]
             if succeeded:
                 self.service.record_runtime_job_observation(
                     job_id, kind=RuntimeJobObservationKind.PROVIDER_TERMINAL,
                     payload={"result": value}, provider_terminal=True, terminal_status="completed")
-            elif job_id in self._terminal_progress:
-                terminal = self._terminal_progress[job_id]
-                observation = terminal.get("terminal_observation")
-                status = (
-                    observation.get("terminal_status")
-                    if isinstance(observation, dict) else None
-                ) or "unknown"
-                self.service.record_runtime_job_observation(
-                    job_id,
-                    kind=RuntimeJobObservationKind.PROVIDER_TERMINAL,
-                    payload={"result": {"job_error": value, "terminal_observation": observation}},
-                    provider_terminal=True,
-                    terminal_status=status,
-                )
             else:
-                self.service.record_runtime_job_observation(
-                    job_id, kind=RuntimeJobObservationKind.COLLECTOR_LOST, payload=value)
+                self._record_worker_failure(job_id, value, self._terminal_progress.get(job_id))
+            # 결과 기록 실패로 쥐고 있던 lease는 owner tick이 기록한 뒤 놓는다.
+            self._release_job_lease(job_id)
             return self.service.load_runtime_job(job_id)
+        lock_state: OwnerLockState | None = None
+        if job.thread_id is None:
+            try:
+                lock_state, lease = self._job_lease(job)
+            except RuntimeOwnerLockUnavailable:
+                return job  # lock 계층 오류에서는 어떤 전이도 하지 않는다(fail-closed).
+            if lock_state is OwnerLockState.HELD_OTHER:
+                # 살아 있는 다른 owner의 job이다. job deadline 경과 뒤 interrupt 요청 1회만 한다(T2).
+                if job.status is RuntimeJobStatus.RUNNING and self._now() >= job.absolute_deadline_at:
+                    self._request_bounded_interrupt(job, reason="absolute_deadline_exceeded")
+                return self.service.load_runtime_job(job_id)
+            if lock_state is OwnerLockState.FREE:
+                # lease를 얻어 owner 부재를 확인했다(T1). deadline을 기다리지 않고 판정하되 재시작하지 않는다.
+                try:
+                    return self._settle_released_owner(job)[1]
+                finally:
+                    _release_owner_lease(lease)
+            # HELD_SELF는 기존 owner 경로다. ABSENT(owner proof 없음)는 성공 checkpoint 재부착과
+            # 절대 deadline hard stop만 기존대로 하고 소실 판정은 하지 않는다(I10).
         checkpointed, _checkpoint_result = self._durable_target_result(job_id)
         if checkpointed:
             return self.reattach(job_id)
-        if self._now() >= job.absolute_deadline_at:
+        if self._now() >= job.absolute_deadline_at and not (
+            # binding 없는 collector_lost에는 interrupt할 turn이 없다. interrupt↔collector_lost 반복을 막는다.
+            job.thread_id is None and job.status is RuntimeJobStatus.COLLECTOR_LOST
+        ):
             self._request_bounded_interrupt(
                 job, reason="absolute_deadline_exceeded",
             )
@@ -1863,6 +2641,7 @@ class RuntimeJobSupervisor:
             self.service.record_runtime_job_observation(
                 job_id, kind=RuntimeJobObservationKind.COLLECTOR_LOST,
                 payload={"reason": "collector thread exited without a result"})
+            self._release_job_lease(job_id)
             return self.service.load_runtime_job(job_id)
         if job.thread_id is not None and (
             worker is None
@@ -1884,13 +2663,111 @@ class RuntimeJobSupervisor:
                         },
                     )
                 return self.service.load_runtime_job(job_id)
-        if worker is None and job.status is RuntimeJobStatus.RUNNING:
+        if (
+            worker is None
+            and job.status is RuntimeJobStatus.RUNNING
+            and lock_state is OwnerLockState.HELD_SELF
+        ):
+            # lease를 쥔 채 worker 없이 남은 자기 job(claim 뒤 예외)만 여기서 소실로 기록하고 놓는다.
             self.service.record_runtime_job_observation(
                 job_id,
                 kind=RuntimeJobObservationKind.COLLECTOR_LOST,
                 payload={"reason": "supervisor restarted before provider binding was durable"},
             )
+            self._release_job_lease(job_id)
         return self.service.load_runtime_job(job_id)
+
+    def _current_epoch(self, job_id: str) -> tuple[int | None, str | None]:
+        """현재 epoch 표지: supervisor claim(thread 없음)이 남긴 마지막 STARTED·COLLECTOR_REATTACHED 관측."""
+
+        with self.service.ledger.read() as connection:
+            rows = connection.execute(
+                "SELECT rowid AS sequence,id,payload_json FROM runtime_job_observations "
+                "WHERE job_id=? AND kind IN (?,?) ORDER BY rowid DESC",
+                (
+                    job_id,
+                    RuntimeJobObservationKind.STARTED.value,
+                    RuntimeJobObservationKind.COLLECTOR_REATTACHED.value,
+                ),
+            ).fetchall()
+        for row in rows:
+            if json.loads(row["payload_json"]).get("thread_id") is None:
+                return row["sequence"], row["id"]
+        return None, None
+
+    def _record_worker_failure(
+        self, job_id: str, error: Any, terminal: dict[str, Any] | None,
+    ) -> None:
+        """worker 실패 결과의 관측. in-memory 결과와 epoch 결속 실패 checkpoint가 같은 payload를 만든다."""
+
+        if terminal is None:
+            self.service.record_runtime_job_observation(
+                job_id, kind=RuntimeJobObservationKind.COLLECTOR_LOST, payload=error)
+            return
+        observation = terminal.get("terminal_observation")
+        status = (
+            observation.get("terminal_status")
+            if isinstance(observation, dict) else None
+        ) or "unknown"
+        self.service.record_runtime_job_observation(
+            job_id,
+            kind=RuntimeJobObservationKind.PROVIDER_TERMINAL,
+            payload={"result": {"job_error": error, "terminal_observation": observation}},
+            provider_terminal=True,
+            terminal_status=status,
+        )
+
+    def _epoch_failure_checkpoint(self, job: RuntimeJob) -> tuple[Any, dict[str, Any] | None] | None:
+        """현재 epoch의 실패 checkpoint와 그 epoch의 마지막 역할 terminal progress를 읽는다."""
+
+        sequence, epoch = self._current_epoch(job.job_id)
+        if epoch is None:
+            return None
+        with self.service.ledger.read() as connection:
+            rows = connection.execute(
+                "SELECT payload_json FROM runtime_job_observations "
+                "WHERE job_id=? AND kind=? AND rowid>? ORDER BY rowid",
+                (job.job_id, RuntimeJobObservationKind.PROVIDER_PROGRESS.value, sequence),
+            ).fetchall()
+        found, error, terminal = False, None, None
+        for row in rows:
+            payload = json.loads(row["payload_json"])
+            progress = payload.get("role_progress")
+            if isinstance(progress, dict) and progress.get("event") in _ROLE_TERMINAL_EVENTS:
+                terminal = progress
+            if (
+                payload.get("target_failure_checkpoint_version") == "1.0"
+                and payload.get("epoch_observation_id") == epoch
+                and payload.get("job_request_digest") == job.request_digest
+                and payload.get("attempt_id") == job.attempt_id
+            ):
+                found, error = True, payload.get("error")
+        return (error, terminal) if found else None
+
+    def _settle_released_owner(self, job: RuntimeJob) -> tuple[UnboundJobVerdict | None, RuntimeJob]:
+        """lease를 쥔 호출자가 owner 부재를 확인한 뒤 K·C행 하나만 기록한다. 재시작하지 않는다."""
+
+        job = self.service.load_runtime_job(job.job_id)
+        # tick(observe)은 재시작·종료 라우팅을 하지 않으므로 K·C행만 판정해 원장 읽기를 늘리지 않는다.
+        verdict = _classify_owner_rows(
+            self.service, job, lock_state=OwnerLockState.FREE,
+            now=self._now(), grace_seconds=self.terminal_observation_grace_seconds,
+        )
+        if verdict is not None and verdict.row == "K":
+            return verdict, self.reattach(job.job_id)
+        if verdict is not None and verdict.row == "C":
+            failure = self._epoch_failure_checkpoint(job)
+            if failure is not None:
+                self._record_worker_failure(job.job_id, *failure)
+            else:
+                # envelope가 허용한 새 payload key 목록 밖이므로 기존 reason payload를 그대로 쓴다.
+                self.service.record_runtime_job_observation(
+                    job.job_id,
+                    kind=RuntimeJobObservationKind.COLLECTOR_LOST,
+                    payload={"reason": "supervisor restarted before provider binding was durable"},
+                )
+            return verdict, self.service.load_runtime_job(job.job_id)
+        return verdict, job
 
     def bind_provider_turn(self, job_id: str, *, thread_id: str, turn_id: str) -> RuntimeJob:
         before = self.service.load_runtime_job(job_id)
@@ -2135,6 +3012,9 @@ class RuntimeJobSupervisor:
                         f"worker_alive={worker is not None and worker.is_alive()}"
                     ),
                 )
+            # 살아 있는 worker의 lease는 worker가 결과를 durable하게 남긴 뒤 스스로 놓는다.
+            if worker is None or not worker.is_alive():
+                self._release_job_lease(job_id)
         try:
             remaining = deadline - time.monotonic()
             if remaining > 0:
@@ -2160,32 +3040,72 @@ _FAILURE_OBSERVATION_LIMIT = 10_000
 _FAILURE_DIAGNOSIS_PROVENANCE = FAILURE_DIAGNOSIS_PROVENANCE
 
 
+#: run_once와 status가 같은 말로 표시하는 재계획 provider 부재 안내.
+REPLAN_PROVIDER_REQUIRED_DETAIL = (
+    "승인 범위 안의 Plan subgraph 후보와 독립 review를 생성할 provider가 필요합니다. "
+    "CLI에서는 run-once에 --role-config를 지정합니다."
+)
+#: consumed replanning job_error에 대해 status·replan 거절·문서가 같은 말로 적는 탈출 경로 부재.
+REPLAN_JOB_ERROR_NO_PUBLIC_ESCAPE = (
+    "현재 공개 CLI에는 이 차단 상태를 같은 project 안에서 해소하는 recovery 명령이 없다."
+)
+
+
+def _replan_job_error_detail(job_id: str, result: dict[str, Any]) -> str:
+    error = result.get("job_error")
+    unavailable = result.get("runtime_job_result_unavailable") is True
+    terminal = result.get("terminal_observation")
+    error_type = (
+        "runtime_job_result_unavailable" if unavailable
+        else error.get("error_type") if isinstance(error, dict) else None
+    )
+    message = error.get("error") if isinstance(error, dict) else None
+    terminal_status = terminal.get("terminal_status") if isinstance(terminal, dict) else None
+    return (
+        f"replanning job {job_id}의 provider terminal은 관측했지만 local typed 결과를 확정할 수 "
+        f"없습니다(error_type={error_type}, "
+        f"terminal_observed={'true' if unavailable or isinstance(terminal, dict) else 'false'}, "
+        f"terminal_status={terminal_status}, error={str(message)[:300] if message else None}). "
+        "외부 효과가 확인되지 않아 자동·수동 재계획을 하지 않습니다. "
+        + REPLAN_JOB_ERROR_NO_PUBLIC_ESCAPE
+    )
+
+
 def replan_candidate_blocker(
-    service: EngineService, *, project_id: str, assessment_id: str,
+    service: EngineService, *, project_id: str, assessment_id: str, connection: Any = None,
 ) -> tuple[str, str] | None:
     """자동 재계획 후보의 원장 판정을 읽기 전용으로 계산해 (blocker_code, detail)을 돌려준다.
 
-    run_once와 status가 같은 판정을 쓰도록 한 곳에 둔다. 소비된 replanning 결과가 없거나
+    run_once·status·replan 명령이 같은 판정을 쓰도록 한 곳에 둔다. 소비된 replanning 결과가 없거나
     후보가 아직 원장에 없거나 이미 활성화됐거나 활성화 전제조건을 모두 통과하면 None이다.
+    소비된 결과가 job_error처럼 typed 결과를 확정할 수 없으면 EXTERNAL_EFFECT_UNKNOWN이다.
     전제조건은 `_activate_plan_in_transaction`과 같은 순서의 service 판정을 쓰기 없이 다시
     실행한다. 후보가 결속한 StateSnapshot이 current가 아니면 다른 새 state에서도 통과하지 않는다.
+    ``connection``을 주면 호출자 transaction 안에서 같은 판정을 읽는다.
     """
+
+    from contextlib import nullcontext
 
     from .domain import CandidateStatus
     from .ledger import EngineLedgerError, EngineTransaction
     from .planning import ExpandedPlanEvaluation
     from .service import GoalAuthorizationRequired, PlanStateSnapshotStaleError
 
-    with service.ledger.read() as connection:
+    with nullcontext(connection) if connection is not None else service.ledger.read() as connection:
         job = connection.execute(
-            "SELECT result_json FROM runtime_jobs WHERE project_id=? AND checkpoint_key=? "
+            "SELECT id,result_json FROM runtime_jobs WHERE project_id=? AND checkpoint_key=? "
             "AND status='consumed'",
             (project_id, f"replanning:{assessment_id}"),
         ).fetchone()
         if job is None or job["result_json"] is None:
             return None
+        result = json.loads(job["result_json"])
+        if isinstance(result, dict) and (
+            "job_error" in result or result.get("runtime_job_result_unavailable") is True
+        ):
+            return "EXTERNAL_EFFECT_UNKNOWN", _replan_job_error_detail(job["id"], result)
         try:
-            evaluation = ExpandedPlanEvaluation.model_validate(json.loads(job["result_json"]))
+            evaluation = ExpandedPlanEvaluation.model_validate(result)
         except ValueError:
             return None
         plan = evaluation.plan
@@ -2232,6 +3152,119 @@ def replan_candidate_blocker(
         except (EngineServiceError, EngineLedgerError) as error:
             return "REPLAN_CANDIDATE_ACTIVATION_BLOCKED", str(error)
     return None
+
+
+@dataclass(frozen=True)
+class ReplanHead:
+    """재계획 head assessment와 그 `replanning:{ID}` checkpoint의 원장 관측(읽기 전용)."""
+
+    task_id: str
+    attempt_id: str
+    failure_fingerprint: str
+    stable_assessment_id: str
+    stable_recorded: bool
+    assessment_id: str
+    job_id: str | None
+    job_status: str | None
+    #: consumed 결과가 typed 후보이면 그 evaluation, 아니면 None(job_error 등).
+    evaluation: Any
+    #: evaluation 후보가 원장에 같은 binding으로 등록돼 있는가. 다른 binding이면 False다.
+    candidate_registered: bool
+    candidate_activated: bool
+    #: `replan_candidate_blocker`와 같은 (code, detail). consumed 결과가 없으면 None이다.
+    blocker: tuple[str, str] | None
+
+
+def replan_head(
+    service: EngineService, *, project_id: str, task_id: str, attempt_id: str,
+    failure_fingerprint: str, connection: Any = None,
+) -> ReplanHead:
+    """주어진 실패의 head assessment와 그 consumed replanning 결과·후보 binding을 원장에서 읽는다.
+
+    head는 `current_replan_assessment`, 차단 판정은 `replan_candidate_blocker`와 같은 구현이다.
+    """
+
+    from contextlib import nullcontext
+
+    from .planning import ExpandedPlanEvaluation
+    from .recovery import stable_recovery_assessment_id
+
+    with nullcontext(connection) if connection is not None else service.ledger.read() as connection:
+        stable = stable_recovery_assessment_id(attempt_id, failure_fingerprint)
+        head = current_replan_assessment(
+            connection, project_id=project_id, attempt_id=attempt_id,
+            failure_fingerprint=failure_fingerprint,
+        )
+        stable_recorded = connection.execute(
+            "SELECT 1 FROM recovery_assessments WHERE id=?", (stable,)
+        ).fetchone() is not None
+        job = connection.execute(
+            "SELECT id,status,result_json FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
+            (project_id, f"replanning:{head}"),
+        ).fetchone()
+        evaluation = None
+        registered = activated = False
+        blocker = None
+        if job is not None and job["status"] == RuntimeJobStatus.CONSUMED.value:
+            try:
+                evaluation = ExpandedPlanEvaluation.model_validate_json(job["result_json"])
+            except (TypeError, ValueError):
+                evaluation = None
+            if evaluation is not None:
+                try:
+                    registered = service._registered_replan_candidate(
+                        connection, evaluation.plan, evaluation.decision,
+                    )
+                except EngineServiceError:
+                    registered = False
+                activated = connection.execute(
+                    "SELECT 1 FROM plan_activations WHERE plan_revision_id=?",
+                    (evaluation.plan.plan_revision_id,),
+                ).fetchone() is not None
+            blocker = replan_candidate_blocker(
+                service, project_id=project_id, assessment_id=head, connection=connection,
+            )
+    return ReplanHead(
+        task_id=task_id, attempt_id=attempt_id, failure_fingerprint=failure_fingerprint,
+        stable_assessment_id=stable, stable_recorded=stable_recorded, assessment_id=head,
+        job_id=None if job is None else job["id"], job_status=None if job is None else job["status"],
+        evaluation=evaluation, candidate_registered=registered, candidate_activated=activated,
+        blocker=blocker,
+    )
+
+
+def current_replan_head(
+    service: EngineService, *, project_id: str, connection: Any = None,
+) -> ReplanHead | None:
+    """active Plan의 현재 실패가 자동 SUBGRAPH_REPLAN 경로일 때 그 head 관측을 돌려준다.
+
+    대상·실패 지문은 status·replan 명령과 같은 `current_failure_diagnosis`에서 얻는다.
+    미해결 실패가 없거나 subgraph 재계획 경로가 아니면 None이다. 읽기 전용이다.
+    """
+
+    from contextlib import nullcontext
+
+    from .recovery import current_failure_diagnosis
+
+    with nullcontext(connection) if connection is not None else service.ledger.read() as reader:
+        project = reader.execute(
+            "SELECT active_plan_revision_id FROM projects WHERE id=?", (project_id,)
+        ).fetchone()
+    if project is None:
+        return None
+    failure = current_failure_diagnosis(
+        service, project_id=project_id, plan_revision_id=project["active_plan_revision_id"],
+    )
+    if failure is None:
+        return None
+    target, diagnosis = failure
+    route = recovery_route(diagnosis, validation_result_id=target["validation_result_id"])
+    if route.mode != "automatic" or diagnosis.repair_action is not RepairAction.SUBGRAPH_REPLAN:
+        return None
+    return replan_head(
+        service, project_id=project_id, task_id=target["task_id"], attempt_id=target["attempt_id"],
+        failure_fingerprint=diagnosis.failure_fingerprint, connection=connection,
+    )
 
 
 class TaskGatePending(RuntimeError):
@@ -2385,6 +3418,8 @@ class EngineDispatcher:
                 or request.get("resume_notice") is True
                 or row["kind"] == AttemptKind.VALIDATION.value
             ),
+            # F1: job worker 안의 효과만 그 job의 실행 가능 여부를 같은 transaction에서 본다.
+            runtime_job_id=active_runtime_job_id(),
         )
 
     def _invoke_runtime_operation(
@@ -2424,18 +3459,9 @@ class EngineDispatcher:
                             "MODEL_BINDING_CHANGED"
                             if prefix.startswith("MODEL_LOCK_")
                             else prefix
-                        ) if prefix in {
-                            "STALE_EXECUTION_INPUT",
-                            "RUNTIME_INTENT_BINDING_MISMATCH",
-                            "PROMPT_BINDING_MISMATCH",
-                            "PROMPT_ARTIFACT_INVALID",
-                            "MODEL_BINDING_CHANGED",
-                            "PERMISSION_POLICY_MISMATCH",
-                            "TARGET_BINDING_CHANGED",
-                            "EFFECT_CHECKPOINT_STALE",
-                            "WORKFLOW_CANCELLED",
-                            "WORKFLOW_PAUSED",
-                        } or prefix.startswith("MODEL_LOCK_") else "RUNTIME_EFFECT_PREFLIGHT_FAILED"
+                        ) if prefix in _RUNTIME_EFFECT_PREFLIGHT_CODES or prefix.startswith(
+                            "MODEL_LOCK_"
+                        ) else "RUNTIME_EFFECT_PREFLIGHT_FAILED"
                     self.service.record_runtime_effect_not_started(
                         attempt_id=attempt_id,
                         intent_id=intent_id,
@@ -2572,7 +3598,7 @@ class EngineDispatcher:
             outcome = self._run_once(project_id, proposal=proposal,
                                      goal_validation_step=goal_validation_step,
                                      goal_validation_retry=goal_validation_retry)
-        except (BudgetBlocked, GoalAuthorizationRequired) as error:
+        except (BudgetBlocked, GoalAuthorizationRequired, RuntimeOwnerLockUnavailable) as error:
             outcome = RunOnceOutcome(action=RunOnceAction.BLOCKED, project_id=project_id,
                                      blocker_code=error.code, detail=str(error))
         with self.service.ledger.read() as connection:
@@ -2604,6 +3630,200 @@ class EngineDispatcher:
             tick_elapsed_ms=max(0, int((time.monotonic() - started) * 1000)),
         )
 
+    @staticmethod
+    def _observed_job_outcome(job: RuntimeJob, extra: str | None = None) -> RunOnceOutcome:
+        detail = (
+            "활성 RuntimeJob의 provider 상태를 한 번 관측했습니다: "
+            f"{job.kind.value}/{job.status.value}"
+        )
+        return RunOnceOutcome(
+            action=RunOnceAction.OBSERVED,
+            project_id=job.project_id,
+            task_id=job.task_id,
+            attempt_id=job.attempt_id,
+            detail=detail if extra is None else f"{detail}. {extra}",
+        )
+
+    def _cancel_for_prepared_recovery(self, job: RuntimeJob) -> bool:
+        """binding 전 collector를 잃은 job을 닫고 기존 prepared effect checkpoint 복구로 넘긴다."""
+
+        if (
+            job.status is not RuntimeJobStatus.COLLECTOR_LOST
+            or job.thread_id is not None
+            or job.attempt_id is None
+        ):
+            return False
+        with self.service.ledger.read() as connection:
+            recoverable_intent = connection.execute(
+                "SELECT 1 FROM runtime_intents WHERE attempt_id=? AND status='prepared' LIMIT 1",
+                (job.attempt_id,),
+            ).fetchone()
+        if recoverable_intent is None:
+            return False
+        self.service.cancel_runtime_job(
+            job.job_id,
+            reason="binding 전 collector가 사라져 prepared effect checkpoint 복구로 전환",
+        )
+        return True
+
+    def _job_provider_available(self, job: RuntimeJob) -> bool:
+        """재시작에 필요한 provider가 이 인스턴스에 있는가(kind별)."""
+
+        if job.kind is RuntimeJobKind.REPLANNING:
+            return self.recovery_provider is not None
+        if job.kind is RuntimeJobKind.EXECUTION_SPEC_PREPARE:
+            return self.proposal_provider is not None
+        return True
+
+    def _restart_target(self, job: RuntimeJob) -> tuple[Callable[[], Any], bool]:
+        """저장된 ``job.request``만으로 원래 target과 같은 호출을 다시 만든다(설계 4.4 표).
+
+        request를 바꾸지 않으므로 request digest는 저장값과 같다. 재구성 입력이 달라져 worker가
+        실패하면 다음 run_once의 5행 typed 정지다(같은 job의 재시작은 한 번뿐).
+        """
+
+        request = job.request
+        if job.kind is RuntimeJobKind.RECOVERY:
+            return (lambda: {"assessment": request["assessment"]}), True
+        if job.kind is RuntimeJobKind.REPLANNING:
+            from .domain import RecoveryAssessment
+
+            return (lambda: self.recovery_provider.replan(
+                project_id=job.project_id,
+                task_id=job.task_id,
+                assessment=RecoveryAssessment.model_validate(request["assessment"]),
+                evidence_documents=tuple(request["evidence_documents"]),
+                inventory=self.runtime.list_models(),
+            )), True
+        if job.kind is RuntimeJobKind.EXECUTION_SPEC_PREPARE:
+            from .context import AdditionalContextRequest
+
+            followup = request.get("context_request")
+            return self._execution_preparation_target(
+                project_id=job.project_id,
+                task_id=request["task_id"],
+                context_request=(
+                    None if followup is None else AdditionalContextRequest.model_validate(followup)
+                ),
+            ), True
+        # WORKER_TURN·TASK_SEMANTIC_VALIDATE(intent 없음): 앞 epoch의 미실행 provider 예약을 재사용한다.
+        with self.service.ledger.read() as connection:
+            unused = connection.execute(
+                "SELECT id FROM provider_calls WHERE attempt_id=? AND execution_status='reserved' "
+                "AND new_turn_count=0 ORDER BY rowid DESC LIMIT 1",
+                (job.attempt_id,),
+            ).fetchone()
+        existing_call_id = None if unused is None else unused["id"]
+        return (lambda: self._dispatch_reserved(
+            job.attempt_id,
+            validation_id=request.get("validation_id"),
+            existing_call_id=existing_call_id,
+        )), False
+
+    def _restart_unbound(
+        self, job: RuntimeJob, verdict: UnboundJobVerdict, lease: _OwnerLease,
+    ) -> RunOnceOutcome:
+        """lease를 쥔 채 같은 job을 한 번 재시작한다(설계 4.4). lease는 ``_start_worker``로 넘긴다."""
+
+        try:
+            target, complete_on_return = self._restart_target(job)
+            from .budget import BudgetManager
+
+            for call_id in verdict.release_call_ids:
+                # role_requested 전이라 효과가 시작되지 않은 귀속 예약만 기존 정산 경로로 닫는다.
+                BudgetManager(self.service).release_before_effect(
+                    call_id, reason=f"owner 소실 뒤 같은 job 재시작 전 해제(role_requested 전): {job.job_id}",
+                )
+        except BaseException:
+            _release_owner_lease(lease)
+            raise
+        restarted = self.supervisor._start_worker(
+            job, target, complete_on_return=complete_on_return, lease=lease, restart=verdict.restart,
+        )
+        if restarted.status is not RuntimeJobStatus.RUNNING:
+            # claim 조건(상태·deadline·재시작 횟수)이 transaction 안에서 어긋났다. 다음 run_once가 다시 판정한다.
+            return self._observed_job_outcome(restarted)
+        return RunOnceOutcome(
+            action=RunOnceAction.DISPATCHED,
+            project_id=job.project_id,
+            task_id=job.task_id,
+            attempt_id=job.attempt_id,
+            detail=(
+                "binding 없는 RuntimeJob의 owner 소실과 효과 미시작을 확인해 같은 job을 한 번 재시작했습니다: "
+                f"{job.kind.value}/{job.job_id}"
+            ),
+        )
+
+    @staticmethod
+    def _blocked_job_outcome(job: RuntimeJob, verdict: UnboundJobVerdict) -> RunOnceOutcome:
+        return RunOnceOutcome(
+            action=RunOnceAction.BLOCKED,
+            project_id=job.project_id,
+            task_id=job.task_id,
+            attempt_id=job.attempt_id,
+            blocker_code=verdict.blocker_code,
+            failure_class=verdict.failure_class,
+            suggested_repair_action=verdict.repair_action,
+            checkpoint_required=verdict.checkpoint_required,
+            detail=verdict.detail,
+        )
+
+    def _route_active_unbound(self, job: RuntimeJob) -> RunOnceOutcome | None:
+        """binding 없는 활성 job을 owner lease로 판정해 설계 4.3 표의 한 결과로 끝낸다.
+
+        None이면 lease 아래에서 job을 닫고(3·4행) 기존 prepared·thread 복구 경로로 흐름을 이어 간다.
+        한 run_once는 한 durable 단계만 한다. typed 정지 행은 원장을 쓰지 않는다.
+        """
+
+        supervisor = self.supervisor
+        lease = None
+        try:
+            state, lease = supervisor._job_lease(job)
+        except RuntimeOwnerLockUnavailable as error:
+            state = error
+        if state is OwnerLockState.FREE:
+            handed_off = False
+            try:
+                verdict, observed = supervisor._settle_released_owner(job)
+                if verdict is not None:
+                    return self._observed_job_outcome(observed)  # K·C
+                verdict = classify_unbound_runtime_job(
+                    self.service, observed, lock_state=OwnerLockState.FREE,
+                    provider_available=self._job_provider_available(observed),
+                    now=supervisor._now(), grace_seconds=supervisor.terminal_observation_grace_seconds,
+                )
+                if verdict is None:
+                    return self._observed_job_outcome(observed)
+                if verdict.row == "3":
+                    if self._cancel_for_prepared_recovery(observed):
+                        return None
+                    return self._observed_job_outcome(observed)
+                if verdict.row == "4":
+                    self.service.cancel_runtime_job(observed.job_id, reason="owner_lost_after_thread_receipt")
+                    return None
+                if verdict.row in {"S", "6"}:
+                    handed_off = True
+                    return self._restart_unbound(observed, verdict, lease)
+                return self._blocked_job_outcome(observed, verdict)
+            finally:
+                if not handed_off:
+                    _release_owner_lease(lease)
+        verdict = classify_unbound_runtime_job(
+            self.service,
+            job,
+            lock_state=state,
+            provider_available=self._job_provider_available(job),
+            now=supervisor._now(),
+            grace_seconds=supervisor.terminal_observation_grace_seconds,
+        )
+        if verdict is not None and verdict.blocker_code is not None:
+            # 0·0p: 원장을 바꾸지 않는다. lock 파일 없는 행은 tick도 부르지 않는다(J4).
+            return self._blocked_job_outcome(job, verdict)
+        # 1·2: 살아 있는 owner다. 기존 owner tick(HELD_SELF) 또는 deadline 뒤 interrupt 요청(HELD_OTHER)만 한다.
+        observed = supervisor.tick(job.job_id)
+        unresponsive = verdict is not None and verdict.detail == _OWNER_UNRESPONSIVE_DETAIL
+        return self._observed_job_outcome(observed, verdict.detail if unresponsive else None)
+
     def _run_once(
         self, project_id: str, *, proposal: ExecutionSpecProposal | None = None,
         goal_validation_step: Any | None = None,
@@ -2633,36 +3853,26 @@ class EngineDispatcher:
                 "ORDER BY a.created_at, a.rowid LIMIT 1",
                 (project_id,),
             ).fetchone()
+        # 1.0 RuntimeJob은 Windows 전용이다. POSIX는 어떤 원장 쓰기·job 행 생성보다 먼저 멈춘다(결정 D1).
+        if project["active_plan_revision_id"] is not None and not owner_lock_platform_supported():
+            return RunOnceOutcome(
+                action=RunOnceAction.BLOCKED,
+                project_id=project_id,
+                blocker_code=RuntimeOwnerLockUnavailable.code,
+                detail=RUNTIME_OWNER_PLATFORM_UNSUPPORTED,
+            )
         active_job = self.service.active_runtime_job(project_id)
-        if (
-            active_job is not None
-            and active_job.status is RuntimeJobStatus.COLLECTOR_LOST
-            and active_job.thread_id is None
-            and active_job.attempt_id is not None
-        ):
-            with self.service.ledger.read() as connection:
-                recoverable_intent = connection.execute(
-                    "SELECT 1 FROM runtime_intents WHERE attempt_id=? AND status='prepared' LIMIT 1",
-                    (active_job.attempt_id,),
-                ).fetchone()
-            if recoverable_intent is not None:
-                self.service.cancel_runtime_job(
-                    active_job.job_id,
-                    reason="binding 전 collector가 사라져 prepared effect checkpoint 복구로 전환",
-                )
+        if active_job is not None and self.supervisor is not None and active_job.thread_id is None:
+            routed = self._route_active_unbound(active_job)
+            if routed is not None:
+                return routed
+            active_job = None
+        elif active_job is not None and self.supervisor is None:
+            # ponytail: supervisor 없는 inline 모드는 owner lease 보호 밖이다(설계 R15). 기존 전환을 둔다.
+            if self._cancel_for_prepared_recovery(active_job):
                 active_job = None
         if active_job is not None and self.supervisor is not None:
-            observed_job = self.supervisor.tick(active_job.job_id)
-            return RunOnceOutcome(
-                action=RunOnceAction.OBSERVED,
-                project_id=project_id,
-                task_id=observed_job.task_id,
-                attempt_id=observed_job.attempt_id,
-                detail=(
-                    "활성 RuntimeJob의 provider 상태를 한 번 관측했습니다: "
-                    f"{observed_job.kind.value}/{observed_job.status.value}"
-                ),
-            )
+            return self._observed_job_outcome(self.supervisor.tick(active_job.job_id))
         if prepared:
             if len(prepared) == 1:
                 with self.service.ledger.read() as connection:
@@ -3218,10 +4428,6 @@ class EngineDispatcher:
             tuple(json.loads(row["payload_json"]) for row in rows),
         )
 
-    @staticmethod
-    def _stable_recovery_id(attempt_id: str, failure_fingerprint: str) -> str:
-        return stable_recovery_assessment_id(attempt_id, failure_fingerprint)
-
     def _recovery_assessment(
         self,
         *,
@@ -3233,10 +4439,12 @@ class EngineDispatcher:
 
         if diagnosis.failure_class is None or diagnosis.repair_action is None:
             raise EngineServiceError("분류되지 않은 실패에는 assessment를 만들 수 없습니다.")
-        assessment_id = self._stable_recovery_id(
-            attempt_id, diagnosis.failure_fingerprint
-        )
         with self.service.ledger.read() as connection:
+            # 사용자 replan 재시도 행이 있으면 그 head가 다음 checkpoint다. 없으면 stable ID다.
+            assessment_id = current_replan_assessment(
+                connection, project_id=project_id, attempt_id=attempt_id,
+                failure_fingerprint=diagnosis.failure_fingerprint,
+            )
             existing = connection.execute(
                 "SELECT payload_json FROM recovery_assessments WHERE id=?",
                 (assessment_id,),
@@ -3491,19 +4699,6 @@ class EngineDispatcher:
         assessment: Any,
         evidence_documents: tuple[dict[str, Any], ...],
     ) -> RunOnceOutcome:
-        if self.recovery_provider is None:
-            return RunOnceOutcome(
-                action=RunOnceAction.BLOCKED,
-                project_id=project_id,
-                task_id=task_id,
-                attempt_id=attempt_id,
-                evidence_ids=assessment.new_evidence_ids,
-                blocker_code="REPLAN_PROVIDER_REQUIRED",
-                failure_class=assessment.failure_class,
-                suggested_repair_action=RepairAction.SUBGRAPH_REPLAN,
-                checkpoint_required=True,
-                detail="승인 범위 안의 Plan subgraph 후보와 독립 review를 생성할 provider가 필요합니다.",
-            )
         checkpoint = f"replanning:{assessment.assessment_id}"
         request = {
             "assessment": assessment.model_dump(mode="json"),
@@ -3514,6 +4709,21 @@ class EngineDispatcher:
                 "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
                 (project_id, checkpoint),
             ).fetchone()
+        # provider는 새 job을 예약할 때만 필요하다. 이미 있는 job의 관측·소비·판정은 provider 없이
+        # 같은 결과를 내므로 status와 같은 판정(job 없음 + provider 부재)에서만 멈춘다.
+        if row is None and self.recovery_provider is None:
+            return RunOnceOutcome(
+                action=RunOnceAction.BLOCKED,
+                project_id=project_id,
+                task_id=task_id,
+                attempt_id=attempt_id,
+                evidence_ids=assessment.new_evidence_ids,
+                blocker_code="REPLAN_PROVIDER_REQUIRED",
+                failure_class=assessment.failure_class,
+                suggested_repair_action=RepairAction.SUBGRAPH_REPLAN,
+                checkpoint_required=True,
+                detail=REPLAN_PROVIDER_REQUIRED_DETAIL,
+            )
         if row is None:
             job = self._recovery_supervisor.schedule(
                 project_id=project_id,
@@ -3553,6 +4763,10 @@ class EngineDispatcher:
         try:
             result = self.service.consume_runtime_job_required_result(job.job_id)
         except ExternalOperationUnknown as error:
+            # status와 replan 거절이 같은 job ID·오류 유형·terminal 관측 여부를 쓰도록 같은 helper로 읽는다.
+            blocker = replan_candidate_blocker(
+                self.service, project_id=project_id, assessment_id=assessment.assessment_id,
+            )
             return RunOnceOutcome(
                 action=RunOnceAction.BLOCKED,
                 project_id=project_id,
@@ -3562,7 +4776,11 @@ class EngineDispatcher:
                 failure_class=FailureClass.EXTERNAL_UNKNOWN,
                 suggested_repair_action=RepairAction.WAIT_EXTERNAL,
                 checkpoint_required=True,
-                detail=str(error),
+                detail=(
+                    blocker[1][:5000]
+                    if blocker is not None and blocker[0] == "EXTERNAL_EFFECT_UNKNOWN"
+                    else str(error)
+                ),
             )
         from .ledger import EngineLedgerError
         from .planning import ExpandedPlanEvaluation
@@ -3617,6 +4835,38 @@ class EngineDispatcher:
             detail="독립 review를 통과한 Plan subgraph revision을 승인 경계 안에서 자동 활성화했습니다.",
         )
 
+    def _execution_preparation_target(
+        self,
+        *,
+        project_id: str,
+        task_id: str,
+        supplied_proposal: ExecutionSpecProposal | None = None,
+        context_request: Any | None = None,
+    ) -> Callable[[], dict[str, Any]]:
+        """Execution Spec 준비 job의 target. 최초 예약·Context 후속·owner 소실 재시작이 같이 쓴다."""
+
+        from .execution import ExecutionPreparation
+
+        def prepare() -> dict[str, Any]:
+            inventory = self.runtime.list_models()
+            if supplied_proposal is not None:
+                result = ExecutionPreparation(proposal=supplied_proposal)
+            elif context_request is None:
+                result = self.proposal_provider.prepare_task(
+                    project_id=project_id, task_id=task_id, inventory=inventory,
+                )
+            else:
+                result = self.proposal_provider.prepare_task(
+                    project_id=project_id, task_id=task_id, inventory=inventory,
+                    context_request=context_request,
+                )
+            return {
+                "preparation": result.model_dump(mode="json"),
+                "model_inventory": inventory.model_dump(mode="json"),
+            }
+
+        return prepare
+
     def _execution_spec_job(
         self,
         *,
@@ -3667,22 +4917,9 @@ class EngineDispatcher:
                     (project_id, checkpoint),
                 ).fetchone()
         if row is None:
-            def prepare() -> dict[str, Any]:
-                inventory = self.runtime.list_models()
-                result = (
-                    ExecutionPreparation(proposal=supplied_proposal)
-                    if supplied_proposal is not None
-                    else self.proposal_provider.prepare_task(
-                        project_id=project_id,
-                        task_id=task_id,
-                        inventory=inventory,
-                    )
-                )
-                return {
-                    "preparation": result.model_dump(mode="json"),
-                    "model_inventory": inventory.model_dump(mode="json"),
-                }
-
+            prepare = self._execution_preparation_target(
+                project_id=project_id, task_id=task_id, supplied_proposal=supplied_proposal,
+            )
             job = self.supervisor.schedule(
                 project_id=project_id, kind=RuntimeJobKind.EXECUTION_SPEC_PREPARE,
                 checkpoint_key=checkpoint,
@@ -3775,19 +5012,9 @@ class EngineDispatcher:
             ),
         }
 
-        def prepare() -> dict[str, Any]:
-            inventory = self.runtime.list_models()
-            result = self.proposal_provider.prepare_task(
-                project_id=project_id,
-                task_id=task_id,
-                inventory=inventory,
-                context_request=request,
-            )
-            return {
-                "preparation": result.model_dump(mode="json"),
-                "model_inventory": inventory.model_dump(mode="json"),
-            }
-
+        prepare = self._execution_preparation_target(
+            project_id=project_id, task_id=task_id, context_request=request,
+        )
         self.supervisor.schedule(
             project_id=project_id, kind=RuntimeJobKind.EXECUTION_SPEC_PREPARE,
             checkpoint_key=prefix + "context:" + sha256_digest(followup),

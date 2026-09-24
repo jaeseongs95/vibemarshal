@@ -28,7 +28,9 @@
 
 ## D03. 응용 명령과 짧은 tick — planned
 
-`EngineApplication`은 `prepare / revise / authorize / run_once / observe / pause / cancel / status / final-report`의 명령 경계를 연결한다. CLI는 이 응용 계층을 호출하며 별도 상태 권위를 만들지 않는다. 명령 이름은 설계 경계이며 현재 CLI에서 모두 제공된다는 뜻은 아니다. `revise`는 같은 Goal의 다음 revision을 실제 Goal 역할로 준비하고 Planning까지 수행하지만 Plan을 활성화하지 않는다. 새 revision의 Plan은 기존 승인으로 자동 활성화되지 않고, 새 Goal target을 표시한 `authorize`로만 활성화된다.
+`EngineApplication`은 `prepare / revise / authorize / run_once / observe / pause / cancel / status / replan / final-report`의 명령 경계를 연결한다. CLI는 이 응용 계층을 호출하며 별도 상태 권위를 만들지 않는다. 명령 이름은 설계 경계이며 현재 CLI에서 모두 제공된다는 뜻은 아니다. `revise`는 같은 Goal의 다음 revision을 실제 Goal 역할로 준비하고 Planning까지 수행하지만 Plan을 활성화하지 않는다. 새 revision의 Plan은 기존 승인으로 자동 활성화되지 않고, 새 Goal target을 표시한 `authorize`로만 활성화된다.
+
+`replan`은 차단된 재계획 후보에만 쓴다. 대상은 decision이 `needs_revision`인 `REPLAN_CANDIDATE_NOT_ADMISSIBLE`과, 후보가 결속한 StateSnapshot이 current가 아닌 경우다. Core는 적격성·차단 후보에 결속된 typed basis·원장 한도를 검사한 뒤 새 subgraph 재계획 시도(RecoveryAssessment와 History)만 기록한다. 역할 호출은 다음 `run_once`의 replanning RuntimeJob이 한다(D04). 명령은 내부 식별자·파일을 받지 않고, 사용자 rationale은 감사 기록일 뿐 근거가 아니다. 재계획 후보가 있을 때 `authorize`는 active Plan이 아니라 그 후보를 target으로 표시하고, 같은 transaction에서 승인과 그 후보의 활성화를 함께 기록하거나 모두 거절한다.
 
 `RuntimeJobSupervisor`는 활성 job 동안만 provider 연결·stream·receipt·terminal·usage·절대 deadline을 관리한다. `run_once`는 job 예약/시작 또는 이미 도착한 관측 결과 소비 후 신속히 반환한다. 스케줄 tick 안에서 전체 모델 turn 종료를 기다리지 않는다. 전역 상주 daemon은 필수 의존성이 아니다. supervisor는 관측을 저장하고 Core가 상태 전이·검사·완료를 결정한다. 재시작이나 새 tick이 기존 job의 절대 deadline을 초기화하지 않도록 결속한다.
 
@@ -173,6 +175,8 @@ Engine schema 4는 별도의 새 DB로 만든다. schema 3/raw receipt/history �
 ## V03. 비차단 후속 범위와 효과 제한
 
 R3.1 대비 token/speed, performance 36, 비교 lifecycle 최적화와 v2 static 11/qualification 13은 별도 비차단 보고 또는 해당 provider 채택 Gate다. 원래 결과·fixture·보고서를 수정하거나 당시 판정을 PASS로 바꾸지 않는다. GUI, Localizer/번역 최적화, MCTS/광범위 그래프, 동일 프로젝트 병렬, remote/multiOS hardening은 1.0 이후다. 활성 job 동안의 supervisor는 필수 구현이며 후속 GUI나 전역 daemon과 혼동하지 않는다.
+
+1.0 RuntimeJob 실행 OS는 Windows다. Linux·macOS·WSL의 POSIX 경로는 fail-closed다. `owner_lock_platform_supported()`가 거짓이면 `run_once`는 활성 Plan이 있는 프로젝트에서 어떤 원장 쓰기·job 행 생성보다 먼저 `RUNTIME_OWNER_LOCK_UNAVAILABLE`(detail `platform unsupported: posix`)로 멈추고, CLI owner는 `action=blocked` 결과를 게시한 뒤 exit code 0으로 끝난다. owner lock 획득도 같은 이유로 거절한다. `status`는 같은 함수로 같은 blocker와 Windows 전용 안내를 보인다. `prepare`·`authorize`·`status`·`replan`·`pause`·`cancel`은 동작한다. Linux 지원은 1.0 이후이며, POSIX lock 구현과 Docker Linux 검증은 1.0 범위가 아니다.
 
 FM-09의 개발 조율·dispatch·원장 자동화는 제품 runtime 기능이나 1.0 품질 Gate가 아니다. 재현 가능한 release evidence를 수집하는 delivery 보조 도구로 유지하되, 그 자체의 확장·완성도와 사용자의 실제 Codex 예약 `ACTIVE`/`PAUSED` 상태를 제품 critical path에 넣지 않는다. 제품 scheduler의 `run_once` 의미와 supervisor 결속은 동결 wheel·격리 Engine DB에서 연속·동시·재시작 subprocess tick으로 FM-04·FM-08·FM-14에서 직접 검증한다. 실제 Codex 예약 연동은 사용자 opt-in 비차단 운영 검사다.
 
