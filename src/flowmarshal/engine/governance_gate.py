@@ -48,7 +48,7 @@ from .service import latest_write_observation
 MANIFEST = "host-integration.json"
 MANIFEST_FORMAT = "agent-governance-suite.host-integration.v1"
 HOST_ID = "flowmarshal-engine"
-MINIMUM_NODE = (22, 13)
+MINIMUM_NODE = (24, 0)
 MODEL_CLASSES = ("lightweight", "general", "deep", "frontier")
 # 소비 표면 선언: Engine이 플러그인에 기대는 진입점 id, MCP 도구와 그 data에서 읽는 필드, 스크립트 출력에서
 # 읽는 필드다. Engine의 의존이 바뀔 때만 바뀐다. 플러그인 버전·digest는 여기 두지 않는다.
