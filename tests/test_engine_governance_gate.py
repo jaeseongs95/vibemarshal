@@ -1003,7 +1003,7 @@ class PluginSurfaceTests(unittest.TestCase):
                                          for entry_id, path in self.PATHS.items()]}
         self.classes = self.base / "classes.json"
         self.write_classes({"observed-model": "deep"})
-        self.node_version = b"v22.13.0\n"
+        self.node_version = b"v24.0.0\n"
         self.tools = list(CONSUMED_SURFACE["mcp_tools"])
         self.runs: list[tuple[list[str], dict]] = []
         self.clients: list[list[str]] = []
@@ -1063,7 +1063,7 @@ class PluginSurfaceTests(unittest.TestCase):
                          summary["manifest_sha256"])
         self.assertEqual("sha256:" + hashlib.sha256(self.classes.read_bytes()).hexdigest(),
                          summary["model_class_table_digest"])
-        self.assertEqual(("local_derived", 6, "v22.13.0"),
+        self.assertEqual(("local_derived", 6, "v24.0.0"),
                          (summary["provenance"], summary["file_count"], summary["node_version"]))
         self.assertEqual([{"source": "plugin_manifest_file", "plugin": {"id": "fake", "version": "9.9.9"}},
                           {"source": "mcp_server_info", "serverInfo": {"name": "stub-server", "version": "0"}}],
@@ -1130,7 +1130,7 @@ class PluginSurfaceTests(unittest.TestCase):
             "entry_point:acceptance-cli": lambda: self.manifest["entryPoints"][4].update(id=["acceptance-cli"]),
             "entry_points": lambda: self.manifest.update(entryPoints=7),
             "closure_file": lambda: self.manifest["entryPoints"][1]["executionClosure"].append("missing.json"),
-            "node_version": lambda: setattr(self, "node_version", b"v22.12.9\n"),
+            "node_version": lambda: setattr(self, "node_version", b"v23.11.1\n"),
             "mcp_tools": lambda: self.tools.remove("finalize_workflow"),
             "mcp_server_start": lambda: setattr(self, "tools", GovernanceTimeout(
                 "MCP_SERVER_EXITED: tools/list 응답 전에 서버가 끝났습니다.")),
@@ -1153,6 +1153,26 @@ class PluginSurfaceTests(unittest.TestCase):
         with self.assertRaises(GovernanceContractMismatch) as raised:
             GovernancePlugin(self.root, self.base / "state", self.classes).preflight()
         self.assertIn("GOVERNANCE_CONTRACT_MISMATCH: manifest:", str(raised.exception))
+
+    def test_node_floor_is_24_and_the_observed_version_is_kept(self) -> None:
+        # Node 24 미만은 MCP 서버를 띄우기 전에 계약 불일치로 막고, 통과하면 관측한 원문 버전을 identity에 남긴다.
+        for rejected in (b"v23.11.1\n", b"v22.13.0\n", b"v22.22.0\n", b"v20.19.0\n", b"nope\n"):
+            with self.subTest(rejected=rejected):
+                self.setUp()
+                self.node_version = rejected
+                with self.assertRaises(GovernanceContractMismatch) as raised:
+                    self.plugin().preflight()
+                self.assertTrue(str(raised.exception).startswith(
+                    "GOVERNANCE_CONTRACT_MISMATCH: node_version: 기대 node 24.0 이상, 관측 "), raised.exception)
+                self.assertIs(False, raised.exception.effects_started)
+                self.assertEqual([], self.clients)
+        for accepted in (b"v24.0.0\n", b"v24.19.0\n", b"v25.1.0\n"):
+            with self.subTest(accepted=accepted):
+                self.setUp()
+                self.node_version = accepted
+                summary = self.plugin().preflight()["summary"]
+                self.assertEqual(("local_derived", accepted.decode().strip()),
+                                 (summary["provenance"], summary["node_version"]))
 
     def test_client_start_timeouts_stay_retryable_and_a_start_failure_is_a_mismatch(self) -> None:
         # initialize·tools/list의 timeout은 판정할 수 없는 상태다. 계약 불일치로 바꾸지 않고 그대로 다시 시도하게 둔다.
