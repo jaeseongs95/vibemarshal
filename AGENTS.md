@@ -21,7 +21,7 @@
 이 절은 장기 제품 계약이다. GoalAuthorization·자동 Plan 활성화·실행/usage 분리·RuntimeJobSupervisor·schema 4의 새 계약은 **planned**이며 문서 갱신을 구현·검증 완료로 해석하지 않는다. 상세 수용 기준은 대상 source의 `docs/redesign-1.0-contract.md`를 따른다.
 
 - 기존 Core·revision·DAG·binding·evidence·validation을 유지한다. 재계획은 실행 중 Attempt를 보호하고 유효성이 확인된 완료 evidence만 재사용한다.
-- EngineApplication의 prepare/authorize/run_once/observe/pause/cancel/status/final-report 경계를 연결한다. run_once는 job 예약/시작 또는 관측 소비 후 신속히 반환한다. 활성화 후 준비·실행·검사·복구/replanning 역할 모두 RuntimeJob·checkpoint에 포함한다. 승인 전 대화형 준비는 동기 실행을 유지할 수 있다.
+- EngineApplication의 prepare/revise/authorize/run_once/observe/pause/cancel/status/replan/final-report 경계를 연결한다. run_once는 job 예약/시작 또는 관측 소비 후 신속히 반환한다. 활성화 후 준비·실행·검사·복구/replanning 역할 모두 RuntimeJob·checkpoint에 포함한다. 승인 전 대화형 준비는 동기 실행을 유지할 수 있다.
 - 활성화 뒤 모든 실행 Task는 agent-governance-suite workflow gate를 반드시 지난다. 구현과 결정적 검증은 됐고 실제 모델 실측·release qualification은 미실행이다. 규칙은 아래 「agent-governance-suite 필수 연동」 절을 따른다.
 - supervisor는 활성 job 동안만 연결·stream·receipt·provider terminal·usage·절대 deadline을 관리한다. 전역 daemon은 필수가 아니며 완료 판정은 Core만 한다. provider turn의 terminal은 외부 효과 완료가 아니며, 효과는 typed adapter receipt나 대상 재관측으로 별도 확인한다.
 - 실제 효과 직전 freshness와 target/context/prompt/requested model/policy 결속을 재검사한다. lease 만료·collector 종료는 provider terminal이 아니다. 부분 쓰기 후 허용 resume와 immutable 입력 변경을 구분한다. `model/list`는 요청 조합의 지원 여부만 증명하며 provider가 turn별 model/effort를 응답이나 자체 session 기록에 명시하지 않으면 실제 적용값으로 기록하지 않는다.
@@ -168,11 +168,12 @@ FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 - dependency를 만족한 Task만 `ready`가 된다. 같은 프로젝트는 먼저 직렬 실행하며 resource lock·충돌 검증 전에는 병렬화하지 않는다.
 - 기본 순서는 `Execution Spec → precondition·snapshot·context·effect checkpoint → governance gate(dispatch 전) → Attempt reserve → intent → provider call → receipt/binding → 결과 관측 → Task validation → governance gate(완료 전) → State 재관측 → Goal Test`다.
 - 준비 역할과 결정적 검증도 효과 전에 append-only intent를 남긴다. 완료 관측이 없는 효과는 `external_unknown`으로 보존하고 입력 변경·새 Task·모델 변경으로 우회해 자동 재실행하지 않는다. 기존 intent·binding·receipt와 provider 상태를 재개 없이 먼저 대조하고, 실제 후속 turn이 필요할 때만 마지막 validated checkpoint에서 resume한다.
+- OS lock 경합은 owner 생존 신호다. lock 획득 뒤 원장 재조회와 CAS가 전이 근거다. lock 파일 없는 활성 행은 fail-closed한다.
 - 파일·artifact·build·test·diff의 결정적 검사를 우선하고 의미 검토에만 별도 Validator를 쓴다. Validator는 Worker와 분리된 실행 경로에서 원자료를 다시 관측하고 독립 request·receipt·evidence binding을 남긴다. Task validation과 plan-level Goal Test를 분리하며 모든 필수 Task·criterion·integration evidence 뒤에만 Goal을 완료한다.
 - 독립 Goal Test는 실제 명령 또는 별도 Validator의 새 관측이 필요하다. 다른 model/effort 표기만으로 독립성을 충족하지 않으며, Task evidence 집계는 Plan에 `task_aggregate`가 명시된 경우만 허용한다.
 - 실패 분류는 `implementation`, `context`, `task_contract`, `dependency`, `environment`, `requirement_change`, `external_unknown`이다. provider/local code와 직접 evidence로 분류하고 model-reported code는 진단 가설로만 보존한다. 1.0은 로컬 Context 해소·effect unknown observe-first와 직접 evidence에 결속한 실제 repair/replan 한 경로를 검증하며, 나머지는 명시적 정지·revision routing을 제공한다.
 - 같은 Task repair(`task_repair`·`continue`)는 현재 Execution Spec 입력이 그대로면 같은 spec으로 다시 연다. 직전 Attempt가 쓰기 target을 바꿔 입력이 stale하면, 바뀐 경로가 모두 쓰기 target이고 그 Attempt의 최신 쓰기 관측(file·diff evidence `after_digest`)과 같거나 Worker가 기록 없이 실패한 경우에만 Task를 `ready`로 되돌려 재관측 뒤 새 Execution Spec revision으로 준비한다. 읽기 target·context 원본의 변경이나 관측과 다른 쓰기 target(사용자 편집)은 재관측으로 흡수하지 않고 `REPAIR_INPUT_CHANGED`로 멈춘다. reserve의 mutable target 허용은 같은 Worker의 resume에만 쓴다. 실패한 Worker가 선언 밖 파일에 남긴 변경은 재관측이 흡수하는 known limitation이다. 없어진 입력도 바뀐 경로로 같은 규칙을 따른다(쓰기 관측의 `after_digest` null이 부재와 같다). `REPAIR_INPUT_CHANGED`로 멈춘 뒤에는 바뀐 입력을 직전 상태로 되돌리면 다음 `run_once`가 repair를 이어 가고, 변경을 유지하려면 Goal revision·재계획 경로로 간다. 삭제 뒤 `ready`로 열린 Task가 Goal 완료까지 가는지는 새 Execution Spec 준비 결과에 달려 있다.
-- 동일 실패 재계획은 최대 2회, Goal 전체 재계획은 최대 5회이며 원장에서 계산한다. 첫 재계획 뒤 새 evidence 없는 반복을 차단한다.
+- 동일 실패 재계획은 최대 2회, Goal 전체 재계획은 최대 5회이며 원장에서 계산한다. 첫 재계획 뒤에는 새 EvidenceRecord 또는 Core가 직접 관측·결속한 새 typed basis가 없는 반복을 차단한다. 사용자 rationale은 근거가 아니다.
 - 최종 GoalVerdict 전 deterministic Goal Test의 운영 상세를 복구할 때는 최신 FAIL·직접 evidence·원인 분류·동일 의미의 변경 명세를 명시하고 freshness·최대 두 번의 복구 한도를 검사한다. 이전 결과를 보존하고 새 binding·History·intent·receipt·validation으로 연결한다.
 
 ## agent-governance-suite 필수 연동

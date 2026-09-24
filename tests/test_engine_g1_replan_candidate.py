@@ -270,6 +270,8 @@ class ReplanCandidateTests(unittest.TestCase):
     def _application_status(self, prepared, runtime, dispatcher):
         application = EngineApplication(prepared.service, runtime=runtime)
         application._dispatcher = lambda: dispatcher
+        # G1b: status는 run_once와 같은 recovery-provider 판정을 쓴다. 주입한 dispatcher와 맞춘다.
+        application.recovery_provider_available = lambda: dispatcher.recovery_provider is not None
         return application
 
     # --- AC1·AC2: 비적격 후보 ------------------------------------------------

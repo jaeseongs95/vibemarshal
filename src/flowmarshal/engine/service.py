@@ -135,10 +135,21 @@ class GoalAuthorizationRequired(EngineServiceError):
     code = "GOAL_AUTHORIZATION_REQUIRED"
     effects_started = False
 
-    def __init__(self, changes: tuple[dict[str, Any], ...]) -> None:
+    def __init__(self, changes: tuple[dict[str, Any], ...], guidance: str | None = None) -> None:
         self.changes = changes
         super().__init__("GOAL_AUTHORIZATION_REQUIRED: 사용자 목표·대상·효과·정책 판단이 필요합니다: "
-                         + canonical_json(changes))
+                         + canonical_json(changes) + ("" if guidance is None else " " + guidance))
+
+
+_LINEAGE_REQUIRED = (
+    "active Plan을 교체하려면 같은 plan_id의 immutable supersedes 계보가 현재 revision으로 이어져야 합니다."
+)
+#: authorize 거절과 replan 거절이 같은 말로 적는 재계획 후보의 effect 변경 안내.
+_EFFECT_REAUTHORIZATION_GAP = (
+    "재계획 후보의 외부 효과 변경(boundary=effect)은 Goal 효과 정책과 비교한 것이라 같은 Goal을 다시 "
+    "승인해도 풀리지 않습니다. typed 효과 계약을 담은 새 Goal revision과 승인이 필요하지만 active Plan이 "
+    "있는 동안의 Goal revision은 아직 지원하지 않습니다(GOAL_REVISION_ACTIVE_PLAN, E2E-15 gap)."
+)
 
 
 class ContextRequiredError(EngineServiceError):
@@ -1641,30 +1652,109 @@ class EngineService:
         self, job_id: str, *, thread_id: str | None = None, turn_id: str | None = None,
     ) -> RuntimeJob:
         with self.ledger.transaction() as tx:
+            if thread_id is None:
+                row = tx.one("SELECT * FROM runtime_jobs WHERE id = ?", (job_id,))
+                if row["status"] == RuntimeJobStatus.COLLECTOR_LOST.value and row["thread_id"] is None:
+                    # binding 없는 collector_lost의 재시작 claim은 owner lease를 쥔 supervisor만 한다.
+                    return self._runtime_job_from_row(row)
+            return self._claim_runtime_job_start_in_transaction(
+                tx, job_id, thread_id=thread_id, turn_id=turn_id,
+            )[0]
+
+    def _claim_runtime_job_start(self, job_id: str) -> tuple[RuntimeJob, bool]:
+        """supervisor 전용: scheduled·collector_lost → running 전이를 이 호출이 만들었는지 함께 돌려준다.
+
+        worker는 True를 받은 호출자만 시작한다. 같은 job을 동시에 잡은 다른 호출자는 False와
+        현재 job을 받는다.
+        """
+
+        return self._claim_runtime_job_start_epoch(job_id)[:2]
+
+    def _claim_runtime_job_start_epoch(self, job_id: str) -> tuple[RuntimeJob, bool, str | None]:
+        """``_claim_runtime_job_start``와 같고, 이긴 호출에는 시작 관측 ID(epoch 표지)도 돌려준다."""
+
+        with self.ledger.transaction() as tx:
+            return self._claim_runtime_job_start_in_transaction(tx, job_id)
+
+    def _claim_runtime_job_restart(
+        self, job_id: str, *, restart: dict[str, Any],
+    ) -> tuple[RuntimeJob, bool, str | None]:
+        """supervisor 라우터 전용: owner lease를 쥔 채 binding 없는 job을 한 번 재시작하는 claim.
+
+        같은 transaction에서 thread 없음, 저장된 job deadline과 승인 deadline 전(재계산·연장 없음),
+        이전 재시작 없음을 다시 확인한다. 하나라도 어긋나면 claim하지 않는다.
+        """
+
+        with self.ledger.transaction() as tx:
             row = tx.one("SELECT * FROM runtime_jobs WHERE id = ?", (job_id,))
-            if row["status"] not in {RuntimeJobStatus.SCHEDULED.value, RuntimeJobStatus.COLLECTOR_LOST.value}:
-                return self._runtime_job_from_row(row)
-            event = (
-                RuntimeJobObservationKind.COLLECTOR_REATTACHED
-                if row["status"] == RuntimeJobStatus.COLLECTOR_LOST.value
-                else RuntimeJobObservationKind.STARTED
+            approval = tx.maybe_one(
+                "SELECT json_extract(payload_json,'$.absolute_deadline_at') AS deadline "
+                "FROM goal_authorizations WHERE project_id=? ORDER BY revision_no DESC LIMIT 1",
+                (row["project_id"],),
             )
-            tx.connection.execute(
-                "UPDATE runtime_jobs SET status='running',thread_id=COALESCE(?,thread_id),"
-                "turn_id=COALESCE(?,turn_id),started_at=COALESCE(started_at,?),updated_at=? WHERE id=?",
-                (thread_id, turn_id, tx.now, tx.now, job_id),
+            now = _dt(tx.now)
+            if (
+                row["thread_id"] is not None
+                or now >= _dt(row["absolute_deadline_at"])
+                or (approval is not None and approval["deadline"] is not None
+                    and now >= _dt(approval["deadline"]))
+                or tx.maybe_one(
+                    "SELECT 1 FROM runtime_job_observations WHERE job_id=? AND kind IN (?,?) "
+                    "AND json_extract(payload_json,'$.restart') IS NOT NULL LIMIT 1",
+                    (
+                        job_id,
+                        RuntimeJobObservationKind.STARTED.value,
+                        RuntimeJobObservationKind.COLLECTOR_REATTACHED.value,
+                    ),
+                ) is not None
+            ):
+                return self._runtime_job_from_row(row), False, None
+            return self._claim_runtime_job_start_in_transaction(tx, job_id, restart=restart)
+
+    def _claim_runtime_job_start_in_transaction(
+        self, tx: Any, job_id: str, *, thread_id: str | None = None, turn_id: str | None = None,
+        restart: dict[str, Any] | None = None,
+    ) -> tuple[RuntimeJob, bool, str | None]:
+        """write transaction 안의 compare-and-set으로 running 전이와 시작 관측을 한 번만 기록한다."""
+
+        row = tx.one("SELECT * FROM runtime_jobs WHERE id = ?", (job_id,))
+        if row["status"] not in {RuntimeJobStatus.SCHEDULED.value, RuntimeJobStatus.COLLECTOR_LOST.value}:
+            return self._runtime_job_from_row(row), False, None
+        event = (
+            RuntimeJobObservationKind.COLLECTOR_REATTACHED
+            if row["status"] == RuntimeJobStatus.COLLECTOR_LOST.value
+            else RuntimeJobObservationKind.STARTED
+        )
+        claimed = tx.connection.execute(
+            "UPDATE runtime_jobs SET status='running',thread_id=COALESCE(?,thread_id),"
+            "turn_id=COALESCE(?,turn_id),started_at=COALESCE(started_at,?),updated_at=? "
+            "WHERE id=? AND status=?",
+            (thread_id, turn_id, tx.now, tx.now, job_id, row["status"]),
+        ).rowcount == 1
+        if not claimed:
+            return (
+                self._runtime_job_from_row(tx.one("SELECT * FROM runtime_jobs WHERE id=?", (job_id,))),
+                False,
+                None,
             )
-            payload = {
-                "collector_event": event.value,
-                "thread_id": thread_id,
-                "turn_id": turn_id,
-                "absolute_deadline_at": row["absolute_deadline_at"],
-            }
-            self._append_runtime_job_observation(
-                tx, job_id=job_id, project_id=row["project_id"], kind=event, payload=payload,
-            )
-            tx.history(row["project_id"], f"runtime_job.{event.value}", "runtime_job", job_id, payload)
-            return self._runtime_job_from_row(tx.one("SELECT * FROM runtime_jobs WHERE id=?", (job_id,)))
+        payload = {
+            "collector_event": event.value,
+            "thread_id": thread_id,
+            "turn_id": turn_id,
+            "absolute_deadline_at": row["absolute_deadline_at"],
+        }
+        if restart is not None:
+            # epoch_sequence·restart_no가 payload digest를 유일하게 만들어 관측과 History 수가 맞는다.
+            payload["restart"] = restart
+        observation = self._append_runtime_job_observation(
+            tx, job_id=job_id, project_id=row["project_id"], kind=event, payload=payload,
+        )
+        tx.history(row["project_id"], f"runtime_job.{event.value}", "runtime_job", job_id, payload)
+        return (
+            self._runtime_job_from_row(tx.one("SELECT * FROM runtime_jobs WHERE id=?", (job_id,))),
+            True,
+            observation.observation_id,
+        )
 
     def bind_runtime_job_provider(
         self,
@@ -1751,8 +1841,13 @@ class EngineService:
         payload: dict[str, Any],
         provider_terminal: bool = False,
         terminal_status: str | None = None,
+        require_runnable: bool = False,
     ) -> RuntimeJobObservation:
-        """관측을 저장하되 Attempt·Task·Goal의 완료는 판정하지 않는다."""
+        """관측을 저장하되 Attempt·Task·Goal의 완료는 판정하지 않는다.
+
+        ``require_runnable``이면 역할 효과 직전 기록(F2)이라 같은 transaction에서 job이 아직
+        실행 가능한지 먼저 확인하고, 아니면 기록하지 않고 거절한다.
+        """
 
         if provider_terminal != (kind is RuntimeJobObservationKind.PROVIDER_TERMINAL):
             raise EngineServiceError(
@@ -1765,6 +1860,8 @@ class EngineService:
 
         with self.ledger.transaction() as tx:
             row = tx.one("SELECT * FROM runtime_jobs WHERE id = ?", (job_id,))
+            if require_runnable:
+                self._assert_runtime_job_runnable(tx, row)
             if provider_terminal and row["status"] in {
                 RuntimeJobStatus.PROVIDER_TERMINAL.value,
                 RuntimeJobStatus.CONSUMED.value,
@@ -1836,6 +1933,24 @@ class EngineService:
                  "terminal_status": terminal_status, "payload_digest": observation.payload_digest},
             )
             return observation
+
+    @staticmethod
+    def _assert_runtime_job_runnable(tx: Any, row: Any) -> None:
+        """효과 직전 fence(F1·F2). 끝났거나 소실된 job, job deadline이 지난 job은 효과를 시작하지 않는다.
+
+        INTERRUPTING(pause)은 거절하지 않는다. binding 직후 interrupt를 전달하는 기존 의미를 지킨다.
+        """
+
+        if row["status"] in {
+            RuntimeJobStatus.CANCELLED.value,
+            RuntimeJobStatus.COLLECTOR_LOST.value,
+            RuntimeJobStatus.PROVIDER_TERMINAL.value,
+            RuntimeJobStatus.CONSUMED.value,
+        } or _dt(tx.now) >= _dt(row["absolute_deadline_at"]):
+            raise EngineServiceError(
+                f"RUNTIME_JOB_NOT_RUNNING: RuntimeJob {row['id']} status={row['status']}, "
+                f"absolute_deadline_at={row['absolute_deadline_at']}; 새 provider 효과를 시작하지 않습니다."
+            )
 
     def begin_runtime_job_interrupt(self, job_id: str, *, payload: dict[str, Any]) -> bool:
         """원인이 결속된 interrupt를 정확히 한 번 예약한다."""
@@ -2476,11 +2591,63 @@ class EngineService:
     ) -> GoalAuthorizationTarget:
         """사용자에게 표시한 실제 승인 요청을 host capability에 결속한다."""
         with self.ledger.read() as connection:
-            return self._goal_authorization_target(connection, project_id, operating_policy)
+            return self._goal_authorization_target(connection, project_id, operating_policy)[0]
+
+    def _replan_candidate_for_activation(
+        self, connection: Any, project_id: str,
+    ) -> PlanContractRevision | None:
+        """planning.search_recorded보다 먼저 원장 구조만으로 head 재계획 후보를 고른다.
+
+        승인·GAR 상태와 무관하다. active Plan과 같은 plan_id의 최신 revision이고, ready이며 Core
+        decision이 admissible이고, head consumed replanning 결과와 exact binding이며, 아직
+        활성화되지 않았고, supersedes 계보가 active에 닿을 때만 그 후보다. 최신 revision이 draft이면
+        후보가 없고 더 오래된 ready 후보를 고르지 않는다. 후보가 없으면 None(기존 선택)이다.
+        head 판정은 run_once·status·replan과 같은 `current_replan_head`를 쓴다.
+        """
+        from .runtime import current_replan_head
+
+        head = current_replan_head(self, project_id=project_id, connection=connection)
+        if head is None:
+            return None
+        if head.blocker is not None and head.blocker[0] == "REPLAN_CANDIDATE_BINDING_MISMATCH":
+            # job 결과와 원장 후보가 결속되지 않으면 어느 Plan이 후보인지 추측하지 않는다.
+            raise EngineServiceError(
+                "PLAN_SELECTION_REQUIRED: 재계획 job 결과와 원장 후보의 결속이 달라 Core가 활성화할 "
+                "Plan을 정할 수 없습니다."
+            )
+        if head.evaluation is None or not head.candidate_registered or head.candidate_activated:
+            return None
+        plan = head.evaluation.plan
+        active_id = connection.execute(
+            "SELECT active_plan_revision_id FROM projects WHERE id = ?", (project_id,),
+        ).fetchone()["active_plan_revision_id"]
+        latest = connection.execute(
+            "SELECT id, status FROM plan_revisions WHERE plan_id = ? ORDER BY revision_no DESC LIMIT 1",
+            (plan.plan_id,),
+        ).fetchone()
+        decision = connection.execute(
+            "SELECT status FROM candidate_decisions WHERE artifact_kind = 'plan' AND artifact_digest = ?",
+            (plan.activation_digest,),
+        ).fetchone()
+        if (
+            latest["id"] != plan.plan_revision_id
+            or latest["status"] != RevisionStatus.READY.value
+            or decision is None
+            or decision["status"] != CandidateStatus.ADMISSIBLE.value
+        ):
+            return None
+        return plan if self._supersedes_reaches(connection, plan, active_id) else None
+
+    def _authorization_plan(self, connection: Any, project_id: str) -> tuple[PlanContractRevision, bool]:
+        """승인 target·authorize 재계산·활성화가 함께 쓰는 선택과 재계획 후보 여부."""
+        candidate = self._replan_candidate_for_activation(connection, project_id)
+        if candidate is not None:
+            return candidate, True
+        return self._selected_plan_for_activation(connection, project_id), False
 
     @staticmethod
     def _selected_plan_for_activation(connection: Any, project_id: str) -> PlanContractRevision:
-        """activate_selected_plan과 승인 preview가 공유하는 단일 eligible 선택 판정."""
+        """activate_selected_plan과, 재계획 후보가 없을 때의 승인 선택이 공유하는 eligible 선택 판정."""
         selection = connection.execute(
             "SELECT payload_json FROM history_events WHERE project_id = ? "
             "AND event_type = 'planning.search_recorded' ORDER BY sequence DESC LIMIT 1",
@@ -2553,10 +2720,10 @@ class EngineService:
             raise EngineServiceError("선택된 Plan revision의 저장 결속이 다릅니다.")
         return plan
 
-    @staticmethod
     def _goal_authorization_target(
-        connection, project_id, operating_policy,
-    ) -> GoalAuthorizationTarget:
+        self, connection, project_id, operating_policy,
+    ) -> tuple[GoalAuthorizationTarget, PlanContractRevision, bool]:
+        """승인 target과 그 target이 결속한 Plan 선택·재계획 후보 여부를 함께 돌려준다."""
         from .authorization import current_budget_policies, _operating_budget
 
         project = connection.execute("SELECT * FROM projects WHERE id=?", (project_id,)).fetchone()
@@ -2574,7 +2741,7 @@ class EngineService:
         if profile is None:
             raise EngineServiceError("active ProjectProfile revision을 찾을 수 없습니다.")
         policy = (operating_policy or GoalOperatingPolicy()).model_copy(update={"execution_guard_version": "2.0"})
-        plan = EngineService._selected_plan_for_activation(connection, project_id)
+        plan, replan_candidate = self._authorization_plan(connection, project_id)
         budget_policies = tuple(
             canonical_json({
                 "scope_key": item["scope_key"],
@@ -2597,7 +2764,7 @@ class EngineService:
             effect_policy=goal.definition.effect_policy,
             operating_policy=policy,
             budget_policies=budget_policies,
-        )
+        ), plan, replan_candidate
 
     def authorize_goal(self, *, project_id: str, source: str,
                        operating_policy: GoalOperatingPolicy | None = None,
@@ -2608,7 +2775,7 @@ class EngineService:
             return self._authorize_goal_in_transaction(
                 tx, project_id=project_id, source=source, operating_policy=operating_policy,
                 capability=capability, authorization_target=authorization_target,
-            )
+            )[0]
 
     def _authorize_goal_in_transaction(
         self, tx: Any, *, project_id: str, source: str,
@@ -2616,7 +2783,8 @@ class EngineService:
         capability: GoalAuthorizationCapability | None = None,
         authorization_target: GoalAuthorizationTarget | None = None,
         validate_selected_plan: bool = False,
-    ) -> GoalAuthorization:
+    ) -> tuple[GoalAuthorization, PlanContractRevision, bool]:
+        """승인을 기록하고 target이 결속한 Plan 선택·재계획 후보 여부를 함께 돌려준다."""
         require_host_execution()
         from .authorization import current_budget_policies
 
@@ -2632,7 +2800,7 @@ class EngineService:
                 ledger_path=self.ledger.path,
                 target=authorization_target,
             )
-            target = self._goal_authorization_target(
+            target, selected, replan_candidate = self._goal_authorization_target(
                 tx.connection, project_id, operating_policy,
             )
             if target != authorization_target:
@@ -2640,7 +2808,7 @@ class EngineService:
                     "CORE_CAPABILITY_DENIED: 표시 후 승인 target이 변경됐습니다."
                 )
         else:
-            target = self._goal_authorization_target(
+            target, selected, replan_candidate = self._goal_authorization_target(
                 tx.connection, project_id, operating_policy,
             )
             consume_goal_authorization(
@@ -2651,7 +2819,12 @@ class EngineService:
             )
         project = tx.one("SELECT * FROM projects WHERE id = ?", (project_id,))
         if validate_selected_plan:
-            selected = self._selected_plan_for_activation(tx.connection, project_id)
+            # 취소한 Goal에서는 재계획 후보를 활성화하지 않는다. 승인 쓰기 전에 거절한다.
+            if replan_candidate and self.workflow_control_state(project_id) == "cancelled":
+                raise EngineServiceError(
+                    "WORKFLOW_CANCELLED: 취소된 Goal workflow에서는 재계획 후보를 활성화하지 않습니다. "
+                    "승인과 활성화를 기록하지 않았습니다."
+                )
             self._assert_plan_inputs_current(tx, project, selected)
         goal = GoalContractRevision.model_validate_json(tx.one(
             "SELECT payload_json FROM goal_revisions WHERE id = ? AND status = 'active'",
@@ -2694,7 +2867,7 @@ class EngineService:
                    {"authorization_digest": authorization.authorization_digest, "source": source,
                     "max_provider_calls": policy.max_provider_calls,
                     "absolute_deadline_at": authorization.absolute_deadline_at.isoformat()})
-        return authorization
+        return authorization, selected, replan_candidate
 
     def authorize_goal_and_activate_plan(
         self, *, project_id: str, source: str,
@@ -2705,12 +2878,12 @@ class EngineService:
     ) -> tuple[GoalAuthorization, str]:
         """승인과 선택 Plan 활성화를 함께 commit하거나 함께 rollback한다."""
         with self.ledger.transaction() as tx:
-            authorization = self._authorize_goal_in_transaction(
+            authorization, selected, replan_candidate = self._authorize_goal_in_transaction(
                 tx, project_id=project_id, source=source, operating_policy=operating_policy,
                 capability=capability, authorization_target=authorization_target,
                 validate_selected_plan=True,
             )
-            selected = self._selected_plan_for_activation(tx.connection, project_id)
+            # 승인 insert 뒤에 다시 선택하지 않는다. target·재계산과 같은 insert 전 선택을 활성화한다.
             if expected_plan_revision_id is not None and selected.plan_revision_id != expected_plan_revision_id:
                 raise CoreCapabilityError("CORE_CAPABILITY_DENIED: 승인한 Plan 선택이 변경됐습니다.")
             plan_row = tx.one("SELECT status FROM plan_revisions WHERE id = ?", (selected.plan_revision_id,))
@@ -2735,10 +2908,19 @@ class EngineService:
                     tx.history(project_id, "role_slot.reauthorized", "plan_activation", activation["id"],
                                {"authorization_id": authorization.authorization_id})
                 return authorization, activation["id"]
-            activation_id = self._activate_plan_in_transaction(
-                tx, plan_revision_id=selected.plan_revision_id,
-                activation_digest=selected.activation_digest, source="goal_authorization",
-            )
+            try:
+                activation_id = self._activate_plan_in_transaction(
+                    tx, plan_revision_id=selected.plan_revision_id,
+                    activation_digest=selected.activation_digest, source="goal_authorization",
+                )
+            except GoalAuthorizationRequired as error:
+                # 새 승인은 Goal 효과 정책을 그대로 복사하므로 남은 effect 변경은 재승인으로 풀리지 않는다.
+                if replan_candidate and any(change["boundary"] == "effect" for change in error.changes):
+                    raise GoalAuthorizationRequired(
+                        error.changes,
+                        guidance=_EFFECT_REAUTHORIZATION_GAP + " 승인과 활성화를 기록하지 않았습니다.",
+                    ) from error
+                raise
             return authorization, activation_id
 
     def activate_authorized_plan(self, *, plan_revision_id: str) -> str:
@@ -2891,6 +3073,22 @@ class EngineService:
             )
 
     @staticmethod
+    def _supersedes_reaches(connection: Any, plan: PlanContractRevision, active_plan_id: str) -> bool:
+        """plan_id가 active와 같고 같은 plan_id의 supersedes 계보가 active revision에 닿는가."""
+        active = connection.execute(
+            "SELECT plan_id FROM plan_revisions WHERE id = ?", (active_plan_id,),
+        ).fetchone()
+        ancestor = plan.supersedes_plan_revision_id
+        while ancestor is not None and ancestor != active_plan_id:
+            prior = connection.execute(
+                "SELECT plan_id, supersedes_id FROM plan_revisions WHERE id = ?", (ancestor,),
+            ).fetchone()
+            if prior is None or prior["plan_id"] != plan.plan_id:
+                break
+            ancestor = prior["supersedes_id"]
+        return active is not None and ancestor == active_plan_id and plan.plan_id == active["plan_id"]
+
+    @staticmethod
     def _assert_plan_inputs_current(tx: Any, project: Any, payload: PlanContractRevision) -> None:
         """승인 쓰기 전과 활성화 직전에 같은 Goal·State·Map freshness를 검사한다."""
         require_host_execution()
@@ -2937,20 +3135,8 @@ class EngineService:
         active_plan_id = project["active_plan_revision_id"]
         if active_plan_id is not None:
             self._assert_plan_replacement_quiescent(tx, project["id"])
-            active_plan = tx.one(
-                "SELECT id, plan_id, status FROM plan_revisions WHERE id = ?",
-                (active_plan_id,),
-            )
-            ancestor = payload.supersedes_plan_revision_id
-            while ancestor is not None and ancestor != active_plan_id:
-                prior = tx.one("SELECT plan_id, supersedes_id FROM plan_revisions WHERE id = ?", (ancestor,))
-                if prior["plan_id"] != payload.plan_id:
-                    break
-                ancestor = prior["supersedes_id"]
-            if ancestor != active_plan_id or payload.plan_id != active_plan["plan_id"]:
-                raise EngineServiceError(
-                    "active Plan을 교체하려면 같은 plan_id의 immutable supersedes 계보가 현재 revision으로 이어져야 합니다."
-                )
+            if not self._supersedes_reaches(tx.connection, payload, active_plan_id):
+                raise EngineServiceError(_LINEAGE_REQUIRED)
         self._assert_plan_inputs_current(tx, project, payload)
         now = tx.now
         reused = self._reuse_completed_tasks(tx, payload, active_plan_id) if active_plan_id else ()
@@ -4661,8 +4847,13 @@ class EngineService:
         *,
         request: Any | None = None,
         allow_mutable_targets: bool = False,
+        runtime_job_id: str | None = None,
     ) -> None:
-        """효과 호출 직전의 durable intent와 immutable 입력을 원자적으로 대조한다."""
+        """효과 호출 직전의 durable intent와 immutable 입력을 원자적으로 대조한다.
+
+        ``runtime_job_id``는 효과를 내는 활성 RuntimeJob이다(F1). None(supervisor 없는 inline
+        dispatch)이면 job을 검사하지 않고 기존 동작 그대로다.
+        """
         if intent_id is None:
             raise EngineServiceError("runtime 효과에는 먼저 저장된 intent가 필요합니다.")
         with self.ledger.transaction() as tx:
@@ -4695,6 +4886,11 @@ class EngineService:
                         "WORKFLOW_CANCELLED: 취소 뒤 새 provider 효과를 시작할 수 없습니다."
                     )
                 break
+            if runtime_job_id is not None:
+                # F1: effect_dispatching marker와 같은 transaction에서 job이 아직 실행 가능한지 본다.
+                self._assert_runtime_job_runnable(
+                    tx, tx.one("SELECT * FROM runtime_jobs WHERE id = ?", (runtime_job_id,)),
+                )
             task = tx.one("SELECT * FROM task_contracts WHERE id = ?", (attempt["task_id"],))
             spec_row = tx.one(
                 "SELECT * FROM execution_spec_revisions WHERE task_id = ? AND is_current = 1",
@@ -7351,8 +7547,361 @@ class EngineService:
         with self.ledger.transaction() as tx:
             self._record_recovery_assessment_in_transaction(tx, project_id, assessment)
 
+    def request_subgraph_replan_retry(
+        self, project_id: str, *, rationale: str, source: str = "engine-application",
+    ) -> dict[str, Any]:
+        """차단된 SUBGRAPH_REPLAN 후보 하나에 사용자 재시도 assessment를 Core 기록으로만 남긴다.
+
+        역할·provider·supervisor를 부르지 않고 runtime job도 만들지 않는다. 다음 run_once가 head
+        assessment의 `replanning:{ID}` checkpoint로 job을 예약한다. 적격은 head 후보가
+        needs_revision decision인 REPLAN_CANDIDATE_NOT_ADMISSIBLE이거나 PLAN_STATE_SNAPSHOT_STALE일
+        때뿐이다. 새 근거는 차단 후보에 결속된 typed basis이며 EvidenceRecord로 만들지 않는다.
+        실패 지문·횟수·ID는 원장에서 파생하고 rationale은 History 감사값일 뿐이다.
+        거절은 한 transaction 안에서 쓰기 전에 일어나므로 원장을 바꾸지 않는다.
+        """
+
+        require_host_execution()
+        from .recovery import (
+            current_failure_diagnosis,
+            recovery_limit_decision,
+            recovery_route,
+            replan_retry_assessment_id,
+        )
+        from .runtime import REPLAN_JOB_ERROR_NO_PUBLIC_ESCAPE, replan_head
+
+        if not rationale.strip():
+            raise EngineServiceError("REPLAN_RETRY_RATIONALE_REQUIRED: 재시도 이유를 남겨야 합니다.")
+        with self.ledger.transaction() as tx:
+            project = tx.maybe_one("SELECT * FROM projects WHERE id = ?", (project_id,))
+            if project is None:
+                raise EngineServiceError("PROJECT_NOT_FOUND")
+            if self.workflow_control_state(project_id) == "cancelled":
+                raise EngineServiceError(
+                    "WORKFLOW_CANCELLED: 취소된 Goal workflow는 재개하거나 다시 계획할 수 없습니다."
+                )
+
+            def not_blocked(detail: str) -> EngineServiceError:
+                return EngineServiceError(
+                    "REPLAN_RETRY_NOT_BLOCKED: 사용자 재계획을 기다리는 차단 후보가 없습니다. "
+                    f"{detail} 현재 상태는 status로 확인합니다."
+                )
+
+            failure = current_failure_diagnosis(
+                self, project_id=project_id, plan_revision_id=project["active_plan_revision_id"],
+            )
+            if failure is None:
+                raise not_blocked("active Plan에 미해결 실패가 없습니다.")
+            target, diagnosis = failure
+            route = recovery_route(diagnosis, validation_result_id=target["validation_result_id"])
+            if route.mode != "automatic" or diagnosis.repair_action is not RepairAction.SUBGRAPH_REPLAN:
+                raise not_blocked(
+                    "현재 실패는 subgraph 재계획 대상이 아닙니다"
+                    f"(failure_class={None if diagnosis.failure_class is None else diagnosis.failure_class.value})."
+                )
+            attempt_id = target["attempt_id"]
+            fingerprint = diagnosis.failure_fingerprint
+            observed_head = replan_head(
+                self, project_id=project_id, task_id=target["task_id"], attempt_id=attempt_id,
+                failure_fingerprint=fingerprint, connection=tx.connection,
+            )
+            head = observed_head.assessment_id
+            if not observed_head.stable_recorded:
+                raise not_blocked("자동 assessment가 아직 없습니다. run-once가 먼저 자동 재계획을 시도합니다.")
+            if observed_head.job_status != RuntimeJobStatus.CONSUMED.value:
+                if head != observed_head.stable_assessment_id:
+                    # 같은 차단 후보에 대한 재시도가 이미 기록됐고 다음 run_once를 기다린다.
+                    return self._replan_retry_result(tx, project_id, head, recorded=False)
+                raise not_blocked(self._replan_job_progress_text(tx, observed_head))
+            if observed_head.blocker is None:
+                raise not_blocked("재계획 후보가 활성화됐거나 다음 run-once가 활성화합니다.")
+            code, detail = observed_head.blocker
+            evaluation = observed_head.evaluation
+            goal = tx.one(
+                "SELECT definition_digest FROM goal_revisions WHERE id = ?",
+                (project["active_goal_revision_id"],),
+            )
+            current_state = tx.one(
+                "SELECT id, snapshot_digest FROM state_snapshots WHERE project_id = ? "
+                "AND goal_contract_digest = ? AND is_current = 1",
+                (project_id, goal["definition_digest"]),
+            )
+            # STALE 적격은 blocker의 첫 code가 아니라 원장에 같은 binding으로 등록된 차단 후보의
+            # base StateSnapshot이 current인지로 판정한다. run_once의 보고 순서(승인 먼저)는 그대로다.
+            stale = (
+                evaluation is not None
+                and observed_head.candidate_registered
+                and not observed_head.candidate_activated
+                and evaluation.plan.definition.base_state_snapshot_digest != current_state["snapshot_digest"]
+            )
+            # base State는 current인데 결속한 ProjectMap만 비current이면(재관측의 Map·State 기록 사이 중단)
+            # STALE도 아니고 재승인·refine으로도 풀리지 않는다. 적격 code보다 먼저 거절한다.
+            if (
+                not stale
+                and (
+                    code == "GOAL_AUTHORIZATION_REQUIRED"
+                    or (code == "REPLAN_CANDIDATE_NOT_ADMISSIBLE"
+                        and evaluation.decision.status is CandidateStatus.NEEDS_REVISION)
+                )
+                and tx.one(
+                    "SELECT is_current FROM project_map_revisions WHERE revision_digest = ?",
+                    (evaluation.plan.definition.project_map_digest,),
+                )["is_current"] != 1
+            ):
+                raise EngineServiceError(
+                    f"REPLAN_RETRY_ACTIVATION_BLOCKED: head blocker={code}. 후보의 base StateSnapshot은 "
+                    "current이지만 결속한 ProjectMap이 최신 revision이 아닙니다(재관측이 새 ProjectMap을 기록한 "
+                    "뒤 StateSnapshot을 기록하기 전에 멈춘 상태). 재승인이나 finding 수정으로는 풀리지 않습니다. "
+                    "다음 재관측이 새 StateSnapshot을 기록하면 이 후보는 STALE 재시도 대상이 되지만, 이 차단 "
+                    "상태에서 run-once는 재관측하지 않고 현재 공개 CLI에는 재관측만 수행하는 명령이 없습니다. "
+                    f"detail=project_map_digest={evaluation.plan.definition.project_map_digest}"
+                )
+            reauthorization = (
+                "후보는 적격이지만 승인 경계가 바뀌었습니다. authorize는 이 후보를 승인 target으로 표시하고, "
+                "확인하면 같은 transaction에서 승인과 후보 활성화를 함께 기록합니다. 승인 정책이 후보의 변경을 "
+                "덮지 못하면 아무것도 기록하지 않고 거절합니다."
+            )
+            if code == "GOAL_AUTHORIZATION_REQUIRED" and not stale:
+                # 같은 판정의 GAR changes에서 boundary를 읽는다. effect 변경은 재승인으로 풀리지 않는다.
+                try:
+                    self._plan_authorization(tx, project, evaluation.plan)
+                except GoalAuthorizationRequired as error:
+                    if any(change["boundary"] == "effect" for change in error.changes):
+                        reauthorization = (
+                            _EFFECT_REAUTHORIZATION_GAP + " 현재 공개 CLI에는 이 차단 상태를 같은 project "
+                            "안에서 해소하는 명령이 없습니다."
+                        )
+            rejections = {
+                "EXTERNAL_EFFECT_UNKNOWN": (
+                    "REPLAN_RETRY_OBSERVE_FIRST",
+                    "재계획 job 결과를 확정할 수 없어 외부 효과를 먼저 관측해야 합니다. 이 상태는 자동·수동 "
+                    f"재계획 대상이 아닙니다. {REPLAN_JOB_ERROR_NO_PUBLIC_ESCAPE}",
+                ),
+                "GOAL_AUTHORIZATION_REQUIRED": (
+                    "REPLAN_RETRY_REAUTHORIZATION_REQUIRED",
+                    reauthorization,
+                ),
+                "REPLAN_CANDIDATE_ACTIVATION_BLOCKED": (
+                    "REPLAN_RETRY_ACTIVATION_BLOCKED",
+                    "후보의 활성화 사전 조건이 맞지 않습니다. 진행 중인 Plan 교체처럼 끝나면 풀리는 조건은 "
+                    "다음 run-once가 같은 후보로 이어 가며, 그 밖의 조건은 status의 detail로 원인을 확인합니다.",
+                ),
+                "REPLAN_CANDIDATE_BINDING_MISMATCH": (
+                    "REPLAN_RETRY_BINDING_MISMATCH",
+                    "재계획 job 결과와 원장 후보의 결속이 달라 새 재시도로 덮어쓰지 않습니다. 원장 후보와 "
+                    "job 결과를 대조해 원인을 확인합니다.",
+                ),
+            }
+            # GAR만 STALE보다 먼저 보고될 수 있는 적격 code다. ACTIVATION_BLOCKED는 stale이어도 거절한다.
+            stale_eligible = {"GOAL_AUTHORIZATION_REQUIRED"}
+            if code in rejections and not (stale and code in stale_eligible):
+                rejected, guidance = rejections[code]
+                raise EngineServiceError(f"{rejected}: head blocker={code}. {guidance} detail={detail[:1000]}")
+            if code == "GOAL_AUTHORIZATION_REQUIRED":
+                # blocker 판정은 GAR에서 멈추므로 그 뒤의 활성화 전제를 같은 tx에서 다시 본다.
+                # 남는 차단이 stale State 하나일 때만 STALE 재시도 대상이다.
+                hidden = "후보 base StateSnapshot이 current로 관측됐습니다."
+                try:
+                    self._assert_plan_replacement_quiescent(tx, project_id)
+                    if not self._supersedes_reaches(
+                        tx.connection, evaluation.plan, project["active_plan_revision_id"],
+                    ):
+                        raise EngineServiceError(_LINEAGE_REQUIRED)
+                    self._assert_plan_inputs_current(tx, project, evaluation.plan)
+                except PlanStateSnapshotStaleError:
+                    hidden = None
+                except (EngineServiceError, EngineLedgerError) as error:
+                    hidden = str(error)
+                if hidden is not None:
+                    # stale 후보는 run-once가 활성화하지 않으므로 조건이 풀린 뒤의 다음 행동은 replan 재실행이다.
+                    raise EngineServiceError(
+                        f"REPLAN_RETRY_ACTIVATION_BLOCKED: head blocker={code}. 후보의 base StateSnapshot은 "
+                        "stale이지만 승인 밖 활성화 사전 조건이 맞지 않아 STALE 재시도를 기록하지 않습니다. "
+                        "run-once는 이 후보를 활성화하지 않습니다. 진행 중인 Plan 교체처럼 끝나면 풀리는 조건은 "
+                        "해소된 뒤 replan을 다시 실행하고, 그 밖의 조건은 detail로 원인을 확인합니다. "
+                        f"detail={hidden[:1000]}"
+                    )
+            blocked = evaluation.plan
+            decision = evaluation.decision
+            if code == "REPLAN_CANDIDATE_NOT_ADMISSIBLE" and decision.status is not CandidateStatus.NEEDS_REVISION:
+                raise EngineServiceError(
+                    f"REPLAN_RETRY_NOT_REMEDIABLE: head blocker={code}, decision={decision.status.value}"
+                    f"(finding_codes={list(decision.finding_codes)}). 수정 가능한 finding이 아니므로 같은 입력의 "
+                    "재계획은 근거 없는 반복입니다. 목표·범위·효과를 바꾸려면 새 Goal revision과 승인이 필요하지만 "
+                    "active Plan이 있는 동안의 Goal revision은 아직 지원하지 않습니다(E2E-15 gap). 현재 공개 "
+                    "CLI에는 이 차단 상태를 같은 project 안에서 해소하는 명령이 없습니다. 원장을 직접 고치지 않습니다."
+                )
+            if code not in {"REPLAN_CANDIDATE_NOT_ADMISSIBLE", "PLAN_STATE_SNAPSHOT_STALE"} | stale_eligible:
+                raise not_blocked(f"알 수 없는 head blocker {code}입니다.")
+            retry_id = replan_retry_assessment_id(attempt_id, fingerprint, blocked.plan_revision_id)
+            if tx.maybe_one("SELECT 1 FROM recovery_assessments WHERE id = ?", (retry_id,)) is not None:
+                # 후보당 재시도는 한 번이다. 같은 후보로 다시 부르면 같은 ID를 돌려주고 쓰지 않는다.
+                return self._replan_retry_result(tx, project_id, retry_id, recorded=False)
+
+            if stale:
+                # 후보가 결속한 State가 current가 아니면 새 관측 자체가 새 입력이다.
+                observed = tx.one(
+                    "SELECT MAX(sequence) AS sequence FROM history_events WHERE project_id = ? "
+                    "AND event_type = 'state.observed' AND entity_id = ?",
+                    (project_id, current_state["id"]),
+                )
+                basis = {
+                    "kind": "candidate_state_stale",
+                    "provenance": "local_derived",
+                    "candidate_base_state_snapshot_digest": blocked.definition.base_state_snapshot_digest,
+                    "current_state_snapshot_id": current_state["id"],
+                    "current_state_snapshot_digest": current_state["snapshot_digest"],
+                    "observed_event": "state.observed",
+                    "observed_sequence": observed["sequence"],
+                }
+            elif code == "REPLAN_CANDIDATE_NOT_ADMISSIBLE":
+                registered = tx.one(
+                    "SELECT MAX(sequence) AS sequence FROM history_events WHERE project_id = ? "
+                    "AND event_type = 'plan.registered' AND entity_id = ?",
+                    (project_id, blocked.plan_revision_id),
+                )
+                decision_row = tx.one(
+                    "SELECT id FROM candidate_decisions WHERE artifact_kind = 'plan' AND artifact_digest = ?",
+                    (blocked.activation_digest,),
+                )
+                findings = [
+                    item.model_dump(mode="json") | {"source": source_name, "provenance": provenance}
+                    for source_name, provenance, items in (
+                        ("deterministic", "local_derived", evaluation.deterministic_findings),
+                        ("reviewer", "model_reported", tuple(
+                            finding for submission in evaluation.effective_semantic_submissions
+                            for finding in submission.findings
+                        )),
+                    )
+                    for item in items
+                    if item.blocking
+                ]
+                basis = {
+                    "kind": "candidate_needs_revision",
+                    "provenance": "local_derived",
+                    "decision_id": decision_row["id"],
+                    "decision_status": decision.status.value,
+                    "finding_codes": list(decision.finding_codes),
+                    "findings": findings,
+                    "observed_event": "plan.registered",
+                    "observed_sequence": registered["sequence"],
+                }
+            else:
+                raise EngineServiceError(
+                    "REPLAN_RETRY_BASIS_REQUIRED: 차단 후보의 State가 current라 STALE typed basis가 없습니다."
+                )
+            limits = recovery_limit_decision(
+                tx.connection, project_id=project_id, task_id=target["task_id"],
+                attempt_id=attempt_id, diagnosis=diagnosis, assessment_id=retry_id,
+                basis_sequence=basis["observed_sequence"],
+            )
+            if limits.limit_code is not None:
+                raise EngineServiceError(f"{limits.limit_code}: {limits.detail}")
+            assessment = RecoveryAssessment(
+                assessment_id=retry_id,
+                attempt_id=attempt_id,
+                failure_class=diagnosis.failure_class,
+                action=RepairAction.SUBGRAPH_REPLAN,
+                rationale=(
+                    f"차단 후보 {blocked.plan_revision_id}({code})에 결속된 typed basis "
+                    f"{basis['kind']}로 같은 실패의 subgraph 재계획을 다시 시도합니다."
+                ),
+                failure_fingerprint=fingerprint,
+                new_evidence_ids=(),
+                same_failure_replan_count=limits.same_failure_replan_count + 1,
+                goal_replan_count=limits.goal_replan_count + 1,
+            )
+            self._record_recovery_assessment_in_transaction(
+                tx, project_id, assessment, typed_basis_sequence=basis["observed_sequence"],
+            )
+            tx.history(
+                project_id,
+                "recovery.replan_retry_requested",
+                "recovery_assessment",
+                retry_id,
+                {
+                    "assessment_id": retry_id,
+                    "prior_assessment_id": head,
+                    "attempt_id": attempt_id,
+                    "task_id": target["task_id"],
+                    "failure_fingerprint": fingerprint,
+                    "blocked_plan_revision_id": blocked.plan_revision_id,
+                    "blocked_plan_activation_digest": blocked.activation_digest,
+                    "head_blocker_code": code,
+                    "basis": basis,
+                    "same_failure_replan_count": assessment.same_failure_replan_count,
+                    "goal_replan_count": assessment.goal_replan_count,
+                    "rationale": rationale,
+                    "rationale_provenance": "user_supplied_audit",
+                    "source": source,
+                },
+            )
+            return self._replan_retry_result(tx, project_id, retry_id, recorded=True)
+
+    @staticmethod
+    def _replan_job_progress_text(tx: Any, head: Any) -> str:
+        """소비 전 stable head job의 실제 다음 행동을 job 상태별로 안내한다(run_once 경로와 같은 판정)."""
+
+        from .runtime import REPLAN_JOB_ERROR_NO_PUBLIC_ESCAPE
+
+        status = head.job_status
+        if status is None:
+            return (
+                "자동 재계획 job이 아직 예약 전입니다. run-once를 이어 실행합니다"
+                "(재계획 역할 설정이 없으면 --role-config를 지정)."
+            )
+        if status == RuntimeJobStatus.PROVIDER_TERMINAL.value:
+            return f"replanning job {head.job_id}의 결과를 관측했습니다. 다음 run-once가 결과를 소비해 후보를 판정합니다."
+        if status == RuntimeJobStatus.CANCELLED.value:
+            return (
+                f"replanning job {head.job_id}이 취소됐습니다. 취소된 job은 다시 예약하지 않고 run-once도 "
+                f"이어 가지 않습니다. {REPLAN_JOB_ERROR_NO_PUBLIC_ESCAPE}"
+            )
+        if status == RuntimeJobStatus.COLLECTOR_LOST.value:
+            # tick·observe는 저장된 provider binding이나 결과 checkpoint가 있을 때만 재관측으로 잇는다.
+            resumable = tx.one(
+                "SELECT thread_id FROM runtime_jobs WHERE id = ?", (head.job_id,),
+            )["thread_id"] is not None or tx.maybe_one(
+                "SELECT 1 FROM runtime_job_observations WHERE job_id = ? AND kind = ? "
+                "AND json_extract(payload_json,'$.target_result_checkpoint_version') IS NOT NULL LIMIT 1",
+                (head.job_id, RuntimeJobObservationKind.PROVIDER_PROGRESS.value),
+            ) is not None
+            if resumable:
+                return (
+                    f"replanning job {head.job_id}의 collector가 끊겼지만 저장된 provider binding이나 결과 "
+                    "checkpoint가 있어 다음 run-once(또는 observe)가 재관측으로 이어 갑니다."
+                )
+            # service 계층은 owner lock probe를 갖지 않으므로 durable 사실과 다음 run-once의 규칙만 말한다.
+            # 현재 판정은 status로 확인한다는 안내는 거절 wrapper(not_blocked)가 붙인다.
+            return (
+                f"replanning job {head.job_id}의 collector가 결과·provider binding 없이 끊겼습니다. 다음 "
+                "run-once가 owner lock으로 생존을 확인해 한 번 재시작하거나 typed blocker로 멈춥니다."
+            )
+        return f"replanning job {head.job_id}이 진행 중입니다({status}). run-once를 이어 실행하면 같은 job을 관측합니다."
+
+    @staticmethod
+    def _replan_retry_result(tx: Any, project_id: str, assessment_id: str, *, recorded: bool) -> dict[str, Any]:
+        request = json.loads(tx.one(
+            "SELECT payload_json FROM history_events WHERE project_id = ? "
+            "AND event_type = 'recovery.replan_retry_requested' AND entity_id = ?",
+            (project_id, assessment_id),
+        )["payload_json"])
+        return {
+            "project_id": project_id,
+            "assessment_id": assessment_id,
+            "recorded": recorded,
+            "blocked_plan_revision_id": request["blocked_plan_revision_id"],
+            "head_blocker_code": request["head_blocker_code"],
+            "basis_kind": request["basis"]["kind"],
+            "next": (
+                f"다음 run-once가 replanning:{assessment_id} job을 예약합니다."
+                if recorded
+                else "같은 차단 후보의 재시도는 이미 기록됐습니다. 원장을 바꾸지 않았습니다. status로 진행을 확인합니다."
+            ),
+        }
+
     def _record_recovery_assessment_in_transaction(
-        self, tx: Any, project_id: str, assessment: RecoveryAssessment
+        self, tx: Any, project_id: str, assessment: RecoveryAssessment,
+        *, typed_basis_sequence: int | None = None,
     ) -> None:
         expected_action = self.repair_action_for(assessment.failure_class)
         if assessment.action is not expected_action:
@@ -7433,7 +7982,18 @@ class EngineService:
             and assessment.action in {RepairAction.SUBGRAPH_REPLAN, RepairAction.GOAL_REVISION}
             and not assessment.new_evidence_ids
         ):
-            raise EngineServiceError("첫 재계획 이후에는 새 evidence가 필요합니다.")
+            # 새 EvidenceRecord가 없으면 Core가 직접 관측·결속한 typed basis(사용자 replan)만
+            # 새 근거로 인정한다. 그 History 순번이 직전 recovery.assessed보다 뒤여야 한다.
+            previous_assessed = tx.connection.execute(
+                "SELECT MAX(sequence) FROM history_events WHERE project_id = ? AND event_type = 'recovery.assessed'",
+                (project_id,),
+            ).fetchone()[0]
+            if (
+                typed_basis_sequence is None
+                or previous_assessed is None
+                or int(typed_basis_sequence) <= int(previous_assessed)
+            ):
+                raise EngineServiceError("첫 재계획 이후에는 새 evidence가 필요합니다.")
         prior_ids = {evidence_id for row in existing_assessments
                      for evidence_id in json.loads(row["payload_json"])["new_evidence_ids"]}
         for evidence_id in assessment.new_evidence_ids:
