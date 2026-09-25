@@ -7,6 +7,7 @@ checkout·branch·worktree에는 쓰지 않으며, AGS 상태 경로는 모두 �
 
 실행 조건: node 24 이상, ``FLOWMARSHAL_AGS_REPO``(기본 ``D:/codex/거버전스 3.0/agent-governance-suite``)에 고정 SHA가
 있어야 한다. ``FLOWMARSHAL_F06C2_EVIDENCE``를 주면 redacted 결과를 그 JSON 파일에 쓴다.
+``FLOWMARSHAL_AGS_BUILT_ROOT``를 주면 archive 대신 그 폴더(pin을 worktree 밖에서 새로 build한 root)의 사본을 실행한다.
 """
 from __future__ import annotations
 
@@ -93,15 +94,22 @@ class A2SubprocessRoundTripTests(unittest.TestCase):
         cls._folder = tempfile.TemporaryDirectory(prefix="fm-f06c2-")
         base = Path(cls._folder.name).resolve()
         cls.root = base / "ags"
-        cls.root.mkdir()
-        archive = subprocess.run(["git", "-C", str(AGS_REPO), "archive", "--format=tar", AGS_PIN],
-                                 capture_output=True, check=True, timeout=300)
-        with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as tar:
-            tar.extractall(cls.root, filter="data")
+        built = os.environ.get("FLOWMARSHAL_AGS_BUILT_ROOT")
+        if built:
+            # pin을 worktree 밖에서 새로 build한 root를 쓴다. profile 파일을 쓰므로 사본에서 실행한다.
+            shutil.copytree(built, cls.root, ignore=shutil.ignore_patterns("node_modules", ".git"))
+            source = {"ags_source": "fresh_build", "ags_built_root": str(Path(built).resolve())}
+        else:
+            cls.root.mkdir()
+            archive = subprocess.run(["git", "-C", str(AGS_REPO), "archive", "--format=tar", AGS_PIN],
+                                     capture_output=True, check=True, timeout=300)
+            with tarfile.open(fileobj=io.BytesIO(archive.stdout)) as tar:
+                tar.extractall(cls.root, filter="data")
+            source = {"ags_source": "committed_archive",
+                      "ags_archive_sha256": hashlib.sha256(archive.stdout).hexdigest()}
         server = cls.root / SERVER
         cls.evidence = {
-            "ags_pin": AGS_PIN, "ags_repo": str(AGS_REPO),
-            "ags_archive_sha256": hashlib.sha256(archive.stdout).hexdigest(),
+            "ags_pin": AGS_PIN, "ags_repo": str(AGS_REPO), **source,
             "server_bundle_sha256": hashlib.sha256(server.read_bytes()).hexdigest(),
             "node": subprocess.run(["node", "--version"], capture_output=True, text=True).stdout.strip(),
             "checks": {},
