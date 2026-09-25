@@ -1381,9 +1381,49 @@ class ReplanningOwnerProcessTests(_ChildProcessMixin, g1b._ReplanHarness, unitte
         self.assertIsNone(process.poll())  # owner loop가 끝나지 않았다.
         (work / "release").touch()
         self.assertEqual(0, process.wait(90), self._child_log(work, "replan-owner"))
-        self._until_recovered_activation()
+        # M-14 D1(AC23 (6)): child CLI owner는 자기 expand job만 끝낸다. provider 없는 부모는 expand를
+        # 소비하고, review job을 예약해야 하는 시점에 REPLAN_PROVIDER_REQUIRED로 멈춘다.
+        review_key = f"{self._job_checkpoint()}:review"
+        blocked = self._until_blocked()
+        self.assertEqual("REPLAN_PROVIDER_REQUIRED", blocked.blocker_code, blocked)
+        next_action = self.application.status(self.project_id)["recovery"]["next_action"]
+        self.assertEqual(
+            (blocked.blocker_code, blocked.detail), (next_action["blocker_code"], next_action["detail"]),
+        )
+        self.assertEqual([], self._rows(
+            "SELECT id FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?", self.project_id, review_key,
+        ))
+        # 같은 원장을 연 별도 EngineApplication(재계획 provider: scripted reviewer runner, fake runtime, 층 A)이
+        # review job을 예약·소비해 활성화한다. 실제 provider 호출이 아니다.
+        def reviewer_calls() -> int:
+            return [role for (role,) in self._rows(
+                "SELECT role FROM provider_calls WHERE project_id=?", self.project_id,
+            )].count(RECOVERY_PLAN_REVIEWER_ROLE)
+
+        reviewer_calls_before = reviewer_calls()
+        provider = EngineApplication(
+            EngineService(SQLiteEngineLedger(
+                self.service.ledger.path, artifact_root=self.service.ledger.artifact_root,
+            )),
+            runtime=self.runtime, role_configuration=fm08._roles(),
+            structured_runner=InspectionScriptedRunner({RECOVERY_PLAN_REVIEWER_ROLE: [g1b._clean_review()]}),
+            governance=ALLOW_ALL,
+        )
+        self.supervisors.append(provider.supervisor)
+        result = None
+        for _ in range(80):
+            result = provider.run_once(self.project_id)
+            if result.action is RunOnceAction.RECOVERED:
+                break
+            self.assertIn(result.action, {RunOnceAction.DISPATCHED, RunOnceAction.OBSERVED}, result)
+            time.sleep(0.01)
+        self.assertEqual(RunOnceAction.RECOVERED, result.action, result)
         self.assertEqual(2, self._plan(self._active_plan_id()).revision_no)
         self.assertEqual("consumed", self._rows("SELECT status FROM runtime_jobs WHERE id=?", self.job_id)[0][0])
+        self.assertEqual([("consumed",)], self._rows(
+            "SELECT status FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?", self.project_id, review_key,
+        ))
+        self.assertEqual(reviewer_calls_before + 1, reviewer_calls())
         entries = _journal_entries(work)
         self.assertEqual(1, entries.count("inventory"))
         self.assertEqual(1, entries.count("role:plan_expander"))

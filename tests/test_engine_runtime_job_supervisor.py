@@ -24,6 +24,7 @@ from flowmarshal.engine.execution import ExecutionPreparation, ExecutionProposal
 from flowmarshal.engine.qualification import default_role_configuration
 from flowmarshal.engine.runtime import EngineDispatcher, FakeCodexRuntime, RuntimeJobSupervisor
 from flowmarshal.engine.models import AssignmentResolutionError
+from flowmarshal.engine.operations import ExternalOperationUnknown
 from flowmarshal.engine.roles import ScriptedStructuredRoleRunner
 from flowmarshal.engine.service import EngineServiceError
 from tests.test_engine_qualification import qualification_inventory
@@ -578,7 +579,14 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
         self.assertIn("collector_reattached", kinds)
         self.assertIn("provider_terminal", kinds)
 
-    def test_restart_restores_raw_terminal_result_for_every_typed_job_kind(self) -> None:
+    def test_restart_reattach_of_every_typed_job_kind_is_result_unavailable(self) -> None:
+        """M-14 D4(CC-2): checkpoint 없이 재부착한 typed kind는 역할 원문을 결과로 쓰지 않는다.
+
+        provider terminal·terminal_status·원 관측은 보존하고 결과는 결과 없음이며 소비는 typed unknown이다.
+        dispatch kind는 기존대로 관측 전체가 결과다. 성공 checkpoint 경로는
+        test_restart_restores_durable_target_result_for_every_job_kind가 지킨다.
+        """
+
         typed_kinds = tuple(
             kind for kind in RuntimeJobKind
             if kind not in {
@@ -586,7 +594,7 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
                 RuntimeJobKind.TASK_SEMANTIC_VALIDATE,
             }
         )
-        for index, kind in enumerate(typed_kinds):
+        for index, kind in enumerate((*typed_kinds, RuntimeJobKind.WORKER_TURN)):
             with self.subTest(kind=kind.value):
                 thread = self.runtime.create_thread(
                     cwd=self.prepared.workspace,
@@ -614,7 +622,6 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
                     thread_id=thread.binding.thread_id,
                     turn_id=turn.binding.turn_id,
                 )
-                expected = {"kind": kind.value, "restored": True}
                 self.runtime.complete(
                     thread.binding.thread_id,
                     response=(
@@ -627,10 +634,26 @@ class RuntimeJobSupervisorTests(unittest.TestCase):
                 ).reattach(job.job_id)
 
                 self.assertEqual(RuntimeJobStatus.PROVIDER_TERMINAL, terminal.status)
-                self.assertEqual(
-                    expected,
-                    self.prepared.service.consume_runtime_job_required_result(job.job_id),
-                )
+                self.assertEqual("completed", terminal.provider_terminal_status)
+                with self.prepared.service.ledger.read() as connection:
+                    row = connection.execute(
+                        "SELECT terminal_status,payload_json FROM runtime_job_observations "
+                        "WHERE job_id=? AND kind='provider_terminal'",
+                        (job.job_id,),
+                    ).fetchone()
+                payload = json.loads(row["payload_json"])
+                self.assertEqual("completed", row["terminal_status"])
+                self.assertEqual(turn.binding.turn_id, payload["observation"]["turn_id"])
+                if kind is RuntimeJobKind.WORKER_TURN:
+                    self.assertEqual(
+                        payload["observation"],
+                        self.prepared.service.consume_runtime_job_required_result(job.job_id),
+                    )
+                    continue
+                self.assertIs(True, payload["result"]["runtime_job_result_unavailable"])
+                self.assertEqual(payload["observation"], payload["result"]["provider_observation"])
+                with self.assertRaises(ExternalOperationUnknown):
+                    self.prepared.service.consume_runtime_job_required_result(job.job_id)
 
     def test_restart_restores_durable_target_result_for_every_job_kind(self) -> None:
         supervisor = RuntimeJobSupervisor(

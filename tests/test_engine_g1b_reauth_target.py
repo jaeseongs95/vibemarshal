@@ -160,11 +160,14 @@ class ReauthorizationTargetTests(_ConsoleHarness, unittest.TestCase):
     def test_console_target_binds_the_automatic_candidate_and_activates_it_with_the_approval(self) -> None:
         rev1, candidate = self._gar_candidate()
         # run_once가 GAR를 보고한 바로 그 consumed replanning 결과의 후보다.
-        consumed = [json.loads(row[0])["plan"]["plan_revision_id"] for row in self._rows(
-            "SELECT result_json FROM runtime_jobs WHERE project_id=? AND kind='replanning' AND status='consumed'",
+        # M-14 D1: expand checkpoint(`replan_phase`)와 review의 최종 evaluation이 같은 후보를 가리킨다.
+        consumed = [(row[1], json.loads(row[0])["plan"]["plan_revision_id"]) for row in self._rows(
+            "SELECT result_json,checkpoint_key FROM runtime_jobs WHERE project_id=? AND kind='replanning' "
+            "AND status='consumed' ORDER BY rowid",
             self.project_id,
         )]
-        self.assertEqual([candidate], consumed)
+        self.assertEqual([candidate], sorted({plan_id for _key, plan_id in consumed}))
+        self.assertEqual([(f"{consumed[0][0]}:review", candidate)], consumed[1:])
         self.assertEqual(
             "GOAL_AUTHORIZATION_REQUIRED",
             self.application.status(self.project_id)["recovery"]["next_action"]["blocker_code"],

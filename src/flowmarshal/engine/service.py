@@ -7567,7 +7567,7 @@ class EngineService:
             recovery_route,
             replan_retry_assessment_id,
         )
-        from .runtime import REPLAN_JOB_ERROR_NO_PUBLIC_ESCAPE, replan_head
+        from .runtime import REPLAN_JOB_ERROR_NO_PUBLIC_ESCAPE, replan_final_evaluation, replan_head
 
         if not rationale.strip():
             raise EngineServiceError("REPLAN_RETRY_RATIONALE_REQUIRED: 재시도 이유를 남겨야 합니다.")
@@ -7613,6 +7613,13 @@ class EngineService:
                     return self._replan_retry_result(tx, project_id, head, recorded=False)
                 raise not_blocked(self._replan_job_progress_text(tx, observed_head))
             if observed_head.blocker is None:
+                if replan_final_evaluation(tx.connection, project_id, head).review_unreserved:
+                    # M-14 D1 규칙 6: expand 후보는 검증됐지만 독립 review job이 아직 없다.
+                    raise not_blocked(
+                        "재계획 후보는 review 대기 중입니다. 독립 review job이 아직 예약되지 않아 후보가 적격인지는 "
+                        "아직 모릅니다. 재계획 역할 설정이 있는 다음 run-once(CLI는 --role-config)가 review job을 "
+                        "예약합니다."
+                    )
                 raise not_blocked("재계획 후보가 활성화됐거나 다음 run-once가 활성화합니다.")
             code, detail = observed_head.blocker
             evaluation = observed_head.evaluation
@@ -7867,8 +7874,10 @@ class EngineService:
             ) is not None
             if resumable:
                 return (
-                    f"replanning job {head.job_id}의 collector가 끊겼지만 저장된 provider binding이나 결과 "
-                    "checkpoint가 있어 다음 run-once(또는 observe)가 재관측으로 이어 갑니다."
+                    f"replanning job {head.job_id}의 collector가 끊겼고 저장된 provider binding이나 결과 "
+                    "checkpoint가 있습니다. owner lock이 풀려 owner가 없고 절대 deadline과 관측 유예 시간이 "
+                    "지났으며 interrupt 요청 뒤에도 turn 종료가 관측되지 않았으면, run-once는 다시 관측하지 않고 "
+                    "멈추며 명시적 observe가 원래 turn을 관측합니다. 그 밖에는 다음 run-once가 이 job을 판정합니다."
                 )
             # service 계층은 owner lock probe를 갖지 않으므로 durable 사실과 다음 run-once의 규칙만 말한다.
             # 현재 판정은 status로 확인한다는 안내는 거절 wrapper(not_blocked)가 붙인다.

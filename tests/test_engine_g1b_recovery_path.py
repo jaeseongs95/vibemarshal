@@ -42,6 +42,7 @@ from flowmarshal.engine.recovery import (
 from flowmarshal.engine.recovery_planning import RECOVERY_PLAN_REVIEWER_ROLE, RecoveryPlanProvider
 from flowmarshal.engine.runtime import (
     REPLAN_JOB_ERROR_NO_PUBLIC_ESCAPE,
+    REPLAN_PROVIDER_REQUIRED_DETAIL,
     FakeCodexRuntime,
     RuntimeJobSupervisor,
     notify_active_runtime_job_progress,
@@ -361,8 +362,10 @@ class ReplanFacadePathTests(_ReplanHarness, unittest.TestCase):
         scheduled = self.application.run_once(self.project_id)
         self.assertEqual(RunOnceAction.DISPATCHED, scheduled.action, scheduled)
         self.assertEqual("replanning", scheduled.runtime_job_kind)
+        stable_id = stable_recovery_assessment_id(attempt, fingerprint)
+        # M-14 D1: 첫 재계획은 expand·review 두 phase job이다(rowid 순).
         self.assertEqual(
-            [(f"replanning:{stable_recovery_assessment_id(attempt, fingerprint)}", "consumed"),
+            [(f"replanning:{stable_id}", "consumed"), (f"replanning:{stable_id}:review", "consumed"),
              (f"replanning:{retry_id}", "running")],
             self._jobs(),
         )
@@ -1352,14 +1355,30 @@ class ProviderlessHeadJobTests(_ReplanHarness, unittest.TestCase):
         self.assertEqual(RunOnceAction.OBSERVED, terminal.action, terminal)
         self.assertIn("replanning/provider_terminal", terminal.detail)
         self.assertEqual("automatic_pending", bare.status(self.project_id)["recovery"]["state"])
-        recovered = bare.run_once(self.project_id)
-        self.assertEqual(RunOnceAction.RECOVERED, recovered.action, recovered)
+        # M-14 D1(AC21) 재작성: bare는 기존 expand job의 결과를 provider 없이 소비하고, 새 review job을
+        # 예약해야 하는 시점에 provider 부재로 멈춘다.
+        stopped = bare.run_once(self.project_id)
+        self.assertEqual(
+            (RunOnceAction.BLOCKED, "REPLAN_PROVIDER_REQUIRED", REPLAN_PROVIDER_REQUIRED_DETAIL),
+            (stopped.action, stopped.blocker_code, stopped.detail), stopped,
+        )
+        recovery = bare.status(self.project_id)["recovery"]
+        self.assertEqual(("user_decision_required", "REPLAN_PROVIDER_REQUIRED"),
+                         (recovery["state"], recovery["next_action"]["blocker_code"]), recovery)
 
-        # 새 job 행이 없고, 역할 호출은 기존 job이 이미 시작한 두 호출뿐이다.
+        # bare 구간: 새 job 행 없음, 역할 호출은 기존 expand job의 expander 하나, 새 provider_call 없음.
         self.assertEqual(jobs, self._job_ids())
+        self.assertEqual(["plan_expander"], [call.role for call in self.runner.calls][called:])
+        self.assertEqual([], self._provider_call_roles()[len(provider_calls):])
+
+        # provider 있는 인스턴스가 review job을 예약해 끝낸다. expander는 다시 부르지 않는다.
+        recovered = self._until_recovered_activation()
+        self.assertEqual(RunOnceAction.RECOVERED, recovered.action, recovered)
+        self.assertEqual(jobs, self._job_ids()[:len(jobs)])
+        expand_key = self._jobs()[-2][0]
+        self.assertEqual([(expand_key, "consumed"), (f"{expand_key}:review", "consumed")], self._jobs()[-2:])
         self.assertEqual(["plan_expander", RECOVERY_PLAN_REVIEWER_ROLE],
                          [call.role for call in self.runner.calls][called:])
-        # bare 인스턴스 구간의 새 provider_call은 기존 job의 recovery reviewer 하나뿐이다.
         self.assertEqual([RECOVERY_PLAN_REVIEWER_ROLE], self._provider_call_roles()[len(provider_calls):])
         self.assertEqual(2, self._plan(self._active_plan_id()).revision_no)
         self.assertEqual("recovered", bare.status(self.project_id)["recovery"]["state"])
