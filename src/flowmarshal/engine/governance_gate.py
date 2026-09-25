@@ -506,8 +506,11 @@ class GovernancePlugin:
     계산한다. 플러그인의 .git, 버전, 기대 digest는 보지 않는다.
     """
 
-    def __init__(self, root: Path, state_dir: Path, model_classes: Path | None = None) -> None:
+    def __init__(self, root: Path, state_dir: Path, model_classes: Path | None = None, *,
+                 dispatch_binding: Any | None = None) -> None:
         self.root, self.state_dir, self.model_classes_path = root, state_dir, model_classes
+        # 인증 dispatch의 profile binding은 생성 때 한 번 정하고 바꾸지 않는다(없으면 보호 VM vm/*).
+        self._dispatch_binding = dispatch_binding
         state_dir.mkdir(parents=True, exist_ok=True)
         self.env = {**os.environ,
                     "AGENT_GOVERNANCE_HOST_ATTESTATION": HOST_ID,
@@ -646,12 +649,16 @@ class GovernancePlugin:
         """preflight가 읽은 「관측 model → class」 대응표. A2 서명의 modelClass 주장은 여기서만 나온다."""
         return dict(self._model_classes)
 
+    @property
+    def dispatch_binding(self) -> Any | None:
+        return self._dispatch_binding
+
     def authenticated_dispatch(self) -> Any:
         from .ags_invocation_transport import AuthenticatedDispatchTransport
 
         with self._dispatch_lock:
             if self._dispatch is None:
-                self._dispatch = AuthenticatedDispatchTransport(self._client())
+                self._dispatch = AuthenticatedDispatchTransport(self._client(), self._dispatch_binding)
             return self._dispatch
 
     def approved_slot_control(self) -> Any:
@@ -690,6 +697,15 @@ class GovernancePlugin:
                 self._mcp.close()
                 self._mcp = None
             self._dispatch = None
+
+
+def _dispatch_binding(producer: Any) -> Any | None:
+    """producer가 서명 body에 넣는 profile binding. 보호 VM producer(profile 없음)는 None이다."""
+    if producer.profile_id is None:
+        return None
+    from .ags_invocation_transport import DispatchBinding
+
+    return DispatchBinding(producer.profile_id, producer.freeze_identity)
 
 
 def _active_goal(service: Any, project_id: str) -> Any:
@@ -860,7 +876,8 @@ class GovernanceSettings:
 
         # 제품 경로의 gate에는 항상 런타임 적합성 분기를 결속한다.
         return GovernanceTaskGate(
-            service, plugin=GovernancePlugin(self.plugin_root, self.state_dir / "plugin", self.model_classes),
+            service, plugin=GovernancePlugin(self.plugin_root, self.state_dir / "plugin", self.model_classes,
+                                             dispatch_binding=_dispatch_binding(self.observation_producer)),
             steward=RoleSteward(service, runtime=runtime, roles=roles, runner=runner,
                                 cwd=self.state_dir / "steward-cwd"),
             state_dir=self.state_dir, conformance=self.check_conformance, conformance_check_set=CHECK_SET_DIGEST,
@@ -975,6 +992,11 @@ class GovernanceTaskGate:
              observation: dict[str, Any] | None, *, replay: bool) -> dict[str, Any]:
         request = {"tool": tool, "arguments": arguments, "observation": observation}
         if self.producer is not None and observation is not None:
+            # plugin의 dispatch 이름공간은 이 producer의 profile과 같아야 한다. 다르면 원장·서명 전에 멈춘다.
+            expected = _dispatch_binding(self.producer)
+            observed = getattr(self.plugin, "dispatch_binding", expected)
+            if observed != expected:
+                raise GovernanceContractMismatch("dispatch_profile", expected, observed)
             with self.service.ledger.read() as connection:
                 project = connection.execute(
                     "SELECT active_goal_revision_id FROM projects WHERE id=?", (task["project_id"],)
