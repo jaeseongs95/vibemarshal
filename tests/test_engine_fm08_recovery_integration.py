@@ -723,7 +723,7 @@ class EngineFm08RecoveryIntegrationTests(unittest.TestCase):
                 (self.project_id,),
             ).fetchall()
             jobs = connection.execute(
-                "SELECT kind,status FROM runtime_jobs WHERE project_id=? "
+                "SELECT kind,status,checkpoint_key FROM runtime_jobs WHERE project_id=? "
                 "AND kind IN ('recovery','replanning') ORDER BY created_at,rowid",
                 (self.project_id,),
             ).fetchall()
@@ -744,10 +744,12 @@ class EngineFm08RecoveryIntegrationTests(unittest.TestCase):
             [(original_plan_id, 1, "superseded", None), (active_plan_id, 2, "active", original_plan_id)],
             [tuple(row) for row in plan_rows],
         )
+        # M-14 D1: 재계획은 역할 turn마다 job 하나다(expand `replanning:{ID}` 뒤 review `…:review`).
         self.assertEqual(
-            [("recovery", "consumed"), ("replanning", "consumed")],
+            [("recovery", "consumed"), ("replanning", "consumed"), ("replanning", "consumed")],
             [(row["kind"], row["status"]) for row in jobs],
         )
+        self.assertEqual(f"{jobs[1]['checkpoint_key']}:review", jobs[2]["checkpoint_key"])
         self.assertIn(RECOVERY_PLAN_REVIEWER_ROLE, [row["reviewer_role"] for row in reviews])
         self.assertNotEqual(
             RECOVERY_PLAN_REVIEWER_ROLE, reviews[0]["reviewer_role"],

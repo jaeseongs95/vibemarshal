@@ -1198,7 +1198,29 @@ class EngineApplication:
                 if job.status is RuntimeJobStatus.PROVIDER_TERMINAL:
                     job = self._dispatcher().finalize_cancelled_runtime_job(job.job_id)
             elif job.status is RuntimeJobStatus.COLLECTOR_LOST and job.thread_id is not None:
-                job = self.supervisor.reattach(job.job_id)
+                from .runtime import (
+                    OwnerLockState,
+                    RuntimeOwnerLockUnavailable,
+                    _bound_target,
+                    _release_owner_lease,
+                )
+
+                if not _bound_target(job):
+                    job = self.supervisor.reattach(job.job_id)  # dispatch kind: 기존 그대로
+                else:
+                    # bound target kind: owner lease가 FREE일 때만 lease를 쥔 채 원래 turn을 다시 관측한다.
+                    # HELD_OTHER·ABSENT·lock 오류는 원장을 바꾸지 않는다(판정 사유는 status가 보인다).
+                    try:
+                        state, lease = self.supervisor._job_lease(job)
+                    except RuntimeOwnerLockUnavailable:
+                        state, lease = None, None
+                    if state is OwnerLockState.FREE:
+                        try:
+                            job = self.supervisor.reattach(job.job_id)
+                        finally:
+                            _release_owner_lease(lease)
+                    elif state is OwnerLockState.HELD_SELF:
+                        job = self.supervisor.tick(job.job_id)
             else:
                 job = self.supervisor.tick(job.job_id)
         return {
@@ -1788,21 +1810,25 @@ class EngineApplication:
         return tuple(codes)
 
     def _unbound_job_verdict(self, job: RuntimeJob | None) -> Any:
-        """binding 없는 활성 job을 run_once 라우터와 같은 분류 함수로 판정한다(AC18).
+        """binding 없는 활성 job과 bound target kind job을 run_once 라우터와 같은 분류 함수로 판정한다(AC18).
 
         읽기 전용 probe(lock 파일을 만들지 않고 registry·원장에 쓰지 않음)와 AC1 predicate만 넘긴다.
-        bound job이거나 활성 job이 없으면 None이다.
+        dispatch kind의 bound job이거나 활성 job이 없으면 None이다.
         """
 
-        if job is None or job.thread_id is not None:
+        if job is None:
             return None
         from .domain import utc_now
         from .runtime import (
             RuntimeOwnerLockUnavailable,
+            _bound_target,
             classify_unbound_runtime_job,
             probe_owner_lock,
             runtime_owner_lock_path,
         )
+
+        if job.thread_id is not None and not _bound_target(job):
+            return None
 
         try:
             lock_state = probe_owner_lock(
@@ -1911,7 +1937,11 @@ class EngineApplication:
         limit_detail = None
         replan_blocker = None
         if route.mode == "automatic":
-            from .runtime import REPLAN_PROVIDER_REQUIRED_DETAIL, replan_candidate_blocker
+            from .runtime import (
+                REPLAN_PROVIDER_REQUIRED_DETAIL,
+                replan_candidate_blocker,
+                replan_final_evaluation,
+            )
 
             with self.service.ledger.read() as connection:
                 # assessment_id는 run_once와 같은 head(`current_replan_assessment`)다.
@@ -1922,10 +1952,8 @@ class EngineApplication:
                     attempt_id=target["attempt_id"],
                     diagnosis=diagnosis,
                 )
-                replan_job = connection.execute(
-                    "SELECT 1 FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
-                    (project_id, f"replanning:{observation.assessment_id}"),
-                ).fetchone()
+                # run_once `_automatic_subgraph_replan`과 같은 reader(규칙 1~6)로 phase job을 읽는다.
+                replan_read = replan_final_evaluation(connection, project_id, observation.assessment_id)
             limits = RecoveryLimitStatus.model_validate(
                 observation.model_dump(mode="json")
             )
@@ -1938,10 +1966,10 @@ class EngineApplication:
                 replan_blocker is None
                 and diagnosis.repair_action is RepairAction.SUBGRAPH_REPLAN
                 and observation.assessment_recorded
-                and replan_job is None
+                and (replan_read.current_job is None or replan_read.review_unreserved)
                 and not self.recovery_provider_available()
             ):
-                # run_once는 새 replanning job을 예약해야 할 때 provider가 없으면 멈춘다.
+                # run_once는 새 replanning job(expand 또는 review)을 예약해야 할 때 provider가 없으면 멈춘다.
                 replan_blocker = ("REPLAN_PROVIDER_REQUIRED", REPLAN_PROVIDER_REQUIRED_DETAIL)
         classification = RecoveryClassification(
             task_id=target["task_id"],

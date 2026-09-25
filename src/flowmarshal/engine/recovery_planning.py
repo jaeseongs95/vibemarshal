@@ -16,9 +16,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
+from ..canonical import sha256_digest
 from .domain import (
+    EngineModel,
     ModelAssignmentContract,
     ModelFallback,
     PlanContractRevision,
@@ -32,6 +34,7 @@ from .models import EngineRoleConfiguration, ModelInventory
 from .plan_inspection_provider import PLAN_INSPECTION_PROVIDER_V1
 from .role_budget import replan_budget
 from .roles import StructuredRolePort
+from .runtime import REPLAN_JOB_ERROR_NO_PUBLIC_ESCAPE
 from .service import EngineService
 
 #: 원 planning reviewer와 구분되는 복구 전용 독립 검토 역할.
@@ -40,6 +43,69 @@ RECOVERY_PLAN_REVIEWER_ROLE = "recovery_plan_reviewer"
 
 class RecoveryPlanError(RuntimeError):
     """재계획 입력이 원장 상태와 결속되지 않았을 때의 오류."""
+
+
+#: review 입력 결속이 어긋났을 때 detail의 접두다. code·enum이 아니다(설계 v5.1 D1 §6).
+REVIEW_INPUT_MISMATCH = "RECOVERY_REPLAN_REVIEW_INPUT_MISMATCH"
+
+
+class ReplanExpansionCheckpoint(EngineModel):
+    """review가 필요한 expand·refine phase의 결과. decision이 없어 이것만으로는 등록·활성화되지 않는다.
+
+    최상위 `plan`은 retry assessment ID 파생(`recovery.current_replan_assessment`)이 읽는 자리다.
+    최종 evaluation은 별도 review job의 `review_replan`만 만든다.
+    """
+
+    replan_phase: Literal["expand"]
+    plan: PlanContractRevision
+    deterministic_findings: tuple[()] = ()
+    review_required: Literal[True]
+
+
+def review_input_mismatch(cause: str, *, unknown: str) -> str:
+    """review 입력 불일치 detail: 원인 → 모르는 것 → 지금 할 행동 순서다."""
+
+    return (
+        f"{REVIEW_INPUT_MISMATCH}: {cause} {unknown} "
+        "review 역할과 expander를 자동으로 다시 부르지 않습니다. replan으로는 이 상태가 풀리지 않습니다. "
+        + REPLAN_JOB_ERROR_NO_PUBLIC_ESCAPE
+    )
+
+
+def replan_expansion_mismatch(expand_row: Any) -> tuple[ReplanExpansionCheckpoint | None, str | None]:
+    """소비된 expand 행의 결과를 review 입력으로 검증한다(설계 v5.1 D1 §6 (i)(ii)(iii)).
+
+    (i) `result_json`의 canonical digest를 다시 계산해 `result_digest` 열과 대조하고, (ii) strict
+    `ReplanExpansionCheckpoint`로 파싱하고, (iii) Plan 본문을 저장 모양 그대로 다시 검증한다.
+    통과하면 (checkpoint, None), 어긋나면 (None, detail)이다. raise 여부는 호출자가 정한다
+    (Core의 review 예약 전 reader는 typed 반환, review worker는 `RecoveryPlanError`).
+    """
+
+    job_id = expand_row["id"]
+    try:
+        recomputed = sha256_digest(json.loads(expand_row["result_json"]))
+    except (TypeError, ValueError) as error:
+        return None, review_input_mismatch(
+            f"expand job {job_id}의 result_json을 JSON으로 읽을 수 없습니다({type(error).__name__}).",
+            unknown="결과가 언제 어떻게 바뀌었는지는 모릅니다.",
+        )
+    if recomputed != expand_row["result_digest"]:
+        return None, review_input_mismatch(
+            f"expand job {job_id}의 result_json에서 다시 계산한 canonical digest {recomputed}가 "
+            f"result_digest 열 {expand_row['result_digest']}와 다릅니다.",
+            unknown="result_json과 result_digest 가운데 어느 쪽이 바뀌었는지는 모릅니다.",
+        )
+    try:
+        checkpoint = ReplanExpansionCheckpoint.model_validate_json(expand_row["result_json"])
+        PlanContractRevision.model_validate_json(checkpoint.plan.model_dump_json())
+    except ValueError as error:
+        first = (str(error).splitlines() or [""])[0]
+        return None, review_input_mismatch(
+            f"expand job {job_id}의 result_json이 ReplanExpansionCheckpoint 형식과 맞지 않습니다"
+            f"({type(error).__name__}: {first[:300]}).",
+            unknown="결과가 언제 어떻게 바뀌었는지는 모릅니다.",
+        )
+    return checkpoint, None
 
 
 def _assignment(binding: Any, *, role: str) -> RoleAssignmentPolicy:
@@ -227,7 +293,7 @@ class RecoveryPlanProvider:
         같은 Plan의 다음 revision을 만들 수 있으므로 그 입력을 digest로 읽어 함께 돌려준다.
         """
 
-        from .planning import ExpandedPlanEvaluation
+        from .runtime import replan_final_evaluation
 
         assessment_id = getattr(assessment, "assessment_id", None)
         if assessment_id is None:
@@ -243,14 +309,10 @@ class RecoveryPlanProvider:
             request = json.loads(event["payload_json"])
             if request["basis"]["kind"] != "candidate_needs_revision":
                 return None
-            job = connection.execute(
-                "SELECT result_json FROM runtime_jobs WHERE project_id=? AND checkpoint_key=? "
-                "AND status='consumed'",
-                (project_id, f"replanning:{request['prior_assessment_id']}"),
-            ).fetchone()
-            blocked = None if job is None else ExpandedPlanEvaluation.model_validate_json(
-                job["result_json"]
-            )
+            # 차단 후보의 최종 evaluation은 run_once·status와 같은 reader(규칙 1~6)로 읽는다.
+            blocked = replan_final_evaluation(
+                connection, project_id, request["prior_assessment_id"],
+            ).final
             if blocked is None or blocked.plan.plan_revision_id != request["blocked_plan_revision_id"]:
                 raise RecoveryPlanError(
                     "RECOVERY_REPLAN_BASIS_NOT_FOUND: 재시도 basis의 차단 후보 결과가 원장과 다릅니다."
@@ -271,6 +333,17 @@ class RecoveryPlanProvider:
             ProjectMapRevision.model_validate_json(project_map["payload_json"]),
         )
 
+    def _budgeted_runner(self, project_id: str, goal: Any) -> Any:
+        from .budget import BudgetedRoleRunner
+
+        return BudgetedRoleRunner(
+            self.runner,
+            self.service,
+            project_id=project_id,
+            goal_id=goal.goal_id,
+            goal_digest=goal.definition_digest,
+        )
+
     def replan(
         self,
         *,
@@ -280,22 +353,18 @@ class RecoveryPlanProvider:
         evidence_documents: tuple[dict[str, Any], ...] = (),
         inventory: ModelInventory,
     ) -> Any:
-        """실패 Task subgraph를 교체한 새 Plan revision과 Core 재계산 decision을 만든다."""
+        """expand·refine phase: 실패 Task subgraph를 교체한 새 Plan revision을 만든다.
+
+        역할 turn은 expander(또는 refiner) 하나다. deterministic finding이 없으면 review가 필요하므로
+        decision 없는 `ReplanExpansionCheckpoint`를 돌려주고, 독립 검토는 별도 review job의
+        `review_replan`이 자기 turn에서 한다(설계 v5.1 D1). deterministic finding이 있으면 review 없이
+        Core 재계산 decision의 최종 evaluation이다.
+        """
 
         del evidence_documents  # 실패 근거는 Core assessment에 이미 결속돼 있다.
-        from .budget import BudgetedRoleRunner
         from .models import AssignmentResolver
-        from .planner_roles import (
-            PlanExpanderAdapter,
-            PlanReviewerAdapter,
-            RuleBasedTaskAssigner,
-        )
-        from .planning import (
-            ExpandedPlanEvaluation,
-            plan_gate,
-            plan_review_evidence_catalog,
-        )
-        from .domain import validate_reviewer_submission_evidence
+        from .planner_roles import PlanExpanderAdapter, RuleBasedTaskAssigner
+        from .planning import ExpandedPlanEvaluation, plan_gate
 
         self.roles.validate_inventory(inventory)
         plan, skeleton = self._active_plan(project_id)
@@ -317,7 +386,6 @@ class RecoveryPlanProvider:
             project_map = self.service.load_current_project_map(project_id)
         else:
             blocked, state, project_map = needs_revision
-        root = Path(project_map.root)
 
         assignment = ModelAssignmentContract(
             executor=_assignment(self.roles.executor, role="executor"),
@@ -326,27 +394,17 @@ class RecoveryPlanProvider:
         )
         AssignmentResolver().resolve_contract(assignment, inventory)
         assigner = RuleBasedTaskAssigner(assignment, assignment, assignment)
-        runner = BudgetedRoleRunner(
-            self.runner,
-            self.service,
-            project_id=project_id,
-            goal_id=goal.goal_id,
-            goal_digest=goal.definition_digest,
-        )
-        common = {
-            "inventory_digest": inventory.inventory_digest,
-            "inventory": inventory,
-            "cwd": root,
-        }
         with replan_budget():
             expander = PlanExpanderAdapter(
-                runner,
+                self._budgeted_runner(project_id, goal),
                 assigner,
                 model=self.roles.plan_expander.model,
                 effort=self.roles.plan_expander.effort,
                 allowed_fallbacks=self.roles.plan_expander.allowed_fallbacks,
                 inspection_provider_contract=self.inspection_contract,
-                **common,
+                inventory_digest=inventory.inventory_digest,
+                inventory=inventory,
+                cwd=Path(project_map.root),
             )
             if needs_revision is None:
                 # previous_plan 없이 상세화한다. 역할 입력(payload)은 previous_plan을 쓰지 않으므로
@@ -384,45 +442,141 @@ class RecoveryPlanProvider:
                 state=state,
                 project_map=project_map,
             )
-            submissions = ()
-            if not deterministic:
-                submission = PlanReviewerAdapter(
-                    runner,
-                    model=self.roles.general_reviewer.model,
-                    effort=self.roles.general_reviewer.effort,
-                    allowed_fallbacks=self.roles.general_reviewer.allowed_fallbacks,
-                    critical_model=self.roles.critical_reviewer.model,
-                    critical_effort=self.roles.critical_reviewer.effort,
-                    critical_allowed_fallbacks=self.roles.critical_reviewer.allowed_fallbacks,
-                    inspection_provider_contract=self.inspection_contract,
-                    **common,
-                ).review(
-                    plan=replacement,
-                    goal=goal,
-                    state=state,
-                    project_map=project_map,
-                    risk_route=self.reviewer_role,
-                )
-                validate_reviewer_submission_evidence(
-                    submission,
-                    evidence_catalog=plan_review_evidence_catalog(
-                        replacement, goal, state, project_map
-                    ),
-                    known_task_refs={
-                        item.task_ref for item in replacement.definition.tasks
-                    },
-                )
-                submissions = (submission,)
-        findings = deterministic + tuple(
-            finding for submission in submissions for finding in submission.findings
-        )
+        if not deterministic:
+            return ReplanExpansionCheckpoint(
+                replan_phase="expand", plan=replacement, review_required=True,
+            )
         return ExpandedPlanEvaluation(
             plan=replacement,
             deterministic_findings=deterministic,
-            semantic_submissions=submissions,
+            semantic_submissions=(),
             decision=derive_candidate_decision(
                 candidate_digest=replacement.activation_digest,
-                findings=findings,
-                ratings=submissions[0].ratings if submissions and not findings else None,
+                findings=deterministic,
+                ratings=None,
+            ),
+        )
+
+    def review_replan(
+        self,
+        *,
+        project_id: str,
+        task_id: str,
+        assessment: Any,
+        inventory: ModelInventory,
+    ) -> Any:
+        """review phase: expand checkpoint의 교체 Plan을 독립 검토해 최종 evaluation을 만든다.
+
+        입력은 closure가 아니라 원장에서 읽는다. 이 assessment의 `:review` job request로 expand 행을
+        다시 읽어 결속(project·task·assessment, expand_job_id, 재계산 digest = result_digest 열 = request 값,
+        checkpoint Plan activation digest = request 값, active Goal digest = Plan goal digest)을 대조하고,
+        하나라도 어긋나면 역할 호출 전에 `RecoveryPlanError`다. 최초 실행과 재시작이 같은 경로다.
+        """
+
+        from .domain import validate_reviewer_submission_evidence
+        from .planner_roles import PlanReviewerAdapter
+        from .planning import ExpandedPlanEvaluation, plan_review_evidence_catalog
+
+        def mismatch(cause: str) -> RecoveryPlanError:
+            return RecoveryPlanError(review_input_mismatch(
+                cause, unknown="어느 쪽이 언제 바뀌었는지는 모릅니다.",
+            ))
+
+        self.roles.validate_inventory(inventory)
+        assessment_id = getattr(assessment, "assessment_id", None)
+        expand_key = f"replanning:{assessment_id}"
+        with self.service.ledger.read() as connection:
+            review_row = connection.execute(
+                "SELECT * FROM runtime_jobs WHERE project_id=? AND checkpoint_key=?",
+                (project_id, f"{expand_key}:review"),
+            ).fetchone()
+            request = {} if review_row is None else json.loads(review_row["request_json"])
+            expand_row = connection.execute(
+                "SELECT * FROM runtime_jobs WHERE id=? AND project_id=? AND checkpoint_key=?",
+                (request.get("expand_job_id"), project_id, expand_key),
+            ).fetchone()
+        if review_row is None or request.get("replan_phase") != "review":
+            raise mismatch(f"review job {expand_key}:review의 review phase 요청이 원장에 없습니다.")
+        if (
+            review_row["task_id"] != task_id
+            or not isinstance(request.get("assessment"), dict)
+            or request["assessment"].get("assessment_id") != assessment_id
+        ):
+            raise mismatch(
+                f"review job {review_row['id']}의 task·assessment 결속이 이 review 호출"
+                f"(task {task_id}, assessment {assessment_id})과 다릅니다."
+            )
+        if expand_row is None or expand_row["status"] != "consumed" or expand_row["task_id"] != task_id:
+            raise mismatch(
+                f"review job {review_row['id']}의 expand_job_id {request.get('expand_job_id')}가 "
+                f"이 assessment의 소비된 expand 행({expand_key})과 결속되지 않습니다."
+            )
+        expansion, detail = replan_expansion_mismatch(expand_row)
+        if detail is not None:
+            raise RecoveryPlanError(detail)
+        if request.get("expand_result_digest") != expand_row["result_digest"]:
+            raise mismatch(
+                f"review request의 expand_result_digest {request.get('expand_result_digest')}가 expand 행의 "
+                f"result_digest 열 {expand_row['result_digest']}(재계산 값과 같음)과 다릅니다."
+            )
+        plan = expansion.plan
+        if request.get("activation_digest") != plan.activation_digest:
+            raise mismatch(
+                f"review request의 activation_digest {request.get('activation_digest')}가 expand checkpoint "
+                f"Plan의 activation digest {plan.activation_digest}와 다릅니다."
+            )
+        goal = self.service.load_active_goal(project_id)
+        if goal.definition_digest != plan.definition.goal_contract_digest:
+            raise mismatch(
+                f"active Goal의 definition_digest {goal.definition_digest}가 교체 Plan의 "
+                f"goal_contract_digest {plan.definition.goal_contract_digest}와 다릅니다."
+            )
+        with self.service.ledger.read() as connection:
+            state_row = connection.execute(
+                "SELECT payload_json FROM state_snapshots WHERE project_id=? AND snapshot_digest=?",
+                (project_id, plan.definition.base_state_snapshot_digest),
+            ).fetchone()
+            map_row = connection.execute(
+                "SELECT payload_json FROM project_map_revisions WHERE project_id=? "
+                "AND revision_digest=?",
+                (project_id, plan.definition.project_map_digest),
+            ).fetchone()
+        if state_row is None or map_row is None:
+            raise mismatch("교체 Plan이 결속한 StateSnapshot·ProjectMap이 원장에 없습니다.")
+        state = StateSnapshot.model_validate_json(state_row["payload_json"])
+        project_map = ProjectMapRevision.model_validate_json(map_row["payload_json"])
+        with replan_budget():
+            submission = PlanReviewerAdapter(
+                self._budgeted_runner(project_id, goal),
+                model=self.roles.general_reviewer.model,
+                effort=self.roles.general_reviewer.effort,
+                allowed_fallbacks=self.roles.general_reviewer.allowed_fallbacks,
+                critical_model=self.roles.critical_reviewer.model,
+                critical_effort=self.roles.critical_reviewer.effort,
+                critical_allowed_fallbacks=self.roles.critical_reviewer.allowed_fallbacks,
+                inspection_provider_contract=self.inspection_contract,
+                inventory_digest=inventory.inventory_digest,
+                inventory=inventory,
+                cwd=Path(project_map.root),
+            ).review(
+                plan=plan,
+                goal=goal,
+                state=state,
+                project_map=project_map,
+                risk_route=self.reviewer_role,
+            )
+            validate_reviewer_submission_evidence(
+                submission,
+                evidence_catalog=plan_review_evidence_catalog(plan, goal, state, project_map),
+                known_task_refs={item.task_ref for item in plan.definition.tasks},
+            )
+        return ExpandedPlanEvaluation(
+            plan=plan,
+            deterministic_findings=(),
+            semantic_submissions=(submission,),
+            decision=derive_candidate_decision(
+                candidate_digest=plan.activation_digest,
+                findings=submission.findings,
+                ratings=submission.ratings if not submission.findings else None,
             ),
         )
