@@ -6214,20 +6214,18 @@ class EngineService:
             "AND event_type='provider_effect.confirmed' ORDER BY sequence",
             (task["project_id"], call["id"]),
         )
-        # terminal 효과에는 같은 receipt·identity의 기존 확인이 있어야 한다.
-        if call["effect_status"] == "terminal" and not any(
+        already_confirmed = any(
             json.loads(item["payload_json"]).get("effect_identity_digest")
             == observation.effect_identity_digest
             and json.loads(item["payload_json"]).get("provider_receipt_digest")
             == observation.receipt_digest
             for item in prior_confirmations
-        ):
+        )
+        # terminal 효과에는 같은 receipt·identity의 기존 확인이 있어야 한다.
+        if call["effect_status"] == "terminal" and not already_confirmed:
             raise EngineServiceError("EFFECT_ADAPTER_RECEIPT_BINDING_MISMATCH")
-        if any(
-            json.loads(item["payload_json"]).get("binding_digest")
-            == sha256_digest(binding)
-            for item in prior_confirmations
-        ):
+        # 후속 관측의 시각·provenance는 evidence/validation에 남기고 효과는 다시 확인하지 않는다.
+        if already_confirmed:
             return
         tx.history(
             task["project_id"], "provider_effect.confirmed", "provider_call", call["id"],

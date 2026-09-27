@@ -1085,6 +1085,76 @@ class TypedExternalObservationAtomicityTests(EngineServiceFixture):
         self.record(self.identityless("validation_ext_b"))
         self.service.complete_task(self.task.task_id)
 
+    def test_later_observations_append_provenance_without_reconfirming_effect(self):
+        self.finish_with_task_validation()
+        before = self.snapshot()
+        confirmations = tuple(row for row in before["history_events"]
+                              if row[3] == "provider_effect.confirmed")
+        self.assertEqual(2, len(confirmations))
+        first = self.observe()
+        second = first.model_copy(update={"observed_at": first.observed_at + timedelta(microseconds=1)})
+        for index, observation in enumerate((first, second, second), 1):
+            with self.subTest(observed_at=observation.observed_at, replay=index == 3):
+                result = self.record(observation)
+                self.assertEqual(ValidationStatus.PASS, result.status)
+                self.assertEqual(observation.observed_at, result.evaluated_at)
+                after = self.snapshot()
+                self.assertEqual(len(before["evidence_records"]) + index, len(after["evidence_records"]))
+                self.assertEqual(len(before["validation_results"]) + index, len(after["validation_results"]))
+                # 기존 confirmation을 포함한 History 원문은 변경하지 않고 관측만 append한다.
+                self.assertEqual(before["history_events"], after["history_events"][:len(before["history_events"])])
+                with self.ledger.read() as connection:
+                    row = connection.execute("SELECT payload_json FROM evidence_records WHERE id=?",
+                                             (result.evidence_ids[0],)).fetchone()
+                evidence = EvidenceRecord.model_validate_json(row[0])
+                self.assertEqual(observation.observed_at, evidence.observed_at)
+                self.assertEqual(f"{observation.provider}:{observation.selector}", evidence.source_ref)
+                self.assertEqual(observation.model_dump(mode="json"), json.loads(evidence.observation))
+                self.assertEqual(sha256_digest({"kind": evidence.kind.value, "typed_observation": observation}),
+                                 evidence.content_digest)
+                self.assertEqual(confirmations, tuple(row for row in after["history_events"]
+                                                      if row[3] == "provider_effect.confirmed"))
+                self.assertEqual(before["provider_calls"], after["provider_calls"])
+                self.assertEqual(before["attempts"], after["attempts"])
+        self.service.complete_task(self.task.task_id)
+
+    def test_confirmed_identity_is_not_reconfirmed_while_another_effect_is_unknown(self):
+        first = self.observe(validation_id="validation_ext_a")
+        self.record(first)
+        before = self.snapshot()
+        confirmations = tuple(row for row in before["history_events"]
+                              if row[3] == "provider_effect.confirmed")
+        self.assertEqual(1, len(confirmations))
+        with self.ledger.read() as connection:
+            self.assertEqual("unknown", connection.execute("SELECT effect_status FROM provider_calls WHERE id=?",
+                                                          (self.call_id,)).fetchone()[0])
+        result = self.record(first.model_copy(update={"observed_at": first.observed_at + timedelta(microseconds=1)}))
+        self.assertEqual(ValidationStatus.PASS, result.status)
+        after = self.snapshot()
+        self.assertEqual(len(before["evidence_records"]) + 1, len(after["evidence_records"]))
+        self.assertEqual(len(before["validation_results"]) + 1, len(after["validation_results"]))
+        self.assertEqual(confirmations, tuple(row for row in after["history_events"]
+                                              if row[3] == "provider_effect.confirmed"))
+        self.assertEqual(before["provider_calls"], after["provider_calls"])
+        self.assertEqual(before["history_events"], after["history_events"][:len(before["history_events"])])
+        self.record(self.observe(self.identities[1], self.receipts[1], validation_id="validation_ext_a"))
+        with self.ledger.read() as connection:
+            self.assertEqual("terminal", connection.execute("SELECT effect_status FROM provider_calls WHERE id=?",
+                                                           (self.call_id,)).fetchone()[0])
+        self.assertEqual(2, sum(row[3] == "provider_effect.confirmed"
+                               for row in self.snapshot()["history_events"]))
+
+    def test_confirmed_effect_still_rejects_stale_or_mismatched_observations_atomically(self):
+        self.finish_with_task_validation()
+        self.rejected_without_change(self.observe(observed_at=utc_now() - timedelta(days=1)),
+                                     "EFFECT_TARGET_OBSERVATION_PRECEDES_RECEIPT")
+        for receipt in (self.receipts[1], sha256_digest("unrecorded-followup")):
+            with self.subTest(receipt=receipt):
+                self.rejected_without_change(self.observe(receipt=receipt),
+                                             "EFFECT_ADAPTER_RECEIPT_BINDING_MISMATCH")
+        self.rejected_without_change(self.observe(self.identities[0].model_copy(update={"target": "repo:other/name"})),
+                                     "EFFECT_TARGET_OBSERVATION_IDENTITY_MISMATCH")
+
     def test_stale_receipt_observation_rejected_without_state_change(self):
         self.rejected_without_change(self.observe(observed_at=utc_now() - timedelta(days=1)),
                                      "EFFECT_TARGET_OBSERVATION_PRECEDES_RECEIPT")
