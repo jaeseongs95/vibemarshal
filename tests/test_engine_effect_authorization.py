@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 import unittest
 from datetime import timedelta
+from contextlib import contextmanager
+from unittest.mock import patch
 
 from pydantic import ValidationError
 
@@ -13,7 +16,7 @@ from flowmarshal.engine.domain import (
     ApprovalClass, BudgetStage, CriterionVerdict, EffectContract, EffectIdentity, EvidenceKind,
     EvidenceRecord, ExternalValidationObservation, FailureClass, GoalContractRevision, GoalVerdict,
     GoalVerdictStatus, MutationPolicy, RevisionStatus, TaskKind, ValidationResult,
-    ValidationStatus, RuntimeIntentKind, ThreadBinding, ExecutionAction,
+    ValidationStatus, RuntimeIntentKind, ThreadBinding, ExecutionAction, ValidationContract, ValidationExecutionStep,
     derive_candidate_decision, new_id, utc_now,
 )
 from flowmarshal.engine.planning import (
@@ -21,6 +24,7 @@ from flowmarshal.engine.planning import (
     plan_gate, skeleton_gate, skeleton_review_evidence_catalog,
 )
 from flowmarshal.engine.service import EngineServiceError
+from flowmarshal.engine.ledger import EngineTransaction
 from flowmarshal.engine.worker_prompt import assemble_worker_prompt
 from tests import engine_helpers as fixtures
 from tests.test_engine_ledger_service import EngineServiceFixture
@@ -876,6 +880,276 @@ class EngineEffectAuthorizationTests(EngineServiceFixture):
             row = connection.execute("SELECT authorization_id FROM plan_activations").fetchone()
         self.assertEqual(authorization.authorization_id, row[0])
         self.assertEqual((task.task_id,), self.service.list_ready_tasks(self.project_id))
+
+
+class TypedExternalObservationAtomicityTests(EngineServiceFixture):
+    """공개 관측 경로의 원자성과 확인된 효과의 후속 검증을 보호한다."""
+
+    def setUp(self):
+        super().setUp()
+        self.identities = (
+            EngineEffectAuthorizationTests.effect_identity(),
+            EngineEffectAuthorizationTests.effect_identity().model_copy(update={
+                "operation": "publish-assets", "scope": "release-assets:v1",
+                "idempotency_key": "release-assets-v1-idempotent",
+            }),
+        )
+        effects = tuple(EffectContract(
+            effect_id=f"publish_{index}", external=True, reversible=True,
+            statement=f"publish_{index}", identity_version="2.0", identity=identity,
+        ) for index, identity in enumerate(self.identities, 1))
+        policy = self.goal.definition.effect_policy.model_copy(update={
+            "allowed_external_effects": tuple(effect.effect_id for effect in effects),
+            "allowed_external_effect_contracts": self.identities,
+        })
+        self.goal = EngineEffectAuthorizationTests.revised_goal(self, policy)
+        self.service.register_goal(self.goal)
+        self.state = fixtures.state(self.project_id, self.goal.definition_digest, self.map.revision_digest)
+        self.service.record_state_snapshot(self.state)
+        self.skeleton = fixtures.skeleton(self.goal, self.state)
+        review = fixtures.clean_review(
+            sha256_digest(self.skeleton), role="skeleton_reviewer",
+            evidence_catalog=skeleton_review_evidence_catalog(self.skeleton, self.goal, self.state, self.map),
+        )
+        self.service.record_skeleton_evaluation(CandidateEvaluation(
+            candidate=self.skeleton, semantic_submission=review,
+            decision=derive_candidate_decision(candidate_digest=sha256_digest(self.skeleton),
+                                              findings=(), ratings=review.ratings),
+        ))
+        self.plan, task, _ = fixtures.plan(
+            self.project_id, self.goal, self.state, self.map.revision_digest, self.skeleton, self.inventory,
+        )
+        self.task = task.model_copy(update={
+            "expected_effects": effects,
+            "validations": (*task.validations, *(ValidationContract(
+                validation_id=validation_id, statement="외부 release 존재를 재관측한다.",
+                method="external_observation", required_evidence_kinds=("external_observation",),
+            ) for validation_id in ("validation_ext_a", "validation_ext_b"))),
+        })
+        definition = self.plan.definition.model_copy(update={"tasks": (self.task,)})
+        self.plan = self.plan.model_copy(update={"definition": definition,
+                                                "definition_digest": definition.definition_digest})
+        review = fixtures.clean_review(
+            self.plan.activation_digest, role="external_effect_reviewer",
+            evidence_catalog=plan_review_evidence_catalog(self.plan, self.goal, self.state, self.map),
+        )
+        self.service.authorize_goal(project_id=self.project_id, source="atomic observation fixture")
+        self.service.register_authorized_plan_revision(ExpandedPlanEvaluation(
+            plan=self.plan, semantic_submissions=(review,),
+            decision=derive_candidate_decision(candidate_digest=self.plan.activation_digest,
+                                              findings=(), ratings=review.ratings),
+        ))
+        spec = self.spec()
+        definition = spec.definition.model_copy(update={
+            "actions": tuple(ExecutionAction(action_ref=f"external_{index}", kind="external_effect",
+                description=effect.statement, effect_id=effect.effect_id)
+                for index, effect in enumerate(effects, 1)),
+            "validation_steps": (*spec.definition.validation_steps, *(ValidationExecutionStep(
+                validation_id=validation_id, method="external_observation", external_selector="release:v1",
+                required_evidence_kinds=("external_observation",),
+            ) for validation_id in ("validation_ext_a", "validation_ext_b"))),
+        })
+        bundle = assemble_worker_prompt(task=self.task, definition=definition,
+                                       profile=self.profile.definition, root=self.root)
+        definition = definition.model_copy(update={"context_manifest": definition.context_manifest.model_copy(
+            update={"prompt_binding": bundle.binding})})
+        self.service.materialize_execution_spec(spec.model_copy(update={
+            "definition": definition, "definition_digest": definition.definition_digest,
+        }), inventory=self.inventory)
+        self.attempt = self.service.reserve_attempt(task_id=self.task.task_id)
+        self.call_id = BudgetManager(self.service).reserve(
+            project_id=self.project_id, goal_id=self.goal.goal_id, goal_digest=self.goal.definition_digest,
+            call_key="atomic-worker", role="worker", request={"kind": "worker"},
+            attempt_id=self.attempt.attempt_id,
+        )
+        intent = self.service.prepare_runtime_intent(
+            attempt_id=self.attempt.attempt_id, kind=RuntimeIntentKind.START_TURN,
+            idempotency_key="atomic-start-runtime-turn", request={"thread_id": "atomic-thread", "turn_id": "atomic-turn",
+                "effect_identities": [identity.model_dump(mode="json") for identity in self.identities]},
+        )
+        receipt = self.service.record_runtime_receipt(
+            intent_id=intent.intent_id, provider_operation_id="atomic-turn", response={"accepted": True},
+            binding=ThreadBinding(thread_id="atomic-thread", turn_id="atomic-turn", bound_at=utc_now()),
+        )
+        # INJECTION: provider terminal/valid는 기존 외부효과 회귀와 같은 임시 SQL fixture다.
+        # 실제 provider 호출이나 설치 경로의 성공을 의미하지 않는다.
+        with self.ledger.transaction() as tx:
+            tx.connection.execute("UPDATE provider_calls SET execution_status='terminal',effect_status='unknown',"
+                "result_status='valid',status='settled',completed_at=? WHERE id=?", (tx.now, self.call_id))
+        self.receipt_args = dict(task_id=self.task.task_id, attempt_id=self.attempt.attempt_id,
+            provider_call_id=self.call_id, runtime_intent_id=intent.intent_id, runtime_receipt_id=receipt.receipt_id,
+            thread_id="atomic-thread", turn_id="atomic-turn")
+        self.receipts = tuple(self.service.record_effect_receipt(
+            **self.receipt_args, effect_identity=identity, provider_operation_id=f"atomic-operation-{index}",
+            response_digest=sha256_digest(f"atomic-operation-{index}"),
+        ) for index, identity in enumerate(self.identities))
+
+    def observe(self, identity=None, receipt=None, *, validation_id="validation_ext_b", observed_at=None):
+        identity = identity or self.identities[0]
+        document = dict(provider=identity.provider, selector="release:v1", observation="release가 존재한다.",
+                        effect_identity_digest=identity.identity_digest)
+        return ExternalValidationObservation(
+            validation_id=validation_id, task_id=self.task.task_id, **document,
+            receipt_digest=receipt or self.receipts[0], effect_identity=identity, passed=True,
+            target_observation_digest=sha256_digest(document), observed_at=observed_at or utc_now(),
+        )
+
+    def record(self, observation):
+        return self.service.record_typed_validation_observation(project_id=self.project_id,
+            plan_revision_id=self.plan.plan_revision_id, observation=observation)
+
+    def snapshot(self):
+        with self.ledger.read() as connection:
+            return {table: tuple(tuple(row) for row in connection.execute(f"SELECT * FROM {table} ORDER BY rowid"))
+                    for table in ("attempts", "provider_calls", "task_contracts", "evidence_records",
+                                  "validation_results", "history_events")}
+
+    def rejected_without_change(self, observation, code):
+        before = self.snapshot()
+        with self.assertRaisesRegex(EngineServiceError, code):
+            self.record(observation)
+        self.assertEqual(before, self.snapshot())
+
+    def finish_with_task_validation(self):
+        for identity, receipt in zip(self.identities, self.receipts):
+            self.record(self.observe(identity, receipt, validation_id="validation_ext_a"))
+        self.service.finish_attempt(attempt_id=self.attempt.attempt_id, succeeded=True)
+        evidence = EvidenceRecord(evidence_id=new_id("evidence"), project_id=self.project_id,
+            task_id=self.task.task_id, attempt_id=self.attempt.attempt_id, kind=EvidenceKind.TEST,
+            source_ref="atomic-task-test", observation="Task 검증 통과", content_digest=sha256_digest("task-pass"),
+            observed_at=utc_now())
+        self.service.record_evidence(evidence)
+        self.service.record_validation(project_id=self.project_id, plan_revision_id=self.plan.plan_revision_id,
+            result=ValidationResult(validation_result_id=new_id("validation_result"), validation_id="validation_task",
+                task_id=self.task.task_id, status=ValidationStatus.PASS, evidence_ids=(evidence.evidence_id,),
+                rationale="Task 검증 통과", evaluated_at=utc_now()))
+        # 효과 확인 관측과 Worker 성공 뒤의 validation epoch는 서로 다르다.
+        self.record(self.identityless("validation_ext_a"))
+
+    def identityless(self, validation_id):
+        return ExternalValidationObservation(validation_id=validation_id, task_id=self.task.task_id,
+            provider="github", selector="release:v1", passed=True, observation="후속 release 관측",
+            receipt_digest=sha256_digest("identityless"), observed_at=utc_now())
+
+    def test_public_identity_eight_fields_rejected_without_state_change(self):
+        for field, value in (("provider", "other"), ("system", "other"), ("target", "repo:other/name"),
+            ("account", "account:other"), ("operation", "other"), ("scope", "other"),
+            ("idempotency_key", "other"), ("checkpoint_policy", "always")):
+            with self.subTest(field=field):
+                self.rejected_without_change(self.observe(self.identities[0].model_copy(update={field: value})),
+                                             "EFFECT_TARGET_OBSERVATION_IDENTITY_MISMATCH")
+
+    def test_public_receipt_call_and_attempt_mismatch_leave_no_validation(self):
+        for receipt in (self.receipts[1], sha256_digest("unrecorded")):
+            with self.subTest(receipt=receipt):
+                self.rejected_without_change(self.observe(receipt=receipt), "EFFECT_ADAPTER_RECEIPT_BINDING_MISMATCH")
+        for field, prefix in (("provider_call_id", "provider_call"), ("attempt_id", "attempt")):
+            with self.subTest(field=field):
+                with self.ledger.transaction() as tx:
+                    body = json.loads(tx.one("SELECT payload_json FROM history_events WHERE entity_id=? "
+                        "AND event_type='effect.receipt_recorded' ORDER BY sequence LIMIT 1", (self.call_id,))[0])
+                    # INJECTION: 정상 receipt API가 생성할 수 없는 결속 오류를 append-only History에 추가한다.
+                    body[field] = new_id(prefix)
+                    body["receipt_digest"] = sha256_digest(body)
+                    tx.history(self.project_id, "effect.receipt_recorded", "provider_call", self.call_id, body)
+                self.rejected_without_change(self.observe(receipt=body["receipt_digest"]),
+                                             "EFFECT_ADAPTER_RECEIPT_BINDING_MISMATCH")
+
+    def test_rejected_post_finish_validation_cannot_complete_task(self):
+        self.finish_with_task_validation()
+        self.rejected_without_change(self.observe(self.identities[0].model_copy(update={"target": "repo:other/name"})),
+                                     "EFFECT_TARGET_OBSERVATION_IDENTITY_MISMATCH")
+        before = self.snapshot()
+        with self.assertRaises(EngineServiceError):
+            self.service.complete_task(self.task.task_id)
+        self.assertEqual(before, self.snapshot())
+
+    def test_confirmed_receipt_accepts_later_validation_and_exact_replay(self):
+        self.finish_with_task_validation()
+        observation = self.observe()
+        result = self.record(observation)
+        self.assertEqual(ValidationStatus.PASS, result.status)
+        with self.ledger.read() as connection:
+            confirmations = connection.execute("SELECT COUNT(*) FROM history_events "
+                "WHERE event_type='provider_effect.confirmed'").fetchone()[0]
+        self.record(observation)
+        self.assertEqual(confirmations, sum(row[3] == "provider_effect.confirmed"
+                                           for row in self.snapshot()["history_events"]))
+        self.assertEqual(self.receipts[0], self.service.record_effect_receipt(
+            **self.receipt_args, effect_identity=self.identities[0], provider_operation_id="atomic-operation-0",
+            response_digest=sha256_digest("atomic-operation-0")))
+        self.service.complete_task(self.task.task_id)
+
+    def test_identityless_existing_contract_can_complete(self):
+        self.finish_with_task_validation()
+        self.record(self.identityless("validation_ext_b"))
+        self.service.complete_task(self.task.task_id)
+
+    def test_stale_receipt_observation_rejected_without_state_change(self):
+        self.rejected_without_change(self.observe(observed_at=utc_now() - timedelta(days=1)),
+                                     "EFFECT_TARGET_OBSERVATION_PRECEDES_RECEIPT")
+
+    def test_validation_construction_failure_rolls_back_evidence(self):
+        before = self.snapshot()
+        with patch("flowmarshal.engine.service.ValidationResult", side_effect=EngineServiceError("validation failure")):
+            with self.assertRaisesRegex(EngineServiceError, "validation failure"):
+                self.record(self.observe())
+        self.assertEqual(before, self.snapshot())
+
+    def test_intermediate_history_failure_rolls_back_all_records(self):
+        original = EngineTransaction.history
+        for event in ("validation.recorded", "provider_effect.confirmed"):
+            with self.subTest(event=event):
+                before = self.snapshot()
+
+                def fail_after_history(tx, project_id, event_type, *args):
+                    result = original(tx, project_id, event_type, *args)
+                    if event_type == event:
+                        raise RuntimeError("injected history failure")
+                    return result
+
+                with patch.object(EngineTransaction, "history", fail_after_history):
+                    with self.assertRaisesRegex(RuntimeError, "injected history failure"):
+                        self.record(self.observe())
+                self.assertEqual(before, self.snapshot())
+
+    def test_terminal_effect_requires_preexisting_confirmation(self):
+        # INJECTION: 확인 history가 없는 terminal 표식을 정상 receipt 확인으로 취급하지 않는다.
+        with self.ledger.transaction() as tx:
+            tx.connection.execute("UPDATE provider_calls SET effect_status='terminal' WHERE id=?", (self.call_id,))
+        self.rejected_without_change(self.observe(), "EFFECT_ADAPTER_RECEIPT_BINDING_MISMATCH")
+
+    def test_confirmed_receipt_from_older_attempt_cannot_validate_new_attempt(self):
+        self.finish_with_task_validation()
+        # INJECTION: 새 execution Attempt가 열렸을 때 이전 terminal receipt를 선택하지 않는다.
+        with self.ledger.transaction() as tx:
+            tx.connection.execute(
+                "INSERT INTO attempts (id,project_id,plan_revision_id,task_id,execution_spec_digest,"
+                "attempt_no,kind,status,created_at,started_at,updated_at) "
+                "SELECT ?,project_id,plan_revision_id,task_id,execution_spec_digest,attempt_no+1,"
+                "'execution','running',?,?,? FROM attempts WHERE id=?",
+                (new_id("attempt"), tx.now, tx.now, tx.now, self.attempt.attempt_id),
+            )
+        self.rejected_without_change(self.observe(), "EFFECT_ADAPTER_RECEIPT_BINDING_MISMATCH")
+
+    def test_exception_after_terminal_effect_update_rolls_back_whole_observation(self):
+        self.record(self.observe(validation_id="validation_ext_a"))
+        before = self.snapshot()
+        original = self.ledger.transaction
+
+        @contextmanager
+        def fail_before_commit():
+            with original() as tx:
+                yield tx
+                status = tx.one("SELECT effect_status FROM provider_calls WHERE id=?", (self.call_id,))[0]
+                if status == "terminal":
+                    raise RuntimeError("injected before commit")
+
+        with patch.object(self.ledger, "transaction", fail_before_commit):
+            with self.assertRaisesRegex(RuntimeError, "injected before commit"):
+                self.record(self.observe(self.identities[1], self.receipts[1]))
+        self.assertEqual(before, self.snapshot())
+
 
 
 if __name__ == "__main__":
