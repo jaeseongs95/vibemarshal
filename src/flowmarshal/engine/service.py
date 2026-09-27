@@ -5292,41 +5292,46 @@ class EngineService:
 
     def record_evidence(self, evidence: EvidenceRecord) -> None:
         with self.ledger.transaction() as tx:
-            tx.one("SELECT id FROM projects WHERE id = ?", (evidence.project_id,))
-            if evidence.task_id is not None:
-                task = tx.one("SELECT project_id FROM task_contracts WHERE id = ?", (evidence.task_id,))
-                if task["project_id"] != evidence.project_id:
-                    raise EngineServiceError("Evidence Task가 다른 프로젝트에 속합니다.")
-            if evidence.attempt_id is not None:
-                attempt = tx.one("SELECT project_id, task_id FROM attempts WHERE id = ?", (evidence.attempt_id,))
-                if attempt["project_id"] != evidence.project_id or (
-                    evidence.task_id is not None and attempt["task_id"] != evidence.task_id
-                ):
-                    raise EngineServiceError("Evidence Attempt binding이 다릅니다.")
-            tx.connection.execute(
-                "INSERT INTO evidence_records "
-                "(id, project_id, task_id, attempt_id, kind, source_ref, observation, content_digest, "
-                "payload_json, observed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    evidence.evidence_id,
-                    evidence.project_id,
-                    evidence.task_id,
-                    evidence.attempt_id,
-                    evidence.kind.value,
-                    evidence.source_ref,
-                    evidence.observation,
-                    evidence.content_digest,
-                    canonical_json(evidence),
-                    evidence.observed_at.isoformat(),
-                ),
-            )
-            tx.history(
-                evidence.project_id,
-                "evidence.recorded",
-                "evidence_record",
+            self._record_evidence_in_transaction(tx, evidence)
+
+    def _record_evidence_in_transaction(
+        self, tx: EngineTransaction, evidence: EvidenceRecord,
+    ) -> None:
+        tx.one("SELECT id FROM projects WHERE id = ?", (evidence.project_id,))
+        if evidence.task_id is not None:
+            task = tx.one("SELECT project_id FROM task_contracts WHERE id = ?", (evidence.task_id,))
+            if task["project_id"] != evidence.project_id:
+                raise EngineServiceError("Evidence Task가 다른 프로젝트에 속합니다.")
+        if evidence.attempt_id is not None:
+            attempt = tx.one("SELECT project_id, task_id FROM attempts WHERE id = ?", (evidence.attempt_id,))
+            if attempt["project_id"] != evidence.project_id or (
+                evidence.task_id is not None and attempt["task_id"] != evidence.task_id
+            ):
+                raise EngineServiceError("Evidence Attempt binding이 다릅니다.")
+        tx.connection.execute(
+            "INSERT INTO evidence_records "
+            "(id, project_id, task_id, attempt_id, kind, source_ref, observation, content_digest, "
+            "payload_json, observed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
                 evidence.evidence_id,
-                {"task_id": evidence.task_id, "kind": evidence.kind.value, "content_digest": evidence.content_digest},
-            )
+                evidence.project_id,
+                evidence.task_id,
+                evidence.attempt_id,
+                evidence.kind.value,
+                evidence.source_ref,
+                evidence.observation,
+                evidence.content_digest,
+                canonical_json(evidence),
+                evidence.observed_at.isoformat(),
+            ),
+        )
+        tx.history(
+            evidence.project_id,
+            "evidence.recorded",
+            "evidence_record",
+            evidence.evidence_id,
+            {"task_id": evidence.task_id, "kind": evidence.kind.value, "content_digest": evidence.content_digest},
+        )
 
     def confirm_worker_target_observation(
         self, *, attempt_id: str, evidence_ids: tuple[str, ...]
@@ -5842,128 +5847,137 @@ class EngineService:
         operation_binding: dict[str, Any] | None = None,
     ) -> None:
         with self.ledger.transaction() as tx:
-            plan_row = tx.one(
-                "SELECT payload_json FROM plan_revisions WHERE id = ? AND project_id = ?",
-                (plan_revision_id, project_id),
+            self._record_validation_in_transaction(
+                tx, project_id=project_id, plan_revision_id=plan_revision_id,
+                result=result, operation_binding=operation_binding,
             )
-            plan = PlanContractRevision.model_validate_json(plan_row["payload_json"])
-            task_validation_ids = {
-                validation.validation_id: task.task_id
-                for task in plan.definition.tasks
-                for validation in task.validations
-            }
-            validation_contracts = {
+
+    def _record_validation_in_transaction(
+        self, tx: EngineTransaction, *, project_id: str, plan_revision_id: str,
+        result: ValidationResult, operation_binding: dict[str, Any] | None = None,
+    ) -> None:
+        plan_row = tx.one(
+            "SELECT payload_json FROM plan_revisions WHERE id = ? AND project_id = ?",
+            (plan_revision_id, project_id),
+        )
+        plan = PlanContractRevision.model_validate_json(plan_row["payload_json"])
+        task_validation_ids = {
+            validation.validation_id: task.task_id
+            for task in plan.definition.tasks
+            for validation in task.validations
+        }
+        validation_contracts = {
+            validation.validation_id: validation
+            for task in plan.definition.tasks
+            for validation in task.validations
+        }
+        integration_ids = {
+            validation.validation_id for validation in plan.definition.integration_validations
+        }
+        validation_contracts.update(
+            {
                 validation.validation_id: validation
-                for task in plan.definition.tasks
-                for validation in task.validations
+                for validation in plan.definition.integration_validations
             }
-            integration_ids = {
-                validation.validation_id for validation in plan.definition.integration_validations
-            }
-            validation_contracts.update(
-                {
-                    validation.validation_id: validation
-                    for validation in plan.definition.integration_validations
-                }
+        )
+        if result.validation_id not in task_validation_ids and result.validation_id not in integration_ids:
+            raise EngineServiceError("PlanContract에 없는 validation 결과입니다.")
+        expected_task = task_validation_ids.get(result.validation_id)
+        if expected_task != result.task_id:
+            raise EngineServiceError("validation의 Task binding이 계약과 다릅니다.")
+        validation_contract = validation_contracts[result.validation_id]
+        if result.task_id is not None:
+            task_contract = next(
+                item for item in plan.definition.tasks if item.task_id == result.task_id
             )
-            if result.validation_id not in task_validation_ids and result.validation_id not in integration_ids:
-                raise EngineServiceError("PlanContract에 없는 validation 결과입니다.")
-            expected_task = task_validation_ids.get(result.validation_id)
-            if expected_task != result.task_id:
-                raise EngineServiceError("validation의 Task binding이 계약과 다릅니다.")
-            validation_contract = validation_contracts[result.validation_id]
-            if result.task_id is not None:
-                task_contract = next(
-                    item for item in plan.definition.tasks if item.task_id == result.task_id
-                )
-                if (
-                    task_contract.assignment.independence_required
-                    and validation_contract.method == "semantic"
-                    and result.status in {ValidationStatus.PASS, ValidationStatus.FAIL}
-                ):
-                    self._verify_semantic_validation_independence(
-                        tx, project_id=project_id, task_id=result.task_id,
-                        validation_id=result.validation_id,
-                        status=result.status,
-                        evidence_ids=result.evidence_ids,
-                        goal_validation_binding_digest=result.goal_validation_binding_digest,
-                    )
-            elif (
-                validation_contract.method == "semantic"
-                and validation_contract.evidence_mode == "independent"
+            if (
+                task_contract.assignment.independence_required
+                and validation_contract.method == "semantic"
                 and result.status in {ValidationStatus.PASS, ValidationStatus.FAIL}
             ):
                 self._verify_semantic_validation_independence(
-                    tx,
-                    project_id=project_id,
-                    task_id=None,
+                    tx, project_id=project_id, task_id=result.task_id,
                     validation_id=result.validation_id,
                     status=result.status,
                     evidence_ids=result.evidence_ids,
                     goal_validation_binding_digest=result.goal_validation_binding_digest,
                 )
-            if result.evidence_ids:
-                placeholders = ",".join("?" for _ in result.evidence_ids)
-                rows = tx.all(
-                    f"SELECT id, project_id, task_id, kind FROM evidence_records WHERE id IN ({placeholders})",
-                    tuple(result.evidence_ids),
+        elif (
+            validation_contract.method == "semantic"
+            and validation_contract.evidence_mode == "independent"
+            and result.status in {ValidationStatus.PASS, ValidationStatus.FAIL}
+        ):
+            self._verify_semantic_validation_independence(
+                tx,
+                project_id=project_id,
+                task_id=None,
+                validation_id=result.validation_id,
+                status=result.status,
+                evidence_ids=result.evidence_ids,
+                goal_validation_binding_digest=result.goal_validation_binding_digest,
+            )
+        if result.evidence_ids:
+            placeholders = ",".join("?" for _ in result.evidence_ids)
+            rows = tx.all(
+                f"SELECT id, project_id, task_id, kind FROM evidence_records WHERE id IN ({placeholders})",
+                tuple(result.evidence_ids),
+            )
+            if len(rows) != len(result.evidence_ids):
+                raise EngineServiceError("validation evidence 일부가 원장에 없습니다.")
+            if any(row["project_id"] != project_id for row in rows):
+                raise EngineServiceError("다른 프로젝트 evidence를 validation에 사용할 수 없습니다.")
+            if result.task_id is not None and any(
+                row["task_id"] not in {None, result.task_id} for row in rows
+            ):
+                raise EngineServiceError("다른 Task evidence를 validation에 사용할 수 없습니다.")
+            if result.status in {ValidationStatus.PASS, ValidationStatus.FAIL}:
+                required_kinds = set(
+                    validation_contracts[result.validation_id].required_evidence_kinds
                 )
-                if len(rows) != len(result.evidence_ids):
-                    raise EngineServiceError("validation evidence 일부가 원장에 없습니다.")
-                if any(row["project_id"] != project_id for row in rows):
-                    raise EngineServiceError("다른 프로젝트 evidence를 validation에 사용할 수 없습니다.")
-                if result.task_id is not None and any(
-                    row["task_id"] not in {None, result.task_id} for row in rows
-                ):
-                    raise EngineServiceError("다른 Task evidence를 validation에 사용할 수 없습니다.")
-                if result.status in {ValidationStatus.PASS, ValidationStatus.FAIL}:
-                    required_kinds = set(
-                        validation_contracts[result.validation_id].required_evidence_kinds
+                actual_kinds = {row["kind"] for row in rows}
+                if not required_kinds.issubset(actual_kinds):
+                    raise EngineServiceError(
+                        "validation에 필요한 evidence kind가 부족합니다: "
+                        + ", ".join(sorted(required_kinds - actual_kinds))
                     )
-                    actual_kinds = {row["kind"] for row in rows}
-                    if not required_kinds.issubset(actual_kinds):
-                        raise EngineServiceError(
-                            "validation에 필요한 evidence kind가 부족합니다: "
-                            + ", ".join(sorted(required_kinds - actual_kinds))
-                        )
-            if operation_binding is not None:
-                self._verify_task_validation_operation_binding(
-                    tx,
-                    project_id=project_id,
-                    plan_revision_id=plan_revision_id,
-                    result=result,
-                    binding=operation_binding,
-                )
-            tx.connection.execute(
-                "INSERT INTO validation_results "
-                "(id, project_id, plan_revision_id, task_id, validation_id, status, payload_json, evaluated_at) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    result.validation_result_id,
-                    project_id,
-                    plan_revision_id,
-                    result.task_id,
-                    result.validation_id,
-                    result.status.value,
-                    canonical_json(result),
-                    result.evaluated_at.isoformat(),
-                ),
+        if operation_binding is not None:
+            self._verify_task_validation_operation_binding(
+                tx,
+                project_id=project_id,
+                plan_revision_id=plan_revision_id,
+                result=result,
+                binding=operation_binding,
             )
-            from .plan_reuse import observation_checkpoint
-            reuse_checkpoint = None if result.task_id is None else observation_checkpoint(self, tx.connection, result.task_id)
-            tx.history(
-                project_id,
-                "validation.recorded",
-                "validation_result",
+        tx.connection.execute(
+            "INSERT INTO validation_results "
+            "(id, project_id, plan_revision_id, task_id, validation_id, status, payload_json, evaluated_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
                 result.validation_result_id,
-                {
-                    "validation_id": result.validation_id,
-                    "status": result.status.value,
-                    "task_id": result.task_id,
-                    "operation_binding": operation_binding,
-                    "reuse_checkpoint": reuse_checkpoint,
-                },
-            )
+                project_id,
+                plan_revision_id,
+                result.task_id,
+                result.validation_id,
+                result.status.value,
+                canonical_json(result),
+                result.evaluated_at.isoformat(),
+            ),
+        )
+        from .plan_reuse import observation_checkpoint
+        reuse_checkpoint = None if result.task_id is None else observation_checkpoint(self, tx.connection, result.task_id)
+        tx.history(
+            project_id,
+            "validation.recorded",
+            "validation_result",
+            result.validation_result_id,
+            {
+                "validation_id": result.validation_id,
+                "status": result.status.value,
+                "task_id": result.task_id,
+                "operation_binding": operation_binding,
+                "reuse_checkpoint": reuse_checkpoint,
+            },
+        )
 
     def record_typed_validation_observation(
         self,
@@ -5974,7 +5988,9 @@ class EngineService:
     ) -> ValidationResult:
         """수동·외부 관측을 계약과 대조해 evidence 및 validation 결과로 변환한다."""
 
-        with self.ledger.read() as connection:
+        # 거절된 관측이 evidence·validation·효과 확인의 일부만 남기지 않게 한다.
+        with self.ledger.transaction() as tx:
+            connection = tx.connection
             plan_row = connection.execute(
                 "SELECT payload_json FROM plan_revisions WHERE id = ? AND project_id = ?",
                 (plan_revision_id, project_id),
@@ -6061,160 +6077,177 @@ class EngineService:
                         and binding.step.external_selector != observation.selector):
                     raise EngineServiceError("외부 관측 selector가 Goal Test binding과 다릅니다.")
 
-        evidence_ids: list[str] = []
-        observed_at = observation.observed_at
-        for kind_name in contract.required_evidence_kinds:
-            try:
-                kind = EvidenceKind(kind_name)
-            except ValueError as error:
-                raise EngineServiceError(
-                    f"지원하지 않는 validation evidence kind입니다: {kind_name}"
-                ) from error
-            evidence = EvidenceRecord(
-                evidence_id=new_id("evidence"),
-                project_id=project_id,
+            evidence_ids: list[str] = []
+            observed_at = observation.observed_at
+            for kind_name in contract.required_evidence_kinds:
+                try:
+                    kind = EvidenceKind(kind_name)
+                except ValueError as error:
+                    raise EngineServiceError(
+                        f"지원하지 않는 validation evidence kind입니다: {kind_name}"
+                    ) from error
+                evidence = EvidenceRecord(
+                    evidence_id=new_id("evidence"),
+                    project_id=project_id,
+                    task_id=observation.task_id,
+                    kind=kind,
+                    source_ref=(
+                        observation.source_ref
+                        if isinstance(observation, ManualValidationObservation)
+                        else f"{observation.provider}:{observation.selector}"
+                    ),
+                    observation=observation.model_dump_json()[:10_000],
+                    content_digest=sha256_digest(
+                        {"kind": kind.value, "typed_observation": observation}
+                    ),
+                    observed_at=observed_at,
+                )
+                self._record_evidence_in_transaction(tx, evidence)
+                evidence_ids.append(evidence.evidence_id)
+            passed = observation.passed
+            result = ValidationResult(
+                validation_result_id=new_id("validation_result"),
+                validation_id=observation.validation_id,
                 task_id=observation.task_id,
-                kind=kind,
-                source_ref=(
-                    observation.source_ref
+                status=(
+                    ValidationStatus.INCONCLUSIVE
+                    if passed is None
+                    else (ValidationStatus.PASS if passed else ValidationStatus.FAIL)
+                ),
+                evidence_ids=tuple(evidence_ids),
+                rationale=(
+                    observation.observation
                     if isinstance(observation, ManualValidationObservation)
-                    else f"{observation.provider}:{observation.selector}"
+                    else f"{observation.provider} 관측: {observation.observation}"
                 ),
-                observation=observation.model_dump_json()[:10_000],
-                content_digest=sha256_digest(
-                    {"kind": kind.value, "typed_observation": observation}
-                ),
-                observed_at=observed_at,
+                evaluated_at=observed_at,
             )
-            self.record_evidence(evidence)
-            evidence_ids.append(evidence.evidence_id)
-        passed = observation.passed
-        result = ValidationResult(
-            validation_result_id=new_id("validation_result"),
-            validation_id=observation.validation_id,
-            task_id=observation.task_id,
-            status=(
-                ValidationStatus.INCONCLUSIVE
-                if passed is None
-                else (ValidationStatus.PASS if passed else ValidationStatus.FAIL)
-            ),
-            evidence_ids=tuple(evidence_ids),
-            rationale=(
-                observation.observation
-                if isinstance(observation, ManualValidationObservation)
-                else f"{observation.provider} 관측: {observation.observation}"
-            ),
-            evaluated_at=observed_at,
-        )
-        self.record_validation(
-            project_id=project_id,
-            plan_revision_id=plan_revision_id,
-            result=result,
-        )
-        if isinstance(observation, ExternalValidationObservation) and observation.task_id is not None:
-            self._confirm_external_effect_observation(observation)
-        return result
+            self._record_validation_in_transaction(
+                tx,
+                project_id=project_id,
+                plan_revision_id=plan_revision_id,
+                result=result,
+            )
+            if isinstance(observation, ExternalValidationObservation) and observation.task_id is not None:
+                self._confirm_external_effect_observation_in_transaction(tx, observation)
+            return result
 
     def _confirm_external_effect_observation(
         self, observation: ExternalValidationObservation,
     ) -> None:
-        """Confirm only the conjunction of adapter receipt and target observation."""
+        with self.ledger.transaction() as tx:
+            self._confirm_external_effect_observation_in_transaction(tx, observation)
+
+    def _confirm_external_effect_observation_in_transaction(
+        self, tx: EngineTransaction, observation: ExternalValidationObservation,
+    ) -> None:
+        """adapter receipt와 target 관측이 함께 결속된 효과만 확인한다."""
         if observation.effect_identity is None or observation.passed is not True:
             return
-        with self.ledger.transaction() as tx:
-            task = tx.one("SELECT project_id,payload_json FROM task_contracts WHERE id=?",
-                          (observation.task_id,))
-            contract = json.loads(task["payload_json"])
-            if (
-                any(item["external"] for item in contract["expected_effects"])
-                and any(not item["external"] for item in contract["expected_effects"])
-            ):
-                raise EngineServiceError("MIXED_EFFECT_CONTRACT_REQUIRES_TASK_SPLIT")
-            expected = {
-                sha256_digest(item["identity"])
-                for item in contract["expected_effects"]
-                if item["external"] and item.get("identity_version") == "2.0"
-                and isinstance(item.get("identity"), dict)
-            }
-            if observation.effect_identity_digest not in expected:
-                raise EngineServiceError("EFFECT_TARGET_OBSERVATION_IDENTITY_MISMATCH")
-            if observation.provider != observation.effect_identity.provider:
-                raise EngineServiceError("EFFECT_TARGET_OBSERVATION_PROVIDER_MISMATCH")
-            candidates = tx.all(
-                "SELECT c.* FROM provider_calls c JOIN attempts a ON a.id=c.attempt_id "
-                "WHERE a.task_id=? AND a.kind='execution' AND c.role='worker' "
-                "AND c.execution_status='terminal' AND c.result_status='valid' "
-                "AND c.effect_status='unknown' ORDER BY c.rowid",
-                (observation.task_id,),
-            )
-            matches: list[tuple[Any, dict[str, Any], datetime]] = []
-            for candidate in candidates:
-                receipts = tx.all(
-                    "SELECT payload_json,created_at FROM history_events WHERE project_id=? "
-                    "AND entity_type='provider_call' AND entity_id=? "
-                    "AND event_type='effect.receipt_recorded' ORDER BY sequence",
-                    (task["project_id"], candidate["id"]),
-                )
-                for row in receipts:
-                    item = json.loads(row["payload_json"])
-                    if (
-                        item.get("receipt_digest") == observation.receipt_digest
-                        and item.get("effect_identity_digest")
-                        == observation.effect_identity_digest
-                        and item.get("attempt_id") == candidate["attempt_id"]
-                        and item.get("provider_call_id") == candidate["id"]
-                    ):
-                        receipt_recorded_at = datetime.fromisoformat(row["created_at"])
-                        if observation.observed_at < receipt_recorded_at:
-                            raise EngineServiceError(
-                                "EFFECT_TARGET_OBSERVATION_PRECEDES_RECEIPT"
-                            )
-                        matches.append((candidate, item, receipt_recorded_at))
-            if len(matches) != 1:
-                raise EngineServiceError("EFFECT_ADAPTER_RECEIPT_BINDING_MISMATCH")
-            call, receipt, receipt_recorded_at = matches[0]
-            binding = {
-                "confirmation_contract_version": "2.1",
-                "status": "confirmed",
-                "source": "external_target_observation",
-                "effect_identity": observation.effect_identity.model_dump(mode="json"),
-                "effect_identity_digest": observation.effect_identity_digest,
-                "target_observation_digest": observation.target_observation_digest,
-                "provider_receipt_digest": observation.receipt_digest,
-                "receipt_recorded_at": receipt_recorded_at.isoformat(),
-                "target_observed_at": observation.observed_at.isoformat(),
-            }
-            prior_confirmations = tx.all(
-                "SELECT payload_json FROM history_events WHERE project_id=? "
+        task = tx.one("SELECT project_id,payload_json FROM task_contracts WHERE id=?",
+                      (observation.task_id,))
+        contract = json.loads(task["payload_json"])
+        if (
+            any(item["external"] for item in contract["expected_effects"])
+            and any(not item["external"] for item in contract["expected_effects"])
+        ):
+            raise EngineServiceError("MIXED_EFFECT_CONTRACT_REQUIRES_TASK_SPLIT")
+        expected = {
+            sha256_digest(item["identity"])
+            for item in contract["expected_effects"]
+            if item["external"] and item.get("identity_version") == "2.0"
+            and isinstance(item.get("identity"), dict)
+        }
+        if observation.effect_identity_digest not in expected:
+            raise EngineServiceError("EFFECT_TARGET_OBSERVATION_IDENTITY_MISMATCH")
+        if observation.provider != observation.effect_identity.provider:
+            raise EngineServiceError("EFFECT_TARGET_OBSERVATION_PROVIDER_MISMATCH")
+        candidates = tx.all(
+            "SELECT c.* FROM provider_calls c JOIN attempts a ON a.id=c.attempt_id "
+            "WHERE a.task_id=? AND a.kind='execution' AND c.role='worker' "
+            "AND c.execution_status='terminal' AND c.result_status='valid' "
+            "AND (c.effect_status='unknown' OR (c.effect_status='terminal' AND a.id=("
+            "SELECT id FROM attempts WHERE task_id=a.task_id AND kind='execution' "
+            "ORDER BY attempt_no DESC,rowid DESC LIMIT 1))) ORDER BY c.rowid",
+            (observation.task_id,),
+        )
+        matches: list[tuple[Any, dict[str, Any], datetime]] = []
+        for candidate in candidates:
+            receipts = tx.all(
+                "SELECT payload_json,created_at FROM history_events WHERE project_id=? "
                 "AND entity_type='provider_call' AND entity_id=? "
-                "AND event_type='provider_effect.confirmed' ORDER BY sequence",
-                (task["project_id"], call["id"]),
+                "AND event_type='effect.receipt_recorded' ORDER BY sequence",
+                (task["project_id"], candidate["id"]),
             )
-            if any(
-                json.loads(item["payload_json"]).get("binding_digest")
-                == sha256_digest(binding)
-                for item in prior_confirmations
-            ):
-                return
-            tx.history(
-                task["project_id"], "provider_effect.confirmed", "provider_call", call["id"],
-                {**binding, "binding_digest": sha256_digest(binding)},
+            for row in receipts:
+                item = json.loads(row["payload_json"])
+                if (
+                    item.get("receipt_digest") == observation.receipt_digest
+                    and item.get("effect_identity_digest")
+                    == observation.effect_identity_digest
+                    and item.get("attempt_id") == candidate["attempt_id"]
+                    and item.get("provider_call_id") == candidate["id"]
+                ):
+                    receipt_recorded_at = datetime.fromisoformat(row["created_at"])
+                    if observation.observed_at < receipt_recorded_at:
+                        raise EngineServiceError(
+                            "EFFECT_TARGET_OBSERVATION_PRECEDES_RECEIPT"
+                        )
+                    matches.append((candidate, item, receipt_recorded_at))
+        if len(matches) != 1:
+            raise EngineServiceError("EFFECT_ADAPTER_RECEIPT_BINDING_MISMATCH")
+        call, receipt, receipt_recorded_at = matches[0]
+        binding = {
+            "confirmation_contract_version": "2.1",
+            "status": "confirmed",
+            "source": "external_target_observation",
+            "effect_identity": observation.effect_identity.model_dump(mode="json"),
+            "effect_identity_digest": observation.effect_identity_digest,
+            "target_observation_digest": observation.target_observation_digest,
+            "provider_receipt_digest": observation.receipt_digest,
+            "receipt_recorded_at": receipt_recorded_at.isoformat(),
+            "target_observed_at": observation.observed_at.isoformat(),
+        }
+        prior_confirmations = tx.all(
+            "SELECT payload_json FROM history_events WHERE project_id=? "
+            "AND entity_type='provider_call' AND entity_id=? "
+            "AND event_type='provider_effect.confirmed' ORDER BY sequence",
+            (task["project_id"], call["id"]),
+        )
+        # terminal 효과에는 같은 receipt·identity의 기존 확인이 있어야 한다.
+        if call["effect_status"] == "terminal" and not any(
+            json.loads(item["payload_json"]).get("effect_identity_digest")
+            == observation.effect_identity_digest
+            and json.loads(item["payload_json"]).get("provider_receipt_digest")
+            == observation.receipt_digest
+            for item in prior_confirmations
+        ):
+            raise EngineServiceError("EFFECT_ADAPTER_RECEIPT_BINDING_MISMATCH")
+        if any(
+            json.loads(item["payload_json"]).get("binding_digest")
+            == sha256_digest(binding)
+            for item in prior_confirmations
+        ):
+            return
+        tx.history(
+            task["project_id"], "provider_effect.confirmed", "provider_call", call["id"],
+            {**binding, "binding_digest": sha256_digest(binding)},
+        )
+        confirmed_rows = tx.all(
+            "SELECT payload_json FROM history_events WHERE project_id=? "
+            "AND entity_type='provider_call' AND entity_id=? "
+            "AND event_type='provider_effect.confirmed' ORDER BY sequence",
+            (task["project_id"], call["id"]),
+        )
+        confirmed = {
+            json.loads(row["payload_json"]).get("effect_identity_digest")
+            for row in confirmed_rows
+        }
+        if confirmed >= expected:
+            tx.connection.execute(
+                "UPDATE provider_calls SET effect_status='terminal' WHERE id=?",
+                (call["id"],),
             )
-            confirmed_rows = tx.all(
-                "SELECT payload_json FROM history_events WHERE project_id=? "
-                "AND entity_type='provider_call' AND entity_id=? "
-                "AND event_type='provider_effect.confirmed' ORDER BY sequence",
-                (task["project_id"], call["id"]),
-            )
-            confirmed = {
-                json.loads(row["payload_json"]).get("effect_identity_digest")
-                for row in confirmed_rows
-            }
-            if confirmed >= expected:
-                tx.connection.execute(
-                    "UPDATE provider_calls SET effect_status='terminal' WHERE id=?",
-                    (call["id"],),
-                )
 
     def record_effect_receipt(
         self,
