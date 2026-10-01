@@ -730,6 +730,31 @@ def _new_row_id(prefix: str) -> str:
     return new_id(prefix)
 
 
+def _verify_history_rows(rows: list[sqlite3.Row]) -> bool:
+    previous_hash: str | None = None
+    for expected_sequence, row in enumerate(rows, start=1):
+        payload = json.loads(row["payload_json"])
+        body = {
+            "id": row["id"],
+            "project_id": row["project_id"],
+            "sequence": row["sequence"],
+            "event_type": row["event_type"],
+            "entity_type": row["entity_type"],
+            "entity_id": row["entity_id"],
+            "payload": payload,
+            "previous_hash": row["previous_hash"],
+            "created_at": row["created_at"],
+        }
+        if (
+            row["sequence"] != expected_sequence
+            or row["previous_hash"] != previous_hash
+            or row["event_hash"] != sha256_digest(body)
+        ):
+            return False
+        previous_hash = row["event_hash"]
+    return True
+
+
 class SQLiteEngineLedger:
     """기존 prototype DB와 식별자·파일을 공유하지 않는 Engine 원장."""
 
@@ -855,32 +880,13 @@ class SQLiteEngineLedger:
                 "SELECT * FROM history_events WHERE project_id = ? ORDER BY sequence",
                 (project_id,),
             ).fetchall()
-        previous_hash: str | None = None
-        for expected_sequence, row in enumerate(rows, start=1):
-            payload = json.loads(row["payload_json"])
-            body = {
-                "id": row["id"],
-                "project_id": row["project_id"],
-                "sequence": row["sequence"],
-                "event_type": row["event_type"],
-                "entity_type": row["entity_type"],
-                "entity_id": row["entity_id"],
-                "payload": payload,
-                "previous_hash": row["previous_hash"],
-                "created_at": row["created_at"],
-            }
-            if (
-                row["sequence"] != expected_sequence
-                or row["previous_hash"] != previous_hash
-                or row["event_hash"] != sha256_digest(body)
-            ):
-                return False
-            previous_hash = row["event_hash"]
-        return True
+        return _verify_history_rows(rows)
 
 
     def project_snapshot(self, project_id: str) -> dict[str, Any]:
         with self.read() as connection:
+            # 상태와 이력을 짧은 한 snapshot에서 읽고 hash 계산 전에 연결을 닫는다.
+            connection.execute("BEGIN")
             project = connection.execute(
                 "SELECT * FROM projects WHERE id = ?", (project_id,)
             ).fetchone()
@@ -912,9 +918,10 @@ class SQLiteEngineLedger:
                 "FROM context_source_registrations WHERE project_id = ? ORDER BY registered_at, rowid",
                 (project_id,),
             ).fetchall()
-            history_count = connection.execute(
-                "SELECT COUNT(*) FROM history_events WHERE project_id = ?", (project_id,)
-            ).fetchone()[0]
+            history_rows = connection.execute(
+                "SELECT * FROM history_events WHERE project_id = ? ORDER BY sequence",
+                (project_id,),
+            ).fetchall()
         return {
             "project": dict(project),
             "plans": [dict(row) for row in plans],
@@ -922,8 +929,8 @@ class SQLiteEngineLedger:
             "attempts": [dict(row) for row in attempts],
             "runtime_jobs": [dict(row) for row in runtime_jobs],
             "context_sources": [dict(row) for row in context_sources],
-            "history_count": history_count,
-            "history_valid": self.verify_history(project_id),
+            "history_count": len(history_rows),
+            "history_valid": _verify_history_rows(history_rows),
         }
 
 
