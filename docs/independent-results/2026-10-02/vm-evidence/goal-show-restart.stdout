@@ -1,0 +1,55 @@
+{
+  "goal_contract": {
+    "schema_version": "1.0",
+    "goal_revision_id": "goal_revision_eba1ce17d27b404291cbd67d2e1e09e4",
+    "goal_id": "goal_f5e758865c5245b8a12900a4e7a6181a",
+    "revision_no": 1,
+    "definition": {
+      "project_id": "project_1ff9f17b4d264c55b8b1025d4aae6358",
+      "source_request": "합성 검증",
+      "source_request_digest": "sha256:5d0409d20f0aeead70f507061f84433bb2bc95b890ae92e113a12d0603711d8a",
+      "mission_class": "feature_extension",
+      "observable_outcome": "CLI 동작",
+      "hard_acceptance": [
+        {
+          "criterion_id": "ac_1",
+          "statement": "단위 검사",
+          "validation_intent": "단위 검사를 실제 evidence로 검증한다.",
+          "trace_refs": [
+            "trace_user_request"
+          ]
+        }
+      ],
+      "quality_preferences": [],
+      "constraints": [],
+      "non_goals": [],
+      "assumptions": [],
+      "unresolved_questions": [],
+      "approved_decision_refs": [],
+      "source_traces": [
+        {
+          "trace_id": "trace_user_request",
+          "source_ref": "user-request",
+          "statement": "합성 검증",
+          "source_digest": "sha256:5d0409d20f0aeead70f507061f84433bb2bc95b890ae92e113a12d0603711d8a"
+        }
+      ],
+      "effect_policy": {
+        "mutation_policy": "scoped_change",
+        "behavior_policy": "preserve_public_contracts",
+        "allowed_external_effects": [],
+        "prohibited_effects": [],
+        "irreversible_effects_require_checkpoint": true
+      },
+      "profile_definition_digest": "sha256:18ebf45e0e1c165098f18e5c092dcf1b012f88db590e1c4addd84dadd6c20f79"
+    },
+    "definition_digest": "sha256:d0fae61fdbede6d9a27aef0fe48d68e0b09230c54f106f3a90349f24040ffb4d",
+    "status": "ready",
+    "preparation_binding": null,
+    "supersedes_goal_revision_id": null,
+    "created_at": "2026-10-01T22:57:40.637820Z"
+  },
+  "ledger_status": "active",
+  "is_active": true,
+  "activated_at": "2026-10-01T22:57:40.638836Z"
+}

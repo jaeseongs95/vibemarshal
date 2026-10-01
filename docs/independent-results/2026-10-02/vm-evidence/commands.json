@@ -1,0 +1,110 @@
+{
+  "aliases": {
+    "WORKSPACE": "consumer-selected scratch workspace",
+    "SOURCE": "${WORKSPACE}/vm-portable",
+    "EVIDENCE": "${WORKSPACE}/vm-evidence",
+    "PYTHON": "${WORKSPACE}/vm-test-venv/bin/python",
+    "WHEEL": "${EVIDENCE}/dist/flowmarshal_engine-0.2.0a1-py3-none-any.whl"
+  },
+  "commands": [
+    {
+      "name": "clone",
+      "cwd": "${WORKSPACE}",
+      "command": "git clone --no-checkout https://github.com/jaeseongs95/vibemarshal.git vm-portable",
+      "exit": 128,
+      "elapsed_seconds": "not_recorded",
+      "start_time": "not_recorded",
+      "note": "Git HTTPS authentication unavailable; connector exact-source/archive used"
+    },
+    {
+      "name": "dependencies",
+      "cwd": "${WORKSPACE}",
+      "command": "python -m venv ${WORKSPACE}/vm-test-venv && ${PYTHON} -m pip install -r ${SOURCE}/requirements.lock \"setuptools>=77\" wheel build",
+      "exit": 0,
+      "elapsed_seconds": "not_recorded",
+      "start_time": "not_recorded",
+      "note": "locked dependencies"
+    },
+    {
+      "name": "pip-check",
+      "cwd": "${WORKSPACE}",
+      "command": "${PYTHON} -m pip check",
+      "exit": 0,
+      "elapsed_seconds": "not_recorded",
+      "start_time": "not_recorded",
+      "note": "no broken requirements"
+    },
+    {
+      "name": "build",
+      "cwd": "${SOURCE}",
+      "command": "${PYTHON} -m build --wheel --no-isolation --outdir ${EVIDENCE}/dist",
+      "exit": 0,
+      "elapsed_seconds": "not_recorded",
+      "start_time": "not_recorded",
+      "note": "local diagnostic wheel only"
+    },
+    {
+      "name": "install",
+      "cwd": "${WORKSPACE}",
+      "command": "${PYTHON} -m pip install --no-deps ${WHEEL}",
+      "exit": 0,
+      "elapsed_seconds": "not_recorded",
+      "start_time": "not_recorded",
+      "note": "fresh dedicated venv; dependencies installed first"
+    },
+    {
+      "name": "initial-broad-suite",
+      "cwd": "${SOURCE}",
+      "command": "HOME=${EVIDENCE}/home CODEX_HOME=${EVIDENCE}/home/.codex TMPDIR=${EVIDENCE}/tmp PYTHONPATH=${SOURCE}/src ${PYTHON} -m unittest -v tests.test_engine_cli tests.test_engine_cli_revise tests.test_engine_user_facade tests.test_engine_application tests.test_engine_task_validation_recovery tests.test_engine_runtime_job_supervisor tests.test_engine_clean_install_qualification tests.test_engine_packaging",
+      "exit": 1,
+      "elapsed_seconds": 45.162,
+      "start_time": "not_recorded",
+      "note": "122 tests; 20 failure records and18error records; source-root env missing for2 errors; D1 unsupported elsewhere"
+    },
+    {
+      "name": "initial-portable-suite",
+      "cwd": "${SOURCE}",
+      "command": "FLOWMARSHAL_ENGINE_SOURCE_ROOT=${SOURCE} ${PYTHON} ${EVIDENCE}/run_portable_subset.py",
+      "exit": 1,
+      "elapsed_seconds": 41.47,
+      "start_time": "not_recorded",
+      "note": "120tests;2 D1-dependent completed-goal fixture failures, excluded with reason in final runner"
+    },
+    {
+      "name": "portable-subset-final",
+      "cwd": "${WORKSPACE}",
+      "command": "VM_SOURCE_ROOT=${SOURCE} VM_EVIDENCE_ROOT=${EVIDENCE} HOME=${EVIDENCE}/home CODEX_HOME=${EVIDENCE}/home/.codex TMPDIR=${EVIDENCE}/tmp FLOWMARSHAL_ENGINE_SOURCE_ROOT=${SOURCE} ${PYTHON} ${EVIDENCE}/run_portable_subset.py",
+      "exit": 0,
+      "elapsed_seconds": 30.837,
+      "start_time": "not_recorded",
+      "note": "118tests;0failure/error/skip"
+    },
+    {
+      "name": "public-path-final",
+      "cwd": "${EVIDENCE}",
+      "command": "env -u PYTHONPATH VM_EVIDENCE_ROOT=${EVIDENCE} ${PYTHON} ${EVIDENCE}/public_path_smoke.py",
+      "exit": 0,
+      "elapsed_seconds": "not_recorded",
+      "start_time": "not_recorded",
+      "note": "9subprocess commands; each stdout/stderr retained; exact subcommand cwd and exit in public-path-result.json"
+    },
+    {
+      "name": "installed-probe",
+      "cwd": "${SOURCE}",
+      "command": "env -u PYTHONPATH ${PYTHON} ${SOURCE}/scripts/installed_candidate_qualification.py --source-root ${SOURCE} --candidate-wheel ${WHEEL} probe",
+      "exit": 0,
+      "elapsed_seconds": "not_recorded",
+      "start_time": "not_recorded",
+      "note": "installed bytes binding"
+    },
+    {
+      "name": "installed-dry-run",
+      "cwd": "${EVIDENCE}",
+      "command": "env -u PYTHONPATH HOME=${EVIDENCE}/home ${PYTHON} ${SOURCE}/scripts/installed_candidate_qualification.py --source-root ${SOURCE} --candidate-wheel ${WHEEL} eval run --scope project-e2e --project-root ${SOURCE} --pre-provider-dry-run",
+      "exit": 0,
+      "elapsed_seconds": "not_recorded",
+      "start_time": "not_recorded",
+      "note": "release_pass false; no provider call"
+    }
+  ]
+}

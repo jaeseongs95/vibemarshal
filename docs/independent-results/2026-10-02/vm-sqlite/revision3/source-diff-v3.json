@@ -1,0 +1,14 @@
+{
+  "candidate": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "files_compared": 142,
+  "ignored": "__pycache__ bytecode only",
+  "missing": [],
+  "changed": [
+    {
+      "path": "src/flowmarshal/engine/ledger.py",
+      "baseline_sha256": "cecb5d6b50e736933005c6c849d6018992434ccdc8a9b13cb012f8e5fc5c0d41",
+      "proposal_sha256": "7c1b089720f5b270bd192902aea7db7f793f7903859f11a20e5c55cccb216fc2"
+    }
+  ],
+  "canonical_modified": false
+}

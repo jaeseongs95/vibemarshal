@@ -1,0 +1,9 @@
+{
+  "candidate": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "tree": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d",
+  "archive_sha256": "31024d4a14fe7a5d447eba8e909df67b85c6311dfa67c23a90ccfc0411851639",
+  "files_verified": 409,
+  "mismatches": [],
+  "scope": "sanitized tracked source subset; not a full Git checkout",
+  "exclusions": "No .git, untracked files, credentials, runtime state, operational DB/WAL, spikes, native/provider messages or historical raw fixture packets. Most docs and JSON regression fixtures omitted. Tests depending on omitted assets need a separately scoped transfer."
+}

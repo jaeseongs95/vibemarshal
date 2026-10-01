@@ -1,0 +1,18 @@
+test_after_commit_wal_failure_is_retryable_valid_database (__main__.InitializationLifecycleReview.test_after_commit_wal_failure_is_retryable_valid_database) ... ok
+test_all_schema_objects_match_original_executescript_exactly (__main__.InitializationLifecycleReview.test_all_schema_objects_match_original_executescript_exactly) ... ok
+test_borrowed_identity_connection_keeps_transaction_owned_by_caller (__main__.InitializationLifecycleReview.test_borrowed_identity_connection_keeps_transaction_owned_by_caller) ... ok
+test_malformed_existing_db_closes_connection_and_preserves_bytes (__main__.InitializationLifecycleReview.test_malformed_existing_db_closes_connection_and_preserves_bytes) ... FAIL
+test_uncommitted_schema_and_identity_are_invisible_to_other_connection (__main__.InitializationLifecycleReview.test_uncommitted_schema_and_identity_are_invisible_to_other_connection) ... ok
+
+======================================================================
+FAIL: test_malformed_existing_db_closes_connection_and_preserves_bytes (__main__.InitializationLifecycleReview.test_malformed_existing_db_closes_connection_and_preserves_bytes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-sqlite-review/review_initialization_lifecycle.py", line 37, in test_malformed_existing_db_closes_connection_and_preserves_bytes
+    self.assertTrue(all(c.explicitly_closed for c in created), 'configuration failure leaked acquired connection')
+AssertionError: False is not true : configuration failure leaked acquired connection
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.049s
+
+FAILED (failures=1)

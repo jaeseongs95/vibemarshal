@@ -1,0 +1,163 @@
+{
+  "candidate": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "proposal_revision": 3,
+  "canonical_patch_status": "NOT_APPLIED",
+  "clock_source": "UTC datetime + monotonic perf_counter",
+  "host_timezone": "KST +0900",
+  "runs": [
+    {
+      "id": "atomic-v3",
+      "command_argv": [
+        "<VENV>/bin/python",
+        "<TESTS>/test_atomic_initialize_proposal.py"
+      ],
+      "cwd": "<WORKSPACE>",
+      "environment": {
+        "VM_SOURCE": "<PROPOSAL_V3>",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "<PROPOSAL_V3>/src:<SOURCE>"
+      },
+      "started_at_utc": "2026-10-01T23:06:22.081660+00:00",
+      "ended_at_utc": "2026-10-01T23:06:22.924491+00:00",
+      "command_wall_duration_seconds": 0.8428112639999199,
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "raw_log": "logs/atomic-v3.log"
+    },
+    {
+      "id": "revalidation-v3",
+      "command_argv": [
+        "<VENV>/bin/python",
+        "<TESTS>/revision2/test_initialize_revalidation.py"
+      ],
+      "cwd": "<WORKSPACE>",
+      "environment": {
+        "VM_SOURCE": "<PROPOSAL_V3>",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "<PROPOSAL_V3>/src:<SOURCE>"
+      },
+      "started_at_utc": "2026-10-01T23:06:22.924598+00:00",
+      "ended_at_utc": "2026-10-01T23:06:23.534922+00:00",
+      "command_wall_duration_seconds": 0.6103137599998263,
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "raw_log": "logs/revalidation-v3.log"
+    },
+    {
+      "id": "setup-v3",
+      "command_argv": [
+        "<VENV>/bin/python",
+        "<TESTS>/revision3/test_connection_setup_cleanup.py"
+      ],
+      "cwd": "<WORKSPACE>",
+      "environment": {
+        "VM_SOURCE": "<PROPOSAL_V3>",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "<PROPOSAL_V3>/src:<SOURCE>"
+      },
+      "started_at_utc": "2026-10-01T23:06:23.534992+00:00",
+      "ended_at_utc": "2026-10-01T23:06:23.968991+00:00",
+      "command_wall_duration_seconds": 0.4339921319997302,
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "raw_log": "logs/setup-v3.log"
+    },
+    {
+      "id": "boundary-v3",
+      "command_argv": [
+        "<VENV>/bin/python",
+        "<TESTS>/test_sqlite_boundaries.py"
+      ],
+      "cwd": "<WORKSPACE>",
+      "environment": {
+        "VM_SOURCE": "<PROPOSAL_V3>",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "<PROPOSAL_V3>/src:<SOURCE>"
+      },
+      "started_at_utc": "2026-10-01T23:06:23.969066+00:00",
+      "ended_at_utc": "2026-10-01T23:06:36.285769+00:00",
+      "command_wall_duration_seconds": 12.316691825999897,
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "raw_log": "logs/boundary-v3.log"
+    },
+    {
+      "id": "stress-v3",
+      "command_argv": [
+        "<VENV>/bin/python",
+        "<TESTS>/run_concurrency_stress.py"
+      ],
+      "cwd": "<WORKSPACE>",
+      "environment": {
+        "VM_SOURCE": "<PROPOSAL_V3>",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "<PROPOSAL_V3>/src:<SOURCE>"
+      },
+      "started_at_utc": "2026-10-01T23:06:36.285921+00:00",
+      "ended_at_utc": "2026-10-01T23:06:38.991569+00:00",
+      "command_wall_duration_seconds": 2.705639923000035,
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "raw_log": "logs/stress-v3.log"
+    },
+    {
+      "id": "repo-v3",
+      "command_argv": [
+        "<VENV>/bin/python",
+        "-m",
+        "unittest",
+        "tests.test_engine_ledger_snapshot",
+        "tests.test_engine_ledger_service",
+        "tests.test_engine_current_snapshot_goal_scope",
+        "-v"
+      ],
+      "cwd": "<WORKSPACE>",
+      "environment": {
+        "VM_SOURCE": "<PROPOSAL_V3>",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "<PROPOSAL_V3>/src:<SOURCE>"
+      },
+      "started_at_utc": "2026-10-01T23:06:38.991683+00:00",
+      "ended_at_utc": "2026-10-01T23:06:41.035767+00:00",
+      "command_wall_duration_seconds": 2.0440771779999523,
+      "exit_code": 1,
+      "expected_exit_code": 1,
+      "raw_log": "logs/repo-v3.log"
+    },
+    {
+      "id": "patch-check-v3",
+      "command_argv": [
+        "git",
+        "-C",
+        "<SOURCE>",
+        "apply",
+        "--check",
+        "--whitespace=error-all",
+        "<TESTS>/revision3/artifacts/atomic-initialize-v3.patch"
+      ],
+      "cwd": "<WORKSPACE>",
+      "environment": {
+        "VM_SOURCE": "<PROPOSAL_V3>",
+        "PYTHONDONTWRITEBYTECODE": "1",
+        "PYTHONPATH": "<PROPOSAL_V3>/src:<SOURCE>"
+      },
+      "started_at_utc": "2026-10-01T23:06:41.035841+00:00",
+      "ended_at_utc": "2026-10-01T23:06:41.045212+00:00",
+      "command_wall_duration_seconds": 0.009364961000301264,
+      "exit_code": 0,
+      "expected_exit_code": 0,
+      "raw_log": "logs/patch-check-v3.log"
+    }
+  ],
+  "aliases": {
+    "<WORKSPACE>": "isolated cloud workspace",
+    "<SOURCE>": "unchanged exact candidate",
+    "<PROPOSAL_V1>": "immutable blocked revision1",
+    "<PROPOSAL_V2>": "immutable superseded revision2",
+    "<PROPOSAL_V3>": "isolated current revision3",
+    "<TESTS>": "SQLite artifact directory",
+    "<VENV>": "locked Python virtual environment",
+    "<PYTHON_RUNTIME>": "Python standard library"
+  },
+  "artifact_source_identity": "v3 patch40339ffa0ef57f5d6152c289344c7fda0011c70c0ea40338861495c3fa170a89"
+}

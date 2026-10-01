@@ -1,0 +1,123 @@
+{
+  "candidate": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "status": "FINAL_READY",
+  "canonical_patch_status": "NOT_APPLIED",
+  "clock": "UTC date 2026-10-01; host KST+0900; individual command timestamps not recorded",
+  "files": [
+    {
+      "relative_path": "REPORT.md",
+      "bytes": 11108,
+      "sha256": "0a5d00c6538bf8a9067147f0894f36f1ba9a1531fd866a9cd537dc00476f28c2"
+    },
+    {
+      "relative_path": "artifacts/atomic-initialize.patch",
+      "bytes": 1785,
+      "sha256": "15c25624117c3d6737c919f7979fd623e709be54901087d50e5ea487f42aefa9"
+    },
+    {
+      "relative_path": "artifacts/execution-manifest.json",
+      "bytes": 8073,
+      "sha256": "21d033e110e6a20d3372abeff385f0571638e8e158a4a7f45aad7ce589dec51e"
+    },
+    {
+      "relative_path": "artifacts/probe-results.json",
+      "bytes": 6510,
+      "sha256": "78710b3d9559bc2cfc46474585ca60b964e61f5f6221576771686ee8d16bc60d"
+    },
+    {
+      "relative_path": "artifacts/source-manifest.json",
+      "bytes": 2885,
+      "sha256": "774619bf93665a6f815bb612da5e83a1841087caeedf68822ad4a1610cc9f7bc"
+    },
+    {
+      "relative_path": "logs/atomic-after.log",
+      "bytes": 1286,
+      "sha256": "2a2aaa9ce41ab33599232e20656859a5b4c8f9e1f8a13e69ba8595d7e4a297a3"
+    },
+    {
+      "relative_path": "logs/atomic-before.log",
+      "bytes": 7797,
+      "sha256": "0f5ce27db6374f1202b9eaaa7a32097b19f1230de676a46bb7de81e856f2ddfd"
+    },
+    {
+      "relative_path": "logs/boundary-suite-full-service.log",
+      "bytes": 3628,
+      "sha256": "19db44cfaa9237201e786ff896ccfc85eff002d244326b561e38cedfbd69696b"
+    },
+    {
+      "relative_path": "logs/concurrency-stress.log",
+      "bytes": 3189,
+      "sha256": "47202b398c8f3598695b45d1c2926f97f42f56eefbe16132de6fd8f49405c884"
+    },
+    {
+      "relative_path": "logs/environment-locked.txt",
+      "bytes": 502,
+      "sha256": "baf485db387438e58f0d418a28d20e4a0a5e5f6f9dbbce4d4150e7739dc0a66b"
+    },
+    {
+      "relative_path": "logs/patch-check.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "relative_path": "logs/probes.log",
+      "bytes": 4737,
+      "sha256": "4322e9352b880cdc339fc5e74f20d07fcd17b34929abdad1830d7b9be0db550c"
+    },
+    {
+      "relative_path": "logs/proposal-boundary-suite.log",
+      "bytes": 3628,
+      "sha256": "d6e87b11f43d7d4d899437a9b9e1433806e8cfdd79991617e5ceaf6036be8beb"
+    },
+    {
+      "relative_path": "logs/proposal-open-issues.log",
+      "bytes": 2765,
+      "sha256": "9dc4df101134613f39fac1ac9bb5987581e537b145afcc1300673a06dd87098f"
+    },
+    {
+      "relative_path": "logs/proposal-repo-regression.log",
+      "bytes": 7193,
+      "sha256": "c9162ec52c0118903d2961e126ff6952329f4ea7f9b91955e75a12ad6c8fdc74"
+    },
+    {
+      "relative_path": "logs/proposed-regressions.log",
+      "bytes": 3628,
+      "sha256": "e551fca92e361b6007962ed71143baa390e8867db8756ea489400baa6f349bbc"
+    },
+    {
+      "relative_path": "logs/repo-failure-diagnosis.log",
+      "bytes": 4946,
+      "sha256": "2bda2caf718a1ef2b76fbc78f8d7eac3e5ae38fca7b8b1d003fb2f181b7f17f8"
+    },
+    {
+      "relative_path": "logs/repo-regression-suite.log",
+      "bytes": 7193,
+      "sha256": "1dd6ab7092d91a2be0d6c87e33be2e481dc2293f0ebfb145e6b575c13e239788"
+    },
+    {
+      "relative_path": "probe_failures_and_plans.py",
+      "bytes": 10408,
+      "sha256": "90bfd62eb78ddf84d3a58d9491c5351ee76834a1728d2e58fd297da1ae1abc3b"
+    },
+    {
+      "relative_path": "run_concurrency_stress.py",
+      "bytes": 493,
+      "sha256": "8dee1e721ff00c22ed38a356e2325d631e8e1fd9e05ceb2bb8f619f18a68dcee"
+    },
+    {
+      "relative_path": "test_atomic_initialize_proposal.py",
+      "bytes": 4372,
+      "sha256": "91494d41f4160226643098197da448ddcc402208e38697e041658a938c4f9e05"
+    },
+    {
+      "relative_path": "test_proposed_regressions.py",
+      "bytes": 2656,
+      "sha256": "83b5ce91b2c8d7173eb0a82e634dab878c03a3539e78d3c05fef226ae270cc48"
+    },
+    {
+      "relative_path": "test_sqlite_boundaries.py",
+      "bytes": 19668,
+      "sha256": "61e2c5a4bbbfc69c176db585973c9191ea5da0afd97a73dd011bcc0004c3b4b3"
+    }
+  ]
+}

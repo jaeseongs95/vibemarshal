@@ -1,0 +1,100 @@
+{
+  "candidate": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "patch_sha256": "40339ffa0ef57f5d6152c289344c7fda0011c70c0ea40338861495c3fa170a89",
+  "source_changed_by_reviewer": false,
+  "operating_db_or_wal_accessed": false,
+  "synthetic_only": true,
+  "environment": {
+    "python": "3.12.14",
+    "sqlite": "3.53.1",
+    "python_executable": "vm-test-venv/bin/python",
+    "platform": "Linux/POSIX"
+  },
+  "runs": [
+    {
+      "id": "independent-v3",
+      "command": "VM_SOURCE=\"$PWD/vm-sqlite/proposal-v3\" PYTHONDONTWRITEBYTECODE=1 vm-test-venv/bin/python vm-sqlite-review/review_initialize_v2.py",
+      "exit_code": 0,
+      "log": "logs/independent-v3.log",
+      "tests": 7,
+      "passed": 7
+    },
+    {
+      "id": "lifecycle-v3",
+      "command": "VM_SOURCE=\"$PWD/vm-sqlite/proposal-v3\" VM_BASELINE=\"$PWD/vm-portable\" PYTHONDONTWRITEBYTECODE=1 vm-test-venv/bin/python vm-sqlite-review/review_initialization_lifecycle.py",
+      "exit_code": 0,
+      "log": "logs/lifecycle-v3.log",
+      "tests": 5,
+      "passed": 5
+    },
+    {
+      "id": "concurrent-v3",
+      "command": "VM_SOURCE=\"$PWD/vm-sqlite/proposal-v3\" PYTHONDONTWRITEBYTECODE=1 vm-test-venv/bin/python vm-sqlite-review/review_concurrent_initialize.py",
+      "exit_code": 0,
+      "log": "logs/concurrent-v3.log",
+      "scenario_count": 1,
+      "repetitions": 20,
+      "processes_each": 4,
+      "successful_initializations": 80,
+      "not_unique_test_count": true
+    },
+    {
+      "id": "atomic-v3",
+      "command": "VM_SOURCE=\"$PWD/vm-sqlite/proposal-v3\" PYTHONDONTWRITEBYTECODE=1 vm-test-venv/bin/python vm-sqlite/test_atomic_initialize_proposal.py",
+      "exit_code": 0,
+      "log": "logs/atomic-v3.log",
+      "existing_author_suite_rerun": true,
+      "tests": 8,
+      "passed": 8
+    },
+    {
+      "id": "boundary-v3",
+      "command": "VM_SOURCE=\"$PWD/vm-sqlite/proposal-v3\" PYTHONDONTWRITEBYTECODE=1 vm-test-venv/bin/python vm-sqlite/test_sqlite_boundaries.py",
+      "exit_code": 0,
+      "log": "logs/boundary-v3.log",
+      "existing_author_suite_rerun": true,
+      "tests": 26,
+      "passed": 26
+    },
+    {
+      "id": "revalidation-v3",
+      "command": "VM_SOURCE=\"$PWD/vm-sqlite/proposal-v3\" PYTHONDONTWRITEBYTECODE=1 vm-test-venv/bin/python vm-sqlite/revision2/test_initialize_revalidation.py",
+      "exit_code": 0,
+      "log": "logs/revalidation-v3.log",
+      "existing_author_suite_rerun": true,
+      "tests": 4,
+      "passed": 4
+    },
+    {
+      "id": "setup-v3",
+      "command": "VM_SOURCE=\"$PWD/vm-sqlite/proposal-v3\" PYTHONDONTWRITEBYTECODE=1 vm-test-venv/bin/python vm-sqlite/revision3/test_connection_setup_cleanup.py",
+      "exit_code": 0,
+      "log": "logs/setup-v3.log",
+      "existing_author_suite_rerun": true,
+      "tests": 3,
+      "passed": 3
+    },
+    {
+      "id": "repository-v3",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=\"$PWD/vm-sqlite/proposal-v3/src:$PWD/vm-portable\" vm-test-venv/bin/python -m unittest tests.test_engine_ledger_snapshot tests.test_engine_ledger_service tests.test_engine_current_snapshot_goal_scope -v",
+      "exit_code": 1,
+      "log": "logs/repository-v3.log",
+      "existing_repository_suite_rerun": true,
+      "tests": 25,
+      "passed": 22,
+      "errors": 3,
+      "classification": "same baseline POSIX owner-lock unsupported downstream fixture errors"
+    }
+  ],
+  "patch_check": {
+    "command": "git -C vm-portable apply --check --whitespace=error-all ../vm-sqlite/revision3/artifacts/atomic-initialize-v3.patch",
+    "exit_code": 0
+  },
+  "limitations": [
+    "not release approval",
+    "not source integration approval",
+    "not Windows qualification",
+    "empty zero-identity schema-free DB acceptance is explicit scope expansion",
+    "suite repetitions and overlapping coverage are not added to unique qualification counts"
+  ]
+}

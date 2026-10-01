@@ -1,0 +1,89 @@
+{
+  "candidate": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "revision": 2,
+  "status": "SUPERSEDED_INTEGRATION_BLOCKED_BY_CONNECTION_CLEANUP_REGRESSION",
+  "canonical_patch_status": "NOT_APPLIED",
+  "original_report_and_raw_logs": "PRESERVED_UNCHANGED",
+  "files": [
+    {
+      "relative_path": "00-STATUS.md",
+      "bytes": 718,
+      "sha256": "6f611a50d4444d5d6817ee513e527e93b57d3c9f9f54460576ac5dbf1d4350cd"
+    },
+    {
+      "relative_path": "REPORT-V2.md",
+      "bytes": 4905,
+      "sha256": "c5012e49f6f74a5cb30aee1df7e77b791e8da6af15bb9c0836230b78562204dd"
+    },
+    {
+      "relative_path": "artifacts/README.txt",
+      "bytes": 121,
+      "sha256": "f8dc52fbecdafdc9e094ef3a8f7a40edbfa5dd3a0f9276187d74b217cd953b0d"
+    },
+    {
+      "relative_path": "atomic-initialize-v2.patch",
+      "bytes": 4132,
+      "sha256": "47701107ba6f78135badc01da6353b62c2ee5429777ac4844a7c5b447e117a7c"
+    },
+    {
+      "relative_path": "execution-v2.json",
+      "bytes": 4459,
+      "sha256": "d1cc01bbe082c4cd2bf1d3c2a422c0fc13522f025a483c7962470485d651f80f"
+    },
+    {
+      "relative_path": "logs/atomic-after-v2.log",
+      "bytes": 1286,
+      "sha256": "b1dce520042130c4eaff8d7be38c8f69e3d3d4063d19b62f8ac6636ff6bbfa1d"
+    },
+    {
+      "relative_path": "logs/boundary-after-v2.log",
+      "bytes": 3628,
+      "sha256": "f87d0351240a33afd63e676c3126dbdc206d6d6dafda7b87c1776889787ee298"
+    },
+    {
+      "relative_path": "logs/concurrency-stress-v2.log",
+      "bytes": 3189,
+      "sha256": "125e7a5c02aa20b23f07ae3234da57ee03cedd45f555f198b7a2a28caaccb6e9"
+    },
+    {
+      "relative_path": "logs/patch-check-v2.log",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "relative_path": "logs/repo-regression-v2.log",
+      "bytes": 7193,
+      "sha256": "fa428878bb1f9523a05b9007e6214f393d89c15525431af5a64651c603f346fe"
+    },
+    {
+      "relative_path": "logs/revalidation-after-v2.log",
+      "bytes": 726,
+      "sha256": "8e246fc0761c0e2d12848092e7f80b7031a46b7065a9120637fd3ad5ec1798ef"
+    },
+    {
+      "relative_path": "logs/revalidation-before-v1.log",
+      "bytes": 4992,
+      "sha256": "44b8e094ff73bcb8b3bce983e9a9d50bb64ebc3ccd07f68d6275ae4129eaa10d"
+    },
+    {
+      "relative_path": "run_concurrency_stress.py",
+      "bytes": 493,
+      "sha256": "8dee1e721ff00c22ed38a356e2325d631e8e1fd9e05ceb2bb8f619f18a68dcee"
+    },
+    {
+      "relative_path": "test_atomic_initialize_proposal.py",
+      "bytes": 4372,
+      "sha256": "91494d41f4160226643098197da448ddcc402208e38697e041658a938c4f9e05"
+    },
+    {
+      "relative_path": "test_initialize_revalidation.py",
+      "bytes": 4752,
+      "sha256": "e91567ad8da344703a8a5bc8535a541e49e13e1af27131744b9cdc0ff6b8659c"
+    },
+    {
+      "relative_path": "test_sqlite_boundaries.py",
+      "bytes": 19668,
+      "sha256": "61e2c5a4bbbfc69c176db585973c9191ea5da0afd97a73dd011bcc0004c3b4b3"
+    }
+  ]
+}

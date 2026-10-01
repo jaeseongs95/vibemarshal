@@ -1,0 +1,53 @@
+WARNING: The directory '/home/agent/.cache/pip' or its parent directory is not owned or is not writable by the current user. The cache has been disabled. Check the permissions and owner of that directory. If executing pip with sudo, you should use sudo's -H flag.
+WARNING: Retrying (Retry(total=4, connect=None, read=None, redirect=None, status=None)) after connection broken by 'ProxyError('Cannot connect to proxy.', TimeoutError('timed out'))': /simple/setuptools/
+Collecting setuptools>=77
+  Downloading setuptools-84.0.0-py3-none-any.whl.metadata (6.6 kB)
+Collecting wheel
+  Downloading wheel-0.48.0-py3-none-any.whl.metadata (2.3 kB)
+Collecting build
+  Downloading build-1.6.1-py3-none-any.whl.metadata (5.6 kB)
+Collecting cryptography==50.0.1 (from -r ${WORKSPACE}/vm-portable/requirements.lock (line 2))
+  Downloading cryptography-50.0.1-cp311-abi3-manylinux_2_34_x86_64.whl.metadata (4.3 kB)
+Collecting openai-codex==0.147.0 (from -r ${WORKSPACE}/vm-portable/requirements.lock (line 3))
+  Downloading openai_codex-0.147.0-py3-none-any.whl.metadata (2.5 kB)
+Collecting pydantic==2.13.5 (from -r ${WORKSPACE}/vm-portable/requirements.lock (line 4))
+  Downloading pydantic-2.13.5-py3-none-any.whl.metadata (110 kB)
+Collecting cffi>=2.0.0 (from cryptography==50.0.1->-r ${WORKSPACE}/vm-portable/requirements.lock (line 2))
+  Downloading cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl.metadata (2.5 kB)
+Collecting openai-codex-cli-bin==0.147.0 (from openai-codex==0.147.0->-r ${WORKSPACE}/vm-portable/requirements.lock (line 3))
+  Downloading openai_codex_cli_bin-0.147.0-py3-none-manylinux_2_17_x86_64.whl.metadata (1.1 kB)
+Collecting annotated-types>=0.6.0 (from pydantic==2.13.5->-r ${WORKSPACE}/vm-portable/requirements.lock (line 4))
+  Downloading annotated_types-0.8.0-py3-none-any.whl.metadata (15 kB)
+Collecting pydantic-core==2.46.5 (from pydantic==2.13.5->-r ${WORKSPACE}/vm-portable/requirements.lock (line 4))
+  Downloading pydantic_core-2.46.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (6.6 kB)
+Collecting typing-extensions>=4.14.1 (from pydantic==2.13.5->-r ${WORKSPACE}/vm-portable/requirements.lock (line 4))
+  Downloading typing_extensions-4.16.0-py3-none-any.whl.metadata (3.3 kB)
+Collecting typing-inspection>=0.4.2 (from pydantic==2.13.5->-r ${WORKSPACE}/vm-portable/requirements.lock (line 4))
+  Downloading typing_inspection-0.4.4-py3-none-any.whl.metadata (2.6 kB)
+Collecting packaging>=24.0 (from wheel)
+  Downloading packaging-26.3-py3-none-any.whl.metadata (3.5 kB)
+Collecting pyproject_hooks (from build)
+  Downloading pyproject_hooks-1.3.3-py3-none-any.whl.metadata (1.3 kB)
+Collecting pycparser (from cffi>=2.0.0->cryptography==50.0.1->-r ${WORKSPACE}/vm-portable/requirements.lock (line 2))
+  Downloading pycparser-3.0-py3-none-any.whl.metadata (8.2 kB)
+Downloading cryptography-50.0.1-cp311-abi3-manylinux_2_34_x86_64.whl (4.7 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 4.7/4.7 MB 50.1 MB/s eta 0:00:00
+Downloading openai_codex-0.147.0-py3-none-any.whl (81 kB)
+Downloading pydantic-2.13.5-py3-none-any.whl (472 kB)
+Downloading openai_codex_cli_bin-0.147.0-py3-none-manylinux_2_17_x86_64.whl (119.9 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 119.9/119.9 MB 71.7 MB/s eta 0:00:00
+Downloading pydantic_core-2.46.5-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl (2.1 MB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 2.1/2.1 MB 28.3 MB/s eta 0:00:00
+Downloading setuptools-84.0.0-py3-none-any.whl (818 kB)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 818.2/818.2 kB 11.7 MB/s eta 0:00:00
+Downloading wheel-0.48.0-py3-none-any.whl (33 kB)
+Downloading build-1.6.1-py3-none-any.whl (31 kB)
+Downloading annotated_types-0.8.0-py3-none-any.whl (13 kB)
+Downloading cffi-2.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.whl (221 kB)
+Downloading packaging-26.3-py3-none-any.whl (129 kB)
+Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Downloading typing_inspection-0.4.4-py3-none-any.whl (14 kB)
+Downloading pyproject_hooks-1.3.3-py3-none-any.whl (10 kB)
+Downloading pycparser-3.0-py3-none-any.whl (48 kB)
+Installing collected packages: typing-extensions, setuptools, pyproject_hooks, pycparser, packaging, openai-codex-cli-bin, annotated-types, wheel, typing-inspection, pydantic-core, cffi, build, pydantic, cryptography, openai-codex
+Successfully installed annotated-types-0.8.0 build-1.6.1 cffi-2.1.1 cryptography-50.0.1 openai-codex-0.147.0 openai-codex-cli-bin-0.147.0 packaging-26.3 pycparser-3.0 pydantic-2.13.5 pydantic-core-2.46.5 pyproject_hooks-1.3.3 setuptools-84.0.0 typing-extensions-4.16.0 typing-inspection-0.4.4 wheel-0.48.0

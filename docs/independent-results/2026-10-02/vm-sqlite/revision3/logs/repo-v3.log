@@ -1,0 +1,64 @@
+test_full_history_tampering_is_still_rejected (tests.test_engine_ledger_snapshot.EngineLedgerSnapshotTests.test_full_history_tampering_is_still_rejected) ... ok
+test_missing_project_keeps_the_existing_error (tests.test_engine_ledger_snapshot.EngineLedgerSnapshotTests.test_missing_project_keeps_the_existing_error) ... ok
+test_read_still_allows_callers_to_begin_their_own_snapshot (tests.test_engine_ledger_snapshot.EngineLedgerSnapshotTests.test_read_still_allows_callers_to_begin_their_own_snapshot) ... ok
+test_snapshot_keeps_one_commit_when_writer_commits_between_selects (tests.test_engine_ledger_snapshot.EngineLedgerSnapshotTests.test_snapshot_keeps_one_commit_when_writer_commits_between_selects) ... ok
+test_activation_requires_exact_digest (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_activation_requires_exact_digest) ... ok
+test_conflict_goal_can_be_inspected_and_revised_in_one_chain (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_conflict_goal_can_be_inspected_and_revised_in_one_chain) ... ok
+test_contract_and_history_are_immutable (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_contract_and_history_are_immutable) ... ok
+test_engine_ledger_has_distinct_identity_and_no_access_grants (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_engine_ledger_has_distinct_identity_and_no_access_grants) ... ok
+test_execution_spec_cannot_change_task_semantics (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_execution_spec_cannot_change_task_semantics) ... ok
+test_file_change_after_materialization_blocks_attempt (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_file_change_after_materialization_blocks_attempt) ... ok
+test_goal_satisfied_is_refused_before_task_and_goal_evidence (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_goal_satisfied_is_refused_before_task_and_goal_evidence) ... ok
+test_manual_typed_observation_is_bound_to_current_spec_and_evidence (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_manual_typed_observation_is_bound_to_current_spec_and_evidence) ... ERROR
+test_plan_revision_must_supersede_latest_in_same_lineage (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_plan_revision_must_supersede_latest_in_same_lineage) ... ok
+test_prototype_database_is_rejected_without_migration (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_prototype_database_is_rejected_without_migration) ... ok
+test_replan_limits_and_counts_are_ledger_derived (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_replan_limits_and_counts_are_ledger_derived) ... ok
+test_same_project_attempts_are_serialized (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_same_project_attempts_are_serialized) ... ok
+test_service_recomputes_skeleton_gate_instead_of_trusting_payload (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_service_recomputes_skeleton_gate_instead_of_trusting_payload) ... ok
+test_service_rejects_copied_unknown_evidence_before_plan_registration (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_service_rejects_copied_unknown_evidence_before_plan_registration) ... ok
+test_service_rejects_plan_semantic_drift_hidden_by_clean_review (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_service_rejects_plan_semantic_drift_hidden_by_clean_review) ... ok
+test_stale_state_blocks_activation (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_stale_state_blocks_activation) ... ok
+test_unreceipted_intent_enters_recovery_and_is_not_retried (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_unreceipted_intent_enters_recovery_and_is_not_retried) ... ok
+test_checkpoint_after_revision_with_larger_digest (tests.test_engine_current_snapshot_goal_scope.CurrentSnapshotGoalScopeTests.test_checkpoint_after_revision_with_larger_digest) ... ERROR
+test_checkpoint_after_revision_with_smaller_digest (tests.test_engine_current_snapshot_goal_scope.CurrentSnapshotGoalScopeTests.test_checkpoint_after_revision_with_smaller_digest) ... ERROR
+test_planning_search_active_goal_digest_larger (tests.test_engine_current_snapshot_goal_scope.CurrentSnapshotGoalScopeTests.test_planning_search_active_goal_digest_larger) ... ok
+test_planning_search_active_goal_digest_smaller (tests.test_engine_current_snapshot_goal_scope.CurrentSnapshotGoalScopeTests.test_planning_search_active_goal_digest_smaller) ... ok
+
+======================================================================
+ERROR: test_manual_typed_observation_is_bound_to_current_spec_and_evidence (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_manual_typed_observation_is_bound_to_current_spec_and_evidence)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<SOURCE>/tests/test_engine_ledger_service.py", line 546, in test_manual_typed_observation_is_bound_to_current_spec_and_evidence
+    connection.execute(
+TypeError: 'NoneType' object is not subscriptable
+
+======================================================================
+ERROR: test_checkpoint_after_revision_with_larger_digest (tests.test_engine_current_snapshot_goal_scope.CurrentSnapshotGoalScopeTests.test_checkpoint_after_revision_with_larger_digest)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<SOURCE>/tests/test_engine_current_snapshot_goal_scope.py", line 182, in test_checkpoint_after_revision_with_larger_digest
+    self.assert_checkpoint_uses_task_plan_goal_snapshot(larger=True)
+  File "<SOURCE>/tests/test_engine_current_snapshot_goal_scope.py", line 143, in assert_checkpoint_uses_task_plan_goal_snapshot
+    self.finish_worker_and_validate()
+  File "<SOURCE>/tests/test_engine_plan_completion_reuse.py", line 28, in finish_worker_and_validate
+    binding = ThreadBinding.model_validate_json(row["binding_json"])
+                                                ~~~^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+======================================================================
+ERROR: test_checkpoint_after_revision_with_smaller_digest (tests.test_engine_current_snapshot_goal_scope.CurrentSnapshotGoalScopeTests.test_checkpoint_after_revision_with_smaller_digest)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<SOURCE>/tests/test_engine_current_snapshot_goal_scope.py", line 186, in test_checkpoint_after_revision_with_smaller_digest
+    self.assert_checkpoint_uses_task_plan_goal_snapshot(larger=False)
+  File "<SOURCE>/tests/test_engine_current_snapshot_goal_scope.py", line 143, in assert_checkpoint_uses_task_plan_goal_snapshot
+    self.finish_worker_and_validate()
+  File "<SOURCE>/tests/test_engine_plan_completion_reuse.py", line 28, in finish_worker_and_validate
+    binding = ThreadBinding.model_validate_json(row["binding_json"])
+                                                ~~~^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+----------------------------------------------------------------------
+Ran 25 tests in 1.157s
+
+FAILED (errors=3)

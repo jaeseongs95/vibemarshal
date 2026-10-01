@@ -1,0 +1,65 @@
+test_acceptance_reads_hold_authoritative_writer_transaction (__main__.RevalidationRegression.test_acceptance_reads_hold_authoritative_writer_transaction) ... FAIL
+test_existing_empty_db_becoming_foreign_is_rejected (__main__.RevalidationRegression.test_existing_empty_db_becoming_foreign_is_rejected) ... FAIL
+test_missing_path_becoming_foreign_is_rejected (__main__.RevalidationRegression.test_missing_path_becoming_foreign_is_rejected) ... FAIL
+test_rollback_failure_preserves_primary_exception_and_connection_cleanup (__main__.RevalidationRegression.test_rollback_failure_preserves_primary_exception_and_connection_cleanup) ... ERROR
+
+======================================================================
+ERROR: test_rollback_failure_preserves_primary_exception_and_connection_cleanup (__main__.RevalidationRegression.test_rollback_failure_preserves_primary_exception_and_connection_cleanup)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<PROPOSAL_V1>/src/flowmarshal/engine/ledger.py", line 812, in initialize
+    connection.executemany(
+  File "<TESTS>/revision2/test_initialize_revalidation.py", line 68, in executemany
+    def executemany(self,*args):raise PrimaryFailure('primary')
+                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RevalidationRegression.test_rollback_failure_preserves_primary_exception_and_connection_cleanup.<locals>.PrimaryFailure: primary
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "<TESTS>/revision2/test_initialize_revalidation.py", line 71, in test_rollback_failure_preserves_primary_exception_and_connection_cleanup
+    with self.assertRaisesRegex(PrimaryFailure,'primary'):self.ledger.initialize()
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<PROPOSAL_V1>/src/flowmarshal/engine/ledger.py", line 823, in initialize
+    connection.rollback()
+  File "<TESTS>/revision2/test_initialize_revalidation.py", line 69, in rollback
+    def rollback(self):raise RollbackFailure('secondary')
+                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RevalidationRegression.test_rollback_failure_preserves_primary_exception_and_connection_cleanup.<locals>.RollbackFailure: secondary
+
+======================================================================
+FAIL: test_acceptance_reads_hold_authoritative_writer_transaction (__main__.RevalidationRegression.test_acceptance_reads_hold_authoritative_writer_transaction)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<TESTS>/revision2/test_initialize_revalidation.py", line 60, in test_acceptance_reads_hold_authoritative_writer_transaction
+    self.assertTrue(all(in_transaction for sql,in_transaction in observations),observations)
+AssertionError: False is not true : [('PRAGMA APPLICATION_ID', False), ('PRAGMA USER_VERSION', False), ('SELECT 1 FROM SQLITE_MASTER LIMIT 1', False)]
+
+======================================================================
+FAIL: test_existing_empty_db_becoming_foreign_is_rejected (__main__.RevalidationRegression.test_existing_empty_db_becoming_foreign_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<TESTS>/revision2/test_initialize_revalidation.py", line 45, in test_existing_empty_db_becoming_foreign_is_rejected
+    def test_existing_empty_db_becoming_foreign_is_rejected(self):self.assert_racing_foreign_db_rejected(True)
+                                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<TESTS>/revision2/test_initialize_revalidation.py", line 38, in assert_racing_foreign_db_rejected
+    with self.assertRaises(EngineLedgerError):self.ledger.initialize()
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineLedgerError not raised
+
+======================================================================
+FAIL: test_missing_path_becoming_foreign_is_rejected (__main__.RevalidationRegression.test_missing_path_becoming_foreign_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<TESTS>/revision2/test_initialize_revalidation.py", line 46, in test_missing_path_becoming_foreign_is_rejected
+    def test_missing_path_becoming_foreign_is_rejected(self):self.assert_racing_foreign_db_rejected(False)
+                                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<TESTS>/revision2/test_initialize_revalidation.py", line 38, in assert_racing_foreign_db_rejected
+    with self.assertRaises(EngineLedgerError):self.ledger.initialize()
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineLedgerError not raised
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.039s
+
+FAILED (failures=3, errors=1)

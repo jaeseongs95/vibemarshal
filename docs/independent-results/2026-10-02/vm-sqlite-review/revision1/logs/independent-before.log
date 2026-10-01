@@ -1,0 +1,54 @@
+test_existing_empty_db_became_foreign_before_lock_must_be_rejected (__main__.IndependentInitializeReview.test_existing_empty_db_became_foreign_before_lock_must_be_rejected) ... ok
+test_existing_engine_data_and_schema_are_unchanged_by_initialize (__main__.IndependentInitializeReview.test_existing_engine_data_and_schema_are_unchanged_by_initialize) ... ok
+test_foreign_view_only_database_is_preserved (__main__.IndependentInitializeReview.test_foreign_view_only_database_is_preserved) ... ok
+test_process_exit_after_application_id_is_recoverable (__main__.IndependentInitializeReview.test_process_exit_after_application_id_is_recoverable) ... FAIL
+test_process_exit_after_ddl_is_recoverable (__main__.IndependentInitializeReview.test_process_exit_after_ddl_is_recoverable) ... FAIL
+test_rollback_failure_does_not_mask_primary_exception (__main__.IndependentInitializeReview.test_rollback_failure_does_not_mask_primary_exception) ... ok
+test_schema_and_identity_share_one_transaction (__main__.IndependentInitializeReview.test_schema_and_identity_share_one_transaction) ... FAIL
+
+======================================================================
+FAIL: test_process_exit_after_application_id_is_recoverable (__main__.IndependentInitializeReview.test_process_exit_after_application_id_is_recoverable)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-sqlite-review/review_initialize.py", line 124, in test_process_exit_after_application_id_is_recoverable
+    def test_process_exit_after_application_id_is_recoverable(self): self._crash_rollback('identity', 72)
+                                                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-sqlite-review/review_initialize.py", line 118, in _crash_rollback
+    self.assertEqual([], c.execute('SELECT name FROM sqlite_master').fetchall())
+AssertionError: Lists differ: [] != [('budget_policy_revisions',), ('sqlite_au[6192 chars]e',)]
+
+Second list contains 161 additional elements.
+First extra element 0:
+('budget_policy_revisions',)
+
+Diff is 6727 characters long. Set self.maxDiff to None to see it.
+
+======================================================================
+FAIL: test_process_exit_after_ddl_is_recoverable (__main__.IndependentInitializeReview.test_process_exit_after_ddl_is_recoverable)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-sqlite-review/review_initialize.py", line 123, in test_process_exit_after_ddl_is_recoverable
+    def test_process_exit_after_ddl_is_recoverable(self): self._crash_rollback('schema', 71)
+                                                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-sqlite-review/review_initialize.py", line 118, in _crash_rollback
+    self.assertEqual([], c.execute('SELECT name FROM sqlite_master').fetchall())
+AssertionError: Lists differ: [] != [('budget_policy_revisions',), ('sqlite_au[6192 chars]e',)]
+
+Second list contains 161 additional elements.
+First extra element 0:
+('budget_policy_revisions',)
+
+Diff is 6727 characters long. Set self.maxDiff to None to see it.
+
+======================================================================
+FAIL: test_schema_and_identity_share_one_transaction (__main__.IndependentInitializeReview.test_schema_and_identity_share_one_transaction)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-sqlite-review/review_initialize.py", line 110, in test_schema_and_identity_share_one_transaction
+    self.assertTrue(all(value for _, value in phases), phases)
+AssertionError: False is not true : [('schema', False), ('metadata-before', False), ('PRAGMA application_id = 1179469105', True), ('PRAGMA user_version = 4', True)]
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.057s
+
+FAILED (failures=3)

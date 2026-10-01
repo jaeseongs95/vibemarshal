@@ -1,0 +1,176 @@
+test_background_owner_observes_after_deadline_interrupt (tests.test_engine_cli.EngineCliTests.test_background_owner_observes_after_deadline_interrupt) ... ok
+test_background_owner_publishes_initial_tick_then_keeps_job_lifetime (tests.test_engine_cli.EngineCliTests.test_background_owner_publishes_initial_tick_then_keeps_job_lifetime) ... ok
+test_budget_show_projects_pre_goal_provider_receipt (tests.test_engine_cli.EngineCliTests.test_budget_show_projects_pre_goal_provider_receipt) ... ok
+test_config_init_does_not_overwrite_existing_file (tests.test_engine_cli.EngineCliTests.test_config_init_does_not_overwrite_existing_file) ... ok
+test_config_init_rejects_duplicate_role_without_writing (tests.test_engine_cli.EngineCliTests.test_config_init_rejects_duplicate_role_without_writing) ... ok
+test_config_init_rejects_unsupported_binding_without_writing (tests.test_engine_cli.EngineCliTests.test_config_init_rejects_unsupported_binding_without_writing) ... ok
+test_config_init_writes_user_owned_inventory_validated_roles (tests.test_engine_cli.EngineCliTests.test_config_init_writes_user_owned_inventory_validated_roles) ... ok
+test_main_explicit_argv_is_forwarded_to_owner_process (tests.test_engine_cli.EngineCliTests.test_main_explicit_argv_is_forwarded_to_owner_process) ... ok
+test_project_goal_and_planning_context_roundtrip (tests.test_engine_cli.EngineCliTests.test_project_goal_and_planning_context_roundtrip) ... ok
+test_public_command_surface_is_present (tests.test_engine_cli.EngineCliTests.test_public_command_surface_is_present) ... ok
+test_run_once_passes_explicit_codex_project_binding_to_runtime (tests.test_engine_cli.EngineCliTests.test_run_once_passes_explicit_codex_project_binding_to_runtime) ... ok
+test_run_once_spawns_owner_before_emitting (tests.test_engine_cli.EngineCliTests.test_run_once_spawns_owner_before_emitting) ... ok
+test_user_facade_commands_parse_without_internal_plan_identifiers (tests.test_engine_cli.EngineCliTests.test_user_facade_commands_parse_without_internal_plan_identifiers) ... ok
+test_active_plan_is_reported_as_error_code_without_runtime_calls_or_writes (tests.test_engine_cli_revise.EngineCliReviseTests.test_active_plan_is_reported_as_error_code_without_runtime_calls_or_writes) ... ok
+test_handler_calls_application_revise_and_emits_result (tests.test_engine_cli_revise.EngineCliReviseTests.test_handler_calls_application_revise_and_emits_result) ... ok
+test_parser_routes_revise_to_its_handler (tests.test_engine_cli_revise.EngineCliReviseTests.test_parser_routes_revise_to_its_handler) ... ok
+test_conflicting_duplicate_receipts_are_shown_and_not_summed (tests.test_engine_application.EngineApplicationTests.test_conflicting_duplicate_receipts_are_shown_and_not_summed) ... ok
+test_entity_refs_and_history_cursor_include_query_bindings (tests.test_engine_application.EngineApplicationTests.test_entity_refs_and_history_cursor_include_query_bindings) ... ok
+test_final_report_uses_verdict_goal_revision_not_active_goal (tests.test_engine_application.EngineApplicationTests.test_final_report_uses_verdict_goal_revision_not_active_goal) ... ok
+test_missing_expected_call_is_counted_once_and_does_not_invent_a_stage (tests.test_engine_application.EngineApplicationTests.test_missing_expected_call_is_counted_once_and_does_not_invent_a_stage) ... ok
+test_model_binding_needs_observed_inventory_without_calling_provider (tests.test_engine_application.EngineApplicationTests.test_model_binding_needs_observed_inventory_without_calling_provider) ... ok
+test_partial_usage_keeps_component_subtotals_and_reports_incomplete (tests.test_engine_application.EngineApplicationTests.test_partial_usage_keeps_component_subtotals_and_reports_incomplete) ... ok
+test_provider_usage_id_on_duplicate_receipt_excludes_logical_tokens_but_keeps_latency (tests.test_engine_application.EngineApplicationTests.test_provider_usage_id_on_duplicate_receipt_excludes_logical_tokens_but_keeps_latency) ... ok
+test_recovery_query_exposes_exact_validation_failure_without_mutation (tests.test_engine_application.EngineApplicationTests.test_recovery_query_exposes_exact_validation_failure_without_mutation) ... ok
+test_reserved_provider_call_with_usage_id_is_not_a_completed_measurement (tests.test_engine_application.EngineApplicationTests.test_reserved_provider_call_with_usage_id_is_not_a_completed_measurement) ... ok
+test_unavailable_tokens_keep_observed_latency_subtotal (tests.test_engine_application.EngineApplicationTests.test_unavailable_tokens_keep_observed_latency_subtotal) ... ok
+test_unobserved_provider_call_makes_total_incomplete_without_using_reservation_actual (tests.test_engine_application.EngineApplicationTests.test_unobserved_provider_call_makes_total_incomplete_without_using_reservation_actual) ... ok
+test_unsettled_provider_usage_keeps_its_observed_latency (tests.test_engine_application.EngineApplicationTests.test_unsettled_provider_usage_keeps_its_observed_latency) ... ok
+test_usage_keeps_zero_distinct_from_missing_and_excludes_other_goal (tests.test_engine_application.EngineApplicationTests.test_usage_keeps_zero_distinct_from_missing_and_excludes_other_goal) ... ok
+test_conflicting_pre_goal_logical_receipts_are_not_summed (tests.test_engine_application.PreGoalUsageSummaryTests.test_conflicting_pre_goal_logical_receipts_are_not_summed) ... ok
+test_conflicting_provider_receipt_is_reported_without_inventing_usage (tests.test_engine_application.PreGoalUsageSummaryTests.test_conflicting_provider_receipt_is_reported_without_inventing_usage) ... ok
+test_legacy_unavailable_receipt_omitted_and_null_tokens_compare_equal (tests.test_engine_application.PreGoalUsageSummaryTests.test_legacy_unavailable_receipt_omitted_and_null_tokens_compare_equal) ... ok
+test_malformed_provider_request_keeps_a_typed_incomplete_summary (tests.test_engine_application.PreGoalUsageSummaryTests.test_malformed_provider_request_keeps_a_typed_incomplete_summary) ... ok
+test_pre_goal_projection_reads_legacy_call_settled_history (tests.test_engine_application.PreGoalUsageSummaryTests.test_pre_goal_projection_reads_legacy_call_settled_history) ... ok
+test_pre_goal_receipt_is_typed_then_attach_keeps_the_same_total_once (tests.test_engine_application.PreGoalUsageSummaryTests.test_pre_goal_receipt_is_typed_then_attach_keeps_the_same_total_once) ... ok
+test_pre_goal_schema_recovery_keeps_latency_as_unavailable_projection (tests.test_engine_application.PreGoalUsageSummaryTests.test_pre_goal_schema_recovery_keeps_latency_as_unavailable_projection) ... ok
+test_unknown_and_zero_are_distinct_and_goal_scope_is_explicit (tests.test_engine_application.PreGoalUsageSummaryTests.test_unknown_and_zero_are_distinct_and_goal_scope_is_explicit) ... ok
+test_active_plan_rejects_before_role_runtime_and_ledger_writes (tests.test_engine_application_revise.EngineApplicationReviseTests.test_active_plan_rejects_before_role_runtime_and_ledger_writes) ... ok
+test_revision_after_satisfied_goal_plans_without_activation (tests.test_engine_application_revise.EngineApplicationReviseTests.test_revision_after_satisfied_goal_plans_without_activation) ... FAIL
+test_widened_effect_revision_needs_new_target_authorization (tests.test_engine_application_revise.EngineApplicationReviseTests.test_widened_effect_revision_needs_new_target_authorization) ... FAIL
+test_cli_pause_status_and_cancel_use_the_same_durable_control_state (tests.test_engine_user_facade.EngineUserFacadeTests.test_cli_pause_status_and_cancel_use_the_same_durable_control_state) ... ok
+test_pause_resume_cancel_and_duplicate_run_once_are_consistent (tests.test_engine_user_facade.EngineUserFacadeTests.test_pause_resume_cancel_and_duplicate_run_once_are_consistent) ... ok
+test_prepare_uses_real_goal_and_planning_roles_then_authorizes_selected_plan (tests.test_engine_user_facade.EngineUserFacadeTests.test_prepare_uses_real_goal_and_planning_roles_then_authorizes_selected_plan) ... ok
+test_read_only_final_report_checks_all_criteria_evidence_and_source_digest (tests.test_engine_user_facade.EngineUserFacadeTests.test_read_only_final_report_checks_all_criteria_evidence_and_source_digest) ... ok
+test_environment_recovery_combines_validation_and_worker_cause_evidence (tests.test_engine_task_validation_recovery.TaskValidationRecoveryTests.test_environment_recovery_combines_validation_and_worker_cause_evidence) ... ok
+test_ledger_retry_limit_blocks_before_assessment_write (tests.test_engine_task_validation_recovery.TaskValidationRecoveryTests.test_ledger_retry_limit_blocks_before_assessment_write) ... ok
+test_retry_rejects_unbound_or_non_direct_recovery_evidence (tests.test_engine_task_validation_recovery.TaskValidationRecoveryTests.test_retry_rejects_unbound_or_non_direct_recovery_evidence) ... ok
+test_unknown_effect_blocks_validation_recovery_without_mutation (tests.test_engine_task_validation_recovery.TaskValidationRecoveryTests.test_unknown_effect_blocks_validation_recovery_without_mutation) ... ok
+test_validation_failure_retry_preserves_history_and_requires_new_worker_validation (tests.test_engine_task_validation_recovery.TaskValidationRecoveryTests.test_validation_failure_retry_preserves_history_and_requires_new_worker_validation) ... ok
+test_changed_wheel_or_bundle_invalidates_the_cell_contract (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_changed_wheel_or_bundle_invalidates_the_cell_contract) ... ok
+test_clean_install_suite_keeps_approved_thresholds_and_single_responsibility (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_clean_install_suite_keeps_approved_thresholds_and_single_responsibility) ... ok
+test_complete_typed_evidence_passes_final_scope_verification (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_complete_typed_evidence_passes_final_scope_verification) ... ok
+test_evidence_outside_run_root_is_rejected_at_creation (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_evidence_outside_run_root_is_rejected_at_creation) ... ok
+test_failed_install_keeps_typed_evidence_and_never_reports_pass (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_failed_install_keeps_typed_evidence_and_never_reports_pass)
+실제 빈 venv를 만들고 설치를 실패시켜 fail-closed 경로를 관측한다. ... ok
+test_harness_rejects_relative_inputs_and_non_empty_run_root (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_harness_rejects_relative_inputs_and_non_empty_run_root) ... ok
+test_legacy_string_refs_without_typed_records_cannot_pass (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_legacy_string_refs_without_typed_records_cannot_pass) ... ok
+test_link_fails_closed_on_malformed_run_root (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_fails_closed_on_malformed_run_root) ... ok
+test_link_keeps_clean_install_failure_class (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_keeps_clean_install_failure_class) ... ok
+test_link_passes_for_verified_live_run_with_same_candidate (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_passes_for_verified_live_run_with_same_candidate) ... ok
+test_link_rejects_candidate_import_root_outside_venv (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_candidate_import_root_outside_venv) ... ok
+test_link_rejects_candidate_probe_mismatch_or_editable (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_candidate_probe_mismatch_or_editable) ... ok
+test_link_rejects_different_project_e2e_candidate (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_different_project_e2e_candidate) ... ok
+test_link_rejects_dry_run_that_claims_release_pass (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_dry_run_that_claims_release_pass) ... ok
+test_link_rejects_import_origin_outside_venv_or_under_source (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_import_origin_outside_venv_or_under_source) ... ok
+test_link_rejects_missing_or_failed_stage (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_missing_or_failed_stage) ... ok
+test_link_rejects_relative_run_root_and_missing_report (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_relative_run_root_and_missing_report) ... ok
+test_link_rejects_report_digest_mismatch (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_report_digest_mismatch) ... ok
+test_link_rejects_reused_or_non_live_provenance (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_reused_or_non_live_provenance) ... ok
+test_link_reports_failed_install_as_product_failure (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_reports_failed_install_as_product_failure) ... ok
+test_link_without_run_root_is_not_run (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_without_run_root_is_not_run) ... ok
+test_not_run_and_failed_cells_are_not_conflated_or_promoted (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_not_run_and_failed_cells_are_not_conflated_or_promoted) ... ok
+test_source_diagnostic_contract_change_invalidates_reuse (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_source_diagnostic_contract_change_invalidates_reuse)
+다른 evaluation 계약의 cell을 이 cell의 PASS 근거로 재사용하지 않는다. ... ok
+test_tampered_and_deleted_evidence_cannot_pass (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_tampered_and_deleted_evidence_cannot_pass) ... ok
+test_wrong_wheel_binding_in_evidence_is_rejected (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_wrong_wheel_binding_in_evidence_is_rejected) ... ok
+test_cli_clean_install_command_requires_wheel_and_bundle (tests.test_engine_clean_install_qualification.ProjectE2EPreProviderDryRunTests.test_cli_clean_install_command_requires_wheel_and_bundle) ... ok
+test_cli_rejects_dry_run_outside_project_e2e (tests.test_engine_clean_install_qualification.ProjectE2EPreProviderDryRunTests.test_cli_rejects_dry_run_outside_project_e2e) ... ok
+test_dry_run_reports_fake_boundary_without_provider_contact (tests.test_engine_clean_install_qualification.ProjectE2EPreProviderDryRunTests.test_dry_run_reports_fake_boundary_without_provider_contact) ... ok
+test_dry_run_requires_the_same_candidate_wheel_binding (tests.test_engine_clean_install_qualification.ProjectE2EPreProviderDryRunTests.test_dry_run_requires_the_same_candidate_wheel_binding) ... ok
+test_built_wheel_contains_only_engine_scope_files (tests.test_engine_packaging.EnginePackagingContractTests.test_built_wheel_contains_only_engine_scope_files)
+실제 wheel을 빌드해 파일 목록으로 Engine-only 범위를 직접 검사한다. ... ok
+test_install_document_matches_pins_and_schema_contract (tests.test_engine_packaging.EnginePackagingContractTests.test_install_document_matches_pins_and_schema_contract) ... ok
+test_installed_candidate_launcher_binds_project_e2e_wheel (tests.test_engine_packaging.EnginePackagingContractTests.test_installed_candidate_launcher_binds_project_e2e_wheel) ... ok
+test_installed_candidate_launcher_reads_literal_allowlist (tests.test_engine_packaging.EnginePackagingContractTests.test_installed_candidate_launcher_reads_literal_allowlist) ... ok
+test_installed_candidate_launcher_rejects_source_product_import (tests.test_engine_packaging.EnginePackagingContractTests.test_installed_candidate_launcher_rejects_source_product_import) ... ok
+test_installed_candidate_launcher_sets_explicit_source_root (tests.test_engine_packaging.EnginePackagingContractTests.test_installed_candidate_launcher_sets_explicit_source_root) ... ok
+test_qualification_requires_explicit_developer_source_root (tests.test_engine_packaging.EnginePackagingContractTests.test_qualification_requires_explicit_developer_source_root) ... ok
+test_shipped_engine_modules_do_not_import_developer_only_code (tests.test_engine_packaging.EnginePackagingContractTests.test_shipped_engine_modules_do_not_import_developer_only_code)
+import graph 범위 검사(FM-10-C1)를 source AST로 직접 재현한다. ... ok
+test_user_wheel_exposes_only_engine_entrypoint_and_packages (tests.test_engine_packaging.EnginePackagingContractTests.test_user_wheel_exposes_only_engine_entrypoint_and_packages) ... ok
+test_cli_restricts_portable_options_to_preflight_prepare_and_requires_the_triplet (tests.test_engine_inspection_portable_preflight.PortablePreflightTests.test_cli_restricts_portable_options_to_preflight_prepare_and_requires_the_triplet) ... usage: run_portable_subset.py [-h] --run-root RUN_ROOT
+                              [--role-config ROLE_CONFIG]
+                              [--execution-mode {qualification,development-diagnostic}]
+                              [--inspection-contract {plan-inspection-v1,plan-inspection-v2}]
+                              [--fixture-package FIXTURE_PACKAGE]
+                              [--codex-bin CODEX_BIN]
+                              [--budget-policy BUDGET_POLICY]
+                              [--role-timeout-policy ROLE_TIMEOUT_POLICY]
+                              [--codex-project-binding CODEX_PROJECT_BINDING]
+                              {preflight,prepare,run,review-generated}
+run_portable_subset.py: error: preflight에는 --fixture-package, --codex-bin, --role-config가 필요합니다.
+usage: run_portable_subset.py [-h] --run-root RUN_ROOT
+                              [--role-config ROLE_CONFIG]
+                              [--execution-mode {qualification,development-diagnostic}]
+                              [--inspection-contract {plan-inspection-v1,plan-inspection-v2}]
+                              [--fixture-package FIXTURE_PACKAGE]
+                              [--codex-bin CODEX_BIN]
+                              [--budget-policy BUDGET_POLICY]
+                              [--role-timeout-policy ROLE_TIMEOUT_POLICY]
+                              [--codex-project-binding CODEX_PROJECT_BINDING]
+                              {preflight,prepare,run,review-generated}
+run_portable_subset.py: error: 입력 설정은 preflight/prepare에서만 사용할 수 있습니다.
+ok
+test_instruction_binding_uses_current_probe_sources_without_reading_old_run (tests.test_engine_inspection_portable_preflight.PortablePreflightTests.test_instruction_binding_uses_current_probe_sources_without_reading_old_run) ... ok
+test_portable_summary_avoids_old_history_and_fails_on_its_own_workspace_mutation (tests.test_engine_inspection_portable_preflight.PortablePreflightTests.test_portable_summary_avoids_old_history_and_fails_on_its_own_workspace_mutation) ... {"status": "PASS", "logical_calls": 0, "provider_turns": 0, "usage": {"cached_input_tokens": null, "input_tokens": null, "latency_ms": null, "output_tokens": null, "provider_duration_ms": null, "reasoning_included_in_output": null, "reasoning_tokens": null, "total_tokens": null, "unavailable_reason": "모든 시작 turn의 완전한 terminal usage를 유일하게 귀속하지 못했습니다."}, "error": null}
+{"status": "FAIL", "logical_calls": 0, "provider_turns": 0, "usage": {"cached_input_tokens": null, "input_tokens": null, "latency_ms": null, "output_tokens": null, "provider_duration_ms": null, "reasoning_included_in_output": null, "reasoning_tokens": null, "total_tokens": null, "unavailable_reason": "모든 시작 turn의 완전한 terminal usage를 유일하게 귀속하지 못했습니다."}, "error": null}
+ok
+test_preflight_binds_explicit_detached_workspace_package_binary_and_rejects_byte_mutation (tests.test_engine_inspection_portable_preflight.PortablePreflightTests.test_preflight_binds_explicit_detached_workspace_package_binary_and_rejects_byte_mutation) ... ok
+test_preflight_rejects_non_explicit_or_relative_inputs_before_writing (tests.test_engine_inspection_portable_preflight.PortablePreflightTests.test_preflight_rejects_non_explicit_or_relative_inputs_before_writing) ... ok
+test_unreceived_instruction_probe_blocks_prepare_before_any_new_effect (tests.test_engine_inspection_portable_preflight.PortablePreflightTests.test_unreceived_instruction_probe_blocks_prepare_before_any_new_effect) ... ok
+test_conforming_plugin_passes_every_check_in_isolated_resources (tests.test_engine_governance_conformance.ConformanceModuleTests.test_conforming_plugin_passes_every_check_in_isolated_resources) ... ok
+test_deterministic_rejection_is_not_reclassified_as_retryable (tests.test_engine_governance_conformance.ConformanceModuleTests.test_deterministic_rejection_is_not_reclassified_as_retryable) ... ok
+test_each_unexpected_behavior_fails_its_own_check_without_raising (tests.test_engine_governance_conformance.ConformanceModuleTests.test_each_unexpected_behavior_fails_its_own_check_without_raising) ... ok
+test_environment_failures_are_retryable_not_results (tests.test_engine_governance_conformance.ConformanceModuleTests.test_environment_failures_are_retryable_not_results) ... ok
+test_failures_outside_the_probe_are_also_retryable (tests.test_engine_governance_conformance.ConformanceModuleTests.test_failures_outside_the_probe_are_also_retryable)
+임시 디렉터리 생성·대응표 쓰기·플러그인 생성·정리의 예외도 결과 없는 효과가 아니라 다시 시도할 실패다. ... ok
+test_module_is_framework_free_and_names_no_real_model (tests.test_engine_governance_conformance.ConformanceModuleTests.test_module_is_framework_free_and_names_no_real_model) ... ok
+test_preflight_mismatch_is_reported_as_a_contract_mismatch (tests.test_engine_governance_conformance.ConformanceModuleTests.test_preflight_mismatch_is_reported_as_a_contract_mismatch) ... ok
+test_probe_model_class_write_failure_is_retryable (tests.test_engine_governance_conformance.ConformanceModuleTests.test_probe_model_class_write_failure_is_retryable) ... ok
+test_adoption_command_reports_the_result_and_sets_the_exit_code (tests.test_engine_governance_conformance.CallSiteTests.test_adoption_command_reports_the_result_and_sets_the_exit_code) ... ok
+test_e2e_reuses_frozen_conformance_and_only_rebinds_exact_identity (tests.test_engine_governance_conformance.CallSiteTests.test_e2e_reuses_frozen_conformance_and_only_rebinds_exact_identity) ... ok
+test_snapshot_commit_keeps_user_git_state_and_captures_worktree (tests.test_engine_governance_gate.SnapshotTests.test_snapshot_commit_keeps_user_git_state_and_captures_worktree) ... ok
+test_client_start_timeouts_stay_retryable_and_a_start_failure_is_a_mismatch (tests.test_engine_governance_gate.PluginSurfaceTests.test_client_start_timeouts_stay_retryable_and_a_start_failure_is_a_mismatch) ... ok
+test_entry_points_come_from_the_manifest_and_identity_is_derived_from_the_closure (tests.test_engine_governance_gate.PluginSurfaceTests.test_entry_points_come_from_the_manifest_and_identity_is_derived_from_the_closure) ... ok
+test_model_class_table_is_rejected_before_typed_use (tests.test_engine_governance_gate.PluginSurfaceTests.test_model_class_table_is_rejected_before_typed_use) ... ok
+test_node_floor_is_24_and_the_observed_version_is_kept (tests.test_engine_governance_gate.PluginSurfaceTests.test_node_floor_is_24_and_the_observed_version_is_kept) ... ok
+test_observed_calls_are_refused_without_the_a2_producer_and_no_cli_signs (tests.test_engine_governance_gate.PluginSurfaceTests.test_observed_calls_are_refused_without_the_a2_producer_and_no_cli_signs) ... ok
+test_plan_stage_requirement_is_validated_from_the_consumed_surface_declaration (tests.test_engine_governance_gate.PluginSurfaceTests.test_plan_stage_requirement_is_validated_from_the_consumed_surface_declaration) ... ok
+test_preflight_names_the_failed_check (tests.test_engine_governance_gate.PluginSurfaceTests.test_preflight_names_the_failed_check) ... ok
+test_product_gate_does_not_pin_the_plugin (tests.test_engine_governance_gate.PluginSurfaceTests.test_product_gate_does_not_pin_the_plugin) ... ok
+test_refused_or_malformed_signing_and_failed_scripts_are_effect_free_mismatches (tests.test_engine_governance_gate.PluginSurfaceTests.test_refused_or_malformed_signing_and_failed_scripts_are_effect_free_mismatches) ... ok
+test_close_finishes_cleanup_when_stdin_is_already_gone (tests.test_engine_governance_gate.McpClientCleanupTests.test_close_finishes_cleanup_when_stdin_is_already_gone)
+stdin.close()가 실패해도 프로세스·스레드 정리를 건너뛰지 않는다. 남은 프로세스가 앞 예외를 덮지 않게 한다. ... ok
+test_expired_mcp_deadline_blocks_before_sending (tests.test_engine_governance_gate.TimeoutTests.test_expired_mcp_deadline_blocks_before_sending) ... ok
+test_mcp_absolute_deadline_is_not_reset_by_irrelevant_output (tests.test_engine_governance_gate.TimeoutTests.test_mcp_absolute_deadline_is_not_reset_by_irrelevant_output) ... ok
+test_mcp_client_times_out_on_a_silent_server (tests.test_engine_governance_gate.TimeoutTests.test_mcp_client_times_out_on_a_silent_server) ... ok
+test_subprocess_calls_time_out_with_explicit_codes (tests.test_engine_governance_gate.TimeoutTests.test_subprocess_calls_time_out_with_explicit_codes) ... ok
+test_l7_posix_fails_closed_before_any_ledger_write_but_other_facades_work (tests.test_engine_g1b_owner_lease.ReplanningOwnerProcessTests.test_l7_posix_fails_closed_before_any_ledger_write_but_other_facades_work) ... ok
+test_s4_posix_status_is_unchanged_before_activation_and_blocks_after_it (tests.test_engine_g1b_owner_lease.OwnerStatusReplanTests.test_s4_posix_status_is_unchanged_before_activation_and_blocks_after_it)
+AC19: 활성 Plan이 없으면 POSIX status도 그대로다. 활성화 뒤에는 run_once와 같은 blocker다. ... ok
+
+======================================================================
+FAIL: test_revision_after_satisfied_goal_plans_without_activation (tests.test_engine_application_revise.EngineApplicationReviseTests.test_revision_after_satisfied_goal_plans_without_activation)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_application_revise.py", line 167, in test_revision_after_satisfied_goal_plans_without_activation
+    self.satisfy_first_goal()
+  File "${WORKSPACE}/vm-portable/tests/test_engine_application_revise.py", line 128, in satisfy_first_goal
+    self.assertEqual(RunOnceAction.COMPLETED, outcome.action, outcome.detail)
+AssertionError: <RunOnceAction.COMPLETED: 'completed'> != <RunOnceAction.BLOCKED: 'blocked'> : RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+======================================================================
+FAIL: test_widened_effect_revision_needs_new_target_authorization (tests.test_engine_application_revise.EngineApplicationReviseTests.test_widened_effect_revision_needs_new_target_authorization)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_application_revise.py", line 206, in test_widened_effect_revision_needs_new_target_authorization
+    self.satisfy_first_goal()
+  File "${WORKSPACE}/vm-portable/tests/test_engine_application_revise.py", line 128, in satisfy_first_goal
+    self.assertEqual(RunOnceAction.COMPLETED, outcome.action, outcome.detail)
+AssertionError: <RunOnceAction.COMPLETED: 'completed'> != <RunOnceAction.BLOCKED: 'blocked'> : RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+----------------------------------------------------------------------
+Ran 120 tests in 41.470s
+
+FAILED (failures=2)

@@ -1,0 +1,10 @@
+test_after_commit_wal_failure_is_retryable_valid_database (__main__.InitializationLifecycleReview.test_after_commit_wal_failure_is_retryable_valid_database) ... ok
+test_all_schema_objects_match_original_executescript_exactly (__main__.InitializationLifecycleReview.test_all_schema_objects_match_original_executescript_exactly) ... ok
+test_borrowed_identity_connection_keeps_transaction_owned_by_caller (__main__.InitializationLifecycleReview.test_borrowed_identity_connection_keeps_transaction_owned_by_caller) ... ok
+test_malformed_existing_db_closes_connection_and_preserves_bytes (__main__.InitializationLifecycleReview.test_malformed_existing_db_closes_connection_and_preserves_bytes) ... ok
+test_uncommitted_schema_and_identity_are_invisible_to_other_connection (__main__.InitializationLifecycleReview.test_uncommitted_schema_and_identity_are_invisible_to_other_connection) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.038s
+
+OK

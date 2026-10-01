@@ -1,0 +1,45 @@
+test_existing_empty_db_became_foreign_before_lock_must_be_rejected (__main__.IndependentInitializeReview.test_existing_empty_db_became_foreign_before_lock_must_be_rejected) ... FAIL
+test_existing_engine_data_and_schema_are_unchanged_by_initialize (__main__.IndependentInitializeReview.test_existing_engine_data_and_schema_are_unchanged_by_initialize) ... ok
+test_foreign_view_only_database_is_preserved (__main__.IndependentInitializeReview.test_foreign_view_only_database_is_preserved) ... ok
+test_process_exit_after_application_id_is_recoverable (__main__.IndependentInitializeReview.test_process_exit_after_application_id_is_recoverable) ... ok
+test_process_exit_after_ddl_is_recoverable (__main__.IndependentInitializeReview.test_process_exit_after_ddl_is_recoverable) ... ok
+test_rollback_failure_does_not_mask_primary_exception (__main__.IndependentInitializeReview.test_rollback_failure_does_not_mask_primary_exception) ... ERROR
+test_schema_and_identity_share_one_transaction (__main__.IndependentInitializeReview.test_schema_and_identity_share_one_transaction) ... ok
+
+======================================================================
+ERROR: test_rollback_failure_does_not_mask_primary_exception (__main__.IndependentInitializeReview.test_rollback_failure_does_not_mask_primary_exception)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-sqlite/proposal/src/flowmarshal/engine/ledger.py", line 812, in initialize
+    connection.executemany(
+  File "${WORKSPACE}/vm-sqlite-review/review_initialize.py", line 139, in executemany
+    def executemany(self, *args): raise PrimaryFailure('synthetic primary initialization error')
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+IndependentInitializeReview.test_rollback_failure_does_not_mask_primary_exception.<locals>.PrimaryFailure: synthetic primary initialization error
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-sqlite-review/review_initialize.py", line 142, in test_rollback_failure_does_not_mask_primary_exception
+    with self.assertRaises(PrimaryFailure): self.ledger.initialize()
+                                            ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-sqlite/proposal/src/flowmarshal/engine/ledger.py", line 823, in initialize
+    connection.rollback()
+  File "${WORKSPACE}/vm-sqlite-review/review_initialize.py", line 140, in rollback
+    def rollback(self): raise RollbackFailure('synthetic rollback failure')
+                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+IndependentInitializeReview.test_rollback_failure_does_not_mask_primary_exception.<locals>.RollbackFailure: synthetic rollback failure
+
+======================================================================
+FAIL: test_existing_empty_db_became_foreign_before_lock_must_be_rejected (__main__.IndependentInitializeReview.test_existing_empty_db_became_foreign_before_lock_must_be_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-sqlite-review/review_initialize.py", line 71, in test_existing_empty_db_became_foreign_before_lock_must_be_rejected
+    with self.assertRaises(EngineLedgerError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineLedgerError not raised
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.081s
+
+FAILED (failures=1, errors=1)

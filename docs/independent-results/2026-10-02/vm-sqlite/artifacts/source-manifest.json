@@ -1,0 +1,77 @@
+{
+  "candidate": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "files": [
+    {
+      "path": "tests/test_engine_ledger_service.py",
+      "git_blob_sha": "bf787857649fb939ee1615229f489c34daa21e68",
+      "sha256": "4721f0b54a26848888ecf2ee9875130c8d11c9f42e73372326d14d6650ddc21b",
+      "size": 42923
+    },
+    {
+      "path": "tests/test_engine_ledger_snapshot.py",
+      "git_blob_sha": "dfb4383eee5569e73cc86ba2ae5d2d8ea988ebd5",
+      "sha256": "d03ded9225b0bd404baac242a86ba304a67656173af440c8c8bf3e2f7285f946",
+      "size": 5139
+    },
+    {
+      "path": "tests/test_engine_current_snapshot_goal_scope.py",
+      "git_blob_sha": "fd65cc4bb1ca0d47e5fd4da3327ab124cb746013",
+      "sha256": "78846e8c12c1f233aec07f8782f31ae5bce1962742dc9537484e45c84325a6f8",
+      "size": 9142
+    },
+    {
+      "path": "src/flowmarshal/__init__.py",
+      "git_blob_sha": "f0324b5edf2b99bd811e25e6eb61c3e2713cc3cd",
+      "sha256": "0481f64b3feab188df0af84f605e7e344622304bb982a9ab5d2d42fb2a4d0872",
+      "size": 324
+    },
+    {
+      "path": "src/flowmarshal/canonical.py",
+      "git_blob_sha": "c62f16195acea93ede89e76c5a65f7ab96b42460",
+      "sha256": "64b74f58b66f513bdcd124d49c8cc9da64eb1df28182225d502cdede10f09282",
+      "size": 1730
+    },
+    {
+      "path": "src/flowmarshal/time.py",
+      "git_blob_sha": "6eef4b3c22d095203801e16f3587cdf5c48f793b",
+      "sha256": "e031fd1a63a00f9ce18e032cfea87e1986bc472a601fa8d0e460b6cd3ff9d841",
+      "size": 200
+    },
+    {
+      "path": "src/flowmarshal/engine/__init__.py",
+      "git_blob_sha": "5fedae815d4f06ff5c581a7db53f8b5a114cd252",
+      "sha256": "ec3d34d1025b3a399b6fe64db909aa134327eebe4406fe7b7fa9069f9f1a758b",
+      "size": 666
+    },
+    {
+      "path": "src/flowmarshal/engine/service.py",
+      "git_blob_sha": "8f9c55b3a83d77187790abe5b3ae576d1d7db46f",
+      "sha256": "a0b3aaf0645825c7eeb62babab0d63c8062158c38be46cf59a3649f3053568b3",
+      "size": 423365
+    },
+    {
+      "path": "src/flowmarshal/engine/capabilities.py",
+      "git_blob_sha": "7b4a616e267d0d64f048df4d5c0dbf7340fd5597",
+      "sha256": "1e819d6c87e65d61c82aa988799d99b52b913c4ecd67721e2ceb00ef5def765f",
+      "size": 6546
+    },
+    {
+      "path": "src/flowmarshal/engine/domain.py",
+      "git_blob_sha": "5dca7a898a8f73db53a3c504bbf0ce04170f1bd0",
+      "sha256": "09fe1cd1f6e160652e0ee81f4fd7a055f3813decd9ca056c97af2708e8ff95c4",
+      "size": 123000
+    },
+    {
+      "path": "src/flowmarshal/engine/ledger.py",
+      "git_blob_sha": "fe82d17527a0dfa6ce4a37f13f0a7e28a23fd6ab",
+      "sha256": "cecb5d6b50e736933005c6c849d6018992434ccdc8a9b13cb012f8e5fc5c0d41",
+      "size": 42787
+    },
+    {
+      "path": "src/flowmarshal/engine/model_lock.py",
+      "git_blob_sha": "b54281b6ccb1fef1f6ba6328762af94895559545",
+      "sha256": "e5fc1b8c6a3d365fe0209514daa5073d237ff9647003b21ff526ade70ec1726c",
+      "size": 11751
+    }
+  ]
+}

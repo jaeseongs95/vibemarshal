@@ -1,0 +1,14 @@
+usage: flowmarshal-engine config init [-h] --output OUTPUT --model MODEL
+                                      --effort
+                                      {none,minimal,low,medium,high,xhigh,max,ultra}
+                                      [--role ROLE=MODEL:EFFORT]
+                                      [--codex-bin CODEX_BIN]
+
+options:
+  -h, --help            show this help message and exit
+  --output OUTPUT
+  --model MODEL
+  --effort {none,minimal,low,medium,high,xhigh,max,ultra}
+  --role ROLE=MODEL:EFFORT
+                        특정 역할만 다른 binding으로 설정합니다. 역할별로 한 번씩 지정할 수 있습니다.
+  --codex-bin CODEX_BIN

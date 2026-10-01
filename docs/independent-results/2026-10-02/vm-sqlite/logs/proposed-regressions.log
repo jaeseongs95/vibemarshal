@@ -1,0 +1,59 @@
+test_concurrent_first_initialization_is_idempotent (__main__.ProposedRegressions.test_concurrent_first_initialization_is_idempotent) ... FAIL
+test_corrupt_history_json_is_reported_invalid_without_crash (__main__.ProposedRegressions.test_corrupt_history_json_is_reported_invalid_without_crash) ... ERROR
+test_init_failure_can_be_retried_without_deleting_db (__main__.ProposedRegressions.test_init_failure_can_be_retried_without_deleting_db) ... ERROR
+
+======================================================================
+ERROR: test_corrupt_history_json_is_reported_invalid_without_crash (__main__.ProposedRegressions.test_corrupt_history_json_is_reported_invalid_without_crash)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<TESTS>/test_proposed_regressions.py", line 42, in test_corrupt_history_json_is_reported_invalid_without_crash
+    self.assertFalse(ledger.verify_history(P))
+                     ^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<SOURCE>/src/flowmarshal/engine/ledger.py", line 883, in verify_history
+    return _verify_history_rows(rows)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<SOURCE>/src/flowmarshal/engine/ledger.py", line 736, in _verify_history_rows
+    payload = json.loads(row["payload_json"])
+              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<PYTHON_RUNTIME>/lib/python3.12/json/__init__.py", line 346, in loads
+    return _default_decoder.decode(s)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<PYTHON_RUNTIME>/lib/python3.12/json/decoder.py", line 338, in decode
+    obj, end = self.raw_decode(s, idx=_w(s, 0).end())
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<PYTHON_RUNTIME>/lib/python3.12/json/decoder.py", line 354, in raw_decode
+    obj, end = self.scan_once(s, idx)
+               ^^^^^^^^^^^^^^^^^^^^^^
+json.decoder.JSONDecodeError: Expecting property name enclosed in double quotes: line 1 column 2 (char 1)
+
+======================================================================
+ERROR: test_init_failure_can_be_retried_without_deleting_db (__main__.ProposedRegressions.test_init_failure_can_be_retried_without_deleting_db)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<TESTS>/test_proposed_regressions.py", line 30, in test_init_failure_can_be_retried_without_deleting_db
+    ledger.initialize()
+  File "<SOURCE>/src/flowmarshal/engine/ledger.py", line 797, in initialize
+    self._assert_identity()
+  File "<SOURCE>/src/flowmarshal/engine/ledger.py", line 832, in _assert_identity
+    raise EngineLedgerError("prototype 또는 외부 DB를 Engine 원장으로 열 수 없습니다.")
+flowmarshal.engine.ledger.EngineLedgerError: prototype 또는 외부 DB를 Engine 원장으로 열 수 없습니다.
+
+======================================================================
+FAIL: test_concurrent_first_initialization_is_idempotent (__main__.ProposedRegressions.test_concurrent_first_initialization_is_idempotent)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<TESTS>/test_proposed_regressions.py", line 37, in test_concurrent_first_initialization_is_idempotent
+    self.assertEqual(['ok','ok'],sorted(out))
+AssertionError: Lists differ: ['ok', 'ok'] != ['OperationalError: database is locked', 'ok']
+
+First differing element 0:
+'ok'
+'OperationalError: database is locked'
+
+- ['ok', 'ok']
++ ['OperationalError: database is locked', 'ok']
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.055s
+
+FAILED (failures=1, errors=2)

@@ -1,0 +1,9 @@
+test_acceptance_reads_hold_authoritative_writer_transaction (__main__.RevalidationRegression.test_acceptance_reads_hold_authoritative_writer_transaction) ... ok
+test_existing_empty_db_becoming_foreign_is_rejected (__main__.RevalidationRegression.test_existing_empty_db_becoming_foreign_is_rejected) ... ok
+test_missing_path_becoming_foreign_is_rejected (__main__.RevalidationRegression.test_missing_path_becoming_foreign_is_rejected) ... ok
+test_rollback_failure_preserves_primary_exception_and_connection_cleanup (__main__.RevalidationRegression.test_rollback_failure_preserves_primary_exception_and_connection_cleanup) ... ok
+
+----------------------------------------------------------------------
+Ran 4 tests in 0.064s
+
+OK

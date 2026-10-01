@@ -1,0 +1,220 @@
+* Getting build dependencies for wheel...
+running egg_info
+creating src/flowmarshal_engine.egg-info
+writing src/flowmarshal_engine.egg-info/PKG-INFO
+writing dependency_links to src/flowmarshal_engine.egg-info/dependency_links.txt
+writing entry points to src/flowmarshal_engine.egg-info/entry_points.txt
+writing requirements to src/flowmarshal_engine.egg-info/requires.txt
+writing top-level names to src/flowmarshal_engine.egg-info/top_level.txt
+writing manifest file 'src/flowmarshal_engine.egg-info/SOURCES.txt'
+reading manifest file 'src/flowmarshal_engine.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+adding license file 'NOTICE'
+writing manifest file 'src/flowmarshal_engine.egg-info/SOURCES.txt'
+* Building wheel...
+running bdist_wheel
+running build
+running build_py
+creating build/lib/flowmarshal
+copying src/flowmarshal/__init__.py -> build/lib/flowmarshal
+copying src/flowmarshal/canonical.py -> build/lib/flowmarshal
+copying src/flowmarshal/time.py -> build/lib/flowmarshal
+creating build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/reporting.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/application.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/roles.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/goal_feedback.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/planning_recovery.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/__init__.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/model_observation.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/execution.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/cli.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/service.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/plan_inspection_provider.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/planning_feedback.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/runtime.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/operation_trace.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/governance_gate.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/ags_invocation_transport.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/plan_reuse.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/plan_inspection_eval.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/models.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/worker_prompt.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/role_usage_reconciliation.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/capabilities.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/domain.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/read_models.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/recovery.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/role_execution.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/planning.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/plan_review_adjudication.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/goal.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/claude_runtime.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/console_host.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/ledger.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/validation_obligations.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/context.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/budget.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/validation_execution.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/qualification_manifest.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/authorization.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/plan_inspection.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/operations.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/planner_roles.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/ags_approved_slot_producer.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/inspection_generation_review.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/providers.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/model_rebinding.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/role_observations.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/ags_observation_producer.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/plan_inspection_v2.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/runtime_observation.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/governance_conformance.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/role_budget.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/model_lock.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/recovery_planning.py -> build/lib/flowmarshal/engine
+copying src/flowmarshal/engine/plan_inspection_eval_v2.py -> build/lib/flowmarshal/engine
+installing to build/bdist.linux-x86_64/wheel
+running install
+running install_lib
+creating build/bdist.linux-x86_64/wheel
+creating build/bdist.linux-x86_64/wheel/flowmarshal
+copying build/lib/flowmarshal/__init__.py -> build/bdist.linux-x86_64/wheel/./flowmarshal
+copying build/lib/flowmarshal/canonical.py -> build/bdist.linux-x86_64/wheel/./flowmarshal
+copying build/lib/flowmarshal/time.py -> build/bdist.linux-x86_64/wheel/./flowmarshal
+creating build/bdist.linux-x86_64/wheel/flowmarshal/engine
+copying build/lib/flowmarshal/engine/reporting.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/application.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/roles.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/goal_feedback.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/planning_recovery.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/__init__.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/model_observation.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/execution.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/cli.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/service.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/plan_inspection_provider.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/planning_feedback.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/runtime.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/operation_trace.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/governance_gate.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/ags_invocation_transport.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/plan_reuse.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/plan_inspection_eval.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/models.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/worker_prompt.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/role_usage_reconciliation.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/capabilities.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/domain.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/read_models.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/recovery.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/role_execution.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/planning.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/plan_review_adjudication.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/goal.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/claude_runtime.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/console_host.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/ledger.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/validation_obligations.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/context.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/budget.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/validation_execution.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/qualification_manifest.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/authorization.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/plan_inspection.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/operations.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/planner_roles.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/ags_approved_slot_producer.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/inspection_generation_review.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/providers.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/model_rebinding.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/role_observations.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/ags_observation_producer.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/plan_inspection_v2.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/runtime_observation.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/governance_conformance.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/role_budget.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/model_lock.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/recovery_planning.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+copying build/lib/flowmarshal/engine/plan_inspection_eval_v2.py -> build/bdist.linux-x86_64/wheel/./flowmarshal/engine
+running install_egg_info
+running egg_info
+writing src/flowmarshal_engine.egg-info/PKG-INFO
+writing dependency_links to src/flowmarshal_engine.egg-info/dependency_links.txt
+writing entry points to src/flowmarshal_engine.egg-info/entry_points.txt
+writing requirements to src/flowmarshal_engine.egg-info/requires.txt
+writing top-level names to src/flowmarshal_engine.egg-info/top_level.txt
+reading manifest file 'src/flowmarshal_engine.egg-info/SOURCES.txt'
+adding license file 'LICENSE'
+adding license file 'NOTICE'
+writing manifest file 'src/flowmarshal_engine.egg-info/SOURCES.txt'
+Copying src/flowmarshal_engine.egg-info to build/bdist.linux-x86_64/wheel/./flowmarshal_engine-0.2.0a1-py3.12.egg-info
+running install_scripts
+creating build/bdist.linux-x86_64/wheel/flowmarshal_engine-0.2.0a1.dist-info/WHEEL
+creating '${WORKSPACE}/vm-evidence/dist/.tmp-3dy022iv/flowmarshal_engine-0.2.0a1-py3-none-any.whl' and adding 'build/bdist.linux-x86_64/wheel' to it
+adding 'flowmarshal/__init__.py'
+adding 'flowmarshal/canonical.py'
+adding 'flowmarshal/time.py'
+adding 'flowmarshal/engine/__init__.py'
+adding 'flowmarshal/engine/ags_approved_slot_producer.py'
+adding 'flowmarshal/engine/ags_invocation_transport.py'
+adding 'flowmarshal/engine/ags_observation_producer.py'
+adding 'flowmarshal/engine/application.py'
+adding 'flowmarshal/engine/authorization.py'
+adding 'flowmarshal/engine/budget.py'
+adding 'flowmarshal/engine/capabilities.py'
+adding 'flowmarshal/engine/claude_runtime.py'
+adding 'flowmarshal/engine/cli.py'
+adding 'flowmarshal/engine/console_host.py'
+adding 'flowmarshal/engine/context.py'
+adding 'flowmarshal/engine/domain.py'
+adding 'flowmarshal/engine/execution.py'
+adding 'flowmarshal/engine/goal.py'
+adding 'flowmarshal/engine/goal_feedback.py'
+adding 'flowmarshal/engine/governance_conformance.py'
+adding 'flowmarshal/engine/governance_gate.py'
+adding 'flowmarshal/engine/inspection_generation_review.py'
+adding 'flowmarshal/engine/ledger.py'
+adding 'flowmarshal/engine/model_lock.py'
+adding 'flowmarshal/engine/model_observation.py'
+adding 'flowmarshal/engine/model_rebinding.py'
+adding 'flowmarshal/engine/models.py'
+adding 'flowmarshal/engine/operation_trace.py'
+adding 'flowmarshal/engine/operations.py'
+adding 'flowmarshal/engine/plan_inspection.py'
+adding 'flowmarshal/engine/plan_inspection_eval.py'
+adding 'flowmarshal/engine/plan_inspection_eval_v2.py'
+adding 'flowmarshal/engine/plan_inspection_provider.py'
+adding 'flowmarshal/engine/plan_inspection_v2.py'
+adding 'flowmarshal/engine/plan_reuse.py'
+adding 'flowmarshal/engine/plan_review_adjudication.py'
+adding 'flowmarshal/engine/planner_roles.py'
+adding 'flowmarshal/engine/planning.py'
+adding 'flowmarshal/engine/planning_feedback.py'
+adding 'flowmarshal/engine/planning_recovery.py'
+adding 'flowmarshal/engine/providers.py'
+adding 'flowmarshal/engine/qualification_manifest.py'
+adding 'flowmarshal/engine/read_models.py'
+adding 'flowmarshal/engine/recovery.py'
+adding 'flowmarshal/engine/recovery_planning.py'
+adding 'flowmarshal/engine/reporting.py'
+adding 'flowmarshal/engine/role_budget.py'
+adding 'flowmarshal/engine/role_execution.py'
+adding 'flowmarshal/engine/role_observations.py'
+adding 'flowmarshal/engine/role_usage_reconciliation.py'
+adding 'flowmarshal/engine/roles.py'
+adding 'flowmarshal/engine/runtime.py'
+adding 'flowmarshal/engine/runtime_observation.py'
+adding 'flowmarshal/engine/service.py'
+adding 'flowmarshal/engine/validation_execution.py'
+adding 'flowmarshal/engine/validation_obligations.py'
+adding 'flowmarshal/engine/worker_prompt.py'
+adding 'flowmarshal_engine-0.2.0a1.dist-info/licenses/LICENSE'
+adding 'flowmarshal_engine-0.2.0a1.dist-info/licenses/NOTICE'
+adding 'flowmarshal_engine-0.2.0a1.dist-info/METADATA'
+adding 'flowmarshal_engine-0.2.0a1.dist-info/WHEEL'
+adding 'flowmarshal_engine-0.2.0a1.dist-info/entry_points.txt'
+adding 'flowmarshal_engine-0.2.0a1.dist-info/top_level.txt'
+adding 'flowmarshal_engine-0.2.0a1.dist-info/RECORD'
+removing build/bdist.linux-x86_64/wheel
+Successfully built flowmarshal_engine-0.2.0a1-py3-none-any.whl

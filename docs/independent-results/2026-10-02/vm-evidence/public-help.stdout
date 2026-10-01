@@ -1,0 +1,48 @@
+usage: flowmarshal-engine [-h] [--role-timeout-policy ROLE_TIMEOUT_POLICY]
+                          [--codex-project-binding CODEX_PROJECT_BINDING]
+                          [--db DB] [--artifacts ARTIFACTS]
+                          [--provider {codex,claude}]
+                          [--claude-bin CLAUDE_BIN]
+                          [--claude-model-catalog CLAUDE_MODEL_CATALOG]
+                          [--claude-state-root CLAUDE_STATE_ROOT]
+                          [--claude-setting-sources CLAUDE_SETTING_SOURCES]
+                          {config,prepare,revise,authorize,run-once,observe,pause,cancel,status,replan,final-report,project,governance,model,goal,plan,task,run,attempt,validate,recover,report}
+                          ...
+
+FlowMarshal 새 authority engine
+
+positional arguments:
+  {config,prepare,revise,authorize,run-once,observe,pause,cancel,status,replan,final-report,project,governance,model,goal,plan,task,run,attempt,validate,recover,report}
+    config              user-owned Engine 설정 생성
+    prepare             raw request를 실제 Goal 정규화·독립 review·Planning으로 준비
+    revise              최신 Goal의 다음 revision을 실제 정규화·독립 review·Planning으로
+                        준비(활성화는 authorize)
+    authorize           목표·범위·효과·운영 정책을 승인하고 선택 Plan을 활성화
+    run-once            bounded scheduler tick 한 번 실행
+    observe             active provider job을 한 번 관측
+    pause               현재 Goal workflow 일시정지
+    cancel              현재 Goal workflow 취소
+    status              Core·control·job 상태 표시
+    replan              차단된 재계획 후보에 새 subgraph 재계획 시도를 기록(역할 호출은 다음 run-once)
+    final-report        GoalVerdict에 결속된 최종 보고 표시
+
+options:
+  -h, --help            show this help message and exit
+  --role-timeout-policy ROLE_TIMEOUT_POLICY
+                        역할별 timeout 운영 설정 JSON
+  --codex-project-binding CODEX_PROJECT_BINDING
+                        새 역할·Worker thread의 App Server 프로젝트 결속 JSON
+  --db DB
+  --artifacts ARTIFACTS
+  --provider {codex,claude}
+                        역할·Worker 호출 provider (기본 codex)
+  --claude-bin CLAUDE_BIN
+                        Claude Code CLI 실행 파일 (기본 PATH의 claude)
+  --claude-model-catalog CLAUDE_MODEL_CATALOG
+                        Claude provider가 받을 model/effort 카탈로그 JSON
+                        (flowmarshal-claude-model-catalog-v1)
+  --claude-state-root CLAUDE_STATE_ROOT
+                        Claude thread 지침·상태를 둘 디렉터리
+  --claude-setting-sources CLAUDE_SETTING_SOURCES
+                        Claude CLI --setting-sources 값 (기본 빈 값:
+                        user/project/local 설정을 읽지 않음)

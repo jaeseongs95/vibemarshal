@@ -1,0 +1,13 @@
+test_commit_failure_rolls_back_everything_and_retries (__main__.AtomicInitializeProposal.test_commit_failure_rolls_back_everything_and_retries) ... ok
+test_existing_foreign_schema_and_rows_are_never_adopted (__main__.AtomicInitializeProposal.test_existing_foreign_schema_and_rows_are_never_adopted) ... ok
+test_identity_failure_rolls_back_metadata_and_retries (__main__.AtomicInitializeProposal.test_identity_failure_rolls_back_metadata_and_retries) ... ok
+test_keyboard_interrupt_rolls_back_everything (__main__.AtomicInitializeProposal.test_keyboard_interrupt_rolls_back_everything) ... ok
+test_metadata_failure_rolls_back_schema_and_retries (__main__.AtomicInitializeProposal.test_metadata_failure_rolls_back_schema_and_retries) ... ok
+test_mid_schema_failure_rolls_back_ddl_and_retries (__main__.AtomicInitializeProposal.test_mid_schema_failure_rolls_back_ddl_and_retries) ... ok
+test_nonzero_foreign_identity_is_never_adopted (__main__.AtomicInitializeProposal.test_nonzero_foreign_identity_is_never_adopted) ... ok
+test_zero_byte_and_empty_sqlite_are_accepted_without_deletion (__main__.AtomicInitializeProposal.test_zero_byte_and_empty_sqlite_are_accepted_without_deletion) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.095s
+
+OK

@@ -1,0 +1,45 @@
+test_manual_typed_observation_is_bound_to_current_spec_and_evidence (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_manual_typed_observation_is_bound_to_current_spec_and_evidence) ... DISPATCH_RESULT RunOnceResult(action=<RunOnceAction.BLOCKED: 'blocked'>, project_id='project_37e32615fb7c458da3319a1c0a38000e', task_id=None, attempt_id=None, execution_spec_revision_id=None, validation_result_id=None, goal_verdict_id=None, evidence_ids=(), blocker_code='RUNTIME_OWNER_LOCK_UNAVAILABLE', failure_class=None, suggested_repair_action=None, checkpoint_required=False, detail='RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix', runtime_job_id=None, runtime_job_kind=None, runtime_job_status=None, tick_elapsed_ms=2)
+ERROR
+test_checkpoint_after_revision_with_larger_digest (tests.test_engine_current_snapshot_goal_scope.CurrentSnapshotGoalScopeTests.test_checkpoint_after_revision_with_larger_digest) ... DISPATCH_RESULT RunOnceResult(action=<RunOnceAction.BLOCKED: 'blocked'>, project_id='project_64d2dc2966d943208aefc042f90a7d3b', task_id=None, attempt_id=None, execution_spec_revision_id=None, validation_result_id=None, goal_verdict_id=None, evidence_ids=(), blocker_code='RUNTIME_OWNER_LOCK_UNAVAILABLE', failure_class=None, suggested_repair_action=None, checkpoint_required=False, detail='RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix', runtime_job_id=None, runtime_job_kind=None, runtime_job_status=None, tick_elapsed_ms=2)
+ERROR
+test_checkpoint_after_revision_with_smaller_digest (tests.test_engine_current_snapshot_goal_scope.CurrentSnapshotGoalScopeTests.test_checkpoint_after_revision_with_smaller_digest) ... DISPATCH_RESULT RunOnceResult(action=<RunOnceAction.BLOCKED: 'blocked'>, project_id='project_da049c3067104f1994a6af7a330e3496', task_id=None, attempt_id=None, execution_spec_revision_id=None, validation_result_id=None, goal_verdict_id=None, evidence_ids=(), blocker_code='RUNTIME_OWNER_LOCK_UNAVAILABLE', failure_class=None, suggested_repair_action=None, checkpoint_required=False, detail='RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix', runtime_job_id=None, runtime_job_kind=None, runtime_job_status=None, tick_elapsed_ms=3)
+ERROR
+
+======================================================================
+ERROR: test_manual_typed_observation_is_bound_to_current_spec_and_evidence (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_manual_typed_observation_is_bound_to_current_spec_and_evidence)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<SOURCE>/tests/test_engine_ledger_service.py", line 546, in test_manual_typed_observation_is_bound_to_current_spec_and_evidence
+    connection.execute(
+TypeError: 'NoneType' object is not subscriptable
+
+======================================================================
+ERROR: test_checkpoint_after_revision_with_larger_digest (tests.test_engine_current_snapshot_goal_scope.CurrentSnapshotGoalScopeTests.test_checkpoint_after_revision_with_larger_digest)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<SOURCE>/tests/test_engine_current_snapshot_goal_scope.py", line 182, in test_checkpoint_after_revision_with_larger_digest
+    self.assert_checkpoint_uses_task_plan_goal_snapshot(larger=True)
+  File "<SOURCE>/tests/test_engine_current_snapshot_goal_scope.py", line 143, in assert_checkpoint_uses_task_plan_goal_snapshot
+    self.finish_worker_and_validate()
+  File "<SOURCE>/tests/test_engine_plan_completion_reuse.py", line 28, in finish_worker_and_validate
+    binding = ThreadBinding.model_validate_json(row["binding_json"])
+                                                ~~~^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+======================================================================
+ERROR: test_checkpoint_after_revision_with_smaller_digest (tests.test_engine_current_snapshot_goal_scope.CurrentSnapshotGoalScopeTests.test_checkpoint_after_revision_with_smaller_digest)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<SOURCE>/tests/test_engine_current_snapshot_goal_scope.py", line 186, in test_checkpoint_after_revision_with_smaller_digest
+    self.assert_checkpoint_uses_task_plan_goal_snapshot(larger=False)
+  File "<SOURCE>/tests/test_engine_current_snapshot_goal_scope.py", line 143, in assert_checkpoint_uses_task_plan_goal_snapshot
+    self.finish_worker_and_validate()
+  File "<SOURCE>/tests/test_engine_plan_completion_reuse.py", line 28, in finish_worker_and_validate
+    binding = ThreadBinding.model_validate_json(row["binding_json"])
+                                                ~~~^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.160s
+
+FAILED (errors=3)

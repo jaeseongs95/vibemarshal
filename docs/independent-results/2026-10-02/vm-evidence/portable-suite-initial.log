@@ -1,0 +1,557 @@
+test_background_owner_observes_after_deadline_interrupt (tests.test_engine_cli.EngineCliTests.test_background_owner_observes_after_deadline_interrupt) ... ok
+test_background_owner_publishes_initial_tick_then_keeps_job_lifetime (tests.test_engine_cli.EngineCliTests.test_background_owner_publishes_initial_tick_then_keeps_job_lifetime) ... ok
+test_budget_show_projects_pre_goal_provider_receipt (tests.test_engine_cli.EngineCliTests.test_budget_show_projects_pre_goal_provider_receipt) ... ok
+test_config_init_does_not_overwrite_existing_file (tests.test_engine_cli.EngineCliTests.test_config_init_does_not_overwrite_existing_file) ... ok
+test_config_init_rejects_duplicate_role_without_writing (tests.test_engine_cli.EngineCliTests.test_config_init_rejects_duplicate_role_without_writing) ... ok
+test_config_init_rejects_unsupported_binding_without_writing (tests.test_engine_cli.EngineCliTests.test_config_init_rejects_unsupported_binding_without_writing) ... ok
+test_config_init_writes_user_owned_inventory_validated_roles (tests.test_engine_cli.EngineCliTests.test_config_init_writes_user_owned_inventory_validated_roles) ... ok
+test_main_explicit_argv_is_forwarded_to_owner_process (tests.test_engine_cli.EngineCliTests.test_main_explicit_argv_is_forwarded_to_owner_process) ... ok
+test_project_goal_and_planning_context_roundtrip (tests.test_engine_cli.EngineCliTests.test_project_goal_and_planning_context_roundtrip) ... ok
+test_public_command_surface_is_present (tests.test_engine_cli.EngineCliTests.test_public_command_surface_is_present) ... ok
+test_run_once_passes_explicit_codex_project_binding_to_runtime (tests.test_engine_cli.EngineCliTests.test_run_once_passes_explicit_codex_project_binding_to_runtime) ... ok
+test_run_once_spawns_owner_before_emitting (tests.test_engine_cli.EngineCliTests.test_run_once_spawns_owner_before_emitting) ... ok
+test_user_facade_commands_parse_without_internal_plan_identifiers (tests.test_engine_cli.EngineCliTests.test_user_facade_commands_parse_without_internal_plan_identifiers) ... ok
+test_active_plan_is_reported_as_error_code_without_runtime_calls_or_writes (tests.test_engine_cli_revise.EngineCliReviseTests.test_active_plan_is_reported_as_error_code_without_runtime_calls_or_writes) ... ok
+test_handler_calls_application_revise_and_emits_result (tests.test_engine_cli_revise.EngineCliReviseTests.test_handler_calls_application_revise_and_emits_result) ... ok
+test_parser_routes_revise_to_its_handler (tests.test_engine_cli_revise.EngineCliReviseTests.test_parser_routes_revise_to_its_handler) ... ok
+test_automatic_recovery_revalidation_and_goal_verdict_finish_through_facade (tests.test_engine_user_facade.EngineUserFacadeTests.test_automatic_recovery_revalidation_and_goal_verdict_finish_through_facade) ... FAIL
+test_cli_pause_status_and_cancel_use_the_same_durable_control_state (tests.test_engine_user_facade.EngineUserFacadeTests.test_cli_pause_status_and_cancel_use_the_same_durable_control_state) ... ok
+test_pause_resume_cancel_and_duplicate_run_once_are_consistent (tests.test_engine_user_facade.EngineUserFacadeTests.test_pause_resume_cancel_and_duplicate_run_once_are_consistent) ... ok
+test_prepare_uses_real_goal_and_planning_roles_then_authorizes_selected_plan (tests.test_engine_user_facade.EngineUserFacadeTests.test_prepare_uses_real_goal_and_planning_roles_then_authorizes_selected_plan) ... ok
+test_read_only_final_report_checks_all_criteria_evidence_and_source_digest (tests.test_engine_user_facade.EngineUserFacadeTests.test_read_only_final_report_checks_all_criteria_evidence_and_source_digest) ... ok
+test_conflicting_duplicate_receipts_are_shown_and_not_summed (tests.test_engine_application.EngineApplicationTests.test_conflicting_duplicate_receipts_are_shown_and_not_summed) ... ok
+test_entity_refs_and_history_cursor_include_query_bindings (tests.test_engine_application.EngineApplicationTests.test_entity_refs_and_history_cursor_include_query_bindings) ... ok
+test_final_report_uses_verdict_goal_revision_not_active_goal (tests.test_engine_application.EngineApplicationTests.test_final_report_uses_verdict_goal_revision_not_active_goal) ... ok
+test_missing_expected_call_is_counted_once_and_does_not_invent_a_stage (tests.test_engine_application.EngineApplicationTests.test_missing_expected_call_is_counted_once_and_does_not_invent_a_stage) ... ok
+test_model_binding_needs_observed_inventory_without_calling_provider (tests.test_engine_application.EngineApplicationTests.test_model_binding_needs_observed_inventory_without_calling_provider) ... ok
+test_partial_usage_keeps_component_subtotals_and_reports_incomplete (tests.test_engine_application.EngineApplicationTests.test_partial_usage_keeps_component_subtotals_and_reports_incomplete) ... ok
+test_provider_usage_id_on_duplicate_receipt_excludes_logical_tokens_but_keeps_latency (tests.test_engine_application.EngineApplicationTests.test_provider_usage_id_on_duplicate_receipt_excludes_logical_tokens_but_keeps_latency) ... ok
+test_recovery_query_exposes_exact_validation_failure_without_mutation (tests.test_engine_application.EngineApplicationTests.test_recovery_query_exposes_exact_validation_failure_without_mutation) ... ok
+test_reserved_provider_call_with_usage_id_is_not_a_completed_measurement (tests.test_engine_application.EngineApplicationTests.test_reserved_provider_call_with_usage_id_is_not_a_completed_measurement) ... ok
+test_unavailable_tokens_keep_observed_latency_subtotal (tests.test_engine_application.EngineApplicationTests.test_unavailable_tokens_keep_observed_latency_subtotal) ... ok
+test_unobserved_provider_call_makes_total_incomplete_without_using_reservation_actual (tests.test_engine_application.EngineApplicationTests.test_unobserved_provider_call_makes_total_incomplete_without_using_reservation_actual) ... ok
+test_unsettled_provider_usage_keeps_its_observed_latency (tests.test_engine_application.EngineApplicationTests.test_unsettled_provider_usage_keeps_its_observed_latency) ... ok
+test_usage_keeps_zero_distinct_from_missing_and_excludes_other_goal (tests.test_engine_application.EngineApplicationTests.test_usage_keeps_zero_distinct_from_missing_and_excludes_other_goal) ... ok
+test_conflicting_pre_goal_logical_receipts_are_not_summed (tests.test_engine_application.PreGoalUsageSummaryTests.test_conflicting_pre_goal_logical_receipts_are_not_summed) ... ok
+test_conflicting_provider_receipt_is_reported_without_inventing_usage (tests.test_engine_application.PreGoalUsageSummaryTests.test_conflicting_provider_receipt_is_reported_without_inventing_usage) ... ok
+test_legacy_unavailable_receipt_omitted_and_null_tokens_compare_equal (tests.test_engine_application.PreGoalUsageSummaryTests.test_legacy_unavailable_receipt_omitted_and_null_tokens_compare_equal) ... ok
+test_malformed_provider_request_keeps_a_typed_incomplete_summary (tests.test_engine_application.PreGoalUsageSummaryTests.test_malformed_provider_request_keeps_a_typed_incomplete_summary) ... ok
+test_pre_goal_projection_reads_legacy_call_settled_history (tests.test_engine_application.PreGoalUsageSummaryTests.test_pre_goal_projection_reads_legacy_call_settled_history) ... ok
+test_pre_goal_receipt_is_typed_then_attach_keeps_the_same_total_once (tests.test_engine_application.PreGoalUsageSummaryTests.test_pre_goal_receipt_is_typed_then_attach_keeps_the_same_total_once) ... ok
+test_pre_goal_schema_recovery_keeps_latency_as_unavailable_projection (tests.test_engine_application.PreGoalUsageSummaryTests.test_pre_goal_schema_recovery_keeps_latency_as_unavailable_projection) ... ok
+test_unknown_and_zero_are_distinct_and_goal_scope_is_explicit (tests.test_engine_application.PreGoalUsageSummaryTests.test_unknown_and_zero_are_distinct_and_goal_scope_is_explicit) ... ok
+test_environment_recovery_combines_validation_and_worker_cause_evidence (tests.test_engine_task_validation_recovery.TaskValidationRecoveryTests.test_environment_recovery_combines_validation_and_worker_cause_evidence) ... ok
+test_ledger_retry_limit_blocks_before_assessment_write (tests.test_engine_task_validation_recovery.TaskValidationRecoveryTests.test_ledger_retry_limit_blocks_before_assessment_write) ... ok
+test_retry_rejects_unbound_or_non_direct_recovery_evidence (tests.test_engine_task_validation_recovery.TaskValidationRecoveryTests.test_retry_rejects_unbound_or_non_direct_recovery_evidence) ... ok
+test_run_once_reports_typed_validation_recovery_blocker (tests.test_engine_task_validation_recovery.TaskValidationRecoveryTests.test_run_once_reports_typed_validation_recovery_blocker) ... FAIL
+test_unknown_effect_blocks_validation_recovery_without_mutation (tests.test_engine_task_validation_recovery.TaskValidationRecoveryTests.test_unknown_effect_blocks_validation_recovery_without_mutation) ... ok
+test_validation_failure_retry_preserves_history_and_requires_new_worker_validation (tests.test_engine_task_validation_recovery.TaskValidationRecoveryTests.test_validation_failure_retry_preserves_history_and_requires_new_worker_validation) ... ok
+test_background_lost_create_receipt_is_recovered_without_duplicate_effect (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_background_lost_create_receipt_is_recovered_without_duplicate_effect) ... ERROR
+test_bindingless_collector_loss_yields_to_prepared_effect_recovery (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_bindingless_collector_loss_yields_to_prepared_effect_recovery) ... ERROR
+test_cancel_before_turn_effect_blocks_late_start (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_cancel_before_turn_effect_blocks_late_start) ... ERROR
+test_cancel_finalization_requires_cancelled_workflow (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_cancel_finalization_requires_cancelled_workflow) ... FAIL
+test_cancel_observation_failure_is_preserved_as_unknown (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_cancel_observation_failure_is_preserved_as_unknown) ... FAIL
+test_cancel_racing_with_late_turn_start_preserves_binding_and_interrupts (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_cancel_racing_with_late_turn_start_preserves_binding_and_interrupts) ... ERROR
+test_cancel_reason_does_not_resume_provider (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_cancel_reason_does_not_resume_provider) ... FAIL
+test_cancel_with_unreceipted_intent_stays_external_unknown (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_cancel_with_unreceipted_intent_stays_external_unknown) ... FAIL
+test_collector_loss_and_restart_are_not_provider_terminal (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_collector_loss_and_restart_are_not_provider_terminal) ... ok
+test_deadline_before_provider_binding_delivers_interrupt_after_late_start (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_deadline_before_provider_binding_delivers_interrupt_after_late_start) ... ok
+test_deadline_interrupt_fails_attempt_without_resume (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_deadline_interrupt_fails_attempt_without_resume) ... FAIL
+test_deadline_interrupt_is_bounded_and_not_terminal (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_deadline_interrupt_is_bounded_and_not_terminal) ... ok
+test_deadline_terminal_observation_grace_ends_as_collector_lost (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_deadline_terminal_observation_grace_ends_as_collector_lost) ... FAIL
+test_engine_application_restart_consumes_checkpoint_without_model_recall (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_engine_application_restart_consumes_checkpoint_without_model_recall) ... FAIL
+test_every_post_activation_role_kind_starts_with_a_short_tick (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_every_post_activation_role_kind_starts_with_a_short_tick) ... ERROR
+test_execution_preparation_job_never_starts_a_second_role_turn (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_execution_preparation_job_never_starts_a_second_role_turn) ... ERROR
+test_goal_prepare_model_binding_error_is_consumed_as_core_blocker (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_goal_prepare_model_binding_error_is_consumed_as_core_blocker) ... FAIL
+test_pause_during_thread_creation_can_resume_same_attempt (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_pause_during_thread_creation_can_resume_same_attempt) ... ERROR
+test_pause_reason_preserves_single_resume_path (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_pause_reason_preserves_single_resume_path) ... FAIL
+test_restart_reattach_of_every_typed_job_kind_is_result_unavailable (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_reattach_of_every_typed_job_kind_is_result_unavailable)
+M-14 D4(CC-2): checkpoint 없이 재부착한 typed kind는 역할 원문을 결과로 쓰지 않는다. ... ok
+test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) ... 
+  test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) (kind='execution_spec_prepare') ... ERROR
+  test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) (kind='worker_turn') ... ERROR
+  test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) (kind='task_semantic_validate') ... ERROR
+  test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) (kind='goal_test_prepare') ... ERROR
+  test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) (kind='goal_semantic_validate') ... ERROR
+  test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) (kind='recovery') ... ERROR
+  test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) (kind='replanning') ... ERROR
+test_restarted_supervisor_close_marks_and_interrupts_bound_job (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restarted_supervisor_close_marks_and_interrupts_bound_job) ... ok
+test_restarted_supervisor_observes_exact_running_turn_before_terminal (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restarted_supervisor_observes_exact_running_turn_before_terminal) ... ok
+test_runtime_job_lifecycle_and_close_do_not_decide_core_completion (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_runtime_job_lifecycle_and_close_do_not_decide_core_completion) ... ok
+test_sdk_close_is_bounded_and_does_not_decide_completion (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_sdk_close_is_bounded_and_does_not_decide_completion) ... ERROR
+test_second_interrupted_turn_is_resume_exhausted (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_second_interrupted_turn_is_resume_exhausted) ... FAIL
+test_slow_create_and_start_turn_keep_dispatch_ticks_bounded_and_idempotent (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_slow_create_and_start_turn_keep_dispatch_ticks_bounded_and_idempotent) ... ERROR
+test_slow_execution_spec_provider_does_not_block_run_once (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_slow_execution_spec_provider_does_not_block_run_once) ... FAIL
+test_slow_inventory_for_supplied_proposal_stays_in_execution_spec_job (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_slow_inventory_for_supplied_proposal_stays_in_execution_spec_job) ... FAIL
+test_slow_inventory_lookup_does_not_block_execution_spec_prepare_tick (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_slow_inventory_lookup_does_not_block_execution_spec_prepare_tick) ... FAIL
+test_slow_inventory_lookup_does_not_block_goal_semantic_validate_tick (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_slow_inventory_lookup_does_not_block_goal_semantic_validate_tick) ... FAIL
+test_slow_inventory_lookup_does_not_block_goal_test_prepare_tick (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_slow_inventory_lookup_does_not_block_goal_test_prepare_tick) ... FAIL
+test_slow_runtime_read_keeps_run_once_bounded_and_job_nonterminal (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_slow_runtime_read_keeps_run_once_bounded_and_job_nonterminal) ... FAIL
+test_transient_cancel_observation_failure_retries_before_unknown (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_transient_cancel_observation_failure_retries_before_unknown) ... FAIL
+test_turn_started_progress_binds_once_and_rejects_a_different_turn (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_turn_started_progress_binds_once_and_rejects_a_different_turn) ... ok
+test_unrelated_blocked_tick_does_not_report_a_consumed_job (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_unrelated_blocked_tick_does_not_report_a_consumed_job) ... FAIL
+test_changed_wheel_or_bundle_invalidates_the_cell_contract (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_changed_wheel_or_bundle_invalidates_the_cell_contract) ... ok
+test_clean_install_suite_keeps_approved_thresholds_and_single_responsibility (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_clean_install_suite_keeps_approved_thresholds_and_single_responsibility) ... ok
+test_complete_typed_evidence_passes_final_scope_verification (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_complete_typed_evidence_passes_final_scope_verification) ... ok
+test_evidence_outside_run_root_is_rejected_at_creation (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_evidence_outside_run_root_is_rejected_at_creation) ... ok
+test_failed_install_keeps_typed_evidence_and_never_reports_pass (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_failed_install_keeps_typed_evidence_and_never_reports_pass)
+실제 빈 venv를 만들고 설치를 실패시켜 fail-closed 경로를 관측한다. ... ok
+test_harness_rejects_relative_inputs_and_non_empty_run_root (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_harness_rejects_relative_inputs_and_non_empty_run_root) ... ok
+test_legacy_string_refs_without_typed_records_cannot_pass (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_legacy_string_refs_without_typed_records_cannot_pass) ... ok
+test_link_fails_closed_on_malformed_run_root (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_fails_closed_on_malformed_run_root) ... ok
+test_link_keeps_clean_install_failure_class (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_keeps_clean_install_failure_class) ... ok
+test_link_passes_for_verified_live_run_with_same_candidate (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_passes_for_verified_live_run_with_same_candidate) ... ok
+test_link_rejects_candidate_import_root_outside_venv (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_candidate_import_root_outside_venv) ... ok
+test_link_rejects_candidate_probe_mismatch_or_editable (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_candidate_probe_mismatch_or_editable) ... ok
+test_link_rejects_different_project_e2e_candidate (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_different_project_e2e_candidate) ... ok
+test_link_rejects_dry_run_that_claims_release_pass (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_dry_run_that_claims_release_pass) ... ok
+test_link_rejects_import_origin_outside_venv_or_under_source (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_import_origin_outside_venv_or_under_source) ... ok
+test_link_rejects_missing_or_failed_stage (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_missing_or_failed_stage) ... ok
+test_link_rejects_relative_run_root_and_missing_report (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_relative_run_root_and_missing_report) ... ok
+test_link_rejects_report_digest_mismatch (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_report_digest_mismatch) ... ok
+test_link_rejects_reused_or_non_live_provenance (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_rejects_reused_or_non_live_provenance) ... ok
+test_link_reports_failed_install_as_product_failure (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_reports_failed_install_as_product_failure) ... ok
+test_link_without_run_root_is_not_run (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_link_without_run_root_is_not_run) ... ok
+test_not_run_and_failed_cells_are_not_conflated_or_promoted (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_not_run_and_failed_cells_are_not_conflated_or_promoted) ... ok
+test_source_diagnostic_contract_change_invalidates_reuse (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_source_diagnostic_contract_change_invalidates_reuse)
+다른 evaluation 계약의 cell을 이 cell의 PASS 근거로 재사용하지 않는다. ... ok
+test_tampered_and_deleted_evidence_cannot_pass (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_tampered_and_deleted_evidence_cannot_pass) ... ok
+test_wrong_wheel_binding_in_evidence_is_rejected (tests.test_engine_clean_install_qualification.CleanInstallQualificationTests.test_wrong_wheel_binding_in_evidence_is_rejected) ... ok
+test_cli_clean_install_command_requires_wheel_and_bundle (tests.test_engine_clean_install_qualification.ProjectE2EPreProviderDryRunTests.test_cli_clean_install_command_requires_wheel_and_bundle) ... ERROR
+test_cli_rejects_dry_run_outside_project_e2e (tests.test_engine_clean_install_qualification.ProjectE2EPreProviderDryRunTests.test_cli_rejects_dry_run_outside_project_e2e) ... ERROR
+test_dry_run_reports_fake_boundary_without_provider_contact (tests.test_engine_clean_install_qualification.ProjectE2EPreProviderDryRunTests.test_dry_run_reports_fake_boundary_without_provider_contact) ... ok
+test_dry_run_requires_the_same_candidate_wheel_binding (tests.test_engine_clean_install_qualification.ProjectE2EPreProviderDryRunTests.test_dry_run_requires_the_same_candidate_wheel_binding) ... ok
+test_built_wheel_contains_only_engine_scope_files (tests.test_engine_packaging.EnginePackagingContractTests.test_built_wheel_contains_only_engine_scope_files)
+실제 wheel을 빌드해 파일 목록으로 Engine-only 범위를 직접 검사한다. ... ok
+test_install_document_matches_pins_and_schema_contract (tests.test_engine_packaging.EnginePackagingContractTests.test_install_document_matches_pins_and_schema_contract) ... ok
+test_installed_candidate_launcher_binds_project_e2e_wheel (tests.test_engine_packaging.EnginePackagingContractTests.test_installed_candidate_launcher_binds_project_e2e_wheel) ... ok
+test_installed_candidate_launcher_reads_literal_allowlist (tests.test_engine_packaging.EnginePackagingContractTests.test_installed_candidate_launcher_reads_literal_allowlist) ... ok
+test_installed_candidate_launcher_rejects_source_product_import (tests.test_engine_packaging.EnginePackagingContractTests.test_installed_candidate_launcher_rejects_source_product_import) ... ok
+test_installed_candidate_launcher_sets_explicit_source_root (tests.test_engine_packaging.EnginePackagingContractTests.test_installed_candidate_launcher_sets_explicit_source_root) ... ok
+test_qualification_requires_explicit_developer_source_root (tests.test_engine_packaging.EnginePackagingContractTests.test_qualification_requires_explicit_developer_source_root) ... ok
+test_shipped_engine_modules_do_not_import_developer_only_code (tests.test_engine_packaging.EnginePackagingContractTests.test_shipped_engine_modules_do_not_import_developer_only_code)
+import graph 범위 검사(FM-10-C1)를 source AST로 직접 재현한다. ... ok
+test_user_wheel_exposes_only_engine_entrypoint_and_packages (tests.test_engine_packaging.EnginePackagingContractTests.test_user_wheel_exposes_only_engine_entrypoint_and_packages) ... ok
+
+======================================================================
+ERROR: test_background_lost_create_receipt_is_recovered_without_duplicate_effect (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_background_lost_create_receipt_is_recovered_without_duplicate_effect)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 1624, in test_background_lost_create_receipt_is_recovered_without_duplicate_effect
+    supervisor._workers[dispatched.runtime_job_id].join(1)
+    ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: None
+
+======================================================================
+ERROR: test_bindingless_collector_loss_yields_to_prepared_effect_recovery (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_bindingless_collector_loss_yields_to_prepared_effect_recovery)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 1592, in test_bindingless_collector_loss_yields_to_prepared_effect_recovery
+    worker = supervisor._workers[dispatched.runtime_job_id]
+             ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: None
+
+======================================================================
+ERROR: test_cancel_before_turn_effect_blocks_late_start (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_cancel_before_turn_effect_blocks_late_start)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 1094, in test_cancel_before_turn_effect_blocks_late_start
+    worker = supervisor._workers[dispatched.runtime_job_id]
+             ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: None
+
+======================================================================
+ERROR: test_cancel_racing_with_late_turn_start_preserves_binding_and_interrupts (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_cancel_racing_with_late_turn_start_preserves_binding_and_interrupts)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 1023, in test_cancel_racing_with_late_turn_start_preserves_binding_and_interrupts
+    worker = supervisor._workers[dispatched.runtime_job_id]
+             ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: None
+
+======================================================================
+ERROR: test_every_post_activation_role_kind_starts_with_a_short_tick (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_every_post_activation_role_kind_starts_with_a_short_tick)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 171, in test_every_post_activation_role_kind_starts_with_a_short_tick
+    job = supervisor.schedule(
+          ^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 2431, in schedule
+    state, lease = _acquire_owner_lease(path, self, create=not reserved)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 217, in _acquire_owner_lease
+    raise RuntimeOwnerLockUnavailable(RUNTIME_OWNER_PLATFORM_UNSUPPORTED)
+flowmarshal.engine.runtime.RuntimeOwnerLockUnavailable: RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+======================================================================
+ERROR: test_execution_preparation_job_never_starts_a_second_role_turn (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_execution_preparation_job_never_starts_a_second_role_turn)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 505, in test_execution_preparation_job_never_starts_a_second_role_turn
+    job = supervisor.schedule(
+          ^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 2431, in schedule
+    state, lease = _acquire_owner_lease(path, self, create=not reserved)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 217, in _acquire_owner_lease
+    raise RuntimeOwnerLockUnavailable(RUNTIME_OWNER_PLATFORM_UNSUPPORTED)
+flowmarshal.engine.runtime.RuntimeOwnerLockUnavailable: RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+======================================================================
+ERROR: test_pause_during_thread_creation_can_resume_same_attempt (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_pause_during_thread_creation_can_resume_same_attempt)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 1169, in test_pause_during_thread_creation_can_resume_same_attempt
+    worker = supervisor._workers[dispatched.runtime_job_id]
+             ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyError: None
+
+======================================================================
+ERROR: test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) (kind='execution_spec_prepare')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 667, in test_restart_restores_durable_target_result_for_every_job_kind
+    job = supervisor.schedule(
+          ^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 2431, in schedule
+    state, lease = _acquire_owner_lease(path, self, create=not reserved)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 217, in _acquire_owner_lease
+    raise RuntimeOwnerLockUnavailable(RUNTIME_OWNER_PLATFORM_UNSUPPORTED)
+flowmarshal.engine.runtime.RuntimeOwnerLockUnavailable: RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+======================================================================
+ERROR: test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) (kind='worker_turn')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 667, in test_restart_restores_durable_target_result_for_every_job_kind
+    job = supervisor.schedule(
+          ^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 2431, in schedule
+    state, lease = _acquire_owner_lease(path, self, create=not reserved)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 217, in _acquire_owner_lease
+    raise RuntimeOwnerLockUnavailable(RUNTIME_OWNER_PLATFORM_UNSUPPORTED)
+flowmarshal.engine.runtime.RuntimeOwnerLockUnavailable: RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+======================================================================
+ERROR: test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) (kind='task_semantic_validate')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 667, in test_restart_restores_durable_target_result_for_every_job_kind
+    job = supervisor.schedule(
+          ^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 2431, in schedule
+    state, lease = _acquire_owner_lease(path, self, create=not reserved)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 217, in _acquire_owner_lease
+    raise RuntimeOwnerLockUnavailable(RUNTIME_OWNER_PLATFORM_UNSUPPORTED)
+flowmarshal.engine.runtime.RuntimeOwnerLockUnavailable: RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+======================================================================
+ERROR: test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) (kind='goal_test_prepare')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 667, in test_restart_restores_durable_target_result_for_every_job_kind
+    job = supervisor.schedule(
+          ^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 2431, in schedule
+    state, lease = _acquire_owner_lease(path, self, create=not reserved)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 217, in _acquire_owner_lease
+    raise RuntimeOwnerLockUnavailable(RUNTIME_OWNER_PLATFORM_UNSUPPORTED)
+flowmarshal.engine.runtime.RuntimeOwnerLockUnavailable: RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+======================================================================
+ERROR: test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) (kind='goal_semantic_validate')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 667, in test_restart_restores_durable_target_result_for_every_job_kind
+    job = supervisor.schedule(
+          ^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 2431, in schedule
+    state, lease = _acquire_owner_lease(path, self, create=not reserved)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 217, in _acquire_owner_lease
+    raise RuntimeOwnerLockUnavailable(RUNTIME_OWNER_PLATFORM_UNSUPPORTED)
+flowmarshal.engine.runtime.RuntimeOwnerLockUnavailable: RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+======================================================================
+ERROR: test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) (kind='recovery')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 667, in test_restart_restores_durable_target_result_for_every_job_kind
+    job = supervisor.schedule(
+          ^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 2431, in schedule
+    state, lease = _acquire_owner_lease(path, self, create=not reserved)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 217, in _acquire_owner_lease
+    raise RuntimeOwnerLockUnavailable(RUNTIME_OWNER_PLATFORM_UNSUPPORTED)
+flowmarshal.engine.runtime.RuntimeOwnerLockUnavailable: RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+======================================================================
+ERROR: test_restart_restores_durable_target_result_for_every_job_kind (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_restores_durable_target_result_for_every_job_kind) (kind='replanning')
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 667, in test_restart_restores_durable_target_result_for_every_job_kind
+    job = supervisor.schedule(
+          ^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 2431, in schedule
+    state, lease = _acquire_owner_lease(path, self, create=not reserved)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 217, in _acquire_owner_lease
+    raise RuntimeOwnerLockUnavailable(RUNTIME_OWNER_PLATFORM_UNSUPPORTED)
+flowmarshal.engine.runtime.RuntimeOwnerLockUnavailable: RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+======================================================================
+ERROR: test_sdk_close_is_bounded_and_does_not_decide_completion (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_sdk_close_is_bounded_and_does_not_decide_completion)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 1364, in test_sdk_close_is_bounded_and_does_not_decide_completion
+    job = supervisor.schedule(
+          ^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 2431, in schedule
+    state, lease = _acquire_owner_lease(path, self, create=not reserved)
+                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/runtime.py", line 217, in _acquire_owner_lease
+    raise RuntimeOwnerLockUnavailable(RUNTIME_OWNER_PLATFORM_UNSUPPORTED)
+flowmarshal.engine.runtime.RuntimeOwnerLockUnavailable: RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+======================================================================
+ERROR: test_slow_create_and_start_turn_keep_dispatch_ticks_bounded_and_idempotent (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_slow_create_and_start_turn_keep_dispatch_ticks_bounded_and_idempotent)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 1541, in test_slow_create_and_start_turn_keep_dispatch_ticks_bounded_and_idempotent
+    worker = supervisor._workers[first.runtime_job_id]
+             ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+KeyError: None
+
+======================================================================
+ERROR: test_cli_clean_install_command_requires_wheel_and_bundle (tests.test_engine_clean_install_qualification.ProjectE2EPreProviderDryRunTests.test_cli_clean_install_command_requires_wheel_and_bundle)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_clean_install_qualification.py", line 764, in test_cli_clean_install_command_requires_wheel_and_bundle
+    parser = build_parser()
+             ^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/eval_cli.py", line 620, in build_parser
+    run.add_argument("--project-root", default=str(project_root()))
+                                                   ^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/qualification.py", line 280, in project_root
+    raise QualificationRunError(
+flowmarshal.engine.qualification.QualificationRunError: FLOWMARSHAL_ENGINE_SOURCE_ROOT를 승인된 개발 source root로 지정해야 합니다.
+
+======================================================================
+ERROR: test_cli_rejects_dry_run_outside_project_e2e (tests.test_engine_clean_install_qualification.ProjectE2EPreProviderDryRunTests.test_cli_rejects_dry_run_outside_project_e2e)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_clean_install_qualification.py", line 749, in test_cli_rejects_dry_run_outside_project_e2e
+    parser = build_parser()
+             ^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/eval_cli.py", line 620, in build_parser
+    run.add_argument("--project-root", default=str(project_root()))
+                                                   ^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/qualification.py", line 280, in project_root
+    raise QualificationRunError(
+flowmarshal.engine.qualification.QualificationRunError: FLOWMARSHAL_ENGINE_SOURCE_ROOT를 승인된 개발 source root로 지정해야 합니다.
+
+======================================================================
+FAIL: test_automatic_recovery_revalidation_and_goal_verdict_finish_through_facade (tests.test_engine_user_facade.EngineUserFacadeTests.test_automatic_recovery_revalidation_and_goal_verdict_finish_through_facade)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_user_facade.py", line 415, in test_automatic_recovery_revalidation_and_goal_verdict_finish_through_facade
+    self.assertEqual(RunOnceAction.DISPATCHED, materialized.action)
+AssertionError: <RunOnceAction.DISPATCHED: 'dispatched'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_run_once_reports_typed_validation_recovery_blocker (tests.test_engine_task_validation_recovery.TaskValidationRecoveryTests.test_run_once_reports_typed_validation_recovery_blocker)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_task_validation_recovery.py", line 299, in test_run_once_reports_typed_validation_recovery_blocker
+    self.assertEqual("TASK_VALIDATION_RECOVERY_REQUIRED", outcome.blocker_code)
+AssertionError: 'TASK_VALIDATION_RECOVERY_REQUIRED' != 'RUNTIME_OWNER_LOCK_UNAVAILABLE'
+- TASK_VALIDATION_RECOVERY_REQUIRED
++ RUNTIME_OWNER_LOCK_UNAVAILABLE
+
+
+======================================================================
+FAIL: test_cancel_finalization_requires_cancelled_workflow (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_cancel_finalization_requires_cancelled_workflow)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 875, in test_cancel_finalization_requires_cancelled_workflow
+    _dispatcher, dispatched = self._dispatch_worker()
+                              ^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 127, in _dispatch_worker
+    self.assertEqual(
+AssertionError: <RunOnceAction.MATERIALIZED: 'materialized'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_cancel_observation_failure_is_preserved_as_unknown (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_cancel_observation_failure_is_preserved_as_unknown)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 942, in test_cancel_observation_failure_is_preserved_as_unknown
+    _dispatcher, dispatched = self._dispatch_worker()
+                              ^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 127, in _dispatch_worker
+    self.assertEqual(
+AssertionError: <RunOnceAction.MATERIALIZED: 'materialized'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_cancel_reason_does_not_resume_provider (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_cancel_reason_does_not_resume_provider)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 829, in test_cancel_reason_does_not_resume_provider
+    _dispatcher, dispatched = self._dispatch_worker()
+                              ^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 127, in _dispatch_worker
+    self.assertEqual(
+AssertionError: <RunOnceAction.MATERIALIZED: 'materialized'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_cancel_with_unreceipted_intent_stays_external_unknown (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_cancel_with_unreceipted_intent_stays_external_unknown)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 976, in test_cancel_with_unreceipted_intent_stays_external_unknown
+    _dispatcher, dispatched = self._dispatch_worker()
+                              ^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 127, in _dispatch_worker
+    self.assertEqual(
+AssertionError: <RunOnceAction.MATERIALIZED: 'materialized'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_deadline_interrupt_fails_attempt_without_resume (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_deadline_interrupt_fails_attempt_without_resume)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 739, in test_deadline_interrupt_fails_attempt_without_resume
+    dispatcher, dispatched = self._dispatch_worker()
+                             ^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 127, in _dispatch_worker
+    self.assertEqual(
+AssertionError: <RunOnceAction.MATERIALIZED: 'materialized'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_deadline_terminal_observation_grace_ends_as_collector_lost (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_deadline_terminal_observation_grace_ends_as_collector_lost)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 1342, in test_deadline_terminal_observation_grace_ends_as_collector_lost
+    self.assertEqual(RuntimeJobStatus.COLLECTOR_LOST, observed.status)
+AssertionError: <RuntimeJobStatus.COLLECTOR_LOST: 'collector_lost'> != <RuntimeJobStatus.RUNNING: 'running'>
+
+======================================================================
+FAIL: test_engine_application_restart_consumes_checkpoint_without_model_recall (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_engine_application_restart_consumes_checkpoint_without_model_recall)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 254, in test_engine_application_restart_consumes_checkpoint_without_model_recall
+    self.assertEqual(RunOnceAction.DISPATCHED, first.action)
+AssertionError: <RunOnceAction.DISPATCHED: 'dispatched'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_goal_prepare_model_binding_error_is_consumed_as_core_blocker (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_goal_prepare_model_binding_error_is_consumed_as_core_blocker)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 374, in test_goal_prepare_model_binding_error_is_consumed_as_core_blocker
+    self._complete_task(self.prepared, self.runtime)
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 65, in _complete_task
+    self.assertEqual(
+AssertionError: <RunOnceAction.VALIDATED: 'validated'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_pause_reason_preserves_single_resume_path (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_pause_reason_preserves_single_resume_path)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 791, in test_pause_reason_preserves_single_resume_path
+    _dispatcher, dispatched = self._dispatch_worker()
+                              ^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 127, in _dispatch_worker
+    self.assertEqual(
+AssertionError: <RunOnceAction.MATERIALIZED: 'materialized'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_second_interrupted_turn_is_resume_exhausted (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_second_interrupted_turn_is_resume_exhausted)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 1215, in test_second_interrupted_turn_is_resume_exhausted
+    dispatcher, _dispatched = self._dispatch_worker()
+                              ^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 127, in _dispatch_worker
+    self.assertEqual(
+AssertionError: <RunOnceAction.MATERIALIZED: 'materialized'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_slow_execution_spec_provider_does_not_block_run_once (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_slow_execution_spec_provider_does_not_block_run_once)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 213, in test_slow_execution_spec_provider_does_not_block_run_once
+    self.assertTrue(provider_started.wait(0.5))
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_slow_inventory_for_supplied_proposal_stays_in_execution_spec_job (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_slow_inventory_for_supplied_proposal_stays_in_execution_spec_job)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 325, in test_slow_inventory_for_supplied_proposal_stays_in_execution_spec_job
+    self.assertEqual(RunOnceAction.DISPATCHED, first.action)
+AssertionError: <RunOnceAction.DISPATCHED: 'dispatched'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_slow_inventory_lookup_does_not_block_execution_spec_prepare_tick (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_slow_inventory_lookup_does_not_block_execution_spec_prepare_tick)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 296, in test_slow_inventory_lookup_does_not_block_execution_spec_prepare_tick
+    self.assertEqual(RunOnceAction.DISPATCHED, first.action)
+AssertionError: <RunOnceAction.DISPATCHED: 'dispatched'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_slow_inventory_lookup_does_not_block_goal_semantic_validate_tick (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_slow_inventory_lookup_does_not_block_goal_semantic_validate_tick)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 418, in test_slow_inventory_lookup_does_not_block_goal_semantic_validate_tick
+    self._complete_task(prepared, FakeCodexRuntime(self.inventory))
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 65, in _complete_task
+    self.assertEqual(
+AssertionError: <RunOnceAction.VALIDATED: 'validated'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_slow_inventory_lookup_does_not_block_goal_test_prepare_tick (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_slow_inventory_lookup_does_not_block_goal_test_prepare_tick)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 336, in test_slow_inventory_lookup_does_not_block_goal_test_prepare_tick
+    self._complete_task(self.prepared, self.runtime)
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 65, in _complete_task
+    self.assertEqual(
+AssertionError: <RunOnceAction.VALIDATED: 'validated'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_slow_runtime_read_keeps_run_once_bounded_and_job_nonterminal (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_slow_runtime_read_keeps_run_once_bounded_and_job_nonterminal)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 1685, in test_slow_runtime_read_keeps_run_once_bounded_and_job_nonterminal
+    self.assertEqual(RunOnceAction.DISPATCHED, dispatched.action)
+AssertionError: <RunOnceAction.DISPATCHED: 'dispatched'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_transient_cancel_observation_failure_retries_before_unknown (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_transient_cancel_observation_failure_retries_before_unknown)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 903, in test_transient_cancel_observation_failure_retries_before_unknown
+    _dispatcher, dispatched = self._dispatch_worker()
+                              ^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 127, in _dispatch_worker
+    self.assertEqual(
+AssertionError: <RunOnceAction.MATERIALIZED: 'materialized'> != <RunOnceAction.BLOCKED: 'blocked'>
+
+======================================================================
+FAIL: test_unrelated_blocked_tick_does_not_report_a_consumed_job (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_unrelated_blocked_tick_does_not_report_a_consumed_job)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-portable/tests/test_engine_runtime_job_supervisor.py", line 1748, in test_unrelated_blocked_tick_does_not_report_a_consumed_job
+    self.assertEqual("EXECUTION_SPEC_PROPOSAL_REQUIRED", result.blocker_code)
+AssertionError: 'EXECUTION_SPEC_PROPOSAL_REQUIRED' != 'RUNTIME_OWNER_LOCK_UNAVAILABLE'
+- EXECUTION_SPEC_PROPOSAL_REQUIRED
++ RUNTIME_OWNER_LOCK_UNAVAILABLE
+
+
+----------------------------------------------------------------------
+Ran 122 tests in 45.162s
+
+FAILED (failures=20, errors=18)

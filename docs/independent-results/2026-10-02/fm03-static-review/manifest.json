@@ -1,0 +1,16 @@
+{
+  "candidate_commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "scope": "Independent static source/contract review only; no runtime execution or current kit acceptance",
+  "normalization": {
+    "<REVIEW_SOURCE>": "separate reviewer executor exact source checkout",
+    "<REVIEW_ATTACHMENTS>": "separate reviewer executor authorized historical packet folder"
+  },
+  "original_report_sha256": "fcbfc7957eb09cf665937fd16ad8d0a151f0cc64ba6e8cebb7d211a5e7e44969",
+  "files": [
+    {
+      "path": "FM03-32bb0f9-independent-contract-review.txt",
+      "bytes": 22318,
+      "sha256": "34a01172ca9e99bac4afdb43d644ee0e6138dd5ba8b425edf2fd4b3aa5579a6f"
+    }
+  ]
+}

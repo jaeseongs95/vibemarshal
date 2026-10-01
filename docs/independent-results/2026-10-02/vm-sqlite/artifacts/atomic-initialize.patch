@@ -1,0 +1,36 @@
+--- a/src/flowmarshal/engine/ledger.py
++++ b/src/flowmarshal/engine/ledger.py
+@@ -794,11 +794,21 @@
+     def initialize(self) -> None:
+         is_new = not self.path.exists() or self.path.stat().st_size == 0
+         if not is_new:
+-            self._assert_identity()
++            # 실패한 최초 transaction은 SQLite의 빈 파일 header만 남길 수 있다.
++            # 사용자 schema·identity가 전혀 없는 DB만 신규로 인정하고 기존 원장은 변환하지 않는다.
++            with self.read() as probe:
++                is_new = (
++                    probe.execute("PRAGMA application_id").fetchone()[0] == 0
++                    and probe.execute("PRAGMA user_version").fetchone()[0] == 0
++                    and probe.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone() is None
++                )
++            if not is_new:
++                self._assert_identity()
+         connection = self._connect()
+         try:
+             if is_new:
+-                connection.executescript(SCHEMA_SQL)
++                # executescript는 앞선 transaction을 commit하므로 BEGIN을 script 안에 둔다.
++                connection.executescript("BEGIN IMMEDIATE;\n" + SCHEMA_SQL)
+                 connection.executemany(
+                     "INSERT INTO schema_meta(key, value) VALUES (?, ?)",
+                     (
+@@ -809,6 +819,9 @@
+                 connection.execute(f"PRAGMA application_id = {SQLITE_APPLICATION_ID}")
+                 connection.execute(f"PRAGMA user_version = {ENGINE_SCHEMA_REVISION}")
+             connection.commit()
++        except BaseException:
++            connection.rollback()
++            raise
+         finally:
+             connection.close()
+         self.artifact_root.mkdir(parents=True, exist_ok=True)

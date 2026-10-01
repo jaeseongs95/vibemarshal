@@ -1,0 +1,156 @@
+{
+  "passed": true,
+  "commands": [
+    {
+      "name": "public-help",
+      "argv": [
+        "${WORKSPACE}/vm-test-venv/bin/flowmarshal-engine",
+        "--help"
+      ],
+      "cwd": "${WORKSPACE}/vm-evidence/public smoke 최종",
+      "exit": 0,
+      "expected_exit": 0
+    },
+    {
+      "name": "config-help",
+      "argv": [
+        "${WORKSPACE}/vm-test-venv/bin/flowmarshal-engine",
+        "config",
+        "init",
+        "--help"
+      ],
+      "cwd": "${WORKSPACE}/vm-evidence/public smoke 최종",
+      "exit": 0,
+      "expected_exit": 0
+    },
+    {
+      "name": "project-init",
+      "argv": [
+        "${WORKSPACE}/vm-test-venv/bin/flowmarshal-engine",
+        "--db",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/state/engine.sqlite3",
+        "--artifacts",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/artifacts",
+        "project",
+        "init",
+        "--name",
+        "공백 portable smoke",
+        "--root",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/project with spaces"
+      ],
+      "cwd": "${WORKSPACE}/vm-evidence/public smoke 최종",
+      "exit": 0,
+      "expected_exit": 0
+    },
+    {
+      "name": "project-show-restart",
+      "argv": [
+        "${WORKSPACE}/vm-test-venv/bin/flowmarshal-engine",
+        "--db",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/state/engine.sqlite3",
+        "--artifacts",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/artifacts",
+        "project",
+        "show",
+        "--project-id",
+        "project_1ff9f17b4d264c55b8b1025d4aae6358"
+      ],
+      "cwd": "${WORKSPACE}/vm-evidence/public smoke 최종",
+      "exit": 0,
+      "expected_exit": 0
+    },
+    {
+      "name": "goal-create",
+      "argv": [
+        "${WORKSPACE}/vm-test-venv/bin/flowmarshal-engine",
+        "--db",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/state/engine.sqlite3",
+        "--artifacts",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/artifacts",
+        "goal",
+        "create",
+        "--project-id",
+        "project_1ff9f17b4d264c55b8b1025d4aae6358",
+        "--request",
+        "합성 검증",
+        "--outcome",
+        "CLI 동작",
+        "--acceptance",
+        "단위 검사"
+      ],
+      "cwd": "${WORKSPACE}/vm-evidence/public smoke 최종",
+      "exit": 0,
+      "expected_exit": 0
+    },
+    {
+      "name": "goal-show-restart",
+      "argv": [
+        "${WORKSPACE}/vm-test-venv/bin/flowmarshal-engine",
+        "--db",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/state/engine.sqlite3",
+        "--artifacts",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/artifacts",
+        "goal",
+        "show",
+        "--project-id",
+        "project_1ff9f17b4d264c55b8b1025d4aae6358"
+      ],
+      "cwd": "${WORKSPACE}/vm-evidence/public smoke 최종",
+      "exit": 0,
+      "expected_exit": 0
+    },
+    {
+      "name": "plan-search-context",
+      "argv": [
+        "${WORKSPACE}/vm-test-venv/bin/flowmarshal-engine",
+        "--db",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/state/engine.sqlite3",
+        "--artifacts",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/artifacts",
+        "plan",
+        "search",
+        "--project-id",
+        "project_1ff9f17b4d264c55b8b1025d4aae6358"
+      ],
+      "cwd": "${WORKSPACE}/vm-evidence/public smoke 최종",
+      "exit": 0,
+      "expected_exit": 0
+    },
+    {
+      "name": "public-status",
+      "argv": [
+        "${WORKSPACE}/vm-test-venv/bin/flowmarshal-engine",
+        "--db",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/state/engine.sqlite3",
+        "--artifacts",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/artifacts",
+        "status",
+        "--project-id",
+        "project_1ff9f17b4d264c55b8b1025d4aae6358"
+      ],
+      "cwd": "${WORKSPACE}/vm-evidence/public smoke 최종",
+      "exit": 0,
+      "expected_exit": 0
+    },
+    {
+      "name": "missing-project-rejected",
+      "argv": [
+        "${WORKSPACE}/vm-test-venv/bin/flowmarshal-engine",
+        "--db",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/state/engine.sqlite3",
+        "--artifacts",
+        "${WORKSPACE}/vm-evidence/public smoke 최종/artifacts",
+        "project",
+        "show",
+        "--project-id",
+        "project_00000000000000000000000000000000"
+      ],
+      "cwd": "${WORKSPACE}/vm-evidence/public smoke 최종",
+      "exit": 2,
+      "expected_exit": 2
+    }
+  ],
+  "provider_calls": 0,
+  "scope": "synthetic local CLI only; no release qualification",
+  "import_origin": "${WORKSPACE}/vm-test-venv/lib/python3.12/site-packages/flowmarshal/__init__.py"
+}

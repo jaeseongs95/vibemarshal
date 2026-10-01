@@ -1,0 +1,119 @@
+{
+  "status": "context_ready",
+  "message": "Goal·Project Map·State projection을 고정했습니다. role provider가 만든 PlanningSearchOutcome을 --outcome-file로 전달하면 Core 검증 후 등록합니다.",
+  "goal_contract_digest": "sha256:d0fae61fdbede6d9a27aef0fe48d68e0b09230c54f106f3a90349f24040ffb4d",
+  "project_map_digest": "sha256:6dd4b7b80095ccc153ea304980ce443e8c4cf6306a5d616df8edb192e8f4b942",
+  "state_snapshot_digest": "sha256:9a3875169681750248cfdd5e354897087d56af7eb3726fc64fc5dddb720bcf0d",
+  "model_input": {
+    "goal": {
+      "schema_version": "1.0",
+      "goal_revision_id": "goal_revision_eba1ce17d27b404291cbd67d2e1e09e4",
+      "goal_id": "goal_f5e758865c5245b8a12900a4e7a6181a",
+      "revision_no": 1,
+      "definition": {
+        "project_id": "project_1ff9f17b4d264c55b8b1025d4aae6358",
+        "source_request": "합성 검증",
+        "source_request_digest": "sha256:5d0409d20f0aeead70f507061f84433bb2bc95b890ae92e113a12d0603711d8a",
+        "mission_class": "feature_extension",
+        "observable_outcome": "CLI 동작",
+        "hard_acceptance": [
+          {
+            "criterion_id": "ac_1",
+            "statement": "단위 검사",
+            "validation_intent": "단위 검사를 실제 evidence로 검증한다.",
+            "trace_refs": [
+              "trace_user_request"
+            ]
+          }
+        ],
+        "quality_preferences": [],
+        "constraints": [],
+        "non_goals": [],
+        "assumptions": [],
+        "unresolved_questions": [],
+        "approved_decision_refs": [],
+        "source_traces": [
+          {
+            "trace_id": "trace_user_request",
+            "source_ref": "user-request",
+            "statement": "합성 검증",
+            "source_digest": "sha256:5d0409d20f0aeead70f507061f84433bb2bc95b890ae92e113a12d0603711d8a"
+          }
+        ],
+        "effect_policy": {
+          "mutation_policy": "scoped_change",
+          "behavior_policy": "preserve_public_contracts",
+          "allowed_external_effects": [],
+          "prohibited_effects": [],
+          "irreversible_effects_require_checkpoint": true
+        },
+        "profile_definition_digest": "sha256:18ebf45e0e1c165098f18e5c092dcf1b012f88db590e1c4addd84dadd6c20f79"
+      },
+      "definition_digest": "sha256:d0fae61fdbede6d9a27aef0fe48d68e0b09230c54f106f3a90349f24040ffb4d",
+      "status": "ready",
+      "preparation_binding": null,
+      "supersedes_goal_revision_id": null,
+      "created_at": "2026-10-01T22:57:40.637820Z"
+    },
+    "project_map": {
+      "schema_version": "1.0",
+      "project_map_revision_id": "project_map_efe73a45ce1d4334bf50223c62b4d44e",
+      "project_id": "project_1ff9f17b4d264c55b8b1025d4aae6358",
+      "revision_no": 1,
+      "root": "${WORKSPACE}/vm-evidence/public smoke 최종/project with spaces",
+      "entries": [
+        {
+          "entry_id": "entry_838b2121f18db0b970383822",
+          "kind": "instruction",
+          "path": "AGENTS.md",
+          "content_digest": "sha256:5d5b82d0bcac1415e3bf204a8207a2d44f1d801a9866c7dd58bbaee5d00b2862",
+          "symbols": [],
+          "tags": [
+            "instruction_source",
+            "md"
+          ]
+        }
+      ],
+      "instruction_source_refs": [
+        "entry_838b2121f18db0b970383822"
+      ],
+      "created_at": "2026-10-01T22:57:41.760665Z"
+    },
+    "state": {
+      "schema_version": "1.0",
+      "snapshot_id": "snapshot_c4924107454c48938f35eb1e6d21cc3c",
+      "project_id": "project_1ff9f17b4d264c55b8b1025d4aae6358",
+      "goal_contract_digest": "sha256:d0fae61fdbede6d9a27aef0fe48d68e0b09230c54f106f3a90349f24040ffb4d",
+      "version": 1,
+      "scope_fingerprint": "sha256:0cd076f203f08a896f870f7fb6a1b5d084128c4f61f10023555c41ed2050eaae",
+      "facts": [
+        {
+          "fact_id": "fact_project_map",
+          "predicate": "current project map",
+          "value": "sha256:6dd4b7b80095ccc153ea304980ce443e8c4cf6306a5d616df8edb192e8f4b942",
+          "source_ref": "project-map",
+          "evidence_digest": "sha256:6dd4b7b80095ccc153ea304980ce443e8c4cf6306a5d616df8edb192e8f4b942",
+          "confidence_basis": "observed",
+          "freshness": "current",
+          "invalidates_on": [
+            "project file content changes"
+          ]
+        },
+        {
+          "fact_id": "fact_workspace_path_inventory",
+          "predicate": "current project file path inventory",
+          "value": "sha256:9ef9f9b913767588bdca9216726d7126c9f698a8996ce75744c59efd37ccfef7",
+          "source_ref": "project-workspace:path-inventory",
+          "evidence_digest": "sha256:9ef9f9b913767588bdca9216726d7126c9f698a8996ce75744c59efd37ccfef7",
+          "confidence_basis": "observed",
+          "freshness": "current",
+          "invalidates_on": [
+            "project file path set changes"
+          ]
+        }
+      ],
+      "unknowns": [],
+      "observed_at": "2026-10-01T22:57:41.765365Z"
+    }
+  }
+}

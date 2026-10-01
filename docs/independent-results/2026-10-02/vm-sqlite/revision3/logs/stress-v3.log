@@ -1,0 +1,26 @@
+test_10_multi_process_history_has_no_gaps_or_forks (test_sqlite_boundaries.SQLiteBoundaries.test_10_multi_process_history_has_no_gaps_or_forks) ... ok
+test_12_exact_cas_method_eight_processes_one_winner (test_sqlite_boundaries.SQLiteBoundaries.test_12_exact_cas_method_eight_processes_one_winner) ... ok
+test_10_multi_process_history_has_no_gaps_or_forks (test_sqlite_boundaries.SQLiteBoundaries.test_10_multi_process_history_has_no_gaps_or_forks) ... ok
+test_12_exact_cas_method_eight_processes_one_winner (test_sqlite_boundaries.SQLiteBoundaries.test_12_exact_cas_method_eight_processes_one_winner) ... ok
+test_10_multi_process_history_has_no_gaps_or_forks (test_sqlite_boundaries.SQLiteBoundaries.test_10_multi_process_history_has_no_gaps_or_forks) ... ok
+test_12_exact_cas_method_eight_processes_one_winner (test_sqlite_boundaries.SQLiteBoundaries.test_12_exact_cas_method_eight_processes_one_winner) ... ok
+test_10_multi_process_history_has_no_gaps_or_forks (test_sqlite_boundaries.SQLiteBoundaries.test_10_multi_process_history_has_no_gaps_or_forks) ... ok
+test_12_exact_cas_method_eight_processes_one_winner (test_sqlite_boundaries.SQLiteBoundaries.test_12_exact_cas_method_eight_processes_one_winner) ... ok
+test_10_multi_process_history_has_no_gaps_or_forks (test_sqlite_boundaries.SQLiteBoundaries.test_10_multi_process_history_has_no_gaps_or_forks) ... ok
+test_12_exact_cas_method_eight_processes_one_winner (test_sqlite_boundaries.SQLiteBoundaries.test_12_exact_cas_method_eight_processes_one_winner) ... ok
+test_10_multi_process_history_has_no_gaps_or_forks (test_sqlite_boundaries.SQLiteBoundaries.test_10_multi_process_history_has_no_gaps_or_forks) ... ok
+test_12_exact_cas_method_eight_processes_one_winner (test_sqlite_boundaries.SQLiteBoundaries.test_12_exact_cas_method_eight_processes_one_winner) ... ok
+test_10_multi_process_history_has_no_gaps_or_forks (test_sqlite_boundaries.SQLiteBoundaries.test_10_multi_process_history_has_no_gaps_or_forks) ... ok
+test_12_exact_cas_method_eight_processes_one_winner (test_sqlite_boundaries.SQLiteBoundaries.test_12_exact_cas_method_eight_processes_one_winner) ... ok
+test_10_multi_process_history_has_no_gaps_or_forks (test_sqlite_boundaries.SQLiteBoundaries.test_10_multi_process_history_has_no_gaps_or_forks) ... ok
+test_12_exact_cas_method_eight_processes_one_winner (test_sqlite_boundaries.SQLiteBoundaries.test_12_exact_cas_method_eight_processes_one_winner) ... ok
+test_10_multi_process_history_has_no_gaps_or_forks (test_sqlite_boundaries.SQLiteBoundaries.test_10_multi_process_history_has_no_gaps_or_forks) ... ok
+test_12_exact_cas_method_eight_processes_one_winner (test_sqlite_boundaries.SQLiteBoundaries.test_12_exact_cas_method_eight_processes_one_winner) ... ok
+test_10_multi_process_history_has_no_gaps_or_forks (test_sqlite_boundaries.SQLiteBoundaries.test_10_multi_process_history_has_no_gaps_or_forks) ... ok
+test_12_exact_cas_method_eight_processes_one_winner (test_sqlite_boundaries.SQLiteBoundaries.test_12_exact_cas_method_eight_processes_one_winner) ... ok
+
+----------------------------------------------------------------------
+Ran 20 tests in 2.249s
+
+OK
+REPETITIONS=10 UNIQUE_TESTS=2 TOTAL_EXECUTIONS=20

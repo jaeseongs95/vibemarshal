@@ -1,0 +1,117 @@
+test_commit_failure_rolls_back_everything_and_retries (__main__.AtomicInitializeProposal.test_commit_failure_rolls_back_everything_and_retries) ... FAIL
+test_existing_foreign_schema_and_rows_are_never_adopted (__main__.AtomicInitializeProposal.test_existing_foreign_schema_and_rows_are_never_adopted) ... ok
+test_identity_failure_rolls_back_metadata_and_retries (__main__.AtomicInitializeProposal.test_identity_failure_rolls_back_metadata_and_retries) ... FAIL
+test_keyboard_interrupt_rolls_back_everything (__main__.AtomicInitializeProposal.test_keyboard_interrupt_rolls_back_everything) ... FAIL
+test_metadata_failure_rolls_back_schema_and_retries (__main__.AtomicInitializeProposal.test_metadata_failure_rolls_back_schema_and_retries) ... FAIL
+test_mid_schema_failure_rolls_back_ddl_and_retries (__main__.AtomicInitializeProposal.test_mid_schema_failure_rolls_back_ddl_and_retries) ... FAIL
+test_nonzero_foreign_identity_is_never_adopted (__main__.AtomicInitializeProposal.test_nonzero_foreign_identity_is_never_adopted) ... ok
+test_zero_byte_and_empty_sqlite_are_accepted_without_deletion (__main__.AtomicInitializeProposal.test_zero_byte_and_empty_sqlite_are_accepted_without_deletion) ... ERROR
+
+======================================================================
+ERROR: test_zero_byte_and_empty_sqlite_are_accepted_without_deletion (__main__.AtomicInitializeProposal.test_zero_byte_and_empty_sqlite_are_accepted_without_deletion)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 65, in test_zero_byte_and_empty_sqlite_are_accepted_without_deletion
+    SQLiteEngineLedger(empty).initialize()
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/ledger.py", line 797, in initialize
+    self._assert_identity()
+  File "${WORKSPACE}/vm-portable/src/flowmarshal/engine/ledger.py", line 826, in _assert_identity
+    raise EngineLedgerError("기존 DB가 FlowMarshal Engine 원장으로 식별되지 않습니다.")
+flowmarshal.engine.ledger.EngineLedgerError: 기존 DB가 FlowMarshal Engine 원장으로 식별되지 않습니다.
+
+======================================================================
+FAIL: test_commit_failure_rolls_back_everything_and_retries (__main__.AtomicInitializeProposal.test_commit_failure_rolls_back_everything_and_retries)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 42, in test_commit_failure_rolls_back_everything_and_retries
+    def test_commit_failure_rolls_back_everything_and_retries(self):self.fault('commit')
+                                                                    ^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 39, in fault
+    self.assert_empty_then_retry()
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 13, in assert_empty_then_retry
+    self.assertEqual([],c.execute('SELECT name FROM sqlite_master').fetchall())
+AssertionError: Lists differ: [] != [('budget_policy_revisions',), ('sqlite_au[6192 chars]e',)]
+
+Second list contains 161 additional elements.
+First extra element 0:
+('budget_policy_revisions',)
+
+Diff is 6727 characters long. Set self.maxDiff to None to see it.
+
+======================================================================
+FAIL: test_identity_failure_rolls_back_metadata_and_retries (__main__.AtomicInitializeProposal.test_identity_failure_rolls_back_metadata_and_retries)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 41, in test_identity_failure_rolls_back_metadata_and_retries
+    def test_identity_failure_rolls_back_metadata_and_retries(self):self.fault('identity')
+                                                                    ^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 39, in fault
+    self.assert_empty_then_retry()
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 13, in assert_empty_then_retry
+    self.assertEqual([],c.execute('SELECT name FROM sqlite_master').fetchall())
+AssertionError: Lists differ: [] != [('budget_policy_revisions',), ('sqlite_au[6192 chars]e',)]
+
+Second list contains 161 additional elements.
+First extra element 0:
+('budget_policy_revisions',)
+
+Diff is 6727 characters long. Set self.maxDiff to None to see it.
+
+======================================================================
+FAIL: test_keyboard_interrupt_rolls_back_everything (__main__.AtomicInitializeProposal.test_keyboard_interrupt_rolls_back_everything)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 43, in test_keyboard_interrupt_rolls_back_everything
+    def test_keyboard_interrupt_rolls_back_everything(self):self.fault('metadata',KeyboardInterrupt)
+                                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 39, in fault
+    self.assert_empty_then_retry()
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 13, in assert_empty_then_retry
+    self.assertEqual([],c.execute('SELECT name FROM sqlite_master').fetchall())
+AssertionError: Lists differ: [] != [('budget_policy_revisions',), ('sqlite_au[6192 chars]e',)]
+
+Second list contains 161 additional elements.
+First extra element 0:
+('budget_policy_revisions',)
+
+Diff is 6727 characters long. Set self.maxDiff to None to see it.
+
+======================================================================
+FAIL: test_metadata_failure_rolls_back_schema_and_retries (__main__.AtomicInitializeProposal.test_metadata_failure_rolls_back_schema_and_retries)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 40, in test_metadata_failure_rolls_back_schema_and_retries
+    def test_metadata_failure_rolls_back_schema_and_retries(self):self.fault('metadata')
+                                                                  ^^^^^^^^^^^^^^^^^^^^^^
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 39, in fault
+    self.assert_empty_then_retry()
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 13, in assert_empty_then_retry
+    self.assertEqual([],c.execute('SELECT name FROM sqlite_master').fetchall())
+AssertionError: Lists differ: [] != [('budget_policy_revisions',), ('sqlite_au[6192 chars]e',)]
+
+Second list contains 161 additional elements.
+First extra element 0:
+('budget_policy_revisions',)
+
+Diff is 6727 characters long. Set self.maxDiff to None to see it.
+
+======================================================================
+FAIL: test_mid_schema_failure_rolls_back_ddl_and_retries (__main__.AtomicInitializeProposal.test_mid_schema_failure_rolls_back_ddl_and_retries)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 47, in test_mid_schema_failure_rolls_back_ddl_and_retries
+    self.assert_empty_then_retry()
+  File "${WORKSPACE}/vm-sqlite/test_atomic_initialize_proposal.py", line 13, in assert_empty_then_retry
+    self.assertEqual([],c.execute('SELECT name FROM sqlite_master').fetchall())
+AssertionError: Lists differ: [] != [('budget_policy_revisions',), ('sqlite_au[6192 chars]e',)]
+
+Second list contains 161 additional elements.
+First extra element 0:
+('budget_policy_revisions',)
+
+Diff is 6727 characters long. Set self.maxDiff to None to see it.
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.059s
+
+FAILED (failures=5, errors=1)

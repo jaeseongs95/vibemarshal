@@ -1,0 +1,66 @@
+{
+  "foreign_committed_before_write_lock": {
+    "application_id": 12345,
+    "user_version": 9,
+    "tables": [
+      "independent_app_data"
+    ],
+    "foreign_rows": [
+      [
+        "preserve-me"
+      ]
+    ]
+  },
+  "initialize_returned": "success",
+  "after_initialize": {
+    "application_id": 1179469105,
+    "user_version": 4,
+    "tables": [
+      "approved_role_slot_authorizations",
+      "approved_role_slot_sources",
+      "attempts",
+      "budget_adjustments",
+      "budget_policy_revisions",
+      "budget_usage",
+      "candidate_decisions",
+      "candidate_reviews",
+      "context_source_registrations",
+      "effect_checkpoints",
+      "evidence_records",
+      "execution_spec_revisions",
+      "goal_authorizations",
+      "goal_revisions",
+      "goal_verdicts",
+      "history_events",
+      "independent_app_data",
+      "model_rebinding_selections",
+      "plan_activations",
+      "plan_revisions",
+      "profile_revisions",
+      "project_map_revisions",
+      "projects",
+      "provider_calls",
+      "recovery_assessments",
+      "role_slot_participation",
+      "runtime_intents",
+      "runtime_job_observations",
+      "runtime_jobs",
+      "runtime_receipts",
+      "schema_meta",
+      "skeleton_candidates",
+      "state_snapshots",
+      "task_completion_reuse",
+      "task_contracts",
+      "task_dependencies",
+      "usage_observations",
+      "usage_reconciliations",
+      "validation_results"
+    ],
+    "foreign_rows": [
+      [
+        "preserve-me"
+      ]
+    ]
+  },
+  "patch_sha256": "15c25624117c3d6737c919f7979fd623e709be54901087d50e5ea487f42aefa9"
+}

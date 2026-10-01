@@ -1,0 +1,109 @@
+{
+  "candidate": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "revision": 2,
+  "canonical_status": "NOT_APPLIED",
+  "previous_revision_status": "INTEGRATION_BLOCKED_BY_AUDIT",
+  "patch_sha256": "47701107ba6f78135badc01da6353b62c2ee5429777ac4844a7c5b447e117a7c",
+  "proposal_ledger_sha256": "839d8ae5769bc66209f23144d778dcfea3c421edda532156fb6d6bc73b63363e",
+  "python": "3.12.14",
+  "sqlite": "3.53.1",
+  "pydantic": "2.13.5",
+  "clock_record_created_utc": "2026-10-01T23:04:19.739893+00:00",
+  "host_timezone": "KST +0900",
+  "clock_note": "Per-command start/end and shell wall duration not recorded. Unit-test reported suite duration retained separately.",
+  "runs": [
+    {
+      "id": "revalidation-before",
+      "cwd": "<WORKSPACE>",
+      "command": "VM_SOURCE=$PWD/vm-sqlite/proposal PYTHONDONTWRITEBYTECODE=1 vm-test-venv/bin/python vm-sqlite/revision2/test_initialize_revalidation.py",
+      "exit_code": 1,
+      "raw_log": "logs/revalidation-before-v1.log",
+      "started_at": null,
+      "ended_at": null,
+      "command_duration_seconds": null,
+      "duration_source": "not recorded",
+      "unittest_reported_duration_seconds": 0.039
+    },
+    {
+      "id": "revalidation-after",
+      "cwd": "<WORKSPACE>",
+      "command": "VM_SOURCE=$PWD/vm-sqlite/proposal-v2 PYTHONDONTWRITEBYTECODE=1 vm-test-venv/bin/python vm-sqlite/revision2/test_initialize_revalidation.py",
+      "exit_code": 0,
+      "raw_log": "logs/revalidation-after-v2.log",
+      "started_at": null,
+      "ended_at": null,
+      "command_duration_seconds": null,
+      "duration_source": "not recorded",
+      "unittest_reported_duration_seconds": 0.038
+    },
+    {
+      "id": "atomic-after",
+      "cwd": "<WORKSPACE>",
+      "command": "VM_SOURCE=$PWD/vm-sqlite/proposal-v2 PYTHONDONTWRITEBYTECODE=1 vm-test-venv/bin/python vm-sqlite/test_atomic_initialize_proposal.py",
+      "exit_code": 0,
+      "raw_log": "logs/atomic-after-v2.log",
+      "started_at": null,
+      "ended_at": null,
+      "command_duration_seconds": null,
+      "duration_source": "not recorded",
+      "unittest_reported_duration_seconds": 0.091
+    },
+    {
+      "id": "boundary-after",
+      "cwd": "<WORKSPACE>",
+      "command": "VM_SOURCE=$PWD/vm-sqlite/proposal-v2 PYTHONDONTWRITEBYTECODE=1 vm-test-venv/bin/python vm-sqlite/test_sqlite_boundaries.py",
+      "exit_code": 0,
+      "raw_log": "logs/boundary-after-v2.log",
+      "started_at": null,
+      "ended_at": null,
+      "command_duration_seconds": null,
+      "duration_source": "not recorded",
+      "unittest_reported_duration_seconds": 11.624
+    },
+    {
+      "id": "stress",
+      "cwd": "<WORKSPACE>",
+      "command": "VM_SOURCE=$PWD/vm-sqlite/proposal-v2 PYTHONDONTWRITEBYTECODE=1 vm-test-venv/bin/python vm-sqlite/run_concurrency_stress.py",
+      "exit_code": 0,
+      "raw_log": "logs/concurrency-stress-v2.log",
+      "started_at": null,
+      "ended_at": null,
+      "command_duration_seconds": null,
+      "duration_source": "not recorded",
+      "unittest_reported_duration_seconds": 1.817
+    },
+    {
+      "id": "repo-regression",
+      "cwd": "<WORKSPACE>",
+      "command": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=$PWD/vm-sqlite/proposal-v2/src:$PWD/vm-portable vm-test-venv/bin/python -m unittest tests.test_engine_ledger_snapshot tests.test_engine_ledger_service tests.test_engine_current_snapshot_goal_scope -v",
+      "exit_code": 1,
+      "raw_log": "logs/repo-regression-v2.log",
+      "started_at": null,
+      "ended_at": null,
+      "command_duration_seconds": null,
+      "duration_source": "not recorded",
+      "unittest_reported_duration_seconds": 0.816
+    },
+    {
+      "id": "patch-check",
+      "cwd": "<WORKSPACE>",
+      "command": "git -C vm-portable apply --check --whitespace=error-all ../vm-sqlite/revision2/artifacts/atomic-initialize-v2.patch",
+      "exit_code": 0,
+      "raw_log": "logs/patch-check-v2.log",
+      "started_at": null,
+      "ended_at": null,
+      "command_duration_seconds": null,
+      "duration_source": "not recorded",
+      "unittest_reported_duration_seconds": null
+    }
+  ],
+  "aliases": {
+    "<WORKSPACE>": "isolated dot cloud workspace",
+    "<SOURCE>": "unchanged canonical checkout32bb0f9",
+    "<PROPOSAL_V1>": "immutable revision1 proposal copy",
+    "<PROPOSAL_V2>": "isolated revision2 proposal copy",
+    "<TESTS>": "SQLite test artifact directory",
+    "<VENV>": "locked Python environment",
+    "<PYTHON_RUNTIME>": "Python standard library"
+  }
+}

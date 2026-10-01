@@ -1,0 +1,22 @@
+{
+  "project": {
+    "id": "project_1ff9f17b4d264c55b8b1025d4aae6358",
+    "name": "공백 portable smoke",
+    "root": "${WORKSPACE}/vm-evidence/public smoke 최종/project with spaces",
+    "artifact_root": "${WORKSPACE}/vm-evidence/public smoke 최종/artifacts/project_1ff9f17b4d264c55b8b1025d4aae6358",
+    "active_profile_revision_id": "profile_revision_a975b65b95464f479001a77aaa008ba9",
+    "active_goal_revision_id": null,
+    "active_plan_revision_id": null,
+    "run_state": "idle",
+    "recovery_reason": null,
+    "created_at": "2026-10-01T22:57:39.499540Z",
+    "updated_at": "2026-10-01T22:57:39.502837Z"
+  },
+  "plans": [],
+  "tasks": [],
+  "attempts": [],
+  "runtime_jobs": [],
+  "context_sources": [],
+  "history_count": 2,
+  "history_valid": true
+}

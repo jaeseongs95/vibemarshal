@@ -1,0 +1,31 @@
+test_01_connection_pragmas_and_uri_escaping (__main__.SQLiteBoundaries.test_01_connection_pragmas_and_uri_escaping) ... ok
+test_02_foreign_keys_reject_orphan_and_rollback (__main__.SQLiteBoundaries.test_02_foreign_keys_reject_orphan_and_rollback) ... ok
+test_03_baseexception_rolls_back_state_and_history (__main__.SQLiteBoundaries.test_03_baseexception_rolls_back_state_and_history) ... ok
+test_04_read_handle_refuses_main_and_attached_writes (__main__.SQLiteBoundaries.test_04_read_handle_refuses_main_and_attached_writes) ... ok
+test_05_role_scope_denies_ledger_read_and_write (__main__.SQLiteBoundaries.test_05_role_scope_denies_ledger_read_and_write) ... ok
+test_06_connections_close_on_success_and_exception (__main__.SQLiteBoundaries.test_06_connections_close_on_success_and_exception) ... ok
+test_07_snapshot_releases_reader_before_hashing (__main__.SQLiteBoundaries.test_07_snapshot_releases_reader_before_hashing) ... ok
+test_08_wal_read_snapshot_survives_process_writer (__main__.SQLiteBoundaries.test_08_wal_read_snapshot_survives_process_writer) ... ok
+test_09_busy_writer_waits_then_succeeds (__main__.SQLiteBoundaries.test_09_busy_writer_waits_then_succeeds) ... ok
+test_10_multi_process_history_has_no_gaps_or_forks (__main__.SQLiteBoundaries.test_10_multi_process_history_has_no_gaps_or_forks) ... ok
+test_11_process_crash_rolls_back_uncommitted_wal (__main__.SQLiteBoundaries.test_11_process_crash_rolls_back_uncommitted_wal) ... ok
+test_12_exact_cas_method_eight_processes_one_winner (__main__.SQLiteBoundaries.test_12_exact_cas_method_eight_processes_one_winner) ... ok
+test_13_exact_cas_rejected_terminal_state_has_no_side_effect (__main__.SQLiteBoundaries.test_13_exact_cas_rejected_terminal_state_has_no_side_effect) ... ok
+test_14_cas_observation_failure_rolls_back_running_transition (__main__.SQLiteBoundaries.test_14_cas_observation_failure_rolls_back_running_transition) ... ok
+test_15_partial_unique_active_job_enforced (__main__.SQLiteBoundaries.test_15_partial_unique_active_job_enforced) ... ok
+test_16_current_snapshot_unique_per_goal_not_per_project (__main__.SQLiteBoundaries.test_16_current_snapshot_unique_per_goal_not_per_project) ... ok
+test_17_history_append_only_and_hash_tamper_detection (__main__.SQLiteBoundaries.test_17_history_append_only_and_hash_tamper_detection) ... ok
+test_18_identity_rejects_foreign_without_mutation (__main__.SQLiteBoundaries.test_18_identity_rejects_foreign_without_mutation) ... ok
+test_19_schema3_rejected_by_writer_but_read_with_original_semantics (__main__.SQLiteBoundaries.test_19_schema3_rejected_by_writer_but_read_with_original_semantics) ... ok
+test_20_bad_identity_versions_fail_closed (__main__.SQLiteBoundaries.test_20_bad_identity_versions_fail_closed) ... ok
+test_21_read_does_not_implicitly_pin_snapshot (__main__.SQLiteBoundaries.test_21_read_does_not_implicitly_pin_snapshot) ... ok
+test_22_history_project_isolation (__main__.SQLiteBoundaries.test_22_history_project_isolation) ... ok
+test_23_strict_types_and_check_constraints (__main__.SQLiteBoundaries.test_23_strict_types_and_check_constraints) ... ok
+test_24_transaction_handles_closed_after_rollback (__main__.SQLiteBoundaries.test_24_transaction_handles_closed_after_rollback) ... ok
+test_25_busy_timeout_expires_without_partial_write (__main__.SQLiteBoundaries.test_25_busy_timeout_expires_without_partial_write) ... ok
+test_26_project_snapshot_all_query_boundaries_share_one_commit (__main__.SQLiteBoundaries.test_26_project_snapshot_all_query_boundaries_share_one_commit) ... ok
+
+----------------------------------------------------------------------
+Ran 26 tests in 11.623s
+
+OK

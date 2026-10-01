@@ -1,0 +1,26 @@
+test_cleanup_failure_does_not_mask_configuration_failure (__main__.ConnectionSetupCleanup.test_cleanup_failure_does_not_mask_configuration_failure) ... ok
+test_malformed_existing_file_closes_acquired_connection_and_preserves_bytes (__main__.ConnectionSetupCleanup.test_malformed_existing_file_closes_acquired_connection_and_preserves_bytes) ... FAIL
+test_pragma_configuration_failure_closes_writable_and_readonly_connections (__main__.ConnectionSetupCleanup.test_pragma_configuration_failure_closes_writable_and_readonly_connections) ... FAIL
+
+======================================================================
+FAIL: test_malformed_existing_file_closes_acquired_connection_and_preserves_bytes (__main__.ConnectionSetupCleanup.test_malformed_existing_file_closes_acquired_connection_and_preserves_bytes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<TESTS>/revision3/test_connection_setup_cleanup.py", line 22, in test_malformed_existing_file_closes_acquired_connection_and_preserves_bytes
+    self.assertTrue(acquired);self.assertTrue(all(c.closed for c in acquired));self.assertEqual(original_bytes,self.path.read_bytes())
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+======================================================================
+FAIL: test_pragma_configuration_failure_closes_writable_and_readonly_connections (__main__.ConnectionSetupCleanup.test_pragma_configuration_failure_closes_writable_and_readonly_connections)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "<TESTS>/revision3/test_connection_setup_cleanup.py", line 36, in test_pragma_configuration_failure_closes_writable_and_readonly_connections
+    self.assertTrue(acquired);self.assertTrue(all(c.closed for c in acquired))
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: False is not true
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.008s
+
+FAILED (failures=2)

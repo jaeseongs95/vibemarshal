@@ -1,0 +1,12 @@
+test_existing_empty_db_became_foreign_before_lock_must_be_rejected (__main__.IndependentInitializeReview.test_existing_empty_db_became_foreign_before_lock_must_be_rejected) ... ok
+test_existing_engine_data_and_schema_are_unchanged_by_initialize (__main__.IndependentInitializeReview.test_existing_engine_data_and_schema_are_unchanged_by_initialize) ... ok
+test_foreign_view_only_database_is_preserved (__main__.IndependentInitializeReview.test_foreign_view_only_database_is_preserved) ... ok
+test_process_exit_after_application_id_is_recoverable (__main__.IndependentInitializeReview.test_process_exit_after_application_id_is_recoverable) ... ok
+test_process_exit_after_ddl_is_recoverable (__main__.IndependentInitializeReview.test_process_exit_after_ddl_is_recoverable) ... ok
+test_rollback_failure_does_not_mask_primary_exception (__main__.IndependentInitializeReview.test_rollback_failure_does_not_mask_primary_exception) ... ok
+test_schema_and_identity_share_one_transaction (__main__.IndependentInitializeReview.test_schema_and_identity_share_one_transaction) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.073s
+
+OK

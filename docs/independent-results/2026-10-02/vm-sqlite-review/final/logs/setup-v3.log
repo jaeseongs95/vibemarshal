@@ -1,0 +1,8 @@
+test_cleanup_failure_does_not_mask_configuration_failure (__main__.ConnectionSetupCleanup.test_cleanup_failure_does_not_mask_configuration_failure) ... ok
+test_malformed_existing_file_closes_acquired_connection_and_preserves_bytes (__main__.ConnectionSetupCleanup.test_malformed_existing_file_closes_acquired_connection_and_preserves_bytes) ... ok
+test_pragma_configuration_failure_closes_writable_and_readonly_connections (__main__.ConnectionSetupCleanup.test_pragma_configuration_failure_closes_writable_and_readonly_connections) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.009s
+
+OK

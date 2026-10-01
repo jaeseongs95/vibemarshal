@@ -1,0 +1,341 @@
+FM03 fullcaller / 공통 vendor 권위 계약 독립 검토
+대상: 32bb0f9dd9f024045d24487312b50f5b703573a3, branch work
+판정: 소스 경계 확인 완료. 현행 fullcaller 900/300/Task5400, fixed130,
+source-closure, native ancestry 및 qualification 충족은 NOT_VERIFIED.
+
+범위와 provenance
+
+이 검토는 <REVIEW_SOURCE>의 AGENTS.md, 승인 계약, 관련 소스·테스트 정의,
+기존 첨부 source packet을 읽은 독립 정적 검토다. 17개 Python 파일을 AST parse하고
+SHA-256을 계산했다. 모듈을 import하거나 제품 테스트를 실행하지 않았다. provider 호출,
+Windows/native 실행, FM03 endpoint 재호출, wheel/SQLite 작업, 운영 DB 접근·변경,
+인증 변경, 소스 구현·채택은 없다. HEAD와 git status를 재확인했으며 clean이다.
+이전 환경 준비 canary는 이 검토의 증거가 아니다.
+
+현재 사용자 handoff(이 검토에서 raw를 재관측하지 않은 주장): Windows endpoint r7은
+이미 1회 소비됨. expiry-before-start는 START=false/marker=0. running UTC+3은
+START=true/role-marker=3/owned-handle=3 signaled/JobActive=0/cleanup=true/
+runner-exit=2/unknown. 독립 POST는 채택됨. 이 진술을 그대로 보존하되 fullcaller,
+native ancestry, 제품 acceptance 또는 qualification으로 확대하지 않는다.
+
+1. 핵심 finding
+
+F1 [현재 소스-kit 증거 부재]
+현재 HEAD의 tracked 경로에 fm03_guard.py, fixed_caller.py, bounded-foreground.py,
+FIXED-INPUTS 또는 fullcaller 이름의 파일은 없다. <REVIEW_ATTACHMENTS>의 zip 6개를
+파일명·제한된 identity 필드로 검사했다. 5개에는 과거 FM03/S0 component가 있고,
+나머지 currentmain packet SOURCE-IDENTITY.json의 head는 12ac9e65096f86b203729dabeacac96b06148a9b다.
+과거 guard는 HEAD=5e5e8ede7a748c070193f4ac3d18a4c3d2e818e1을 하드코딩한다.
+따라서 현재 32bb 및 r7에 결속한 완전한 Windows 원본 kit는 조사 범위에서 찾지 못했다.
+이 finding은 파일이 전 세계에 없다는 주장이 아니며, 사용자의 Windows 원본과
+VM publisher의 향후 GitHub evidence를 대체하지 않는다.
+
+F2 [과거 fullcaller와 S0 deadline 경로의 차이]
+과거 fm03_guard.py:48-90은 개발 실행 GO의 provider_calls=0, raw_limit=16,
+full_seconds=900, other_seconds=300, outer_seconds=5400 및 받은 시각부터 5400초인
+UTC 기한을 검사한다. 같은 파일:49는 이 guard가 제품 승인 source가 아니라고 명시한다.
+과거 bounded-foreground.py:427-441은 remaining=deadline-now-30을 한 번 계산하고
+min(900 또는 300, remaining)을 run_bounded에 넘기지만 s0_deadlines는 넘기지 않는다.
+run_bounded:119-127의 그 분기는 절대 기한을 다시 보지 않고, :176은 START 후
+monotonic+timeout으로 실행 기한을 만든다. 절대 기한 재검사와 cleanup/save를 포함한
+기한 판정(:166-180,320-327)은 s0_deadlines가 있을 때만 적용된다.
+이는 현행 kit의 결함 판정이 아니라, 확보된 과거 코드만으로 fullcaller 전체의
+Task5400 준수를 증명할 수 없다는 직접 근거다. r7 endpoint 성공으로 메울 수 없다.
+
+F3 [fixed caller 증거의 범위]
+과거 fixed_caller.py:17-19,37-44는 V02-d/V03-b 전용 payload300 및 cleanup15+
+forensic15를 사용한다. :85-104는 UTC/monotonic 기간 일치와 남은 전체 예산을 검사하며,
+:113-161은 실제 host/native binding과 source hash를 확인하고 START 직전 재관측한다.
+:166-194는 terminal raw·Job cleanup·독립 aggregation과 save 후 기한을 검사한다.
+이 파일은 900초 full-engine caller도, 임의 task를 실행하는 공개 ABI도 아니다.
+fixed130의 ordered ID manifest/profile은 확보되지 않았다. guard의 6개 module에 있는
+직접 test_ 정의는 현재 HEAD에서 12+15+6+15+10+4=62개다. 이는 AST 개수일 뿐이며
+상속·loader expansion을 포함하는 실제 130개 suite의 개수나 동등성을 판단하지 않는다.
+
+F4 [Core 승인, AGS gate, 실행 adapter는 별도 권위]
+현재 repo는 승인 capability, current-source projection, durable intent, 효과 직전
+재검사, unknown 보존, validation 판정을 제공한다(아래 mapping). 이것들을 하나의
+AGS 승인 또는 vendor 공통 caller API라고 부르면 안 된다. AGS dispatch reservation은
+MCP 호출 ID의 단회 사용을 위한 것이며 VM Core의 GoalAuthorization·Attempt 예약이 아니다.
+service.py/runtime.py에는 beginEffect라는 공개 symbol이 없다. 대응되는 기존 경계는
+prepare_authorized_runtime_effect + runtime.effect_dispatching + adapter invocation이다.
+외부 kit의 beginEffect가 이 경계를 어떻게 결속하는지는 추가 source가 필요하다.
+
+F5 [profile과 소비 표면의 알려진 간극]
+ags_invocation_transport.py:46-66은 A2=flowmarshal-same-user-v1을 fm namespace에,
+binding 없는 보호 VM 경로를 vm namespace에 생성 시 고정한다. :85-117은 profile,
+epoch, call ID, tool, input digest를 대조하고 ticket을 사용 시 소모한다. 오류 후 다른
+profile로 fallback하지 않는다. governance_gate.py:923-940은 R16 approved-slot을
+보호 VM signer 전용으로 두며 A2 producer를 명시 거부한다. A2로 R16을 통과시키는 것은
+공통화가 아니다. tests/test_engine_ags_a2_transport_contract.py:259-264는 vm/fm
+hello/reserve_dispatch가 CONSUMED_SURFACE에 없는 F07-a known gap을 직접 기록한다.
+이 검토는 F07 구현이나 gap 해소를 하지 않는다.
+
+F6 [지원 OS 경계]
+docs/redesign-1.0-contract.md:181 및 runtime.py:4134-4141은 D1 Windows-only를
+명시한다. POSIX run_once의 RUNTIME_OWNER_LOCK_UNAVAILABLE은 원장 쓰기 전에 멈추는
+지원 경계다. Linux fake/monkeypatch PASS로 Windows native ancestry를 대체하거나
+POSIX lock 구현을 요구하지 않는다.
+
+2. 현재 source의 authority 경로 mapping
+
+아래 경로는 모두 정확한 32bb candidate에 대한 source reference다.
+공통 prefix: src/flowmarshal/engine/
+
+승인 source:
+  application.py:666 ApplicationAuthority, :756 _authorize_with_application_authority;
+  service.py:2780 _authorize_goal_in_transaction은 host scope, capability 타입·ledger·
+  target 결속을 소비하고 현재 target을 재계산한다. :2872 승인과 selected Plan activation은
+  같은 transaction. source 문자열, permission 문자열, 모델의 승인 선언은 발급 권한이 아니다.
+  tests/test_engine_console_authority.py:52,100,118,130,139,210;
+  tests/test_engine_core_capabilities.py:61,139,334,356에 경계별 검사가 정의돼 있다.
+
+projection:
+  service.py:2396 read_current_approved_role_slot_source는 한 read transaction에서 active
+  Plan/Task, revocation, control 상태, 최신 승인·deadline, 참여 계보 및 watermark를 읽고
+  snapshot_digest와 expected binding을 대조한다. 입력 자료를 승인으로 생성하지 않는다.
+  ags_approved_slot_producer.py:38-81은 caller 제공 source 본문 대신 이 port를 읽고
+  invocation/epoch/snapshot/expiry를 별도 source-signing domain에 결속한다.
+  tests/test_engine_approved_stage_slots.py:72,163,174,181,188 및
+  tests/test_engine_ags_approved_slot_producer.py:105,119,130,141,154,178이 인접 정의다.
+
+reserve:
+  service.py:4499 reserve_attempt; budget.py:383 reserve는 request digest·call key와
+  Goal 호출 상한/절대 기한(:421-430)을 검사한다. service.py:1502 schedule_runtime_job은
+  caller deadline을 승인 deadline과 min으로 제한하고 checkpoint key/request를 고정한다.
+  AGS AuthenticatedDispatchTransport.reserve(:85)는 별도 transport reservation이다.
+
+bind / admit:
+  service.py:1759 bind_runtime_job_provider는 최초 exact thread/turn을 보존하고 다른
+  binding을 거절한다. interrupt/cancel과 경합한 늦은 receipt도 보존하되 terminal로 보지 않는다.
+  runtime.py:3610 _verify_runtime_effect_inputs는 cwd, 정책, model lock, prompt/schema와
+  current spec을 효과 직전에 대조한다. 요청 model/effort와 provider 관측을 분리한다.
+  과거 S0Window.admit/before_start는 packet의 HostGO/native/parent/receipt 관측 경계이며
+  이 Core API와 동일하거나 자동 결속됐다는 증거는 없다.
+
+beginEffect에 대응하는 실제 효과 직전 경계:
+  service.py:4843 prepare_authorized_runtime_effect는 prepared intent/request digest,
+  current authorization/spec/input/checkpoint를 대조한 뒤 :4934 effect_dispatching을 기록한다.
+  runtime_job_id가 있으면 같은 transaction에서 runnable deadline fence(:4889)를 검사한다.
+  :1938은 terminal/cancelled/collector_lost/expired job을 거절한다. INTERRUPTING은 기존
+  late-binding 뒤 interrupt 전달 의미 때문에 허용된다고 명시한다. 이를 취소 승인으로 혼동하지 않는다.
+  job 없는 inline 호환 경로는 해당 job fence를 검사하지 않는다고 :4854에 명시돼 있으므로
+  fullcaller가 어떤 경로를 사용하는지 정확히 결속해야 한다.
+
+adapter:
+  runtime.py:3690 _invoke_runtime_operation은 preflight 실패를 not_started로 남긴 뒤
+  invoke하지 않는다. 통과하면 trace/role scope 내 invoke(:3757)를 수행한다.
+  :5896 _start_turn은 durable turn intent→adapter→exact late binding→receipt 저장을 연결한다.
+  이 애플리케이션 transaction과 외부 프로세스 START 사이를 전역 atomic 또는 exactly-once로
+  주장할 수 없다. Windows Job/owned handle과 실제 native 조상 증거는 별도다.
+
+unknown / interrupt / save:
+  runtime.py:2738,2939는 deadline interrupt와 bounded receipt 관측을 구분하며,
+  ACK를 terminal로 승격하지 않고 grace 뒤 collector_lost를 보존한다.
+  operations.py:20은 receipt 없는 외부 작업의 무조건 재호출을 금지한다.
+  tests/test_engine_runtime_job_supervisor.py:529,658,688,975,1001,1072,1273,1324에
+  checkpoint/unknown/late bind 검사가 정의돼 있다. 실행 결과는 이번 검토에서 얻지 않았다.
+  과거 bounded-foreground.py:74-93은 terminal temp+replace 실패 시 exit2와 unknown을
+  남기지만 현재 Windows save/interrupt 전체 연결의 증거로 사용할 수 없다.
+
+validation:
+  service.py:6459는 같은 성공 Attempt의 유일한 terminal-valid provider call, typed effect
+  receipt 및 확인을 요구한다. :6627 complete_task는 unresolved effect를 차단하고 모든
+  required validation의 최신 PASS를 확인한다. :6671 GoalVerdict도 별도다.
+  governance_gate.py:944,947의 dispatch/completion gate는 이 Core 판정에 더하는 조건이며
+  사용자 승인, 의미 validation 또는 Goal 완료 권위를 대체하지 않는다.
+  tests/test_engine_effect_authorization.py:214,241,1042,1058,1067;
+  tests/test_engine_execution_usage_separation.py:143,287이 인접 검사 정의다.
+
+3. host-neutral 공통 계약에 필요한 최소 불변조건 (제안, 채택 아님)
+
+공통 policy는 vendor별 executable, SDK, 토큰, 세션 파일, AGS 내부 저장 구조를 import하지
+않고 typed input/output으로 표현한다. 최소 binding은 authorization reference/revision,
+project/Task/Attempt, exact source closure digest, requested role/model/effort, profile,
+canonical request digest, immutable absolute deadline, effect identity 및 관측 provenance다.
+producer/host가 발행한 값과 adapter/provider가 관측한 값을 별도 필드로 유지한다.
+승인 source 소유자는 VM Core, gate verdict 소유자는 AGS, 프로세스/Job 관측 소유자는
+host adapter, 제품 completion 소유자는 Core다. 공통 policy가 이 권위를 합치지 않는다.
+profile은 explicit selection이며 same-user assertion을 protected-VM truth로 승격하지 않는다.
+
+시간 계약의 검토 oracle: 원 승인 Task 기한 T+5400은 tick/resume/restart로 연장하지 않는다.
+full stage 900, 기타 stage 300은 상한으로 적용하고 효과 시작까지의 대기, interrupt,
+cleanup, 최종 raw save가 어느 예산에 속하는지 현행 profile에서 고정한다. 실제 START
+직전 fresh UTC와 local-derived monotonic 양쪽의 더 이른 기한을 사용하고, 부족한
+전체 reserve에서는 시작을 거절한다. monotonic 숫자는 다른 process/boot로 무증명 이전하지 않는다.
+기존 S0의 15+15를 현행 fullcaller의 승인값이라고 가정하지 않는다.
+
+4. 최소 discriminating test plan (모두 미실행)
+
+T1 승인/projection와 역할 분리:
+  정상 승인 snapshot 한 개를 기준으로 source-only 문자열, forged projection, stale
+  revision/revocation, 잘못된 Task·profile을 각각 한 필드씩 변경한다. reserve/START=0,
+  승인행·completion 변화=0을 확인한다. AGS PASS를 줘도 Core 거절이 유지돼야 한다.
+
+T2 reserve→bind→admit→START freshness:
+  예약 이후 START 직전에 승인/선택/closure/prompt/profile 중 한 값을 바꾸는 table case.
+  원래 intent와 거절 이유를 보존하고 adapter 호출/marker=0. 다른 receipt/epoch 또는
+  소비된 ticket 재사용도 0. projection 성공만으로 시작하지 않는지를 구분한다.
+
+T3 fullcaller900 / other300 / Task5400:
+  full, other stage를 각각 테스트하되 전체 900/300을 기다릴 필요 없이 승인된 clock seam의
+  경계 직전/정확한 기한/직후를 사용한다. 최초 T를 5400에 가깝게 옮겨 stage budget과
+  Task budget 중 더 이른 제한이 이기는지를 확인한다. setup 지연·reserve 지연을 넣어
+  처음 계산한 timeout으로 START 뒤 기한이 밀리는 결함을 구별한다. clock seam이 없으면
+  native 담당자가 승인된 작은 profile을 별도 명명하며 생산 상한 입증과 분리한다.
+
+T4 running UTC+3 / clock / interrupt:
+  기존 r7 결과는 재사용 가능한 endpoint 관측으로만 묶고 재실행하지 않는다. 새 fullcaller
+  승인 슬롯에서 해당 adapter 호출·Task deadline·원래 intent가 결속되는지 관측한다.
+  이미 START한 경우 deadline 후 interrupt receipt가 와도 terminal=false/unknown을 유지.
+  실제 owned handles signaled, JobActive=0, cleanup 및 native ancestry는 Windows에서만 확인.
+
+T5 save 실패와 deadline 경합:
+  reservation save 실패는 adapter 호출 0. START 이후 terminal write/replace 실패는 exit2,
+  unknown, completion 없음. raw save 직전과 직후 Task deadline을 넘기는 두 case로
+  pre-write timestamp만으로 성공을 인증하지 않음을 확인한다. 같은 consumed slot 재호출 금지.
+
+T6 source closure / fixed130:
+  현재 승인된 ordered 130 IDs, unique set, module/fixture/loader digest를 실제 수집 결과와
+  비교한다. 누락/중복/순서변경/새 skip/추가 case, transitive helper·import origin 변경을
+  각각 검출해야 한다. 130이라는 count만 일치해도 불합격. closure에 interpreter,
+  adapter, caller, selected profile, fixture, authority-read bridge를 포함한다. sibling
+  wheel/SQLite 검사를 다시 돌리지 않고 같은 candidate hash의 receipt를 참조한다.
+
+T7 profile 단절:
+  A2↔protected VM, wrong freezeIdentity/epoch, unknown profile을 입력한다. 첫 효과 전
+  거절, 서명/dispatch 0, namespace fallback 0. R16 A2 거절은 유지한다. common policy는
+  vendor별 authority source를 자체 생성하거나 포맷을 묵시 변환하지 않는다.
+
+T8 unknown→validation:
+  provider terminal만, cleanup만, AGS PASS만 각각 제공해도 Core complete=0.
+  정확한 원 intent/Attempt의 typed receipt·대상 재관측·필수 validation이 모두 일치할 때만
+  완료 후보가 된다. late usage와 adopted POST만으로 unknown을 성공으로 바꾸지 않는다.
+
+5. 가장 작은 남은 vertical path와 필요한 전달물
+
+먼저 current Windows kit를 정확한 32bb source closure와 결속해 정적 대조한다. 필요한
+파일 이름은 발견한 과거 caller의 실제 reference 기준이며, 현행 이름이 다르면 publisher가
+old→current mapping과 hash를 제공해야 한다. 아래 내용 자체가 실행 승인이나 credential은 아니다.
+
+  - 현행 fm03_guard.py, bounded-foreground.py, 실제 fullcaller entrypoint;
+    fixed_caller.py, s0_host_window.py 및 host-bridge/parent-port의 현재 구현.
+  - discover-main.py, verify-installed.py, verify-entrypoint-paired.py, observe-inputs.py,
+    supervisor-fixture.py, supervisor-smoke.py, prepare-seal.py, pure-selfcheck.py,
+    cleanup-selfcheck.py (과거 scripts-final.json에서 요구한 전체 11개 집합과 비교).
+  - manifests/scripts-final.json, fixed-inputs.json, preparation-r4-seal.json 및
+    tracked-source.json; 현행 closure의 빠진 transitive 파일과 source→32bb mapping.
+  - FIXED-INPUTS.json의 V02-d/V03-b 또는 현행 fullcaller profile, payload entrypoints,
+    fixed130의 ordered ID manifest/loader/fixture hashes. 토큰·전체 환경 dump는 제외.
+  - 현행 adapter/Job launcher, authority-read bridge, beginEffect가 실제 있는 module과
+    public interface/schema 및 callsite. beginEffect 이름만 있는 계약은 구현 증거가 아니다.
+  - execution-go의 비밀 없는 binding projection/schema: 승인 reference·digest/revision,
+    consumed 상태, source closure, task/stage budget 및 기산점. native message 원문·실제
+    credential·운영 DB/WAL은 전달하지 않는다. 실제 읽기 권위는 원 host에 유지한다.
+  - r7 원 evidence와 independent POST의 publisher 제공 immutable GitHub ref, 상대 파일명,
+    SHA-256 및 결과 schema. 지금 handoff에는 정확한 ref/파일명이 없으므로 발명하지 않는다.
+
+그 다음 T1/T2/T3/T5/T6/T7의 순수 정책 판별을 현행 kit의 공개 경계에 연결하고 결과를
+별도로 남긴다. 연결 source가 없으면 NOT_RUN이며 Linux fake로 채우지 않는다.
+마지막으로 native 소유자가 새로 승인된 별도 fullcaller 슬롯 한 개에서 source→approval
+projection→reserve→bind→admit→beginEffect→기존 adapter→unknown/validation을 끝까지
+연결한다. r7 consumed endpoint는 재사용 실행하지 않고 digest로만 인용한다. 최소 우선
+case는 T3의 setup 지연과 T5의 save 경합 중 정적 검토로 아직 갈라지지 않은 한 case다.
+정상 완료는 별도 요구이며 fault-path unknown 관측을 fullcaller 성공으로 집계하지 않는다.
+나머지 요구는 관측이 있을 때만 채운다. 이 검토에서 모든 항목의 채택·실행 승인은 하지 않는다.
+
+정적 원시 증거는 아래 JSON에 첨부된다. 파일별 hash는 재검토 시 원본 대조용이며,
+parse 성공은 runtime 또는 제품 계약 PASS가 아니다.
+
+{
+  "head": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "git_status_porcelain": "",
+  "verification": "Static parsing, source reading and SHA-256 only; no product or native tests executed",
+  "files": [
+    {
+      "path": "src/flowmarshal/engine/application.py",
+      "sha256": "7a47ef6148c2e168b1499bd169c5ed7eb4d45690aef4549648a21b24b996d7fb",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "src/flowmarshal/engine/service.py",
+      "sha256": "a0b3aaf0645825c7eeb62babab0d63c8062158c38be46cf59a3649f3053568b3",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "src/flowmarshal/engine/runtime.py",
+      "sha256": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "src/flowmarshal/engine/budget.py",
+      "sha256": "496cbb84acd757ab370cc5b8c54e456ada55a17feae543d39accd5512d860223",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "src/flowmarshal/engine/ags_invocation_transport.py",
+      "sha256": "6ced622d3a68ece90e87155129aa6a2e9da754b532667e290a6a70bd710eff2d",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "src/flowmarshal/engine/ags_approved_slot_producer.py",
+      "sha256": "341abe08d5784684136220f35a5334e7c20dc36425a5008fe516cd0839f2890a",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "src/flowmarshal/engine/ags_observation_producer.py",
+      "sha256": "c5f4a4e30a9820ccbcf96030da7ccf908a2b5e3b88ae0514443fe96463e3b90f",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "src/flowmarshal/engine/governance_gate.py",
+      "sha256": "e266339a0c656c005322544ca304071129797b8f6e551f44286b283ae0f7e51c",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "src/flowmarshal/engine/operations.py",
+      "sha256": "e9dac47755be04f5c7625e95290c4e8c360d938a26b9556cc0a09a4fa1720fd7",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "historical-packet/bounded-foreground.py",
+      "sha256": "6a8ca93e158874731dd4dc0f14186a2aae35120740fdbd691866e3ed9bf0f673",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "historical-packet/cloud_regression_runner.py",
+      "sha256": "3d7a11115801326f271cc1124399303c1c99a09907afd723387b2a60ee20df7c",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "historical-packet/fixed_caller.py",
+      "sha256": "6c73afbff1e24ddd861b3a127e659b5448e9a76d1b883b5befa48d97ecb61a9e",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "historical-packet/fm03_guard.py",
+      "sha256": "bec53f74bd21642ebbde44bdafeb3c45d0256bc2666dba5000b0cf9251c3054a",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "historical-packet/offline_checks.py",
+      "sha256": "77e4aa7c3e76ce164a39ef1f09e4006ee5919991d6f7a4e13978c3fa00ec2fc3",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "historical-packet/parent_port.py",
+      "sha256": "2467800e3568e5a5ffa0a45f39f91a5f5c16812b8c3ea4af71ac4a58cb6cfb6a",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "historical-packet/parent_receipt_bridge.py",
+      "sha256": "899d2f940b12e7f3102834910fa87cf3bbbbc1561212929c920fcb2bdbd561bd",
+      "syntax": "parsed; module not executed"
+    },
+    {
+      "path": "historical-packet/s0_host_window.py",
+      "sha256": "97822a54da891a6d5a49152a7977aa49661b2280444922fa602379f531587729",
+      "syntax": "parsed; module not executed"
+    }
+  ]
+}
