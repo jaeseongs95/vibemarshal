@@ -1,0 +1,113 @@
+{
+  "format": "sqlite-candidate-publication-v1",
+  "prepared_at": "2026-10-01T23:52:24.984675+00:00",
+  "destination_repository": "https://github.com/jaeseongs95/vibemarshal",
+  "source_branch": "codex/sqlite-atomic-initialize-v3",
+  "source_commit": "211a5a0f5891a44f217aa7aae18bdb8825775878",
+  "source_tree": "e901b77ebf7551342ada996dd7ee4e8422b92f7a",
+  "source_parent": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "evidence_branch": "codex/sqlite-atomic-initialize-v3-evidence",
+  "evidence_parent": "211a5a0f5891a44f217aa7aae18bdb8825775878",
+  "status": "draft_review_candidate; remote verification follows publication",
+  "policy_panel": "PENDING",
+  "source_go": false,
+  "merge": false,
+  "deployment": false,
+  "release": false,
+  "windows_native": "NOT_RUN",
+  "python_310_runtime": "NOT_RUN",
+  "immutable_original_files": [
+    {
+      "source": "REPORT.txt",
+      "published": "sealed-report.txt",
+      "sha256": "97eade89860018dedce2883167e35a8cdcda88dacd14169df969b45d2e8a8259"
+    },
+    {
+      "source": "candidate-manifest.json",
+      "published": "sealed-candidate-manifest.json",
+      "sha256": "b865694f4a2fe06fa5849fed85b46d6b182f073fd28e20bee68154405592aec0"
+    },
+    {
+      "source": "candidate.diff.patch",
+      "published": "candidate.diff.patch",
+      "sha256": "de93689e8c366004fc7bef877ea501da43f6f9c3a7ea3c6aafc0c1b5ed2e543a"
+    },
+    {
+      "source": "atomic-initialize-v3.patch",
+      "published": "reviewed-v3.patch",
+      "sha256": "40339ffa0ef57f5d6152c289344c7fda0011c70c0ea40338861495c3fa170a89"
+    },
+    {
+      "source": "EARLY-OBSERVATIONS.txt",
+      "published": "EARLY-OBSERVATIONS.txt",
+      "sha256": "925da321426ac2d4b75b0879ae4d3791e3e1d50495263d9061c7c202470ba9e8"
+    },
+    {
+      "source": "verify_candidate.py",
+      "published": "verify_candidate.py",
+      "sha256": "bb2c392c9dab0df42215d62069473c90b5e5604249392f2aefa9a855d0354b71"
+    },
+    {
+      "source": "run_base_regressions.py",
+      "published": "run_base_regressions.py",
+      "sha256": "42ea0b55a952a791ae19f4b3373a39c04292a58b2dee8ceb4b6da5c7d165a012"
+    },
+    {
+      "source": "run.py",
+      "published": "run.py",
+      "sha256": "1c606b66e41b1988374dc06d933df203123338f619bb93374f00bd0d6095d38c"
+    }
+  ],
+  "receipt_selection": {
+    "original_sha256": "37284fd9e376e3d18ccea1e3f993be1bf27cd54a39acf7ecb06b224395f8659a",
+    "selected_indices": [
+      0,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31,
+      32,
+      33,
+      34,
+      35,
+      36,
+      40,
+      42
+    ],
+    "selected_count": 34,
+    "preserves_raw_fields": true
+  },
+  "forbidden_files_included": false,
+  "prepublication_validation": {
+    "non_patch_outer_diff_check": "PASS",
+    "immutable_patch_reverse_apply_checks": "PASS",
+    "artifact_sha256": "PASS",
+    "initial_outer_whitespace_exit": 2,
+    "initial_checksum_wrong_cwd_exit": 1,
+    "failure_receipts_preserved": true,
+    "implementation_unchanged": true,
+    "tests_rerun": false
+  }
+}

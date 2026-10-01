@@ -1,0 +1,68 @@
+{
+  "sealed_at": "2026-10-01T23:45:16.254434+00:00",
+  "branch": "codex/sqlite-atomic-initialize-v3",
+  "commit": "211a5a0f5891a44f217aa7aae18bdb8825775878",
+  "tree": "e901b77ebf7551342ada996dd7ee4e8422b92f7a",
+  "parent": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "base_tree": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d",
+  "evidence_commit": "8a159ed4b79058aba8e6302358733696b33d11ff",
+  "reviewed_patch_sha256": "40339ffa0ef57f5d6152c289344c7fda0011c70c0ea40338861495c3fa170a89",
+  "clean_worktree": true,
+  "candidate_diff_sha256": "de93689e8c366004fc7bef877ea501da43f6f9c3a7ea3c6aafc0c1b5ed2e543a",
+  "owned_paths": [
+    "src/flowmarshal/engine/ledger.py",
+    "tests/test_engine_ledger_initialize.py"
+  ],
+  "files": [
+    {
+      "path": "src/flowmarshal/engine/ledger.py",
+      "git_blob": "9f60ed7b78f97e88de8db5fad794ae8cd009e496",
+      "sha256": "7c1b089720f5b270bd192902aea7db7f793f7903859f11a20e5c55cccb216fc2",
+      "bytes": 44602
+    },
+    {
+      "path": "tests/test_engine_ledger_initialize.py",
+      "git_blob": "1a6935ae45c3917edba791a5ac13e657847fb81d",
+      "sha256": "b9d7b8ccd6be06608d225a24bddee9203de8581c044a7494b4e62eb4953be8c6",
+      "bytes": 18434
+    }
+  ],
+  "writer": {
+    "author": "Codex SQLite Candidate Writer <codex-sqlite-candidate@local.invalid>",
+    "source_thread_id": "01a0f995-7341-7179-91a4-63a814e66020",
+    "requested_model": "gpt-6.1-sol",
+    "requested_effort": "high",
+    "provider_observed_model": null,
+    "provider_observed_effort": null,
+    "observation_reason": "This execution environment exposes no authoritative per-turn provider model/effort metadata.",
+    "fallback_used": false,
+    "provider_calls_performed": 0
+  },
+  "final_tests": {
+    "new_regressions": 11,
+    "relevant_existing_regressions": 6,
+    "baseline_sensitivity_methods": 3,
+    "baseline_failing_methods": 2,
+    "baseline_passing_methods": 1,
+    "prior_26_checks_rerun": false,
+    "prior_20_concurrency_repeats_rerun": false
+  },
+  "qualification": {
+    "empty_zero_identity_schema_policy": "PENDING independent decision panel",
+    "source_go": false,
+    "windows_qualification": false,
+    "merge_approved": false,
+    "pushed": false
+  },
+  "not_run": [
+    "Windows native process/owner-lock qualification",
+    "Python 3.10 runtime",
+    "Other supported Python/SQLite combinations",
+    "True power-loss durability",
+    "Whole repository/release gate",
+    "Installation/wheel",
+    "Provider roles/planning/E2E",
+    "Prior 26 boundary checks and 20 concurrency repetitions",
+    "Independent policy adoption/source GO/merge/publication review"
+  ]
+}

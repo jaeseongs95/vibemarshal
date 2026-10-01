@@ -1,0 +1,12 @@
+수집기 시작 전 read-only inspection은 tool response로만 관측했다.
+초기 cwd=/workspace, repository=/workspace/vibemarshal; local branch=work;
+HEAD=32bb0f9dd9f024045d24487312b50f5b703573a3, clean.
+/workspace 자체에 git status: exit 128, fatal: not a git repository (or any of the parent directories): .git
+rg의 /tmp/codex-daemon-1000 검색: Permission denied (os error 13), exit 2.
+8a159ed commit 초기 cat-file: exit 128, fatal: git cat-file: could not get object info.
+공식 remote fetch 이후 commit bytes 확인 성공은 commands.jsonl에 기록했다.
+초기 for-each-ref shell 구문: --format=%(refname)\ %(objectname), exit 2.
+원 stderr: /bin/bash: -c: line 14: syntax error near unexpected token `('
+바르게 quote한 재실행 argv/출력/시간/exit=0은 commands.jsonl에 있다.
+이 초기 inspection의 exact UTC start/end는 NOT_OBSERVED이며 추정하지 않았다.
+검증에 사용한 base/digest/preimage/branch/patch apply/tests/commit/seal은 수집기 기록에 있다.

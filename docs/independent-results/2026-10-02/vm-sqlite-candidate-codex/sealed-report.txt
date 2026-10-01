@@ -1,0 +1,132 @@
+SQLite v3 격리 candidate 봉인 보고서
+
+Branch: codex/sqlite-atomic-initialize-v3
+Commit: 211a5a0f5891a44f217aa7aae18bdb8825775878
+Tree: e901b77ebf7551342ada996dd7ee4e8422b92f7a
+Parent/base: 32bb0f9dd9f024045d24487312b50f5b703573a3
+Base tree: 27e18c0c7853c1d35a98d5437cebf0ba703ed42d
+Evidence commit: 8a159ed4b79058aba8e6302358733696b33d11ff
+Reviewed raw patch SHA-256: 40339ffa0ef57f5d6152c289344c7fda0011c70c0ea40338861495c3fa170a89
+Sealed diff SHA-256: de93689e8c366004fc7bef877ea501da43f6f9c3a7ea3c6aafc0c1b5ed2e543a
+Commit author: Codex SQLite Candidate Writer <codex-sqlite-candidate@local.invalid>
+UTC commit time: 2026-10-01T23:44:16+00:00
+
+처음 local branch는 work 하나(요청 base)이고 worktree는 clean이었다. 원격 branch는
+codex/linux-fixture-portability, dot/vm-core-flow-evidence-20261002,
+dot/vm-results-20261002, main만 있었고 SQLite candidate branch는 없었다.
+origin/main의 local tracking ref는 12ac9e6…로 stale였지만 ls-remote의 실제 main은
+요청 base 32bb0f9…였다. main ref를 이동·merge·rebase하지 않았다.
+원격 dot/vm-core-flow-evidence-20261002가 preflight 중 변경된 값은 원격
+evidence branch 관측이며 변경 주체는 여기서 확인하지 않았다. 새 candidate branch는
+codex/sqlite-atomic-initialize-v3 하나만 만들었다. subagent를 만들지 않았다.
+
+원격 private evidence branch를 FETCH_HEAD로 가져와 명시 commit에서 raw patch와
+REVIEW-final.md를 읽었다. patch raw digest, ledger preimage SHA-256/Git blob,
+base commit/tree와 clean 상태를 모두 확인한 뒤 apply --check를 통과하고 적용했다.
+preimage SHA-256: cecb5d6b50e736933005c6c849d6018992434ccdc8a9b13cb012f8e5fc5c0d41
+preimage blob: fe82d17527a0dfa6ce4a37f13f0a7e28a23fd6ab
+postimage SHA-256: 7c1b089720f5b270bd192902aea7db7f793f7903859f11a20e5c55cccb216fc2
+postimage blob: 9f60ed7b78f97e88de8db5fad794ae8cd009e496
+
+소유 경계:
+- src/flowmarshal/engine/ledger.py: reviewed v3 patch 그대로, 52 insertion/18 deletion.
+- tests/test_engine_ledger_initialize.py: 신규 영구 unittest 회귀 11 method, 379줄.
+그 외 Core/F07/product source, prior prototype 및 과거 negative evidence는 변경하지 않았다.
+운영 DB·index·migration·profile·설치·제품 generation을 실행하지 않았다.
+모든 DB는 TemporaryDirectory의 disposable fixture이며 provider call은 0회다.
+Git index는 승인된 source commit을 stage하는 데만 썼다. product DB index에 접근하지 않았다.
+
+지침 및 skill:
+- candidate AGENTS.md 전체 적용 범위를 읽었다. 별도 하위 source/test AGENTS는 없었다.
+- 공식 AGS https://github.com/jaeseongs95/agent-governance-suite 의 main
+  ba85fdcf245b9910674d88fffdd125f6f0454027를 읽기용 복제했다. 설치하지 않았다.
+- skills/ponytail/SKILL.md를 실제 읽고 적용했다. 관련 change-scope-guardian 및
+  acceptance-evidence-validator SKILL.md도 구현 전에 읽었다. 후자의 workflow/MCP
+  결과를 주장하지 않는다. 이 writer는 source 후보를 작성했으며 독립 reviewer가 아니다.
+- 적용 skill: https://github.com/jaeseongs95/agent-governance-suite/blob/ba85fdcf245b9910674d88fffdd125f6f0454027/skills/ponytail/SKILL.md
+- task가 지정한 workspace-write/auto_review 환경과 격리 source 작성·no-push 지시를
+  AGENTS의 과거 danger-full-access/never 및 main merge/push 지침보다 우선했다.
+  sandbox escalation·auto-review rejection은 없었다.
+- Library 접근·업로드는 하지 않았다.
+
+요청/관측 분리:
+client_requested model=gpt-6.1-sol, effort=high, fallback 없음.
+provider_observed model=null, effort=null: 이 환경은 authoritative per-turn metadata를
+제공하지 않는다. 요청 이름이나 commit trailer를 실제 모델 관측으로 승격하지 않았다.
+writer trace는 위 commit author와 사용자 제공 source_thread_id
+01a0f995-7341-7179-91a4-63a814e66020에 결속했다.
+직접 관측 runtime: Linux 6.18.44 x86_64/glibc2.41, Python 3.12.14,
+SQLite 3.53.1, pydantic 2.13.4(프로젝트 선언 2.13.5와 다름).
+설치된 source qualification 환경으로 주장하지 않는다. 의존성 설치·교체는 없었다.
+
+최종 실행:
+- 신규 11 method PASS. elapsed=2.208555s,
+  UTC=2026-10-01T23:42:51.177979+00:00 -> 2026-10-01T23:42:53.386481+00:00, exit=0.
+- 기존 관련 snapshot 4 + identity/prototype 보호 2 = 6 method PASS.
+  elapsed=0.583919s,
+  UTC=2026-10-01T23:41:18.293917+00:00 -> 2026-10-01T23:41:18.877786+00:00, exit=0.
+- 기준 ledger bytes를 process memory에서만 교체해 신규 3 method 검출력을 확인:
+  원자성 1 FAIL, rollback method의 7 subcase FAIL, malformed cleanup 1 PASS.
+  즉 3 method 중 2 failing method, 1 passing method이며 failure observation 8개를
+  unique test 수로 합산하지 않았다. elapsed=0.494554s,
+  UTC=2026-10-01T23:43:26.421665+00:00 -> 2026-10-01T23:43:26.916166+00:00, expected exit=1.
+- 초기 신규 10 method PASS 뒤 설정 cleanup 회귀 및 fixture 경로 분리를 추가해서
+  최종 11 method를 다시 실행했다. 두 실행을 합산하지 않는다.
+- baseline 검출력 첫 실행은 PYTHONPATH에 repository root를 빠뜨려 loader ERROR 3개,
+  exit=1이었다. PYTHONPATH=src:.로 고쳐 재실행했다. 검출력 근거로 쓰지 않는다.
+- 초기 for-each-ref shell 호출은 괄호 quoting 오류로 exit=2였다. 올바른 quoted
+  argv로 재실행한 exit=0 결과를 preflight 근거로 쓴다.
+- raw stdout/stderr, argv, cwd, UTC start/end, elapsed, exit는 commands.jsonl에 있다.
+  run.py는 명령 output을 변환하지 않고 수집하며 JSON의 개행을 decode하면 원문이다.
+- git diff --cached --check 및 git diff --check base HEAD exit=0.
+- Python 3.10 AST parse PASS; Python 3.10 runtime PASS를 주장하지 않는다.
+- SCHEMA_SQL은 baseline 원문과 같고 SHA-256은
+  7b0dfe58482056e6501e419c8df3a63176cb7f9e021f7c787c5a3d4ad32c277d.
+- 모든 sqlite_master(type,name,tbl_name,sql) 객체(트리거 포함)가 executescript 결과와
+  같다. integrity_check 및 foreign_key_check PASS.
+- clean worktree와 exact parent, 변경 path 두 개를 봉인 시 재확인했다.
+- candidate.bundle verify exit=0. bundle은 base commit을 prerequisite로 요구한다.
+
+회귀 coverage:
+1. DDL·schema_meta·application_id/user_version의 한 transaction 및 commit 전 다른
+   reader에서 schema/identity가 보이지 않음을 검사.
+2. DDL/metadata/identity/commit 오류, KeyboardInterrupt 및 rollback secondary failure
+   이후 schema/identity rollback, connection close와 정상 retry 검사.
+3. spawn process의 DDL 직후 exit 71/application_id 직후 exit 72 rollback/retry 검사.
+4. missing/기존 빈 경로에서 BEGIN IMMEDIATE 직전 independent writer의 foreign
+   commit을 거절하고 main bytes·foreign data·identity·DELETE journal을 보존.
+5. foreign view-only 및 각각 nonzero application_id/user_version 보존 검사.
+6. borrowed connection 성공/거절 모두 caller transaction·connection을 유지.
+7. malformed file bytes와 acquired connection 명시 close 검사.
+8. commit 후 WAL fault는 유효 schema+metadata+identity를 남기며 retry 시 dump 보존,
+   WAL 및 artifact directory 정상 생성. 이미 commit된 DB를 rollback했다고 주장하지 않음.
+9. incomplete static schema rollback/retry 및 readonly/writable setup primary error와
+   secondary close error의 lifecycle 검사.
+
+플랫폼 구분:
+신규 process target crash_initialize와 create_foreign_database는 module-level helper이며
+multiprocessing.get_context('spawn')만 사용한다. fork-only 신규 test는 없다.
+Linux에서 spawn 실제 실행만 관측했다. frozen prior reviewer의 fork 기반 process cases
+및 20회 concurrency 반복은 재실행하지 않았다. Windows native 자격 판정은 미실행이다.
+
+대기/NOT_RUN:
+빈 application_id=0, user_version=0, sqlite_master empty SQLite DB 허용 확대는 v3 bytes에
+포함되어 있으나 별도 independent decision panel 대기다. 재시도 fixture를 사용하는
+candidate 작성은 그 정책 채택·source GO·Windows qualification·merge 승인과 다르다.
+Windows native process/owner lock, Python 3.10 runtime, 지원 Python/SQLite matrix,
+실제 power-loss durability, 전체 repository/release gate, wheel/installation,
+provider role/planning/실제 요청 E2E, 기존 26 boundary check·20 concurrency repetition,
+independent policy/source/merge/publication review는 NOT_RUN이다.
+현재 blocker는 정책 panel 결정, 모델/effort 실제 관측 gap 및 parent final review다.
+main merge/rebase, push/publication은 수행하지 않았다. parent의 최종 publication 승인 전
+push하지 않는다. 기존 REVIEW-final의 한계(close 자체의 모든 실패 조합, cleanup error
+별도 기록 부재, filesystem transaction 부재 등)를 수정했다고 주장하지 않는다.
+
+전달물:
+candidate-manifest.json: commit/tree/ownership/model provenance/NOT_RUN.
+candidate.diff.patch: base 대비 두 파일 전체 diff(정확한 commit bytes).
+candidate.bundle: base prerequisite를 가진 단일 candidate commit.
+commands.jsonl: 검증·봉인 raw command receipts.
+atomic-initialize-v3.patch 및 REVIEW-final.md: immutable source evidence 복사.
+verify_candidate.py, run_base_regressions.py, seal_candidate.py, run.py: 실행한 근거 도구.
+SHA256SUMS: evidence packet의 개별 파일 digest.

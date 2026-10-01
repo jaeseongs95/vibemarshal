@@ -1,0 +1,496 @@
+diff --git a/src/flowmarshal/engine/ledger.py b/src/flowmarshal/engine/ledger.py
+index fe82d17527a0dfa6ce4a37f13f0a7e28a23fd6ab..9f60ed7b78f97e88de8db5fad794ae8cd009e496 100644
+--- a/src/flowmarshal/engine/ledger.py
++++ b/src/flowmarshal/engine/ledger.py
+@@ -769,7 +769,7 @@ class SQLiteEngineLedger:
+         self.artifact_root = Path(artifact_root) if artifact_root else self.path.parent / DEFAULT_ARTIFACT_DIRECTORY
+         self.clock = clock or SystemClock()
+ 
+-    def _connect(self, *, readonly: bool = False) -> sqlite3.Connection:
++    def _connect(self, *, readonly: bool = False, configure_journal: bool = True) -> sqlite3.Connection:
+         # 역할에는 직렬화된 context만 제공한다. raw read handle도 ATTACH 등으로 확장될 수 있다.
+         require_host_execution()
+         if readonly:
+@@ -781,24 +781,45 @@ class SQLiteEngineLedger:
+         else:
+             self.path.parent.mkdir(parents=True, exist_ok=True)
+             connection = sqlite3.connect(self.path, timeout=10.0)
+-        connection.row_factory = sqlite3.Row
+-        connection.execute("PRAGMA foreign_keys = ON")
+-        connection.execute("PRAGMA busy_timeout = 10000")
+-        if readonly:
+-            connection.execute("PRAGMA query_only = ON")
+-        if not readonly:
+-            connection.execute("PRAGMA journal_mode = WAL")
+-            connection.execute("PRAGMA synchronous = FULL")
+-        return connection
++        try:
++            connection.row_factory = sqlite3.Row
++            connection.execute("PRAGMA foreign_keys = ON")
++            connection.execute("PRAGMA busy_timeout = 10000")
++            if readonly:
++                connection.execute("PRAGMA query_only = ON")
++            if not readonly:
++                if configure_journal:
++                    connection.execute("PRAGMA journal_mode = WAL")
++                connection.execute("PRAGMA synchronous = FULL")
++            return connection
++        except BaseException:
++            try:
++                connection.close()
++            except BaseException:
++                # 설정 실패의 원 예외가 연결 정리 오류로 바뀌지 않게 한다.
++                pass
++            raise
+ 
+     def initialize(self) -> None:
+-        is_new = not self.path.exists() or self.path.stat().st_size == 0
+-        if not is_new:
+-            self._assert_identity()
+-        connection = self._connect()
++        # 대상의 identity를 writer lock 안에서 확인하기 전에는 journal mode도 변경하지 않는다.
++        connection = self._connect(configure_journal=False)
+         try:
++            connection.execute("BEGIN IMMEDIATE")
++            is_new = (
++                connection.execute("PRAGMA application_id").fetchone()[0] == 0
++                and connection.execute("PRAGMA user_version").fetchone()[0] == 0
++                and connection.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone() is None
++            )
+             if is_new:
+-                connection.executescript(SCHEMA_SQL)
++                # executescript의 implicit commit을 피하고 trigger 본문을 포함한 문장 단위를 실행한다.
++                statement = ""
++                for line in SCHEMA_SQL.splitlines(keepends=True):
++                    statement += line
++                    if sqlite3.complete_statement(statement):
++                        connection.execute(statement)
++                        statement = ""
++                if statement.strip():
++                    raise EngineLedgerError("Engine schema SQL의 마지막 문장이 완결되지 않았습니다.")
+                 connection.executemany(
+                     "INSERT INTO schema_meta(key, value) VALUES (?, ?)",
+                     (
+@@ -808,13 +829,25 @@ class SQLiteEngineLedger:
+                 )
+                 connection.execute(f"PRAGMA application_id = {SQLITE_APPLICATION_ID}")
+                 connection.execute(f"PRAGMA user_version = {ENGINE_SCHEMA_REVISION}")
++            else:
++                self._assert_identity(connection=connection)
+             connection.commit()
++            connection.execute("PRAGMA journal_mode = WAL")
++        except BaseException:
++            try:
++                connection.rollback()
++            except BaseException:
++                # rollback 오류가 최초 초기화 실패를 가리지 않게 원 예외를 보존한다.
++                pass
++            raise
+         finally:
+             connection.close()
+         self.artifact_root.mkdir(parents=True, exist_ok=True)
+ 
+-    def _assert_identity(self) -> None:
+-        connection = self._connect(readonly=True)
++    def _assert_identity(self, *, connection: sqlite3.Connection | None = None) -> None:
++        owns_connection = connection is None
++        if connection is None:
++            connection = self._connect(readonly=True)
+         try:
+             tables = {
+                 row["name"]
+@@ -851,7 +884,8 @@ class SQLiteEngineLedger:
+             if connection.execute("PRAGMA user_version").fetchone()[0] != ENGINE_SCHEMA_REVISION:
+                 raise EngineLedgerError("SQLite user_version과 Engine schema revision이 다릅니다.")
+         finally:
+-            connection.close()
++            if owns_connection:
++                connection.close()
+ 
+     @contextmanager
+     def transaction(self) -> Iterator[EngineTransaction]:
+diff --git a/tests/test_engine_ledger_initialize.py b/tests/test_engine_ledger_initialize.py
+new file mode 100644
+index 0000000000000000000000000000000000000000..1a6935ae45c3917edba791a5ac13e657847fb81d
+--- /dev/null
++++ b/tests/test_engine_ledger_initialize.py
+@@ -0,0 +1,379 @@
++from __future__ import annotations
++
++import multiprocessing
++import os
++import sqlite3
++import tempfile
++import unittest
++from contextlib import closing
++from pathlib import Path
++from unittest.mock import patch
++
++from flowmarshal.engine import ledger as ledger_module
++from flowmarshal.engine.ledger import (
++    ENGINE_SCHEMA_ID,
++    ENGINE_SCHEMA_REVISION,
++    SCHEMA_SQL,
++    SQLITE_APPLICATION_ID,
++    EngineLedgerError,
++    SQLiteEngineLedger,
++)
++
++
++class ConnectionProxy:
++    def __init__(self, connection):
++        self.connection = connection
++
++    def __getattr__(self, name):
++        return getattr(self.connection, name)
++
++
++def crash_initialize(path: str, phase: str) -> None:
++    # spawn에서도 import 가능한 진입점. 실제 power loss 대신 process 종료를 재현한다.
++    ledger = SQLiteEngineLedger(path)
++    original = ledger._connect
++
++    class CrashConnection(ConnectionProxy):
++        def execute(self, sql, *args):
++            result = self.connection.execute(sql, *args)
++            if phase == "schema" and sql.lstrip().startswith("CREATE TABLE"):
++                os._exit(71)
++            if phase == "identity" and sql.startswith("PRAGMA application_id ="):
++                os._exit(72)
++            return result
++
++        def executescript(self, sql):
++            result = self.connection.executescript(sql)
++            if phase == "schema":
++                os._exit(71)
++            return result
++
++    ledger._connect = lambda **options: CrashConnection(original(**options))
++    ledger.initialize()
++
++
++def create_foreign_database(path: str) -> None:
++    # parent에서 connection을 연 뒤, BEGIN IMMEDIATE 직전에 독립 writer가 commit한다.
++    with closing(sqlite3.connect(path)) as connection:
++        connection.execute("CREATE TABLE foreign_data(value TEXT)")
++        connection.execute("INSERT INTO foreign_data VALUES ('preserve-me')")
++        connection.execute("PRAGMA application_id = 12345")
++        connection.execute("PRAGMA user_version = 9")
++        connection.commit()
++
++
++class EngineLedgerInitializeTests(unittest.TestCase):
++    def setUp(self) -> None:
++        self.temporary = tempfile.TemporaryDirectory()
++        self.addCleanup(self.temporary.cleanup)
++        self.root = Path(self.temporary.name)
++        self.path = self.root / "engine.sqlite3"
++        self.ledger = SQLiteEngineLedger(self.path)
++
++    def assert_empty(self, path: Path) -> None:
++        with closing(sqlite3.connect(path)) as connection:
++            self.assertEqual([], connection.execute("SELECT name FROM sqlite_master").fetchall())
++            self.assertEqual(0, connection.execute("PRAGMA application_id").fetchone()[0])
++            self.assertEqual(0, connection.execute("PRAGMA user_version").fetchone()[0])
++
++    def assert_valid(self, ledger: SQLiteEngineLedger) -> None:
++        ledger._assert_identity()
++        with ledger.read() as connection:
++            self.assertEqual(SQLITE_APPLICATION_ID, connection.execute("PRAGMA application_id").fetchone()[0])
++            self.assertEqual(ENGINE_SCHEMA_REVISION, connection.execute("PRAGMA user_version").fetchone()[0])
++            self.assertEqual(
++                {"schema_id": ENGINE_SCHEMA_ID, "schema_revision": str(ENGINE_SCHEMA_REVISION)},
++                dict(connection.execute("SELECT key, value FROM schema_meta")),
++            )
++            self.assertEqual("ok", connection.execute("PRAGMA integrity_check").fetchone()[0])
++            self.assertEqual([], connection.execute("PRAGMA foreign_key_check").fetchall())
++
++    def run_process(self, target, args, expected_exit: int) -> None:
++        # fork를 요구하지 않는다. Windows에서도 같은 module-level target을 사용한다.
++        process = multiprocessing.get_context("spawn").Process(target=target, args=args)
++        process.start()
++        try:
++            process.join(15)
++            self.assertFalse(process.is_alive(), "synthetic writer timeout")
++            self.assertEqual(expected_exit, process.exitcode)
++        finally:
++            if process.is_alive():
++                process.terminate()
++                process.join(5)
++            process.close()
++
++    def test_schema_metadata_and_identity_commit_together(self) -> None:
++        original = self.ledger._connect
++        phases = []
++        traces = []
++        observed = []
++        test = self
++
++        class ObservedConnection(ConnectionProxy):
++            def execute(self, sql, *args):
++                result = self.connection.execute(sql, *args)
++                if sql.lstrip().startswith("CREATE ") or sql.startswith((
++                    "PRAGMA application_id", "PRAGMA user_version", "SELECT 1 FROM sqlite_master",
++                )):
++                    phases.append(self.connection.in_transaction)
++                return result
++
++            def executemany(self, *args):
++                phases.append(self.connection.in_transaction)
++                return self.connection.executemany(*args)
++
++            def commit(self):
++                with closing(sqlite3.connect(test.path)) as reader:
++                    observed.append((
++                        reader.execute("SELECT name FROM sqlite_master").fetchall(),
++                        reader.execute("PRAGMA application_id").fetchone()[0],
++                        reader.execute("PRAGMA user_version").fetchone()[0],
++                        reader.execute("PRAGMA journal_mode").fetchone()[0],
++                    ))
++                return self.connection.commit()
++
++        def connect(**options):
++            connection = original(**options)
++            connection.set_trace_callback(traces.append)
++            return ObservedConnection(connection)
++
++        with patch.object(self.ledger, "_connect", connect):
++            self.ledger.initialize()
++        self.assertTrue(phases)
++        self.assertTrue(all(phases))
++        boundaries = [sql.strip().rstrip(";").upper() for sql in traces
++                      if sql.strip().upper().startswith(("BEGIN", "COMMIT", "ROLLBACK"))]
++        self.assertEqual(["BEGIN IMMEDIATE", "COMMIT"], boundaries)
++        self.assertEqual([([], 0, 0, "delete")], observed)
++        self.assert_valid(self.ledger)
++
++    def test_schema_objects_including_triggers_match_executescript(self) -> None:
++        query = "SELECT type, name, tbl_name, sql FROM sqlite_master ORDER BY type, name"
++        with closing(sqlite3.connect(":memory:")) as reference:
++            reference.executescript(SCHEMA_SQL)
++            expected = reference.execute(query).fetchall()
++        self.assertTrue(any(row[0] == "trigger" for row in expected))
++        self.ledger.initialize()
++        with closing(sqlite3.connect(self.path)) as actual:
++            self.assertEqual(expected, actual.execute(query).fetchall())
++        self.assert_valid(self.ledger)
++
++    def test_initialization_failures_roll_back_and_retry(self) -> None:
++        for phase in ("schema", "metadata", "application_id", "user_version", "commit", "interrupt", "rollback"):
++            with self.subTest(phase=phase):
++                ledger = SQLiteEngineLedger(
++                    self.root / (phase + ".sqlite3"), artifact_root=self.root / (phase + "-artifacts"),
++                )
++                original = ledger._connect
++                acquired = []
++                error_type = KeyboardInterrupt if phase == "interrupt" else ValueError
++
++                class FaultConnection(ConnectionProxy):
++                    def execute(self, sql, *args):
++                        result = self.connection.execute(sql, *args)
++                        if ((phase == "schema" and sql.lstrip().startswith("CREATE TABLE"))
++                                or sql.startswith("PRAGMA " + phase + " =")):
++                            raise error_type("synthetic initialization failure")
++                        return result
++
++                    def executemany(self, *args):
++                        result = self.connection.executemany(*args)
++                        if phase in {"metadata", "interrupt", "rollback"}:
++                            raise error_type("synthetic initialization failure")
++                        return result
++
++                    def commit(self):
++                        if phase == "commit":
++                            raise error_type("synthetic initialization failure")
++                        return self.connection.commit()
++
++                    def rollback(self):
++                        if phase == "rollback":
++                            raise RuntimeError("synthetic secondary rollback failure")
++                        return self.connection.rollback()
++
++                def connect(**options):
++                    connection = original(**options)
++                    acquired.append(connection)
++                    return FaultConnection(connection)
++
++                with patch.object(ledger, "_connect", connect):
++                    with self.assertRaisesRegex(error_type, "synthetic initialization failure"):
++                        ledger.initialize()
++                for connection in acquired:
++                    with self.assertRaises(sqlite3.ProgrammingError):
++                        connection.execute("SELECT 1")
++                self.assert_empty(ledger.path)
++                self.assertFalse(ledger.artifact_root.exists())
++                ledger.initialize()
++                self.assert_valid(ledger)
++
++    def test_incomplete_schema_rolls_back_and_retries(self) -> None:
++        with patch.object(ledger_module, "SCHEMA_SQL", SCHEMA_SQL + "\nCREATE TABLE incomplete("):
++            with self.assertRaisesRegex(EngineLedgerError, "완결되지"):
++                self.ledger.initialize()
++        self.assert_empty(self.path)
++        self.ledger.initialize()
++        self.assert_valid(self.ledger)
++
++    def test_process_crash_rolls_back_and_retries_with_spawn(self) -> None:
++        for phase, exit_code in (("schema", 71), ("identity", 72)):
++            with self.subTest(phase=phase):
++                ledger = SQLiteEngineLedger(self.root / (phase + ".sqlite3"))
++                self.run_process(crash_initialize, (str(ledger.path), phase), exit_code)
++                self.assert_empty(ledger.path)
++                ledger.initialize()
++                self.assert_valid(ledger)
++
++    def test_foreign_commit_before_writer_lock_is_preserved(self) -> None:
++        for preexisting in (False, True):
++            with self.subTest(preexisting=preexisting):
++                ledger = SQLiteEngineLedger(self.root / (str(preexisting) + ".sqlite3"))
++                if preexisting:
++                    with closing(sqlite3.connect(ledger.path)) as connection:
++                        connection.execute("PRAGMA user_version = 0")
++                original = ledger._connect
++                before = []
++                test = self
++
++                class RacingConnection(ConnectionProxy):
++                    def execute(self, sql, *args):
++                        if sql == "BEGIN IMMEDIATE":
++                            test.run_process(create_foreign_database, (str(ledger.path),), 0)
++                            before.append(ledger.path.read_bytes())
++                        return self.connection.execute(sql, *args)
++
++                with patch.object(ledger, "_connect", lambda **options: RacingConnection(original(**options))):
++                    with self.assertRaises(EngineLedgerError):
++                        ledger.initialize()
++                self.assertEqual(1, len(before))
++                self.assertEqual(before[0], ledger.path.read_bytes())
++                self.assertFalse(ledger.artifact_root.exists())
++                with closing(sqlite3.connect(ledger.path)) as connection:
++                    self.assertEqual([("preserve-me",)], connection.execute("SELECT value FROM foreign_data").fetchall())
++                    self.assertEqual([("foreign_data",)], connection.execute("SELECT name FROM sqlite_master").fetchall())
++                    self.assertEqual(12345, connection.execute("PRAGMA application_id").fetchone()[0])
++                    self.assertEqual(9, connection.execute("PRAGMA user_version").fetchone()[0])
++                    self.assertEqual("delete", connection.execute("PRAGMA journal_mode").fetchone()[0])
++
++    def test_foreign_view_and_nonzero_identity_are_preserved(self) -> None:
++        for sql in ("CREATE VIEW foreign_view AS SELECT 7", "PRAGMA application_id = 99", "PRAGMA user_version = 1"):
++            with self.subTest(sql=sql):
++                with tempfile.TemporaryDirectory(dir=self.root) as temporary:
++                    path = Path(temporary) / "foreign.sqlite3"
++                    with closing(sqlite3.connect(path)) as connection:
++                        connection.execute(sql)
++                        connection.commit()
++                        before_dump = list(connection.iterdump())
++                        before_identity = (connection.execute("PRAGMA application_id").fetchone(),
++                                           connection.execute("PRAGMA user_version").fetchone())
++                    before = path.read_bytes()
++                    ledger = SQLiteEngineLedger(path)
++                    with self.assertRaises(EngineLedgerError):
++                        ledger.initialize()
++                    self.assertEqual(before, path.read_bytes())
++                    with closing(sqlite3.connect(path)) as connection:
++                        self.assertEqual(before_dump, list(connection.iterdump()))
++                        self.assertEqual(before_identity, (connection.execute("PRAGMA application_id").fetchone(),
++                                                           connection.execute("PRAGMA user_version").fetchone()))
++                        self.assertEqual("delete", connection.execute("PRAGMA journal_mode").fetchone()[0])
++
++    def test_borrowed_identity_connection_remains_owned_by_caller(self) -> None:
++        self.ledger.initialize()
++        with closing(self.ledger._connect(configure_journal=False)) as connection:
++            connection.execute("BEGIN IMMEDIATE")
++            self.ledger._assert_identity(connection=connection)
++            self.assertTrue(connection.in_transaction)
++            connection.execute("PRAGMA user_version = 9")
++            with self.assertRaises(EngineLedgerError):
++                self.ledger._assert_identity(connection=connection)
++            self.assertTrue(connection.in_transaction)
++            self.assertEqual(9, connection.execute("PRAGMA user_version").fetchone()[0])
++            connection.rollback()
++            self.assertEqual(ENGINE_SCHEMA_REVISION, connection.execute("PRAGMA user_version").fetchone()[0])
++
++    def test_malformed_file_closes_acquired_connection_and_preserves_bytes(self) -> None:
++        before = b"synthetic malformed SQLite file" * 100
++        self.path.write_bytes(before)
++        original = sqlite3.connect
++        acquired = []
++
++        class TrackedConnection(sqlite3.Connection):
++            explicitly_closed = False
++
++            def close(self):
++                self.explicitly_closed = True
++                return super().close()
++
++        def connect(*args, **options):
++            connection = original(*args, factory=TrackedConnection, **options)
++            acquired.append(connection)
++            return connection
++
++        with patch.object(sqlite3, "connect", connect):
++            with self.assertRaises(sqlite3.DatabaseError):
++                self.ledger.initialize()
++        self.assertEqual(before, self.path.read_bytes())
++        self.assertTrue(acquired)
++        self.assertTrue(all(connection.explicitly_closed for connection in acquired))
++        self.assertFalse(self.ledger.artifact_root.exists())
++        for connection in acquired:
++            with self.assertRaises(sqlite3.ProgrammingError):
++                connection.execute("SELECT 1")
++
++    def test_postcommit_wal_failure_leaves_valid_database_and_retries(self) -> None:
++        original = self.ledger._connect
++
++        class FaultConnection(ConnectionProxy):
++            def execute(self, sql, *args):
++                if sql == "PRAGMA journal_mode = WAL":
++                    raise RuntimeError("synthetic postcommit WAL failure")
++                return self.connection.execute(sql, *args)
++
++        with patch.object(self.ledger, "_connect", lambda **options: FaultConnection(original(**options))):
++            with self.assertRaisesRegex(RuntimeError, "postcommit WAL failure"):
++                self.ledger.initialize()
++        self.assert_valid(self.ledger)
++        self.assertFalse(self.ledger.artifact_root.exists())
++        with closing(sqlite3.connect(self.path)) as connection:
++            before = list(connection.iterdump())
++            self.assertEqual("delete", connection.execute("PRAGMA journal_mode").fetchone()[0])
++        self.ledger.initialize()
++        with closing(sqlite3.connect(self.path)) as connection:
++            self.assertEqual(before, list(connection.iterdump()))
++            self.assertEqual("wal", connection.execute("PRAGMA journal_mode").fetchone()[0])
++        self.assertTrue(self.ledger.artifact_root.is_dir())
++
++    def test_connection_setup_failure_preserves_primary_error_and_closes(self) -> None:
++        self.ledger.initialize()
++        original = sqlite3.connect
++        for readonly in (False, True):
++            with self.subTest(readonly=readonly):
++                acquired = []
++
++                class FaultConnection(sqlite3.Connection):
++                    def execute(self, sql, *args):
++                        if sql == "PRAGMA busy_timeout = 10000":
++                            raise ValueError("synthetic configuration failure")
++                        return super().execute(sql, *args)
++
++                    def close(self):
++                        super().close()
++                        raise RuntimeError("synthetic secondary close failure")
++
++                def connect(*args, **options):
++                    connection = original(*args, factory=FaultConnection, **options)
++                    acquired.append(connection)
++                    return connection
++
++                with patch.object(sqlite3, "connect", connect):
++                    with self.assertRaisesRegex(ValueError, "synthetic configuration failure"):
++                        self.ledger._connect(readonly=readonly)
++                self.assertTrue(acquired)
++                for connection in acquired:
++                    with self.assertRaises(sqlite3.ProgrammingError):
++                        connection.execute("SELECT 1")
++
++
++if __name__ == "__main__":
++    unittest.main()
