@@ -6684,12 +6684,30 @@ class EngineService:
             if expected_criteria != actual_criteria:
                 raise EngineServiceError("GoalVerdict criterion coverage가 정확하지 않습니다.")
             if verdict.status is GoalVerdictStatus.SATISFIED:
+                project = tx.one("SELECT active_plan_revision_id FROM projects WHERE id = ?", (project_id,))
+                if plan_row["status"] != "active" or project["active_plan_revision_id"] != plan_revision_id:
+                    raise EngineServiceError("현재 active Plan만 Goal satisfied를 선언할 수 있습니다.")
                 incomplete = tx.connection.execute(
                     "SELECT COUNT(*) FROM task_contracts WHERE plan_revision_id = ? AND status <> 'completed'",
                     (plan_revision_id,),
                 ).fetchone()[0]
                 if incomplete:
                     raise EngineServiceError("모든 Task가 완료되기 전에는 Goal satisfied를 선언할 수 없습니다.")
+                for task in plan.definition.tasks:
+                    latest_task_results = {
+                        row["validation_id"]: row
+                        for row in self.effective_task_validation_results(
+                            tx.connection, task.task_id,
+                        )
+                    }
+                    if any(
+                        validation.validation_id not in latest_task_results
+                        or latest_task_results[validation.validation_id]["status"] != "pass"
+                        for validation in task.validations
+                    ):
+                        raise EngineServiceError(
+                            "Goal satisfied에는 모든 Task validation의 최신 PASS 결과가 필요합니다."
+                        )
                 unresolved = self._unresolved_execution_provider_calls(
                     tx, plan_revision_id=plan_revision_id,
                 )
@@ -6719,20 +6737,23 @@ class EngineService:
                 expected_integrations = {
                     item.validation_id for item in plan.definition.integration_validations
                 }
-                passed: set[str] = set()
-                result_ids: set[str] = set()
-                for row in tx.all(
-                    "SELECT id, validation_id, status FROM validation_results "
-                    "WHERE plan_revision_id = ? AND task_id IS NULL ORDER BY evaluated_at, rowid",
-                    (plan_revision_id,),
+                latest_integrations = {
+                    row["validation_id"]: row
+                    for row in tx.all(
+                        "SELECT id, validation_id, status FROM validation_results "
+                        "WHERE plan_revision_id = ? AND task_id IS NULL ORDER BY evaluated_at, rowid",
+                        (plan_revision_id,),
+                    )
+                }
+                if any(
+                    validation_id not in latest_integrations
+                    or latest_integrations[validation_id]["status"] != "pass"
+                    for validation_id in expected_integrations
                 ):
-                    if row["status"] == "pass":
-                        passed.add(row["validation_id"])
-                        result_ids.add(row["id"])
-                if not expected_integrations.issubset(passed):
-                    raise EngineServiceError("plan-level integration/Goal Test PASS evidence가 부족합니다.")
-                if not set(verdict.integration_validation_result_ids).issubset(result_ids):
-                    raise EngineServiceError("GoalVerdict가 실제 PASS integration 결과에 결속되지 않았습니다.")
+                    raise EngineServiceError("plan-level integration/Goal Test 최신 PASS evidence가 부족합니다.")
+                result_ids = {latest_integrations[item]["id"] for item in expected_integrations}
+                if set(verdict.integration_validation_result_ids) != result_ids:
+                    raise EngineServiceError("GoalVerdict가 최신 PASS integration 결과에 정확히 결속되지 않았습니다.")
                 evidence_ids = {item for criterion in verdict.criteria for item in criterion.evidence_ids}
                 if evidence_ids:
                     placeholders = ",".join("?" for _ in evidence_ids)
