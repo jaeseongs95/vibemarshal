@@ -1,0 +1,1 @@
+{"verification": "PASS bounded supported public preparation/authorization/D1 checks; full vertical NOT_RUN", "live_provider_calls": 0, "not_run": ["ready ExecutionSpec materialization", "Task admission with AGS AND gate", "Task execution", "independent Task validation", "independent GoalTest", "Core GoalVerdict"], "seconds": 0.176988}

@@ -1,0 +1,1647 @@
+{
+  "verification": "PASS bounded supported public preparation/authorization/D1 checks; full vertical NOT_RUN",
+  "scope": "EngineApplication + public ApplicationAuthority; existing scripted role and FakeCodexRuntime adapters",
+  "not_full_public_e2e": "No installed CLI/user terminal, real AGS, native execution or live provider qualification",
+  "runtime_platform_supported": false,
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "requested_orchestration_model": "gpt-6.1-sol",
+  "requested_orchestration_effort": "high",
+  "observed_orchestration_model": null,
+  "observed_orchestration_effort": null,
+  "fallback": null,
+  "live_provider_calls": 0,
+  "scripted_role_receipts": [
+    {
+      "role": "goal_normalizer",
+      "call_id": "model_call_2bfa3668759344f0ad39c1d5cc69d168",
+      "status": "succeeded",
+      "requested_model": "worker",
+      "requested_effort": "medium",
+      "observed_model": null,
+      "observed_effort": null,
+      "provenance": "existing scripted adapter; no live provider"
+    },
+    {
+      "role": "goal_reviewer",
+      "call_id": "model_call_ab155bdc773c4a5bb6bf9a5cad2347a4",
+      "status": "succeeded",
+      "requested_model": "validator",
+      "requested_effort": "high",
+      "observed_model": null,
+      "observed_effort": null,
+      "provenance": "existing scripted adapter; no live provider"
+    },
+    {
+      "role": "skeleton_generator",
+      "call_id": "model_call_1c388d4591bb47aa9c2cdf5b35716eb0",
+      "status": "succeeded",
+      "requested_model": "worker",
+      "requested_effort": "medium",
+      "observed_model": null,
+      "observed_effort": null,
+      "provenance": "existing scripted adapter; no live provider"
+    },
+    {
+      "role": "skeleton_reviewer",
+      "call_id": "model_call_1df80a0ed33a4dfcb137b5fbe7921105",
+      "status": "succeeded",
+      "requested_model": "validator",
+      "requested_effort": "high",
+      "observed_model": null,
+      "observed_effort": null,
+      "provenance": "existing scripted adapter; no live provider"
+    },
+    {
+      "role": "plan_expander",
+      "call_id": "model_call_4b280f3a7ca2449fa8c493db9f6b7174",
+      "status": "succeeded",
+      "requested_model": "worker",
+      "requested_effort": "medium",
+      "observed_model": null,
+      "observed_effort": null,
+      "provenance": "existing scripted adapter; no live provider"
+    },
+    {
+      "role": "compact_plan_reviewer",
+      "call_id": "model_call_382d00366e794839af973ff9abc6eedd",
+      "status": "succeeded",
+      "requested_model": "validator",
+      "requested_effort": "high",
+      "observed_model": null,
+      "observed_effort": null,
+      "provenance": "existing scripted adapter; no live provider"
+    }
+  ],
+  "events": [
+    {
+      "name": "public_application_prepare",
+      "before": {
+        "tables": {
+          "goal_revisions": 0,
+          "plan_revisions": 0,
+          "goal_authorizations": 0,
+          "plan_activations": 0,
+          "execution_spec_revisions": 0,
+          "task_contracts": 0,
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "runtime_jobs": 0,
+          "provider_calls": 0,
+          "validation_results": 0,
+          "goal_verdicts": 0,
+          "history_events": 2
+        },
+        "history_event_counts": {
+          "profile.activated": 1,
+          "project.created": 1
+        },
+        "history_rows_sha256": "2fd1b5b65f627170316c983b6427354fbebba1a4585aed58ebf676a4b4368cc7",
+        "plans": [],
+        "tasks": [],
+        "provider_calls": [],
+        "adapter_effect_calls": {
+          "structured_role": 0,
+          "scripted_receipts": 0,
+          "runtime_create": 0,
+          "runtime_turn": 0,
+          "runtime_resume": 0,
+          "runtime_interrupt": 0,
+          "governance_open": 0,
+          "gate_before_execution": 0,
+          "gate_before_completion": 0
+        },
+        "live_provider_calls": 0
+      },
+      "after": {
+        "tables": {
+          "goal_revisions": 1,
+          "plan_revisions": 1,
+          "goal_authorizations": 0,
+          "plan_activations": 0,
+          "execution_spec_revisions": 0,
+          "task_contracts": 1,
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "runtime_jobs": 0,
+          "provider_calls": 6,
+          "validation_results": 0,
+          "goal_verdicts": 0,
+          "history_events": 28
+        },
+        "history_event_counts": {
+          "budget.call_observed": 6,
+          "budget.call_reserved": 6,
+          "budget.goal_bound": 2,
+          "budget.recorded": 6,
+          "goal.activated": 1,
+          "plan.registered": 1,
+          "planning.search_recorded": 1,
+          "profile.activated": 1,
+          "project.created": 1,
+          "project_map.recorded": 1,
+          "skeleton.evaluated": 1,
+          "state.observed": 1
+        },
+        "history_rows_sha256": "092a63d919acea8b44e9aed22912e562968eb9a32373bdc1e85361c6d587334b",
+        "plans": [
+          {
+            "id": "plan_revision_c1aa076a085145d6ad4a9218f24ea853",
+            "revision_no": 1,
+            "definition_digest": "sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa",
+            "activation_digest": "sha256:72887fc27c5051f611989140f577db0cd94e3c6d852646ad911e676bd4cf5ad4",
+            "payload_json": "{\"created_at\":\"2026-10-01T23:25:45.533033Z\",\"definition\":{\"base_state_snapshot_digest\":\"sha256:31652d7788a50a3471aea922a1aed6a352d93afa8ea4959b4be79766b6146f4e\",\"dependencies\":[],\"expected_effects\":[],\"goal_contract_digest\":\"sha256:dcda43c332c6c9573b72ba2f17e1e28763fc8297eb3c3a3fa771aaebe9b9648c\",\"goal_coverage\":[{\"criterion_id\":\"ac_001\",\"task_ids\":[\"task_d38d6a36c60c4a899d6ed0bdc64eedee\"],\"validation_ids\":[\"validation_task\",\"validation_goal\"]}],\"integration_validations\":[{\"criterion_refs\":[\"ac_001\"],\"evidence_mode\":\"independent\",\"method\":\"semantic\",\"required_evidence_kinds\":[\"model_review\"],\"statement\":\"Task와 분리된 Validator가 최종 파일과 evidence를 검토한다.\",\"validation_id\":\"validation_goal\"}],\"model_inventory_digest\":\"sha256:1d05b41a743065162f973faa67535fdc7f552d992d195844a0ab872680c45803\",\"planning_budget\":{\"max_candidate_versions\":5,\"max_initial_candidates\":3,\"max_logical_role_calls\":14,\"max_refinement_per_candidate\":1,\"max_shortlist\":2,\"replan_reserve_percent\":25},\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"project_map_digest\":\"sha256:0946f2aa41b51d934dd79fd21486c1baa579442fde2ad645270d35327f623d69\",\"source_skeleton_digest\":\"sha256:e1e39b414f8bafc2d5555ef90122f1bb3f2d70a0fbaae288fb52032a0d9cc7b5\",\"tasks\":[{\"acceptance_criteria\":[\"Task 검사가 PASS다.\"],\"approval_class\":\"plan_activation\",\"assignment\":{\"executor\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"medium\",\"preferred_model\":\"worker\",\"role\":\"executor\"},\"independence_required\":true,\"validator\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"high\",\"preferred_model\":\"validator\",\"role\":\"validator\"}},\"consumes\":[\"input:request\"],\"expected_effects\":[],\"goal_criterion_refs\":[\"ac_001\"],\"kind\":\"change\",\"objective\":\"app.py 값을 2로 바꾼다.\",\"preconditions\":[],\"produces\":[\"result:app_value\"],\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"recovery\":{\"max_goal_replans\":5,\"max_same_failure_replans\":2,\"requires_new_evidence\":true,\"resume_strategy\":\"existing_binding_first\",\"retryable_failure_classes\":[\"implementation\",\"context\"]},\"required_capabilities\":[],\"risk_level\":\"low\",\"risk_tags\":[],\"task_id\":\"task_d38d6a36c60c4a899d6ed0bdc64eedee\",\"task_ref\":\"single_task\",\"validations\":[{\"method\":\"deterministic\",\"required_evidence_kinds\":[\"test\"],\"statement\":\"app.py의 값이 2인지 실행 검사한다.\",\"validation_id\":\"validation_task\"}]}]},\"definition_digest\":\"sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa\",\"plan_id\":\"plan_c4ee70a7a49544899a30056e8f97fa32\",\"plan_revision_id\":\"plan_revision_c1aa076a085145d6ad4a9218f24ea853\",\"revision_no\":1,\"schema_version\":\"1.0\",\"status\":\"ready\"}",
+            "status": "ready"
+          }
+        ],
+        "tasks": [
+          {
+            "id": "task_d38d6a36c60c4a899d6ed0bdc64eedee",
+            "status": "pending"
+          }
+        ],
+        "provider_calls": [
+          {
+            "role": "goal_normalizer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "goal_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_generator",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "plan_expander",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "compact_plan_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          }
+        ],
+        "adapter_effect_calls": {
+          "structured_role": 6,
+          "scripted_receipts": 6,
+          "runtime_create": 0,
+          "runtime_turn": 0,
+          "runtime_resume": 0,
+          "runtime_interrupt": 0,
+          "governance_open": 0,
+          "gate_before_execution": 0,
+          "gate_before_completion": 0
+        },
+        "live_provider_calls": 0
+      },
+      "result": {
+        "status": "ready_for_authorization",
+        "role_sequence": [
+          "goal_normalizer",
+          "goal_reviewer",
+          "skeleton_generator",
+          "skeleton_reviewer",
+          "plan_expander",
+          "compact_plan_reviewer"
+        ]
+      },
+      "table_deltas": {
+        "goal_revisions": 1,
+        "plan_revisions": 1,
+        "goal_authorizations": 0,
+        "plan_activations": 0,
+        "execution_spec_revisions": 0,
+        "task_contracts": 1,
+        "attempts": 0,
+        "runtime_intents": 0,
+        "runtime_receipts": 0,
+        "runtime_jobs": 0,
+        "provider_calls": 6,
+        "validation_results": 0,
+        "goal_verdicts": 0,
+        "history_events": 26
+      },
+      "effect_deltas": {
+        "structured_role": 6,
+        "scripted_receipts": 6,
+        "runtime_create": 0,
+        "runtime_turn": 0,
+        "runtime_resume": 0,
+        "runtime_interrupt": 0,
+        "governance_open": 0,
+        "gate_before_execution": 0,
+        "gate_before_completion": 0
+      }
+    },
+    {
+      "name": "public_authorize_without_host_capability_denied",
+      "before": {
+        "tables": {
+          "goal_revisions": 1,
+          "plan_revisions": 1,
+          "goal_authorizations": 0,
+          "plan_activations": 0,
+          "execution_spec_revisions": 0,
+          "task_contracts": 1,
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "runtime_jobs": 0,
+          "provider_calls": 6,
+          "validation_results": 0,
+          "goal_verdicts": 0,
+          "history_events": 28
+        },
+        "history_event_counts": {
+          "budget.call_observed": 6,
+          "budget.call_reserved": 6,
+          "budget.goal_bound": 2,
+          "budget.recorded": 6,
+          "goal.activated": 1,
+          "plan.registered": 1,
+          "planning.search_recorded": 1,
+          "profile.activated": 1,
+          "project.created": 1,
+          "project_map.recorded": 1,
+          "skeleton.evaluated": 1,
+          "state.observed": 1
+        },
+        "history_rows_sha256": "092a63d919acea8b44e9aed22912e562968eb9a32373bdc1e85361c6d587334b",
+        "plans": [
+          {
+            "id": "plan_revision_c1aa076a085145d6ad4a9218f24ea853",
+            "revision_no": 1,
+            "definition_digest": "sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa",
+            "activation_digest": "sha256:72887fc27c5051f611989140f577db0cd94e3c6d852646ad911e676bd4cf5ad4",
+            "payload_json": "{\"created_at\":\"2026-10-01T23:25:45.533033Z\",\"definition\":{\"base_state_snapshot_digest\":\"sha256:31652d7788a50a3471aea922a1aed6a352d93afa8ea4959b4be79766b6146f4e\",\"dependencies\":[],\"expected_effects\":[],\"goal_contract_digest\":\"sha256:dcda43c332c6c9573b72ba2f17e1e28763fc8297eb3c3a3fa771aaebe9b9648c\",\"goal_coverage\":[{\"criterion_id\":\"ac_001\",\"task_ids\":[\"task_d38d6a36c60c4a899d6ed0bdc64eedee\"],\"validation_ids\":[\"validation_task\",\"validation_goal\"]}],\"integration_validations\":[{\"criterion_refs\":[\"ac_001\"],\"evidence_mode\":\"independent\",\"method\":\"semantic\",\"required_evidence_kinds\":[\"model_review\"],\"statement\":\"Task와 분리된 Validator가 최종 파일과 evidence를 검토한다.\",\"validation_id\":\"validation_goal\"}],\"model_inventory_digest\":\"sha256:1d05b41a743065162f973faa67535fdc7f552d992d195844a0ab872680c45803\",\"planning_budget\":{\"max_candidate_versions\":5,\"max_initial_candidates\":3,\"max_logical_role_calls\":14,\"max_refinement_per_candidate\":1,\"max_shortlist\":2,\"replan_reserve_percent\":25},\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"project_map_digest\":\"sha256:0946f2aa41b51d934dd79fd21486c1baa579442fde2ad645270d35327f623d69\",\"source_skeleton_digest\":\"sha256:e1e39b414f8bafc2d5555ef90122f1bb3f2d70a0fbaae288fb52032a0d9cc7b5\",\"tasks\":[{\"acceptance_criteria\":[\"Task 검사가 PASS다.\"],\"approval_class\":\"plan_activation\",\"assignment\":{\"executor\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"medium\",\"preferred_model\":\"worker\",\"role\":\"executor\"},\"independence_required\":true,\"validator\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"high\",\"preferred_model\":\"validator\",\"role\":\"validator\"}},\"consumes\":[\"input:request\"],\"expected_effects\":[],\"goal_criterion_refs\":[\"ac_001\"],\"kind\":\"change\",\"objective\":\"app.py 값을 2로 바꾼다.\",\"preconditions\":[],\"produces\":[\"result:app_value\"],\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"recovery\":{\"max_goal_replans\":5,\"max_same_failure_replans\":2,\"requires_new_evidence\":true,\"resume_strategy\":\"existing_binding_first\",\"retryable_failure_classes\":[\"implementation\",\"context\"]},\"required_capabilities\":[],\"risk_level\":\"low\",\"risk_tags\":[],\"task_id\":\"task_d38d6a36c60c4a899d6ed0bdc64eedee\",\"task_ref\":\"single_task\",\"validations\":[{\"method\":\"deterministic\",\"required_evidence_kinds\":[\"test\"],\"statement\":\"app.py의 값이 2인지 실행 검사한다.\",\"validation_id\":\"validation_task\"}]}]},\"definition_digest\":\"sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa\",\"plan_id\":\"plan_c4ee70a7a49544899a30056e8f97fa32\",\"plan_revision_id\":\"plan_revision_c1aa076a085145d6ad4a9218f24ea853\",\"revision_no\":1,\"schema_version\":\"1.0\",\"status\":\"ready\"}",
+            "status": "ready"
+          }
+        ],
+        "tasks": [
+          {
+            "id": "task_d38d6a36c60c4a899d6ed0bdc64eedee",
+            "status": "pending"
+          }
+        ],
+        "provider_calls": [
+          {
+            "role": "goal_normalizer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "goal_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_generator",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "plan_expander",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "compact_plan_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          }
+        ],
+        "adapter_effect_calls": {
+          "structured_role": 6,
+          "scripted_receipts": 6,
+          "runtime_create": 0,
+          "runtime_turn": 0,
+          "runtime_resume": 0,
+          "runtime_interrupt": 0,
+          "governance_open": 0,
+          "gate_before_execution": 0,
+          "gate_before_completion": 0
+        },
+        "live_provider_calls": 0
+      },
+      "after": {
+        "tables": {
+          "goal_revisions": 1,
+          "plan_revisions": 1,
+          "goal_authorizations": 0,
+          "plan_activations": 0,
+          "execution_spec_revisions": 0,
+          "task_contracts": 1,
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "runtime_jobs": 0,
+          "provider_calls": 6,
+          "validation_results": 0,
+          "goal_verdicts": 0,
+          "history_events": 28
+        },
+        "history_event_counts": {
+          "budget.call_observed": 6,
+          "budget.call_reserved": 6,
+          "budget.goal_bound": 2,
+          "budget.recorded": 6,
+          "goal.activated": 1,
+          "plan.registered": 1,
+          "planning.search_recorded": 1,
+          "profile.activated": 1,
+          "project.created": 1,
+          "project_map.recorded": 1,
+          "skeleton.evaluated": 1,
+          "state.observed": 1
+        },
+        "history_rows_sha256": "092a63d919acea8b44e9aed22912e562968eb9a32373bdc1e85361c6d587334b",
+        "plans": [
+          {
+            "id": "plan_revision_c1aa076a085145d6ad4a9218f24ea853",
+            "revision_no": 1,
+            "definition_digest": "sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa",
+            "activation_digest": "sha256:72887fc27c5051f611989140f577db0cd94e3c6d852646ad911e676bd4cf5ad4",
+            "payload_json": "{\"created_at\":\"2026-10-01T23:25:45.533033Z\",\"definition\":{\"base_state_snapshot_digest\":\"sha256:31652d7788a50a3471aea922a1aed6a352d93afa8ea4959b4be79766b6146f4e\",\"dependencies\":[],\"expected_effects\":[],\"goal_contract_digest\":\"sha256:dcda43c332c6c9573b72ba2f17e1e28763fc8297eb3c3a3fa771aaebe9b9648c\",\"goal_coverage\":[{\"criterion_id\":\"ac_001\",\"task_ids\":[\"task_d38d6a36c60c4a899d6ed0bdc64eedee\"],\"validation_ids\":[\"validation_task\",\"validation_goal\"]}],\"integration_validations\":[{\"criterion_refs\":[\"ac_001\"],\"evidence_mode\":\"independent\",\"method\":\"semantic\",\"required_evidence_kinds\":[\"model_review\"],\"statement\":\"Task와 분리된 Validator가 최종 파일과 evidence를 검토한다.\",\"validation_id\":\"validation_goal\"}],\"model_inventory_digest\":\"sha256:1d05b41a743065162f973faa67535fdc7f552d992d195844a0ab872680c45803\",\"planning_budget\":{\"max_candidate_versions\":5,\"max_initial_candidates\":3,\"max_logical_role_calls\":14,\"max_refinement_per_candidate\":1,\"max_shortlist\":2,\"replan_reserve_percent\":25},\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"project_map_digest\":\"sha256:0946f2aa41b51d934dd79fd21486c1baa579442fde2ad645270d35327f623d69\",\"source_skeleton_digest\":\"sha256:e1e39b414f8bafc2d5555ef90122f1bb3f2d70a0fbaae288fb52032a0d9cc7b5\",\"tasks\":[{\"acceptance_criteria\":[\"Task 검사가 PASS다.\"],\"approval_class\":\"plan_activation\",\"assignment\":{\"executor\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"medium\",\"preferred_model\":\"worker\",\"role\":\"executor\"},\"independence_required\":true,\"validator\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"high\",\"preferred_model\":\"validator\",\"role\":\"validator\"}},\"consumes\":[\"input:request\"],\"expected_effects\":[],\"goal_criterion_refs\":[\"ac_001\"],\"kind\":\"change\",\"objective\":\"app.py 값을 2로 바꾼다.\",\"preconditions\":[],\"produces\":[\"result:app_value\"],\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"recovery\":{\"max_goal_replans\":5,\"max_same_failure_replans\":2,\"requires_new_evidence\":true,\"resume_strategy\":\"existing_binding_first\",\"retryable_failure_classes\":[\"implementation\",\"context\"]},\"required_capabilities\":[],\"risk_level\":\"low\",\"risk_tags\":[],\"task_id\":\"task_d38d6a36c60c4a899d6ed0bdc64eedee\",\"task_ref\":\"single_task\",\"validations\":[{\"method\":\"deterministic\",\"required_evidence_kinds\":[\"test\"],\"statement\":\"app.py의 값이 2인지 실행 검사한다.\",\"validation_id\":\"validation_task\"}]}]},\"definition_digest\":\"sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa\",\"plan_id\":\"plan_c4ee70a7a49544899a30056e8f97fa32\",\"plan_revision_id\":\"plan_revision_c1aa076a085145d6ad4a9218f24ea853\",\"revision_no\":1,\"schema_version\":\"1.0\",\"status\":\"ready\"}",
+            "status": "ready"
+          }
+        ],
+        "tasks": [
+          {
+            "id": "task_d38d6a36c60c4a899d6ed0bdc64eedee",
+            "status": "pending"
+          }
+        ],
+        "provider_calls": [
+          {
+            "role": "goal_normalizer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "goal_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_generator",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "plan_expander",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "compact_plan_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          }
+        ],
+        "adapter_effect_calls": {
+          "structured_role": 6,
+          "scripted_receipts": 6,
+          "runtime_create": 0,
+          "runtime_turn": 0,
+          "runtime_resume": 0,
+          "runtime_interrupt": 0,
+          "governance_open": 0,
+          "gate_before_execution": 0,
+          "gate_before_completion": 0
+        },
+        "live_provider_calls": 0
+      },
+      "result": {
+        "error": "CoreCapabilityError",
+        "message": "CORE_CAPABILITY_REQUIRED: 신뢰된 host의 action capability가 필요합니다."
+      },
+      "table_deltas": {
+        "goal_revisions": 0,
+        "plan_revisions": 0,
+        "goal_authorizations": 0,
+        "plan_activations": 0,
+        "execution_spec_revisions": 0,
+        "task_contracts": 0,
+        "attempts": 0,
+        "runtime_intents": 0,
+        "runtime_receipts": 0,
+        "runtime_jobs": 0,
+        "provider_calls": 0,
+        "validation_results": 0,
+        "goal_verdicts": 0,
+        "history_events": 0
+      },
+      "effect_deltas": {
+        "structured_role": 0,
+        "scripted_receipts": 0,
+        "runtime_create": 0,
+        "runtime_turn": 0,
+        "runtime_resume": 0,
+        "runtime_interrupt": 0,
+        "governance_open": 0,
+        "gate_before_execution": 0,
+        "gate_before_completion": 0
+      }
+    },
+    {
+      "name": "public_application_authority_authorize_activate",
+      "before": {
+        "tables": {
+          "goal_revisions": 1,
+          "plan_revisions": 1,
+          "goal_authorizations": 0,
+          "plan_activations": 0,
+          "execution_spec_revisions": 0,
+          "task_contracts": 1,
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "runtime_jobs": 0,
+          "provider_calls": 6,
+          "validation_results": 0,
+          "goal_verdicts": 0,
+          "history_events": 28
+        },
+        "history_event_counts": {
+          "budget.call_observed": 6,
+          "budget.call_reserved": 6,
+          "budget.goal_bound": 2,
+          "budget.recorded": 6,
+          "goal.activated": 1,
+          "plan.registered": 1,
+          "planning.search_recorded": 1,
+          "profile.activated": 1,
+          "project.created": 1,
+          "project_map.recorded": 1,
+          "skeleton.evaluated": 1,
+          "state.observed": 1
+        },
+        "history_rows_sha256": "092a63d919acea8b44e9aed22912e562968eb9a32373bdc1e85361c6d587334b",
+        "plans": [
+          {
+            "id": "plan_revision_c1aa076a085145d6ad4a9218f24ea853",
+            "revision_no": 1,
+            "definition_digest": "sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa",
+            "activation_digest": "sha256:72887fc27c5051f611989140f577db0cd94e3c6d852646ad911e676bd4cf5ad4",
+            "payload_json": "{\"created_at\":\"2026-10-01T23:25:45.533033Z\",\"definition\":{\"base_state_snapshot_digest\":\"sha256:31652d7788a50a3471aea922a1aed6a352d93afa8ea4959b4be79766b6146f4e\",\"dependencies\":[],\"expected_effects\":[],\"goal_contract_digest\":\"sha256:dcda43c332c6c9573b72ba2f17e1e28763fc8297eb3c3a3fa771aaebe9b9648c\",\"goal_coverage\":[{\"criterion_id\":\"ac_001\",\"task_ids\":[\"task_d38d6a36c60c4a899d6ed0bdc64eedee\"],\"validation_ids\":[\"validation_task\",\"validation_goal\"]}],\"integration_validations\":[{\"criterion_refs\":[\"ac_001\"],\"evidence_mode\":\"independent\",\"method\":\"semantic\",\"required_evidence_kinds\":[\"model_review\"],\"statement\":\"Task와 분리된 Validator가 최종 파일과 evidence를 검토한다.\",\"validation_id\":\"validation_goal\"}],\"model_inventory_digest\":\"sha256:1d05b41a743065162f973faa67535fdc7f552d992d195844a0ab872680c45803\",\"planning_budget\":{\"max_candidate_versions\":5,\"max_initial_candidates\":3,\"max_logical_role_calls\":14,\"max_refinement_per_candidate\":1,\"max_shortlist\":2,\"replan_reserve_percent\":25},\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"project_map_digest\":\"sha256:0946f2aa41b51d934dd79fd21486c1baa579442fde2ad645270d35327f623d69\",\"source_skeleton_digest\":\"sha256:e1e39b414f8bafc2d5555ef90122f1bb3f2d70a0fbaae288fb52032a0d9cc7b5\",\"tasks\":[{\"acceptance_criteria\":[\"Task 검사가 PASS다.\"],\"approval_class\":\"plan_activation\",\"assignment\":{\"executor\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"medium\",\"preferred_model\":\"worker\",\"role\":\"executor\"},\"independence_required\":true,\"validator\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"high\",\"preferred_model\":\"validator\",\"role\":\"validator\"}},\"consumes\":[\"input:request\"],\"expected_effects\":[],\"goal_criterion_refs\":[\"ac_001\"],\"kind\":\"change\",\"objective\":\"app.py 값을 2로 바꾼다.\",\"preconditions\":[],\"produces\":[\"result:app_value\"],\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"recovery\":{\"max_goal_replans\":5,\"max_same_failure_replans\":2,\"requires_new_evidence\":true,\"resume_strategy\":\"existing_binding_first\",\"retryable_failure_classes\":[\"implementation\",\"context\"]},\"required_capabilities\":[],\"risk_level\":\"low\",\"risk_tags\":[],\"task_id\":\"task_d38d6a36c60c4a899d6ed0bdc64eedee\",\"task_ref\":\"single_task\",\"validations\":[{\"method\":\"deterministic\",\"required_evidence_kinds\":[\"test\"],\"statement\":\"app.py의 값이 2인지 실행 검사한다.\",\"validation_id\":\"validation_task\"}]}]},\"definition_digest\":\"sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa\",\"plan_id\":\"plan_c4ee70a7a49544899a30056e8f97fa32\",\"plan_revision_id\":\"plan_revision_c1aa076a085145d6ad4a9218f24ea853\",\"revision_no\":1,\"schema_version\":\"1.0\",\"status\":\"ready\"}",
+            "status": "ready"
+          }
+        ],
+        "tasks": [
+          {
+            "id": "task_d38d6a36c60c4a899d6ed0bdc64eedee",
+            "status": "pending"
+          }
+        ],
+        "provider_calls": [
+          {
+            "role": "goal_normalizer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "goal_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_generator",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "plan_expander",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "compact_plan_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          }
+        ],
+        "adapter_effect_calls": {
+          "structured_role": 6,
+          "scripted_receipts": 6,
+          "runtime_create": 0,
+          "runtime_turn": 0,
+          "runtime_resume": 0,
+          "runtime_interrupt": 0,
+          "governance_open": 0,
+          "gate_before_execution": 0,
+          "gate_before_completion": 0
+        },
+        "live_provider_calls": 0
+      },
+      "after": {
+        "tables": {
+          "goal_revisions": 1,
+          "plan_revisions": 1,
+          "goal_authorizations": 1,
+          "plan_activations": 1,
+          "execution_spec_revisions": 0,
+          "task_contracts": 1,
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "runtime_jobs": 0,
+          "provider_calls": 6,
+          "validation_results": 0,
+          "goal_verdicts": 0,
+          "history_events": 30
+        },
+        "history_event_counts": {
+          "budget.call_observed": 6,
+          "budget.call_reserved": 6,
+          "budget.goal_bound": 2,
+          "budget.recorded": 6,
+          "goal.activated": 1,
+          "goal.authorized": 1,
+          "plan.activated": 1,
+          "plan.registered": 1,
+          "planning.search_recorded": 1,
+          "profile.activated": 1,
+          "project.created": 1,
+          "project_map.recorded": 1,
+          "skeleton.evaluated": 1,
+          "state.observed": 1
+        },
+        "history_rows_sha256": "d5fd99b60869e69f434241fc975f87d6f6bebc8b58c54ede1531e12fce1ac09e",
+        "plans": [
+          {
+            "id": "plan_revision_c1aa076a085145d6ad4a9218f24ea853",
+            "revision_no": 1,
+            "definition_digest": "sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa",
+            "activation_digest": "sha256:72887fc27c5051f611989140f577db0cd94e3c6d852646ad911e676bd4cf5ad4",
+            "payload_json": "{\"created_at\":\"2026-10-01T23:25:45.533033Z\",\"definition\":{\"base_state_snapshot_digest\":\"sha256:31652d7788a50a3471aea922a1aed6a352d93afa8ea4959b4be79766b6146f4e\",\"dependencies\":[],\"expected_effects\":[],\"goal_contract_digest\":\"sha256:dcda43c332c6c9573b72ba2f17e1e28763fc8297eb3c3a3fa771aaebe9b9648c\",\"goal_coverage\":[{\"criterion_id\":\"ac_001\",\"task_ids\":[\"task_d38d6a36c60c4a899d6ed0bdc64eedee\"],\"validation_ids\":[\"validation_task\",\"validation_goal\"]}],\"integration_validations\":[{\"criterion_refs\":[\"ac_001\"],\"evidence_mode\":\"independent\",\"method\":\"semantic\",\"required_evidence_kinds\":[\"model_review\"],\"statement\":\"Task와 분리된 Validator가 최종 파일과 evidence를 검토한다.\",\"validation_id\":\"validation_goal\"}],\"model_inventory_digest\":\"sha256:1d05b41a743065162f973faa67535fdc7f552d992d195844a0ab872680c45803\",\"planning_budget\":{\"max_candidate_versions\":5,\"max_initial_candidates\":3,\"max_logical_role_calls\":14,\"max_refinement_per_candidate\":1,\"max_shortlist\":2,\"replan_reserve_percent\":25},\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"project_map_digest\":\"sha256:0946f2aa41b51d934dd79fd21486c1baa579442fde2ad645270d35327f623d69\",\"source_skeleton_digest\":\"sha256:e1e39b414f8bafc2d5555ef90122f1bb3f2d70a0fbaae288fb52032a0d9cc7b5\",\"tasks\":[{\"acceptance_criteria\":[\"Task 검사가 PASS다.\"],\"approval_class\":\"plan_activation\",\"assignment\":{\"executor\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"medium\",\"preferred_model\":\"worker\",\"role\":\"executor\"},\"independence_required\":true,\"validator\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"high\",\"preferred_model\":\"validator\",\"role\":\"validator\"}},\"consumes\":[\"input:request\"],\"expected_effects\":[],\"goal_criterion_refs\":[\"ac_001\"],\"kind\":\"change\",\"objective\":\"app.py 값을 2로 바꾼다.\",\"preconditions\":[],\"produces\":[\"result:app_value\"],\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"recovery\":{\"max_goal_replans\":5,\"max_same_failure_replans\":2,\"requires_new_evidence\":true,\"resume_strategy\":\"existing_binding_first\",\"retryable_failure_classes\":[\"implementation\",\"context\"]},\"required_capabilities\":[],\"risk_level\":\"low\",\"risk_tags\":[],\"task_id\":\"task_d38d6a36c60c4a899d6ed0bdc64eedee\",\"task_ref\":\"single_task\",\"validations\":[{\"method\":\"deterministic\",\"required_evidence_kinds\":[\"test\"],\"statement\":\"app.py의 값이 2인지 실행 검사한다.\",\"validation_id\":\"validation_task\"}]}]},\"definition_digest\":\"sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa\",\"plan_id\":\"plan_c4ee70a7a49544899a30056e8f97fa32\",\"plan_revision_id\":\"plan_revision_c1aa076a085145d6ad4a9218f24ea853\",\"revision_no\":1,\"schema_version\":\"1.0\",\"status\":\"ready\"}",
+            "status": "active"
+          }
+        ],
+        "tasks": [
+          {
+            "id": "task_d38d6a36c60c4a899d6ed0bdc64eedee",
+            "status": "ready"
+          }
+        ],
+        "provider_calls": [
+          {
+            "role": "goal_normalizer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "goal_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_generator",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "plan_expander",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "compact_plan_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          }
+        ],
+        "adapter_effect_calls": {
+          "structured_role": 6,
+          "scripted_receipts": 6,
+          "runtime_create": 0,
+          "runtime_turn": 0,
+          "runtime_resume": 0,
+          "runtime_interrupt": 0,
+          "governance_open": 0,
+          "gate_before_execution": 0,
+          "gate_before_completion": 0
+        },
+        "live_provider_calls": 0
+      },
+      "result": {
+        "authorization_id": "goal_authorization_542c8d69192d4faeaad39077d91212b8",
+        "activation_id": "activation_20138d1f66ce4d1a97abbe0d64e8bd77",
+        "target_digest": "sha256:6d1f7e00d888c9be62550c54b7b3527294bf9ac68e471a6b271f611b984d18be",
+        "scope": "public trusted-host API; synthetic business confirmation"
+      },
+      "table_deltas": {
+        "goal_revisions": 0,
+        "plan_revisions": 0,
+        "goal_authorizations": 1,
+        "plan_activations": 1,
+        "execution_spec_revisions": 0,
+        "task_contracts": 0,
+        "attempts": 0,
+        "runtime_intents": 0,
+        "runtime_receipts": 0,
+        "runtime_jobs": 0,
+        "provider_calls": 0,
+        "validation_results": 0,
+        "goal_verdicts": 0,
+        "history_events": 2
+      },
+      "effect_deltas": {
+        "structured_role": 0,
+        "scripted_receipts": 0,
+        "runtime_create": 0,
+        "runtime_turn": 0,
+        "runtime_resume": 0,
+        "runtime_interrupt": 0,
+        "governance_open": 0,
+        "gate_before_execution": 0,
+        "gate_before_completion": 0
+      }
+    },
+    {
+      "name": "public_active_plan_revision_supported_boundary",
+      "before": {
+        "tables": {
+          "goal_revisions": 1,
+          "plan_revisions": 1,
+          "goal_authorizations": 1,
+          "plan_activations": 1,
+          "execution_spec_revisions": 0,
+          "task_contracts": 1,
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "runtime_jobs": 0,
+          "provider_calls": 6,
+          "validation_results": 0,
+          "goal_verdicts": 0,
+          "history_events": 30
+        },
+        "history_event_counts": {
+          "budget.call_observed": 6,
+          "budget.call_reserved": 6,
+          "budget.goal_bound": 2,
+          "budget.recorded": 6,
+          "goal.activated": 1,
+          "goal.authorized": 1,
+          "plan.activated": 1,
+          "plan.registered": 1,
+          "planning.search_recorded": 1,
+          "profile.activated": 1,
+          "project.created": 1,
+          "project_map.recorded": 1,
+          "skeleton.evaluated": 1,
+          "state.observed": 1
+        },
+        "history_rows_sha256": "d5fd99b60869e69f434241fc975f87d6f6bebc8b58c54ede1531e12fce1ac09e",
+        "plans": [
+          {
+            "id": "plan_revision_c1aa076a085145d6ad4a9218f24ea853",
+            "revision_no": 1,
+            "definition_digest": "sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa",
+            "activation_digest": "sha256:72887fc27c5051f611989140f577db0cd94e3c6d852646ad911e676bd4cf5ad4",
+            "payload_json": "{\"created_at\":\"2026-10-01T23:25:45.533033Z\",\"definition\":{\"base_state_snapshot_digest\":\"sha256:31652d7788a50a3471aea922a1aed6a352d93afa8ea4959b4be79766b6146f4e\",\"dependencies\":[],\"expected_effects\":[],\"goal_contract_digest\":\"sha256:dcda43c332c6c9573b72ba2f17e1e28763fc8297eb3c3a3fa771aaebe9b9648c\",\"goal_coverage\":[{\"criterion_id\":\"ac_001\",\"task_ids\":[\"task_d38d6a36c60c4a899d6ed0bdc64eedee\"],\"validation_ids\":[\"validation_task\",\"validation_goal\"]}],\"integration_validations\":[{\"criterion_refs\":[\"ac_001\"],\"evidence_mode\":\"independent\",\"method\":\"semantic\",\"required_evidence_kinds\":[\"model_review\"],\"statement\":\"Task와 분리된 Validator가 최종 파일과 evidence를 검토한다.\",\"validation_id\":\"validation_goal\"}],\"model_inventory_digest\":\"sha256:1d05b41a743065162f973faa67535fdc7f552d992d195844a0ab872680c45803\",\"planning_budget\":{\"max_candidate_versions\":5,\"max_initial_candidates\":3,\"max_logical_role_calls\":14,\"max_refinement_per_candidate\":1,\"max_shortlist\":2,\"replan_reserve_percent\":25},\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"project_map_digest\":\"sha256:0946f2aa41b51d934dd79fd21486c1baa579442fde2ad645270d35327f623d69\",\"source_skeleton_digest\":\"sha256:e1e39b414f8bafc2d5555ef90122f1bb3f2d70a0fbaae288fb52032a0d9cc7b5\",\"tasks\":[{\"acceptance_criteria\":[\"Task 검사가 PASS다.\"],\"approval_class\":\"plan_activation\",\"assignment\":{\"executor\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"medium\",\"preferred_model\":\"worker\",\"role\":\"executor\"},\"independence_required\":true,\"validator\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"high\",\"preferred_model\":\"validator\",\"role\":\"validator\"}},\"consumes\":[\"input:request\"],\"expected_effects\":[],\"goal_criterion_refs\":[\"ac_001\"],\"kind\":\"change\",\"objective\":\"app.py 값을 2로 바꾼다.\",\"preconditions\":[],\"produces\":[\"result:app_value\"],\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"recovery\":{\"max_goal_replans\":5,\"max_same_failure_replans\":2,\"requires_new_evidence\":true,\"resume_strategy\":\"existing_binding_first\",\"retryable_failure_classes\":[\"implementation\",\"context\"]},\"required_capabilities\":[],\"risk_level\":\"low\",\"risk_tags\":[],\"task_id\":\"task_d38d6a36c60c4a899d6ed0bdc64eedee\",\"task_ref\":\"single_task\",\"validations\":[{\"method\":\"deterministic\",\"required_evidence_kinds\":[\"test\"],\"statement\":\"app.py의 값이 2인지 실행 검사한다.\",\"validation_id\":\"validation_task\"}]}]},\"definition_digest\":\"sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa\",\"plan_id\":\"plan_c4ee70a7a49544899a30056e8f97fa32\",\"plan_revision_id\":\"plan_revision_c1aa076a085145d6ad4a9218f24ea853\",\"revision_no\":1,\"schema_version\":\"1.0\",\"status\":\"ready\"}",
+            "status": "active"
+          }
+        ],
+        "tasks": [
+          {
+            "id": "task_d38d6a36c60c4a899d6ed0bdc64eedee",
+            "status": "ready"
+          }
+        ],
+        "provider_calls": [
+          {
+            "role": "goal_normalizer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "goal_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_generator",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "plan_expander",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "compact_plan_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          }
+        ],
+        "adapter_effect_calls": {
+          "structured_role": 6,
+          "scripted_receipts": 6,
+          "runtime_create": 0,
+          "runtime_turn": 0,
+          "runtime_resume": 0,
+          "runtime_interrupt": 0,
+          "governance_open": 0,
+          "gate_before_execution": 0,
+          "gate_before_completion": 0
+        },
+        "live_provider_calls": 0
+      },
+      "after": {
+        "tables": {
+          "goal_revisions": 1,
+          "plan_revisions": 1,
+          "goal_authorizations": 1,
+          "plan_activations": 1,
+          "execution_spec_revisions": 0,
+          "task_contracts": 1,
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "runtime_jobs": 0,
+          "provider_calls": 6,
+          "validation_results": 0,
+          "goal_verdicts": 0,
+          "history_events": 30
+        },
+        "history_event_counts": {
+          "budget.call_observed": 6,
+          "budget.call_reserved": 6,
+          "budget.goal_bound": 2,
+          "budget.recorded": 6,
+          "goal.activated": 1,
+          "goal.authorized": 1,
+          "plan.activated": 1,
+          "plan.registered": 1,
+          "planning.search_recorded": 1,
+          "profile.activated": 1,
+          "project.created": 1,
+          "project_map.recorded": 1,
+          "skeleton.evaluated": 1,
+          "state.observed": 1
+        },
+        "history_rows_sha256": "d5fd99b60869e69f434241fc975f87d6f6bebc8b58c54ede1531e12fce1ac09e",
+        "plans": [
+          {
+            "id": "plan_revision_c1aa076a085145d6ad4a9218f24ea853",
+            "revision_no": 1,
+            "definition_digest": "sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa",
+            "activation_digest": "sha256:72887fc27c5051f611989140f577db0cd94e3c6d852646ad911e676bd4cf5ad4",
+            "payload_json": "{\"created_at\":\"2026-10-01T23:25:45.533033Z\",\"definition\":{\"base_state_snapshot_digest\":\"sha256:31652d7788a50a3471aea922a1aed6a352d93afa8ea4959b4be79766b6146f4e\",\"dependencies\":[],\"expected_effects\":[],\"goal_contract_digest\":\"sha256:dcda43c332c6c9573b72ba2f17e1e28763fc8297eb3c3a3fa771aaebe9b9648c\",\"goal_coverage\":[{\"criterion_id\":\"ac_001\",\"task_ids\":[\"task_d38d6a36c60c4a899d6ed0bdc64eedee\"],\"validation_ids\":[\"validation_task\",\"validation_goal\"]}],\"integration_validations\":[{\"criterion_refs\":[\"ac_001\"],\"evidence_mode\":\"independent\",\"method\":\"semantic\",\"required_evidence_kinds\":[\"model_review\"],\"statement\":\"Task와 분리된 Validator가 최종 파일과 evidence를 검토한다.\",\"validation_id\":\"validation_goal\"}],\"model_inventory_digest\":\"sha256:1d05b41a743065162f973faa67535fdc7f552d992d195844a0ab872680c45803\",\"planning_budget\":{\"max_candidate_versions\":5,\"max_initial_candidates\":3,\"max_logical_role_calls\":14,\"max_refinement_per_candidate\":1,\"max_shortlist\":2,\"replan_reserve_percent\":25},\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"project_map_digest\":\"sha256:0946f2aa41b51d934dd79fd21486c1baa579442fde2ad645270d35327f623d69\",\"source_skeleton_digest\":\"sha256:e1e39b414f8bafc2d5555ef90122f1bb3f2d70a0fbaae288fb52032a0d9cc7b5\",\"tasks\":[{\"acceptance_criteria\":[\"Task 검사가 PASS다.\"],\"approval_class\":\"plan_activation\",\"assignment\":{\"executor\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"medium\",\"preferred_model\":\"worker\",\"role\":\"executor\"},\"independence_required\":true,\"validator\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"high\",\"preferred_model\":\"validator\",\"role\":\"validator\"}},\"consumes\":[\"input:request\"],\"expected_effects\":[],\"goal_criterion_refs\":[\"ac_001\"],\"kind\":\"change\",\"objective\":\"app.py 값을 2로 바꾼다.\",\"preconditions\":[],\"produces\":[\"result:app_value\"],\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"recovery\":{\"max_goal_replans\":5,\"max_same_failure_replans\":2,\"requires_new_evidence\":true,\"resume_strategy\":\"existing_binding_first\",\"retryable_failure_classes\":[\"implementation\",\"context\"]},\"required_capabilities\":[],\"risk_level\":\"low\",\"risk_tags\":[],\"task_id\":\"task_d38d6a36c60c4a899d6ed0bdc64eedee\",\"task_ref\":\"single_task\",\"validations\":[{\"method\":\"deterministic\",\"required_evidence_kinds\":[\"test\"],\"statement\":\"app.py의 값이 2인지 실행 검사한다.\",\"validation_id\":\"validation_task\"}]}]},\"definition_digest\":\"sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa\",\"plan_id\":\"plan_c4ee70a7a49544899a30056e8f97fa32\",\"plan_revision_id\":\"plan_revision_c1aa076a085145d6ad4a9218f24ea853\",\"revision_no\":1,\"schema_version\":\"1.0\",\"status\":\"ready\"}",
+            "status": "active"
+          }
+        ],
+        "tasks": [
+          {
+            "id": "task_d38d6a36c60c4a899d6ed0bdc64eedee",
+            "status": "ready"
+          }
+        ],
+        "provider_calls": [
+          {
+            "role": "goal_normalizer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "goal_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_generator",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "plan_expander",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "compact_plan_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          }
+        ],
+        "adapter_effect_calls": {
+          "structured_role": 6,
+          "scripted_receipts": 6,
+          "runtime_create": 0,
+          "runtime_turn": 0,
+          "runtime_resume": 0,
+          "runtime_interrupt": 0,
+          "governance_open": 0,
+          "gate_before_execution": 0,
+          "gate_before_completion": 0
+        },
+        "live_provider_calls": 0
+      },
+      "result": {
+        "error": "EngineApplicationError",
+        "message": "GOAL_REVISION_ACTIVE_PLAN: active Plan plan_revision_c1aa076a085145d6ad4a9218f24ea853이 있는 동안의 Goal revision은 아직 지원하지 않습니다."
+      },
+      "table_deltas": {
+        "goal_revisions": 0,
+        "plan_revisions": 0,
+        "goal_authorizations": 0,
+        "plan_activations": 0,
+        "execution_spec_revisions": 0,
+        "task_contracts": 0,
+        "attempts": 0,
+        "runtime_intents": 0,
+        "runtime_receipts": 0,
+        "runtime_jobs": 0,
+        "provider_calls": 0,
+        "validation_results": 0,
+        "goal_verdicts": 0,
+        "history_events": 0
+      },
+      "effect_deltas": {
+        "structured_role": 0,
+        "scripted_receipts": 0,
+        "runtime_create": 0,
+        "runtime_turn": 0,
+        "runtime_resume": 0,
+        "runtime_interrupt": 0,
+        "governance_open": 0,
+        "gate_before_execution": 0,
+        "gate_before_completion": 0
+      }
+    },
+    {
+      "name": "public_run_once_posix_failclosed_1",
+      "before": {
+        "tables": {
+          "goal_revisions": 1,
+          "plan_revisions": 1,
+          "goal_authorizations": 1,
+          "plan_activations": 1,
+          "execution_spec_revisions": 0,
+          "task_contracts": 1,
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "runtime_jobs": 0,
+          "provider_calls": 6,
+          "validation_results": 0,
+          "goal_verdicts": 0,
+          "history_events": 30
+        },
+        "history_event_counts": {
+          "budget.call_observed": 6,
+          "budget.call_reserved": 6,
+          "budget.goal_bound": 2,
+          "budget.recorded": 6,
+          "goal.activated": 1,
+          "goal.authorized": 1,
+          "plan.activated": 1,
+          "plan.registered": 1,
+          "planning.search_recorded": 1,
+          "profile.activated": 1,
+          "project.created": 1,
+          "project_map.recorded": 1,
+          "skeleton.evaluated": 1,
+          "state.observed": 1
+        },
+        "history_rows_sha256": "d5fd99b60869e69f434241fc975f87d6f6bebc8b58c54ede1531e12fce1ac09e",
+        "plans": [
+          {
+            "id": "plan_revision_c1aa076a085145d6ad4a9218f24ea853",
+            "revision_no": 1,
+            "definition_digest": "sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa",
+            "activation_digest": "sha256:72887fc27c5051f611989140f577db0cd94e3c6d852646ad911e676bd4cf5ad4",
+            "payload_json": "{\"created_at\":\"2026-10-01T23:25:45.533033Z\",\"definition\":{\"base_state_snapshot_digest\":\"sha256:31652d7788a50a3471aea922a1aed6a352d93afa8ea4959b4be79766b6146f4e\",\"dependencies\":[],\"expected_effects\":[],\"goal_contract_digest\":\"sha256:dcda43c332c6c9573b72ba2f17e1e28763fc8297eb3c3a3fa771aaebe9b9648c\",\"goal_coverage\":[{\"criterion_id\":\"ac_001\",\"task_ids\":[\"task_d38d6a36c60c4a899d6ed0bdc64eedee\"],\"validation_ids\":[\"validation_task\",\"validation_goal\"]}],\"integration_validations\":[{\"criterion_refs\":[\"ac_001\"],\"evidence_mode\":\"independent\",\"method\":\"semantic\",\"required_evidence_kinds\":[\"model_review\"],\"statement\":\"Task와 분리된 Validator가 최종 파일과 evidence를 검토한다.\",\"validation_id\":\"validation_goal\"}],\"model_inventory_digest\":\"sha256:1d05b41a743065162f973faa67535fdc7f552d992d195844a0ab872680c45803\",\"planning_budget\":{\"max_candidate_versions\":5,\"max_initial_candidates\":3,\"max_logical_role_calls\":14,\"max_refinement_per_candidate\":1,\"max_shortlist\":2,\"replan_reserve_percent\":25},\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"project_map_digest\":\"sha256:0946f2aa41b51d934dd79fd21486c1baa579442fde2ad645270d35327f623d69\",\"source_skeleton_digest\":\"sha256:e1e39b414f8bafc2d5555ef90122f1bb3f2d70a0fbaae288fb52032a0d9cc7b5\",\"tasks\":[{\"acceptance_criteria\":[\"Task 검사가 PASS다.\"],\"approval_class\":\"plan_activation\",\"assignment\":{\"executor\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"medium\",\"preferred_model\":\"worker\",\"role\":\"executor\"},\"independence_required\":true,\"validator\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"high\",\"preferred_model\":\"validator\",\"role\":\"validator\"}},\"consumes\":[\"input:request\"],\"expected_effects\":[],\"goal_criterion_refs\":[\"ac_001\"],\"kind\":\"change\",\"objective\":\"app.py 값을 2로 바꾼다.\",\"preconditions\":[],\"produces\":[\"result:app_value\"],\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"recovery\":{\"max_goal_replans\":5,\"max_same_failure_replans\":2,\"requires_new_evidence\":true,\"resume_strategy\":\"existing_binding_first\",\"retryable_failure_classes\":[\"implementation\",\"context\"]},\"required_capabilities\":[],\"risk_level\":\"low\",\"risk_tags\":[],\"task_id\":\"task_d38d6a36c60c4a899d6ed0bdc64eedee\",\"task_ref\":\"single_task\",\"validations\":[{\"method\":\"deterministic\",\"required_evidence_kinds\":[\"test\"],\"statement\":\"app.py의 값이 2인지 실행 검사한다.\",\"validation_id\":\"validation_task\"}]}]},\"definition_digest\":\"sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa\",\"plan_id\":\"plan_c4ee70a7a49544899a30056e8f97fa32\",\"plan_revision_id\":\"plan_revision_c1aa076a085145d6ad4a9218f24ea853\",\"revision_no\":1,\"schema_version\":\"1.0\",\"status\":\"ready\"}",
+            "status": "active"
+          }
+        ],
+        "tasks": [
+          {
+            "id": "task_d38d6a36c60c4a899d6ed0bdc64eedee",
+            "status": "ready"
+          }
+        ],
+        "provider_calls": [
+          {
+            "role": "goal_normalizer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "goal_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_generator",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "plan_expander",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "compact_plan_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          }
+        ],
+        "adapter_effect_calls": {
+          "structured_role": 6,
+          "scripted_receipts": 6,
+          "runtime_create": 0,
+          "runtime_turn": 0,
+          "runtime_resume": 0,
+          "runtime_interrupt": 0,
+          "governance_open": 0,
+          "gate_before_execution": 0,
+          "gate_before_completion": 0
+        },
+        "live_provider_calls": 0
+      },
+      "after": {
+        "tables": {
+          "goal_revisions": 1,
+          "plan_revisions": 1,
+          "goal_authorizations": 1,
+          "plan_activations": 1,
+          "execution_spec_revisions": 0,
+          "task_contracts": 1,
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "runtime_jobs": 0,
+          "provider_calls": 6,
+          "validation_results": 0,
+          "goal_verdicts": 0,
+          "history_events": 30
+        },
+        "history_event_counts": {
+          "budget.call_observed": 6,
+          "budget.call_reserved": 6,
+          "budget.goal_bound": 2,
+          "budget.recorded": 6,
+          "goal.activated": 1,
+          "goal.authorized": 1,
+          "plan.activated": 1,
+          "plan.registered": 1,
+          "planning.search_recorded": 1,
+          "profile.activated": 1,
+          "project.created": 1,
+          "project_map.recorded": 1,
+          "skeleton.evaluated": 1,
+          "state.observed": 1
+        },
+        "history_rows_sha256": "d5fd99b60869e69f434241fc975f87d6f6bebc8b58c54ede1531e12fce1ac09e",
+        "plans": [
+          {
+            "id": "plan_revision_c1aa076a085145d6ad4a9218f24ea853",
+            "revision_no": 1,
+            "definition_digest": "sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa",
+            "activation_digest": "sha256:72887fc27c5051f611989140f577db0cd94e3c6d852646ad911e676bd4cf5ad4",
+            "payload_json": "{\"created_at\":\"2026-10-01T23:25:45.533033Z\",\"definition\":{\"base_state_snapshot_digest\":\"sha256:31652d7788a50a3471aea922a1aed6a352d93afa8ea4959b4be79766b6146f4e\",\"dependencies\":[],\"expected_effects\":[],\"goal_contract_digest\":\"sha256:dcda43c332c6c9573b72ba2f17e1e28763fc8297eb3c3a3fa771aaebe9b9648c\",\"goal_coverage\":[{\"criterion_id\":\"ac_001\",\"task_ids\":[\"task_d38d6a36c60c4a899d6ed0bdc64eedee\"],\"validation_ids\":[\"validation_task\",\"validation_goal\"]}],\"integration_validations\":[{\"criterion_refs\":[\"ac_001\"],\"evidence_mode\":\"independent\",\"method\":\"semantic\",\"required_evidence_kinds\":[\"model_review\"],\"statement\":\"Task와 분리된 Validator가 최종 파일과 evidence를 검토한다.\",\"validation_id\":\"validation_goal\"}],\"model_inventory_digest\":\"sha256:1d05b41a743065162f973faa67535fdc7f552d992d195844a0ab872680c45803\",\"planning_budget\":{\"max_candidate_versions\":5,\"max_initial_candidates\":3,\"max_logical_role_calls\":14,\"max_refinement_per_candidate\":1,\"max_shortlist\":2,\"replan_reserve_percent\":25},\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"project_map_digest\":\"sha256:0946f2aa41b51d934dd79fd21486c1baa579442fde2ad645270d35327f623d69\",\"source_skeleton_digest\":\"sha256:e1e39b414f8bafc2d5555ef90122f1bb3f2d70a0fbaae288fb52032a0d9cc7b5\",\"tasks\":[{\"acceptance_criteria\":[\"Task 검사가 PASS다.\"],\"approval_class\":\"plan_activation\",\"assignment\":{\"executor\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"medium\",\"preferred_model\":\"worker\",\"role\":\"executor\"},\"independence_required\":true,\"validator\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"high\",\"preferred_model\":\"validator\",\"role\":\"validator\"}},\"consumes\":[\"input:request\"],\"expected_effects\":[],\"goal_criterion_refs\":[\"ac_001\"],\"kind\":\"change\",\"objective\":\"app.py 값을 2로 바꾼다.\",\"preconditions\":[],\"produces\":[\"result:app_value\"],\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"recovery\":{\"max_goal_replans\":5,\"max_same_failure_replans\":2,\"requires_new_evidence\":true,\"resume_strategy\":\"existing_binding_first\",\"retryable_failure_classes\":[\"implementation\",\"context\"]},\"required_capabilities\":[],\"risk_level\":\"low\",\"risk_tags\":[],\"task_id\":\"task_d38d6a36c60c4a899d6ed0bdc64eedee\",\"task_ref\":\"single_task\",\"validations\":[{\"method\":\"deterministic\",\"required_evidence_kinds\":[\"test\"],\"statement\":\"app.py의 값이 2인지 실행 검사한다.\",\"validation_id\":\"validation_task\"}]}]},\"definition_digest\":\"sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa\",\"plan_id\":\"plan_c4ee70a7a49544899a30056e8f97fa32\",\"plan_revision_id\":\"plan_revision_c1aa076a085145d6ad4a9218f24ea853\",\"revision_no\":1,\"schema_version\":\"1.0\",\"status\":\"ready\"}",
+            "status": "active"
+          }
+        ],
+        "tasks": [
+          {
+            "id": "task_d38d6a36c60c4a899d6ed0bdc64eedee",
+            "status": "ready"
+          }
+        ],
+        "provider_calls": [
+          {
+            "role": "goal_normalizer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "goal_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_generator",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "plan_expander",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "compact_plan_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          }
+        ],
+        "adapter_effect_calls": {
+          "structured_role": 6,
+          "scripted_receipts": 6,
+          "runtime_create": 0,
+          "runtime_turn": 0,
+          "runtime_resume": 0,
+          "runtime_interrupt": 0,
+          "governance_open": 1,
+          "gate_before_execution": 0,
+          "gate_before_completion": 0
+        },
+        "live_provider_calls": 0
+      },
+      "result": {
+        "action": "blocked",
+        "project_id": "project_5c00c7a3a57940c2b25c6c33db20c382",
+        "task_id": null,
+        "attempt_id": null,
+        "execution_spec_revision_id": null,
+        "validation_result_id": null,
+        "goal_verdict_id": null,
+        "evidence_ids": [],
+        "blocker_code": "RUNTIME_OWNER_LOCK_UNAVAILABLE",
+        "failure_class": null,
+        "suggested_repair_action": null,
+        "checkpoint_required": false,
+        "detail": "RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix",
+        "runtime_job_id": null,
+        "runtime_job_kind": null,
+        "runtime_job_status": null,
+        "tick_elapsed_ms": 1
+      },
+      "table_deltas": {
+        "goal_revisions": 0,
+        "plan_revisions": 0,
+        "goal_authorizations": 0,
+        "plan_activations": 0,
+        "execution_spec_revisions": 0,
+        "task_contracts": 0,
+        "attempts": 0,
+        "runtime_intents": 0,
+        "runtime_receipts": 0,
+        "runtime_jobs": 0,
+        "provider_calls": 0,
+        "validation_results": 0,
+        "goal_verdicts": 0,
+        "history_events": 0
+      },
+      "effect_deltas": {
+        "structured_role": 0,
+        "scripted_receipts": 0,
+        "runtime_create": 0,
+        "runtime_turn": 0,
+        "runtime_resume": 0,
+        "runtime_interrupt": 0,
+        "governance_open": 1,
+        "gate_before_execution": 0,
+        "gate_before_completion": 0
+      }
+    },
+    {
+      "name": "public_run_once_posix_failclosed_2",
+      "before": {
+        "tables": {
+          "goal_revisions": 1,
+          "plan_revisions": 1,
+          "goal_authorizations": 1,
+          "plan_activations": 1,
+          "execution_spec_revisions": 0,
+          "task_contracts": 1,
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "runtime_jobs": 0,
+          "provider_calls": 6,
+          "validation_results": 0,
+          "goal_verdicts": 0,
+          "history_events": 30
+        },
+        "history_event_counts": {
+          "budget.call_observed": 6,
+          "budget.call_reserved": 6,
+          "budget.goal_bound": 2,
+          "budget.recorded": 6,
+          "goal.activated": 1,
+          "goal.authorized": 1,
+          "plan.activated": 1,
+          "plan.registered": 1,
+          "planning.search_recorded": 1,
+          "profile.activated": 1,
+          "project.created": 1,
+          "project_map.recorded": 1,
+          "skeleton.evaluated": 1,
+          "state.observed": 1
+        },
+        "history_rows_sha256": "d5fd99b60869e69f434241fc975f87d6f6bebc8b58c54ede1531e12fce1ac09e",
+        "plans": [
+          {
+            "id": "plan_revision_c1aa076a085145d6ad4a9218f24ea853",
+            "revision_no": 1,
+            "definition_digest": "sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa",
+            "activation_digest": "sha256:72887fc27c5051f611989140f577db0cd94e3c6d852646ad911e676bd4cf5ad4",
+            "payload_json": "{\"created_at\":\"2026-10-01T23:25:45.533033Z\",\"definition\":{\"base_state_snapshot_digest\":\"sha256:31652d7788a50a3471aea922a1aed6a352d93afa8ea4959b4be79766b6146f4e\",\"dependencies\":[],\"expected_effects\":[],\"goal_contract_digest\":\"sha256:dcda43c332c6c9573b72ba2f17e1e28763fc8297eb3c3a3fa771aaebe9b9648c\",\"goal_coverage\":[{\"criterion_id\":\"ac_001\",\"task_ids\":[\"task_d38d6a36c60c4a899d6ed0bdc64eedee\"],\"validation_ids\":[\"validation_task\",\"validation_goal\"]}],\"integration_validations\":[{\"criterion_refs\":[\"ac_001\"],\"evidence_mode\":\"independent\",\"method\":\"semantic\",\"required_evidence_kinds\":[\"model_review\"],\"statement\":\"Task와 분리된 Validator가 최종 파일과 evidence를 검토한다.\",\"validation_id\":\"validation_goal\"}],\"model_inventory_digest\":\"sha256:1d05b41a743065162f973faa67535fdc7f552d992d195844a0ab872680c45803\",\"planning_budget\":{\"max_candidate_versions\":5,\"max_initial_candidates\":3,\"max_logical_role_calls\":14,\"max_refinement_per_candidate\":1,\"max_shortlist\":2,\"replan_reserve_percent\":25},\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"project_map_digest\":\"sha256:0946f2aa41b51d934dd79fd21486c1baa579442fde2ad645270d35327f623d69\",\"source_skeleton_digest\":\"sha256:e1e39b414f8bafc2d5555ef90122f1bb3f2d70a0fbaae288fb52032a0d9cc7b5\",\"tasks\":[{\"acceptance_criteria\":[\"Task 검사가 PASS다.\"],\"approval_class\":\"plan_activation\",\"assignment\":{\"executor\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"medium\",\"preferred_model\":\"worker\",\"role\":\"executor\"},\"independence_required\":true,\"validator\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"high\",\"preferred_model\":\"validator\",\"role\":\"validator\"}},\"consumes\":[\"input:request\"],\"expected_effects\":[],\"goal_criterion_refs\":[\"ac_001\"],\"kind\":\"change\",\"objective\":\"app.py 값을 2로 바꾼다.\",\"preconditions\":[],\"produces\":[\"result:app_value\"],\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"recovery\":{\"max_goal_replans\":5,\"max_same_failure_replans\":2,\"requires_new_evidence\":true,\"resume_strategy\":\"existing_binding_first\",\"retryable_failure_classes\":[\"implementation\",\"context\"]},\"required_capabilities\":[],\"risk_level\":\"low\",\"risk_tags\":[],\"task_id\":\"task_d38d6a36c60c4a899d6ed0bdc64eedee\",\"task_ref\":\"single_task\",\"validations\":[{\"method\":\"deterministic\",\"required_evidence_kinds\":[\"test\"],\"statement\":\"app.py의 값이 2인지 실행 검사한다.\",\"validation_id\":\"validation_task\"}]}]},\"definition_digest\":\"sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa\",\"plan_id\":\"plan_c4ee70a7a49544899a30056e8f97fa32\",\"plan_revision_id\":\"plan_revision_c1aa076a085145d6ad4a9218f24ea853\",\"revision_no\":1,\"schema_version\":\"1.0\",\"status\":\"ready\"}",
+            "status": "active"
+          }
+        ],
+        "tasks": [
+          {
+            "id": "task_d38d6a36c60c4a899d6ed0bdc64eedee",
+            "status": "ready"
+          }
+        ],
+        "provider_calls": [
+          {
+            "role": "goal_normalizer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "goal_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_generator",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "plan_expander",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "compact_plan_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          }
+        ],
+        "adapter_effect_calls": {
+          "structured_role": 6,
+          "scripted_receipts": 6,
+          "runtime_create": 0,
+          "runtime_turn": 0,
+          "runtime_resume": 0,
+          "runtime_interrupt": 0,
+          "governance_open": 1,
+          "gate_before_execution": 0,
+          "gate_before_completion": 0
+        },
+        "live_provider_calls": 0
+      },
+      "after": {
+        "tables": {
+          "goal_revisions": 1,
+          "plan_revisions": 1,
+          "goal_authorizations": 1,
+          "plan_activations": 1,
+          "execution_spec_revisions": 0,
+          "task_contracts": 1,
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "runtime_jobs": 0,
+          "provider_calls": 6,
+          "validation_results": 0,
+          "goal_verdicts": 0,
+          "history_events": 30
+        },
+        "history_event_counts": {
+          "budget.call_observed": 6,
+          "budget.call_reserved": 6,
+          "budget.goal_bound": 2,
+          "budget.recorded": 6,
+          "goal.activated": 1,
+          "goal.authorized": 1,
+          "plan.activated": 1,
+          "plan.registered": 1,
+          "planning.search_recorded": 1,
+          "profile.activated": 1,
+          "project.created": 1,
+          "project_map.recorded": 1,
+          "skeleton.evaluated": 1,
+          "state.observed": 1
+        },
+        "history_rows_sha256": "d5fd99b60869e69f434241fc975f87d6f6bebc8b58c54ede1531e12fce1ac09e",
+        "plans": [
+          {
+            "id": "plan_revision_c1aa076a085145d6ad4a9218f24ea853",
+            "revision_no": 1,
+            "definition_digest": "sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa",
+            "activation_digest": "sha256:72887fc27c5051f611989140f577db0cd94e3c6d852646ad911e676bd4cf5ad4",
+            "payload_json": "{\"created_at\":\"2026-10-01T23:25:45.533033Z\",\"definition\":{\"base_state_snapshot_digest\":\"sha256:31652d7788a50a3471aea922a1aed6a352d93afa8ea4959b4be79766b6146f4e\",\"dependencies\":[],\"expected_effects\":[],\"goal_contract_digest\":\"sha256:dcda43c332c6c9573b72ba2f17e1e28763fc8297eb3c3a3fa771aaebe9b9648c\",\"goal_coverage\":[{\"criterion_id\":\"ac_001\",\"task_ids\":[\"task_d38d6a36c60c4a899d6ed0bdc64eedee\"],\"validation_ids\":[\"validation_task\",\"validation_goal\"]}],\"integration_validations\":[{\"criterion_refs\":[\"ac_001\"],\"evidence_mode\":\"independent\",\"method\":\"semantic\",\"required_evidence_kinds\":[\"model_review\"],\"statement\":\"Task와 분리된 Validator가 최종 파일과 evidence를 검토한다.\",\"validation_id\":\"validation_goal\"}],\"model_inventory_digest\":\"sha256:1d05b41a743065162f973faa67535fdc7f552d992d195844a0ab872680c45803\",\"planning_budget\":{\"max_candidate_versions\":5,\"max_initial_candidates\":3,\"max_logical_role_calls\":14,\"max_refinement_per_candidate\":1,\"max_shortlist\":2,\"replan_reserve_percent\":25},\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"project_map_digest\":\"sha256:0946f2aa41b51d934dd79fd21486c1baa579442fde2ad645270d35327f623d69\",\"source_skeleton_digest\":\"sha256:e1e39b414f8bafc2d5555ef90122f1bb3f2d70a0fbaae288fb52032a0d9cc7b5\",\"tasks\":[{\"acceptance_criteria\":[\"Task 검사가 PASS다.\"],\"approval_class\":\"plan_activation\",\"assignment\":{\"executor\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"medium\",\"preferred_model\":\"worker\",\"role\":\"executor\"},\"independence_required\":true,\"validator\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"high\",\"preferred_model\":\"validator\",\"role\":\"validator\"}},\"consumes\":[\"input:request\"],\"expected_effects\":[],\"goal_criterion_refs\":[\"ac_001\"],\"kind\":\"change\",\"objective\":\"app.py 값을 2로 바꾼다.\",\"preconditions\":[],\"produces\":[\"result:app_value\"],\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"recovery\":{\"max_goal_replans\":5,\"max_same_failure_replans\":2,\"requires_new_evidence\":true,\"resume_strategy\":\"existing_binding_first\",\"retryable_failure_classes\":[\"implementation\",\"context\"]},\"required_capabilities\":[],\"risk_level\":\"low\",\"risk_tags\":[],\"task_id\":\"task_d38d6a36c60c4a899d6ed0bdc64eedee\",\"task_ref\":\"single_task\",\"validations\":[{\"method\":\"deterministic\",\"required_evidence_kinds\":[\"test\"],\"statement\":\"app.py의 값이 2인지 실행 검사한다.\",\"validation_id\":\"validation_task\"}]}]},\"definition_digest\":\"sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa\",\"plan_id\":\"plan_c4ee70a7a49544899a30056e8f97fa32\",\"plan_revision_id\":\"plan_revision_c1aa076a085145d6ad4a9218f24ea853\",\"revision_no\":1,\"schema_version\":\"1.0\",\"status\":\"ready\"}",
+            "status": "active"
+          }
+        ],
+        "tasks": [
+          {
+            "id": "task_d38d6a36c60c4a899d6ed0bdc64eedee",
+            "status": "ready"
+          }
+        ],
+        "provider_calls": [
+          {
+            "role": "goal_normalizer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "goal_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_generator",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "skeleton_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "plan_expander",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          },
+          {
+            "role": "compact_plan_reviewer",
+            "status": "usage_unknown",
+            "execution_status": "terminal",
+            "result_status": "valid",
+            "effect_status": "none"
+          }
+        ],
+        "adapter_effect_calls": {
+          "structured_role": 6,
+          "scripted_receipts": 6,
+          "runtime_create": 0,
+          "runtime_turn": 0,
+          "runtime_resume": 0,
+          "runtime_interrupt": 0,
+          "governance_open": 1,
+          "gate_before_execution": 0,
+          "gate_before_completion": 0
+        },
+        "live_provider_calls": 0
+      },
+      "result": {
+        "action": "blocked",
+        "project_id": "project_5c00c7a3a57940c2b25c6c33db20c382",
+        "task_id": null,
+        "attempt_id": null,
+        "execution_spec_revision_id": null,
+        "validation_result_id": null,
+        "goal_verdict_id": null,
+        "evidence_ids": [],
+        "blocker_code": "RUNTIME_OWNER_LOCK_UNAVAILABLE",
+        "failure_class": null,
+        "suggested_repair_action": null,
+        "checkpoint_required": false,
+        "detail": "RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix",
+        "runtime_job_id": null,
+        "runtime_job_kind": null,
+        "runtime_job_status": null,
+        "tick_elapsed_ms": 1
+      },
+      "table_deltas": {
+        "goal_revisions": 0,
+        "plan_revisions": 0,
+        "goal_authorizations": 0,
+        "plan_activations": 0,
+        "execution_spec_revisions": 0,
+        "task_contracts": 0,
+        "attempts": 0,
+        "runtime_intents": 0,
+        "runtime_receipts": 0,
+        "runtime_jobs": 0,
+        "provider_calls": 0,
+        "validation_results": 0,
+        "goal_verdicts": 0,
+        "history_events": 0
+      },
+      "effect_deltas": {
+        "structured_role": 0,
+        "scripted_receipts": 0,
+        "runtime_create": 0,
+        "runtime_turn": 0,
+        "runtime_resume": 0,
+        "runtime_interrupt": 0,
+        "governance_open": 0,
+        "gate_before_execution": 0,
+        "gate_before_completion": 0
+      }
+    }
+  ],
+  "final": {
+    "tables": {
+      "goal_revisions": 1,
+      "plan_revisions": 1,
+      "goal_authorizations": 1,
+      "plan_activations": 1,
+      "execution_spec_revisions": 0,
+      "task_contracts": 1,
+      "attempts": 0,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "runtime_jobs": 0,
+      "provider_calls": 6,
+      "validation_results": 0,
+      "goal_verdicts": 0,
+      "history_events": 30
+    },
+    "history_event_counts": {
+      "budget.call_observed": 6,
+      "budget.call_reserved": 6,
+      "budget.goal_bound": 2,
+      "budget.recorded": 6,
+      "goal.activated": 1,
+      "goal.authorized": 1,
+      "plan.activated": 1,
+      "plan.registered": 1,
+      "planning.search_recorded": 1,
+      "profile.activated": 1,
+      "project.created": 1,
+      "project_map.recorded": 1,
+      "skeleton.evaluated": 1,
+      "state.observed": 1
+    },
+    "history_rows_sha256": "d5fd99b60869e69f434241fc975f87d6f6bebc8b58c54ede1531e12fce1ac09e",
+    "plans": [
+      {
+        "id": "plan_revision_c1aa076a085145d6ad4a9218f24ea853",
+        "revision_no": 1,
+        "definition_digest": "sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa",
+        "activation_digest": "sha256:72887fc27c5051f611989140f577db0cd94e3c6d852646ad911e676bd4cf5ad4",
+        "payload_json": "{\"created_at\":\"2026-10-01T23:25:45.533033Z\",\"definition\":{\"base_state_snapshot_digest\":\"sha256:31652d7788a50a3471aea922a1aed6a352d93afa8ea4959b4be79766b6146f4e\",\"dependencies\":[],\"expected_effects\":[],\"goal_contract_digest\":\"sha256:dcda43c332c6c9573b72ba2f17e1e28763fc8297eb3c3a3fa771aaebe9b9648c\",\"goal_coverage\":[{\"criterion_id\":\"ac_001\",\"task_ids\":[\"task_d38d6a36c60c4a899d6ed0bdc64eedee\"],\"validation_ids\":[\"validation_task\",\"validation_goal\"]}],\"integration_validations\":[{\"criterion_refs\":[\"ac_001\"],\"evidence_mode\":\"independent\",\"method\":\"semantic\",\"required_evidence_kinds\":[\"model_review\"],\"statement\":\"Task와 분리된 Validator가 최종 파일과 evidence를 검토한다.\",\"validation_id\":\"validation_goal\"}],\"model_inventory_digest\":\"sha256:1d05b41a743065162f973faa67535fdc7f552d992d195844a0ab872680c45803\",\"planning_budget\":{\"max_candidate_versions\":5,\"max_initial_candidates\":3,\"max_logical_role_calls\":14,\"max_refinement_per_candidate\":1,\"max_shortlist\":2,\"replan_reserve_percent\":25},\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"project_map_digest\":\"sha256:0946f2aa41b51d934dd79fd21486c1baa579442fde2ad645270d35327f623d69\",\"source_skeleton_digest\":\"sha256:e1e39b414f8bafc2d5555ef90122f1bb3f2d70a0fbaae288fb52032a0d9cc7b5\",\"tasks\":[{\"acceptance_criteria\":[\"Task 검사가 PASS다.\"],\"approval_class\":\"plan_activation\",\"assignment\":{\"executor\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"medium\",\"preferred_model\":\"worker\",\"role\":\"executor\"},\"independence_required\":true,\"validator\":{\"allowed_fallbacks\":[],\"preferred_effort\":\"high\",\"preferred_model\":\"validator\",\"role\":\"validator\"}},\"consumes\":[\"input:request\"],\"expected_effects\":[],\"goal_criterion_refs\":[\"ac_001\"],\"kind\":\"change\",\"objective\":\"app.py 값을 2로 바꾼다.\",\"preconditions\":[],\"produces\":[\"result:app_value\"],\"prohibited_effects\":[],\"project_id\":\"project_5c00c7a3a57940c2b25c6c33db20c382\",\"recovery\":{\"max_goal_replans\":5,\"max_same_failure_replans\":2,\"requires_new_evidence\":true,\"resume_strategy\":\"existing_binding_first\",\"retryable_failure_classes\":[\"implementation\",\"context\"]},\"required_capabilities\":[],\"risk_level\":\"low\",\"risk_tags\":[],\"task_id\":\"task_d38d6a36c60c4a899d6ed0bdc64eedee\",\"task_ref\":\"single_task\",\"validations\":[{\"method\":\"deterministic\",\"required_evidence_kinds\":[\"test\"],\"statement\":\"app.py의 값이 2인지 실행 검사한다.\",\"validation_id\":\"validation_task\"}]}]},\"definition_digest\":\"sha256:1927f11f419b5078cc2592099cfe682cbb0efb95bc87b610d43bbad4cc6703fa\",\"plan_id\":\"plan_c4ee70a7a49544899a30056e8f97fa32\",\"plan_revision_id\":\"plan_revision_c1aa076a085145d6ad4a9218f24ea853\",\"revision_no\":1,\"schema_version\":\"1.0\",\"status\":\"ready\"}",
+        "status": "active"
+      }
+    ],
+    "tasks": [
+      {
+        "id": "task_d38d6a36c60c4a899d6ed0bdc64eedee",
+        "status": "ready"
+      }
+    ],
+    "provider_calls": [
+      {
+        "role": "goal_normalizer",
+        "status": "usage_unknown",
+        "execution_status": "terminal",
+        "result_status": "valid",
+        "effect_status": "none"
+      },
+      {
+        "role": "goal_reviewer",
+        "status": "usage_unknown",
+        "execution_status": "terminal",
+        "result_status": "valid",
+        "effect_status": "none"
+      },
+      {
+        "role": "skeleton_generator",
+        "status": "usage_unknown",
+        "execution_status": "terminal",
+        "result_status": "valid",
+        "effect_status": "none"
+      },
+      {
+        "role": "skeleton_reviewer",
+        "status": "usage_unknown",
+        "execution_status": "terminal",
+        "result_status": "valid",
+        "effect_status": "none"
+      },
+      {
+        "role": "plan_expander",
+        "status": "usage_unknown",
+        "execution_status": "terminal",
+        "result_status": "valid",
+        "effect_status": "none"
+      },
+      {
+        "role": "compact_plan_reviewer",
+        "status": "usage_unknown",
+        "execution_status": "terminal",
+        "result_status": "valid",
+        "effect_status": "none"
+      }
+    ],
+    "adapter_effect_calls": {
+      "structured_role": 6,
+      "scripted_receipts": 6,
+      "runtime_create": 0,
+      "runtime_turn": 0,
+      "runtime_resume": 0,
+      "runtime_interrupt": 0,
+      "governance_open": 1,
+      "gate_before_execution": 0,
+      "gate_before_completion": 0
+    },
+    "live_provider_calls": 0
+  },
+  "ledger_history_valid": true,
+  "not_run": [
+    "ready ExecutionSpec materialization",
+    "Task admission with AGS AND gate",
+    "Task execution",
+    "independent Task validation",
+    "independent GoalTest",
+    "Core GoalVerdict"
+  ],
+  "skip_count": 0,
+  "not_run_leg_count": 6,
+  "remaining_input": "A Windows executor supporting D1 with the same exact candidate and existing scripted adapters. Real AGS AND acceptance additionally needs its declared plugin closure and authorized explicit profile supplied by its owner.",
+  "seconds": 0.176988
+}

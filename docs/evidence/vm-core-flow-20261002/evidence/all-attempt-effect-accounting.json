@@ -1,0 +1,29 @@
+{
+  "attempts": [
+    {
+      "attempt_directory": "disposable-workflow",
+      "role_adapter_call_rows": 6,
+      "persisted_role_receipts": 6,
+      "budget_call_reservations": 6,
+      "business_authorizations": 1,
+      "activations": 1,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "runtime_jobs": 0
+    },
+    {
+      "attempt_directory": "disposable-workflow-r2",
+      "role_adapter_call_rows": 6,
+      "persisted_role_receipts": 6,
+      "budget_call_reservations": 6,
+      "business_authorizations": 1,
+      "activations": 1,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "runtime_jobs": 0
+    }
+  ],
+  "total_scripted_role_adapter_calls": 12,
+  "live_provider_calls": 0,
+  "note": "First attempt stopped at reporting-field AttributeError after successful authorization. Second attempt is complete bounded probe; databases are independent and not exported."
+}

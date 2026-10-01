@@ -1,0 +1,28 @@
+[
+  {
+    "argv": [
+      "git",
+      "clone",
+      "--no-hardlinks",
+      "--no-checkout",
+      "<BASE_CHECKOUT>",
+      "<TASK_ROOT>/candidate"
+    ],
+    "cwd": "<EXECUTION_WORKSPACE>",
+    "exit": 0,
+    "seconds": 0.041,
+    "raw_sha256": "41653406c28b7ad404e3e7d6ace5def00df3218ae94bb3abbc21a9a9d5d1974b"
+  },
+  {
+    "argv": [
+      "git",
+      "checkout",
+      "--detach",
+      "32bb0f9dd9f024045d24487312b50f5b703573a3"
+    ],
+    "cwd": "<TASK_ROOT>/candidate",
+    "exit": 0,
+    "seconds": 0.321,
+    "raw_sha256": "740bfefdb99d9676f293689cac6e4eadb447a78bcbaacb5e0fbd23235612f94a"
+  }
+]

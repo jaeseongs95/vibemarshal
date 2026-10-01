@@ -1,0 +1,152 @@
+{
+  "schema": "vm-core-public-flow-evidence-v1",
+  "repository": "jaeseongs95/vibemarshal",
+  "branch": "dot/vm-core-flow-evidence-20261002",
+  "base_commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "product_candidate_tree": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d",
+  "scope": "completed evidence only; no source changes or new test execution",
+  "normalization": [
+    "<TASK_ROOT>",
+    "<PYTHON_ENV>",
+    "<BASE_CHECKOUT>",
+    "<EXECUTION_WORKSPACE>"
+  ],
+  "first_harness_preservation": "Two-line reconstruction from final source; original launch did not record a standalone harness hash. Original first raw and command receipt are preserved with original-byte SHA-256, and normalized copies have separate hashes.",
+  "excluded": [
+    "synthetic databases and WAL/SHM",
+    "credentials/keys/runtime-profile payloads",
+    "native messages",
+    "personal paths",
+    "candidate .git/source tree"
+  ],
+  "files": [
+    {
+      "path": "harness/attempt1.py",
+      "origin": "task-owned first harness",
+      "original_sha256": "bdb455889724e0b0609206c2bbe443c0d9f8d0373ae55d703935c245beed1b81",
+      "sha256": "bdb455889724e0b0609206c2bbe443c0d9f8d0373ae55d703935c245beed1b81",
+      "bytes": 11178,
+      "provenance": "reconstructed by reversing the two recorded corrections; no additional execution"
+    },
+    {
+      "path": "harness/attempt2.py",
+      "origin": "task-owned final harness",
+      "original_sha256": "d002973584cad77de6aa97db97358d6ec9700503628d9667eb03f24000031476",
+      "sha256": "d002973584cad77de6aa97db97358d6ec9700503628d9667eb03f24000031476",
+      "bytes": 11195,
+      "provenance": "observed task-owned file"
+    },
+    {
+      "path": "harness/correction.diff",
+      "origin": "two-line harness-only correction",
+      "original_sha256": "6863c1effb90f4ca96c398316cff0cafcc1c0627e498f98f1e226511b0cc9301",
+      "sha256": "6863c1effb90f4ca96c398316cff0cafcc1c0627e498f98f1e226511b0cc9301",
+      "bytes": 979,
+      "provenance": "observed task-owned file"
+    },
+    {
+      "path": "evidence/all-attempt-effect-accounting.json",
+      "origin": "evidence/all-attempt-effect-accounting.json",
+      "original_sha256": "051ed62c153f5935e42d83273b8c67e1ed3876773a5ded2c9efff8fd546c0626",
+      "sha256": "051ed62c153f5935e42d83273b8c67e1ed3876773a5ded2c9efff8fd546c0626",
+      "bytes": 908,
+      "provenance": "observed task-owned file"
+    },
+    {
+      "path": "evidence/attempt1-vertical-command.json",
+      "origin": "evidence/attempt1-vertical-command.json",
+      "original_sha256": "4925520834d72a069c22e295a147d00772a0dd19b1dd471a800a5459ae513f01",
+      "sha256": "3b859cf3a4c82dfa018594a28c60e85848c44309808dabda6c091f52bf715ca3",
+      "bytes": 582,
+      "provenance": "observed command receipt plus normalized raw hash"
+    },
+    {
+      "path": "evidence/attempt1-vertical-raw.txt",
+      "origin": "evidence/attempt1-vertical-raw.txt",
+      "original_sha256": "094eaea1787dc7e40f075fed1d1a8711128f77978218b88aa40c36026c41069d",
+      "sha256": "53e22b3138df93cfd14e43059e7d22e82718604ac461be033e8866a6d33889fc",
+      "bytes": 554,
+      "provenance": "observed task-owned file"
+    },
+    {
+      "path": "evidence/bootstrap-0.txt",
+      "origin": "evidence/bootstrap-0.txt",
+      "original_sha256": "41653406c28b7ad404e3e7d6ace5def00df3218ae94bb3abbc21a9a9d5d1974b",
+      "sha256": "ce56f6e7d0776e275abfc6295d343230188349d9a2b93c6aa302897691c75b0c",
+      "bytes": 46,
+      "provenance": "observed task-owned file"
+    },
+    {
+      "path": "evidence/bootstrap-1.txt",
+      "origin": "evidence/bootstrap-1.txt",
+      "original_sha256": "740bfefdb99d9676f293689cac6e4eadb447a78bcbaacb5e0fbd23235612f94a",
+      "sha256": "740bfefdb99d9676f293689cac6e4eadb447a78bcbaacb5e0fbd23235612f94a",
+      "bytes": 85,
+      "provenance": "observed task-owned file"
+    },
+    {
+      "path": "evidence/bootstrap.json",
+      "origin": "evidence/bootstrap.json",
+      "original_sha256": "01b59bad1cb133d4ab405727812fab6714acb20592f32b63423dc53e97ccb66d",
+      "sha256": "595dc272a13a0c0bf4acdf325034018f7a683c94bb2d7daf7f570b1584c64c74",
+      "bytes": 607,
+      "provenance": "observed task-owned file"
+    },
+    {
+      "path": "evidence/candidate.diff",
+      "origin": "evidence/candidate.diff",
+      "original_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "bytes": 0,
+      "provenance": "observed task-owned file"
+    },
+    {
+      "path": "evidence/source-identity.json",
+      "origin": "evidence/source-identity.json",
+      "original_sha256": "4133fa2c538b56aaf1f1e763b1459adc69e2df4c37ba9c9df6f698e3681b93cb",
+      "sha256": "c69069e141ec3573ed77156f57621e11c49beef2e2c712850b8a63f16974fb8d",
+      "bytes": 1401,
+      "provenance": "observed task-owned file"
+    },
+    {
+      "path": "evidence/vertical-command.json",
+      "origin": "evidence/vertical-command.json",
+      "original_sha256": "12c589ce3e33256317e5c0449da3084b2a1a4aa3d0049e271b9cf07a21caea97",
+      "sha256": "cba211028ca1fd45f8fb120352dfdd60faea22cf21342a98a2062fbcca461acc",
+      "bytes": 670,
+      "provenance": "observed command receipt plus normalized raw hash"
+    },
+    {
+      "path": "evidence/vertical-raw.txt",
+      "origin": "evidence/vertical-raw.txt",
+      "original_sha256": "680fb044c195a691a4647b73c28acc21cbdd8c327e7adc39ed43e6ad5971f4dc",
+      "sha256": "680fb044c195a691a4647b73c28acc21cbdd8c327e7adc39ed43e6ad5971f4dc",
+      "bytes": 337,
+      "provenance": "observed task-owned file"
+    },
+    {
+      "path": "evidence/vertical-results.json",
+      "origin": "evidence/vertical-results.json",
+      "original_sha256": "b359019bb9feb06fca59b983941cb0079d22f0c1b01d1d1ccd161a0406a25bf3",
+      "sha256": "b359019bb9feb06fca59b983941cb0079d22f0c1b01d1d1ccd161a0406a25bf3",
+      "bytes": 87743,
+      "provenance": "observed task-owned file"
+    },
+    {
+      "path": "REPORT.txt",
+      "origin": "prepared detailed report",
+      "original_sha256": "47fcb2106541458dafe4b6fa774345da2954e9d478f40782609a84e8163c9f7a",
+      "sha256": "65348b16ed23e4c5d9d0f76edd8b3b1e3722376d1f76bd3920a1e164c1415bc4",
+      "bytes": 9015,
+      "provenance": "prepared report; publication authorization note updated"
+    },
+    {
+      "path": "REPORT.md",
+      "origin": "generated publication summary of completed execution",
+      "original_sha256": "ae386b2a6671fdde46735b789ff287cbe223069f85b21511975c28fd1fa93247",
+      "sha256": "ae386b2a6671fdde46735b789ff287cbe223069f85b21511975c28fd1fa93247",
+      "bytes": 5899,
+      "provenance": "source-grounded report; no additional test run"
+    }
+  ]
+}

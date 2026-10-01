@@ -1,0 +1,19 @@
+{
+  "argv": [
+    "<PYTHON_ENV>/bin/python",
+    "-B",
+    "<TASK_ROOT>/public_vertical_probe.py"
+  ],
+  "cwd": "<TASK_ROOT>/candidate",
+  "exit": 0,
+  "seconds": 0.787924,
+  "harness_sha256": "d002973584cad77de6aa97db97358d6ec9700503628d9667eb03f24000031476",
+  "environment_changes": {
+    "PYTHONPATH": "isolated candidate/src + candidate",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "source_changes": false,
+  "original_raw_sha256": "680fb044c195a691a4647b73c28acc21cbdd8c327e7adc39ed43e6ad5971f4dc",
+  "normalized_raw_sha256": "680fb044c195a691a4647b73c28acc21cbdd8c327e7adc39ed43e6ad5971f4dc",
+  "normalization": "local path labels only; no additional execution"
+}

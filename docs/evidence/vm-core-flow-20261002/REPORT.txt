@@ -1,0 +1,126 @@
+Core public vertical workflow — 독립 실행 보고 / 부모 검토용
+
+결과: 공개 Application 준비·업무 승인·활성화와 D1 차단의 bounded 검사는 PASS.
+전체 public vertical E2E, AGS AND gate·실행·독립 검사·GoalTest·Core 완료는 NOT_RUN.
+실제 제품 소스 결함은 이 실행 범위에서 발견하지 않았다. source proposal patch 없음.
+
+정확한 identity
+  base/candidate commit: 32bb0f9dd9f024045d24487312b50f5b703573a3
+  base/candidate tree: 27e18c0c7853c1d35a98d5437cebf0ba703ed42d
+  isolated cwd: <TASK_ROOT>/candidate
+  source diff: 0 bytes; candidate.diff SHA-256
+    e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+  isolated candidate 및 <BASE_CHECKOUT> 공유 checkout 모두 clean.
+  Python: <PYTHON_ENV>/bin/python, 3.12.14
+  pydantic 2.13.5, cryptography 50.0.1
+  요청 orchestration model/effort: gpt-6.1-sol/high, fallback 없음.
+  provider가 반환한 이 agent의 실제 model/effort 증거: 없음 / null.
+  fixture 역할 요청: worker/medium, validator/high. 모든 observed model/effort는 null.
+  이 fixture 이름·receipt를 실모델 관측으로 승격하지 않았다.
+
+준수한 경계와 입력
+AGENTS.md의 기존 권위 순서·provenance·D1 및 최신 명시 delegated scope를 적용했다.
+<EXECUTION_WORKSPACE>/.agents는 비어 있고 repo .agents/skills는 없다. 작업은 단회 source clone과
+외부 /tmp harness, 자체 disposable project/DB에서 수행했다. 기존 writer의 checkout,
+운영 DB, 실제 사용자 project, runtime profile/key, source GO를 변경하지 않았다.
+라이브 provider, consumed FM03 endpoint, G18/F07 작업, wheel/118 portable/public CLI
+campaign, SQLite init candidate 검사를 실행하지 않았다. 새 disposable DB 생성은 이
+workflow의 setup이었으며 init 자체를 별도 qualification으로 주장하지 않는다.
+
+실행 표면
+  EngineService의 공개 initialize/create_project/register_profile로 disposable setup.
+  EngineApplication.prepare(raw request)로 Goal 및 단일 Plan/Task 생성.
+  EngineApplication.authorize(source only)의 capability 거절.
+  공개 ApplicationAuthority.authorization_target/authorize로 업무 승인+Plan 활성화.
+  EngineApplication.revise 및 run_once의 실제 지원 경계 관측.
+  private capability 발급/DB 직접 쓰기/미리 만든 Goal·Plan 객체 주입 없음.
+  설치 CLI/실제 사용자 terminal 경로는 이 실행 범위에 없고 중복 검사하지 않았다.
+
+지원 test adapter는 기존 ScriptedStructuredRoleRunner 계열의
+tests.engine_inspection_helpers.InspectionScriptedRunner와 FakeCodexRuntime이다.
+역할 응답은 tests.test_engine_fm08_core_integration._responses/_roles의 기존 단일 Task
+fixture를 재사용했다. production EngineService/EngineApplication이 입력을 compile하고
+실제 disposable 원장에 기록했다. Counting wrapper는 role receipt 및 gate 호출만 세었다.
+owner_lock_platform_supported를 patch하지 않았고 source OS 정책을 변경하지 않았다.
+CountingGate는 기존 AllowAllGate fixture를 감싼 것으로 실제 AGS 수용 증거가 아니다.
+
+완료된 실행의 관측
+1. prepare: ready_for_authorization.
+   실제 local scripted adapter 호출 6, scripted receipt 6, provider_calls 표의 fixture 행 6,
+   budget.call_reserved 6. 역할 순서는 goal_normalizer → goal_reviewer → skeleton_generator
+   → skeleton_reviewer → plan_expander → compact_plan_reviewer.
+   Goal revision 1, Plan revision 1, Task 1을 생성; 승인/activation은 0.
+   runtime create/start/resume/interrupt 호출 및 runtime intent/receipt는 모두 0.
+2. source-only authorize: CORE_CAPABILITY_REQUIRED.
+   승인/activation/원장 모든 표·history·adapter 호출 증분 0.
+3. public ApplicationAuthority: 승인행 1 + Plan activation 1을 기록.
+   Plan status active, Task ready. Plan id/revision/definition_digest/activation_digest/
+   payload_json은 승인 전후 동일하다. 역할/실행 호출 증분 0.
+   이것은 disposable trusted-host API의 synthetic business confirmation이다.
+4. active Plan의 revise: GOAL_REVISION_ACTIVE_PLAN 지원 경계에서 거절.
+   Goal/Plan revision·본문·모든 표·history·adapter 호출 증분 0.
+   후속 immutable Plan 생성 또는 실행 중 재계획 검증으로 확대하지 않는다.
+5. 두 번의 run_once: action=blocked,
+   blocker=RUNTIME_OWNER_LOCK_UNAVAILABLE,
+   detail=RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix.
+   두 tick 모두 원장 표·history hash가 동일하고 scripted/worker 실행 호출 증분 0.
+   첫 tick의 governance.open_gate 호출은 1, 두 번째는 0(캐시 재사용).
+   before_execution=0 및 before_completion=0이다. gate verdict는 얻지 않았다.
+6. 최종 원장 history 검증은 true.
+   runtime_jobs/attempts/runtime_intents/runtime_receipts/ExecutionSpecs/
+   validation_results/goal_verdicts는 모두 0.
+
+실행 accounting을 숨기지 않는다
+최초 harness 실행은 공개 EngineAuthorizationResult의 필드를 authorized.authorization_id로
+잘못 읽어 보고 단계에서 AttributeError로 exit1했다. 실제 필드는
+authorized.authorization.authorization_id다. 제품 소스 문제가 아니며 harness만 고쳤다.
+최초 raw/command를 attempt1-*로 보존했고 새 disposable DB에서 두 번째 실행을 완료했다.
+첫 실행도 준비 6 scripted calls/6 persisted receipts, 승인1·활성화1, runtime 효과0이다.
+따라서 두 실행 합계는 local scripted adapter calls12, persisted role receipts12,
+business authorizations2, activations2이며 live provider calls0이다. 성공한 bounded 검사의
+측정값6을 세션 전체 호출12로 대체하거나 반대로 숨기지 않는다.
+
+명령 / exit / 시간 / raw
+  argv: <PYTHON_ENV>/bin/python -B
+        <TASK_ROOT>/public_vertical_probe.py
+  cwd: <TASK_ROOT>/candidate
+  Python path: isolated candidate/src와 candidate만 명시.
+  최종 child exit: 0; wrapper wall time: 0.787924s; harness body: 0.176988s.
+  최종 raw SHA-256:
+    680fb044c195a691a4647b73c28acc21cbdd8c327e7adc39ed43e6ad5971f4dc
+  최초 child exit: 1; wrapper wall time: 0.849965s.
+  최초 raw SHA-256:
+    094eaea1787dc7e40f075fed1d1a8711128f77978218b88aa40c36026c41069d
+  최종 harness SHA-256:
+    d002973584cad77de6aa97db97358d6ec9700503628d9667eb03f24000031476
+  표준 unittest skip: 0(이 실행은 suite discovery가 아닌 explicit public probe).
+  NOT_RUN legs: 6.
+
+NOT_RUN의 정확한 범위 / 최소 다음 입력
+D1는 runtime.py:132 및 :4134-4141에서 active Plan의 POSIX run_once를 어떤 RuntimeJob
+행 생성보다 먼저 차단한다. 따라서 아래 leg에는 실제 성공/거절 판정을 내리지 않았다:
+  ready ExecutionSpec materialization; Task admission+AGS AND gate; Task execution;
+  independent Task validation; independent GoalTest; Core GoalVerdict.
+Linux FakeCodexRuntime이 있어도 이 경계는 그대로다. gate open이나 준비의 PASS로 이를
+대체하지 않으며 OS lock 우회, 내부 dispatcher/service 단계 직접 연결을 E2E로 만들지 않았다.
+
+최소 다음 입력은 정확한 같은 source에서 D1 owner lock을 지원하는 Windows executor다.
+기존 scripted adapters만으로 다음 단일 Task canary를 이어갈 수 있다:
+  tests.test_engine_fm08_early_canary.Fm08EarlyCanaryVerticalPathTests.
+  test_c1_skinny_core_vertical_path_completes_on_deterministic_fixture
+다만 이 기존 test의 AllowAllGate는 실제 AGS를 증명하지 않는다. 공개 run_once에서
+승인 없음 / gate 거절 / Core 성공+gate 통과의 paired cases를 수행해 before_execution
+호출과 worker create/turn/intent/receipt 증분을 비교해야 한다. real AGS AND acceptance를
+원하면 owner가 현재 선언된 plugin closure/explicit profile을 그 executor에 제공해야 하며
+토큰/key/운영 DB 전송은 필요하지 않다. 이 전달 없이 AGS 결과는 NOT_RUN으로 유지한다.
+독립 Validator는 별도 Attempt/thread/receipt, GoalTest는 별도 결과, completion은 Core가
+판정하는 기존 canary 검사를 재사용한다. consumed FM03 endpoint는 호출하지 않는다.
+
+선행 portable/wheel/SQLite sibling 결과를 재실행하거나 이 보고서의 PASS에 포함하지 않았다.
+provider/native qualification, deep adversarial Planner/Validator/DAG, process faults는 이
+workstream의 주장 범위 밖이다. 새로운 source defect가 확인될 때만 최소 isolated patch와
+해당 regression을 제안한다. 현재는 source diff0이라 구현 제안이나 merge가 없다.
+
+이 상세 보고서는 최초 parent review 준비 시점의 기록이다. 이후 사용자가 지정한 private GitHub evidence branch 게시를 명시 승인했다. Library에는 게시하지 않는다.
+export bundle은 이 보고서, 자체 harness, 비밀 없는 command/raw/identity/count JSON만
+포함하고 disposable DB/WAL, candidate .git/source tree, credentials, native messages는 제외한다.

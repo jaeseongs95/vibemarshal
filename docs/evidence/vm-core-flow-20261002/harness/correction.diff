@@ -1,0 +1,20 @@
+--- harness/attempt1.py
++++ harness/attempt2.py
+@@ -23,7 +23,7 @@
+ 
+ ROOT = Path(__file__).resolve().parent
+ EVIDENCE = ROOT / 'evidence'
+-RUN = ROOT / 'disposable-workflow'
++RUN = ROOT / 'disposable-workflow-r2'
+ RUN.mkdir()
+ PROJECT = RUN / 'project'
+ PROJECT.mkdir()
+@@ -157,7 +157,7 @@
+     before = snapshot()
+     authorized = authority.authorize(project_id, target=target, source='disposable-test-host-confirmation')
+     after_authorize = record('public_application_authority_authorize_activate', before,
+-        {'authorization_id': authorized.authorization_id, 'activation_id': authorized.activation_id,
++        {'authorization_id': authorized.authorization.authorization_id, 'activation_id': authorized.activation_id,
+          'target_digest': target.target_digest, 'scope': 'public trusted-host API; synthetic business confirmation'})
+     assert after_authorize['tables']['goal_authorizations'] == 1
+     assert after_authorize['tables']['plan_activations'] == 1

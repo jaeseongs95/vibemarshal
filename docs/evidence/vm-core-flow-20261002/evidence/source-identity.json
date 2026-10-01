@@ -1,0 +1,23 @@
+{
+  "base_commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "base_tree": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d",
+  "candidate_commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "candidate_tree": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d",
+  "candidate_source_changes": false,
+  "proposal_patch": null,
+  "diff_bytes": 0,
+  "diff_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "candidate_status": "",
+  "shared_checkout_status": "",
+  "source_files": {
+    "AGENTS.md": "f6d5a37f3bb61be891f7ecf6a8a993f2e7b70b94f02d5148e47ea13f1695e989",
+    "src/flowmarshal/engine/application.py": "7a47ef6148c2e168b1499bd169c5ed7eb4d45690aef4549648a21b24b996d7fb",
+    "src/flowmarshal/engine/service.py": "a0b3aaf0645825c7eeb62babab0d63c8062158c38be46cf59a3649f3053568b3",
+    "src/flowmarshal/engine/runtime.py": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+    "src/flowmarshal/engine/roles.py": "a333f2c79cb0afb5aa0fda7ef8daaed4ad91b65b0fdb0b131b2e2e5f47944994",
+    "tests/test_engine_fm08_core_integration.py": "f10ce3927982342568b872e6840d8bb129bd5a07f0add72d5552bc133669edfa",
+    "tests/engine_inspection_helpers.py": "0ef4ccb206edbcb31bf19d9474e586014b402c3722a305b4cf7513658149ec93"
+  },
+  "read_skills": "<EXECUTION_WORKSPACE>/.agents empty; no repository .agents/skills",
+  "publication": "not published; prepared for parent review"
+}

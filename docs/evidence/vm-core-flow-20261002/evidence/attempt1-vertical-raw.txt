@@ -1,0 +1,7 @@
+Traceback (most recent call last):
+  File "<TASK_ROOT>/public_vertical_probe.py", line 160, in <module>
+    {'authorization_id': authorized.authorization_id, 'activation_id': authorized.activation_id,
+                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<PYTHON_ENV>/lib/python3.12/site-packages/pydantic/main.py", line 1042, in __getattr__
+    raise AttributeError(f'{type(self).__name__!r} object has no attribute {item!r}')
+AttributeError: 'EngineAuthorizationResult' object has no attribute 'authorization_id'. Did you mean: 'authorization'?
