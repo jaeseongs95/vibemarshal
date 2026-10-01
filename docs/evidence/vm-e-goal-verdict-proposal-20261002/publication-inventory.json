@@ -1,0 +1,233 @@
+{
+  "format": "vm-e-draft-publication-inventory-v1",
+  "implementation_commit": "98bb122970f82bb5fcef122003ee10c7eb787cf4",
+  "implementation_tree": "1bcc8378c86f30aca46fd757545f07d458d65dd3",
+  "direct_base": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "source_files": [
+    {
+      "path": "src/flowmarshal/engine/service.py",
+      "implementation_blob_sha256": "819682f3fe62e1f86cdfa8031e9321164a77da16881ca2b9e77fd1c689c4d743"
+    },
+    {
+      "path": "tests/test_engine_goal_verdict_authority.py",
+      "implementation_blob_sha256": "685e731903c236de40d72d3fa6aaabcab034cba76ecf46a311b5a365d9b17e97"
+    }
+  ],
+  "artifact_files": [
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/README.md",
+      "size_bytes": 7560,
+      "sha256": "f3524e8498db6fda58590e7627a9d83bc8658a1e294cbd072b1d57ca88b4703f",
+      "origin": "publication_review_metadata",
+      "unchanged_original_bytes": false
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/adversarial-shard.raw.txt",
+      "size_bytes": 15657,
+      "sha256": "612f1452ae750f78787dc91e770410d6d702a48125be8b4b1f0c6f67ca88414d",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/adversarial-supported.raw.txt",
+      "size_bytes": 5705,
+      "sha256": "55da416a068fdeb5e7462bb7672f529214dd7129e104102ef8d4352c5f1b7994",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/adversarial.py",
+      "size_bytes": 15213,
+      "sha256": "cff4daa7de7d5c35d457063056354318733f045d5c1a3693a139546fdbf7802f",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/base-final-status.raw.txt",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/base-patch-check.raw.txt",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/baseline-verdict.raw.txt",
+      "size_bytes": 5733,
+      "sha256": "2a1ea323c1899581106a211af4a42d14d94ce50f1d604bfd043d438577d5ffaa",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/baseline.py",
+      "size_bytes": 764,
+      "sha256": "5c87bb479b18a334d1e527be25c1a36c788e12385923432fba477bbfb5ee25bd",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/candidate-final-status.raw.txt",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/candidate-identity.raw.txt",
+      "size_bytes": 82,
+      "sha256": "92f4518b6456487c1bc7d0fb6626aa06bee11679a559658636b84e54fe91d2a7",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/candidate-verdict-final.raw.txt",
+      "size_bytes": 1859,
+      "sha256": "7aeab52319f0db0245a549728d093f667473adda17674baa2f2385c2f0ffd958",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/candidate-verdict.raw.txt",
+      "size_bytes": 1470,
+      "sha256": "3db6c62a96007ab828ae5087afe04d61879ff1f99f07210113da35ff2882dbf8",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/commands.jsonl",
+      "size_bytes": 8685,
+      "sha256": "2fc873fdce4d866f1a3a72a5ffdf7cb342a2125ae0e7bf3804f7f91d1df0f216",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/diff-check.raw.txt",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/diff-ownership.raw.txt",
+      "size_bytes": 90,
+      "sha256": "d9073a9cd64a13c40ee16a5171fd8e2a79b2928bfc366559ae24ad2de5d0800c",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/final-baseline-verdict.raw.txt",
+      "size_bytes": 6448,
+      "sha256": "8ddf7c9a7e681ccfb30e83f7e4d29e05338d835b712b2426eaaf163dd9e9e053",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/final-candidate-verdict.raw.txt",
+      "size_bytes": 5081,
+      "sha256": "11851c39f55cd628b7866415fdf3dbccd4f2ef3e890c444bca025eb48493d0fc",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/normative-sources.json",
+      "size_bytes": 23980,
+      "sha256": "368ebec39e5e9d2908b606f65cd49664ef93b16f47a10a4247e3f28ab0fa097f",
+      "origin": "publication_review_metadata",
+      "unchanged_original_bytes": false
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/proposal-commit.raw.txt",
+      "size_bytes": 212,
+      "sha256": "831cd128ba5e9d86153af0c2c7c9706d7333ffa125f45d63c3ceef9f56a77869",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/proposal-diff.raw.txt",
+      "size_bytes": 11754,
+      "sha256": "5e0832f1976eb822014f0503d341f92528af766e5a56f1fa935658d484dad1eb",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/proposal.patch",
+      "size_bytes": 11754,
+      "sha256": "5e0832f1976eb822014f0503d341f92528af766e5a56f1fa935658d484dad1eb",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/report.json",
+      "size_bytes": 22365,
+      "sha256": "a3ec420741f18f29608dbd391b8d460f6b0362edad25de29a4a7ceb4eecd616f",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/report.txt",
+      "size_bytes": 3678,
+      "sha256": "da51f0c52b50b1b3dd29bf9139b40121af92f9bdaf9789cdf16b4284c8dcb9f9",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/reviewed-base-regressions.raw.txt",
+      "size_bytes": 6448,
+      "sha256": "8c761a919cc79746a3abcdac2a79849aa987dea6f80526359b7cb2edd277bd1a",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/reviewed-candidate-42.raw.txt",
+      "size_bytes": 7466,
+      "sha256": "e99674731f76b74b2509a354f0728cdf8e7f38ac4e73b59d3c7176b5038023a5",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/run.py",
+      "size_bytes": 1089,
+      "sha256": "56a17dc1176065cb86687158bec7fc87c460ae5f9e710c57f88430a4fb6e69d4",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/stage-proposal.raw.txt",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/staged-diff-check.raw.txt",
+      "size_bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    },
+    {
+      "path": "docs/evidence/vm-e-goal-verdict-proposal-20261002/stale-plan-repro.raw.txt",
+      "size_bytes": 988,
+      "sha256": "fb0fbe98fc4161eb85a49b413d91f1312f06556542e86c62f8583e3b8ea00bfd",
+      "origin": "original_synthetic_shard_evidence",
+      "unchanged_original_bytes": true
+    }
+  ],
+  "checked_patterns": [
+    "private_key",
+    "github_token",
+    "api_key",
+    "bearer_token",
+    "aws_access_key",
+    "embedded_url_credentials",
+    "native_session_row"
+  ],
+  "review_result": "outgoing bytes reviewed; synthetic/source/git evidence only; no scan findings",
+  "implementation_independently_approved": false,
+  "note": "This inventory excludes itself from its own hash list."
+}

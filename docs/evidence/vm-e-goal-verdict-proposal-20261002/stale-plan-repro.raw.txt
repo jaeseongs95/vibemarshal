@@ -1,0 +1,15 @@
+test_superseded_plan_verdict_cannot_clear_current_active_plan (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_superseded_plan_verdict_cannot_clear_current_active_plan) ... FAIL
+
+======================================================================
+FAIL: test_superseded_plan_verdict_cannot_clear_current_active_plan (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_superseded_plan_verdict_cannot_clear_current_active_plan)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 117, in test_superseded_plan_verdict_cannot_clear_current_active_plan
+    with self.assertRaises(EngineServiceError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineServiceError not raised
+
+----------------------------------------------------------------------
+Ran 1 test in 0.115s
+
+FAILED (failures=1)

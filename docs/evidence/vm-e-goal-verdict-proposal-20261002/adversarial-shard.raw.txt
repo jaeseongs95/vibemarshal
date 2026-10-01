@@ -1,0 +1,153 @@
+test_declared_api_rejects_conditional_edge_fields (__main__.InvalidGraphInputs.test_declared_api_rejects_conditional_edge_fields) ... ok
+test_duplicate_task_and_duplicate_dependency_are_rejected (__main__.InvalidGraphInputs.test_duplicate_task_and_duplicate_dependency_are_rejected) ... ok
+test_made_up_handoff_product_is_rejected (__main__.InvalidGraphInputs.test_made_up_handoff_product_is_rejected) ... ok
+test_plan_cycles_for_all_declared_edge_types (__main__.InvalidGraphInputs.test_plan_cycles_for_all_declared_edge_types) ... ok
+test_revision_digest_and_self_supersession_are_rejected (__main__.InvalidGraphInputs.test_revision_digest_and_self_supersession_are_rejected) ... ok
+test_skeleton_cycles_for_all_declared_edge_types (__main__.InvalidGraphInputs.test_skeleton_cycles_for_all_declared_edge_types) ... ok
+test_unknown_task_and_self_dependency (__main__.InvalidGraphInputs.test_unknown_task_and_self_dependency) ... ok
+test_failed_validation_does_not_unlock_downstream_task (__main__.DependencyReadiness.test_failed_validation_does_not_unlock_downstream_task) ... ok
+test_failed_worker_does_not_unlock_downstream_task (__main__.DependencyReadiness.test_failed_worker_does_not_unlock_downstream_task) ... ERROR
+test_pending_downstream_spec_is_rejected (__main__.DependencyReadiness.test_pending_downstream_spec_is_rejected) ... ok
+test_project_prefix_does_not_authorize_a_made_up_input (tests.test_engine_planning.EnginePlanningTests.test_project_prefix_does_not_authorize_a_made_up_input) ... ok
+test_hard_gate_failure_is_not_scored_or_reviewed (tests.test_engine_planning.EnginePlanningTests.test_hard_gate_failure_is_not_scored_or_reviewed) ... ok
+test_stale_expanded_plan_is_rejected_before_plan_reviewer (tests.test_engine_planning.EnginePlanningTests.test_stale_expanded_plan_is_rejected_before_plan_reviewer)
+같은 후보는 정상 선택되지만 재관측 뒤의 과거 Plan은 결정적으로 거부한다. ... ok
+test_reviewer_finding_cannot_be_admitted (tests.test_engine_planning.EnginePlanningTests.test_reviewer_finding_cannot_be_admitted) ... ok
+test_serialized_evaluation_cannot_override_core_decision (tests.test_engine_planning.EnginePlanningTests.test_serialized_evaluation_cannot_override_core_decision) ... ok
+test_search_outcome_recomputes_selected_plan_and_call_count (tests.test_engine_planning.EnginePlanningTests.test_search_outcome_recomputes_selected_plan_and_call_count) ... ok
+test_service_recomputes_skeleton_gate_instead_of_trusting_payload (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_service_recomputes_skeleton_gate_instead_of_trusting_payload) ... ok
+test_service_rejects_plan_semantic_drift_hidden_by_clean_review (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_service_rejects_plan_semantic_drift_hidden_by_clean_review) ... ok
+test_service_rejects_copied_unknown_evidence_before_plan_registration (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_service_rejects_copied_unknown_evidence_before_plan_registration) ... ok
+test_plan_revision_must_supersede_latest_in_same_lineage (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_plan_revision_must_supersede_latest_in_same_lineage) ... ok
+test_execution_spec_cannot_change_task_semantics (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_execution_spec_cannot_change_task_semantics) ... ok
+test_file_change_after_materialization_blocks_attempt (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_file_change_after_materialization_blocks_attempt) ... ok
+test_same_project_attempts_are_serialized (tests.test_engine_ledger_service.EngineLedgerServiceTests.test_same_project_attempts_are_serialized) ... ok
+test_source_permission_strings_and_constructed_handles_cannot_authorize (tests.test_engine_core_capabilities.EngineCoreCapabilityTests.test_source_permission_strings_and_constructed_handles_cannot_authorize) ... ok
+test_capability_is_bound_to_authority_project_and_current_policy (tests.test_engine_core_capabilities.EngineCoreCapabilityTests.test_capability_is_bound_to_authority_project_and_current_policy) ... ok
+test_nested_worker_validator_context_cannot_mint_or_use_core_handles (tests.test_engine_core_capabilities.EngineCoreCapabilityTests.test_nested_worker_validator_context_cannot_mint_or_use_core_handles) ... ok
+test_structured_validator_callback_cannot_use_even_leaked_capability (tests.test_engine_core_capabilities.EngineCoreCapabilityTests.test_structured_validator_callback_cannot_use_even_leaked_capability) ... ok
+test_stale_input_after_materialize_blocks_without_raising (tests.test_engine_serial_materialize.SerialMaterializeTests.test_stale_input_after_materialize_blocks_without_raising) ... FAIL
+test_deleted_input_after_materialize_blocks_without_raising (tests.test_engine_serial_materialize.SerialMaterializeTests.test_deleted_input_after_materialize_blocks_without_raising) ... FAIL
+test_stale_input_during_gate_blocks_reserve_without_raising (tests.test_engine_serial_materialize.SerialMaterializeTests.test_stale_input_during_gate_blocks_reserve_without_raising) ... FAIL
+test_independent_semantic_terminal_claim_cannot_skip_model_review (tests.test_engine_execution_automation.ExecutionAutomationTests.test_independent_semantic_terminal_claim_cannot_skip_model_review) ... ERROR
+test_independent_semantic_evidence_cannot_be_reused_or_rebound (tests.test_engine_execution_automation.ExecutionAutomationTests.test_independent_semantic_evidence_cannot_be_reused_or_rebound) ... ERROR
+test_task_semantic_rejects_cross_validation_job_rebinding (tests.test_engine_execution_automation.ExecutionAutomationTests.test_task_semantic_rejects_cross_validation_job_rebinding) ... ERROR
+test_independent_semantic_validator_cannot_reuse_worker_thread (tests.test_engine_execution_automation.ExecutionAutomationTests.test_independent_semantic_validator_cannot_reuse_worker_thread) ... ERROR
+test_task_semantic_validation_rejects_invented_evidence (tests.test_engine_execution_automation.ExecutionAutomationTests.test_task_semantic_validation_rejects_invented_evidence) ... ERROR
+test_semantic_goal_rejects_stale_or_null_binding_reassignment (tests.test_engine_execution_automation.ExecutionAutomationTests.test_semantic_goal_rejects_stale_or_null_binding_reassignment) ... ERROR
+test_tampered_operation_binding_is_rejected_before_recording (tests.test_engine_validation_operation_binding.ValidationOperationBindingTests.test_tampered_operation_binding_is_rejected_before_recording) ... ok
+test_models_are_frozen_and_extra_fields_are_forbidden (tests.test_engine_domain.EngineDomainTests.test_models_are_frozen_and_extra_fields_are_forbidden) ... ok
+test_new_schema_does_not_accept_unconsumed_commit_horizon (tests.test_engine_domain.EngineDomainTests.test_new_schema_does_not_accept_unconsumed_commit_horizon) ... ok
+
+======================================================================
+ERROR: test_failed_worker_does_not_unlock_downstream_task (__main__.DependencyReadiness.test_failed_worker_does_not_unlock_downstream_task)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-evidence/adversarial.py", line 125, in test_failed_worker_does_not_unlock_downstream_task
+    self.service.finish_attempt(attempt_id=attempt.attempt_id, succeeded=False)
+  File "/workspace/vm-e-proposal/src/flowmarshal/engine/service.py", line 5212, in finish_attempt
+    raise EngineServiceError("실패 Attempt에는 failure_class가 필요합니다.")
+flowmarshal.engine.service.EngineServiceError: 실패 Attempt에는 failure_class가 필요합니다.
+
+======================================================================
+ERROR: test_independent_semantic_terminal_claim_cannot_skip_model_review (tests.test_engine_execution_automation.ExecutionAutomationTests.test_independent_semantic_terminal_claim_cannot_skip_model_review)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_execution_automation.py", line 986, in test_independent_semantic_terminal_claim_cannot_skip_model_review
+    dispatcher = self.validating(prepared, runtime)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vm-e-proposal/tests/test_engine_execution_automation.py", line 144, in validating
+    binding = ThreadBinding.model_validate_json(row["binding_json"])
+                                                ~~~^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+======================================================================
+ERROR: test_independent_semantic_evidence_cannot_be_reused_or_rebound (tests.test_engine_execution_automation.ExecutionAutomationTests.test_independent_semantic_evidence_cannot_be_reused_or_rebound)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_execution_automation.py", line 1015, in test_independent_semantic_evidence_cannot_be_reused_or_rebound
+    dispatcher = self.validating(prepared, runtime)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vm-e-proposal/tests/test_engine_execution_automation.py", line 144, in validating
+    binding = ThreadBinding.model_validate_json(row["binding_json"])
+                                                ~~~^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+======================================================================
+ERROR: test_task_semantic_rejects_cross_validation_job_rebinding (tests.test_engine_execution_automation.ExecutionAutomationTests.test_task_semantic_rejects_cross_validation_job_rebinding)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_execution_automation.py", line 1178, in test_task_semantic_rejects_cross_validation_job_rebinding
+    dispatcher = self.validating(prepared, runtime)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vm-e-proposal/tests/test_engine_execution_automation.py", line 144, in validating
+    binding = ThreadBinding.model_validate_json(row["binding_json"])
+                                                ~~~^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+======================================================================
+ERROR: test_independent_semantic_validator_cannot_reuse_worker_thread (tests.test_engine_execution_automation.ExecutionAutomationTests.test_independent_semantic_validator_cannot_reuse_worker_thread)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_execution_automation.py", line 1227, in test_independent_semantic_validator_cannot_reuse_worker_thread
+    dispatcher = self.validating(prepared, runtime)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vm-e-proposal/tests/test_engine_execution_automation.py", line 144, in validating
+    binding = ThreadBinding.model_validate_json(row["binding_json"])
+                                                ~~~^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+======================================================================
+ERROR: test_task_semantic_validation_rejects_invented_evidence (tests.test_engine_execution_automation.ExecutionAutomationTests.test_task_semantic_validation_rejects_invented_evidence)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_execution_automation.py", line 1411, in test_task_semantic_validation_rejects_invented_evidence
+    dispatcher = self.validating(prepared, runtime)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vm-e-proposal/tests/test_engine_execution_automation.py", line 144, in validating
+    binding = ThreadBinding.model_validate_json(row["binding_json"])
+                                                ~~~^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+======================================================================
+ERROR: test_semantic_goal_rejects_stale_or_null_binding_reassignment (tests.test_engine_execution_automation.ExecutionAutomationTests.test_semantic_goal_rejects_stale_or_null_binding_reassignment)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_execution_automation.py", line 735, in test_semantic_goal_rejects_stale_or_null_binding_reassignment
+    self.task_completed(prepared, runtime)
+  File "/workspace/vm-e-proposal/tests/test_engine_execution_automation.py", line 151, in task_completed
+    dispatcher = self.validating(prepared, runtime)
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vm-e-proposal/tests/test_engine_execution_automation.py", line 144, in validating
+    binding = ThreadBinding.model_validate_json(row["binding_json"])
+                                                ~~~^^^^^^^^^^^^^^^^
+TypeError: 'NoneType' object is not subscriptable
+
+======================================================================
+FAIL: test_stale_input_after_materialize_blocks_without_raising (tests.test_engine_serial_materialize.SerialMaterializeTests.test_stale_input_after_materialize_blocks_without_raising)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_serial_materialize.py", line 143, in test_stale_input_after_materialize_blocks_without_raising
+    self.assertEqual(RunOnceAction.MATERIALIZED, first.action, first.detail)
+AssertionError: <RunOnceAction.MATERIALIZED: 'materialized'> != <RunOnceAction.BLOCKED: 'blocked'> : RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+======================================================================
+FAIL: test_deleted_input_after_materialize_blocks_without_raising (tests.test_engine_serial_materialize.SerialMaterializeTests.test_deleted_input_after_materialize_blocks_without_raising)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_serial_materialize.py", line 156, in test_deleted_input_after_materialize_blocks_without_raising
+    self.assertEqual(RunOnceAction.MATERIALIZED, first.action, first.detail)
+AssertionError: <RunOnceAction.MATERIALIZED: 'materialized'> != <RunOnceAction.BLOCKED: 'blocked'> : RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+======================================================================
+FAIL: test_stale_input_during_gate_blocks_reserve_without_raising (tests.test_engine_serial_materialize.SerialMaterializeTests.test_stale_input_during_gate_blocks_reserve_without_raising)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_serial_materialize.py", line 169, in test_stale_input_during_gate_blocks_reserve_without_raising
+    self.assertEqual(RunOnceAction.MATERIALIZED, first.action, first.detail)
+AssertionError: <RunOnceAction.MATERIALIZED: 'materialized'> != <RunOnceAction.BLOCKED: 'blocked'> : RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix
+
+----------------------------------------------------------------------
+Ran 39 tests in 2.059s
+
+FAILED (failures=3, errors=7)

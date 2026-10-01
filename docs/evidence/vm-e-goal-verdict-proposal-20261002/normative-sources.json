@@ -1,0 +1,258 @@
+{
+  "basis_commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "implementation_commit": "98bb122970f82bb5fcef122003ee10c7eb787cf4",
+  "review_status": "DRAFT_NOT_INDEPENDENTLY_REVIEWED_NOT_SOURCE_GO",
+  "cases": [
+    {
+      "id": "VM-E-01",
+      "case": "과거 integration PASS가 최신 FAIL/INCONCLUSIVE를 덮음",
+      "normative_sources": [
+        {
+          "kind": "normative_document",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "docs/orchestration-redesign.md",
+          "section_or_purpose": "§8 원장과 상태 전이: 필수 Task/criterion/integration evidence 확인 뒤 satisfied",
+          "first_line": 370,
+          "last_line": 370,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/docs/orchestration-redesign.md#L370-L370",
+          "file_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+          "exact_text": "대화나 모델의 완료 선언만으로 Task를 완료하지 않는다. Task validation과 plan-level Goal Test를 분리하며, 모든 필수 Task·criterion·integration validation evidence가 확인된 뒤에만 Goal을 `satisfied`로 판정한다.",
+          "explicitly_states_tested_rule": false
+        },
+        {
+          "kind": "normative_document",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "AGENTS.md",
+          "section_or_purpose": "SQLite 원장만 권위, Domain Core만 완료 판정",
+          "first_line": 72,
+          "last_line": 72,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/AGENTS.md#L72-L72",
+          "file_sha256": "f6d5a37f3bb61be891f7ecf6a8a993f2e7b70b94f02d5148e47ea13f1695e989",
+          "exact_text": "- SQLite 원장만 revision·활성 계약·Task·Attempt·binding·evidence·validation·budget·History의 권위다. Domain Core만 상태를 전이하고 완료를 판정한다.",
+          "explicitly_states_tested_rule": true
+        }
+      ],
+      "supporting_sources": [
+        {
+          "kind": "existing_implementation_support_not_normative_contract",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "src/flowmarshal/engine/runtime.py",
+          "section_or_purpose": "기존 dispatcher가 Task/integration 결과를 모아 최신 행을 사용",
+          "first_line": 6911,
+          "last_line": 6918,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/src/flowmarshal/engine/runtime.py#L6911-L6918",
+          "file_sha256": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+          "exact_text": "            rows = connection.execute(\n                \"SELECT * FROM validation_results WHERE plan_revision_id = ? \"\n                \"AND task_id IS NULL \"\n                \"ORDER BY evaluated_at, rowid\",\n                (plan.plan_revision_id,),\n            ).fetchall()\n            rows += [row for task in plan.definition.tasks\n                     for row in self.service.effective_task_validation_results(connection, task.task_id)]",
+          "explicitly_states_tested_rule": false
+        },
+        {
+          "kind": "existing_implementation_support_not_normative_contract",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "src/flowmarshal/engine/runtime.py",
+          "section_or_purpose": "latest는 validation_id별 마지막 행",
+          "first_line": 6933,
+          "last_line": 6933,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/src/flowmarshal/engine/runtime.py#L6933-L6933",
+          "file_sha256": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+          "exact_text": "        latest = {row[\"validation_id\"]: row for row in rows}",
+          "explicitly_states_tested_rule": false
+        },
+        {
+          "kind": "existing_implementation_support_not_normative_contract",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "src/flowmarshal/engine/runtime.py",
+          "section_or_purpose": "최신 결과 FAIL/미확정은 satisfied로 집계하지 않음",
+          "first_line": 7103,
+          "last_line": 7139,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/src/flowmarshal/engine/runtime.py#L7103-L7139",
+          "file_sha256": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+          "exact_text": "        for coverage in plan.definition.goal_coverage:\n            statuses: list[ValidationStatus] = []\n            evidence_ids: set[str] = set()\n            for validation_id in coverage.validation_ids:\n                row = latest_rows.get(validation_id)\n                if row is None:\n                    statuses.append(ValidationStatus.INCONCLUSIVE)\n                    continue\n                result = ValidationResult.model_validate_json(row[\"payload_json\"])\n                statuses.append(result.status)\n                evidence_ids.update(result.evidence_ids)\n            status = (\n                ValidationStatus.FAIL\n                if ValidationStatus.FAIL in statuses\n                else (\n                    ValidationStatus.PASS\n                    if statuses and set(statuses) == {ValidationStatus.PASS}\n                    else ValidationStatus.INCONCLUSIVE\n                )\n            )\n            criteria.append(\n                CriterionVerdict(\n                    criterion_id=coverage.criterion_id,\n                    status=status,\n                    evidence_ids=tuple(sorted(evidence_ids)),\n                    rationale=\"coverage에 결속된 Task validation과 Goal Test의 최신 결과를 집계했습니다.\",\n                )\n            )\n        statuses = {item.status for item in criteria}\n        verdict_status = (\n            GoalVerdictStatus.NOT_SATISFIED\n            if ValidationStatus.FAIL in statuses\n            else (\n                GoalVerdictStatus.SATISFIED\n                if statuses == {ValidationStatus.PASS}\n                else GoalVerdictStatus.INCONCLUSIVE\n            )",
+          "explicitly_states_tested_rule": false
+        }
+      ],
+      "interpretation": "§8의 필수 evidence 확인과 원장 권위에서 현재 refuting 검사 결과를 무시할 수 없다고 해석했다. latest integration 선택 순서는 문서의 독립적인 명시 규칙으로 인용하지 않고 기존 dispatcher와의 Core writer 일관성을 근거로 제안한다."
+    },
+    {
+      "id": "VM-E-02",
+      "case": "completed Task 상태가 최신 FAIL/NOT_RUN을 덮음",
+      "normative_sources": [
+        {
+          "kind": "normative_document",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "docs/redesign-1.0-contract.md",
+          "section_or_purpose": "D02 재사용 계보의 원본/중간 Task 최신 실패·미확정 결과를 현재 Goal에 반영",
+          "first_line": 21,
+          "last_line": 21,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/docs/redesign-1.0-contract.md#L21-L21",
+          "file_sha256": "19c483be40fabae92d90e7b5abc49ecb08f024ecacc559b6a29e3178bf85188c",
+          "exact_text": "재사용된 Task에 새 검사 결과가 기록되면 이전 PASS와 함께 기록 순서로 조회해 최신 결과를 반영한다. 원본이나 중간 Task에 늦게 기록된 실패·미확정 결과도 재사용 계보를 따라 현재 Goal 판정에 반영한다. 다음 Plan으로 다시 재사용할 때는 원본과 중간 Task의 최신 검사 모두 기존 완료 근거에 결속되어야 한다. 새 검사로 이 결속이 달라지면 원래 기록을 보존하고 새 Task를 미완료 상태에서 검증한다.",
+          "explicitly_states_tested_rule": true
+        },
+        {
+          "kind": "normative_document",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "docs/orchestration-redesign.md",
+          "section_or_purpose": "§8 필수 Task 및 integration validation evidence 확인",
+          "first_line": 370,
+          "last_line": 370,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/docs/orchestration-redesign.md#L370-L370",
+          "file_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+          "exact_text": "대화나 모델의 완료 선언만으로 Task를 완료하지 않는다. Task validation과 plan-level Goal Test를 분리하며, 모든 필수 Task·criterion·integration validation evidence가 확인된 뒤에만 Goal을 `satisfied`로 판정한다.",
+          "explicitly_states_tested_rule": true
+        },
+        {
+          "kind": "normative_document",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "AGENTS.md",
+          "section_or_purpose": "Core 원장 권위",
+          "first_line": 72,
+          "last_line": 72,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/AGENTS.md#L72-L72",
+          "file_sha256": "f6d5a37f3bb61be891f7ecf6a8a993f2e7b70b94f02d5148e47ea13f1695e989",
+          "exact_text": "- SQLite 원장만 revision·활성 계약·Task·Attempt·binding·evidence·validation·budget·History의 권위다. Domain Core만 상태를 전이하고 완료를 판정한다.",
+          "explicitly_states_tested_rule": true
+        }
+      ],
+      "supporting_sources": [
+        {
+          "kind": "existing_implementation_support_not_normative_contract",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "src/flowmarshal/engine/service.py",
+          "section_or_purpose": "effective_task_validation_results의 현재 Worker/reuse·기록 순서 계약",
+          "first_line": 3527,
+          "last_line": 3528,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/src/flowmarshal/engine/service.py#L3527-L3528",
+          "file_sha256": "a0b3aaf0645825c7eeb62babab0d63c8062158c38be46cf59a3649f3053568b3",
+          "exact_text": "    def effective_task_validation_results(connection: Any, task_id: str) -> tuple[Any, ...]:\n        \"\"\"현재 Worker/reuse 기준과 그 뒤의 Task 검사 관측을 기록 순서로 반환한다.\"\"\"",
+          "explicitly_states_tested_rule": false
+        },
+        {
+          "kind": "existing_implementation_support_not_normative_contract",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "src/flowmarshal/engine/runtime.py",
+          "section_or_purpose": "기존 최신 Task 결과 집계",
+          "first_line": 7103,
+          "last_line": 7139,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/src/flowmarshal/engine/runtime.py#L7103-L7139",
+          "file_sha256": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+          "exact_text": "        for coverage in plan.definition.goal_coverage:\n            statuses: list[ValidationStatus] = []\n            evidence_ids: set[str] = set()\n            for validation_id in coverage.validation_ids:\n                row = latest_rows.get(validation_id)\n                if row is None:\n                    statuses.append(ValidationStatus.INCONCLUSIVE)\n                    continue\n                result = ValidationResult.model_validate_json(row[\"payload_json\"])\n                statuses.append(result.status)\n                evidence_ids.update(result.evidence_ids)\n            status = (\n                ValidationStatus.FAIL\n                if ValidationStatus.FAIL in statuses\n                else (\n                    ValidationStatus.PASS\n                    if statuses and set(statuses) == {ValidationStatus.PASS}\n                    else ValidationStatus.INCONCLUSIVE\n                )\n            )\n            criteria.append(\n                CriterionVerdict(\n                    criterion_id=coverage.criterion_id,\n                    status=status,\n                    evidence_ids=tuple(sorted(evidence_ids)),\n                    rationale=\"coverage에 결속된 Task validation과 Goal Test의 최신 결과를 집계했습니다.\",\n                )\n            )\n        statuses = {item.status for item in criteria}\n        verdict_status = (\n            GoalVerdictStatus.NOT_SATISFIED\n            if ValidationStatus.FAIL in statuses\n            else (\n                GoalVerdictStatus.SATISFIED\n                if statuses == {ValidationStatus.PASS}\n                else GoalVerdictStatus.INCONCLUSIVE\n            )",
+          "explicitly_states_tested_rule": false
+        }
+      ],
+      "interpretation": "D02 line 21은 재사용 계보를 명시한다. 새 회귀는 같은 원본 Task의 completed 상태 뒤 기록된 FAIL/NOT_RUN을 직접 Core writer로 제출한다. §8과 D02의 최신 실패 보존 원칙을 원본 Task 자체에도 적용한 것으로 reviewer가 적용 범위를 판단해야 한다."
+    },
+    {
+      "id": "VM-E-03",
+      "case": "이전 integration PASS ID를 최신 결과 ID 결속으로 수락",
+      "normative_sources": [
+        {
+          "kind": "normative_document",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "docs/orchestration-redesign.md",
+          "section_or_purpose": "§3 GoalVerdict의 Task/Goal Test 근거 및 strict frozen digest 결속",
+          "first_line": 62,
+          "last_line": 65,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/docs/orchestration-redesign.md#L62-L65",
+          "file_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+          "exact_text": "| `GoalVerdict` | Task 결과와 plan-level Goal Test에 근거한 최종 목표 판정 |\n| `BudgetUsageRecord` | provider가 제공한 단계별 nullable input/cache/output/reasoning/total token, 로컬 latency, retry와 폐기 여부 |\n\n모든 revision과 주요 artifact는 strict frozen schema, canonical JSON과 content digest를 사용한다. Goal과 Plan의 새 revision은 같은 ID 계보의 최신 revision을 명시적으로 supersede한다. 기존 `PlanningMission`, `RequestSpec`, `EffectivePlanningPolicy`, `PlanOutcomeContract`의 의미는 `ProjectProfileRevision + GoalContractRevision`으로 통합한다. Mission 종류는 `GoalContractRevision.mission_class`라는 routing label로만 남긴다.",
+          "explicitly_states_tested_rule": false
+        },
+        {
+          "kind": "normative_document",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "docs/orchestration-redesign.md",
+          "section_or_purpose": "§8 필수 evidence 확인",
+          "first_line": 370,
+          "last_line": 370,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/docs/orchestration-redesign.md#L370-L370",
+          "file_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+          "exact_text": "대화나 모델의 완료 선언만으로 Task를 완료하지 않는다. Task validation과 plan-level Goal Test를 분리하며, 모든 필수 Task·criterion·integration validation evidence가 확인된 뒤에만 Goal을 `satisfied`로 판정한다.",
+          "explicitly_states_tested_rule": false
+        },
+        {
+          "kind": "normative_document",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "docs/orchestration-redesign.md",
+          "section_or_purpose": "§8 독립 Goal Test의 최신 Plan/State/Map 운영 binding과 직접 관측",
+          "first_line": 378,
+          "last_line": 378,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/docs/orchestration-redesign.md#L378-L378",
+          "file_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+          "exact_text": "`IntegrationValidationContract.evidence_mode`의 기본값은 `independent`다. semantic validation은 `model_review` evidence를 필수로 요구하며 terminal PASS/FAIL은 제출된 evidence 종류와 무관하게 독립성 검사를 실행한다. Task 완료 후 Core가 최신 Plan·State·Project Map에 독립 Goal Test의 운영 상세 binding을 만들고 실제 명령 또는 Worker와 다른 Attempt·RuntimeJob·thread/turn을 가진 Validator의 새 원자료 관측을 기록한다. Validator는 자체 terminal provider receipt를 가져야 하며 `SemanticValidationObservation`과 `ValidationResult`의 PASS/FAIL, validation/task ID와 content digest를 정확히 일치시켜야 한다. 사용한 model-review evidence는 재사용하거나 재결속하지 않는다. Task evidence를 다시 합산하는 검사는 Plan에 `task_aggregate`가 명시된 경우에만 수행한다. 운영 상세가 같은 의미를 유지하는 한 Plan을 다시 승인하지 않지만 binding 이후 입력 변경은 `STALE_EXECUTION_INPUT`으로 차단한다.",
+          "explicitly_states_tested_rule": false
+        }
+      ],
+      "supporting_sources": [
+        {
+          "kind": "existing_implementation_support_not_normative_contract",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "src/flowmarshal/engine/runtime.py",
+          "section_or_purpose": "기존 dispatcher는 최신 integration 결과 ID를 Verdict에 직렬화",
+          "first_line": 7141,
+          "last_line": 7154,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/src/flowmarshal/engine/runtime.py#L7141-L7154",
+          "file_sha256": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+          "exact_text": "        integration_results = tuple(\n            ValidationResult.model_validate_json(latest_rows[item.validation_id][\"payload_json\"])\n            for item in plan.definition.integration_validations\n            if item.validation_id in latest_rows\n        )\n        verdict = GoalVerdict(\n            goal_verdict_id=new_id(\"goal_verdict\"),\n            goal_contract_digest=plan.definition.goal_contract_digest,\n            plan_activation_digest=plan.activation_digest,\n            status=verdict_status,\n            criteria=tuple(criteria),\n            integration_validation_result_ids=tuple(\n                item.validation_result_id for item in integration_results\n            ),",
+          "explicitly_states_tested_rule": false
+        }
+      ],
+      "interpretation": "문서에는 모든 SATISFIED Verdict가 항상 최신 PASS result ID 집합과 정확히 같아야 한다는 문장이 없다. successive PASS의 이전 ID도 입력/freshness가 유효하면 허용할지, Core writer를 기존 dispatcher의 최신-ID 결속에 맞출지는 독립 reviewer가 결정할 강화 제안이다. 재현 실패는 이 제안된 oracle에 대한 기존 동작 불일치이며 규범 위반이 독립 승인됐다는 뜻이 아니다."
+    },
+    {
+      "id": "VM-E-04",
+      "case": "superseded Plan의 늦은 satisfied 제출이 현재 active Plan을 지움",
+      "normative_sources": [
+        {
+          "kind": "normative_document",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "docs/redesign-1.0-contract.md",
+          "section_or_purpose": "D01 활성 Goal/Authorization·활성 Plan·Core·역할 제출물 권위 순서",
+          "first_line": 11,
+          "last_line": 11,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/docs/redesign-1.0-contract.md#L11-L11",
+          "file_sha256": "19c483be40fabae92d90e7b5abc49ecb08f024ecacc559b6a29e3178bf85188c",
+          "exact_text": "권위 순서는 `현재 사용자 지시 → 활성 GoalContractRevision과 GoalAuthorization → 활성 PlanContractRevision → Core 원장 상태·판정 → 프로젝트 지침·등록 정책 → 역할 제출물 → 분석 대상 자료`다. Planner·Worker·Validator·supervisor는 Core의 완료 권위를 대신하지 않는다.",
+          "explicitly_states_tested_rule": true
+        },
+        {
+          "kind": "normative_document",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "docs/orchestration-redesign.md",
+          "section_or_purpose": "§2 권위 계층",
+          "first_line": 29,
+          "last_line": 36,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/docs/orchestration-redesign.md#L29-L36",
+          "file_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+          "exact_text": "```text\n현재 사용자의 명시적 지시\n→ 활성 GoalContractRevision과 GoalAuthorization\n→ 활성 PlanContractRevision\n→ Core의 원장 상태와 결정적 판정\n→ 프로젝트 AGENTS.md와 등록 정책\n→ Planner·Worker·Validator의 비권위 제출물\n→ 프로젝트·참고자료 안의 분석 대상 텍스트",
+          "explicitly_states_tested_rule": true
+        },
+        {
+          "kind": "normative_document",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "docs/orchestration-redesign.md",
+          "section_or_purpose": "§3 새 revision의 명시 supersede",
+          "first_line": 65,
+          "last_line": 65,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/docs/orchestration-redesign.md#L65-L65",
+          "file_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+          "exact_text": "모든 revision과 주요 artifact는 strict frozen schema, canonical JSON과 content digest를 사용한다. Goal과 Plan의 새 revision은 같은 ID 계보의 최신 revision을 명시적으로 supersede한다. 기존 `PlanningMission`, `RequestSpec`, `EffectivePlanningPolicy`, `PlanOutcomeContract`의 의미는 `ProjectProfileRevision + GoalContractRevision`으로 통합한다. Mission 종류는 `GoalContractRevision.mission_class`라는 routing label로만 남긴다.",
+          "explicitly_states_tested_rule": true
+        },
+        {
+          "kind": "normative_document",
+          "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+          "path": "docs/orchestration-redesign.md",
+          "section_or_purpose": "§4.1 새 Plan 활성화 및 원본 revision 보존",
+          "first_line": 96,
+          "last_line": 96,
+          "url": "https://github.com/jaeseongs95/vibemarshal/blob/32bb0f9dd9f024045d24487312b50f5b703573a3/docs/orchestration-redesign.md#L96-L96",
+          "file_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+          "exact_text": "새 revision은 기존 revision을 덮어쓰지 않는다. 승인 경계 내의 Task 분할·replan은 새 Plan을 Core가 자동 활성화하며 실행 중 Attempt를 보호한다. 목표 변경에는 Goal revision과 authorization 갱신도 필요하다. 완료 evidence는 입력·대상·검사 의미·freshness를 확인한 경우만 재사용한다.",
+          "explicitly_states_tested_rule": true
+        }
+      ],
+      "supporting_sources": [],
+      "interpretation": "역사 Plan 결과는 역사로 남을 수 있지만 현재 active Plan을 종료·삭제하는 새 권위로 승격할 수 없다고 적용했다. proposal은 SATISFIED 상태 전이만 active Plan에 제한하며 역사 non-satisfied 기록 의미를 확장하지 않는다."
+    }
+  ]
+}

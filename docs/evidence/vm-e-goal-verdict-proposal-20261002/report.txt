@@ -1,0 +1,35 @@
+VM E 결과: 검증된 Core 완료 권위 결함 4건, 격리 proposal 준비. apply/merge/push/GO 없음.
+base SHA 32bb0f9dd9f024045d24487312b50f5b703573a3 / tree 27e18c0c7853c1d35a98d5437cebf0ba703ed42d
+candidate SHA 98bb122970f82bb5fcef122003ee10c7eb787cf4 / tree 1bcc8378c86f30aca46fd757545f07d458d65dd3
+diff SHA-256 5e0832f1976eb822014f0503d341f92528af766e5a56f1fa935658d484dad1eb
+소유 파일: service.py의 record_goal_verdict 한 메서드(+34/-13), 새 회귀 파일(+129).
+requested model/effort: gpt-6.1-sol/high; provider observed: null/null(노출된 receipt 없음). Fallback 0, shard model calls 0.
+기준 source: 회귀 8개 중 기대 실패 6. candidate: targeted 42/42 PASS. diff --check 및 base git apply --check PASS.
+
+검증된 findings:
+VM-E-01: 과거 integration PASS가 최신 FAIL/INCONCLUSIVE를 덮음
+VM-E-02: completed Task 상태가 최신 FAIL/NOT_RUN 검사 결과를 덮음
+VM-E-03: 오래된 integration PASS ID를 최신 결과 결속으로 수락
+VM-E-04: superseded Plan 완료 제출물이 현재 active Plan을 지움
+
+결정적인 raw evidence (전체 argv/cwd/UTC 시작/벽시계/exit/hash는 commands.jsonl 및 report.json):
+reviewed-base-regressions: cwd=/workspace/vibemarshal, exit=1, start=2026-10-01T23:38:55.578854+00:00, duration=1.196226s, rawSHA256=8c761a919cc79746a3abcdac2a79849aa987dea6f80526359b7cb2edd277bd1a
+reviewed-candidate-42: cwd=/workspace/vm-e-proposal, exit=0, start=2026-10-01T23:38:56.909279+00:00, duration=3.624438s, rawSHA256=e99674731f76b74b2509a354f0728cdf8e7f38ac4e73b59d3c7176b5038023a5
+staged-diff-check: cwd=/workspace/vm-e-proposal, exit=0, start=2026-10-01T23:39:31.264908+00:00, duration=0.005637s, rawSHA256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+base-patch-check: cwd=/workspace/vibemarshal, exit=0, start=2026-10-01T23:40:04.968511+00:00, duration=0.003070s, rawSHA256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+범위 및 NOT_RUN:
+TrustedTestEngineService/기존 EngineServiceFixture 및 공개 Core API의 합성 검사이며 public vertical E2E는 아님
+Core service·capability·합성 원장은 test harness만 소유; 실제 역할에 DB/authority handle 전달 없음
+validation subprocess.run은 합성 CompletedProcess 또는 명시 거부로 대체; 실제 명령 성능/효과를 검증한 것이 아님
+D1 우회를 위한 owner_lock 내부 patch, POSIX runtime 확대, 새로운 portable adapter 구현 없음
+Advisor/Jev 실연동은 실행하지 않음; 역할 제출물의 권위 격리만 직접 검사
+원시 SQLite 조작 공격 및 hostile same-process 격리는 알려진 제품 한계; 이 결과를 격리 보장으로 해석하지 않음
+초기 39개 탐색에서 3 failure/7 error: 9개는 D1로 assertion 미도달, 1개는 failure_class 누락 harness 오류; 원본 로그 보존
+중간 unittest module discovery가 imported TestCase 15개를 추가 실행한 로그도 보존; 최종 count에는 합산하지 않음
+9개 Dispatcher 기반 기존 테스트의 목적 assertion은 D1 POSIX guard로 미도달(NOT_RUN). 전체 이름은 report.json 참조.
+conditional dependency condition 필드는 선언 API에 없음: extra field 거부만 확인.
+실제 concurrency/process fault, whole public vertical, live provider/native Windows validation은 이 shard 미실행.
+currentTask 파일 및 repo .agents/skills는 찾지 못함. 적용 가능한 계약·AGENTS 및 기존 test adapter를 읽음.
+F07 첫 4개 source GO 0 유지; producer3 미배정; D7은 F07 merged 이후 조건을 유지.
+운영 DB/profile/keys/live provider 접근 및 Library/GitHub upload 없음. 원 checkout과 candidate 모두 clean.

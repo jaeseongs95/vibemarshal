@@ -1,0 +1,78 @@
+test_current_task_and_integration_pass_can_complete (vm_e_verdict_regression.GoalVerdictAuthorityTests.test_current_task_and_integration_pass_can_complete) ... ok
+test_latest_integration_fail_cannot_be_overridden_by_old_pass (vm_e_verdict_regression.GoalVerdictAuthorityTests.test_latest_integration_fail_cannot_be_overridden_by_old_pass) ... FAIL
+test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass (vm_e_verdict_regression.GoalVerdictAuthorityTests.test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass) ... FAIL
+test_latest_integration_pass_can_supersede_fail (vm_e_verdict_regression.GoalVerdictAuthorityTests.test_latest_integration_pass_can_supersede_fail) ... ok
+test_latest_task_fail_cannot_be_overridden_by_completed_status (vm_e_verdict_regression.GoalVerdictAuthorityTests.test_latest_task_fail_cannot_be_overridden_by_completed_status) ... FAIL
+test_latest_task_not_run_cannot_be_overridden_by_completed_status (vm_e_verdict_regression.GoalVerdictAuthorityTests.test_latest_task_not_run_cannot_be_overridden_by_completed_status) ... FAIL
+test_old_pass_id_cannot_replace_latest_integration_pass_id (vm_e_verdict_regression.GoalVerdictAuthorityTests.test_old_pass_id_cannot_replace_latest_integration_pass_id) ... FAIL
+test_superseded_plan_verdict_cannot_clear_current_active_plan (vm_e_verdict_regression.GoalVerdictAuthorityTests.test_superseded_plan_verdict_cannot_clear_current_active_plan) ... FAIL
+
+======================================================================
+FAIL: test_latest_integration_fail_cannot_be_overridden_by_old_pass (vm_e_verdict_regression.GoalVerdictAuthorityTests.test_latest_integration_fail_cannot_be_overridden_by_old_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 88, in test_latest_integration_fail_cannot_be_overridden_by_old_pass
+    self.assert_rejected_atomically(self.verdict())
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 71, in assert_rejected_atomically
+    with self.assertRaises(EngineServiceError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineServiceError not raised
+
+======================================================================
+FAIL: test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass (vm_e_verdict_regression.GoalVerdictAuthorityTests.test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 92, in test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass
+    self.assert_rejected_atomically(self.verdict())
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 71, in assert_rejected_atomically
+    with self.assertRaises(EngineServiceError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineServiceError not raised
+
+======================================================================
+FAIL: test_latest_task_fail_cannot_be_overridden_by_completed_status (vm_e_verdict_regression.GoalVerdictAuthorityTests.test_latest_task_fail_cannot_be_overridden_by_completed_status)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 96, in test_latest_task_fail_cannot_be_overridden_by_completed_status
+    self.assert_rejected_atomically(self.verdict())
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 71, in assert_rejected_atomically
+    with self.assertRaises(EngineServiceError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineServiceError not raised
+
+======================================================================
+FAIL: test_latest_task_not_run_cannot_be_overridden_by_completed_status (vm_e_verdict_regression.GoalVerdictAuthorityTests.test_latest_task_not_run_cannot_be_overridden_by_completed_status)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 100, in test_latest_task_not_run_cannot_be_overridden_by_completed_status
+    self.assert_rejected_atomically(self.verdict())
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 71, in assert_rejected_atomically
+    with self.assertRaises(EngineServiceError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineServiceError not raised
+
+======================================================================
+FAIL: test_old_pass_id_cannot_replace_latest_integration_pass_id (vm_e_verdict_regression.GoalVerdictAuthorityTests.test_old_pass_id_cannot_replace_latest_integration_pass_id)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 104, in test_old_pass_id_cannot_replace_latest_integration_pass_id
+    self.assert_rejected_atomically(self.verdict())
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 71, in assert_rejected_atomically
+    with self.assertRaises(EngineServiceError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineServiceError not raised
+
+======================================================================
+FAIL: test_superseded_plan_verdict_cannot_clear_current_active_plan (vm_e_verdict_regression.GoalVerdictAuthorityTests.test_superseded_plan_verdict_cannot_clear_current_active_plan)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 117, in test_superseded_plan_verdict_cannot_clear_current_active_plan
+    with self.assertRaises(EngineServiceError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineServiceError not raised
+
+----------------------------------------------------------------------
+Ran 8 tests in 0.795s
+
+FAILED (failures=6)
+{"tested_source": "/workspace/vibemarshal/src/flowmarshal/engine/service.py"}

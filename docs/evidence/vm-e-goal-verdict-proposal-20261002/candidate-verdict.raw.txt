@@ -1,0 +1,12 @@
+test_current_task_and_integration_pass_can_complete (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_current_task_and_integration_pass_can_complete) ... ok
+test_latest_integration_fail_cannot_be_overridden_by_old_pass (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_latest_integration_fail_cannot_be_overridden_by_old_pass) ... ok
+test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass) ... ok
+test_latest_integration_pass_can_supersede_fail (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_latest_integration_pass_can_supersede_fail) ... ok
+test_latest_task_fail_cannot_be_overridden_by_completed_status (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_latest_task_fail_cannot_be_overridden_by_completed_status) ... ok
+test_latest_task_not_run_cannot_be_overridden_by_completed_status (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_latest_task_not_run_cannot_be_overridden_by_completed_status) ... ok
+test_old_pass_id_cannot_replace_latest_integration_pass_id (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_old_pass_id_cannot_replace_latest_integration_pass_id) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.654s
+
+OK

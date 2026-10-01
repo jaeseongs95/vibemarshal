@@ -1,0 +1,67 @@
+test_current_task_and_integration_pass_can_complete (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_current_task_and_integration_pass_can_complete) ... ok
+test_latest_integration_fail_cannot_be_overridden_by_old_pass (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_latest_integration_fail_cannot_be_overridden_by_old_pass) ... FAIL
+test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass) ... FAIL
+test_latest_integration_pass_can_supersede_fail (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_latest_integration_pass_can_supersede_fail) ... ok
+test_latest_task_fail_cannot_be_overridden_by_completed_status (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_latest_task_fail_cannot_be_overridden_by_completed_status) ... FAIL
+test_latest_task_not_run_cannot_be_overridden_by_completed_status (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_latest_task_not_run_cannot_be_overridden_by_completed_status) ... FAIL
+test_old_pass_id_cannot_replace_latest_integration_pass_id (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_old_pass_id_cannot_replace_latest_integration_pass_id) ... FAIL
+
+======================================================================
+FAIL: test_latest_integration_fail_cannot_be_overridden_by_old_pass (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_latest_integration_fail_cannot_be_overridden_by_old_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 84, in test_latest_integration_fail_cannot_be_overridden_by_old_pass
+    self.assert_rejected_atomically(self.verdict())
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 67, in assert_rejected_atomically
+    with self.assertRaises(EngineServiceError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineServiceError not raised
+
+======================================================================
+FAIL: test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 88, in test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass
+    self.assert_rejected_atomically(self.verdict())
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 67, in assert_rejected_atomically
+    with self.assertRaises(EngineServiceError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineServiceError not raised
+
+======================================================================
+FAIL: test_latest_task_fail_cannot_be_overridden_by_completed_status (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_latest_task_fail_cannot_be_overridden_by_completed_status)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 92, in test_latest_task_fail_cannot_be_overridden_by_completed_status
+    self.assert_rejected_atomically(self.verdict())
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 67, in assert_rejected_atomically
+    with self.assertRaises(EngineServiceError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineServiceError not raised
+
+======================================================================
+FAIL: test_latest_task_not_run_cannot_be_overridden_by_completed_status (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_latest_task_not_run_cannot_be_overridden_by_completed_status)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 96, in test_latest_task_not_run_cannot_be_overridden_by_completed_status
+    self.assert_rejected_atomically(self.verdict())
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 67, in assert_rejected_atomically
+    with self.assertRaises(EngineServiceError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineServiceError not raised
+
+======================================================================
+FAIL: test_old_pass_id_cannot_replace_latest_integration_pass_id (tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests.test_old_pass_id_cannot_replace_latest_integration_pass_id)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 100, in test_old_pass_id_cannot_replace_latest_integration_pass_id
+    self.assert_rejected_atomically(self.verdict())
+  File "/workspace/vm-e-proposal/tests/test_engine_goal_verdict_authority.py", line 67, in assert_rejected_atomically
+    with self.assertRaises(EngineServiceError):
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: EngineServiceError not raised
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.765s
+
+FAILED (failures=5)
