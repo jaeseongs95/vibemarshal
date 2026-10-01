@@ -6,6 +6,7 @@ from pathlib import Path
 import tempfile
 import unittest
 
+from flowmarshal.canonical import sha256_bytes, sha256_digest
 from flowmarshal.engine.domain import GoalContractRevision, PlanContractRevision, ProjectMapRevision, StateSnapshot
 from flowmarshal.engine.plan_inspection import (
     PLAN_INSPECTION_INSTRUCTIONS,
@@ -13,6 +14,7 @@ from flowmarshal.engine.plan_inspection import (
     PlanInspection,
     PlanInspectionError,
     validate_plan_inspection,
+    inspection_file_content,
 )
 from flowmarshal.engine.plan_inspection_eval import assess_inspection_review
 from flowmarshal.engine.planner_roles import (
@@ -38,13 +40,23 @@ def inputs(name):
     raw = deepcopy(FIXTURE[filename])
     if name == "semantic-missing-link":
         raw["definition"]["goal_coverage"][0]["validation_ids"].remove("val_task_validator_review")
-        from flowmarshal.canonical import sha256_digest
         raw["definition_digest"] = sha256_digest(raw["definition"])
-    plan = PlanContractRevision.model_validate(raw)
     raw_map = deepcopy(FIXTURE["input-project-map.json"])
+    # 동결 S05 workspace와 같은 bytes를 가진 현재 fixture로 실행 위치만 결속한다.
+    raw_map["root"] = str(ROOT / "project-e2e")
     reference = next(entry for entry in raw_map["entries"] if entry["kind"] == "reference")
     reference["path"] = str(ROOT / "plan-inspection-reference.md")
     project_map = ProjectMapRevision.model_validate(raw_map)
+    state = state.model_copy(update={
+        "scope_fingerprint": sha256_digest({"goal": goal.definition_digest, "map": project_map.revision_digest}),
+        "facts": tuple(fact.model_copy(update={
+            "value": project_map.revision_digest, "evidence_digest": project_map.revision_digest,
+        }) if fact.source_ref == "project-map" else fact for fact in state.facts),
+    })
+    raw["definition"].update(project_map_digest=project_map.revision_digest,
+                             base_state_snapshot_digest=state.snapshot_digest)
+    raw["definition_digest"] = sha256_digest(raw["definition"])
+    plan = PlanContractRevision.model_validate(raw)
     return plan, goal, state, project_map
 
 
@@ -124,6 +136,28 @@ def validate(name, payload):
 
 
 class PlanInspectionTests(unittest.TestCase):
+    def test_fixture_inputs_rebind_root_without_changing_registered_bytes_or_history(self):
+        frozen = deepcopy(FIXTURE)
+        plan, goal, state, project_map = inputs("clean")
+        self.assertEqual((ROOT / "project-e2e").resolve(), Path(project_map.root).resolve())
+        for entry in project_map.entries:
+            with self.subTest(path=entry.path):
+                self.assertEqual(entry.content_digest, sha256_bytes(
+                    inspection_file_content(entry, project_map).encode("utf-8")))
+        self.assertEqual(project_map.revision_digest, plan.definition.project_map_digest)
+        self.assertEqual(state.snapshot_digest, plan.definition.base_state_snapshot_digest)
+        fact = next(fact for fact in state.facts if fact.source_ref == "project-map")
+        self.assertEqual(project_map.revision_digest, fact.value)
+        self.assertEqual(project_map.revision_digest, fact.evidence_digest)
+        self.assertEqual(frozen, FIXTURE)
+
+    def test_rebound_fixture_still_rejects_registered_content_digest_tampering(self):
+        *_, project_map = inputs("clean")
+        entry = next(entry for entry in project_map.entries if entry.kind.value == "instruction")
+        tampered = entry.model_copy(update={"content_digest": "sha256:" + "0" * 64})
+        with self.assertRaisesRegex(PlanInspectionError, "digest 불일치"):
+            inspection_file_content(tampered, project_map)
+
     def _review_with_local_receipt(self, payload):
         from flowmarshal.engine.planner_roles import PlanReviewerAdapter
         from flowmarshal.engine.roles import CodexStructuredRoleRunner
