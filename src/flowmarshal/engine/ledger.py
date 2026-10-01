@@ -769,7 +769,7 @@ class SQLiteEngineLedger:
         self.artifact_root = Path(artifact_root) if artifact_root else self.path.parent / DEFAULT_ARTIFACT_DIRECTORY
         self.clock = clock or SystemClock()
 
-    def _connect(self, *, readonly: bool = False) -> sqlite3.Connection:
+    def _connect(self, *, readonly: bool = False, configure_journal: bool = True) -> sqlite3.Connection:
         # 역할에는 직렬화된 context만 제공한다. raw read handle도 ATTACH 등으로 확장될 수 있다.
         require_host_execution()
         if readonly:
@@ -781,24 +781,45 @@ class SQLiteEngineLedger:
         else:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             connection = sqlite3.connect(self.path, timeout=10.0)
-        connection.row_factory = sqlite3.Row
-        connection.execute("PRAGMA foreign_keys = ON")
-        connection.execute("PRAGMA busy_timeout = 10000")
-        if readonly:
-            connection.execute("PRAGMA query_only = ON")
-        if not readonly:
-            connection.execute("PRAGMA journal_mode = WAL")
-            connection.execute("PRAGMA synchronous = FULL")
-        return connection
+        try:
+            connection.row_factory = sqlite3.Row
+            connection.execute("PRAGMA foreign_keys = ON")
+            connection.execute("PRAGMA busy_timeout = 10000")
+            if readonly:
+                connection.execute("PRAGMA query_only = ON")
+            if not readonly:
+                if configure_journal:
+                    connection.execute("PRAGMA journal_mode = WAL")
+                connection.execute("PRAGMA synchronous = FULL")
+            return connection
+        except BaseException:
+            try:
+                connection.close()
+            except BaseException:
+                # 설정 실패의 원 예외가 연결 정리 오류로 바뀌지 않게 한다.
+                pass
+            raise
 
     def initialize(self) -> None:
-        is_new = not self.path.exists() or self.path.stat().st_size == 0
-        if not is_new:
-            self._assert_identity()
-        connection = self._connect()
+        # 대상의 identity를 writer lock 안에서 확인하기 전에는 journal mode도 변경하지 않는다.
+        connection = self._connect(configure_journal=False)
         try:
+            connection.execute("BEGIN IMMEDIATE")
+            is_new = (
+                connection.execute("PRAGMA application_id").fetchone()[0] == 0
+                and connection.execute("PRAGMA user_version").fetchone()[0] == 0
+                and connection.execute("SELECT 1 FROM sqlite_master LIMIT 1").fetchone() is None
+            )
             if is_new:
-                connection.executescript(SCHEMA_SQL)
+                # executescript의 implicit commit을 피하고 trigger 본문을 포함한 문장 단위를 실행한다.
+                statement = ""
+                for line in SCHEMA_SQL.splitlines(keepends=True):
+                    statement += line
+                    if sqlite3.complete_statement(statement):
+                        connection.execute(statement)
+                        statement = ""
+                if statement.strip():
+                    raise EngineLedgerError("Engine schema SQL의 마지막 문장이 완결되지 않았습니다.")
                 connection.executemany(
                     "INSERT INTO schema_meta(key, value) VALUES (?, ?)",
                     (
@@ -808,13 +829,25 @@ class SQLiteEngineLedger:
                 )
                 connection.execute(f"PRAGMA application_id = {SQLITE_APPLICATION_ID}")
                 connection.execute(f"PRAGMA user_version = {ENGINE_SCHEMA_REVISION}")
+            else:
+                self._assert_identity(connection=connection)
             connection.commit()
+            connection.execute("PRAGMA journal_mode = WAL")
+        except BaseException:
+            try:
+                connection.rollback()
+            except BaseException:
+                # rollback 오류가 최초 초기화 실패를 가리지 않게 원 예외를 보존한다.
+                pass
+            raise
         finally:
             connection.close()
         self.artifact_root.mkdir(parents=True, exist_ok=True)
 
-    def _assert_identity(self) -> None:
-        connection = self._connect(readonly=True)
+    def _assert_identity(self, *, connection: sqlite3.Connection | None = None) -> None:
+        owns_connection = connection is None
+        if connection is None:
+            connection = self._connect(readonly=True)
         try:
             tables = {
                 row["name"]
@@ -851,7 +884,8 @@ class SQLiteEngineLedger:
             if connection.execute("PRAGMA user_version").fetchone()[0] != ENGINE_SCHEMA_REVISION:
                 raise EngineLedgerError("SQLite user_version과 Engine schema revision이 다릅니다.")
         finally:
-            connection.close()
+            if owns_connection:
+                connection.close()
 
     @contextmanager
     def transaction(self) -> Iterator[EngineTransaction]:
