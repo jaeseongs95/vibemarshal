@@ -1,0 +1,14 @@
+test_deadline_terminal_observation_grace_ends_as_collector_lost (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_deadline_terminal_observation_grace_ends_as_collector_lost) ... FAIL
+
+======================================================================
+FAIL: test_deadline_terminal_observation_grace_ends_as_collector_lost (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_deadline_terminal_observation_grace_ends_as_collector_lost)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-g-failure-shard/tests/test_engine_runtime_job_supervisor.py", line 1342, in test_deadline_terminal_observation_grace_ends_as_collector_lost
+    self.assertEqual(RuntimeJobStatus.COLLECTOR_LOST, observed.status)
+AssertionError: <RuntimeJobStatus.COLLECTOR_LOST: 'collector_lost'> != <RuntimeJobStatus.RUNNING: 'running'>
+
+----------------------------------------------------------------------
+Ran 1 test in 0.038s
+
+FAILED (failures=1)

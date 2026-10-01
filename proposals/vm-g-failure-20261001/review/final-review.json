@@ -1,0 +1,37 @@
+{
+  "base_commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "base_git_source_tree": "859283f097c72141249cd87f2916d34cd379573e",
+  "base_source_manifest_sha256": "a1eea39a9823f9b740d624c1ea361277448cc614ef96ed888bac7a39af0139cb",
+  "candidate_source_manifest_sha256": "4a605ef675521762146df6a9e483b4207fc6664230f87a2a8f80149df510a02b",
+  "candidate_commit": null,
+  "candidate_identity_kind": "isolated shadow content only; proposal not applied to approved checkout",
+  "changed_source_hashes": {
+    "src/flowmarshal/engine/runtime.py": {
+      "base": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+      "candidate": "aca3321a4381a7a248819aad694c59494c5fa66783212a7a7ffeb21b7e2ab28f"
+    },
+    "src/flowmarshal/engine/service.py": {
+      "base": "a0b3aaf0645825c7eeb62babab0d63c8062158c38be46cf59a3649f3053568b3",
+      "candidate": "68fdd94a306f625c8db26696c8060fc66236fa1e649d5a5bd96e01efc7c11ea4"
+    }
+  },
+  "patch_sha256": "616647002d4fcc3641dd0fcd6a9a0e11d8f40fa32cd4e403aa2f234903086741",
+  "tracked_source_status": "",
+  "independent_review": {
+    "exact_turn_binding_guard": true,
+    "atomic_delivery_claim": true,
+    "receipt_window_duplicate_blocked": true,
+    "crash_after_claim_preserves_unknown_until_observed": true,
+    "late_unbound_binding_preserved": true,
+    "no_schema_or_posix_ownerlock_change": true,
+    "all_final_case_history_chains_valid": true
+  },
+  "model_provenance": {
+    "requested": {
+      "model": "gpt-6.1-sol",
+      "effort": "high"
+    },
+    "actual_model_observed": null
+  },
+  "release_decision": null
+}

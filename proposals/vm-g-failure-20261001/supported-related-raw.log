@@ -1,0 +1,13 @@
+test_collector_loss_and_restart_are_not_provider_terminal (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_collector_loss_and_restart_are_not_provider_terminal) ... ok
+test_restart_reattach_of_every_typed_job_kind_is_result_unavailable (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_reattach_of_every_typed_job_kind_is_result_unavailable)
+M-14 D4(CC-2): checkpoint 없이 재부착한 typed kind는 역할 원문을 결과로 쓰지 않는다. ... ok
+test_deadline_interrupt_is_bounded_and_not_terminal (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_deadline_interrupt_is_bounded_and_not_terminal) ... ok
+test_restarted_supervisor_close_marks_and_interrupts_bound_job (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restarted_supervisor_close_marks_and_interrupts_bound_job) ... ok
+test_restarted_supervisor_observes_exact_running_turn_before_terminal (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restarted_supervisor_observes_exact_running_turn_before_terminal) ... ok
+test_runtime_job_lifecycle_and_close_do_not_decide_core_completion (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_runtime_job_lifecycle_and_close_do_not_decide_core_completion) ... ok
+test_turn_started_progress_binds_once_and_rejects_a_different_turn (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_turn_started_progress_binds_once_and_rejects_a_different_turn) ... ok
+
+----------------------------------------------------------------------
+Ran 7 tests in 0.394s
+
+OK

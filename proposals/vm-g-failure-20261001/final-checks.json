@@ -1,0 +1,47 @@
+[
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "cwd": "/workspace/vm-g-failure-shard",
+    "start_utc": "2026-10-01T23:37:51.293710+00:00",
+    "end_utc": "2026-10-01T23:37:51.299997+00:00",
+    "elapsed_seconds": 0.00628829900006167,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "git",
+      "apply",
+      "--check",
+      "--whitespace=error",
+      "/workspace/vm-g-artifacts/interrupt-delivery-proposal.patch"
+    ],
+    "cwd": "/workspace/vm-g-failure-shard",
+    "start_utc": "2026-10-01T23:37:51.300003+00:00",
+    "end_utc": "2026-10-01T23:37:51.303297+00:00",
+    "elapsed_seconds": 0.0032992079999303314,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "command": [
+      "git",
+      "status",
+      "--porcelain",
+      "--untracked-files=no"
+    ],
+    "cwd": "/workspace/vm-g-failure-shard",
+    "start_utc": "2026-10-01T23:37:51.303304+00:00",
+    "end_utc": "2026-10-01T23:37:51.311614+00:00",
+    "elapsed_seconds": 0.008313471999940703,
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  }
+]

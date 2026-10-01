@@ -1,0 +1,22 @@
+{
+  "command": [
+    "/workspace/cloud-setup/venv/bin/python",
+    "-m",
+    "unittest",
+    "-v",
+    "tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_collector_loss_and_restart_are_not_provider_terminal",
+    "tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restart_reattach_of_every_typed_job_kind_is_result_unavailable",
+    "tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_deadline_interrupt_is_bounded_and_not_terminal",
+    "tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restarted_supervisor_close_marks_and_interrupts_bound_job",
+    "tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_restarted_supervisor_observes_exact_running_turn_before_terminal",
+    "tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_runtime_job_lifecycle_and_close_do_not_decide_core_completion",
+    "tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_turn_started_progress_binds_once_and_rejects_a_different_turn"
+  ],
+  "cwd": "/workspace/vm-g-failure-shard",
+  "PYTHONPATH": "/workspace/vm-g-artifacts/candidate/src:/workspace/vm-g-failure-shard",
+  "start_utc": "2026-10-01T23:34:43.262963+00:00",
+  "end_utc": "2026-10-01T23:34:44.663693+00:00",
+  "elapsed_seconds": 1.4007354720000649,
+  "exit": 0,
+  "raw_sha256": "7953be6ccd822503a5b588dac0de78637ee7945e355ef8ff815f82867a46f97a"
+}

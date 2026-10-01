@@ -1,0 +1,16 @@
+{
+  "command": [
+    "/workspace/cloud-setup/venv/bin/python",
+    "-m",
+    "unittest",
+    "-v",
+    "tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_deadline_terminal_observation_grace_ends_as_collector_lost"
+  ],
+  "cwd": "/workspace/vm-g-failure-shard",
+  "PYTHONPATH": "/workspace/vm-g-failure-shard/src:/workspace/vm-g-failure-shard",
+  "start_utc": "2026-10-01T23:34:38.691246+00:00",
+  "end_utc": "2026-10-01T23:34:39.627831+00:00",
+  "elapsed_seconds": 0.9365895160000264,
+  "exit": 1,
+  "raw_sha256": "b255c58298630b5f960fed172bfc7f0da199d3d3ac66d89221c00c70d901cdd8"
+}

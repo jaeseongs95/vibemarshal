@@ -1,0 +1,46 @@
+[
+  {
+    "argv": [
+      "git",
+      "apply",
+      "--check",
+      "/workspace/vm-g-artifacts/interrupt-delivery-proposal.patch"
+    ],
+    "cwd": "/workspace/vm-g-failure-shard",
+    "start_utc": "2026-10-01T23:31:40.629990+00:00",
+    "duration_seconds": 0.0036594670000340557,
+    "exit": 0,
+    "raw_file": "/workspace/vm-g-review/check-1.log",
+    "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "argv": [
+      "git",
+      "apply",
+      "--check",
+      "--whitespace=error",
+      "/workspace/vm-g-artifacts/interrupt-delivery-proposal.patch"
+    ],
+    "cwd": "/workspace/vm-g-failure-shard",
+    "start_utc": "2026-10-01T23:31:40.633806+00:00",
+    "duration_seconds": 0.003595232000066062,
+    "exit": 0,
+    "raw_file": "/workspace/vm-g-review/check-2.log",
+    "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "argv": [
+      "/workspace/cloud-setup/venv/bin/python",
+      "-m",
+      "unittest",
+      "tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_turn_started_progress_binds_once_and_rejects_a_different_turn",
+      "-v"
+    ],
+    "cwd": "/workspace/vm-g-failure-shard",
+    "start_utc": "2026-10-01T23:31:40.637523+00:00",
+    "duration_seconds": 1.0846292469999526,
+    "exit": 0,
+    "raw_file": "/workspace/vm-g-review/check-3.log",
+    "raw_sha256": "321590a5b53274b55502256f2bb44c86e79c6c14dc9f141cbf941c35724893d3"
+  }
+]

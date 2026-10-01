@@ -1,0 +1,1244 @@
+{
+  "cases": [
+    {
+      "attempts": 1,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [],
+      "delivery_markers": 0,
+      "effects": [],
+      "case": "test_01_two_process_attempt_reservation_has_one_winner",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.801135224999939
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.5932465580000326
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 1.593337050999935
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.5933618079999405
+        }
+      ],
+      "elapsed_seconds": 1.7883360129999346
+    },
+    {
+      "attempts": 0,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "provider_calls": 1,
+      "job_observations": [],
+      "delivery_markers": 0,
+      "effects": [],
+      "case": "test_02_two_process_budget_admission_has_one_winner",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.8601409919999696
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.644643960000053
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 1.644709687000045
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.6447399820000328
+        }
+      ],
+      "elapsed_seconds": 1.8402018960000532
+    },
+    {
+      "attempts": 0,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [
+        {
+          "kind": "scheduled",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "started",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_progress",
+          "provider_terminal": 0,
+          "terminal_status": null
+        }
+      ],
+      "delivery_markers": 0,
+      "effects": [],
+      "case": "test_03_two_process_exact_binding_is_idempotent",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.8111359730000913
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.610109732000069
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 1.6101730650000263
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.6101886580000837
+        }
+      ],
+      "elapsed_seconds": 1.8297583380000333
+    },
+    {
+      "attempts": 0,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [
+        {
+          "kind": "scheduled",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "started",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_progress",
+          "provider_terminal": 0,
+          "terminal_status": null
+        }
+      ],
+      "delivery_markers": 0,
+      "effects": [],
+      "case": "test_04_two_process_conflicting_binding_has_one_winner",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.8500931030000629
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.737002536000091
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 1.7370593300000792
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.7370737610000333
+        }
+      ],
+      "elapsed_seconds": 1.913522786000044
+    },
+    {
+      "attempts": 0,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [
+        {
+          "kind": "scheduled",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "started",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_progress",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "interrupt_requested",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "interrupt_receipt",
+          "provider_terminal": 0,
+          "terminal_status": null
+        }
+      ],
+      "delivery_markers": 1,
+      "effects": [
+        {
+          "label": "a",
+          "operation": "interrupt",
+          "thread": "synthetic-thread",
+          "turn": "synthetic-turn"
+        }
+      ],
+      "case": "test_05_interrupt_inflight_response_window_has_one_effect",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.7961141109999517
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 0.7961688220000269
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.587120657000014
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.5871769000000313
+        }
+      ],
+      "elapsed_seconds": 1.8045418299999483
+    },
+    {
+      "attempts": 0,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [
+        {
+          "kind": "scheduled",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "started",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_progress",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "interrupt_requested",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_terminal",
+          "provider_terminal": 1,
+          "terminal_status": "completed"
+        }
+      ],
+      "delivery_markers": 1,
+      "effects": [
+        {
+          "label": "a",
+          "operation": "interrupt",
+          "thread": "synthetic-thread",
+          "turn": "synthetic-turn"
+        }
+      ],
+      "case": "test_06_killed_interrupt_sender_is_observed_without_resend",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": -9,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.9260916750000661
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 0.926164262000043
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.8183445060000167
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.8184047250000503
+        }
+      ],
+      "elapsed_seconds": 2.0026863940000794
+    },
+    {
+      "attempts": 0,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [
+        {
+          "kind": "scheduled",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "started",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_progress",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "interrupt_requested",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "interrupt_receipt",
+          "provider_terminal": 0,
+          "terminal_status": null
+        }
+      ],
+      "delivery_markers": 1,
+      "effects": [
+        {
+          "label": "a",
+          "operation": "interrupt",
+          "thread": "synthetic-thread",
+          "turn": "synthetic-turn"
+        }
+      ],
+      "case": "test_07_interrupt_response_loss_is_unknown_not_terminal_or_retry",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.8185429269999531
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 0.8186134409999113
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.695092671999987
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.695174081999994
+        }
+      ],
+      "elapsed_seconds": 1.8464574729999867
+    },
+    {
+      "attempts": 0,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [
+        {
+          "kind": "scheduled",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "started",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_progress",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "interrupt_requested",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "interrupt_receipt",
+          "provider_terminal": 0,
+          "terminal_status": null
+        }
+      ],
+      "delivery_markers": 1,
+      "effects": [
+        {
+          "label": "b",
+          "operation": "interrupt",
+          "thread": "synthetic-thread",
+          "turn": "synthetic-turn"
+        }
+      ],
+      "case": "test_08_reservation_without_delivery_recovers_once",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.777945245000069
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 0.7780015280000043
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.6167559489999803
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.616816158000006
+        }
+      ],
+      "elapsed_seconds": 1.7636233079999784
+    },
+    {
+      "attempts": 1,
+      "runtime_intents": 1,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [],
+      "delivery_markers": 0,
+      "effects": [],
+      "case": "test_09_same_intent_key_is_idempotent_across_processes",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.7831080920000204
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.569673868000109
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 1.5697314330000154
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.5697474170000305
+        }
+      ],
+      "elapsed_seconds": 1.7280940220000502
+    },
+    {
+      "attempts": 1,
+      "runtime_intents": 1,
+      "runtime_receipts": 1,
+      "provider_calls": 0,
+      "job_observations": [],
+      "delivery_markers": 0,
+      "effects": [],
+      "case": "test_10_same_receipt_is_idempotent_across_processes",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.8328478409999889
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.6270124119999991
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 1.6270714390000194
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.6270875320000187
+        }
+      ],
+      "elapsed_seconds": 1.8584586619999754
+    },
+    {
+      "attempts": 1,
+      "runtime_intents": 1,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [],
+      "delivery_markers": 0,
+      "effects": [],
+      "case": "test_11_stale_file_after_intent_refuses_effect_marker",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.9061161710000079
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 0.9062322819999054
+        }
+      ],
+      "elapsed_seconds": 1.121622276999915
+    },
+    {
+      "attempts": 1,
+      "runtime_intents": 1,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [
+        {
+          "kind": "scheduled",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "started",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_progress",
+          "provider_terminal": 0,
+          "terminal_status": null
+        }
+      ],
+      "delivery_markers": 0,
+      "effects": [],
+      "case": "test_12_expired_job_after_intent_refuses_effect_marker",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.8791079600000558
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 0.9992828990000362
+        }
+      ],
+      "elapsed_seconds": 1.185136080999996
+    },
+    {
+      "attempts": 0,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [
+        {
+          "kind": "scheduled",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "started",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "collector_lost",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_progress",
+          "provider_terminal": 0,
+          "terminal_status": null
+        }
+      ],
+      "delivery_markers": 0,
+      "effects": [],
+      "case": "test_13_collector_loss_late_binding_preserves_exact_turn_without_terminal",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.8382748129999982
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.6223477759999696
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 1.6224046099999896
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.6224203629999465
+        }
+      ],
+      "elapsed_seconds": 1.7974725529999205
+    },
+    {
+      "attempts": 1,
+      "runtime_intents": 1,
+      "runtime_receipts": 1,
+      "provider_calls": 0,
+      "job_observations": [],
+      "delivery_markers": 0,
+      "effects": [
+        {
+          "label": "provider",
+          "operation": "create_thread",
+          "thread": "synthetic-thread"
+        }
+      ],
+      "case": "test_14_unknown_receipt_reconciliation_never_repeats_effect",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "provider",
+          "exit": 23,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "provider",
+          "barrier": "ready",
+          "elapsed_seconds": 0.804364253000017
+        },
+        {
+          "label": "provider",
+          "barrier": "released",
+          "elapsed_seconds": 0.8044190340000341
+        },
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 1.5994383409999955
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 1.5994945840000128
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 2.411232242999972
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 2.4112961380000115
+        }
+      ],
+      "elapsed_seconds": 2.5912265719999823
+    },
+    {
+      "attempts": 0,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [
+        {
+          "kind": "scheduled",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "started",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "interrupt_requested",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_progress",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "interrupt_receipt",
+          "provider_terminal": 0,
+          "terminal_status": null
+        }
+      ],
+      "delivery_markers": 1,
+      "effects": [
+        {
+          "label": "b",
+          "operation": "interrupt",
+          "thread": "synthetic-thread",
+          "turn": "synthetic-turn"
+        }
+      ],
+      "case": "test_15_unbound_interrupt_is_delivered_once_after_late_binding",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "c",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.783538490000069
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 0.7835981880000418
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.691974135999999
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.692063077000057
+        },
+        {
+          "label": "c",
+          "barrier": "ready",
+          "elapsed_seconds": 2.568046672000037
+        },
+        {
+          "label": "c",
+          "barrier": "released",
+          "elapsed_seconds": 2.568106771000089
+        }
+      ],
+      "elapsed_seconds": 2.7291213390000166
+    },
+    {
+      "attempts": 0,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [
+        {
+          "kind": "scheduled",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "started",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_progress",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "interrupt_requested",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_terminal",
+          "provider_terminal": 1,
+          "terminal_status": "completed"
+        }
+      ],
+      "delivery_markers": 1,
+      "effects": [],
+      "case": "test_16_crash_after_claim_before_send_does_not_invent_delivery_or_retry",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 24,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "c",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.8034035219999396
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 0.8034632399999282
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.612254456999949
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.6123103799999399
+        },
+        {
+          "label": "c",
+          "barrier": "ready",
+          "elapsed_seconds": 2.5014424099999815
+        },
+        {
+          "label": "c",
+          "barrier": "released",
+          "elapsed_seconds": 2.5015015479999647
+        }
+      ],
+      "elapsed_seconds": 2.6748341029999665
+    },
+    {
+      "attempts": 1,
+      "runtime_intents": 1,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [],
+      "delivery_markers": 0,
+      "effects": [],
+      "case": "test_17_workflow_revocation_after_intent_refuses_effect_marker",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.924011207000035
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 0.9271986969999944
+        }
+      ],
+      "elapsed_seconds": 1.156149916000004
+    },
+    {
+      "attempts": 0,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [
+        {
+          "kind": "scheduled",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "started",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "interrupt_requested",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "cancelled",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_progress",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "interrupt_receipt",
+          "provider_terminal": 0,
+          "terminal_status": null
+        }
+      ],
+      "delivery_markers": 1,
+      "effects": [
+        {
+          "label": "a",
+          "operation": "interrupt",
+          "thread": "synthetic-thread",
+          "turn": "synthetic-turn"
+        }
+      ],
+      "case": "test_18_cancelled_late_binding_still_delivers_one_interrupt",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.8717674099999613
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 0.8718277089999447
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.8313530249999985
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.831425961999912
+        }
+      ],
+      "elapsed_seconds": 1.9981848589999345
+    },
+    {
+      "attempts": 0,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "job_observations": [
+        {
+          "kind": "scheduled",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "started",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_progress",
+          "provider_terminal": 0,
+          "terminal_status": null
+        },
+        {
+          "kind": "provider_terminal",
+          "provider_terminal": 1,
+          "terminal_status": "completed"
+        }
+      ],
+      "delivery_markers": 0,
+      "effects": [],
+      "case": "test_19_provider_terminal_before_interrupt_starts_no_effect",
+      "history_valid": true,
+      "children": [
+        {
+          "label": "a",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "label": "b",
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "barriers": [
+        {
+          "label": "a",
+          "barrier": "ready",
+          "elapsed_seconds": 0.8722655730000497
+        },
+        {
+          "label": "b",
+          "barrier": "ready",
+          "elapsed_seconds": 1.6871273470000006
+        },
+        {
+          "label": "a",
+          "barrier": "released",
+          "elapsed_seconds": 1.68718388100001
+        },
+        {
+          "label": "b",
+          "barrier": "released",
+          "elapsed_seconds": 1.6871999339999775
+        }
+      ],
+      "elapsed_seconds": 1.877718611999967
+    }
+  ],
+  "tests_run": 19,
+  "failures": 0,
+  "errors": 0
+}

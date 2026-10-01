@@ -1,0 +1,35 @@
+{
+  "base": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "repository": "jaeseongs95/vibemarshal",
+  "cwd": "/workspace/vm-g-failure-shard",
+  "tracked_status": "",
+  "source_tree": "859283f097c72141249cd87f2916d34cd379573e",
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "requested_worker_model": {
+    "model": "gpt-6.1-sol",
+    "effort": "high",
+    "provenance": "client_requested"
+  },
+  "actual_model_observation": null,
+  "source_hashes": {
+    "AGENTS.md": "f6d5a37f3bb61be891f7ecf6a8a993f2e7b70b94f02d5148e47ea13f1695e989",
+    "docs/redesign-1.0-contract.md": "19c483be40fabae92d90e7b5abc49ecb08f024ecacc559b6a29e3178bf85188c",
+    "docs/engine-cutover-adr.md": "2409b45c2c073168d676387ec82515647ad80b7990c5c23fc2644ac2f2bfa63e",
+    "src/flowmarshal/engine/runtime.py": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+    "src/flowmarshal/engine/service.py": "a0b3aaf0645825c7eeb62babab0d63c8062158c38be46cf59a3649f3053568b3",
+    "src/flowmarshal/engine/ledger.py": "cecb5d6b50e736933005c6c849d6018992434ccdc8a9b13cb012f8e5fc5c0d41",
+    "src/flowmarshal/engine/ags_invocation_transport.py": "6ced622d3a68ece90e87155129aa6a2e9da754b532667e290a6a70bd710eff2d"
+  },
+  "prohibitions": [
+    "shared source mutation",
+    "F07 source writes",
+    "FM03 rerun",
+    "operating state/auth key access",
+    "live provider/native effects",
+    "Windows proof from Linux",
+    "SQLite proposal3 duplicate tests/repeats",
+    "Library upload",
+    "official GO/merge/release"
+  ]
+}

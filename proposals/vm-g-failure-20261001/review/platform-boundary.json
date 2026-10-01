@@ -1,0 +1,13 @@
+{
+  "argv": [
+    "/workspace/cloud-setup/venv/bin/python",
+    "/workspace/vm-g-review/platform-boundary.py"
+  ],
+  "cwd": "/workspace/vm-g-failure-shard",
+  "start_utc": "2026-10-01T23:32:33.419593+00:00",
+  "duration_seconds": 1.0050416209999185,
+  "exit": 0,
+  "raw_file": "/workspace/vm-g-review/platform-boundary.log",
+  "raw_sha256": "a2680d75cabc1818c582b6c024609881ce2a5e0747e8c0e121b7d1f170290ac8",
+  "classification": "expected unsupported Linux owner platform; not Windows proof"
+}

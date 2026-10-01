@@ -1,0 +1,97 @@
+{
+  "files": {
+    "REPORT.ko.md": {
+      "sha256": "b265c8d00ff907b97a286e3fb65dfbc7318d49d46a72719c273228e3177c8df9",
+      "bytes": 12556
+    },
+    "source-identity.json": {
+      "sha256": "a0d0b29d920077871ade43b05ad7b45cffacdaa7a0e579fc09dfff4c30023573",
+      "bytes": 32624
+    },
+    "final-checks.json": {
+      "sha256": "9888ec8c12d1b9ad5d79431f59fbc4ed556d9d9c416ce730b780fd16e0ea05d9",
+      "bytes": 1094
+    },
+    "interrupt-delivery-proposal.patch": {
+      "sha256": "616647002d4fcc3641dd0fcd6a9a0e11d8f40fa32cd4e403aa2f234903086741",
+      "bytes": 3557
+    },
+    "vm_g_faults.py": {
+      "sha256": "df14fcfda7a5b5a462230ace0b8459cbf40a6708044f2768ab60c02ef19ce975",
+      "bytes": 19193
+    },
+    "build_candidate.py": {
+      "sha256": "66cf74d3adb2bc39e0ccb9e3c2a785c8e1b7fa1765692ea51846dd7eb6e32524",
+      "bytes": 3805
+    },
+    "run_suite.py": {
+      "sha256": "fc4906eb21707b956a8fd2db5d431cf769cb4d1de143af546526b46a9d3c9a70",
+      "bytes": 1261
+    },
+    "run_related.py": {
+      "sha256": "351e9f6ecd7854834d91648bb08fca625e8e2516ff5f5c03bf2d21e78f49e9f9",
+      "bytes": 1664
+    },
+    "run_followups.py": {
+      "sha256": "b0503022eeedc216f0a568be058cfdd7ff72e9b0ae442aa5689c0ff825a2fd95",
+      "bytes": 1637
+    },
+    "base-evidence.json": {
+      "sha256": "173f439d2ef52662052ae21a1e588023add6bdf3dd76368032b305093c4a4d43",
+      "bytes": 27551
+    },
+    "candidate-evidence.json": {
+      "sha256": "4b636cd5b08d2982936306207cd3ffd39289e9504b473f336179682f89f16995",
+      "bytes": 29241
+    },
+    "base-run.json": {
+      "sha256": "568326795f440e24456192e734515e5a1acb35b4467b1e2181bd17e8aca993e8",
+      "bytes": 757
+    },
+    "candidate-run.json": {
+      "sha256": "69ab8f4a97efb3dc42a018af64ae29abf52a04619e9d2ef94a1bb8d97b81611c",
+      "bytes": 769
+    },
+    "related-run.json": {
+      "sha256": "800dff0b719b6ff8b761126bcbd4110af737cb554e5db82558c8c68ada4f0adb",
+      "bytes": 1842
+    },
+    "baseline-deadline-run.json": {
+      "sha256": "e2ade9613527f59250a42e7049a64f2dc5fe65497219a4e39dda6a4e3baa650b",
+      "bytes": 605
+    },
+    "supported-related-run.json": {
+      "sha256": "d3299369c10e7c26159ac2b21f539e894abba9a8c96df6da688a7466b0b5ff20",
+      "bytes": 1436
+    },
+    "base-raw.log": {
+      "sha256": "bfd1b4b6cb4c311f6a332563da34615a2c1c321e2c81edd77ad3487ef21a493b",
+      "bytes": 3981
+    },
+    "candidate-raw.log": {
+      "sha256": "b1f2ba849efe2d573698f14383f7dffe665998703bcbdf8d7c56b6a3c8463c31",
+      "bytes": 2873
+    },
+    "related-raw.log": {
+      "sha256": "0420d5f6a4c6037903b491121189c0a580475cdbf174ef74c5b3f11e16a79ef9",
+      "bytes": 14011
+    },
+    "baseline-deadline-raw.log": {
+      "sha256": "b255c58298630b5f960fed172bfc7f0da199d3d3ac66d89221c00c70d901cdd8",
+      "bytes": 1043
+    },
+    "supported-related-raw.log": {
+      "sha256": "7953be6ccd822503a5b588dac0de78637ee7945e355ef8ff815f82867a46f97a",
+      "bytes": 1625
+    }
+  },
+  "excluded": [
+    "candidate source tree",
+    "sqlite databases",
+    "provider traces",
+    "temporary synthetic projects",
+    "operating profiles/keys/state",
+    "development diagnostics (local retained)"
+  ],
+  "source_identity_manifest": "a0d0b29d920077871ade43b05ad7b45cffacdaa7a0e579fc09dfff4c30023573"
+}

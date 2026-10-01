@@ -1,0 +1,6 @@
+test_turn_started_progress_binds_once_and_rejects_a_different_turn (tests.test_engine_runtime_job_supervisor.RuntimeJobSupervisorTests.test_turn_started_progress_binds_once_and_rejects_a_different_turn) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.048s
+
+OK

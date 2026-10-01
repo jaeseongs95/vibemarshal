@@ -1,0 +1,24 @@
+test_01_two_process_attempt_reservation_has_one_winner (__main__.FaultTests.test_01_two_process_attempt_reservation_has_one_winner) ... ok
+test_02_two_process_budget_admission_has_one_winner (__main__.FaultTests.test_02_two_process_budget_admission_has_one_winner) ... ok
+test_03_two_process_exact_binding_is_idempotent (__main__.FaultTests.test_03_two_process_exact_binding_is_idempotent) ... ok
+test_04_two_process_conflicting_binding_has_one_winner (__main__.FaultTests.test_04_two_process_conflicting_binding_has_one_winner) ... ok
+test_05_interrupt_inflight_response_window_has_one_effect (__main__.FaultTests.test_05_interrupt_inflight_response_window_has_one_effect) ... ok
+test_06_killed_interrupt_sender_is_observed_without_resend (__main__.FaultTests.test_06_killed_interrupt_sender_is_observed_without_resend) ... ok
+test_07_interrupt_response_loss_is_unknown_not_terminal_or_retry (__main__.FaultTests.test_07_interrupt_response_loss_is_unknown_not_terminal_or_retry) ... ok
+test_08_reservation_without_delivery_recovers_once (__main__.FaultTests.test_08_reservation_without_delivery_recovers_once) ... ok
+test_09_same_intent_key_is_idempotent_across_processes (__main__.FaultTests.test_09_same_intent_key_is_idempotent_across_processes) ... ok
+test_10_same_receipt_is_idempotent_across_processes (__main__.FaultTests.test_10_same_receipt_is_idempotent_across_processes) ... ok
+test_11_stale_file_after_intent_refuses_effect_marker (__main__.FaultTests.test_11_stale_file_after_intent_refuses_effect_marker) ... ok
+test_12_expired_job_after_intent_refuses_effect_marker (__main__.FaultTests.test_12_expired_job_after_intent_refuses_effect_marker) ... ok
+test_13_collector_loss_late_binding_preserves_exact_turn_without_terminal (__main__.FaultTests.test_13_collector_loss_late_binding_preserves_exact_turn_without_terminal) ... ok
+test_14_unknown_receipt_reconciliation_never_repeats_effect (__main__.FaultTests.test_14_unknown_receipt_reconciliation_never_repeats_effect) ... ok
+test_15_unbound_interrupt_is_delivered_once_after_late_binding (__main__.FaultTests.test_15_unbound_interrupt_is_delivered_once_after_late_binding) ... ok
+test_16_crash_after_claim_before_send_does_not_invent_delivery_or_retry (__main__.FaultTests.test_16_crash_after_claim_before_send_does_not_invent_delivery_or_retry) ... ok
+test_17_workflow_revocation_after_intent_refuses_effect_marker (__main__.FaultTests.test_17_workflow_revocation_after_intent_refuses_effect_marker) ... ok
+test_18_cancelled_late_binding_still_delivers_one_interrupt (__main__.FaultTests.test_18_cancelled_late_binding_still_delivers_one_interrupt) ... ok
+test_19_provider_terminal_before_interrupt_starts_no_effect (__main__.FaultTests.test_19_provider_terminal_before_interrupt_starts_no_effect) ... ok
+
+----------------------------------------------------------------------
+Ran 19 tests in 36.308s
+
+OK

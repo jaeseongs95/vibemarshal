@@ -1,0 +1,19 @@
+{
+  "command": [
+    "/workspace/cloud-setup/venv/bin/python",
+    "/workspace/vm-g-artifacts/vm_g_faults.py"
+  ],
+  "cwd": "/workspace/vm-g-failure-shard",
+  "environment_overrides": {
+    "VM_G_REPO": "/workspace/vm-g-failure-shard",
+    "VM_G_EVIDENCE": "/workspace/vm-g-artifacts/base-evidence.json",
+    "PYTHONPATH": "/workspace/vm-g-failure-shard/src:/workspace/vm-g-failure-shard",
+    "PYTHONDONTWRITEBYTECODE": "1"
+  },
+  "start_utc": "2026-10-01T23:32:43.186944+00:00",
+  "end_utc": "2026-10-01T23:33:17.123747+00:00",
+  "elapsed_seconds": 33.93680708199997,
+  "exit": 1,
+  "raw_sha256": "bfd1b4b6cb4c311f6a332563da34615a2c1c321e2c81edd77ad3487ef21a493b",
+  "evidence_sha256": "173f439d2ef52662052ae21a1e588023add6bdf3dd76368032b305093c4a4d43"
+}
