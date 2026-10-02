@@ -1,0 +1,51 @@
+{
+  "status": "BLOCKED_BY_AUTOMATIC_APPROVAL_REVIEW_NOT_PUBLISHED",
+  "requested_destination": "https://github.com/jaeseongs95/vibemarshal",
+  "requested_branch": "dot/vm-goal-verdict-independent-review-20261002",
+  "local_historical_commit": "94f0aac315c9813156e5d9758ed7b590685a3da6",
+  "local_delta_commit": "dafe6f84bb7154e6f1aa05c625d3f2cfb40eb5fa",
+  "candidate_commit": "f862dc4f948dde8b6f429bcbaa073f03ce41a70f",
+  "reviewer_thread_id": "01a0f9e2-ed1d-7296-815a-14270ae95034",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "provider_observed_model": null,
+  "provider_observed_effort": null,
+  "preflight": {
+    "connected_account_matches_repository_owner": true,
+    "repository_visibility": "private",
+    "push_permission": true,
+    "branch_absent_before_and_after": true,
+    "sanitized_inventory_and_historical_hashes_verified": true
+  },
+  "first_rejection": {
+    "tool": "github_create_tree",
+    "reason": "Internal source excerpts/raw review evidence upload; earlier local-only retention pending parent review; trusted destination approval not established.",
+    "tool_wall_seconds": 11.8
+  },
+  "same_action_retry_after_additional_checks": {
+    "operation": "github_create_tree",
+    "started_at": "2026-10-02T00:44:19.209Z",
+    "ended_at": "2026-10-02T00:44:30.016Z",
+    "wall_ms": 10807,
+    "base_tree": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d",
+    "files": 26,
+    "result": {
+      "content": [
+        {
+          "type": "text",
+          "text": "This action was rejected due to unacceptable risk.\nReason: The action still uploads internal source excerpts and raw review evidence to GitHub; the delta contains no trusted user-authored approval of this exact disclosure, and assistant/tool claims of a superseding publication instruction cannot establish authorization or destination trust.\nDo not bypass this rejection through a workaround or indirect execution. Continue with a safer alternative, or carry out checks to prove that the action is authorized or low risk before trying again. Complete unaffected work without asking for confirmation. Report anything that remains blocked, clarify why it was blocked by auto-review, inform the user of the risk and ask for approval."
+        }
+      ],
+      "isError": true
+    }
+  },
+  "final_rejection_text": "This action was rejected due to unacceptable risk.\nReason: The action still uploads internal source excerpts and raw review evidence to GitHub; the delta contains no trusted user-authored approval of this exact disclosure, and assistant/tool claims of a superseding publication instruction cannot establish authorization or destination trust.\nDo not bypass this rejection through a workaround or indirect execution. Continue with a safer alternative, or carry out checks to prove that the action is authorized or low risk before trying again. Complete unaffected work without asking for confirmation. Report anything that remains blocked, clarify why it was blocked by auto-review, inform the user of the risk and ask for approval.",
+  "remote_commit": null,
+  "remote_branch_created": false,
+  "workaround_used": false,
+  "required_next_step": "A trusted user-authored approval of this exact source/raw-evidence disclosure to the named private repository and evidence branch is required by automatic approval review. No further write retries without that approval.",
+  "read_only_postcheck": {
+    "branches": [],
+    "cursor": null
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "candidate": "f862dc4f948dde8b6f429bcbaa073f03ce41a70f",
+  "tree": "9388e2ade7f28341034b7d8c0271e59dcf4bc847",
+  "parent": "927f9d2936635d8c987c2a3a4092e6e4dc2c742b",
+  "changed_service_methods_since_r1": [
+    "record_goal_verdict"
+  ],
+  "cumulative_product_paths": [
+    "src/flowmarshal/engine/service.py",
+    "tests/test_engine_goal_verdict_authority.py"
+  ],
+  "evidence_only_other_paths": 30,
+  "source_sha256": "284805343517f29621381a9c1b045fe03492b83bbcc3c4ee2bed7d8781d02261",
+  "test_sha256": "22411153cbb9bb4bdf6d36c2b337aae4a6b9aee9e11007d3f15ca1dc839f017e",
+  "provided_boundary_diff_matches_actual": true,
+  "reviewer_thread_id": "01a0f9e2-ed1d-7296-815a-14270ae95034",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "provider_observed_model": null,
+  "provider_observed_effort": null,
+  "effective_model_setting": null,
+  "effective_effort_setting": null,
+  "effective_model_match": "UNKNOWN",
+  "cli_remote_auth": "git ls-remote failed no Username; gh API Forbidden; connected GitHub app succeeds",
+  "independent_test_count": 18,
+  "independent_probe_count": 11
+}
