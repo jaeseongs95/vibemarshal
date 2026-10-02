@@ -1,0 +1,124 @@
+fresh DELETE bootstrap 복구 후보 — author handoff, 독립 review 대기
+
+Executor 재개 확인:
+첫 exec는 기존 /workspace/vibemarshal에서 성공했다(exit=0, tool wall_time_seconds=0.012966689).
+pwd=/workspace/vibemarshal, clean branch=codex/sqlite-atomic-initialize-v3,
+HEAD=211a5a0f5891a44f217aa7aae18bdb8825775878, worktree는 하나였다.
+환경·actor 대체 요청은 하지 않았다. 그 첫 probe의 exact UTC는 NOT_OBSERVED이며
+추정하지 않았다. 이후 수집기는 commands.jsonl에 argv/cwd/raw stdout/stderr,
+UTC start/end, elapsed_seconds와 exit_code를 기록했다. 실행 blocker는 없다.
+
+새 candidate:
+branch=codex/sqlite-fresh-delete-recovery
+commit=4dae937be993693b78d1dbcd873d499633a08e97
+tree=8c03f489783175f579c86b699a7b98d634217d19
+parent/base=32bb0f9dd9f024045d24487312b50f5b703573a3
+base tree=27e18c0c7853c1d35a98d5437cebf0ba703ed42d
+commit UTC=2026-10-02T00:37:22+00:00
+writer=Codex SQLite Candidate Writer <codex-sqlite-candidate@local.invalid>
+source thread=01a0f995-7341-7179-91a4-63a814e66020
+
+기존 local branches/worktree 및 원격 branch 목록을 확인했고 동등한 recovery
+작업 위치는 없었다. 새 codex/sqlite-fresh-delete-recovery branch는 exact base32bb에서
+만들었다. 두 파일의 동결된 v3 누적 patch를 재사용하고 그 위에 좁은 predicate와
+작은 regression delta만 작성했다. 다른 writer branch를 대체하지 않았다.
+기존 v3 commit211a5a0/treee901b77 및 evidencefdc5d03 refs/bytes, 이전 모든 negative
+evidence와 policy panel 결과는 그대로다. 새 negative 관측은 별도 파일에 남겼다.
+
+정책 입력과 적용 지침:
+VM root의 최신 명시 지시는 fresh DELETE-mode bootstrap failure/crash retry만
+지원하도록 선택했다. 이는 panel 자체가 구현을 승인했다는 뜻이 아니다.
+panel commit=d1b68f837d5e14698f090160502856ce67974502의 REPORT/auxiliary 및
+edge_counterexamples.py의 작은 cache_size=10/COMMIT 종료 예제를 읽었다.
+공식 panel 위치:
+https://github.com/jaeseongs95/vibemarshal/blob/d1b68f837d5e14698f090160502856ce67974502/docs/independent-results/2026-10-02/vm-sqlite-empty-policy/REPORT.md
+기존 candidate AGENTS와 공식 AGS ponytail 지침을 유지했다. 새 marker, framework,
+의존성 또는 schema_version/freelist policy gate는 없다. 이번 no-publish/no-main
+지시를 저장소 기본 merge/push 지침보다 우선했다.
+
+제품 delta는 v3 대비 정확히 조건 한 줄과 주석 한 줄이다:
+    and self.path.stat().st_size == 0
+이는 native writable SQLite recovery 뒤 BEGIN IMMEDIATE writer lock 안에서 같은
+connection의 application_id=0, user_version=0, 전체 sqlite_master 공백 조회 뒤 실행한다.
+파일 pre-open 크기를 gate로 쓰지 않는다. 기존 identity 검사, atomic schema/metadata/
+identity bootstrap, borrowed connection 소유권, commit 뒤 WAL 전환/재시도는 보존했다.
+SCHEMA_SQL은 base/v3/candidate에서 원문 그대로이며 trigger 동등성 회귀도 통과했다.
+
+Engine unlink/truncate 또는 legacy repair는 없다. hot-journal fixture에서 복구 전
+nonzero main이 native SQLite recovery에 의해 writer-locked predicate 시점의 zero
+main으로 바뀌는 것은 별도 관측이다. 이 native 변화는 Engine이 파일을 지우거나
+소유권을 증명했다는 뜻이 아니다. nonzero external logical-empty/pristine WAL/
+VACUUM-empty/DROP-history-empty/옛 WAL rollback residue는 거절하며 main bytes,
+zero identity, 전체 공백 schema와 기존 journal mode를 보존하는 회귀가 통과했다.
+held writer의 committed foreign WAL main/WAL bytes와 row7도 보존됐다. native SQLite의
+recovery/lock/connection lifecycle 자체가 만드는 물리 효과와 이 Engine gate를 구분하며
+일반적인 forensic byte purity나 provenance authentication을 주장하지 않는다.
+
+파일 소유권:
+- src/flowmarshal/engine/ledger.py 하나: cumulative 54 insertion/18 deletion,
+  v3 대비 size clause+comment 2 insertion, SHA256
+  86cdd317b07e3e704229a890679a2955c51811da2087e8bd4eec423307f109d4
+- 기존 tests/test_engine_ledger_initialize.py: 최종 525줄, 기존 11 method와 새 5 method,
+  SHA256 42aed1bbc678bfaa6cf2def1e3a6881ae3979b129343544d2f045ca67b6ce903
+Core/F07의 다른 source, AGENTS, spec, runtime profile, 설치, operating DB/index/migration,
+제품 generation은 변경/실행하지 않았다. Git index는 승인된 두 파일 stage에만 썼다.
+모든 DB/journal/WAL은 TemporaryDirectory 합성 fixture이며 provider calls는 0회다.
+
+로컬 실행 결과:
+명령: env PYTHONPATH=src PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tests.test_engine_ledger_initialize -v
+16 method PASS = relevant existing11 + new5. suite는 한 번만 실행했다.
+UTC=2026-10-02T00:34:42.975613+00:00 -> 2026-10-02T00:34:45.494375+00:00
+command elapsed=2.518811840s, unittest reported=2.073s, exit=0
+새 5 method:
+- nonzero logical-empty container 5 subcase의 rejection/preservation.
+- real static Engine schema cache spill 후 precommit exception: nonzero main 관측,
+  native rollback 후 size0/identity0/schemaempty, 정상 retry.
+- module-level spawn helper의 cache spill/COMMIT 전 process exit75: main>0,
+  journal>512, valid hot-journal magic d9d505f920a163d7. 첫 gate Path.stat의 같은
+  writer connection 관측은 (in_transaction=True, size0, app0, user0, objects=[]).
+  Engine initialize retry와 정상 identity가 이어진다.
+- committed foreign data가 WAL에 있는 동안 main/WAL bytes, row, identity/mode 보존.
+- 정상 Engine project/history/dump/main bytes 보존 및 history 검증.
+기존 11에는 fresh DELETE의 metadata/DDL/identity/commit/interrupt/rollback fault,
+spawn crash 후 rollback/retry, schema trigger equivalence, borrowed connection,
+malformed cleanup, foreign schema/identity/race와 postcommit WAL retry가 포함된다.
+assert_empty helper에 native recovery 뒤 size0 확인을 더했다.
+
+검출력 negative:
+파일·Git ref를 수정하지 않고 frozen v3 ledger bytes만 process memory에 로드했다.
+명령: env PYTHONPATH=src:. PYTHONDONTWRITEBYTECODE=1 python3 /workspace/sqlite-delete-recovery-evidence/v3_predicate_negative.py
+새 rejection method 하나의 5 subcase 모두 EngineLedgerError 미발생으로 FAIL했다.
+UTC=2026-10-02T00:36:01.992653+00:00 -> 2026-10-02T00:36:02.515617+00:00
+elapsed=0.523017550s, expected exit=1.
+이 5 failure observation을 unique method/qualification 수로 합산하지 않는다.
+원 v3가 선택된 새 정책보다 넓게 할당한다는 검출력 근거이며 그 당시 정책 또는
+기존 기술 review의 부정 결과를 재작성하지 않았다.
+
+verify_scope.py는 v3 ledger+정확한 두 줄만 candidate bytes라는 사실, 동결된 refs,
+SCHEMA_SQL 원문 동일성과 Python3.10 AST parse를 검사해 exit0이다.
+SCHEMA_SQL SHA256=7b0dfe58482056e6501e419c8df3a63176cb7f9e021f7c787c5a3d4ad32c277d.
+실제 runtime은 Linux6.18.44/x86_64/glibc2.41, Python3.12.14, SQLite3.53.1이다.
+Python3.10 AST PASS를 Python3.10 runtime 검증으로 승격하지 않는다.
+git diff --cached --check, git diff --check, base32bb..HEAD 및 v3..HEAD diff checks exit0.
+공통 20-run benchmark나 broad suite, 설치/role/provider qualification은 재실행하지 않았다.
+
+요청과 관측:
+requested model=gpt-6.1-sol, effort=high, fallback 없음.
+provider_observed model/effort=null / NOT_OBSERVED; authoritative per-turn metadata가
+이 execution surface에 노출되지 않는다. 요청값을 실제 effective 관측으로 쓰지 않는다.
+
+봉인 및 review 경계:
+누적 diff: cumulative-from-32bb.patch
+SHA256=96c700d9ac4e13ce1bb68434db1b5d445355841dde815bf5a02b1563b3831225
+review delta: predicate-and-tests-from-v3.patch
+SHA256=d756ec74b640efed2c7dca82abdd54f508a22ddc8c84a5a8e08f95209f37634d
+해시와 Git blob은 candidate-manifest.json에 있다. 전체 raw command receipts는
+commands.jsonl에 있으며 JSON string의 newline을 decode하면 original stdout/stderr다.
+작업 트리는 clean이다. parent는 정확히32bb이고 변경 path는 위 두 개뿐이다.
+새 candidate는 로컬에 동결했으며 push/publication하지 않았다. Git bundle도 만들지 않았다.
+Reviewer01a0f9e7의 predicate/new-case independent review는 PENDING이다. author는
+자신의 candidate를 승인하지 않았다. review 후 별도 게시 권한을 기다린다.
+Windows native runner/repin, Python3.10 runtime, 지원 matrix, 실제 power-loss/IOERR,
+20-run benchmark, 전체 release/설치/provider E2E는 NOT_RUN이다.
+main/source GO를 주장하지 않으며 F07 first-four의 첫 main no-ff merge 순서는 그대로다.
+Library 사용/업로드, actor 교체, main merge/rebase, 운영 데이터 mutation은 없다.

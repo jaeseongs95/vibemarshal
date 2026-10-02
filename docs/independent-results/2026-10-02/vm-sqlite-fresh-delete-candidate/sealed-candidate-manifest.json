@@ -1,0 +1,96 @@
+{
+  "sealed_at": "2026-10-02T00:38:37.667687+00:00",
+  "branch": "codex/sqlite-fresh-delete-recovery",
+  "commit": "4dae937be993693b78d1dbcd873d499633a08e97",
+  "tree": "8c03f489783175f579c86b699a7b98d634217d19",
+  "parent": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "base_tree": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d",
+  "preserved_v3_commit": "211a5a0f5891a44f217aa7aae18bdb8825775878",
+  "preserved_v3_tree": "e901b77ebf7551342ada996dd7ee4e8422b92f7a",
+  "preserved_evidence_commit": "fdc5d03bf58c9521ff06ab475aea01d1650a4269",
+  "panel_commit": "d1b68f837d5e14698f090160502856ce67974502",
+  "reviewed_v3_patch_sha256": "40339ffa0ef57f5d6152c289344c7fda0011c70c0ea40338861495c3fa170a89",
+  "owned_paths": [
+    "src/flowmarshal/engine/ledger.py",
+    "tests/test_engine_ledger_initialize.py"
+  ],
+  "files": [
+    {
+      "path": "src/flowmarshal/engine/ledger.py",
+      "blob": "7c282e0590890e213b33cb9d9272aacdf108273f",
+      "sha256": "86cdd317b07e3e704229a890679a2955c51811da2087e8bd4eec423307f109d4",
+      "bytes": 44755
+    },
+    {
+      "path": "tests/test_engine_ledger_initialize.py",
+      "blob": "31aca3b8aee8ac37b08d9cd0f81d192a7cede863",
+      "sha256": "42aed1bbc678bfaa6cf2def1e3a6881ae3979b129343544d2f045ca67b6ce903",
+      "bytes": 25969
+    }
+  ],
+  "patches": {
+    "cumulative-from-32bb.patch": {
+      "from_commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+      "to_commit": "4dae937be993693b78d1dbcd873d499633a08e97",
+      "sha256": "96c700d9ac4e13ce1bb68434db1b5d445355841dde815bf5a02b1563b3831225",
+      "bytes": 32319
+    },
+    "predicate-and-tests-from-v3.patch": {
+      "from_commit": "211a5a0f5891a44f217aa7aae18bdb8825775878",
+      "to_commit": "4dae937be993693b78d1dbcd873d499633a08e97",
+      "sha256": "d756ec74b640efed2c7dca82abdd54f508a22ddc8c84a5a8e08f95209f37634d",
+      "bytes": 9866
+    }
+  },
+  "clean_worktree": true,
+  "executor": {
+    "status": "USABLE; first resumed exec exit 0",
+    "cwd": "/workspace/vibemarshal",
+    "actor_changed": false,
+    "replacement_environment_requested": false
+  },
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "provider_observed_model": null,
+  "provider_observed_effort": null,
+  "fallback_used": false,
+  "provider_calls_performed": 0,
+  "writer_source_thread_id": "01a0f995-7341-7179-91a4-63a814e66020",
+  "policy": {
+    "selected_by": "VM root explicit task instruction",
+    "scope": "fresh DELETE bootstrap failure/crash retry",
+    "predicate": "same writable connection after native recovery, BEGIN IMMEDIATE, app_id=0, user_version=0, complete sqlite_master empty, recovered size=0",
+    "engine_unlink_or_truncate": false,
+    "marker_or_provenance_framework": false,
+    "extra_schema_version_or_freelist_policy_gate": false
+  },
+  "checks": {
+    "existing_methods": 11,
+    "new_methods": 5,
+    "local_methods_passed": 16,
+    "suite_runs": 1,
+    "v3_negative_methods": 1,
+    "v3_negative_failing_subcases": 5,
+    "schema_sql_preserved": true,
+    "python_310_ast": "PASS",
+    "race20_rerun": false
+  },
+  "independent_review": {
+    "status": "PENDING; author does not approve",
+    "reviewer": "01a0f9e7"
+  },
+  "pushed": false,
+  "main_merge": false,
+  "rebase": false,
+  "source_go": false,
+  "f07_order": "F07 first-four required first main no-ff merge remains unchanged",
+  "not_run": [
+    "Independent predicate/new-case review",
+    "Windows native process/owner-lock runner and repin",
+    "Python 3.10 runtime",
+    "Supported Python/SQLite matrix",
+    "Actual power-loss/IOERR durability",
+    "20-run concurrency benchmark",
+    "Whole repository/release/installation/provider qualification"
+  ]
+}
