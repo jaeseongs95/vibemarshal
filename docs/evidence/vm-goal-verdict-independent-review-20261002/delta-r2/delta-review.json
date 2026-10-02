@@ -35,7 +35,8 @@
     "no product edit",
     "F07 first-four order unchanged"
   ],
-  "publication_status": "BLOCKED_BY_AUTOMATIC_APPROVAL_REVIEW_NOT_PUBLISHED",
-  "remote_commit": null,
-  "remaining_blocker": "Trusted user-authored approval for exact source/raw evidence disclosure to named private review branch required by automatic approval review."
+  "publication_status": "PUBLISHED_AND_REMOTE_READBACK_VERIFIED",
+  "remote_commit": "e52af2292e9803ac8fe23fa1da9882ea9493013f",
+  "remaining_blocker": null,
+  "publication_success_receipt": "publication-success.json"
 }

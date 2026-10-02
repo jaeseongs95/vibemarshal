@@ -13,7 +13,7 @@
     "no source archive/fixture directories",
     "no operational profile/keys/transcripts",
     "Raw diff context-space and historical EOF bytes preserved; explicitly scoped artifact whitespace check; candidate product diff check passed",
-    "Final local packet resanitized after publication rejection; no remote branch created"
+    "Direct user approval; remote docs-only packet and selected exact-byte hashes verified; prior rejection preserved as historical record"
   ],
   "files": [
     {
@@ -28,8 +28,8 @@
     },
     {
       "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/README.md",
-      "bytes": 3567,
-      "sha256": "8e824a49e4206ebbe921b7edcc37f0fc11b027af8c01527afe9c39b0a178ae69"
+      "bytes": 3998,
+      "sha256": "f808f38540b0a81d28a4c18b636ff2514e1fcfefa4c407cac9f8b3f1c5dcb7c1"
     },
     {
       "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/REVIEW.md",
@@ -68,8 +68,8 @@
     },
     {
       "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/delta-r2/DELTA_REVIEW.md",
-      "bytes": 8580,
-      "sha256": "8d8dc11ff38730b25211a631db2c88c6abb398548e2df3bd944f0b4c8e332564"
+      "bytes": 9002,
+      "sha256": "ab1c19c338be435be9ab7317a122b2a7d960d7229245b5e526cf71b14ef09dd1"
     },
     {
       "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/delta-r2/author-input-boundary-diff.raw.txt",
@@ -88,8 +88,8 @@
     },
     {
       "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/delta-r2/delta-review.json",
-      "bytes": 1835,
-      "sha256": "40673f0683190a8c3b0abd78c09496b6044e04b5fcc4447106bd5f8cbf8790d3"
+      "bytes": 1783,
+      "sha256": "41b60c813d11c01b6c0f9bd7b567153c9a581a03aafc6cd3da3697b689e9232a"
     },
     {
       "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/delta-r2/delta_probe.py",
@@ -105,6 +105,11 @@
       "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/delta-r2/publication-receipt.json",
       "bytes": 3460,
       "sha256": "3ec3a8e16a8f2065638ad4d76d31a06d1f794f85af7da853a6c009c1ff3c0380"
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/delta-r2/publication-success.json",
+      "bytes": 2807,
+      "sha256": "a928d74686b4d5f6e4b2fb7d286b0057ecbe9e8d719ac66d90c76d2bda5c4dfa"
     },
     {
       "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/delta-r2/r2-cumulative-scope.raw.txt",
@@ -227,5 +232,5 @@
       "sha256": "3442664c5d790c03a6f6ed1f0c9791e50320fd61d319f085d227ef1dada32d71"
     }
   ],
-  "publication_status": "BLOCKED_NOT_PUBLISHED"
+  "publication_status": "PUBLISHED_AND_REMOTE_READBACK_VERIFIED"
 }

@@ -1,0 +1,65 @@
+{
+  "status": "PUBLISHED_AND_REMOTE_READBACK_VERIFIED",
+  "verified_at_utc": "2026-10-02T01:09:58Z",
+  "repository": "jaeseongs95/vibemarshal",
+  "visibility": "private",
+  "branch": "dot/vm-goal-verdict-independent-review-20261002",
+  "reviewer_thread_id": "01a0f9e2-ed1d-7296-815a-14270ae95034",
+  "candidate_commit": "f862dc4f948dde8b6f429bcbaa073f03ce41a70f",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "provider_observed_model": null,
+  "provider_observed_effort": null,
+  "actual_settings_match": "UNKNOWN",
+  "mechanism": "connected GitHub Git API; same operation succeeded after direct trusted user approval",
+  "historical_local_commit": "94f0aac315c9813156e5d9758ed7b590685a3da6",
+  "historical_remote_commit": "310a45385dfd349185b4abc404de63aaae650629",
+  "historical_tree": "63abc93af58f6e952fb3b54db69901c73c3f74f3",
+  "verified_packet_local_commit": "50ae882c81cadffd9b2877b20a7eccaa6b16a957",
+  "verified_packet_remote_commit": "e52af2292e9803ac8fe23fa1da9882ea9493013f",
+  "verified_packet_tree": "bc5e341d3dba00b0330cfebca4b03c1bc0a063f9",
+  "remote_compare": {
+    "base": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+    "ahead_by": 2,
+    "changed_files": 43,
+    "all_paths_in_allowed_evidence_directory": true
+  },
+  "readback_hashes": [
+    {
+      "path": "REVIEW.md",
+      "git_blob": "97e08a82e773cd0e3d5ce236bbc9266a703f5bd0",
+      "sha256": "35b85037bf961d343000e30fa4c2fbfa1c03a66c53a75175ce5919f2ea566c60",
+      "exact_bytes_match": true
+    },
+    {
+      "path": "SHA256SUMS",
+      "git_blob": "a1d8eaea2f27e9d36abd54a9de0788c6a4b57509",
+      "sha256": "c5ada302f010c43eb873bf5f755b3a4982e58c315f9bc8ba7a3a4b4b83cc33b7",
+      "exact_bytes_match": true
+    },
+    {
+      "path": "delta-r2/r2-related-regressions.raw.txt",
+      "git_blob": "1f3022067d82c1e0600488f20f03021e795ac602",
+      "sha256": "ed5effdc4f8f44512e225d031c083ba9a6bf2412d4b247b40e2d5d8dc2caad7b",
+      "exact_bytes_match": true
+    },
+    {
+      "path": "delta-r2/r2-independent-boundary.raw.txt",
+      "git_blob": "5044abc050ba4173e418b9aa2347b4892e1f08d4",
+      "sha256": "4b06d6ba3a5dae380dc244d4181ddfe88b549e38b123cd2fcc406d334d413b5f",
+      "exact_bytes_match": true
+    }
+  ],
+  "prior_rejections_preserved_in": "publication-receipt.json",
+  "publication_blocker": null,
+  "product_changes": 0,
+  "main_tag_pr_merge_changes": 0,
+  "tests_rerun_for_publication": 0,
+  "limits": [
+    "D1 Windows boundary remains",
+    "Direct Core/stub tests are not public provider E2E",
+    "Not source GO, merge or release approval",
+    "F07 first-four order unchanged"
+  ],
+  "receipt_boundary": "This receipt records the verified packet commit above. The later receipt commit has a separate SHA returned by GitHub and final response; no self-referential SHA is claimed."
+}

@@ -66,3 +66,8 @@ Artifact whitespace 검사에서 raw diff의 blank context 줄(` `)이 trailing 
 ## 최종 게시 상태
 
 **NOT_PUBLISHED — automatic approval review 거절.** private repository/계정 owner/push 권한/sanitized bytes를 확인한 뒤 동일 GitHub create_tree 작업을 재요청했지만, trusted user-authored approval로 내부 source 발췌·raw evidence의 정확한 disclosure를 승인한 근거가 없다는 이유로 다시 거절됐다. 추가 쓰기나 우회를 중단했다. readonly branch 재조회 결과 원격 review branch는 없다. `publication-receipt.json`에 사유·시점·checks·실제 reviewer identity를 기록했다. trusted 사용자 승인을 확인하기 전에는 이 packet을 업로드하지 않는다. 기술 검토의 B1 해소 판정은 그대로이며 게시만 차단됐다.
+
+
+## 현재 게시 상태 — 2026-10-02
+
+직접 사용자 승인 후 지정 private evidence branch 게시와 원격 readback이 완료됐다. [publication-success.json](publication-success.json)에 실제 로컬/원격 SHA, tree 일치, docs-only 범위, 원본·R2 raw hash 확인을 기록했다. 위 차단 기록은 당시 상태이며 현재 게시 blocker는 없다. 제품·main·tag·PR·merge 변경은 없다.

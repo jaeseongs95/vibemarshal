@@ -21,3 +21,8 @@ parent 검토 후 private evidence branch용으로 준비한 reviewer 작성 자
 ## 게시 차단 기록
 
 private evidence 업로드가 automatic approval review에서 두 번 거절돼 원격 게시를 하지 않았다. 로컬 역사+delta packet은 완성됐으며 기술 결과는 [delta report](delta-r2/DELTA_REVIEW.md), 게시 차단 사유는 [publication receipt](delta-r2/publication-receipt.json)에 있다. 원격 branch 생성·main·tag·merge·우회는 없다. trusted user-authored approval 확인이 남는다.
+
+
+## 현재 게시 상태 — 2026-10-02
+
+직접 사용자 승인 후 지정 private evidence branch 게시와 원격 readback이 완료됐다. [publication-success.json](delta-r2/publication-success.json)에 실제 로컬/원격 SHA, tree 일치, docs-only 범위, 원본·R2 raw hash 확인을 기록했다. 위 차단 기록은 당시 상태이며 현재 게시 blocker는 없다. 제품·main·tag·PR·merge 변경은 없다.
