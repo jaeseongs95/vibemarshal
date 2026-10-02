@@ -1,0 +1,26 @@
+{
+  "task_id": "vm-interrupt-independent-review-20261002",
+  "argv": [
+    "<PYTHON_ENV>/bin/python",
+    "<REVIEW_ROOT>/idempotent_rpc_probe.py",
+    "<REVIEW_ROOT>/candidate",
+    "candidate"
+  ],
+  "cwd": "<REVIEW_ROOT>/candidate",
+  "selected_environment": {
+    "PATH": "/usr/bin:/bin",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONPATH": "<REVIEW_ROOT>/candidate/src:<REVIEW_ROOT>/candidate"
+  },
+  "start_utc": "2026-10-01T23:54:31.701143+00:00",
+  "end_utc": "2026-10-01T23:54:32.953247+00:00",
+  "elapsed_seconds": 1.2521109270001034,
+  "exit_code": 0,
+  "harness_sha256": "166d461fdd54f014659427611d61fd805bf0938f35c8dc303320c8bd6de751c7",
+  "live_provider_calls": 0,
+  "original_stdout_sha256": "594221470e3d1bf836863aa82f16abdb2f3fe4af63c55f3da71b4e5f58d211d8",
+  "normalized_stdout_sha256": "594221470e3d1bf836863aa82f16abdb2f3fe4af63c55f3da71b4e5f58d211d8",
+  "original_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "normalized_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "path_normalization": "REVIEW_ROOT, PYTHON_ENV, BASE_CHECKOUT aliases; original hash records execution bytes, normalized hash records packet bytes"
+}

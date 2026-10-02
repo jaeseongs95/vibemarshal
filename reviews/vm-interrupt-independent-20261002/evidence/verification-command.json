@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "<PYTHON_ENV>/bin/python",
+    "<REVIEW_ROOT>/verify_inputs.py"
+  ],
+  "cwd": "<REVIEW_ROOT>",
+  "start_utc": "2026-10-01T23:55:59.812578+00:00",
+  "end_utc": "2026-10-01T23:56:00.097854+00:00",
+  "elapsed_seconds": 0.28528230599931703,
+  "exit_code": 0,
+  "original_stdout_sha256": "09a428d5821e7c7133c07a158f1128826a8ec84be5ce5a7eba1a51313ea6c464",
+  "normalized_stdout_sha256": "d50542162513626a4013b78465409f44c52d086c7e7f203c972f86eef1a0e50f",
+  "original_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "normalized_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "path_normalization": "REVIEW_ROOT, PYTHON_ENV, BASE_CHECKOUT aliases; original hash records execution bytes, normalized hash records packet bytes"
+}

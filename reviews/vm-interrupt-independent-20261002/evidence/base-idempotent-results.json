@@ -1,0 +1,152 @@
+{
+  "task_id": "vm-interrupt-independent-review-20261002",
+  "source": "base",
+  "rpc_calls": [
+    {
+      "method": "turn/interrupt",
+      "params": {
+        "threadId": "review-thread",
+        "turnId": "review-turn"
+      }
+    },
+    {
+      "method": "turn/interrupt",
+      "params": {
+        "threadId": "review-thread",
+        "turnId": "review-turn"
+      }
+    }
+  ],
+  "rpc_count": 2,
+  "synthetic_effect_count": 1,
+  "effect_model": "synthetic exact-target idempotent active-to-interrupted transition; not actual provider behavior",
+  "live_provider_calls": 0,
+  "after": {
+    "job_status": "interrupting",
+    "thread_id": "review-thread",
+    "turn_id": "review-turn",
+    "provider_terminal_status": null,
+    "markers": [],
+    "observations": [
+      {
+        "kind": "scheduled",
+        "provider_terminal": false,
+        "terminal_status": null,
+        "payload": {
+          "checkpoint_key": "independent-idempotent_provider_semantics",
+          "execution_guard": {
+            "absolute_deadline_at": "2026-10-02T23:54:32.815360+00:00",
+            "authorization_digest": "sha256:a77bc76a51c6d56608e7954897bbd1e71f35fa7e72974541baac947c65c36efa",
+            "authorization_id": "goal_authorization_579435c8bf6b4951bad5cbbfa0b64195",
+            "max_provider_calls": 25
+          },
+          "kind": "worker_turn",
+          "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+        }
+      },
+      {
+        "kind": "started",
+        "provider_terminal": false,
+        "terminal_status": null,
+        "payload": {
+          "absolute_deadline_at": "2026-10-01T23:56:32.818113+00:00",
+          "collector_event": "started",
+          "thread_id": null,
+          "turn_id": null
+        }
+      },
+      {
+        "kind": "provider_progress",
+        "provider_terminal": false,
+        "terminal_status": null,
+        "payload": {
+          "binding_source": "role_progress",
+          "thread_id": "review-thread",
+          "turn_id": "review-turn"
+        }
+      },
+      {
+        "kind": "interrupt_requested",
+        "provider_terminal": false,
+        "terminal_status": null,
+        "payload": {
+          "absolute_deadline_at": "2026-10-01T23:56:32.818113+00:00",
+          "reason": "workflow_paused",
+          "thread_id": "review-thread",
+          "turn_id": "review-turn"
+        }
+      },
+      {
+        "kind": "interrupt_receipt",
+        "provider_terminal": false,
+        "terminal_status": null,
+        "payload": {
+          "absolute_deadline_at": "2026-10-01T23:56:32.818113+00:00",
+          "interrupt_receipt": {
+            "binding": {
+              "bound_at": "2026-10-01T23:54:32.830806Z",
+              "host_id": null,
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            },
+            "operation_id": "review-turn",
+            "payload": {
+              "interrupted": true,
+              "response": {
+                "interruptAlreadyApplied": true,
+                "synthetic": true
+              },
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          "reason": "workflow_paused",
+          "thread_id": "review-thread",
+          "turn_id": "review-turn"
+        }
+      },
+      {
+        "kind": "interrupt_receipt",
+        "provider_terminal": false,
+        "terminal_status": null,
+        "payload": {
+          "absolute_deadline_at": "2026-10-01T23:56:32.818113+00:00",
+          "interrupt_receipt": {
+            "binding": {
+              "bound_at": "2026-10-01T23:54:32.832700Z",
+              "host_id": null,
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            },
+            "operation_id": "review-turn",
+            "payload": {
+              "interrupted": true,
+              "response": {
+                "interruptAlreadyApplied": false,
+                "synthetic": true
+              },
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          "reason": "workflow_paused",
+          "thread_id": "review-thread",
+          "turn_id": "review-turn"
+        }
+      }
+    ],
+    "table_counts": {
+      "attempts": 0,
+      "runtime_intents": 0,
+      "runtime_receipts": 0,
+      "provider_calls": 0,
+      "goal_verdicts": 0
+    },
+    "task_states": [
+      "ready"
+    ],
+    "effects": [],
+    "reads": [],
+    "history_valid": true
+  }
+}

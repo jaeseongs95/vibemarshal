@@ -1,0 +1,14 @@
+{
+  "repository": "jaeseongs95/vibemarshal",
+  "evidence_commit": "8a159ed4b79058aba8e6302358733696b33d11ff",
+  "path": "docs/independent-results/2026-10-02/vm-sqlite/revision3/atomic-initialize-v3.patch",
+  "git_blob_sha": "0bebe50128b4e10db4f16220fd2c0e33c3597f4b",
+  "content_sha256": "40339ffa0ef57f5d6152c289344c7fda0011c70c0ea40338861495c3fa170a89",
+  "reviewed_changed_path": "src/flowmarshal/engine/ledger.py",
+  "reviewed_functions": [
+    "_connect",
+    "initialize",
+    "_assert_identity"
+  ],
+  "full_patch_reexported": false
+}

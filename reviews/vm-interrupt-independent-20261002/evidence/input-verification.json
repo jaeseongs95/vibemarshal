@@ -1,0 +1,363 @@
+{
+  "task_id": "vm-interrupt-independent-review-20261002",
+  "source_thread_id": "01a0f995-7341-7179-91a4-63a814e66020",
+  "remote_evidence_commit": "6c28f9f271f4e99e1ee81c05db75dc342a022558",
+  "remote_verified_files": 30,
+  "artifact_hashes": [
+    {
+      "path": "proposals/vm-g-failure-20261001/REPORT.ko.md",
+      "bytes": 12556,
+      "sha256": "b265c8d00ff907b97a286e3fb65dfbc7318d49d46a72719c273228e3177c8df9",
+      "git_blob_sha": "f7bf83049eac1fd335a3698c0918f233a57281d8"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/base-evidence.json",
+      "bytes": 27551,
+      "sha256": "173f439d2ef52662052ae21a1e588023add6bdf3dd76368032b305093c4a4d43",
+      "git_blob_sha": "854648932e6dfbf1e34edc618b1d0fefe304face"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/base-raw.log",
+      "bytes": 3981,
+      "sha256": "bfd1b4b6cb4c311f6a332563da34615a2c1c321e2c81edd77ad3487ef21a493b",
+      "git_blob_sha": "be31f57cb73d7385b6d70dd2292053c5683babeb"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/base-run.json",
+      "bytes": 757,
+      "sha256": "568326795f440e24456192e734515e5a1acb35b4467b1e2181bd17e8aca993e8",
+      "git_blob_sha": "12d299b747ee8717da5a9a8db79e2a9af9b4a41b"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/baseline-deadline-raw.log",
+      "bytes": 1043,
+      "sha256": "b255c58298630b5f960fed172bfc7f0da199d3d3ac66d89221c00c70d901cdd8",
+      "git_blob_sha": "74dde441ea713756f51f06832bb6ab39c8280434"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/baseline-deadline-run.json",
+      "bytes": 605,
+      "sha256": "e2ade9613527f59250a42e7049a64f2dc5fe65497219a4e39dda6a4e3baa650b",
+      "git_blob_sha": "98dd620b0ead5e33e0a668569aa381dab8e5236f"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/build_candidate.py",
+      "bytes": 3805,
+      "sha256": "66cf74d3adb2bc39e0ccb9e3c2a785c8e1b7fa1765692ea51846dd7eb6e32524",
+      "git_blob_sha": "88a8b3790895bfdca7e9eb3729fdb37978ee55a4"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/candidate-evidence.json",
+      "bytes": 29241,
+      "sha256": "4b636cd5b08d2982936306207cd3ffd39289e9504b473f336179682f89f16995",
+      "git_blob_sha": "2fcb771f1c68d335a192e55e225912ca30f90e53"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/candidate-raw.log",
+      "bytes": 2873,
+      "sha256": "b1f2ba849efe2d573698f14383f7dffe665998703bcbdf8d7c56b6a3c8463c31",
+      "git_blob_sha": "a70f63faba0b3f6d738e8f7c8a389ab8b9a4c97c"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/candidate-run.json",
+      "bytes": 769,
+      "sha256": "69ab8f4a97efb3dc42a018af64ae29abf52a04619e9d2ef94a1bb8d97b81611c",
+      "git_blob_sha": "7f4382bc239cae175e16bea131267b2c95e8b028"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/delivery-manifest.json",
+      "bytes": 3269,
+      "sha256": "94cd7ade12a602c21f858673b531770e19c9238557f1bd47a8ee2af4e60ac1d8",
+      "git_blob_sha": "bd3c41745f87160b1e298a0fe057d1c72ca5941b"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/final-checks.json",
+      "bytes": 1094,
+      "sha256": "9888ec8c12d1b9ad5d79431f59fbc4ed556d9d9c416ce730b780fd16e0ea05d9",
+      "git_blob_sha": "1d96441e2f2822985c2121ca66d43b71c9947416"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/interrupt-delivery-proposal.patch",
+      "bytes": 3557,
+      "sha256": "616647002d4fcc3641dd0fcd6a9a0e11d8f40fa32cd4e403aa2f234903086741",
+      "git_blob_sha": "200caf2044caa1142d6c3f796f587851a2a1d70c"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/packet-index.json",
+      "bytes": 4607,
+      "sha256": "40d6e1305a9272ef0ada2c45f12481152b82723e0f0671a45751202404f53bba",
+      "git_blob_sha": "08f87b07be6f4504f9953d2fe12fb06fd27229e2"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/related-raw.log",
+      "bytes": 14011,
+      "sha256": "0420d5f6a4c6037903b491121189c0a580475cdbf174ef74c5b3f11e16a79ef9",
+      "git_blob_sha": "04e7fc2f7bd5801d323d8afda497ec499b22f7f1"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/related-run.json",
+      "bytes": 1842,
+      "sha256": "800dff0b719b6ff8b761126bcbd4110af737cb554e5db82558c8c68ada4f0adb",
+      "git_blob_sha": "807403e21798b561436f12806703ccaf4c041085"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/review/baseline-review.json",
+      "bytes": 1583,
+      "sha256": "5ebf2f83374eb3ba308ca8f4731159a73696e8c675009b8e84aed0c331ccbb42",
+      "git_blob_sha": "dfbf109dc54db5ac2a42f3fbf3c2bdced2b42ee2"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/review/check-3.log",
+      "bytes": 307,
+      "sha256": "321590a5b53274b55502256f2bb44c86e79c6c14dc9f141cbf941c35724893d3",
+      "git_blob_sha": "710e43bb8aa3f1bc1a76e7259ec3ef248f56ccf1"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/review/final-review.json",
+      "bytes": 1584,
+      "sha256": "cb27f8dee10f909ee22030afe5759378bf8d2e041f79d08aef7dd35dbed7d55c",
+      "git_blob_sha": "cc2677102a271a8cb0cea2c5728e19ec03c35a82"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/review/independent-checks.json",
+      "bytes": 1469,
+      "sha256": "242dc9ee2c13c8483e68b88a623a4a1620c0f1a9dd914cae76cd9c297a7baa27",
+      "git_blob_sha": "eca734e828b9a802127b323b15238658f7765223"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/review/platform-boundary.json",
+      "bytes": 494,
+      "sha256": "781a3a4944894878704ee88537aa1fc8e485c185caa57e0f340b7b18a415a98a",
+      "git_blob_sha": "0b9b240416ff349422173df810a720f8253f20ce"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/review/platform-boundary.log",
+      "bytes": 131,
+      "sha256": "a2680d75cabc1818c582b6c024609881ce2a5e0747e8c0e121b7d1f170290ac8",
+      "git_blob_sha": "1675800a428524c05f500906498b2e44f4441263"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/review/platform-boundary.py",
+      "bytes": 1203,
+      "sha256": "3de2a99dccc59397941a868e27a436e91423d64198da97b144e5c45e9ae39163",
+      "git_blob_sha": "8335430c018762fddc4ac25c4f131dd81d7775aa"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/run_followups.py",
+      "bytes": 1637,
+      "sha256": "b0503022eeedc216f0a568be058cfdd7ff72e9b0ae442aa5689c0ff825a2fd95",
+      "git_blob_sha": "f18b4c05a7c1f025b2343aa482cfe1bae9c32e68"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/run_related.py",
+      "bytes": 1664,
+      "sha256": "351e9f6ecd7854834d91648bb08fca625e8e2516ff5f5c03bf2d21e78f49e9f9",
+      "git_blob_sha": "bee1c1092b31c4b13a3b509e2f61ce877c1e7b8c"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/run_suite.py",
+      "bytes": 1261,
+      "sha256": "fc4906eb21707b956a8fd2db5d431cf769cb4d1de143af546526b46a9d3c9a70",
+      "git_blob_sha": "09d951aebda68073d4c7fcf20064282e769ba2c5"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/source-identity.json",
+      "bytes": 32624,
+      "sha256": "a0d0b29d920077871ade43b05ad7b45cffacdaa7a0e579fc09dfff4c30023573",
+      "git_blob_sha": "3d4b12ceb5fc56d77d471b9aa6dccf971b73b32c"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/supported-related-raw.log",
+      "bytes": 1625,
+      "sha256": "7953be6ccd822503a5b588dac0de78637ee7945e355ef8ff815f82867a46f97a",
+      "git_blob_sha": "0583dcf5f8d2638b4cf2a9479517c689fa652d09"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/supported-related-run.json",
+      "bytes": 1436,
+      "sha256": "d3299369c10e7c26159ac2b21f539e894abba9a8c96df6da688a7466b0b5ff20",
+      "git_blob_sha": "6f417fc1b9371bc8c860cff044b1cac1a1323bc0"
+    },
+    {
+      "path": "proposals/vm-g-failure-20261001/vm_g_faults.py",
+      "bytes": 19193,
+      "sha256": "df14fcfda7a5b5a462230ace0b8459cbf40a6708044f2768ab60c02ef19ce975",
+      "git_blob_sha": "8a7453c2ed1c2377064c5385112bdd56dfd0d49c"
+    }
+  ],
+  "author_manifest_checks": [
+    {
+      "file": "packet-index.json",
+      "matched_entries": 29,
+      "mismatches": 0
+    },
+    {
+      "file": "delivery-manifest.json",
+      "matched_entries": 21,
+      "mismatches": 0
+    }
+  ],
+  "source_identities": {
+    "base": {
+      "head": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+      "source_manifest_sha256": "a1eea39a9823f9b740d624c1ea361277448cc614ef96ed888bac7a39af0139cb",
+      "source_files": 136,
+      "tracked_status": ""
+    },
+    "candidate": {
+      "head": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+      "source_manifest_sha256": "4a605ef675521762146df6a9e483b4207fc6664230f87a2a8f80149df510a02b",
+      "source_files": 136,
+      "tracked_status": "M src/flowmarshal/engine/runtime.py\n M src/flowmarshal/engine/service.py"
+    }
+  },
+  "shared_checkout": {
+    "head": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+    "status": "",
+    "branch": "work"
+  },
+  "patch_sha256": "616647002d4fcc3641dd0fcd6a9a0e11d8f40fa32cd4e403aa2f234903086741",
+  "scoped_changed_paths": [
+    "src/flowmarshal/engine/runtime.py",
+    "src/flowmarshal/engine/service.py"
+  ],
+  "python_executable": "<PYTHON_ENV>/bin/python",
+  "python_version": "3.12.14",
+  "os": "Linux-6.18.44-x86_64-with-glibc2.41",
+  "node_version": "v24.19.0",
+  "commands": [
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "<REVIEW_ROOT>/base",
+      "exit_code": 0,
+      "stdout": "32bb0f9dd9f024045d24487312b50f5b703573a3\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=no"
+      ],
+      "cwd": "<REVIEW_ROOT>/base",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "<REVIEW_ROOT>/candidate",
+      "exit_code": 0,
+      "stdout": "32bb0f9dd9f024045d24487312b50f5b703573a3\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "status",
+        "--porcelain=v1",
+        "--untracked-files=no"
+      ],
+      "cwd": "<REVIEW_ROOT>/candidate",
+      "exit_code": 0,
+      "stdout": " M src/flowmarshal/engine/runtime.py\n M src/flowmarshal/engine/service.py\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--name-only"
+      ],
+      "cwd": "<REVIEW_ROOT>/candidate",
+      "exit_code": 0,
+      "stdout": "src/flowmarshal/engine/runtime.py\nsrc/flowmarshal/engine/service.py\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "cwd": "<REVIEW_ROOT>/candidate",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "apply",
+        "--check",
+        "--whitespace=error",
+        "<REVIEW_ROOT>/packet/interrupt-delivery-proposal.patch"
+      ],
+      "cwd": "<REVIEW_ROOT>/base",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "<BASE_CHECKOUT>",
+      "exit_code": 0,
+      "stdout": "32bb0f9dd9f024045d24487312b50f5b703573a3\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "status",
+        "--porcelain=v1"
+      ],
+      "cwd": "<BASE_CHECKOUT>",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "git",
+        "branch",
+        "--show-current"
+      ],
+      "cwd": "<BASE_CHECKOUT>",
+      "exit_code": 0,
+      "stdout": "work\n",
+      "stderr": ""
+    },
+    {
+      "argv": [
+        "node",
+        "--version"
+      ],
+      "cwd": "<REVIEW_ROOT>",
+      "exit_code": 0,
+      "stdout": "v24.19.0\n",
+      "stderr": ""
+    }
+  ],
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "actual_observable_model": null,
+  "actual_observable_effort": null,
+  "actual_settings_note": "No authoritative orchestration model/effort metadata exposed; execution used local Python synthetic adapters only.",
+  "provider_auth_consulted": false,
+  "live_provider_calls": 0,
+  "operating_db_profile_accessed": false,
+  "fallback": false
+}

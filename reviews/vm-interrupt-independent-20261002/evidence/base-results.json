@@ -1,0 +1,1442 @@
+{
+  "task_id": "vm-interrupt-independent-review-20261002",
+  "source": "base",
+  "source_head": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "actual_observed_model": null,
+  "actual_observed_effort": null,
+  "live_provider_calls": 0,
+  "cases": [
+    {
+      "case": "concurrent_inflight",
+      "children": [
+        {
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        {
+          "exit": 0,
+          "stdout": "",
+          "stderr": ""
+        }
+      ],
+      "after": {
+        "job_status": "interrupting",
+        "thread_id": "review-thread",
+        "turn_id": "review-turn",
+        "provider_terminal_status": null,
+        "markers": [],
+        "observations": [
+          {
+            "kind": "scheduled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "checkpoint_key": "independent-concurrent_inflight",
+              "execution_guard": {
+                "absolute_deadline_at": "2026-10-02T23:52:17.474717+00:00",
+                "authorization_digest": "sha256:1b81eb52afcd5f31571986ec9e1cf05d05e772921df83c46b3d9ef3592bc72ee",
+                "authorization_id": "goal_authorization_2c9363e8b38a49119cabefedb53e68df",
+                "max_provider_calls": 25
+              },
+              "kind": "worker_turn",
+              "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+            }
+          },
+          {
+            "kind": "started",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:17.478856+00:00",
+              "collector_event": "started",
+              "thread_id": null,
+              "turn_id": null
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "binding_source": "role_progress",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_requested",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:17.478856+00:00",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_receipt",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:17.478856+00:00",
+              "interrupt_receipt": {
+                "binding": null,
+                "operation_id": "review-turn",
+                "payload": {
+                  "synthetic": true
+                }
+              },
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          }
+        ],
+        "table_counts": {
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "provider_calls": 0,
+          "goal_verdicts": 0
+        },
+        "task_states": [
+          "ready"
+        ],
+        "effects": [
+          {
+            "label": "a",
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          },
+          {
+            "label": "b",
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "reads": [],
+        "history_valid": true
+      }
+    },
+    {
+      "case": "crash_before_claim",
+      "child": {
+        "exit": 71,
+        "stdout": "",
+        "stderr": ""
+      },
+      "before": {
+        "job_status": "interrupting",
+        "thread_id": "review-thread",
+        "turn_id": "review-turn",
+        "provider_terminal_status": null,
+        "markers": [],
+        "observations": [
+          {
+            "kind": "scheduled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "checkpoint_key": "independent-crash_before_claim",
+              "execution_guard": {
+                "absolute_deadline_at": "2026-10-02T23:52:20.226689+00:00",
+                "authorization_digest": "sha256:492da18c7d34d465b6ac86458db77b6f927598425a3859b91975e5e0a6af42ea",
+                "authorization_id": "goal_authorization_ac0510ab253d4e7c935921c34b6c3b9b",
+                "max_provider_calls": 25
+              },
+              "kind": "worker_turn",
+              "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+            }
+          },
+          {
+            "kind": "started",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:20.230608+00:00",
+              "collector_event": "started",
+              "thread_id": null,
+              "turn_id": null
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "binding_source": "role_progress",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_requested",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          }
+        ],
+        "table_counts": {
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "provider_calls": 0,
+          "goal_verdicts": 0
+        },
+        "task_states": [
+          "ready"
+        ],
+        "effects": [],
+        "reads": [],
+        "history_valid": true
+      },
+      "after": {
+        "job_status": "interrupting",
+        "thread_id": "review-thread",
+        "turn_id": "review-turn",
+        "provider_terminal_status": null,
+        "markers": [],
+        "observations": [
+          {
+            "kind": "scheduled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "checkpoint_key": "independent-crash_before_claim",
+              "execution_guard": {
+                "absolute_deadline_at": "2026-10-02T23:52:20.226689+00:00",
+                "authorization_digest": "sha256:492da18c7d34d465b6ac86458db77b6f927598425a3859b91975e5e0a6af42ea",
+                "authorization_id": "goal_authorization_ac0510ab253d4e7c935921c34b6c3b9b",
+                "max_provider_calls": 25
+              },
+              "kind": "worker_turn",
+              "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+            }
+          },
+          {
+            "kind": "started",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:20.230608+00:00",
+              "collector_event": "started",
+              "thread_id": null,
+              "turn_id": null
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "binding_source": "role_progress",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_requested",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_receipt",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "interrupt_receipt": {
+                "binding": null,
+                "operation_id": "review-turn",
+                "payload": {
+                  "synthetic": true
+                }
+              },
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "observation": {
+                "active": true,
+                "final_response": null,
+                "payload": {
+                  "synthetic": true
+                },
+                "terminal_status": null,
+                "thread_id": "review-thread",
+                "turn_id": "review-turn"
+              }
+            }
+          }
+        ],
+        "table_counts": {
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "provider_calls": 0,
+          "goal_verdicts": 0
+        },
+        "task_states": [
+          "ready"
+        ],
+        "effects": [
+          {
+            "label": "recover",
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "reads": [
+          {
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          },
+          {
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "history_valid": true
+      }
+    },
+    {
+      "case": "crash_at_rpc_boundary",
+      "child": {
+        "exit": 72,
+        "stdout": "",
+        "stderr": ""
+      },
+      "before": {
+        "job_status": "interrupting",
+        "thread_id": "review-thread",
+        "turn_id": "review-turn",
+        "provider_terminal_status": null,
+        "markers": [],
+        "observations": [
+          {
+            "kind": "scheduled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "checkpoint_key": "independent-crash_at_rpc_boundary",
+              "execution_guard": {
+                "absolute_deadline_at": "2026-10-02T23:52:21.651114+00:00",
+                "authorization_digest": "sha256:342ea4468f0688f6bc75e967ee6d4b8a68466545dc087ab724070c70a8f43467",
+                "authorization_id": "goal_authorization_4ff2290e92114fe5a57dec75d6e80f2a",
+                "max_provider_calls": 25
+              },
+              "kind": "worker_turn",
+              "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+            }
+          },
+          {
+            "kind": "started",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:21.653735+00:00",
+              "collector_event": "started",
+              "thread_id": null,
+              "turn_id": null
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "binding_source": "role_progress",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_requested",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:21.653735+00:00",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          }
+        ],
+        "table_counts": {
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "provider_calls": 0,
+          "goal_verdicts": 0
+        },
+        "task_states": [
+          "ready"
+        ],
+        "effects": [],
+        "reads": [],
+        "history_valid": true
+      },
+      "after": {
+        "job_status": "interrupting",
+        "thread_id": "review-thread",
+        "turn_id": "review-turn",
+        "provider_terminal_status": null,
+        "markers": [],
+        "observations": [
+          {
+            "kind": "scheduled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "checkpoint_key": "independent-crash_at_rpc_boundary",
+              "execution_guard": {
+                "absolute_deadline_at": "2026-10-02T23:52:21.651114+00:00",
+                "authorization_digest": "sha256:342ea4468f0688f6bc75e967ee6d4b8a68466545dc087ab724070c70a8f43467",
+                "authorization_id": "goal_authorization_4ff2290e92114fe5a57dec75d6e80f2a",
+                "max_provider_calls": 25
+              },
+              "kind": "worker_turn",
+              "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+            }
+          },
+          {
+            "kind": "started",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:21.653735+00:00",
+              "collector_event": "started",
+              "thread_id": null,
+              "turn_id": null
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "binding_source": "role_progress",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_requested",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:21.653735+00:00",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_receipt",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:21.653735+00:00",
+              "interrupt_receipt": {
+                "binding": null,
+                "operation_id": "review-turn",
+                "payload": {
+                  "synthetic": true
+                }
+              },
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "observation": {
+                "active": true,
+                "final_response": null,
+                "payload": {
+                  "synthetic": true
+                },
+                "terminal_status": null,
+                "thread_id": "review-thread",
+                "turn_id": "review-turn"
+              }
+            }
+          }
+        ],
+        "table_counts": {
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "provider_calls": 0,
+          "goal_verdicts": 0
+        },
+        "task_states": [
+          "ready"
+        ],
+        "effects": [
+          {
+            "label": "recover",
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "reads": [
+          {
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          },
+          {
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "history_valid": true
+      }
+    },
+    {
+      "case": "crash_after_effect",
+      "child": {
+        "exit": 73,
+        "stdout": "",
+        "stderr": ""
+      },
+      "before": {
+        "job_status": "interrupting",
+        "thread_id": "review-thread",
+        "turn_id": "review-turn",
+        "provider_terminal_status": null,
+        "markers": [],
+        "observations": [
+          {
+            "kind": "scheduled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "checkpoint_key": "independent-crash_after_effect",
+              "execution_guard": {
+                "absolute_deadline_at": "2026-10-02T23:52:22.930780+00:00",
+                "authorization_digest": "sha256:ce5f8edbed29c00f6c3926d49237e468de3b9f721b9592194b7d529111bb782f",
+                "authorization_id": "goal_authorization_f321d87efdea42a7941f503305f4a0ab",
+                "max_provider_calls": 25
+              },
+              "kind": "worker_turn",
+              "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+            }
+          },
+          {
+            "kind": "started",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:22.933242+00:00",
+              "collector_event": "started",
+              "thread_id": null,
+              "turn_id": null
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "binding_source": "role_progress",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_requested",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:22.933242+00:00",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          }
+        ],
+        "table_counts": {
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "provider_calls": 0,
+          "goal_verdicts": 0
+        },
+        "task_states": [
+          "ready"
+        ],
+        "effects": [
+          {
+            "label": "crasher",
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "reads": [],
+        "history_valid": true
+      },
+      "after": {
+        "job_status": "interrupting",
+        "thread_id": "review-thread",
+        "turn_id": "review-turn",
+        "provider_terminal_status": null,
+        "markers": [],
+        "observations": [
+          {
+            "kind": "scheduled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "checkpoint_key": "independent-crash_after_effect",
+              "execution_guard": {
+                "absolute_deadline_at": "2026-10-02T23:52:22.930780+00:00",
+                "authorization_digest": "sha256:ce5f8edbed29c00f6c3926d49237e468de3b9f721b9592194b7d529111bb782f",
+                "authorization_id": "goal_authorization_f321d87efdea42a7941f503305f4a0ab",
+                "max_provider_calls": 25
+              },
+              "kind": "worker_turn",
+              "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+            }
+          },
+          {
+            "kind": "started",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:22.933242+00:00",
+              "collector_event": "started",
+              "thread_id": null,
+              "turn_id": null
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "binding_source": "role_progress",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_requested",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:22.933242+00:00",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_receipt",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:22.933242+00:00",
+              "interrupt_receipt": {
+                "binding": null,
+                "operation_id": "review-turn",
+                "payload": {
+                  "synthetic": true
+                }
+              },
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "observation": {
+                "active": true,
+                "final_response": null,
+                "payload": {
+                  "synthetic": true
+                },
+                "terminal_status": null,
+                "thread_id": "review-thread",
+                "turn_id": "review-turn"
+              }
+            }
+          }
+        ],
+        "table_counts": {
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "provider_calls": 0,
+          "goal_verdicts": 0
+        },
+        "task_states": [
+          "ready"
+        ],
+        "effects": [
+          {
+            "label": "crasher",
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          },
+          {
+            "label": "recover",
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "reads": [
+          {
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          },
+          {
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "history_valid": true
+      }
+    },
+    {
+      "case": "response_loss_then_active_then_terminal",
+      "active": {
+        "job_status": "interrupting",
+        "thread_id": "review-thread",
+        "turn_id": "review-turn",
+        "provider_terminal_status": null,
+        "markers": [],
+        "observations": [
+          {
+            "kind": "scheduled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "checkpoint_key": "independent-response_loss_then_active_then_terminal",
+              "execution_guard": {
+                "absolute_deadline_at": "2026-10-02T23:52:24.135786+00:00",
+                "authorization_digest": "sha256:622251b687b7dc48c406ca33062a690ae421dc6787e16d236df30e91f36a7388",
+                "authorization_id": "goal_authorization_dd81b5c51ce249f4b8200dd774a80c92",
+                "max_provider_calls": 25
+              },
+              "kind": "worker_turn",
+              "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+            }
+          },
+          {
+            "kind": "started",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.138454+00:00",
+              "collector_event": "started",
+              "thread_id": null,
+              "turn_id": null
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "binding_source": "role_progress",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_requested",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.138454+00:00",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_receipt",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.138454+00:00",
+              "detail": "SYNTHETIC_RESPONSE_LOST_AFTER_EFFECT",
+              "interrupt_error": "ConnectionError",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "observation": {
+                "active": true,
+                "final_response": null,
+                "payload": {
+                  "synthetic": true
+                },
+                "terminal_status": null,
+                "thread_id": "review-thread",
+                "turn_id": "review-turn"
+              }
+            }
+          }
+        ],
+        "table_counts": {
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "provider_calls": 0,
+          "goal_verdicts": 0
+        },
+        "task_states": [
+          "ready"
+        ],
+        "effects": [
+          {
+            "label": "parent",
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "reads": [
+          {
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "history_valid": true
+      },
+      "terminal": {
+        "job_status": "provider_terminal",
+        "thread_id": "review-thread",
+        "turn_id": "review-turn",
+        "provider_terminal_status": "completed",
+        "markers": [],
+        "observations": [
+          {
+            "kind": "scheduled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "checkpoint_key": "independent-response_loss_then_active_then_terminal",
+              "execution_guard": {
+                "absolute_deadline_at": "2026-10-02T23:52:24.135786+00:00",
+                "authorization_digest": "sha256:622251b687b7dc48c406ca33062a690ae421dc6787e16d236df30e91f36a7388",
+                "authorization_id": "goal_authorization_dd81b5c51ce249f4b8200dd774a80c92",
+                "max_provider_calls": 25
+              },
+              "kind": "worker_turn",
+              "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+            }
+          },
+          {
+            "kind": "started",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.138454+00:00",
+              "collector_event": "started",
+              "thread_id": null,
+              "turn_id": null
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "binding_source": "role_progress",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_requested",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.138454+00:00",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_receipt",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.138454+00:00",
+              "detail": "SYNTHETIC_RESPONSE_LOST_AFTER_EFFECT",
+              "interrupt_error": "ConnectionError",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "observation": {
+                "active": true,
+                "final_response": null,
+                "payload": {
+                  "synthetic": true
+                },
+                "terminal_status": null,
+                "thread_id": "review-thread",
+                "turn_id": "review-turn"
+              }
+            }
+          },
+          {
+            "kind": "provider_terminal",
+            "provider_terminal": true,
+            "terminal_status": "completed",
+            "payload": {
+              "observation": {
+                "active": false,
+                "final_response": "direct synthetic terminal",
+                "payload": {
+                  "synthetic": true
+                },
+                "terminal_status": "completed",
+                "thread_id": "review-thread",
+                "turn_id": "review-turn"
+              },
+              "result": {
+                "active": false,
+                "final_response": "direct synthetic terminal",
+                "payload": {
+                  "synthetic": true
+                },
+                "terminal_status": "completed",
+                "thread_id": "review-thread",
+                "turn_id": "review-turn"
+              }
+            }
+          }
+        ],
+        "table_counts": {
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "provider_calls": 0,
+          "goal_verdicts": 0
+        },
+        "task_states": [
+          "ready"
+        ],
+        "effects": [
+          {
+            "label": "parent",
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "reads": [
+          {
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          },
+          {
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "history_valid": true
+      }
+    },
+    {
+      "case": "nonowner_claude_no_effect_strands_owner",
+      "owns_before": false,
+      "rejected": {
+        "job_status": "interrupting",
+        "thread_id": "review-thread",
+        "turn_id": "review-turn",
+        "provider_terminal_status": null,
+        "markers": [],
+        "observations": [
+          {
+            "kind": "scheduled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "checkpoint_key": "independent-nonowner_claude_no_effect_strands_owner",
+              "execution_guard": {
+                "absolute_deadline_at": "2026-10-02T23:52:24.191289+00:00",
+                "authorization_digest": "sha256:16bf60a11aa555fea70aae640082b7eaed4b2adcbde99124fd71156a9ffc3ca1",
+                "authorization_id": "goal_authorization_4d8b112d78944c449ce8a6b3831598ff",
+                "max_provider_calls": 25
+              },
+              "kind": "worker_turn",
+              "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+            }
+          },
+          {
+            "kind": "started",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.194119+00:00",
+              "collector_event": "started",
+              "thread_id": null,
+              "turn_id": null
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "binding_source": "role_progress",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_requested",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.194119+00:00",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_receipt",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.194119+00:00",
+              "detail": "CLAUDE_INTERRUPT_TARGET_NOT_LIVE: 이 연결에서 실행 중인 turn이 아닙니다.",
+              "interrupt_error": "RuntimePolicyError",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          }
+        ],
+        "table_counts": {
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "provider_calls": 0,
+          "goal_verdicts": 0
+        },
+        "task_states": [
+          "ready"
+        ],
+        "effects": [],
+        "reads": [],
+        "history_valid": true
+      },
+      "after": {
+        "job_status": "interrupting",
+        "thread_id": "review-thread",
+        "turn_id": "review-turn",
+        "provider_terminal_status": null,
+        "markers": [],
+        "observations": [
+          {
+            "kind": "scheduled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "checkpoint_key": "independent-nonowner_claude_no_effect_strands_owner",
+              "execution_guard": {
+                "absolute_deadline_at": "2026-10-02T23:52:24.191289+00:00",
+                "authorization_digest": "sha256:16bf60a11aa555fea70aae640082b7eaed4b2adcbde99124fd71156a9ffc3ca1",
+                "authorization_id": "goal_authorization_4d8b112d78944c449ce8a6b3831598ff",
+                "max_provider_calls": 25
+              },
+              "kind": "worker_turn",
+              "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+            }
+          },
+          {
+            "kind": "started",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.194119+00:00",
+              "collector_event": "started",
+              "thread_id": null,
+              "turn_id": null
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "binding_source": "role_progress",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_requested",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.194119+00:00",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_receipt",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.194119+00:00",
+              "detail": "CLAUDE_INTERRUPT_TARGET_NOT_LIVE: 이 연결에서 실행 중인 turn이 아닙니다.",
+              "interrupt_error": "RuntimePolicyError",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "observation": {
+                "active": true,
+                "final_response": null,
+                "payload": {
+                  "synthetic": true
+                },
+                "terminal_status": null,
+                "thread_id": "review-thread",
+                "turn_id": "review-turn"
+              }
+            }
+          }
+        ],
+        "table_counts": {
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "provider_calls": 0,
+          "goal_verdicts": 0
+        },
+        "task_states": [
+          "ready"
+        ],
+        "effects": [],
+        "reads": [
+          {
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "history_valid": true
+      }
+    },
+    {
+      "case": "replacement_turn_rejected",
+      "wrong_claim": null,
+      "binding_error": "EngineServiceError: runtime job provider binding이 기존 exact thread/turn과 다릅니다.",
+      "adapter_control_writes": 0,
+      "read_error": "RuntimePolicyError: RUNTIME_OBSERVATION_BINDING_MISMATCH: 재관측 결과가 저장된 exact turn과 다릅니다.",
+      "after": {
+        "job_status": "interrupting",
+        "thread_id": "review-thread",
+        "turn_id": "review-turn",
+        "provider_terminal_status": null,
+        "markers": [],
+        "observations": [
+          {
+            "kind": "scheduled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "checkpoint_key": "independent-replacement_turn_rejected",
+              "execution_guard": {
+                "absolute_deadline_at": "2026-10-02T23:52:24.240897+00:00",
+                "authorization_digest": "sha256:0fd24c360f582ccd4c354d38f2aff37563a2c4a6f2ed0ec5c0153ec01b77b4cc",
+                "authorization_id": "goal_authorization_d56125e78cf540fa809a6c484e220962",
+                "max_provider_calls": 25
+              },
+              "kind": "worker_turn",
+              "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+            }
+          },
+          {
+            "kind": "started",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.243470+00:00",
+              "collector_event": "started",
+              "thread_id": null,
+              "turn_id": null
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "binding_source": "role_progress",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_requested",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_receipt",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "detail": "CLAUDE_INTERRUPT_TARGET_NOT_LIVE: 이 연결에서 실행 중인 turn이 아닙니다.",
+              "interrupt_error": "RuntimePolicyError",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          }
+        ],
+        "table_counts": {
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "provider_calls": 0,
+          "goal_verdicts": 0
+        },
+        "task_states": [
+          "ready"
+        ],
+        "effects": [],
+        "reads": [
+          {
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "history_valid": true
+      }
+    },
+    {
+      "case": "cancel_between_claim_and_rpc",
+      "after": {
+        "job_status": "cancelled",
+        "thread_id": "review-thread",
+        "turn_id": "review-turn",
+        "provider_terminal_status": null,
+        "markers": [],
+        "observations": [
+          {
+            "kind": "scheduled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "checkpoint_key": "independent-cancel_between_claim_and_rpc",
+              "execution_guard": {
+                "absolute_deadline_at": "2026-10-02T23:52:24.284652+00:00",
+                "authorization_digest": "sha256:8f9d1218416803d225198301130b4a2497d5cb5a1ee49dea7b2fd93570a68af5",
+                "authorization_id": "goal_authorization_40de52c69e644127b58ac3ce30d5b4e6",
+                "max_provider_calls": 25
+              },
+              "kind": "worker_turn",
+              "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+            }
+          },
+          {
+            "kind": "started",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.287257+00:00",
+              "collector_event": "started",
+              "thread_id": null,
+              "turn_id": null
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "binding_source": "role_progress",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "interrupt_requested",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.287257+00:00",
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          },
+          {
+            "kind": "cancelled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "prior_status": "interrupting",
+              "reason": "synthetic revocation after dispatch boundary"
+            }
+          },
+          {
+            "kind": "interrupt_receipt",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.287257+00:00",
+              "interrupt_receipt": {
+                "binding": null,
+                "operation_id": "review-turn",
+                "payload": {
+                  "synthetic": true
+                }
+              },
+              "reason": "workflow_paused",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          }
+        ],
+        "table_counts": {
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "provider_calls": 0,
+          "goal_verdicts": 0
+        },
+        "task_states": [
+          "ready"
+        ],
+        "effects": [
+          {
+            "label": "parent",
+            "thread_id": "review-thread",
+            "turn_id": "review-turn"
+          }
+        ],
+        "reads": [],
+        "history_valid": true
+      }
+    },
+    {
+      "case": "d1_platform_boundary",
+      "action": "blocked",
+      "detail": "RUNTIME_OWNER_LOCK_UNAVAILABLE: platform unsupported: posix",
+      "create_calls": 0,
+      "turn_calls": 0,
+      "after": {
+        "job_status": "running",
+        "thread_id": "review-thread",
+        "turn_id": "review-turn",
+        "provider_terminal_status": null,
+        "markers": [],
+        "observations": [
+          {
+            "kind": "scheduled",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "checkpoint_key": "independent-d1_platform_boundary",
+              "execution_guard": {
+                "absolute_deadline_at": "2026-10-02T23:52:24.324627+00:00",
+                "authorization_digest": "sha256:34fc8dccd67253e1ed3c487589da28d48ccf21db0f90a18f3e0e9eb7dc919307",
+                "authorization_id": "goal_authorization_cae90773b8be44b2a2100bb165e73d9a",
+                "max_provider_calls": 25
+              },
+              "kind": "worker_turn",
+              "request_digest": "sha256:a8198524f58e72b56283ab71ebddada22840f108b46ef7165bb3fca9919c5558"
+            }
+          },
+          {
+            "kind": "started",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "absolute_deadline_at": "2026-10-01T23:54:24.327183+00:00",
+              "collector_event": "started",
+              "thread_id": null,
+              "turn_id": null
+            }
+          },
+          {
+            "kind": "provider_progress",
+            "provider_terminal": false,
+            "terminal_status": null,
+            "payload": {
+              "binding_source": "role_progress",
+              "thread_id": "review-thread",
+              "turn_id": "review-turn"
+            }
+          }
+        ],
+        "table_counts": {
+          "attempts": 0,
+          "runtime_intents": 0,
+          "runtime_receipts": 0,
+          "provider_calls": 0,
+          "goal_verdicts": 0
+        },
+        "task_states": [
+          "ready"
+        ],
+        "effects": [],
+        "reads": [],
+        "history_valid": true
+      }
+    }
+  ],
+  "history_valid_all": true
+}

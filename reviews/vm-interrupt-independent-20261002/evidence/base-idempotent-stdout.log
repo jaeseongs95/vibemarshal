@@ -1,0 +1,1 @@
+{"effect_model": "synthetic exact-target idempotent active-to-interrupted transition; not actual provider behavior", "live_provider_calls": 0, "rpc_count": 2, "source": "base", "synthetic_effect_count": 1, "task_id": "vm-interrupt-independent-review-20261002"}

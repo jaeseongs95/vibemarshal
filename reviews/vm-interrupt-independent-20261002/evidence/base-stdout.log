@@ -1,0 +1,9 @@
+{"case": "concurrent_inflight", "observed_effects": 2, "oracle": "observation matched; not product acceptance", "source": "base"}
+{"case": "crash_before_claim", "observed_effects": 1, "oracle": "observation matched; not product acceptance", "source": "base"}
+{"case": "crash_at_rpc_boundary", "observed_effects": 1, "oracle": "observation matched; not product acceptance", "source": "base"}
+{"case": "crash_after_effect", "observed_effects": 2, "oracle": "observation matched; not product acceptance", "source": "base"}
+{"case": "response_loss_then_active_then_terminal", "observed_effects": 1, "oracle": "observation matched; not product acceptance", "source": "base"}
+{"case": "nonowner_claude_no_effect_strands_owner", "observed_effects": 0, "oracle": "observation matched; not product acceptance", "source": "base"}
+{"case": "replacement_turn_rejected", "observed_effects": 0, "oracle": "observation matched; not product acceptance", "source": "base"}
+{"case": "cancel_between_claim_and_rpc", "observed_effects": 1, "oracle": "observation matched; not product acceptance", "source": "base"}
+{"case": "d1_platform_boundary", "observed_effects": 0, "oracle": "observation matched; not product acceptance", "source": "base"}

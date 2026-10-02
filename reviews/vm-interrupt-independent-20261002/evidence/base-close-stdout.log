@@ -1,0 +1,1 @@
+{"actual_external_effect_count": null, "live_provider_calls": 0, "rpc_attempt_count": 2, "scope": "separate adapter object with a synthetic same-turn handle; no actual concurrent native connection proof", "source": "base", "task_id": "vm-interrupt-independent-review-20261002"}

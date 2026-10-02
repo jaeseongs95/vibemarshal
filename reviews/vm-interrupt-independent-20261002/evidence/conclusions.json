@@ -1,0 +1,78 @@
+{
+  "task_id": "vm-interrupt-independent-review-20261002",
+  "source_thread_id": "01a0f995-7341-7179-91a4-63a814e66020",
+  "base_commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "proposal_evidence_commit": "6c28f9f271f4e99e1ee81c05db75dc342a022558",
+  "patch_sha256": "616647002d4fcc3641dd0fcd6a9a0e11d8f40fa32cd4e403aa2f234903086741",
+  "candidate_src_manifest_sha256": "4a605ef675521762146df6a9e483b4207fc6664230f87a2a8f80149df510a02b",
+  "requested_settings": {
+    "model": "gpt-6.1-sol",
+    "effort": "high",
+    "provenance": "client_requested"
+  },
+  "observable_settings": {
+    "model": null,
+    "effort": null,
+    "reason": "authoritative orchestration metadata not exposed"
+  },
+  "disposition": "technical review completed; adoption policy and delivery/recovery disposition unresolved; no source GO or integration approval",
+  "findings": [
+    {
+      "id": "R01",
+      "classification": "policy blocker",
+      "summary": "Cross-process same-job supervisor RPC-at-most-once is proposed hardening. Reservation uniqueness and synthetic RPC-entry counts do not establish actual duplicate provider effects or an explicit existing global RPC criterion.",
+      "evidence": [
+        "remote-comparison.json",
+        "base-idempotent-results.json",
+        "candidate-idempotent-results.json"
+      ]
+    },
+    {
+      "id": "R02",
+      "classification": "candidate delivery-loss tradeoff requiring disposition",
+      "summary": "Crash after durable claim before RPC leaves zero effects and zero interrupt receipts while exact stored turn remains active; subsequent request and reobservation cannot deliver a needed interrupt. Claim/send uncertainty is not a demand for impossible exactly-once.",
+      "evidence": [
+        "base-results.json:crash_at_rpc_boundary",
+        "candidate-results.json:crash_at_rpc_boundary"
+      ]
+    },
+    {
+      "id": "R03",
+      "classification": "preexisting no-effect routing/retry gap; candidate does not fix it",
+      "summary": "Actual disconnected Claude adapter guard rejects before write, but supervisor persists an error interrupt receipt and suppresses a later capable sender. No owner/epoch claim fence; generic execution fence tests do not prove interrupt revocation.",
+      "evidence": [
+        "base-results.json:nonowner_claude_no_effect_strands_owner",
+        "candidate-results.json:nonowner_claude_no_effect_strands_owner"
+      ]
+    },
+    {
+      "id": "R04",
+      "classification": "scope limitation",
+      "summary": "Marker is per job and supervisor delivery path. A separate Codex adapter close with a synthetic same-turn handle bypasses it; both source variants allow two RPC attempts across those paths. Actual native connections/effects not qualified.",
+      "evidence": [
+        "base-close-results.json",
+        "candidate-close-results.json"
+      ]
+    }
+  ],
+  "replacement_turn_effect_observed": false,
+  "claim_wrong_binding_rejected": true,
+  "replacement_stored_read_rejected": true,
+  "provider_terminal_fabricated": false,
+  "live_provider_calls": 0,
+  "discriminating_scenarios": 11,
+  "source_comparison_executions": 22,
+  "qualification_pass": false,
+  "source_changes": "existing proposal patch applied only to disposable shadow; no new fixes or shared source changes",
+  "library_upload_performed": false,
+  "prior_author_internal_crosscheck_counted_as_independent_audit": false,
+  "remaining_inputs": [
+    "owner decision on reservation/RPC/effect guarantee and delivery-loss policy",
+    "direct no-effect recovery/routing authority and visible uncertain-delivery disposition",
+    "supported native owner/provider/AGS qualification if later required",
+    "Planner proposal exact diff for any future combined review"
+  ],
+  "publication_authorized": true,
+  "publication_branch": "dot/vm-interrupt-review-20261002",
+  "parent_disposition": "UNADOPTED/HOLD: duplicate RPC observed; no global duplicate-effect acceptance violation established; new durable claim can lose never-delivered request"
+}

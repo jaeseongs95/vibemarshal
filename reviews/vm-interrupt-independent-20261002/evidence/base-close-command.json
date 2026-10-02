@@ -1,0 +1,26 @@
+{
+  "task_id": "vm-interrupt-independent-review-20261002",
+  "argv": [
+    "<PYTHON_ENV>/bin/python",
+    "<REVIEW_ROOT>/close_bypass_probe.py",
+    "<REVIEW_ROOT>/base",
+    "base"
+  ],
+  "cwd": "<REVIEW_ROOT>/base",
+  "selected_environment": {
+    "PATH": "/usr/bin:/bin",
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONPATH": "<REVIEW_ROOT>/base/src:<REVIEW_ROOT>/base"
+  },
+  "start_utc": "2026-10-02T00:00:57.461914+00:00",
+  "end_utc": "2026-10-02T00:00:58.828587+00:00",
+  "elapsed_seconds": 1.3666812749997916,
+  "exit_code": 0,
+  "harness_sha256": "71d267e16231a20f46b1a919f7e81bafa218b2ad1bcfaf39da6f479e12017f83",
+  "live_provider_calls": 0,
+  "original_stdout_sha256": "c654263d3880ffb2d4642baedba5f18c8f71d3c597583a031fc00235620b27d4",
+  "normalized_stdout_sha256": "c654263d3880ffb2d4642baedba5f18c8f71d3c597583a031fc00235620b27d4",
+  "original_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "normalized_stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "path_normalization": "REVIEW_ROOT, PYTHON_ENV, BASE_CHECKOUT aliases; original hash records execution bytes, normalized hash records packet bytes"
+}
