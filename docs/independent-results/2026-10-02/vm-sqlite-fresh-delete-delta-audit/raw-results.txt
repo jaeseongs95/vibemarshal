@@ -1,0 +1,159 @@
+RECEIPT 0
+ARGV ["git", "ls-remote", "origin", "refs/heads/codex/sqlite-fresh-delete-recovery", "refs/heads/codex/sqlite-fresh-delete-recovery-evidence"]
+SHELL_EQUIVALENT git ls-remote origin refs/heads/codex/sqlite-fresh-delete-recovery refs/heads/codex/sqlite-fresh-delete-recovery-evidence
+CWD <DELTA_AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<DELTA_AUDIT_ROOT>/candidate/src:<DELTA_AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<DELTA_AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:58:11.147375+00:00
+END 2026-10-02T00:58:11.958699+00:00
+EXIT 0 ELAPSED 0.8113306090003789
+STDOUT_BEGIN
+4dae937be993693b78d1dbcd873d499633a08e97	refs/heads/codex/sqlite-fresh-delete-recovery
+c94c7552b4622056cf31c674c9f83058a674cc05	refs/heads/codex/sqlite-fresh-delete-recovery-evidence
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+RECEIPT 1
+ARGV ["git", "show", "-s", "--format=%H %T %P", "4dae937be993693b78d1dbcd873d499633a08e97"]
+SHELL_EQUIVALENT git show -s '--format=%H %T %P' 4dae937be993693b78d1dbcd873d499633a08e97
+CWD <DELTA_AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<DELTA_AUDIT_ROOT>/candidate/src:<DELTA_AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<DELTA_AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:58:12.009031+00:00
+END 2026-10-02T00:58:12.012670+00:00
+EXIT 0 ELAPSED 0.003638548999788327
+STDOUT_BEGIN
+4dae937be993693b78d1dbcd873d499633a08e97 8c03f489783175f579c86b699a7b98d634217d19 32bb0f9dd9f024045d24487312b50f5b703573a3
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+RECEIPT 2
+ARGV ["git", "show", "-s", "--format=%H %T %P", "c94c7552b4622056cf31c674c9f83058a674cc05"]
+SHELL_EQUIVALENT git show -s '--format=%H %T %P' c94c7552b4622056cf31c674c9f83058a674cc05
+CWD <DELTA_AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<DELTA_AUDIT_ROOT>/candidate/src:<DELTA_AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<DELTA_AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:58:12.061714+00:00
+END 2026-10-02T00:58:12.065137+00:00
+EXIT 0 ELAPSED 0.003422512999804894
+STDOUT_BEGIN
+c94c7552b4622056cf31c674c9f83058a674cc05 eae741bb80b1f8ece4ec51a6d18c699594631ad9 4dae937be993693b78d1dbcd873d499633a08e97
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+RECEIPT 3
+ARGV ["python", "-m", "unittest", "-v", "test_engine_ledger_initialize.EngineLedgerInitializeTests.test_nonzero_logical_empty_containers_are_preserved", "test_engine_ledger_initialize.EngineLedgerInitializeTests.test_cache_spill_failure_rolls_back_to_zero_and_retries", "test_engine_ledger_initialize.EngineLedgerInitializeTests.test_hot_journal_recovery_precedes_locked_zero_size_check", "test_engine_ledger_initialize.EngineLedgerInitializeTests.test_committed_foreign_wal_data_are_preserved", "test_engine_ledger_initialize.EngineLedgerInitializeTests.test_existing_engine_data_are_preserved_by_reinitialize", "test_engine_ledger_initialize.EngineLedgerInitializeTests.test_borrowed_identity_connection_remains_owned_by_caller", "test_engine_ledger_initialize.EngineLedgerInitializeTests.test_postcommit_wal_failure_leaves_valid_database_and_retries", "test_engine_ledger_initialize.EngineLedgerInitializeTests.test_process_crash_rolls_back_and_retries_with_spawn"]
+SHELL_EQUIVALENT python -m unittest -v test_engine_ledger_initialize.EngineLedgerInitializeTests.test_nonzero_logical_empty_containers_are_preserved test_engine_ledger_initialize.EngineLedgerInitializeTests.test_cache_spill_failure_rolls_back_to_zero_and_retries test_engine_ledger_initialize.EngineLedgerInitializeTests.test_hot_journal_recovery_precedes_locked_zero_size_check test_engine_ledger_initialize.EngineLedgerInitializeTests.test_committed_foreign_wal_data_are_preserved test_engine_ledger_initialize.EngineLedgerInitializeTests.test_existing_engine_data_are_preserved_by_reinitialize test_engine_ledger_initialize.EngineLedgerInitializeTests.test_borrowed_identity_connection_remains_owned_by_caller test_engine_ledger_initialize.EngineLedgerInitializeTests.test_postcommit_wal_failure_leaves_valid_database_and_retries test_engine_ledger_initialize.EngineLedgerInitializeTests.test_process_crash_rolls_back_and_retries_with_spawn
+CWD <DELTA_AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<DELTA_AUDIT_ROOT>/candidate/src:<DELTA_AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<DELTA_AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:58:12.109789+00:00
+END 2026-10-02T00:58:14.310107+00:00
+EXIT 0 ELAPSED 2.2003271220000897
+STDOUT_BEGIN
+STDOUT_END
+STDERR_BEGIN
+test_nonzero_logical_empty_containers_are_preserved (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_nonzero_logical_empty_containers_are_preserved) ... ok
+test_cache_spill_failure_rolls_back_to_zero_and_retries (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_cache_spill_failure_rolls_back_to_zero_and_retries) ... ok
+test_hot_journal_recovery_precedes_locked_zero_size_check (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_hot_journal_recovery_precedes_locked_zero_size_check) ... ok
+test_committed_foreign_wal_data_are_preserved (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_committed_foreign_wal_data_are_preserved) ... ok
+test_existing_engine_data_are_preserved_by_reinitialize (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_existing_engine_data_are_preserved_by_reinitialize) ... ok
+test_borrowed_identity_connection_remains_owned_by_caller (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_borrowed_identity_connection_remains_owned_by_caller) ... ok
+test_postcommit_wal_failure_leaves_valid_database_and_retries (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_postcommit_wal_failure_leaves_valid_database_and_retries) ... ok
+test_process_crash_rolls_back_and_retries_with_spawn (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_process_crash_rolls_back_and_retries_with_spawn) ... ok
+
+----------------------------------------------------------------------
+Ran 8 tests in 1.628s
+
+OK
+STDERR_END
+RECEIPT 4
+ARGV ["python", "<DELTA_AUDIT_ROOT>/verify_delta.py"]
+SHELL_EQUIVALENT python '<DELTA_AUDIT_ROOT>/verify_delta.py'
+CWD <DELTA_AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<DELTA_AUDIT_ROOT>/candidate/src:<DELTA_AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<DELTA_AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T01:00:24.455498+00:00
+END 2026-10-02T01:00:25.294310+00:00
+EXIT 0 ELAPSED 0.8388188679996347
+STDOUT_BEGIN
+candidate_shape "4dae937be993693b78d1dbcd873d499633a08e97 8c03f489783175f579c86b699a7b98d634217d19 32bb0f9dd9f024045d24487312b50f5b703573a3"
+evidence_shape "c94c7552b4622056cf31c674c9f83058a674cc05 eae741bb80b1f8ece4ec51a6d18c699594631ad9 4dae937be993693b78d1dbcd873d499633a08e97"
+exact_patch {"bytes": 32319, "file": "cumulative-from-32bb.patch", "sha256": "96c700d9ac4e13ce1bb68434db1b5d445355841dde815bf5a02b1563b3831225"}
+exact_patch {"bytes": 9866, "file": "predicate-and-tests-from-v3.patch", "sha256": "d756ec74b640efed2c7dca82abdd54f508a22ddc8c84a5a8e08f95209f37634d"}
+author_evidence_hashes_verified {"checksum_entries": 11, "original_files": 7}
+only_implementation_delta "one size predicate clause and one comment; all other implementation bytes match v3"
+candidate_file {"git_blob": "7c282e0590890e213b33cb9d9272aacdf108273f", "path": "src/flowmarshal/engine/ledger.py", "python310_AST": "PASS_SYNTAX_ONLY", "sha256": "86cdd317b07e3e704229a890679a2955c51811da2087e8bd4eec423307f109d4"}
+candidate_file {"git_blob": "31aca3b8aee8ac37b08d9cd0f81d192a7cede863", "path": "tests/test_engine_ledger_initialize.py", "python310_AST": "PASS_SYNTAX_ONLY", "sha256": "42aed1bbc678bfaa6cf2def1e3a6881ae3979b129343544d2f045ca67b6ce903"}
+static_SCHEMA_SQL_unchanged {"full_schema_execution_not_repeated": true, "sha256": "7b0dfe58482056e6501e419c8df3a63176cb7f9e021f7c787c5a3d4ad32c277d"}
+permanent_method_inventory {"existing": 11, "independent_executed_methods": 8, "new": 5, "new_names": ["test_cache_spill_failure_rolls_back_to_zero_and_retries", "test_committed_foreign_wal_data_are_preserved", "test_existing_engine_data_are_preserved_by_reinitialize", "test_hot_journal_recovery_precedes_locked_zero_size_check", "test_nonzero_logical_empty_containers_are_preserved"], "prior_method_AST_unchanged": true, "total": 16}
+candidate_imports_exact {"flowmarshal": {"path": "<DELTA_AUDIT_ROOT>/candidate/src/flowmarshal/__init__.py", "sha256": "0481f64b3feab188df0af84f605e7e344622304bb982a9ab5d2d42fb2a4d0872"}, "flowmarshal.canonical": {"path": "<DELTA_AUDIT_ROOT>/candidate/src/flowmarshal/canonical.py", "sha256": "64b74f58b66f513bdcd124d49c8cc9da64eb1df28182225d502cdede10f09282"}, "flowmarshal.engine": {"path": "<DELTA_AUDIT_ROOT>/candidate/src/flowmarshal/engine/__init__.py", "sha256": "ec3d34d1025b3a399b6fe64db909aa134327eebe4406fe7b7fa9069f9f1a758b"}, "flowmarshal.engine.capabilities": {"path": "<DELTA_AUDIT_ROOT>/candidate/src/flowmarshal/engine/capabilities.py", "sha256": "1e819d6c87e65d61c82aa988799d99b52b913c4ecd67721e2ceb00ef5def765f"}, "flowmarshal.engine.domain": {"path": "<DELTA_AUDIT_ROOT>/candidate/src/flowmarshal/engine/domain.py", "sha256": "09fe1cd1f6e160652e0ee81f4fd7a055f3813decd9ca056c97af2708e8ff95c4"}, "flowmarshal.engine.ledger": {"path": "<DELTA_AUDIT_ROOT>/candidate/src/flowmarshal/engine/ledger.py", "sha256": "86cdd317b07e3e704229a890679a2955c51811da2087e8bd4eec423307f109d4"}, "flowmarshal.engine.model_lock": {"path": "<DELTA_AUDIT_ROOT>/candidate/src/flowmarshal/engine/model_lock.py", "sha256": "e5fc1b8c6a3d365fe0209514daa5073d237ff9647003b21ff526ade70ec1726c"}, "flowmarshal.time": {"path": "<DELTA_AUDIT_ROOT>/candidate/src/flowmarshal/time.py", "sha256": "e031fd1a63a00f9ce18e032cfea87e1986bc472a601fa8d0e460b6cd3ff9d841"}}
+permanent_module_binding {"path": "<DELTA_AUDIT_ROOT>/candidate/tests/test_engine_ledger_initialize.py", "same_candidate_ledger_class": true}
+runtime {"Python310_runtime": "NOT_RUN", "Windows_runtime": "NOT_RUN", "platform": "Linux-6.18.44-x86_64-with-glibc2.41", "pydantic": "2.13.4", "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]", "python_executable": "<PYTHON_EXECUTABLE>", "sqlite": "3.53.1"}
+DELTA_SOURCE_VERIFICATION_PASS
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+RECEIPT 5
+ARGV ["python", "<DELTA_AUDIT_ROOT>/recovery_boundaries.py"]
+SHELL_EQUIVALENT python '<DELTA_AUDIT_ROOT>/recovery_boundaries.py'
+CWD <DELTA_AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<DELTA_AUDIT_ROOT>/candidate/src:<DELTA_AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<DELTA_AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T01:00:25.342221+00:00
+END 2026-10-02T01:00:26.979736+00:00
+EXIT 0 ELAPSED 1.6375301590001072
+STDOUT_BEGIN
+{"case": "nonzero_original_DELETE_hot_journal", "child_exit": 83, "crashed_size": 679936, "engine_adoption": false, "hot_journal_magic": "d9d505f920a163d7", "hot_journal_size": 5632, "journal_exists_after": false, "original_main_bytes_restored_by_native_recovery": true, "original_main_sha256": "149663e01e4a3e400fa7cd8e5b40d82c0cb4672dcd504d01d42cb54a304beabb", "original_size": 4096, "recovery_is_SQLite_native": true, "rejection": "기존 DB가 FlowMarshal Engine 원장으로 식별되지 않습니다.", "same_connection_gate_sample": {"application_id": 0, "in_transaction": true, "journal_mode": "delete", "objects": [], "recovered_size": 4096, "user_version": 0}}
+{"case": "old_WAL_before_DDL_process_exit", "child_exit": 84, "crashed_size": 4096, "engine_adoption": false, "hashes": {"wal-before-ddl.sqlite3": "0ab48b25cba617ed3a4acca0161813b314c095ef63544bb4af60769eb1012977", "wal-before-ddl.sqlite3-wal": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}, "main_and_held_WAL_bytes_preserved": true, "rejection": "기존 DB가 FlowMarshal Engine 원장으로 식별되지 않습니다.", "same_connection_gate_sample": {"application_id": 0, "in_transaction": true, "journal_mode": "wal", "objects": [], "recovered_size": 4096, "user_version": 0}, "shm_byte_identity": "NOT_ASSERTED"}
+INDEPENDENT_RECOVERY_BOUNDARIES_PASS; Linux spawn only; no engine provenance claim
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+RECEIPT 6
+ARGV ["git", "diff", "--check", "211a5a0f5891a44f217aa7aae18bdb8825775878", "4dae937be993693b78d1dbcd873d499633a08e97"]
+SHELL_EQUIVALENT git diff --check 211a5a0f5891a44f217aa7aae18bdb8825775878 4dae937be993693b78d1dbcd873d499633a08e97
+CWD <DELTA_AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<DELTA_AUDIT_ROOT>/candidate/src:<DELTA_AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<DELTA_AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T01:00:56.327988+00:00
+END 2026-10-02T01:00:56.336254+00:00
+EXIT 0 ELAPSED 0.008264920999863534
+STDOUT_BEGIN
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+RECEIPT 7
+ARGV ["git", "diff", "--check", "32bb0f9dd9f024045d24487312b50f5b703573a3", "4dae937be993693b78d1dbcd873d499633a08e97"]
+SHELL_EQUIVALENT git diff --check 32bb0f9dd9f024045d24487312b50f5b703573a3 4dae937be993693b78d1dbcd873d499633a08e97
+CWD <DELTA_AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<DELTA_AUDIT_ROOT>/candidate/src:<DELTA_AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<DELTA_AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T01:00:56.388640+00:00
+END 2026-10-02T01:00:56.393302+00:00
+EXIT 0 ELAPSED 0.004663084000185336
+STDOUT_BEGIN
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+RECEIPT 8
+ARGV ["git", "status", "--porcelain=v1", "--untracked-files=all"]
+SHELL_EQUIVALENT git status --porcelain=v1 --untracked-files=all
+CWD <DELTA_AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<DELTA_AUDIT_ROOT>/candidate/src:<DELTA_AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<DELTA_AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T01:00:56.434753+00:00
+END 2026-10-02T01:00:56.620586+00:00
+EXIT 0 ELAPSED 0.18583849199967517
+STDOUT_BEGIN
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+RECEIPT 9
+ARGV ["git", "ls-remote", "origin", "refs/heads/codex/sqlite-fresh-delete-recovery", "refs/heads/codex/sqlite-fresh-delete-recovery-evidence", "refs/heads/codex/sqlite-atomic-initialize-v3", "refs/heads/codex/sqlite-atomic-initialize-v3-evidence", "refs/heads/dot/vm-sqlite-candidate-audit-20261002"]
+SHELL_EQUIVALENT git ls-remote origin refs/heads/codex/sqlite-fresh-delete-recovery refs/heads/codex/sqlite-fresh-delete-recovery-evidence refs/heads/codex/sqlite-atomic-initialize-v3 refs/heads/codex/sqlite-atomic-initialize-v3-evidence refs/heads/dot/vm-sqlite-candidate-audit-20261002
+CWD <DELTA_AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<DELTA_AUDIT_ROOT>/candidate/src:<DELTA_AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<DELTA_AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T01:00:56.676651+00:00
+END 2026-10-02T01:00:57.322931+00:00
+EXIT 0 ELAPSED 0.6462900289998288
+STDOUT_BEGIN
+211a5a0f5891a44f217aa7aae18bdb8825775878	refs/heads/codex/sqlite-atomic-initialize-v3
+fdc5d03bf58c9521ff06ab475aea01d1650a4269	refs/heads/codex/sqlite-atomic-initialize-v3-evidence
+4dae937be993693b78d1dbcd873d499633a08e97	refs/heads/codex/sqlite-fresh-delete-recovery
+c94c7552b4622056cf31c674c9f83058a674cc05	refs/heads/codex/sqlite-fresh-delete-recovery-evidence
+53945ce173abc4fa4add535db1a80e8d749dfddb	refs/heads/dot/vm-sqlite-candidate-audit-20261002
+STDOUT_END
+STDERR_BEGIN
+STDERR_END

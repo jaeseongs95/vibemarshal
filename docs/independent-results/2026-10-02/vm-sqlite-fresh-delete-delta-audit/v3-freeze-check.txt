@@ -1,0 +1,14 @@
+원 로컬 v3 packet directory에서 실행:
+sha256sum -c <V3_AUDIT_ROOT>/SHA256SUMS
+exit=0. tool output 원문:
+AUDIT.txt: OK
+audit-manifest.json: OK
+bootstrap-receipt.txt: OK
+candidate.diff.patch: OK
+commands.jsonl: OK
+discriminating_cases.py: OK
+raw-results.txt: OK
+run.py: OK
+verify_source.py: OK
+원격 v3 source/evidence/audit refs 보존은 commands.jsonl receipt9의 ls-remote에 있다.
+이 확인은 과거 tests를 재실행한 결과가 아니다.

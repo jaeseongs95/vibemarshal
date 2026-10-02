@@ -1,0 +1,207 @@
+fresh DELETE recovery candidate의 독립 delta 감사 — VM root 검토용 로컬 산출물
+
+판정: 지정 candidate 4dae937be993693b78d1dbcd873d499633a08e97의 좁은 delta는
+관측한 Linux/Python 3.12/SQLite 3.53.1에서 선택된 fresh DELETE rollback/crash
+recovery 범위에 적합하다. blocking delta finding은 발견하지 않았다.
+이 scoped acceptance는 Windows 검증, source adoption, merge 또는 release가 아니다.
+v3 감사의 당시 기술 판정과 정책 대기를 소급 수정하지 않았다.
+
+현재 정책 입력은 VM root의 명시 결정이다: fresh DELETE bootstrap failure/crash
+retry만 지원한다. 같은 writer connection의 native recovery 뒤 BEGIN IMMEDIATE 안에서
+app_id=0, user_version=0, 전체 sqlite_master 공백, 복구된 파일 size=0을 모두 요구한다.
+nonzero external empty/VACUUM/pristine WAL/DROP history/옛 WAL-before-DDL residue는
+거절한다. Engine이 unlink/truncate하거나 소유 provenance를 주장하는 방식은 없다.
+별도 새 정책 gate·marker·freelist/schema_version 요구를 만들지 않았다.
+
+Identity와 model provenance
+
+real reviewer thread: 01a0f9e7-6196-7476-9cd5-177d24d80038.
+author thread: 01a0f9d2-eaaf-748e-9b22-696261fb5026.
+parent source thread: 01a0f995-7341-7179-91a4-63a814e66020.
+세 thread identity의 출처는 parent admitted task records다.
+exposed agent label: /root. local artifact/run label: sqlite-fresh-delete-delta-audit.
+local label이나 /root를 실제 thread ID로 취급하지 않는다.
+client_requested routing: gpt-6.1-sol/high, fallback 허용 없음.
+provider_observed effective model/effort: null/null, UNKNOWN/NOT_OBSERVED.
+적용값을 인증하는 per-turn metadata는 이 execution surface에 없다. actor/model 변경,
+fallback, subagent, native provider 호출 또는 hidden-state/credential inspection은 없다.
+
+동결 provenance
+
+private source repository: https://github.com/jaeseongs95/vibemarshal
+source branch: codex/sqlite-fresh-delete-recovery
+source commit: 4dae937be993693b78d1dbcd873d499633a08e97
+source tree: 8c03f489783175f579c86b699a7b98d634217d19
+유일 direct parent/base: 32bb0f9dd9f024045d24487312b50f5b703573a3
+base tree: 27e18c0c7853c1d35a98d5437cebf0ba703ed42d
+evidence branch: codex/sqlite-fresh-delete-recovery-evidence
+evidence commit: c94c7552b4622056cf31c674c9f83058a674cc05
+evidence tree: eae741bb80b1f8ece4ec51a6d18c699594631ad9
+유일 evidence parent: 4dae937be993693b78d1dbcd873d499633a08e97
+
+원격에서 두 새 commit을 읽기용 fetch하고 별도 detached checkout으로 검사했다.
+시작 및 최종 ls-remote에서 위 branch tip을 재확인했다. source/evidence의 src/tests
+diff는 비어 있고 base 대비 source 변경 경로는 ledger.py와 해당 test 파일뿐이다.
+기존 AGENTS.md는 v3와 정확히 같은 bytes이고 하위 src/tests 지침 범위도 유지된다.
+선택된 workspace-write/auto_review 및 명시 audit-only/no-source-edits 지시를
+과거 AGENTS의 danger-full-access/never·기본 commit/main push 지침보다 우선했다.
+권한 상승·자동 승인 거절은 없었다. 새 skill이나 Library 작업은 호출하지 않았다.
+
+v3 source: 211a5a0f5891a44f217aa7aae18bdb8825775878
+v3 evidence: fdc5d03bf58c9521ff06ab475aea01d1650a4269
+v3 independent audit publication: 53945ce173abc4fa4add535db1a80e8d749dfddb
+이 refs는 최종 원격 확인에서도 그대로다. 원 로컬 v3 packet의 SHA256SUMS 전체
+검사도 통과했고 그 파일들은 수정하지 않았다. 원 로컬 v3 report SHA-256:
+45c79d620cecfb25c3de38137b5454ee3968330f1ee04367341275804b1d06e2
+새 감사용 helper·logs·합성 파일은 별도 directory에서만 만들었다.
+
+exact delta와 imports
+
+v3 대비 ledger.py는 :812의 주석과 :813의 다음 조건만 추가됐다:
+    and self.path.stat().st_size == 0
+verify_delta.py는 원 v3 ledger bytes에 정확히 이 두 줄을 삽입한 결과가 candidate
+전체 ledger bytes와 같음을 검사했다. 그 밖의 _connect, atomic execute loop,
+metadata/identity write, borrowed ownership, commit/WAL/finally 경로는 모두 그대로다.
+SCHEMA_SQL은 base/v3/new candidate의 원문이 같고 SHA-256은
+7b0dfe58482056e6501e419c8df3a63176cb7f9e021f7c787c5a3d4ad32c277d.
+v3에서 161개 schema 객체/trigger 동등성을 검사한 근거는 동결 보존하며, SQL과
+execute loop가 byte-identical임을 확인했다. 전체 schema 실행 검사를 반복하지 않았다.
+
+누적 full-index/binary patch exact bytes:
+git diff --full-index --binary 32bb0f9dd9f024045d24487312b50f5b703573a3 4dae937be993693b78d1dbcd873d499633a08e97
+cumulative-from-32bb.patch, 32319 bytes, SHA-256:
+96c700d9ac4e13ce1bb68434db1b5d445355841dde815bf5a02b1563b3831225
+v3 대비 full-index/binary patch exact bytes:
+git diff --full-index --binary 211a5a0f5891a44f217aa7aae18bdb8825775878 4dae937be993693b78d1dbcd873d499633a08e97
+predicate-and-tests-from-v3.patch, 9866 bytes, SHA-256:
+d756ec74b640efed2c7dca82abdd54f508a22ddc8c84a5a8e08f95209f37634d
+두 patch는 c94c755 evidence의 파일과 byte-for-byte 같다. publication-manifest의
+original_files 7개 digest와 SHA256SUMS 11개 항목도 모두 확인했다.
+
+candidate ledger Git blob: 7c282e0590890e213b33cb9d9272aacdf108273f
+ledger SHA-256: 86cdd317b07e3e704229a890679a2955c51811da2087e8bd4eec423307f109d4
+permanent test Git blob: 31aca3b8aee8ac37b08d9cd0f81d192a7cede863
+test SHA-256: 42aed1bbc678bfaa6cf2def1e3a6881ae3979b129343544d2f045ca67b6ce903
+실제 loaded flowmarshal module 8개와 test module의 __file__ 및 전체 bytes를
+candidate Git blob에 대조했다. tests.SQLiteEngineLedger도 candidate의 동일 class다.
+PYTHONPATH는 해당 checkout의 src/tests에 고정했다. 인메모리 v3 대체 실행은 없다.
+exact import path/hash 원문은 command receipt index 4에 있다.
+
+기술 검토와 작은 실행 결과
+
+:805의 _connect(configure_journal=False)는 bootstrap 전에 WAL 전환하지 않는다.
+native writable recovery가 가능한 그 handle로 :807 BEGIN IMMEDIATE를 실행하고,
+:809~813에서 세 SQLite 조회와 stat 조건을 평가한다. stat을 pre-open gate로
+앞당기지 않는다. recovery 전 positive size만 보고 fresh crash retry를 거절하는
+문제를 피하면서 recovery 뒤 nonzero logical-empty file은 기존 identity 경로로
+거절한다. 별도 journal_mode 판정은 추가되지 않았고 선택된 물리 size0 조건으로
+실행한 pristine/rollback/crashed WAL 파일들이 거절됐다. size0은 provenance 증명이
+아니다. same-user path 치환/악의적 DB 조작을 막는 새 OS 경계를 주장하지 않는다.
+
+실제 신규 영구 method inventory는 기존 11 + 신규 5 = 16이다. 기존 11 test method의
+AST body는 그대로이고 shared assert_empty는 size0 assertion을 추가했다. crash helper는
+spill phase에 cache_size=10/cache_spill=ON과 COMMIT trace callback의 os._exit(75)를
+추가했다. 이 delta 감사는 전체 16을 다시 돌리지 않았다.
+
+독립 실행한 permanent methods는 새 5개 + 관련 기존 3개 = 8개, 단 한 번이다.
+receipt index 3: UTC 2026-10-02T00:58:12.109789+00:00,
+exit=0, process elapsed=2.200327122s. 원문 unittest 집계:
+Ran 8 tests in 1.628s
+OK
+정확한 긴 argv와 모든 method 이름·원문 ok 출력은 commands.jsonl/raw-results.txt에 있다.
+subcase·child process·author의 16개·과거 v3의 11개를 이 8개에 합산하지 않는다.
+
+새 5개가 실제 검사한 내용:
+- nonzero external-empty, VACUUM-empty, DROP-history-empty, pristine-WAL,
+  WAL-bootstrap-rollback 5 subcase를 거절하고 main bytes/app0/user0/schemaempty/
+  journal mode를 보존했다. DROP-history는 합성 잔존 marker의 존재도 확인했다.
+- cache_size=10의 실제 static Engine schema spill 후 main>0을 관측하고 precommit
+  synthetic exception을 발생시켰다. rollback/reopen 뒤 main size0 및 zero identity/
+  empty schema, 이어지는 정상 retry와 integrity/FK 검사가 통과했다.
+- spawn child가 COMMIT 시작 trace에서 exit75했다. crash 직후 main>0,
+  journal>512와 실제 hot-journal magic d9d505f920a163d7을 확인했다. Engine
+  initialize 내부 첫 Path.stat은 acquired same connection의 다음 상태를 관측했다:
+  (in_transaction=True, size=0, app_id=0, user_version=0, objects=[]).
+  native recovery를 거친 fresh retry 뒤 정상 Engine identity/integrity/FK가 통과했다.
+- committed foreign WAL은 keeper writer를 열어둔 상태에서 main/WAL exact bytes와
+  row7, zero identity, WAL mode를 보존했고 artifact root도 생성하지 않았다.
+- 정상 기존 Engine DB는 project/history 데이터, main bytes, dump와 history 검증을
+  reinitialize 뒤 유지했다.
+
+기존 3개의 재실행은 delta 영향에 한정했다:
+- borrowed identity handle 성공/실패 모두 caller transaction/connection ownership 유지.
+- commit 후 WAL exception은 유효 Engine DB를 남기고 재시도 때 dump 보존/WAL/
+  artifact 생성 지원. app_id가 Engine인 기존 DB는 is_new의 첫 조건에서 false가
+  되므로 positive file size를 bootstrap 요건으로 재적용하지 않는다.
+- 변경된 module-level crash helper의 기존 schema/identity phase exit71/72는
+  강화된 size0 assertion과 정상 retry를 그대로 통과했다.
+
+추가 독립 discriminating scenarios는 recovery_boundaries.py의 두 상황이다.
+둘은 unittest method 수에 포함하지 않는다. receipt index 5:
+UTC 2026-10-02T01:00:25.342221+00:00, exit=0, elapsed=1.637530159s.
+
+1) 원래 nonzero 외부 빈 DELETE DB의 genuine hot journal:
+original main=4096 bytes. child는 writer transaction에서 실제 blob pages를
+cache-spill한 뒤 exit83했다. crashed main=679936, journal=5632 bytes,
+magic=d9d505f920a163d7. Engine 연결의 native recovery가 원 DB를 복구했다.
+same-connection gate 관측은 in_transaction=True, size=4096, app0, user0,
+objects=[], journal_mode=delete였다. 따라서 initialize는 거절했고 원래 4096-byte
+main과 exact bytes가 같았으며 acquired handle은 닫혔다. 원 main SHA-256:
+149663e01e4a3e400fa7cd8e5b40d82c0cb4672dcd504d01d42cb54a304beabb
+journal이 사라진 것은 SQLite native recovery lifecycle이며 Engine unlink/truncate가
+아니다. 거절 전후 damaged-file forensic byte purity를 주장하지 않는다.
+
+2) WAL 설정 후 BEGIN IMMEDIATE, DDL 전에 process exit84:
+crashed main=4096. keeper를 열어 sidecar lifecycle을 고정한 뒤 gate는
+in_transaction=True, size=4096, app0, user0, objects=[], mode=wal을 관측했다.
+initialize는 거절하고 main/held WAL bytes와 빈 schema를 보존했다.
+main SHA-256: 0ab48b25cba617ed3a4acca0161813b314c095ef63544bb4af60769eb1012977
+0-byte WAL SHA-256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+SHM bytes는 일시적인 SQLite coordination state여서 동일성을 주장하지 않는다.
+
+실행 환경·Windows 경계
+
+직접 관측 runtime: Linux-6.18.44-x86_64-with-glibc2.41,
+Python 3.12.14, SQLite 3.53.1, pydantic 2.13.4.
+pyproject의 pydantic 선언 2.13.5와 다른 로컬 diagnostic 환경이며 dependency freeze,
+wheel/install qualification으로 승격하지 않는다. package/dependency 설치는 없었다.
+candidate ledger/tests는 Python 3.10 AST grammar parse PASS이며 runtime은 NOT_RUN이다.
+
+spawn suitability 정적 검토: permanent crash_initialize는 module-level target이고
+spill connect/proxy/trace callback은 child 안에서 만든다. parent가 closure/lambda/
+connection을 pickle해서 넘기지 않는다. target args는 문자열이며 기존 Process
+get_context('spawn')/join/terminate/close 경로가 유지된다. 새 독립 두 helper도
+module-level target, 문자열 args, __main__ guard와 같은 spawn cleanup을 쓴다.
+Linux spawn의 exit75/83/84를 실제 관측했으며 이를 Windows 실행으로 표기하지 않는다.
+Windows runner는 이 새 candidate로 repin하거나 import/실행하지 않았다.
+Windows native runtime/qualification 및 Python 3.10 runtime은 모두 NOT_RUN이다.
+
+기존 한계와 scope
+
+T01 finally-close masking은 delta에서 수정한 내용이 없다. 현재 :846의 finally
+close는 v3와 같은 bytes이며 앞선 감사에서 본 이중 실패 한계를 그대로 보존한다.
+이 감사에서 재현 검사를 다시 돌리지 않았고 해결됐다고 주장하지 않는다.
+bootstrap의 SQL/metadata/identity atomic transaction은 변하지 않았으며 native recovery,
+filesystem artifact directory, commit 후 WAL 전환이 하나의 filesystem transaction인
+것도 아니다. 실제 power-loss, IOERR, provider/native transcript, OS matrix는 미실행이다.
+
+정확한 command/raw/hash 전달
+
+commands.jsonl은 10개 명령 receipt의 argv/cwd/명시 environment/UTC/elapsed/exit와
+raw stdout/stderr를 보존한다. sanitizer는 <DELTA_AUDIT_ROOT>,
+<PYTHON_EXECUTABLE> 같은 local-path 기호만 치환했다. 결과/time/hash/failure field는
+바꾸지 않았다. 원 raw-local commands file SHA-256은 manifest에 있다.
+raw-results.txt는 해당 JSON의 읽기 쉬운 전사본이고 source-check/helper 소스도 포함한다.
+두 immutable Git patches는 path 치환 없이 exact bytes로 전달한다. DB/WAL/SHM/journal
+파일, credential, profile, native transcript, 개인 경로 또는 Library 자료는 없다.
+모든 SQLite 파일은 전용 TemporaryDirectory의 disposable synthetic이며 제거됐다.
+
+delta/base diff --check 두 명령은 exit=0이다. 마지막 candidate git status는 empty
+stdout, exit=0이었다. 코드·영구 tests edits, commit, merge, push/publication, source GO,
+adoption 또는 release는 수행하지 않았다. F07 first-four의 첫 main no-ff merge 순서는
+우회하지 않았다. 이 delta packet은 로컬 parent 검토용이며 v3 packet과 분리돼 있다.
+
+남은 단계는 VM root가 이 scoped evidence를 받아 exact 4dae937 후보로 Windows runner를
+repin하는 것이다. 그 실행·채택·최종 release 판정은 이 작업에서 수행하지 않았다.
+관측 범위의 기술 blocker는 없으며 effective-model metadata gap, Windows/Python3.10/
+지원 matrix·power-loss 등의 NOT_RUN을 최종 qualification으로 승격하지 않는다.

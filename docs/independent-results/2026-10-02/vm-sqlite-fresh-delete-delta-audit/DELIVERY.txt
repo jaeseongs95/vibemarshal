@@ -1,0 +1,16 @@
+완료된 SQLite delta audit의 후속 private delivery다.
+parent가 기존 evidence branch에 append하도록 명시 승인했다.
+원 DELTA-AUDIT.txt와 delta-manifest.json의 local-only/no-publication 기록은 최초 감사
+단계의 상태이며, 원 파일 bytes와 SHA를 수정하지 않고 별도 이 delivery 문서를 추가했다.
+review source는 4dae937be993693b78d1dbcd873d499633a08e97, publication parent는 기존
+v3 감사 evidence HEAD 53945ce173abc4fa4add535db1a80e8d749dfddb다.
+source adoption이나 source bytes 갱신을 하지 않는다. 원 v3 audit directory는 immutable이다.
+실제 method count8과 독립 probe2를 보존하고 author16·subcases·spawn child를 합산하지 않는다.
+Windows/Python3.10 runtime NOT_RUN, effective model/effort UNKNOWN을 그대로 둔다.
+보고서 SHA256 ba084b81e49c3c70c3c5e2d8dcc744909bec99a637c5b44b0e5e1ed180661a4c.
+원 sanitized packet12개 파일은 모두 exact bytes다. 두 immutable patch의 source context
+whitespace도 유지했고 일반 문서 whitespace check에서는 해당 patch만 제외한다.
+PUBLICATION-SHA256SUMS는 추가한 delivery/publication manifest까지 함께 검증한다.
+게시 후 fresh remote fetch의 bytes/hash 검증 결과는 최종 delivery receipt로 전달한다.
+이 작업은 SQLite audit만 다루며 별도 Goal review publication은 처리하지 않는다.
+재테스트, code edits, main, installation, merge/release 또는 Library 작업을 하지 않았다.

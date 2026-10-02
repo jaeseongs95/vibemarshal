@@ -1,0 +1,16 @@
+recorder 이전 setup 명령은 다음과 같다. per-command UTC/exit를 소급 생성하지 않는다.
+기존 v3 source checkout에서:
+git status --porcelain=v1
+git ls-remote origin refs/heads/codex/sqlite-fresh-delete-recovery
+git fetch --depth=3 origin 4dae937be993693b78d1dbcd873d499633a08e97 c94c7552b4622056cf31c674c9f83058a674cc05
+git show -s --format='%H %T %P' 4dae937be993693b78d1dbcd873d499633a08e97
+git show -s --format='%H %T %P' c94c7552b4622056cf31c674c9f83058a674cc05
+git diff --stat 211a5a0f5891a44f217aa7aae18bdb8825775878 4dae937be993693b78d1dbcd873d499633a08e97
+git diff 211a5a0f5891a44f217aa7aae18bdb8825775878 4dae937be993693b78d1dbcd873d499633a08e97 -- src/flowmarshal/engine/ledger.py
+격리 checkout:
+mkdir -p <DELTA_AUDIT_ROOT>
+git worktree add --detach <DELTA_AUDIT_ROOT>/candidate 4dae937be993693b78d1dbcd873d499633a08e97
+worktree setup tool 원문 출력(path 기호 치환):
+Preparing worktree (detached HEAD 4dae937)
+HEAD is now at 4dae937 새 DELETE bootstrap 복구를 0-byte predicate로 한정
+이후 원격 shape/diff/import/실행의 원문 receipt는 commands.jsonl에 있다.

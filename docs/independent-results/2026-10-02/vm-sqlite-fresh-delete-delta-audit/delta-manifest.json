@@ -1,0 +1,230 @@
+{
+  "format": "independent-fresh-delete-sqlite-delta-audit-v1",
+  "sealed_utc": "2026-10-02T01:06:06.498636+00:00",
+  "reviewer_thread_id": "01a0f9e7-6196-7476-9cd5-177d24d80038",
+  "author_thread_id": "01a0f9d2-eaaf-748e-9b22-696261fb5026",
+  "parent_source_thread_id": "01a0f995-7341-7179-91a4-63a814e66020",
+  "identity_provenance": "parent_admitted_task_records",
+  "exposed_agent_label": "/root",
+  "local_artifact_run_label": "sqlite-fresh-delete-delta-audit",
+  "local_label_is_thread_identity": false,
+  "source_repository": "https://github.com/jaeseongs95/vibemarshal",
+  "source_branch": "codex/sqlite-fresh-delete-recovery",
+  "source_commit": "4dae937be993693b78d1dbcd873d499633a08e97",
+  "source_tree": "8c03f489783175f579c86b699a7b98d634217d19",
+  "source_parent": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "evidence_branch": "codex/sqlite-fresh-delete-recovery-evidence",
+  "evidence_commit": "c94c7552b4622056cf31c674c9f83058a674cc05",
+  "evidence_tree": "eae741bb80b1f8ece4ec51a6d18c699594631ad9",
+  "evidence_parent": "4dae937be993693b78d1dbcd873d499633a08e97",
+  "frozen_v3": {
+    "source_commit": "211a5a0f5891a44f217aa7aae18bdb8825775878",
+    "evidence_commit": "fdc5d03bf58c9521ff06ab475aea01d1650a4269",
+    "independent_audit_commit": "53945ce173abc4fa4add535db1a80e8d749dfddb",
+    "original_local_report_sha256": "45c79d620cecfb25c3de38137b5454ee3968330f1ee04367341275804b1d06e2",
+    "original_local_SHA256SUMS_verified": true,
+    "remote_refs_unchanged": true,
+    "immutable_audit_not_rewritten": true
+  },
+  "routing": {
+    "client_requested_model": "gpt-6.1-sol",
+    "client_requested_effort": "high",
+    "fallback_allowed": false,
+    "provider_observed_model": null,
+    "provider_observed_effort": null,
+    "provider_observed_status": "UNKNOWN/NOT_OBSERVED",
+    "provider_turn_id": null,
+    "hidden_state_or_credential_inspection": false
+  },
+  "runtime": {
+    "python": "3.12.14",
+    "sqlite": "3.53.1",
+    "pydantic": "2.13.4",
+    "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+    "declared_pydantic": "2.13.5",
+    "installed_dependency_freeze_not_qualified": true
+  },
+  "scope": {
+    "root_selected_policy": "fresh DELETE bootstrap failure/crash retry only",
+    "predicate": "same writable recovery-capable connection after BEGIN IMMEDIATE: app_id0 + user_version0 + all sqlite_master empty + recovered size0",
+    "new_policy_gate_added_by_reviewer": false,
+    "Engine_unlink_truncate_added": false,
+    "provenance_claim": false,
+    "implementation_delta_from_v3": "one comment line and one size predicate clause",
+    "static_SCHEMA_SQL_sha256": "7b0dfe58482056e6501e419c8df3a63176cb7f9e021f7c787c5a3d4ad32c277d",
+    "full_schema_campaign_not_repeated": true
+  },
+  "method_counts": {
+    "candidate_existing": 11,
+    "candidate_new": 5,
+    "candidate_total": 16,
+    "independently_executed_new": 5,
+    "independently_executed_related_existing": 3,
+    "independently_executed_total": 8,
+    "independent_selected_suite_runs": 1,
+    "author_methods_not_added_to_independent_count": true,
+    "subcases_not_added_to_method_count": true,
+    "additional_discriminating_scenarios": 2,
+    "scenarios_not_unittest_methods": true
+  },
+  "results": {
+    "selected_permanent_methods": "8 PASS; Ran 8 tests in 1.628s; exit0",
+    "selected_permanent_receipt_index": 3,
+    "source_import_patch_verification": "PASS",
+    "source_verification_receipt_index": 4,
+    "independent_recovery_boundaries": "PASS",
+    "independent_boundary_receipt_index": 5,
+    "source_and_delta_diff_checks": "PASS",
+    "clean_candidate_worktree": true,
+    "remote_pins": "MATCH",
+    "all_10_logged_commands_exit0": true,
+    "blocking_delta_findings": [],
+    "scoped_acceptance": "ACCEPT_FOR_SELECTED_FRESH_DELETE_RECOVERY_SCOPE_IN_EXERCISED_LINUX_PY312_SQLITE3531",
+    "source_go": false,
+    "adoption": false,
+    "merge": false,
+    "release": false
+  },
+  "preserved_paths": [
+    "normal existing Engine project/history/data",
+    "borrowed connections and caller transactions",
+    "postcommit WAL failure/retry",
+    "existing schema/identity crash phases",
+    "committed foreign WAL main/data/identity/mode"
+  ],
+  "independent_boundary_observations": [
+    {
+      "case": "nonzero original DELETE hot journal",
+      "original_size": 4096,
+      "crashed_size": 679936,
+      "hot_journal_size": 5632,
+      "magic": "d9d505f920a163d7",
+      "child_exit": 83,
+      "gate": {
+        "in_transaction": true,
+        "size": 4096,
+        "app_id": 0,
+        "user_version": 0,
+        "objects": [],
+        "mode": "delete"
+      },
+      "rejected": true,
+      "native_recovery_restored_original_main_bytes": true
+    },
+    {
+      "case": "WAL before DDL process exit",
+      "child_exit": 84,
+      "crashed_size": 4096,
+      "gate": {
+        "in_transaction": true,
+        "size": 4096,
+        "app_id": 0,
+        "user_version": 0,
+        "objects": [],
+        "mode": "wal"
+      },
+      "rejected": true,
+      "main_and_held_WAL_bytes_preserved": true
+    }
+  ],
+  "known_limits": [
+    {
+      "id": "T01",
+      "scope": "inherited initializer finally close can mask primary exception",
+      "changed": false,
+      "retested": false
+    },
+    "size0 is not provenance authentication",
+    "SQLite native recovery/sidecar lifecycle can change damaged on-disk bytes before Engine rejection; forensic byte purity not claimed",
+    "same-user path replacement is not a new supported security boundary"
+  ],
+  "not_run": [
+    "Windows repin/import/native runtime/qualification",
+    "Python3.10 runtime",
+    "supported Python/SQLite matrix",
+    "actual power-loss/IOERR",
+    "full prior independent campaign",
+    "author full16 suite rerun",
+    "26 prior boundary tests",
+    "20-repeat concurrency campaign",
+    "wheel/install/release/provider/role/planning/E2E"
+  ],
+  "next_step": "VM root review; later Windows runner repinning to this exact candidate. No Windows execution performed by this audit.",
+  "publication": {
+    "status": "LOCAL_ONLY pending VM root",
+    "new_delta_commit": false,
+    "new_delta_push": false,
+    "new_delta_publication": false,
+    "Library_upload": false
+  },
+  "mutations": {
+    "implementation_edits": false,
+    "permanent_test_edits": false,
+    "operating_DB_or_profile": false,
+    "native_provider_calls": 0,
+    "disposable_synthetic_only": true,
+    "merge_order_constraint": "F07 first-four required first main no-ff merge unchanged"
+  },
+  "sanitization": {
+    "all_10_command_receipts_retained": true,
+    "normalized_local_path_labels": [
+      "<DELTA_AUDIT_ROOT>",
+      "<V3_SOURCE_CHECKOUT>",
+      "<PYTHON_EXECUTABLE>"
+    ],
+    "raw_argv_stdout_stderr_modifications": "local path normalization only",
+    "original_local_artifact_sha256": {
+      "DELTA-AUDIT.txt": "ba084b81e49c3c70c3c5e2d8dcc744909bec99a637c5b44b0e5e1ed180661a4c",
+      "run.py": "4e5134a6324212420a6e1661fcecd93885b1861223cef24682edd4c286a73546",
+      "verify_delta.py": "725efa1f2fc7bd7e55d5f29ce407f7db9bd29f096550fa40401a03be6b30d12f",
+      "recovery_boundaries.py": "1118c4f46e9d75b4ed23306ed920c38e56b93a22a3ca77bdb7bd3adfd67d51e4",
+      "cumulative-from-32bb.patch": "96c700d9ac4e13ce1bb68434db1b5d445355841dde815bf5a02b1563b3831225",
+      "predicate-and-tests-from-v3.patch": "d756ec74b640efed2c7dca82abdd54f508a22ddc8c84a5a8e08f95209f37634d",
+      "commands.jsonl": "3d5a4351cf2ab62f125d6fbfc3ff4bafd570f8252a2a20971c7f5ad3cbc59f27"
+    },
+    "DB_WAL_SHM_journal_files_included": false,
+    "credentials_profiles_native_transcripts_personal_paths_included": false
+  },
+  "files": {
+    "DELTA-AUDIT.txt": {
+      "sha256": "ba084b81e49c3c70c3c5e2d8dcc744909bec99a637c5b44b0e5e1ed180661a4c",
+      "bytes": 14204
+    },
+    "bootstrap-setup.txt": {
+      "sha256": "070ee9aa61688e228c3cb13cceba85f93d6c5d8a7d79da628379a6ab5555211b",
+      "bytes": 1117
+    },
+    "commands.jsonl": {
+      "sha256": "c3713efbd3a56743a6119933a9885f1ee7a1f26931b1501416d1a56135732c20",
+      "bytes": 14046
+    },
+    "cumulative-from-32bb.patch": {
+      "sha256": "96c700d9ac4e13ce1bb68434db1b5d445355841dde815bf5a02b1563b3831225",
+      "bytes": 32319
+    },
+    "predicate-and-tests-from-v3.patch": {
+      "sha256": "d756ec74b640efed2c7dca82abdd54f508a22ddc8c84a5a8e08f95209f37634d",
+      "bytes": 9866
+    },
+    "raw-results.txt": {
+      "sha256": "1374441f981883e6e459aaf71ff315c3b9d7f1ea5bfdbb73b0bb009e66cf4dde",
+      "bytes": 15299
+    },
+    "recovery_boundaries.py": {
+      "sha256": "1118c4f46e9d75b4ed23306ed920c38e56b93a22a3ca77bdb7bd3adfd67d51e4",
+      "bytes": 6441
+    },
+    "run.py": {
+      "sha256": "4e5134a6324212420a6e1661fcecd93885b1861223cef24682edd4c286a73546",
+      "bytes": 1431
+    },
+    "v3-freeze-check.txt": {
+      "sha256": "00de530e9cd1c50a648c853c1e260af03d2578a1f5bb8838caec963f92a6cd72",
+      "bytes": 460
+    },
+    "verify_delta.py": {
+      "sha256": "725efa1f2fc7bd7e55d5f29ce407f7db9bd29f096550fa40401a03be6b30d12f",
+      "bytes": 5749
+    }
+  }
+}
