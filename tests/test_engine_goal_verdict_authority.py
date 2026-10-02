@@ -12,7 +12,7 @@ from flowmarshal.canonical import sha256_digest
 from flowmarshal.engine.domain import (
     CriterionVerdict, EvidenceKind, EvidenceRecord, GoalVerdict,
     GoalVerdictStatus, PlanContractRevision, RunOnceAction, ValidationExecutionStep,
-    ValidationResult, ValidationStatus, new_id, utc_now,
+    RuntimeIntentKind, ValidationResult, ValidationStatus, new_id, utc_now,
 )
 from flowmarshal.engine.e2e_qualification import _copy_fixture, _prepare
 from flowmarshal.engine.qualification import default_role_configuration
@@ -24,6 +24,23 @@ from tests.test_engine_qualification import qualification_inventory
 from tests import test_engine_goal_authorization as authorization_tests
 
 
+def authority_records(ledger):
+    """완료 주장 전후 합성 원장의 증거와 실행 기록을 원문 그대로 비교한다."""
+    with ledger.read() as connection:
+        return {table: tuple(tuple(row) for row in connection.execute(
+            f"SELECT * FROM {table} ORDER BY rowid")) for table in (
+                "validation_results", "evidence_records", "attempts",
+                "runtime_intents", "runtime_receipts")}
+
+
+def record_synthetic_receipt(service, attempt_id):
+    intent = service.prepare_runtime_intent(attempt_id=attempt_id,
+        kind=RuntimeIntentKind.CREATE_THREAD, idempotency_key=new_id("synthetic_intent"),
+        request={"synthetic": True})
+    service.record_runtime_receipt(intent_id=intent.intent_id,
+        provider_operation_id=new_id("synthetic_operation"), response={"synthetic": True})
+
+
 class GoalVerdictAuthorityTests(EngineServiceFixture):
     internal_revision_evaluation = authorization_tests.EngineGoalAuthorizationTests.internal_revision_evaluation
     register_internal_revision = authorization_tests.EngineGoalAuthorizationTests.register_internal_revision
@@ -33,6 +50,7 @@ class GoalVerdictAuthorityTests(EngineServiceFixture):
         self.activate()
         self.service.materialize_execution_spec(self.spec(), inventory=self.inventory)
         attempt = self.service.reserve_attempt(task_id=self.task.task_id)
+        record_synthetic_receipt(self.service, attempt.attempt_id)
         self.service.finish_attempt(attempt_id=attempt.attempt_id, succeeded=True)
         self.evidence = EvidenceRecord(
             evidence_id=new_id("evidence"), project_id=self.project_id,
@@ -77,12 +95,14 @@ class GoalVerdictAuthorityTests(EngineServiceFixture):
 
     def assert_rejected_atomically(self, verdict):
         with self.ledger.read() as connection:
-            before = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-                      for table in ("goal_verdicts", "history_events")}
+            before = {table: tuple(tuple(row) for row in connection.execute(f"SELECT * FROM {table} ORDER BY rowid"))
+                      for table in ("goal_verdicts", "history_events", "projects", "plan_revisions",
+                                    "validation_results", "evidence_records", "attempts",
+                                    "runtime_intents", "runtime_receipts")}
         with self.assertRaises(EngineServiceError):
             self.record_verdict(verdict)
         with self.ledger.read() as connection:
-            after = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            after = {table: tuple(tuple(row) for row in connection.execute(f"SELECT * FROM {table} ORDER BY rowid"))
                      for table in before}
             self.assertEqual("active", connection.execute(
                 "SELECT status FROM plan_revisions WHERE id=?", (self.plan.plan_revision_id,)).fetchone()[0])
@@ -115,7 +135,16 @@ class GoalVerdictAuthorityTests(EngineServiceFixture):
         self.assertNotEqual(self.integration.validation_result_id, latest.validation_result_id)
         self.assertEqual(self.integration.evidence_ids, latest.evidence_ids)
         self.assertEqual(self.integration.goal_validation_binding_digest, latest.goal_validation_binding_digest)
-        self.record_verdict(self.verdict())
+        before = authority_records(self.ledger)
+        self.assertTrue(all(before.values()))
+        verdict = self.verdict()
+        self.record_verdict(verdict)
+        self.assertEqual(before, authority_records(self.ledger))
+        with self.ledger.read() as connection:
+            saved = GoalVerdict.model_validate_json(connection.execute(
+                "SELECT payload_json FROM goal_verdicts WHERE id=?",
+                (verdict.goal_verdict_id,)).fetchone()[0])
+        self.assertEqual((self.integration.validation_result_id,), saved.integration_validation_result_ids)
 
     def test_failed_result_id_is_rejected_even_when_latest_result_is_pass(self):
         failed = self.record_result(task=False, status=ValidationStatus.FAIL)
@@ -154,15 +183,17 @@ class GoalVerdictAuthorityTests(EngineServiceFixture):
         replacement, _ = self.register_internal_revision()
         self.service.activate_authorized_plan(plan_revision_id=replacement.plan_revision_id)
         with self.ledger.read() as connection:
-            before = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
-                      for table in ("goal_verdicts", "history_events")}
+            before = {table: tuple(tuple(row) for row in connection.execute(f"SELECT * FROM {table} ORDER BY rowid"))
+                      for table in ("goal_verdicts", "history_events", "projects", "plan_revisions",
+                                    "validation_results", "evidence_records", "attempts",
+                                    "runtime_intents", "runtime_receipts")}
         with self.assertRaises(EngineServiceError):
             self.record_verdict(self.verdict())
         with self.ledger.read() as connection:
             project = connection.execute("SELECT active_plan_revision_id,run_state FROM projects").fetchone()
             self.assertEqual(replacement.plan_revision_id, project["active_plan_revision_id"])
             self.assertNotEqual("completed", project["run_state"])
-            after = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+            after = {table: tuple(tuple(row) for row in connection.execute(f"SELECT * FROM {table} ORDER BY rowid"))
                      for table in before}
         self.assertEqual(before, after)
 
@@ -181,6 +212,7 @@ class GoalTestBindingCompatibilityTests(unittest.TestCase):
         self.service = self.prepared.service
         self.service.compile_execution_spec(self.prepared.proposal, inventory=self.inventory)
         worker = self.service.reserve_attempt(task_id=self.prepared.task_id)
+        record_synthetic_receipt(self.service, worker.attempt_id)
         self.service.finish_attempt(attempt_id=worker.attempt_id, succeeded=True)
         with self.service.ledger.read() as connection:
             self.task_row = connection.execute("SELECT * FROM task_contracts WHERE id=?",
@@ -228,8 +260,16 @@ class GoalTestBindingCompatibilityTests(unittest.TestCase):
                 evidence_ids=results[0].evidence_ids, rationale="동일 입력·Goal Test binding의 기존 PASS")
                 for item in self.plan.definition.goal_coverage),
             integration_validation_result_ids=(results[0].validation_result_id,), evaluated_at=utc_now())
+        before = authority_records(self.service.ledger)
+        self.assertTrue(all(before.values()))
         self.service.record_goal_verdict(project_id=self.prepared.project_id,
             plan_revision_id=self.plan.plan_revision_id, verdict=verdict)
+        self.assertEqual(before, authority_records(self.service.ledger))
+        with self.service.ledger.read() as connection:
+            saved = GoalVerdict.model_validate_json(connection.execute(
+                "SELECT payload_json FROM goal_verdicts WHERE id=?",
+                (verdict.goal_verdict_id,)).fetchone()[0])
+        self.assertEqual((results[0].validation_result_id,), saved.integration_validation_result_ids)
 
     def test_changed_goal_input_is_blocked_before_command_or_result_write(self):
         calls = self.command_mock.call_count
