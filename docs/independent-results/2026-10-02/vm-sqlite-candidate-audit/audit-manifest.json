@@ -1,0 +1,161 @@
+{
+  "format": "independent-sqlite-technical-audit-publication-v1",
+  "sealed_utc": "2026-10-02T00:10:15.673059+00:00",
+  "source_repository": "https://github.com/jaeseongs95/vibemarshal",
+  "source_branch": "codex/sqlite-atomic-initialize-v3",
+  "source_commit": "211a5a0f5891a44f217aa7aae18bdb8825775878",
+  "source_tree": "e901b77ebf7551342ada996dd7ee4e8422b92f7a",
+  "source_parent": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "evidence_branch": "codex/sqlite-atomic-initialize-v3-evidence",
+  "evidence_commit": "fdc5d03bf58c9521ff06ab475aea01d1650a4269",
+  "evidence_tree": "ddc150410b64ace11e5e83c6ba01434d91120132",
+  "evidence_parent": "211a5a0f5891a44f217aa7aae18bdb8825775878",
+  "exposed_task_identity": {
+    "reviewer_thread_id": "01a0f9e7-6196-7476-9cd5-177d24d80038",
+    "author_thread_id": "01a0f9d2-eaaf-748e-9b22-696261fb5026",
+    "parent_source_thread_id": "01a0f995-7341-7179-91a4-63a814e66020",
+    "thread_identity_provenance": "parent_admitted_task_records",
+    "exposed_agent_label": "/root",
+    "local_artifact_run_label": "sqlite-independent-audit",
+    "local_label_is_thread_identity": false,
+    "provider_turn_id": null
+  },
+  "model": {
+    "client_requested": {
+      "model": "gpt-6.1-sol",
+      "effort": "high",
+      "fallback_allowed": false
+    },
+    "provider_observed": {
+      "model": null,
+      "effort": null,
+      "status": "NOT_OBSERVED",
+      "reason": "No authoritative per-turn settings exposed to this delegated task."
+    },
+    "fallback_initiated_by_auditor": false,
+    "hidden_state_or_credential_inspection": false
+  },
+  "runtime": {
+    "python": "3.12.14",
+    "sqlite": "3.53.1",
+    "pydantic": "2.13.4",
+    "platform": "Linux-6.18.44-x86_64-with-glibc2.41"
+  },
+  "results": {
+    "remote_pins": "MATCH",
+    "full_index_diff_and_imports": "MATCH",
+    "permanent_regression_methods": 11,
+    "permanent_regression_result": "PASS",
+    "permanent_receipt_index": 4,
+    "discriminating_receipt_index": 7,
+    "source_verification_final_receipt_index": 8,
+    "independent_cases": [
+      "actual commit SQLITE_BUSY rollback/retry",
+      "actual postcommit WAL SQLITE_BUSY valid DB/retry",
+      "foreign live WAL byte/data/identity/journal preservation",
+      "161 static schema objects and triggers equivalent",
+      "zero identity/header-only and dropped prior data predicate effects observed",
+      "inherited initializer double-close failure masks primary exception observed"
+    ],
+    "python310_AST": "PASS_SYNTAX_ONLY",
+    "empty_database_policy": "PENDING_PARENT",
+    "source_go": false
+  },
+  "findings": [
+    {
+      "id": "P01",
+      "classification": "POLICY_DEPENDENT_SCOPE",
+      "source": "src/flowmarshal/engine/ledger.py:808",
+      "observation": "Zero identity and empty sqlite_master also accepts previously populated/dropped SQLite files with freelist/residual bytes. No policy acceptance decided."
+    },
+    {
+      "id": "T01",
+      "classification": "INHERITED_CLEANUP_LIMIT",
+      "source": "src/flowmarshal/engine/ledger.py:844",
+      "observation": "A finally-close error can replace the first initializer exception; original remains in exception context. Atomic rollback still observed."
+    }
+  ],
+  "not_run": [
+    "Windows native runtime/qualification",
+    "Python3.10 runtime",
+    "supported Python/SQLite matrix",
+    "declared dependency freeze and wheel installation",
+    "actual power loss",
+    "whole repository/release gates",
+    "native provider/role/planning/real-request E2E",
+    "prior 26 boundary tests",
+    "20 concurrency benchmark repetitions"
+  ],
+  "remaining_blockers": [
+    "parent/policy panel decision on zero-identity schema-empty acceptance scope",
+    "provider-observed model/effort metadata unavailable",
+    "parent final source review; no adoption/merge/release"
+  ],
+  "mutations": {
+    "source_edits": false,
+    "test_edits": false,
+    "commits": false,
+    "merge": false,
+    "push": false,
+    "operating_DB_or_profile": false,
+    "real_project_runtime": false,
+    "native_provider_calls": 0,
+    "library_upload": false,
+    "external_publication": false,
+    "local_audit_artifacts_and_disposable_synthetic_only": true
+  },
+  "merge_order_constraint": "F07 first-four required first main no-ff merge; no merge performed.",
+  "receipt_count": 12,
+  "evidence_files": {
+    "AUDIT.txt": {
+      "sha256": "9d72a31ffcad5b6de59be1d7db3e2b4333e8c6c22a6c312c9cee1d38a84c2aa3",
+      "bytes": 19078
+    },
+    "commands.jsonl": {
+      "sha256": "59bbc6bb49c7cd032a1626f0510dd624df4db6c0c56d23e7732c431bbf5948ef",
+      "bytes": 19743
+    },
+    "raw-results.txt": {
+      "sha256": "f23cdb392fbf2be94cb3cc41b04325beac8fdbae022320b60014508286674a3a",
+      "bytes": 19724
+    },
+    "bootstrap-receipt.txt": {
+      "sha256": "cc13cede630b96e5b0fa0502de9bda7bec65a9bcb1f7fe9dafd19b797700112b",
+      "bytes": 2035
+    },
+    "candidate.diff.patch": {
+      "sha256": "de93689e8c366004fc7bef877ea501da43f6f9c3a7ea3c6aafc0c1b5ed2e543a",
+      "bytes": 24483
+    },
+    "run.py": {
+      "sha256": "4e5134a6324212420a6e1661fcecd93885b1861223cef24682edd4c286a73546",
+      "bytes": 1431
+    },
+    "verify_source.py": {
+      "sha256": "e36145f950142bda8ccb6c760319b08c64c5fb0d2ece969158e674491123012a",
+      "bytes": 6042
+    },
+    "discriminating_cases.py": {
+      "sha256": "ec3812538f17d660f201ec426738be62742cd17faf3a58783a19fa9a0d8302ba",
+      "bytes": 11212
+    }
+  },
+  "original_local_manifest_sha256": "8562e562079b063e664662b49289f2337b8de6f5ba82aa0ea84bd1a9d57a8d5b",
+  "publication": {
+    "authorized_branch": "dot/vm-sqlite-candidate-audit-20261002",
+    "base_commit": "211a5a0f5891a44f217aa7aae18bdb8825775878",
+    "packet_prefix": "docs/independent-results/2026-10-02/vm-sqlite-candidate-audit/",
+    "private_repository_verified": true,
+    "status": "PREPARED; remote byte verification follows push",
+    "model_settings_not_changed_or_claimed_observed": true,
+    "no_retesting_for_publication": true,
+    "implementation_bytes_unchanged": true,
+    "source_adoption": false,
+    "main_merge": false,
+    "release": false,
+    "library_upload": false,
+    "receipt_path_normalization": "Local paths replaced by symbolic labels; all other raw argv/stdout/stderr/result fields preserved in commands.jsonl. Final envelope blank line removed only from readable raw-results.txt.",
+    "scoped_technical_disposition": "PASS_FOR_EXERCISED_LINUX_PY312_SCOPE; POLICY_PENDING; NO_SOURCE_GO"
+  },
+  "mutations_scope": "mutations describes original audit phase; later authorized evidence-only commit/push is recorded separately in publication fields"
+}

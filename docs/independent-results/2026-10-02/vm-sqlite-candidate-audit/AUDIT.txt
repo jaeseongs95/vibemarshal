@@ -1,0 +1,271 @@
+게시 주석 (2026-10-02, parent 명시 승인):
+완료된 감사의 sanitized derivative를 frozen implementation commit의 직접 자식으로
+지정 private branch에 게시한다. 이하 test 결과는 최초 감사 실행의 결과이며 게시를
+위해 재실행하지 않았다. reviewer/author thread identity는 parent의 admitted task
+records에서 제공했다. 요청 routing은 gpt-6.1-sol/high, effective settings는 UNKNOWN이다.
+raw 명령/출력에서 로컬 절대 경로만 <AUDIT_ROOT>, <INITIAL_SOURCE_CHECKOUT>,
+<PYTHON_EXECUTABLE>로 표기했다. 모든 exit·결과·hash·UTC·failure receipt는 보존했다.
+원 report와 receipt bytes의 digest는 publication-manifest.json에 결속했다.
+원 감사 당시 no-publication 상태와 현재 evidence publication 승인을 구분한다.
+
+지정 SQLite 초기화 후보의 독립 기술 감사 — 승인된 private evidence publication
+
+지정 Git source와 실행 import의 일치를 확인했고, 신규 영구 회귀 11개는 모두
+통과했다. 실제 SQLite reader lock을 이용한 commit 실패·postcommit WAL 실패,
+live foreign WAL 보존과 static schema/trigger 동등성도 확인했다. 이 결과는
+관측한 Linux/Python 3.12 환경의 기술 근거다. source GO, merge, release 또는
+빈 파일 정책 승인으로 해석할 수 없다.
+
+parent가 별도로 다뤄야 할 정책 관측 P01: 후보의 is_new 조건은 진짜 신규 파일과
+과거 테이블을 drop해서 객체가 없어진 파일을 구분하지 않는다. 합성 과거 데이터의
+잔존 bytes와 freelist가 있는 20KB SQLite 파일도 수용됐다. genuinely empty
+zero-identity 파일 허용이라는 결정만으로 이 더 넓은 수용 범위까지 승인됐다고
+추정하지 않았다. 정책과 후보 predicate의 대응은 PENDING_PARENT다.
+
+기존 cleanup 한계 T01: initialize()의 finally close가 별도로 실패하면 최초
+예외 대신 close 예외가 표면화될 수 있다. 합성 이중 실패로 재현했으며 최초
+ValueError는 RuntimeError.__context__에 남고 DB rollback은 됐다. finally의
+무조건 close 호출은 base에도 있었으므로 이 후보에서 새로 도입한 회귀로 분류하지
+않는다. 모든 cleanup 실패에서 최초 예외를 보존한다고 주장할 수는 없다.
+
+감사 identity와 독립성
+
+이 작업에 직접 노출된 agent identity: /root (Codex delegated primary agent).
+사용자 제공 source_thread_id: 01a0f995-7341-7179-91a4-63a814e66020.
+별도 author task: 01a0f9d2-eaaf-748e-9b22-696261fb5026.
+실제 reviewer thread ID: 01a0f9e7-6196-7476-9cd5-177d24d80038 (parent admitted task records 출처).
+author thread ID: 01a0f9d2-eaaf-748e-9b22-696261fb5026 (parent admitted task records 출처).
+local artifact/run label: sqlite-independent-audit; thread identity가 아니다.
+provider turn ID와 effective model/effort는 노출되지 않았다.
+client_requested: model=gpt-6.1-sol, effort=high, fallback 허용 없음.
+provider_observed: model=null, effort=null, NOT_OBSERVED.
+이 실행 표면은 적용된 per-turn model/effort를 제공하지 않는다. 요청명·commit
+trailer·일반 Codex 설명을 실제 관측 모델로 대체하지 않았다. 감사 중 모델 변경,
+fallback, subagent 또는 native provider 호출을 실행하지 않았다. 요청 조합의
+실제 적용을 인증할 수 없다는 evidence gap은 parent에게 남긴다.
+숨겨진 상태, credential, 개인 profile 또는 운영 DB를 조회하지 않았다.
+author의 sealed-report와 실행 결과를 읽었으나 여기의 판정은 독립 source 검토와
+새 synthetic 실행에 근거한다. 과거 reviewer 26검사/20 concurrency benchmark는
+재실행하지 않았으며 author의 수량을 이 감사에 합산하지 않았다.
+
+실행 환경과 권한
+
+직접 실행 관측: Linux-6.18.44-x86_64-with-glibc2.41,
+Python 3.12.14, SQLite 3.53.1, pydantic 2.13.4.
+Python executable:
+<PYTHON_EXECUTABLE>
+pyproject 선언은 Python >=3.10, pydantic==2.13.5다. 의존성을 설치·교체하지 않았고
+이 실행을 선언된 dependency freeze 또는 설치 qualification으로 주장하지 않는다.
+선택 환경은 workspace-write/auto_review이며 Git fetch 시 network 사용 가능했다.
+candidate AGENTS.md를 읽었고 대상 src/tests에는 추가 적용 AGENTS가 없었다.
+사용자의 현재 명시 지시(선택 환경에서 합성 감사, no source edits/no publication)를
+과거 AGENTS의 danger-full-access/never 및 commit/main merge/push 기본값보다
+우선했다. 권한 상승 요청·자동 승인 거절은 없었다. 별도 skill은 호출하지 않았다.
+
+원격·Git·evidence provenance
+
+권위 source remote: https://github.com/jaeseongs95/vibemarshal.git
+source branch: codex/sqlite-atomic-initialize-v3
+source commit: 211a5a0f5891a44f217aa7aae18bdb8825775878
+source tree: e901b77ebf7551342ada996dd7ee4e8422b92f7a
+유일 direct parent: 32bb0f9dd9f024045d24487312b50f5b703573a3
+base tree: 27e18c0c7853c1d35a98d5437cebf0ba703ed42d
+evidence branch: codex/sqlite-atomic-initialize-v3-evidence
+evidence commit: fdc5d03bf58c9521ff06ab475aea01d1650a4269
+evidence tree: ddc150410b64ace11e5e83c6ba01434d91120132
+유일 evidence parent: 211a5a0f5891a44f217aa7aae18bdb8825775878
+초기와 마지막 ls-remote에서 두 branch tip이 지정값과 일치했다.
+
+격리 checkout: <AUDIT_ROOT>/candidate, detached HEAD.
+기존 <INITIAL_SOURCE_CHECKOUT>은 지정 base에 있었고 candidate object는 없었다.
+격리 repository를 새로 init하고 private remote에서 두 branch를 depth=3으로
+직접 fetch했다. source와 evidence의 parent/tree는 원격에서 받은 Git 객체로
+검사했다. 기존 checkout, branch, main, source/test 파일을 수정하지 않았다.
+최종 candidate git status --porcelain=v1 --untracked-files=all은 stdout empty,
+exit=0이었다. evidence가 src/tests를 바꾸지 않고 docs packet만 추가한 것도
+검사했다. GitHub connector의 읽기 전용 branch 검색도 두 branch 존재를 확인했다.
+
+base→candidate 변경은 정확히 두 경로다:
+src/flowmarshal/engine/ledger.py: 52 insertions, 18 deletions.
+tests/test_engine_ledger_initialize.py: 379 new lines, unittest 11 methods.
+전체 diff: 431 insertions, 18 deletions; git diff --check exit=0.
+
+정확한 diff 생성 argv:
+git diff --full-index --binary 32bb0f9dd9f024045d24487312b50f5b703573a3 211a5a0f5891a44f217aa7aae18bdb8825775878
+이 bytes는 evidence의 candidate.diff.patch와 byte-for-byte 같다.
+SHA-256: de93689e8c366004fc7bef877ea501da43f6f9c3a7ea3c6aafc0c1b5ed2e543a
+reviewed-v3.patch SHA-256:
+40339ffa0ef57f5d6152c289344c7fda0011c70c0ea40338861495c3fa170a89
+base ledger의 disposable 복사본에 해당 raw patch를 git apply한 결과도 실제
+candidate ledger와 byte-for-byte 같았다. publication-manifest의 immutable
+8개 file digest와 evidence SHA256SUMS의 12개 항목을 모두 재검증했다.
+sealed-report.txt SHA-256:
+97eade89860018dedce2883167e35a8cdcda88dacd14169df969b45d2e8a8259
+
+base ledger Git blob: fe82d17527a0dfa6ce4a37f13f0a7e28a23fd6ab
+base ledger SHA-256:
+cecb5d6b50e736933005c6c849d6018992434ccdc8a9b13cb012f8e5fc5c0d41
+candidate ledger Git blob: 9f60ed7b78f97e88de8db5fad794ae8cd009e496
+candidate ledger SHA-256:
+7c1b089720f5b270bd192902aea7db7f793f7903859f11a20e5c55cccb216fc2
+new permanent test Git blob: 1a6935ae45c3917edba791a5ac13e657847fb81d
+new permanent test SHA-256:
+b9d7b8ccd6be06608d225a24bddee9203de8581c044a7494b4e62eb4953be8c6
+
+import는 cwd만 믿지 않았다. PYTHONPATH를 격리 candidate/src와 candidate/tests에
+고정했고 실제 flowmarshal 및 로드된 하위 module 8개의 __file__·source bytes를
+candidate Git blob에 대조했다. 영구 test module의 실제 경로, bytes 및 그 안의
+SQLiteEngineLedger가 candidate의 동일 class인 것도 검사했다. 원문 경로·hash는
+verify_source.py receipt에 있다. baseline 구현으로 바꿔치기한 실행은 없었다.
+
+기술 검토
+
+ledger.py:803에서 initialize는 journal 설정을 보류한 연결을 열고 :807에서
+BEGIN IMMEDIATE를 실행한다. writer lock 뒤 :808의 identity/schema 조회는 같은
+연결·transaction에서 수행된다. 경로 존재·파일 크기에 근거한 이전 판단을 없애
+lock 직전 foreign writer가 commit한 DB를 새 DB로 잘못 취급하는 창을 닫았다.
+일반 connection의 PRAGMA foreign_keys, busy_timeout, synchronous는 connection
+설정이며 이 경로는 identity 검사 전에 journal_mode=WAL을 실행하지 않는다.
+
+DDL은 :815의 line accumulation과 sqlite3.complete_statement로 분리하여
+connection.execute로 실행한다. 현재 static SQL의 trigger 내부 semicolon을
+분할하지 않으며 execute 실패와 미완성 tail은 transaction 안에서 거절된다.
+schema_meta insert, application_id=0x464D4531, user_version=4도 같은 transaction
+안에 있고 :834의 단일 commit이 경계다. 영구 회귀는 trace의 BEGIN IMMEDIATE,
+COMMIT 경계와 commit 직전 별도 reader가 빈 schema/zero identity만 보는 것을
+검사했다. DDL, metadata, 두 identity pragma, precommit exception, KeyboardInterrupt,
+secondary rollback failure 각각에 대해 rollback/close/retry가 통과했다.
+
+crash 영구 회귀는 Linux spawn child에서 첫 CREATE TABLE 직후 os._exit(71),
+application_id 직후 os._exit(72)를 실제 실행했다. parent가 종료 code와 rollback된
+schema/identity를 확인하고 initialize retry 후 identity/integrity/FK를 검사했다.
+이는 process 종료/reopen의 근거이며 power-loss나 storage flush 실패 근거는 아니다.
+
+foreign 보존 영구 회귀는 missing/preexisting path에서 lock 직전 별도 spawn writer의
+commit을 거절했고 main bytes·foreign data·identity·DELETE journal을 보존했다.
+view-only, nonzero application_id-only 및 nonzero user_version-only DB도 거절·보존됐다.
+독립 live-WAL 사례에서는 foreign committed data가 WAL에 있는 상태로 keeper 연결을
+유지했다. initialize는 거절했고 main/WAL bytes, dump, identity, WAL journal mode가
+그대로였다. -shm은 SQLite의 일시적 coordination state여서 byte identity를 주장하지
+않는다. foreign hot-journal recovery나 모든 OS/filesystem 동작으로 일반화하지 않는다.
+
+_assert_identity(:847)의 borrowed connection 성공·거절은 caller transaction/connection을
+닫거나 commit/rollback하지 않았다. 자체 연 연결만 :887에서 닫는다. 내부 borrowed
+연결은 _connect가 sqlite3.Row로 설정한 handle이다. 기존 identity 검사 범위(메타와
+필수 6개 table 및 두 pragma)는 유지됐고 기존 DB의 모든 schema 객체·trigger를
+재검증하는 완전한 integrity attestation으로 강화한 변경은 아니다.
+
+_connect의 BaseException 경로는 acquired connection을 명시 close하고 close 오류가
+최초 setup 예외를 대체하지 않도록 한다. malformed 파일 회귀가 bytes 보존, acquired
+handle 명시 close, artifact root 미생성을 검사했다. setup 오류는 read/write 모두
+secondary close 오류와 함께 검사됐다. initialize의 rollback secondary error도 최초
+예외를 보존한다. 다만 :844 finally close는 T01의 기존 이중 실패 한계를 남긴다.
+
+:835의 WAL 전환은 DB commit 이후다. WAL 실패 뒤 rollback 호출은 이미 commit된
+schema/identity를 되돌리지 않는다. 영구 synthetic WAL exception 검사와 독립 실제
+SQLITE_BUSY=5 검사 모두 유효한 schema/metadata/identity를 보존했고 첫 실패에서는
+artifact root가 없었다. reader를 해제한 뒤 retry는 dump를 그대로 유지하며 WAL과
+artifact root를 생성했다. 이 경로는 DB transaction과 filesystem artifact 생성이
+하나의 atomic 작업임을 보장하지 않는다. pragma의 반환 journal mode를 검사하는
+변경도 아니다. 여기서는 실제 disk SQLite의 retry 결과가 wal인 것을 조회했다.
+
+supported minimum·schema·Windows 정적 검토
+
+candidate ledger와 permanent tests는 Python 3.10 grammar AST parse에 통과했다.
+추가한 Python API인 complete_statement는 Python 3.10 공식 문서에도 있다.
+union annotation은 선언된 >=3.10 범위에 맞는다. AST/API 존재 확인은 Python 3.10
+runtime proof가 아니며 해당 runtime 실행은 NOT_RUN이다.
+https://docs.python.org/3.10/library/sqlite3.html#sqlite3.complete_statement
+동일 문서는 executescript가 pending transaction을 implicit COMMIT하는 동작을
+설명한다. 이 후보가 execute loop를 사용하는 이유와 일치한다.
+https://docs.python.org/3.10/library/sqlite3.html#sqlite3.Cursor.executescript
+
+SCHEMA_SQL 원문은 base와 같고 SHA-256은
+7b0dfe58482056e6501e419c8df3a63176cb7f9e021f7c787c5a3d4ad32c277d.
+신규 초기화와 reference executescript의 sqlite_master(type,name,tbl_name,sql)를
+정렬해서 비교했으며 38 tables, 94 indexes, 29 triggers의 161개 객체가 정확히 같았다.
+그 query 결과 JSON의 SHA-256:
+3c3453412c0622cdba0f0a0ff7057041de800737705943f30cdaeed2c44f4839
+STRICT table은 SQLite >=3.37.0이 필요하다. 이 requirement는 base에도 있었으며
+Python >=3.10 선언만으로 linked SQLite의 그 버전 조건까지 충족됐다고 보지 않는다.
+https://www.sqlite.org/stricttables.html
+지원 Python/SQLite matrix, 선언 dependency freeze와 wheel installation은 NOT_RUN이다.
+
+Windows suitability 정적 검토: test :31 crash_initialize와 :55 create_foreign_database는
+module-level importable target이다. :93은 명시 spawn이며 fork에 기대지 않는다.
+child 안에서 정의되는 proxy class/lambda는 parent→child로 pickle되는 객체가 아니다.
+target args는 문자열·문자열 tuple이고 tempfile은 join 이후까지 유지된다. 종료 검사는
+os._exit의 71/72이며 signal 번호를 요구하지 않는다. unittest.main은 __main__ guard
+안에 있다. join/terminate/join/close cleanup도 있다. Windows용 구조상 명백한 fork
+의존은 발견하지 않았지만 Windows 파일 lock·spawn timing·native sqlite 동작은
+실행하지 않았으므로 Windows runtime/native qualification은 NOT_RUN이다.
+
+독립 실행 명령·원문 결과
+
+명령 receipt는 commands.jsonl에 argv/cwd/명시 환경/start/end UTC/elapsed/exit 및
+원문 stdout/stderr를 별도 field로 보존했다. raw-results.txt는 그 field의 읽기 쉬운
+전사본이다. 기록되지 않은 환경 변수나 credential은 포함하지 않았다.
+runner는 PYTHONDONTWRITEBYTECODE=1과 전용 synthetic-tmp를 설정했고 pytest나
+provider가 필요하지 않은 unittest만 실행했다. 모든 DB와 patch 적용 preimage는
+disposable TemporaryDirectory에만 만들고 제거했다.
+
+실행 entrypoints:
+python <AUDIT_ROOT>/run.py python -m unittest discover -s tests -p test_engine_ledger_initialize.py -v
+python <AUDIT_ROOT>/run.py python <AUDIT_ROOT>/verify_source.py
+python <AUDIT_ROOT>/run.py python <AUDIT_ROOT>/discriminating_cases.py
+
+영구 회귀 receipt index 4:
+UTC 2026-10-02T00:00:32.652931+00:00, exit=0, process elapsed=3.229731997s.
+원문 unittest 집계:
+Ran 11 tests in 2.650s
+OK
+이 11 methods 안의 subcase·spawn child를 별도 성공 수로 합산하지 않는다.
+
+discriminating_cases.py receipt index 7, exit=0, elapsed=0.818821517s:
+- 실제 COMMIT SQLITE_BUSY=5: database is locked; rollback 후 schema/identity empty,
+  acquired handles closed, retry PASS. busy_timeout만 50ms로 축소했고 오류를 가짜로
+  raise하지 않았다. default 10s latency/timeout benchmark로 주장하지 않는다.
+- 실제 postcommit WAL SQLITE_BUSY=5: database is locked; DB VALID, artifact absent,
+  reader 해제 후 dump 보존·wal·artifact 생성 PASS. 독립 reader는 commit 이후 열었다.
+- live foreign WAL: 거절, main/WAL bytes 및 dump/identity/journal 보존 PASS.
+  main SHA-256: 0ab48b25cba617ed3a4acca0161813b314c095ef63544bb4af60769eb1012977
+  WAL SHA-256: 379644de3fff413514d23bec36c4bf12ee92a8c0e7558d6c7dafca6536ceb69e
+  WAL salt 때문에 새 실행의 WAL digest는 달라질 수 있고 위 값은 이 실행의 snapshot이다.
+- static schema/trigger: 전체 sqlite_master 동등 PASS, 위 161개 객체.
+- P01 관측: header-only 4096 bytes/1 page/freelist=0 수용;
+  previous_foreign_data_dropped 20480 bytes/5 pages/freelist=4/합성 잔존 marker=True 수용.
+  정책 판정은 PENDING_PARENT이며 이 관측을 정책 PASS로 집계하지 않는다.
+- T01 관측: 표면 RuntimeError, 원래 ValueError는 context, atomic rollback PASS.
+  이 기대된 한계 재현을 최초 예외 보존 PASS로 표기하지 않는다.
+
+감사 도구 자체의 초회 오류도 보존했다. receipt index 5의 source verify exit=1은
+default git diff의 abbreviated index SHA와 published full-index patch를 그대로
+비교했기 때문이다. --full-index --binary로 생성하면 byte equality와 지정 digest가
+일치했다(index 6). index 8은 test module 실제 origin/class binding 검증을 추가한
+최종 source verify이며 exit=0이다. 영구 회귀나 discriminating DB cases는 다시
+실행하지 않았고 source verify 재실행을 검사 수량에 합산하지 않았다.
+recorder 이전 탐색에서 candidate cat-file은 아직 fetch 전이어서 실패했고,
+tests/conftest.py는 없었으며 python3.10/pytest command 탐색도 없음을 확인했다.
+이 탐색 오류는 후보의 회귀 FAIL 또는 Python 3.10 실행으로 취급하지 않는다.
+
+남은 경계
+
+P01의 schema-empty 기존 파일 수용 범위 및 genuinely empty 파일 정책 결정을
+parent가 별도 policy panel 결과와 join해야 한다. 이 감사는 정책을 결정하지 않는다.
+T01은 기존 cleanup 제한으로 기록했다. 관측한 정상 SQLite 경로에서 초기화
+원자성·foreign 보호·retry의 새 기술 회귀는 발견하지 않았다.
+model/effort의 실제 관측은 UNKNOWN이므로 요청된 조합 적용 인증은 미완료다.
+Windows, Python 3.10 runtime, Python/SQLite 지원 matrix, 실제 power-loss,
+전체 repository/release gates, wheel/install, native provider/role/planning/E2E,
+기존 26 boundary tests와 20 concurrency benchmark 반복은 NOT_RUN이다.
+추가 runtime·matrix 검증이 필요한지와 source acceptance는 parent의 다음 판정이다.
+
+코드·영구 tests edits, commit, merge, push, source GO 및 release는 수행하지 않았다.
+F07 first-four의 required first main no-ff merge 순서를 우회하지 않았다.
+Library upload와 외부 publication도 하지 않았다. 이는 원 감사 단계의 실행 경계다. 후속 parent 지시는 이 packet을 지정 private
+evidence branch에 게시하도록 승인했다. source adoption/main merge/release 승인은 없다.
+
+전달물: AUDIT.txt, audit-manifest.json, bootstrap-receipt.txt, commands.jsonl, raw-results.txt,
+candidate.diff.patch, verify_source.py, discriminating_cases.py, run.py, SHA256SUMS.
+hash manifest는 감사 산출물 파일의 bytes에만 결속하며 model identity 또는
+qualification을 인증하는 signature가 아니다.

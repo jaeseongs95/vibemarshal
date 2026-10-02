@@ -1,0 +1,225 @@
+RECEIPT 0
+ARGV ["git", "ls-remote", "origin", "refs/heads/codex/sqlite-atomic-initialize-v3", "refs/heads/codex/sqlite-atomic-initialize-v3-evidence"]
+SHELL_EQUIVALENT git ls-remote origin refs/heads/codex/sqlite-atomic-initialize-v3 refs/heads/codex/sqlite-atomic-initialize-v3-evidence
+CWD <AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<AUDIT_ROOT>/candidate/src:<AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:00:31.615464+00:00
+END 2026-10-02T00:00:32.415087+00:00
+EXIT 0 ELAPSED 0.7996292610000069
+STDOUT_BEGIN
+211a5a0f5891a44f217aa7aae18bdb8825775878	refs/heads/codex/sqlite-atomic-initialize-v3
+fdc5d03bf58c9521ff06ab475aea01d1650a4269	refs/heads/codex/sqlite-atomic-initialize-v3-evidence
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+
+RECEIPT 1
+ARGV ["git", "log", "-1", "--format=%H %T %P", "211a5a0f5891a44f217aa7aae18bdb8825775878"]
+SHELL_EQUIVALENT git log -1 '--format=%H %T %P' 211a5a0f5891a44f217aa7aae18bdb8825775878
+CWD <AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<AUDIT_ROOT>/candidate/src:<AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:00:32.463667+00:00
+END 2026-10-02T00:00:32.467639+00:00
+EXIT 0 ELAPSED 0.003972063000020398
+STDOUT_BEGIN
+211a5a0f5891a44f217aa7aae18bdb8825775878 e901b77ebf7551342ada996dd7ee4e8422b92f7a 32bb0f9dd9f024045d24487312b50f5b703573a3
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+
+RECEIPT 2
+ARGV ["git", "log", "-1", "--format=%H %T %P", "fdc5d03bf58c9521ff06ab475aea01d1650a4269"]
+SHELL_EQUIVALENT git log -1 '--format=%H %T %P' fdc5d03bf58c9521ff06ab475aea01d1650a4269
+CWD <AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<AUDIT_ROOT>/candidate/src:<AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:00:32.536293+00:00
+END 2026-10-02T00:00:32.541322+00:00
+EXIT 0 ELAPSED 0.005029825000008259
+STDOUT_BEGIN
+fdc5d03bf58c9521ff06ab475aea01d1650a4269 ddc150410b64ace11e5e83c6ba01434d91120132 211a5a0f5891a44f217aa7aae18bdb8825775878
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+
+RECEIPT 3
+ARGV ["git", "diff", "--check", "32bb0f9dd9f024045d24487312b50f5b703573a3", "211a5a0f5891a44f217aa7aae18bdb8825775878"]
+SHELL_EQUIVALENT git diff --check 32bb0f9dd9f024045d24487312b50f5b703573a3 211a5a0f5891a44f217aa7aae18bdb8825775878
+CWD <AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<AUDIT_ROOT>/candidate/src:<AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:00:32.585564+00:00
+END 2026-10-02T00:00:32.590221+00:00
+EXIT 0 ELAPSED 0.004592153000004373
+STDOUT_BEGIN
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+
+RECEIPT 4
+ARGV ["python", "-m", "unittest", "discover", "-s", "tests", "-p", "test_engine_ledger_initialize.py", "-v"]
+SHELL_EQUIVALENT python -m unittest discover -s tests -p test_engine_ledger_initialize.py -v
+CWD <AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<AUDIT_ROOT>/candidate/src:<AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:00:32.652931+00:00
+END 2026-10-02T00:00:35.882652+00:00
+EXIT 0 ELAPSED 3.229731997000016
+STDOUT_BEGIN
+STDOUT_END
+STDERR_BEGIN
+test_borrowed_identity_connection_remains_owned_by_caller (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_borrowed_identity_connection_remains_owned_by_caller) ... ok
+test_connection_setup_failure_preserves_primary_error_and_closes (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_connection_setup_failure_preserves_primary_error_and_closes) ... ok
+test_foreign_commit_before_writer_lock_is_preserved (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_foreign_commit_before_writer_lock_is_preserved) ... ok
+test_foreign_view_and_nonzero_identity_are_preserved (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_foreign_view_and_nonzero_identity_are_preserved) ... ok
+test_incomplete_schema_rolls_back_and_retries (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_incomplete_schema_rolls_back_and_retries) ... ok
+test_initialization_failures_roll_back_and_retry (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_initialization_failures_roll_back_and_retry) ... ok
+test_malformed_file_closes_acquired_connection_and_preserves_bytes (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_malformed_file_closes_acquired_connection_and_preserves_bytes) ... ok
+test_postcommit_wal_failure_leaves_valid_database_and_retries (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_postcommit_wal_failure_leaves_valid_database_and_retries) ... ok
+test_process_crash_rolls_back_and_retries_with_spawn (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_process_crash_rolls_back_and_retries_with_spawn) ... ok
+test_schema_metadata_and_identity_commit_together (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_schema_metadata_and_identity_commit_together) ... ok
+test_schema_objects_including_triggers_match_executescript (test_engine_ledger_initialize.EngineLedgerInitializeTests.test_schema_objects_including_triggers_match_executescript) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 2.650s
+
+OK
+STDERR_END
+
+RECEIPT 5
+ARGV ["python", "<AUDIT_ROOT>/verify_source.py"]
+SHELL_EQUIVALENT python <AUDIT_ROOT>/verify_source.py
+CWD <AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<AUDIT_ROOT>/candidate/src:<AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:01:41.584759+00:00
+END 2026-10-02T00:01:42.231128+00:00
+EXIT 1 ELAPSED 0.6463879529999872
+STDOUT_BEGIN
+commit_tree_parent "211a5a0f5891a44f217aa7aae18bdb8825775878 e901b77ebf7551342ada996dd7ee4e8422b92f7a 32bb0f9dd9f024045d24487312b50f5b703573a3"
+evidence_commit_tree_parent "fdc5d03bf58c9521ff06ab475aea01d1650a4269 ddc150410b64ace11e5e83c6ba01434d91120132 211a5a0f5891a44f217aa7aae18bdb8825775878"
+STDOUT_END
+STDERR_BEGIN
+Traceback (most recent call last):
+  File "<AUDIT_ROOT>/verify_source.py", line 43, in <module>
+    assert diff == published_diff
+           ^^^^^^^^^^^^^^^^^^^^^^
+AssertionError
+STDERR_END
+
+RECEIPT 6
+ARGV ["python", "<AUDIT_ROOT>/verify_source.py"]
+SHELL_EQUIVALENT python <AUDIT_ROOT>/verify_source.py
+CWD <AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<AUDIT_ROOT>/candidate/src:<AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:02:14.949044+00:00
+END 2026-10-02T00:02:15.675870+00:00
+EXIT 0 ELAPSED 0.7268329050000091
+STDOUT_BEGIN
+commit_tree_parent "211a5a0f5891a44f217aa7aae18bdb8825775878 e901b77ebf7551342ada996dd7ee4e8422b92f7a 32bb0f9dd9f024045d24487312b50f5b703573a3"
+evidence_commit_tree_parent "fdc5d03bf58c9521ff06ab475aea01d1650a4269 ddc150410b64ace11e5e83c6ba01434d91120132 211a5a0f5891a44f217aa7aae18bdb8825775878"
+exact_diff_sha256 "de93689e8c366004fc7bef877ea501da43f6f9c3a7ea3c6aafc0c1b5ed2e543a"
+publication_immutable_hashes_match {"EARLY-OBSERVATIONS.txt": "925da321426ac2d4b75b0879ae4d3791e3e1d50495263d9061c7c202470ba9e8", "candidate.diff.patch": "de93689e8c366004fc7bef877ea501da43f6f9c3a7ea3c6aafc0c1b5ed2e543a", "reviewed-v3.patch": "40339ffa0ef57f5d6152c289344c7fda0011c70c0ea40338861495c3fa170a89", "run.py": "1c606b66e41b1988374dc06d933df203123338f619bb93374f00bd0d6095d38c", "run_base_regressions.py": "42ea0b55a952a791ae19f4b3373a39c04292a58b2dee8ceb4b6da5c7d165a012", "sealed-candidate-manifest.json": "b865694f4a2fe06fa5849fed85b46d6b182f073fd28e20bee68154405592aec0", "sealed-report.txt": "97eade89860018dedce2883167e35a8cdcda88dacd14169df969b45d2e8a8259", "verify_candidate.py": "bb2c392c9dab0df42215d62069473c90b5e5604249392f2aefa9a855d0354b71"}
+reviewed_patch_disposable_apply {"argv": ["git", "apply", "<AUDIT_ROOT>/synthetic-tmp/tmptvkrzxbg/reviewed-v3.patch"], "exit_code": 0, "stderr": "", "stdout": ""}
+reviewed_patch_reconstructs_exact_candidate_ledger true
+evidence_SHA256SUMS_entries_verified 12
+ledger_blob {"git_blob": "fe82d17527a0dfa6ce4a37f13f0a7e28a23fd6ab", "ref": "32bb0f9dd9f024045d24487312b50f5b703573a3", "sha256": "cecb5d6b50e736933005c6c849d6018992434ccdc8a9b13cb012f8e5fc5c0d41"}
+ledger_blob {"git_blob": "9f60ed7b78f97e88de8db5fad794ae8cd009e496", "ref": "211a5a0f5891a44f217aa7aae18bdb8825775878", "sha256": "7c1b089720f5b270bd192902aea7db7f793f7903859f11a20e5c55cccb216fc2"}
+permanent_test_blob {"git_blob": "1a6935ae45c3917edba791a5ac13e657847fb81d", "sha256": "b9d7b8ccd6be06608d225a24bddee9203de8581c044a7494b4e62eb4953be8c6"}
+all_loaded_flowmarshal_imports_match_candidate {"flowmarshal": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/__init__.py", "sha256": "0481f64b3feab188df0af84f605e7e344622304bb982a9ab5d2d42fb2a4d0872"}, "flowmarshal.canonical": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/canonical.py", "sha256": "64b74f58b66f513bdcd124d49c8cc9da64eb1df28182225d502cdede10f09282"}, "flowmarshal.engine": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/engine/__init__.py", "sha256": "ec3d34d1025b3a399b6fe64db909aa134327eebe4406fe7b7fa9069f9f1a758b"}, "flowmarshal.engine.capabilities": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/engine/capabilities.py", "sha256": "1e819d6c87e65d61c82aa988799d99b52b913c4ecd67721e2ceb00ef5def765f"}, "flowmarshal.engine.domain": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/engine/domain.py", "sha256": "09fe1cd1f6e160652e0ee81f4fd7a055f3813decd9ca056c97af2708e8ff95c4"}, "flowmarshal.engine.ledger": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/engine/ledger.py", "sha256": "7c1b089720f5b270bd192902aea7db7f793f7903859f11a20e5c55cccb216fc2"}, "flowmarshal.engine.model_lock": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/engine/model_lock.py", "sha256": "e5fc1b8c6a3d365fe0209514daa5073d237ff9647003b21ff526ade70ec1726c"}, "flowmarshal.time": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/time.py", "sha256": "e031fd1a63a00f9ce18e032cfea87e1986bc472a601fa8d0e460b6cd3ff9d841"}}
+unchanged_SCHEMA_SQL_sha256 "7b0dfe58482056e6501e419c8df3a63176cb7f9e021f7c787c5a3d4ad32c277d"
+python_310_AST_only "PASS; runtime NOT_RUN"
+runtime {"declared_pydantic": "2.13.5", "declared_python": ">=3.10", "platform": "Linux-6.18.44-x86_64-with-glibc2.41", "pydantic": "2.13.4", "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]", "python_executable": "<PYTHON_EXECUTABLE>", "sqlite": "3.53.1"}
+SOURCE_VERIFICATION_PASS
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+
+RECEIPT 7
+ARGV ["python", "<AUDIT_ROOT>/discriminating_cases.py"]
+SHELL_EQUIVALENT python <AUDIT_ROOT>/discriminating_cases.py
+CWD <AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<AUDIT_ROOT>/candidate/src:<AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:04:18.919584+00:00
+END 2026-10-02T00:04:19.738390+00:00
+EXIT 0 ELAPSED 0.8188215170000035
+STDOUT_BEGIN
+{"acquired_connections_closed": true, "case": "real_SQLITE_BUSY_at_commit", "error": "database is locked", "error_code": 5, "retry": "PASS", "rollback_schema_and_identity_empty": true}
+{"case": "real_SQLITE_BUSY_after_commit_at_WAL", "committed_database": "VALID", "error": "database is locked", "error_code": 5, "initial_artifact_root_absent": true, "retry_artifact_root_created": true, "retry_journal": "wal", "retry_preserved_dump": true}
+{"artifact_root_absent": true, "case": "foreign_committed_data_in_live_WAL", "dump_identity_and_WAL_mode_preserved": true, "hashes": {"foreign-live-wal.sqlite3": "0ab48b25cba617ed3a4acca0161813b314c095ef63544bb4af60769eb1012977", "foreign-live-wal.sqlite3-wal": "379644de3fff413514d23bec36c4bf12ee92a8c0e7558d6c7dafca6536ceb69e"}, "main_and_WAL_bytes_preserved": true, "rejection": "기존 DB가 FlowMarshal Engine 원장으로 식별되지 않습니다.", "shm_byte_identity": "NOT_ASSERTED; transient SQLite coordination state"}
+{"case": "static_schema_and_trigger_equivalence", "exact_reference_equality": true, "object_counts": {"index": 94, "table": 38, "trigger": 29}, "sqlite_master_sha256": "3c3453412c0622cdba0f0a0ff7057041de800737705943f30cdaeed2c44f4839"}
+{"acceptance_decision": "PENDING_PARENT; observations only", "case": "empty_zero_identity_policy_effects", "observations": [{"before_freelist": 0, "before_pages": 1, "before_size": 4096, "candidate_adopted": true, "kind": "header_only", "synthetic_residual_marker_before": false}, {"before_freelist": 4, "before_pages": 5, "before_size": 20480, "candidate_adopted": true, "kind": "previous_foreign_data_dropped", "synthetic_residual_marker_before": true}], "predicate_does_not_prove": "new provenance, absence of prior data or empty freelist", "predicate_proves": "zero application_id, zero user_version, no sqlite_master objects"}
+{"atomic_rollback": "PASS", "case": "initializer_secondary_close_failure_limit", "original_error_in_context": "ValueError", "primary_exception_preservation": "NOT_GUARANTEED in initialize finally; inherited close call", "surfaced_error": "RuntimeError"}
+INDEPENDENT_CASES_PASS; empty policy not decided; cleanup limit observed
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+
+RECEIPT 8
+ARGV ["python", "<AUDIT_ROOT>/verify_source.py"]
+SHELL_EQUIVALENT python <AUDIT_ROOT>/verify_source.py
+CWD <AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<AUDIT_ROOT>/candidate/src:<AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:05:24.781786+00:00
+END 2026-10-02T00:05:25.683884+00:00
+EXIT 0 ELAPSED 0.9021049269999821
+STDOUT_BEGIN
+commit_tree_parent "211a5a0f5891a44f217aa7aae18bdb8825775878 e901b77ebf7551342ada996dd7ee4e8422b92f7a 32bb0f9dd9f024045d24487312b50f5b703573a3"
+evidence_commit_tree_parent "fdc5d03bf58c9521ff06ab475aea01d1650a4269 ddc150410b64ace11e5e83c6ba01434d91120132 211a5a0f5891a44f217aa7aae18bdb8825775878"
+exact_diff_sha256 "de93689e8c366004fc7bef877ea501da43f6f9c3a7ea3c6aafc0c1b5ed2e543a"
+publication_immutable_hashes_match {"EARLY-OBSERVATIONS.txt": "925da321426ac2d4b75b0879ae4d3791e3e1d50495263d9061c7c202470ba9e8", "candidate.diff.patch": "de93689e8c366004fc7bef877ea501da43f6f9c3a7ea3c6aafc0c1b5ed2e543a", "reviewed-v3.patch": "40339ffa0ef57f5d6152c289344c7fda0011c70c0ea40338861495c3fa170a89", "run.py": "1c606b66e41b1988374dc06d933df203123338f619bb93374f00bd0d6095d38c", "run_base_regressions.py": "42ea0b55a952a791ae19f4b3373a39c04292a58b2dee8ceb4b6da5c7d165a012", "sealed-candidate-manifest.json": "b865694f4a2fe06fa5849fed85b46d6b182f073fd28e20bee68154405592aec0", "sealed-report.txt": "97eade89860018dedce2883167e35a8cdcda88dacd14169df969b45d2e8a8259", "verify_candidate.py": "bb2c392c9dab0df42215d62069473c90b5e5604249392f2aefa9a855d0354b71"}
+reviewed_patch_disposable_apply {"argv": ["git", "apply", "<AUDIT_ROOT>/synthetic-tmp/tmps_smzpbl/reviewed-v3.patch"], "exit_code": 0, "stderr": "", "stdout": ""}
+reviewed_patch_reconstructs_exact_candidate_ledger true
+evidence_SHA256SUMS_entries_verified 12
+ledger_blob {"git_blob": "fe82d17527a0dfa6ce4a37f13f0a7e28a23fd6ab", "ref": "32bb0f9dd9f024045d24487312b50f5b703573a3", "sha256": "cecb5d6b50e736933005c6c849d6018992434ccdc8a9b13cb012f8e5fc5c0d41"}
+ledger_blob {"git_blob": "9f60ed7b78f97e88de8db5fad794ae8cd009e496", "ref": "211a5a0f5891a44f217aa7aae18bdb8825775878", "sha256": "7c1b089720f5b270bd192902aea7db7f793f7903859f11a20e5c55cccb216fc2"}
+permanent_test_blob {"git_blob": "1a6935ae45c3917edba791a5ac13e657847fb81d", "sha256": "b9d7b8ccd6be06608d225a24bddee9203de8581c044a7494b4e62eb4953be8c6"}
+permanent_test_import_and_class_binding {"candidate_ledger_class_binding": true, "test_module_path": "<AUDIT_ROOT>/candidate/tests/test_engine_ledger_initialize.py"}
+all_loaded_flowmarshal_imports_match_candidate {"flowmarshal": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/__init__.py", "sha256": "0481f64b3feab188df0af84f605e7e344622304bb982a9ab5d2d42fb2a4d0872"}, "flowmarshal.canonical": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/canonical.py", "sha256": "64b74f58b66f513bdcd124d49c8cc9da64eb1df28182225d502cdede10f09282"}, "flowmarshal.engine": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/engine/__init__.py", "sha256": "ec3d34d1025b3a399b6fe64db909aa134327eebe4406fe7b7fa9069f9f1a758b"}, "flowmarshal.engine.capabilities": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/engine/capabilities.py", "sha256": "1e819d6c87e65d61c82aa988799d99b52b913c4ecd67721e2ceb00ef5def765f"}, "flowmarshal.engine.domain": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/engine/domain.py", "sha256": "09fe1cd1f6e160652e0ee81f4fd7a055f3813decd9ca056c97af2708e8ff95c4"}, "flowmarshal.engine.ledger": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/engine/ledger.py", "sha256": "7c1b089720f5b270bd192902aea7db7f793f7903859f11a20e5c55cccb216fc2"}, "flowmarshal.engine.model_lock": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/engine/model_lock.py", "sha256": "e5fc1b8c6a3d365fe0209514daa5073d237ff9647003b21ff526ade70ec1726c"}, "flowmarshal.time": {"path": "<AUDIT_ROOT>/candidate/src/flowmarshal/time.py", "sha256": "e031fd1a63a00f9ce18e032cfea87e1986bc472a601fa8d0e460b6cd3ff9d841"}}
+unchanged_SCHEMA_SQL_sha256 "7b0dfe58482056e6501e419c8df3a63176cb7f9e021f7c787c5a3d4ad32c277d"
+python_310_AST_only "PASS; runtime NOT_RUN"
+runtime {"declared_pydantic": "2.13.5", "declared_python": ">=3.10", "platform": "Linux-6.18.44-x86_64-with-glibc2.41", "pydantic": "2.13.4", "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]", "python_executable": "<PYTHON_EXECUTABLE>", "sqlite": "3.53.1"}
+SOURCE_VERIFICATION_PASS
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+
+RECEIPT 9
+ARGV ["git", "status", "--porcelain=v1", "--untracked-files=all"]
+SHELL_EQUIVALENT git status --porcelain=v1 --untracked-files=all
+CWD <AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<AUDIT_ROOT>/candidate/src:<AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:05:25.725498+00:00
+END 2026-10-02T00:05:25.970512+00:00
+EXIT 0 ELAPSED 0.24502223299998604
+STDOUT_BEGIN
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+
+RECEIPT 10
+ARGV ["git", "diff", "--stat", "32bb0f9dd9f024045d24487312b50f5b703573a3", "211a5a0f5891a44f217aa7aae18bdb8825775878"]
+SHELL_EQUIVALENT git diff --stat 32bb0f9dd9f024045d24487312b50f5b703573a3 211a5a0f5891a44f217aa7aae18bdb8825775878
+CWD <AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<AUDIT_ROOT>/candidate/src:<AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:05:26.012375+00:00
+END 2026-10-02T00:05:26.023520+00:00
+EXIT 0 ELAPSED 0.011144780999984505
+STDOUT_BEGIN
+ src/flowmarshal/engine/ledger.py       |  70 ++++--
+ tests/test_engine_ledger_initialize.py | 379 +++++++++++++++++++++++++++++++++
+ 2 files changed, 431 insertions(+), 18 deletions(-)
+STDOUT_END
+STDERR_BEGIN
+STDERR_END
+
+RECEIPT 11
+ARGV ["git", "ls-remote", "origin", "refs/heads/codex/sqlite-atomic-initialize-v3", "refs/heads/codex/sqlite-atomic-initialize-v3-evidence"]
+SHELL_EQUIVALENT git ls-remote origin refs/heads/codex/sqlite-atomic-initialize-v3 refs/heads/codex/sqlite-atomic-initialize-v3-evidence
+CWD <AUDIT_ROOT>/candidate
+EXPLICIT_ENV {"PYTHONPATH": "<AUDIT_ROOT>/candidate/src:<AUDIT_ROOT>/candidate/tests", "PYTHONDONTWRITEBYTECODE": "1", "TMPDIR": "<AUDIT_ROOT>/synthetic-tmp"}
+START 2026-10-02T00:05:26.088273+00:00
+END 2026-10-02T00:05:26.907369+00:00
+EXIT 0 ELAPSED 0.8191047020000042
+STDOUT_BEGIN
+211a5a0f5891a44f217aa7aae18bdb8825775878	refs/heads/codex/sqlite-atomic-initialize-v3
+fdc5d03bf58c9521ff06ab475aea01d1650a4269	refs/heads/codex/sqlite-atomic-initialize-v3-evidence
+STDOUT_END
+STDERR_BEGIN
+STDERR_END

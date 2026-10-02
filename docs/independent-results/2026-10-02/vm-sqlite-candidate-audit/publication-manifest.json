@@ -1,0 +1,92 @@
+{
+  "format": "sanitized-independent-sqlite-audit-publication-v1",
+  "prepared_utc": "2026-10-02T00:20:43.152883+00:00",
+  "destination_repository": "https://github.com/jaeseongs95/vibemarshal",
+  "repository_visibility_observed": "private",
+  "destination_branch": "dot/vm-sqlite-candidate-audit-20261002",
+  "base_commit": "211a5a0f5891a44f217aa7aae18bdb8825775878",
+  "base_tree": "e901b77ebf7551342ada996dd7ee4e8422b92f7a",
+  "candidate_parent": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "publication_commit_parent_expected": "211a5a0f5891a44f217aa7aae18bdb8825775878",
+  "publication_scope": "docs/independent-results/2026-10-02/vm-sqlite-candidate-audit/",
+  "reviewer_thread_id": "01a0f9e7-6196-7476-9cd5-177d24d80038",
+  "author_thread_id": "01a0f9d2-eaaf-748e-9b22-696261fb5026",
+  "parent_source_thread_id": "01a0f995-7341-7179-91a4-63a814e66020",
+  "identity_provenance": "parent_admitted_task_records",
+  "local_artifact_run_label": "sqlite-independent-audit",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "observed_model": null,
+  "observed_effort": null,
+  "observed_status": "UNKNOWN; no authoritative effective-model metadata exposed",
+  "original_artifact_sha256": {
+    "AUDIT.txt": "45c79d620cecfb25c3de38137b5454ee3968330f1ee04367341275804b1d06e2",
+    "commands.jsonl": "3859a120d938ab211e5b900fe29530fbea20b333a6666b9e5de900d5c2727c04",
+    "raw-results.txt": "fd8a343a9680920f7f0089b5384884adaff2582e76c369fe8fa0b3ef1e69d276",
+    "bootstrap-receipt.txt": "1d2d999eda0d1cdb2dd6b4c7ac9a7a0c29fc2aab404e456081ea3930440879cd",
+    "candidate.diff.patch": "de93689e8c366004fc7bef877ea501da43f6f9c3a7ea3c6aafc0c1b5ed2e543a",
+    "run.py": "4e5134a6324212420a6e1661fcecd93885b1861223cef24682edd4c286a73546",
+    "verify_source.py": "e36145f950142bda8ccb6c760319b08c64c5fb0d2ece969158e674491123012a",
+    "discriminating_cases.py": "ec3812538f17d660f201ec426738be62742cd17faf3a58783a19fa9a0d8302ba"
+  },
+  "original_local_manifest_sha256": "8562e562079b063e664662b49289f2337b8de6f5ba82aa0ea84bd1a9d57a8d5b",
+  "original_local_SHA256SUMS_sha256": "5bc0d0c1d2ba5b1d3632eff5f7cbee6bf74f1e8fde1dd749a8600784d69fa890",
+  "sanitization": {
+    "all_12_audit_receipts_retained": true,
+    "path_labels": [
+      "<AUDIT_ROOT>",
+      "<INITIAL_SOURCE_CHECKOUT>",
+      "<PYTHON_EXECUTABLE>"
+    ],
+    "command_and_output_modifications": "Only local path normalization in raw argv/stdout/stderr; no outcome/status/time/hash changes. Readable transcript final envelope blank line removed. Report/manifest add parent-admitted thread identity and publication scope.",
+    "implementation_patch_bytes_unchanged": true
+  },
+  "prohibited_artifact_content": {
+    "credentials": false,
+    "profiles": false,
+    "native_transcripts": false,
+    "personal_paths": false,
+    "DB_or_WAL_files": false,
+    "Library_upload": false
+  },
+  "retained_status": {
+    "policy": "PENDING_PARENT",
+    "legacy_finally_close_masking": "OBSERVED_INHERITED_LIMIT",
+    "Windows_runtime": "NOT_RUN",
+    "Python310_runtime": "NOT_RUN",
+    "source_go": false,
+    "adoption": false,
+    "merge": false,
+    "release": false
+  },
+  "publication_checks": {
+    "remote_target_branch": "ABSENT at preflight",
+    "implementation_branch_tip": "211a5a0f5891a44f217aa7aae18bdb8825775878",
+    "tests_rerun": false,
+    "remote_byte_verification": "TO_BE_PERFORMED after push; final delivery receipt reports actual result",
+    "local_preparation_incidents": [
+      {
+        "outer_exit": 128,
+        "description": "After packet preparation succeeded, two shell Git checks ran from the artifact parent rather than publication checkout; no repository mutation occurred. Repeated with explicit publication cwd; implementation diff was empty."
+      },
+      {
+        "outer_exit": 1,
+        "description": "Non-patch whitespace check identified a readable transcript envelope blank line at EOF; removed only the outer final blank separator. Checksum command was initially run from checkout root instead of packet cwd; corrected in packet validation."
+      }
+    ],
+    "whitespace_check_scope": "All new evidence except immutable candidate.diff.patch; patch contains exact source-diff context spaces and is verified against its frozen SHA256."
+  },
+  "sanitized_file_sha256": {
+    "AUDIT.txt": "9d72a31ffcad5b6de59be1d7db3e2b4333e8c6c22a6c312c9cee1d38a84c2aa3",
+    "README.txt": "4da44f4d6f8ce11d36178ac6ead695d7853d27a4516d0b445376b6918d83a4c4",
+    "audit-manifest.json": "af24a299cf12bf8a4f7ddf89a85c2220e887e6f8b91dfabd0e97d2c6141e9370",
+    "bootstrap-receipt.txt": "cc13cede630b96e5b0fa0502de9bda7bec65a9bcb1f7fe9dafd19b797700112b",
+    "candidate.diff.patch": "de93689e8c366004fc7bef877ea501da43f6f9c3a7ea3c6aafc0c1b5ed2e543a",
+    "commands.jsonl": "59bbc6bb49c7cd032a1626f0510dd624df4db6c0c56d23e7732c431bbf5948ef",
+    "discriminating_cases.py": "ec3812538f17d660f201ec426738be62742cd17faf3a58783a19fa9a0d8302ba",
+    "publication-preflight.jsonl": "0ea167d783e419068068505b507fd6a567ed54987f380c14a5dcb0133047b659",
+    "raw-results.txt": "f23cdb392fbf2be94cb3cc41b04325beac8fdbae022320b60014508286674a3a",
+    "run.py": "4e5134a6324212420a6e1661fcecd93885b1861223cef24682edd4c286a73546",
+    "verify_source.py": "e36145f950142bda8ccb6c760319b08c64c5fb0d2ece969158e674491123012a"
+  }
+}

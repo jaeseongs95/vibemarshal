@@ -1,0 +1,34 @@
+recorder 도입 전 격리 Git setup의 tool 원문 전사본이다.
+원문 exec_command argv의 cmd field:
+
+mkdir -p <AUDIT_ROOT>
+ git init <AUDIT_ROOT>/candidate
+ git -C <AUDIT_ROOT>/candidate remote add origin https://github.com/jaeseongs95/vibemarshal.git
+ git -C <AUDIT_ROOT>/candidate fetch --depth=3 origin refs/heads/codex/sqlite-atomic-initialize-v3:refs/remotes/origin/codex/sqlite-atomic-initialize-v3 refs/heads/codex/sqlite-atomic-initialize-v3-evidence:refs/remotes/origin/codex/sqlite-atomic-initialize-v3-evidence
+ git -C <AUDIT_ROOT>/candidate checkout --detach 211a5a0f5891a44f217aa7aae18bdb8825775878
+
+exec tool result: exit_code=0, wall_time_seconds=3.026227669,
+chunk_id=e875af. stdout/stderr를 분리하지 않은 tool output field 원문:
+
+hint: Using 'master' as the name for the initial branch. This default branch name
+hint: will change to "main" in Git 3.0. To configure the initial branch name
+hint: to use in all of your new repositories, which will suppress this warning,
+hint: call:
+hint:
+hint: 	git config --global init.defaultBranch <name>
+hint:
+hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and
+hint: 'development'. The just-created branch can be renamed via this command:
+hint:
+hint: 	git branch -m <name>
+hint:
+hint: Disable this message with "git config set advice.defaultBranchName false"
+Initialized empty Git repository in <AUDIT_ROOT>/candidate/.git/
+From https://github.com/jaeseongs95/vibemarshal
+ * [new branch]      codex/sqlite-atomic-initialize-v3 -> origin/codex/sqlite-atomic-initialize-v3
+ * [new branch]      codex/sqlite-atomic-initialize-v3-evidence -> origin/codex/sqlite-atomic-initialize-v3-evidence
+HEAD is now at 211a5a0 SQLite 초기화 v3 후보와 영구 회귀 검사 봉인
+
+위 hint는 Git이 출력한 문구다. global config 변경이나 branch rename을 수행한
+명령이 아니다. 별도 per-command timestamp/exit를 소급해서 만들지 않았다.
+이후 provenance/test/source checks의 개별 raw receipt는 commands.jsonl에 있다.
