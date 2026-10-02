@@ -1,0 +1,218 @@
+{
+  "audited_source_entries": [
+    {
+      "case": "VM-E-01",
+      "kind": "normative_document",
+      "path": "docs/orchestration-redesign.md",
+      "first_line": 370,
+      "last_line": 370,
+      "actual_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-01",
+      "kind": "normative_document",
+      "path": "AGENTS.md",
+      "first_line": 72,
+      "last_line": 72,
+      "actual_sha256": "f6d5a37f3bb61be891f7ecf6a8a993f2e7b70b94f02d5148e47ea13f1695e989",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-01",
+      "kind": "existing_implementation_support_not_normative_contract",
+      "path": "src/flowmarshal/engine/runtime.py",
+      "first_line": 6911,
+      "last_line": 6918,
+      "actual_sha256": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-01",
+      "kind": "existing_implementation_support_not_normative_contract",
+      "path": "src/flowmarshal/engine/runtime.py",
+      "first_line": 6933,
+      "last_line": 6933,
+      "actual_sha256": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-01",
+      "kind": "existing_implementation_support_not_normative_contract",
+      "path": "src/flowmarshal/engine/runtime.py",
+      "first_line": 7103,
+      "last_line": 7139,
+      "actual_sha256": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-02",
+      "kind": "normative_document",
+      "path": "docs/redesign-1.0-contract.md",
+      "first_line": 21,
+      "last_line": 21,
+      "actual_sha256": "19c483be40fabae92d90e7b5abc49ecb08f024ecacc559b6a29e3178bf85188c",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-02",
+      "kind": "normative_document",
+      "path": "docs/orchestration-redesign.md",
+      "first_line": 370,
+      "last_line": 370,
+      "actual_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-02",
+      "kind": "normative_document",
+      "path": "AGENTS.md",
+      "first_line": 72,
+      "last_line": 72,
+      "actual_sha256": "f6d5a37f3bb61be891f7ecf6a8a993f2e7b70b94f02d5148e47ea13f1695e989",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-02",
+      "kind": "existing_implementation_support_not_normative_contract",
+      "path": "src/flowmarshal/engine/service.py",
+      "first_line": 3527,
+      "last_line": 3528,
+      "actual_sha256": "a0b3aaf0645825c7eeb62babab0d63c8062158c38be46cf59a3649f3053568b3",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-02",
+      "kind": "existing_implementation_support_not_normative_contract",
+      "path": "src/flowmarshal/engine/runtime.py",
+      "first_line": 7103,
+      "last_line": 7139,
+      "actual_sha256": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-03",
+      "kind": "normative_document",
+      "path": "docs/orchestration-redesign.md",
+      "first_line": 62,
+      "last_line": 65,
+      "actual_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-03",
+      "kind": "normative_document",
+      "path": "docs/orchestration-redesign.md",
+      "first_line": 370,
+      "last_line": 370,
+      "actual_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-03",
+      "kind": "normative_document",
+      "path": "docs/orchestration-redesign.md",
+      "first_line": 378,
+      "last_line": 378,
+      "actual_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-03",
+      "kind": "existing_implementation_support_not_normative_contract",
+      "path": "src/flowmarshal/engine/runtime.py",
+      "first_line": 7141,
+      "last_line": 7154,
+      "actual_sha256": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-04",
+      "kind": "normative_document",
+      "path": "docs/redesign-1.0-contract.md",
+      "first_line": 11,
+      "last_line": 11,
+      "actual_sha256": "19c483be40fabae92d90e7b5abc49ecb08f024ecacc559b6a29e3178bf85188c",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-04",
+      "kind": "normative_document",
+      "path": "docs/orchestration-redesign.md",
+      "first_line": 29,
+      "last_line": 36,
+      "actual_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-04",
+      "kind": "normative_document",
+      "path": "docs/orchestration-redesign.md",
+      "first_line": 65,
+      "last_line": 65,
+      "actual_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+      "hash_matches": true,
+      "exact_text_matches": true
+    },
+    {
+      "case": "VM-E-04",
+      "kind": "normative_document",
+      "path": "docs/orchestration-redesign.md",
+      "first_line": 96,
+      "last_line": 96,
+      "actual_sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+      "hash_matches": true,
+      "exact_text_matches": true
+    }
+  ],
+  "source_hashes": {
+    "AGENTS.md": "f6d5a37f3bb61be891f7ecf6a8a993f2e7b70b94f02d5148e47ea13f1695e989",
+    "docs/orchestration-redesign.md": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+    "docs/redesign-1.0-contract.md": "19c483be40fabae92d90e7b5abc49ecb08f024ecacc559b6a29e3178bf85188c",
+    "docs/engine-cutover-adr.md": "2409b45c2c073168d676387ec82515647ad80b7990c5c23fc2644ac2f2bfa63e",
+    "docs/r31-frozen-baseline.md": "b3330c9db44ca4cf491f294ecba258b737b30fbddab87323e1fde27dac4c61b2",
+    "src/flowmarshal/engine/service.py": "a0b3aaf0645825c7eeb62babab0d63c8062158c38be46cf59a3649f3053568b3",
+    "src/flowmarshal/engine/runtime.py": "771accf78cc92772e164d0b039996911ac0730f9088452655f1ba6bf4cb3f88b",
+    "src/flowmarshal/engine/domain.py": "09fe1cd1f6e160652e0ee81f4fd7a055f3813decd9ca056c97af2708e8ff95c4",
+    "src/flowmarshal/engine/ledger.py": "cecb5d6b50e736933005c6c849d6018992434ccdc8a9b13cb012f8e5fc5c0d41",
+    "src/flowmarshal/engine/plan_reuse.py": "c7f0c0bdbd360bf5f689a04ed244cda0fcc0619cda23446e9407d1f45595b6da",
+    "src/flowmarshal/engine/cli.py": "70ac738c334262b81fb65444646c937f75283539edbeaf929c8227ea9ecac4f9",
+    "src/flowmarshal/engine/console_host.py": "55a212d3df2392297102ddb08b70c8927c2b2aeaffeccfb5d5bf15174f793061",
+    "tests/test_engine_ledger_service.py": "4721f0b54a26848888ecf2ee9875130c8d11c9f42e73372326d14d6650ddc21b",
+    "tests/test_engine_goal_authorization.py": "ec60963adc9d0dfb4600b86dc26202bc18099535aca838b6584d90b5d775a5f0",
+    "candidate:src/flowmarshal/engine/service.py": "819682f3fe62e1f86cdfa8031e9321164a77da16881ca2b9e77fd1c689c4d743",
+    "candidate:tests/test_engine_goal_verdict_authority.py": "685e731903c236de40d72d3fa6aaabcab034cba76ecf46a311b5a365d9b17e97"
+  },
+  "reviewer_thread_id": "01a0f9e2-ed1d-7296-815a-14270ae95034",
+  "canonical_agent": "/root",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "provider_observed_model": null,
+  "provider_observed_effort": null,
+  "model_environment_setting": null,
+  "effort_environment_setting": null,
+  "observation_reason": "No provider turn receipt or authoritative runtime model/effort exposed; requested values are user-provided only.",
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "os_name": "posix",
+  "dependencies": {
+    "pydantic": "2.13.5",
+    "cryptography": "50.0.1",
+    "openai-codex": "0.147.0"
+  }
+}

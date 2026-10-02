@@ -1,0 +1,207 @@
+diff --git a/src/flowmarshal/engine/service.py b/src/flowmarshal/engine/service.py
+index 8f9c55b..a5d6cb3 100644
+--- a/src/flowmarshal/engine/service.py
++++ b/src/flowmarshal/engine/service.py
+@@ -6684,12 +6684,30 @@ class EngineService:
+             if expected_criteria != actual_criteria:
+                 raise EngineServiceError("GoalVerdict criterion coverage가 정확하지 않습니다.")
+             if verdict.status is GoalVerdictStatus.SATISFIED:
++                project = tx.one("SELECT active_plan_revision_id FROM projects WHERE id = ?", (project_id,))
++                if plan_row["status"] != "active" or project["active_plan_revision_id"] != plan_revision_id:
++                    raise EngineServiceError("현재 active Plan만 Goal satisfied를 선언할 수 있습니다.")
+                 incomplete = tx.connection.execute(
+                     "SELECT COUNT(*) FROM task_contracts WHERE plan_revision_id = ? AND status <> 'completed'",
+                     (plan_revision_id,),
+                 ).fetchone()[0]
+                 if incomplete:
+                     raise EngineServiceError("모든 Task가 완료되기 전에는 Goal satisfied를 선언할 수 없습니다.")
++                for task in plan.definition.tasks:
++                    latest_task_results = {
++                        row["validation_id"]: row
++                        for row in self.effective_task_validation_results(
++                            tx.connection, task.task_id,
++                        )
++                    }
++                    if any(
++                        validation.validation_id not in latest_task_results
++                        or latest_task_results[validation.validation_id]["status"] != "pass"
++                        for validation in task.validations
++                    ):
++                        raise EngineServiceError(
++                            "Goal satisfied에는 모든 Task validation의 최신 PASS 결과가 필요합니다."
++                        )
+                 unresolved = self._unresolved_execution_provider_calls(
+                     tx, plan_revision_id=plan_revision_id,
+                 )
+@@ -6719,20 +6737,23 @@ class EngineService:
+                 expected_integrations = {
+                     item.validation_id for item in plan.definition.integration_validations
+                 }
+-                passed: set[str] = set()
+-                result_ids: set[str] = set()
+-                for row in tx.all(
+-                    "SELECT id, validation_id, status FROM validation_results "
+-                    "WHERE plan_revision_id = ? AND task_id IS NULL ORDER BY evaluated_at, rowid",
+-                    (plan_revision_id,),
++                latest_integrations = {
++                    row["validation_id"]: row
++                    for row in tx.all(
++                        "SELECT id, validation_id, status FROM validation_results "
++                        "WHERE plan_revision_id = ? AND task_id IS NULL ORDER BY evaluated_at, rowid",
++                        (plan_revision_id,),
++                    )
++                }
++                if any(
++                    validation_id not in latest_integrations
++                    or latest_integrations[validation_id]["status"] != "pass"
++                    for validation_id in expected_integrations
+                 ):
+-                    if row["status"] == "pass":
+-                        passed.add(row["validation_id"])
+-                        result_ids.add(row["id"])
+-                if not expected_integrations.issubset(passed):
+-                    raise EngineServiceError("plan-level integration/Goal Test PASS evidence가 부족합니다.")
+-                if not set(verdict.integration_validation_result_ids).issubset(result_ids):
+-                    raise EngineServiceError("GoalVerdict가 실제 PASS integration 결과에 결속되지 않았습니다.")
++                    raise EngineServiceError("plan-level integration/Goal Test 최신 PASS evidence가 부족합니다.")
++                result_ids = {latest_integrations[item]["id"] for item in expected_integrations}
++                if set(verdict.integration_validation_result_ids) != result_ids:
++                    raise EngineServiceError("GoalVerdict가 최신 PASS integration 결과에 정확히 결속되지 않았습니다.")
+                 evidence_ids = {item for criterion in verdict.criteria for item in criterion.evidence_ids}
+                 if evidence_ids:
+                     placeholders = ",".join("?" for _ in evidence_ids)
+diff --git a/tests/test_engine_goal_verdict_authority.py b/tests/test_engine_goal_verdict_authority.py
+new file mode 100644
+index 0000000..fd207a6
+--- /dev/null
++++ b/tests/test_engine_goal_verdict_authority.py
+@@ -0,0 +1,129 @@
++"""Goal 완료 쓰기는 제출된 PASS보다 원장의 최신 검사 결과를 우선한다."""
++from __future__ import annotations
++
++import unittest
++
++from flowmarshal.canonical import sha256_digest
++from flowmarshal.engine.domain import (
++    CriterionVerdict, EvidenceKind, EvidenceRecord, GoalVerdict,
++    GoalVerdictStatus, ValidationResult, ValidationStatus, new_id, utc_now,
++)
++from flowmarshal.engine.service import EngineServiceError
++from tests.test_engine_ledger_service import EngineServiceFixture
++from tests import test_engine_goal_authorization as authorization_tests
++
++
++class GoalVerdictAuthorityTests(EngineServiceFixture):
++    internal_revision_evaluation = authorization_tests.EngineGoalAuthorizationTests.internal_revision_evaluation
++    register_internal_revision = authorization_tests.EngineGoalAuthorizationTests.register_internal_revision
++
++    def setUp(self):
++        super().setUp()
++        self.activate()
++        self.service.materialize_execution_spec(self.spec(), inventory=self.inventory)
++        attempt = self.service.reserve_attempt(task_id=self.task.task_id)
++        self.service.finish_attempt(attempt_id=attempt.attempt_id, succeeded=True)
++        self.evidence = EvidenceRecord(
++            evidence_id=new_id("evidence"), project_id=self.project_id,
++            task_id=self.task.task_id, attempt_id=attempt.attempt_id,
++            kind=EvidenceKind.TEST, source_ref="synthetic:validator-observation",
++            observation="합성 검사 관측", content_digest=sha256_digest("합성 검사 관측"),
++            observed_at=utc_now(),
++        )
++        self.service.record_evidence(self.evidence)
++        self.record_result(task=True)
++        self.service.complete_task(self.task.task_id)
++        self.integration = self.record_result(task=False)
++
++    def record_result(self, *, task, status=ValidationStatus.PASS):
++        result = ValidationResult(
++            validation_result_id=new_id("validation_result"),
++            validation_id=(self.task.validations[0].validation_id if task else
++                           self.plan.definition.integration_validations[0].validation_id),
++            task_id=self.task.task_id if task else None, status=status,
++            evidence_ids=() if status is ValidationStatus.NOT_RUN else (self.evidence.evidence_id,),
++            rationale="원장 순서에 결속한 합성 검사 결과", evaluated_at=utc_now(),
++        )
++        self.service.record_validation(project_id=self.project_id,
++            plan_revision_id=self.plan.plan_revision_id, result=result)
++        return result
++
++    def verdict(self, result_ids=None):
++        return GoalVerdict(
++            goal_verdict_id=new_id("goal_verdict"),
++            goal_contract_digest=self.goal.definition_digest,
++            plan_activation_digest=self.plan.activation_digest,
++            status=GoalVerdictStatus.SATISFIED,
++            criteria=(CriterionVerdict(criterion_id="ac_one", status=ValidationStatus.PASS,
++                evidence_ids=(self.evidence.evidence_id,), rationale="제출된 완료 주장"),),
++            integration_validation_result_ids=(self.integration.validation_result_id,)
++                if result_ids is None else result_ids, evaluated_at=utc_now(),
++        )
++
++    def record_verdict(self, verdict):
++        self.service.record_goal_verdict(project_id=self.project_id,
++            plan_revision_id=self.plan.plan_revision_id, verdict=verdict)
++
++    def assert_rejected_atomically(self, verdict):
++        with self.ledger.read() as connection:
++            before = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
++                      for table in ("goal_verdicts", "history_events")}
++        with self.assertRaises(EngineServiceError):
++            self.record_verdict(verdict)
++        with self.ledger.read() as connection:
++            after = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
++                     for table in before}
++            self.assertEqual("active", connection.execute(
++                "SELECT status FROM plan_revisions WHERE id=?", (self.plan.plan_revision_id,)).fetchone()[0])
++        self.assertEqual(before, after)
++
++    def test_current_task_and_integration_pass_can_complete(self):
++        self.record_verdict(self.verdict())
++        with self.ledger.read() as connection:
++            self.assertEqual("completed", connection.execute(
++                "SELECT status FROM plan_revisions WHERE id=?", (self.plan.plan_revision_id,)).fetchone()[0])
++
++    def test_latest_integration_fail_cannot_be_overridden_by_old_pass(self):
++        self.record_result(task=False, status=ValidationStatus.FAIL)
++        self.assert_rejected_atomically(self.verdict())
++
++    def test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass(self):
++        self.record_result(task=False, status=ValidationStatus.INCONCLUSIVE)
++        self.assert_rejected_atomically(self.verdict())
++
++    def test_latest_task_fail_cannot_be_overridden_by_completed_status(self):
++        self.record_result(task=True, status=ValidationStatus.FAIL)
++        self.assert_rejected_atomically(self.verdict())
++
++    def test_latest_task_not_run_cannot_be_overridden_by_completed_status(self):
++        self.record_result(task=True, status=ValidationStatus.NOT_RUN)
++        self.assert_rejected_atomically(self.verdict())
++
++    def test_old_pass_id_cannot_replace_latest_integration_pass_id(self):
++        self.record_result(task=False)
++        self.assert_rejected_atomically(self.verdict())
++
++    def test_latest_integration_pass_can_supersede_fail(self):
++        self.record_result(task=False, status=ValidationStatus.FAIL)
++        self.integration = self.record_result(task=False)
++        self.record_verdict(self.verdict())
++
++    def test_superseded_plan_verdict_cannot_clear_current_active_plan(self):
++        replacement, _ = self.register_internal_revision()
++        self.service.activate_authorized_plan(plan_revision_id=replacement.plan_revision_id)
++        with self.ledger.read() as connection:
++            before = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
++                      for table in ("goal_verdicts", "history_events")}
++        with self.assertRaises(EngineServiceError):
++            self.record_verdict(self.verdict())
++        with self.ledger.read() as connection:
++            project = connection.execute("SELECT active_plan_revision_id,run_state FROM projects").fetchone()
++            self.assertEqual(replacement.plan_revision_id, project["active_plan_revision_id"])
++            self.assertNotEqual("completed", project["run_state"])
++            after = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
++                     for table in before}
++        self.assertEqual(before, after)
++
++
++if __name__ == "__main__":
++    unittest.main()

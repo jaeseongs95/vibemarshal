@@ -1,0 +1,178 @@
+{
+  "status": "SANITIZED_LOCAL_EVIDENCE_BRANCH_PREPARED_NOT_PUSHED",
+  "reviewer_thread_id": "01a0f9e2-ed1d-7296-815a-14270ae95034",
+  "candidate_commit": "98bb122970f82bb5fcef122003ee10c7eb787cf4",
+  "author_new_candidate": "PENDING",
+  "scope": "docs/evidence/vm-goal-verdict-independent-review-20261002 only",
+  "history": "Original REVIEW.md, commands, raw outputs, input audit, scripts and original inventory/hash bytes preserved. New context is in README.md and COMPATIBILITY.md.",
+  "checks": [
+    "explicit file allowlist",
+    "regular UTF-8 files only",
+    "no symlinks",
+    "no SQLite binaries",
+    "no selected credential signatures",
+    "original file hashes verified",
+    "Historical extra EOF blank line preserved; git diff check passes with only blank-at-eof disabled"
+  ],
+  "not_included": [
+    "source archive directories",
+    "fixture directories",
+    "any DB",
+    "operational profiles or keys",
+    "native transcript",
+    "author run result files"
+  ],
+  "additional_tests_or_provider_calls": 0,
+  "files": [
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/COMPATIBILITY.md",
+      "bytes": 5463,
+      "sha256": "657179eb54283375882137d5007ed9ddf04c52afd0fb19fb25d2ac7097f422ca",
+      "history_preserved": false
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/README.md",
+      "bytes": 2345,
+      "sha256": "06de4ce3be931325e9fad89be99d04a513fe00200b9031f502f1db529b91f19e",
+      "history_preserved": false
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/REVIEW.md",
+      "bytes": 14842,
+      "sha256": "35b85037bf961d343000e30fa4c2fbfa1c03a66c53a75175ce5919f2ea566c60",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/SHA256SUMS",
+      "bytes": 1817,
+      "sha256": "c5ada302f010c43eb873bf5f755b3a4982e58c315f9bc8ba7a3a4b4b83cc33b7",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/audit_inputs.py",
+      "bytes": 2678,
+      "sha256": "efc472f91a7a1b365d9b55ca9997c03916b764a48ae8180d0f1fec3699e0bbc1",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/candidate-diff-check.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/candidate-diff.raw.txt",
+      "bytes": 11754,
+      "sha256": "5e0832f1976eb822014f0503d341f92528af766e5a56f1fa935658d484dad1eb",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/candidate-identity.raw.txt",
+      "bytes": 123,
+      "sha256": "7c7ffddee1cc58f23c5f92d89ed6af6bef2403ab19d849e2b33d8296b5806e67",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/commands.jsonl",
+      "bytes": 6650,
+      "sha256": "68afd2f6f8a847a2286b8d101d1cfdf53d6ee05bd8c588f91ed612e43e6927a5",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/independent-base.raw.txt",
+      "bytes": 6998,
+      "sha256": "b5a671101a963219821cc18afb014da9f1b2036a4444c4f86d1c4f8bd557bb96",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/independent-candidate.raw.txt",
+      "bytes": 7740,
+      "sha256": "f811fc4b064cf639476beb0eac571107f3df6783c254cf3549d2ce21599435a4",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/input-audit.raw.txt",
+      "bytes": 8450,
+      "sha256": "0f4b776d9ce92549d687816582c536ca51d79a982a99f3df51e3ae65c34e08e2",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/inventory.json",
+      "bytes": 3556,
+      "sha256": "7da4de54fc0ca05081ad085c83403d27b1605e3a247e60a1354c20bf0bb048ac",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/permanent-candidate.raw.txt",
+      "bytes": 1670,
+      "sha256": "24bfda7f0fa91da35f6efbb009a99656a7ee1dd9357e6ad3b0b27fd58f847da0",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/probe.py",
+      "bytes": 10036,
+      "sha256": "e85f5c57309bf7229fb541591e8302cd5d39aecc11bc8e09934091df81b1d34c",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/public-base.raw.txt",
+      "bytes": 3488,
+      "sha256": "c584bf9481e1c7ee39324d2f4b2746d17602a080edbf5d8a7823eac19e70d4f2",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/public-candidate.raw.txt",
+      "bytes": 3680,
+      "sha256": "30dd59a898e67e237094077f40eb4fe562ac91f4d4831e78c92659a14c779095",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/public_boundary.py",
+      "bytes": 2529,
+      "sha256": "f7c1fae0c7fffd2bf0e13bb7918ac4d2cd8f30b0a9060c1c84e05c9fcca22f55",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/public_fixture.py",
+      "bytes": 4539,
+      "sha256": "520656a131284a81432cc16285d77c99ca33f70f141d57dc0faee0f0b0c59e69",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/repository-final-head.raw.txt",
+      "bytes": 41,
+      "sha256": "2da79b9bab55ffdb7612f06cc54f008d15f4b51c84a52fbf17c6501846d60da9",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/repository-final-status.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/review.json",
+      "bytes": 28697,
+      "sha256": "e46df0cc6fb88544607f173ca8e40e072524df16667117ce47cdc51f8815d3bc",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/run_checks.py",
+      "bytes": 1301,
+      "sha256": "5e042a64942e028dda33cce2e77e362f5dfcd5f53a763224fecf3f693fb0bfb2",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/run_public.py",
+      "bytes": 1052,
+      "sha256": "3442664c5d790c03a6f6ed1f0c9791e50320fd61d319f085d227ef1dada32d71",
+      "history_preserved": true
+    },
+    {
+      "path": "docs/evidence/vm-goal-verdict-independent-review-20261002/PREPARATION.md",
+      "bytes": 1434,
+      "sha256": "67253e04fd9c17ddf1f2484cfa8348816078f2d09694fcabab40e83cf0a59d0e",
+      "history_preserved": false
+    }
+  ]
+}

@@ -1,0 +1,863 @@
+{
+  "review_status": "POLICY_SEPARATION_OR_EXPLICIT_POLICY_DECISION_REQUIRED_NOT_IMPLEMENTATION_OR_RELEASE_APPROVAL",
+  "candidate_commit": "98bb122970f82bb5fcef122003ee10c7eb787cf4",
+  "candidate_tree": "1bcc8378c86f30aca46fd757545f07d458d65dd3",
+  "direct_base": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "artifact_input_commit": "d6956481a964f1b84fb88baa03218a3034f8978d",
+  "reviewer_thread_id": "01a0f9e2-ed1d-7296-815a-14270ae95034",
+  "identity_provenance": "CODEX_THREAD_ID environment, distinct from author task",
+  "canonical_agent": "/root",
+  "requested_model": "gpt-6.1-sol",
+  "requested_effort": "high",
+  "provider_observed_model": null,
+  "provider_observed_effort": null,
+  "actual_settings_match": "UNKNOWN",
+  "independent_agents_spawned": 0,
+  "live_provider_calls": 0,
+  "fallbacks": 0,
+  "core_observations": {
+    "base": [
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "current_pass",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.09357844199996634
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "integration_fail",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass",
+          "fail"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.06808141199996953
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "integration_inconclusive",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass",
+          "inconclusive"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.0625364900000136
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "task_fail",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "fail"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.06221737299995311
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "task_not_run",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "not_run"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.0645366609999769
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "task_inconclusive",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "inconclusive"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.07611446800001431
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "successive_pass_old_id",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass",
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.058486358999971344
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "successive_pass_latest_id",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass",
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.060983542000030866
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "integration_fail_then_pass",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass",
+          "fail",
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.05595902099997829
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "superseded_satisfied",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.07391263699997808
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": true,
+        "active_plan_is_target": false,
+        "case": "superseded_inconclusive",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "active",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "superseded",
+        "wall_seconds": 0.07003757699999369
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "backdated_integration_fail",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "fail",
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.06229316399998197
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "backdated_task_fail",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "fail"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.06569872099998975
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "reuse_valid_pass",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.09752689499998723
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "reuse_late_source_fail",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "fail"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.0989365290000137
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "reuse_late_middle_fail",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "fail"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.11844641299995828
+      }
+    ],
+    "candidate": [
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "current_pass",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.0971254359999989
+      },
+      {
+        "accepted": false,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": true,
+        "case": "integration_fail",
+        "error": "plan-level integration/Goal Test 최신 PASS evidence가 부족합니다.",
+        "integration_statuses_by_evaluated_at": [
+          "pass",
+          "fail"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "active",
+        "provenance_preserved": true,
+        "rejection_atomic": true,
+        "target_plan_status": "active",
+        "wall_seconds": 0.056861253000022316
+      },
+      {
+        "accepted": false,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": true,
+        "case": "integration_inconclusive",
+        "error": "plan-level integration/Goal Test 최신 PASS evidence가 부족합니다.",
+        "integration_statuses_by_evaluated_at": [
+          "pass",
+          "inconclusive"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "active",
+        "provenance_preserved": true,
+        "rejection_atomic": true,
+        "target_plan_status": "active",
+        "wall_seconds": 0.061758096999994905
+      },
+      {
+        "accepted": false,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": true,
+        "case": "task_fail",
+        "error": "Goal satisfied에는 모든 Task validation의 최신 PASS 결과가 필요합니다.",
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "fail"
+        },
+        "project_run_state": "active",
+        "provenance_preserved": true,
+        "rejection_atomic": true,
+        "target_plan_status": "active",
+        "wall_seconds": 0.06354461500001207
+      },
+      {
+        "accepted": false,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": true,
+        "case": "task_not_run",
+        "error": "Goal satisfied에는 모든 Task validation의 최신 PASS 결과가 필요합니다.",
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "not_run"
+        },
+        "project_run_state": "active",
+        "provenance_preserved": true,
+        "rejection_atomic": true,
+        "target_plan_status": "active",
+        "wall_seconds": 0.06429252800000995
+      },
+      {
+        "accepted": false,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": true,
+        "case": "task_inconclusive",
+        "error": "Goal satisfied에는 모든 Task validation의 최신 PASS 결과가 필요합니다.",
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "inconclusive"
+        },
+        "project_run_state": "active",
+        "provenance_preserved": true,
+        "rejection_atomic": true,
+        "target_plan_status": "active",
+        "wall_seconds": 0.06826023100001066
+      },
+      {
+        "accepted": false,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": true,
+        "case": "successive_pass_old_id",
+        "error": "GoalVerdict가 최신 PASS integration 결과에 정확히 결속되지 않았습니다.",
+        "integration_statuses_by_evaluated_at": [
+          "pass",
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "active",
+        "provenance_preserved": true,
+        "rejection_atomic": true,
+        "target_plan_status": "active",
+        "wall_seconds": 0.05933018899997933
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "successive_pass_latest_id",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass",
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.056990796000036426
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "integration_fail_then_pass",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass",
+          "fail",
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.06344681800004537
+      },
+      {
+        "accepted": false,
+        "active_plan_is_replacement": true,
+        "active_plan_is_target": false,
+        "case": "superseded_satisfied",
+        "error": "현재 active Plan만 Goal satisfied를 선언할 수 있습니다.",
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "active",
+        "provenance_preserved": true,
+        "rejection_atomic": true,
+        "target_plan_status": "superseded",
+        "wall_seconds": 0.07476158999998006
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": true,
+        "active_plan_is_target": false,
+        "case": "superseded_inconclusive",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "active",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "superseded",
+        "wall_seconds": 0.07055703899999344
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "backdated_integration_fail",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "fail",
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.06205168299999286
+      },
+      {
+        "accepted": false,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": true,
+        "case": "backdated_task_fail",
+        "error": "Goal satisfied에는 모든 Task validation의 최신 PASS 결과가 필요합니다.",
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "fail"
+        },
+        "project_run_state": "active",
+        "provenance_preserved": true,
+        "rejection_atomic": true,
+        "target_plan_status": "active",
+        "wall_seconds": 0.06495852800003377
+      },
+      {
+        "accepted": true,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": false,
+        "case": "reuse_valid_pass",
+        "error": null,
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "pass"
+        },
+        "project_run_state": "completed",
+        "provenance_preserved": true,
+        "rejection_atomic": null,
+        "target_plan_status": "completed",
+        "wall_seconds": 0.10474644200002103
+      },
+      {
+        "accepted": false,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": true,
+        "case": "reuse_late_source_fail",
+        "error": "Goal satisfied에는 모든 Task validation의 최신 PASS 결과가 필요합니다.",
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "fail"
+        },
+        "project_run_state": "active",
+        "provenance_preserved": true,
+        "rejection_atomic": true,
+        "target_plan_status": "active",
+        "wall_seconds": 0.1066796849999605
+      },
+      {
+        "accepted": false,
+        "active_plan_is_replacement": false,
+        "active_plan_is_target": true,
+        "case": "reuse_late_middle_fail",
+        "error": "Goal satisfied에는 모든 Task validation의 최신 PASS 결과가 필요합니다.",
+        "integration_statuses_by_evaluated_at": [
+          "pass"
+        ],
+        "latest_task": {
+          "validation_task": "fail"
+        },
+        "project_run_state": "active",
+        "provenance_preserved": true,
+        "rejection_atomic": true,
+        "target_plan_status": "active",
+        "wall_seconds": 0.11472099799999569
+      }
+    ]
+  },
+  "permanent_candidate_tests": {
+    "run": 8,
+    "passed": 8,
+    "unittest_elapsed_seconds": 0.479
+  },
+  "commands": [
+    {
+      "name": "candidate-identity",
+      "argv": [
+        "git",
+        "show",
+        "--no-patch",
+        "--format=%H%n%T%n%P",
+        "98bb122970f82bb5fcef122003ee10c7eb787cf4"
+      ],
+      "cwd": "/workspace/vibemarshal",
+      "started_at": "2026-10-01T23:56:05.574678+00:00",
+      "ended_at": "2026-10-01T23:56:05.577947+00:00",
+      "wall_seconds": 0.0032658519999984037,
+      "exit_code": 0,
+      "raw_file": "candidate-identity.raw.txt",
+      "raw_sha256": "7c7ffddee1cc58f23c5f92d89ed6af6bef2403ab19d849e2b33d8296b5806e67"
+    },
+    {
+      "name": "candidate-diff",
+      "argv": [
+        "git",
+        "diff",
+        "32bb0f9dd9f024045d24487312b50f5b703573a3",
+        "98bb122970f82bb5fcef122003ee10c7eb787cf4"
+      ],
+      "cwd": "/workspace/vibemarshal",
+      "started_at": "2026-10-01T23:56:05.578049+00:00",
+      "ended_at": "2026-10-01T23:56:05.586662+00:00",
+      "wall_seconds": 0.008616367999991326,
+      "exit_code": 0,
+      "raw_file": "candidate-diff.raw.txt",
+      "raw_sha256": "5e0832f1976eb822014f0503d341f92528af766e5a56f1fa935658d484dad1eb"
+    },
+    {
+      "name": "candidate-diff-check",
+      "argv": [
+        "git",
+        "diff",
+        "--check",
+        "32bb0f9dd9f024045d24487312b50f5b703573a3",
+        "98bb122970f82bb5fcef122003ee10c7eb787cf4"
+      ],
+      "cwd": "/workspace/vibemarshal",
+      "started_at": "2026-10-01T23:56:05.586701+00:00",
+      "ended_at": "2026-10-01T23:56:05.595213+00:00",
+      "wall_seconds": 0.008518922000007478,
+      "exit_code": 0,
+      "raw_file": "candidate-diff-check.raw.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "base-materialize",
+      "argv": [
+        "git",
+        "archive",
+        "32bb0f9dd9f024045d24487312b50f5b703573a3",
+        "src",
+        "tests",
+        "AGENTS.md",
+        "pyproject.toml"
+      ],
+      "cwd": "/workspace/vibemarshal",
+      "exit_code": 0,
+      "archive_sha256": "ef1cda60b3d0443eb57f845cec4528c0ab76f674ca753187cb05471750dea6d0",
+      "destination": "/workspace/vm-goal-independent-review-20261002/base"
+    },
+    {
+      "name": "candidate-materialize",
+      "argv": [
+        "git",
+        "archive",
+        "98bb122970f82bb5fcef122003ee10c7eb787cf4",
+        "src",
+        "tests",
+        "AGENTS.md",
+        "pyproject.toml"
+      ],
+      "cwd": "/workspace/vibemarshal",
+      "exit_code": 0,
+      "archive_sha256": "ee57067219a6f96ae9c2a4b9367406afb2515ca56b1e6aa8dce0323c0d663eb7",
+      "destination": "/workspace/vm-goal-independent-review-20261002/candidate"
+    },
+    {
+      "name": "independent-base",
+      "argv": [
+        "/workspace/cloud-setup/venv/bin/python",
+        "/workspace/vm-goal-independent-review-20261002/probe.py"
+      ],
+      "cwd": "/workspace/vm-goal-independent-review-20261002/base",
+      "env_overrides": {
+        "PYTHONPATH": "/workspace/vm-goal-independent-review-20261002/base/src:/workspace/vm-goal-independent-review-20261002/base",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "started_at": "2026-10-01T23:58:36.853427+00:00",
+      "ended_at": "2026-10-01T23:58:39.038674+00:00",
+      "wall_seconds": 2.185268466000025,
+      "exit_code": 0,
+      "raw_file": "independent-base.raw.txt",
+      "raw_sha256": "b5a671101a963219821cc18afb014da9f1b2036a4444c4f86d1c4f8bd557bb96"
+    },
+    {
+      "name": "independent-candidate",
+      "argv": [
+        "/workspace/cloud-setup/venv/bin/python",
+        "/workspace/vm-goal-independent-review-20261002/probe.py"
+      ],
+      "cwd": "/workspace/vm-goal-independent-review-20261002/candidate",
+      "env_overrides": {
+        "PYTHONPATH": "/workspace/vm-goal-independent-review-20261002/candidate/src:/workspace/vm-goal-independent-review-20261002/candidate",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "started_at": "2026-10-01T23:58:39.038972+00:00",
+      "ended_at": "2026-10-01T23:58:41.099007+00:00",
+      "wall_seconds": 2.0600467499999695,
+      "exit_code": 0,
+      "raw_file": "independent-candidate.raw.txt",
+      "raw_sha256": "f811fc4b064cf639476beb0eac571107f3df6783c254cf3549d2ce21599435a4"
+    },
+    {
+      "name": "permanent-candidate",
+      "argv": [
+        "/workspace/cloud-setup/venv/bin/python",
+        "-m",
+        "unittest",
+        "-v",
+        "tests.test_engine_goal_verdict_authority.GoalVerdictAuthorityTests"
+      ],
+      "cwd": "/workspace/vm-goal-independent-review-20261002/candidate",
+      "env_overrides": {
+        "PYTHONPATH": "/workspace/vm-goal-independent-review-20261002/candidate/src:/workspace/vm-goal-independent-review-20261002/candidate",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "started_at": "2026-10-01T23:58:41.099331+00:00",
+      "ended_at": "2026-10-01T23:58:42.195736+00:00",
+      "wall_seconds": 1.0964153810000425,
+      "exit_code": 0,
+      "raw_file": "permanent-candidate.raw.txt",
+      "raw_sha256": "24bfda7f0fa91da35f6efbb009a99656a7ee1dd9357e6ad3b0b27fd58f847da0"
+    },
+    {
+      "name": "public-base",
+      "argv": [
+        "/workspace/cloud-setup/venv/bin/python",
+        "/workspace/vm-goal-independent-review-20261002/public_boundary.py"
+      ],
+      "cwd": "/workspace/vm-goal-independent-review-20261002/base",
+      "env_overrides": {
+        "PYTHONPATH": "/workspace/vm-goal-independent-review-20261002/base/src:/workspace/vm-goal-independent-review-20261002/base",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "started_at": "2026-10-02T00:00:36.538202+00:00",
+      "ended_at": "2026-10-02T00:00:40.675941+00:00",
+      "wall_seconds": 4.137744120000036,
+      "exit_code": 0,
+      "raw_file": "public-base.raw.txt",
+      "raw_sha256": "c584bf9481e1c7ee39324d2f4b2746d17602a080edbf5d8a7823eac19e70d4f2"
+    },
+    {
+      "name": "public-candidate",
+      "argv": [
+        "/workspace/cloud-setup/venv/bin/python",
+        "/workspace/vm-goal-independent-review-20261002/public_boundary.py"
+      ],
+      "cwd": "/workspace/vm-goal-independent-review-20261002/candidate",
+      "env_overrides": {
+        "PYTHONPATH": "/workspace/vm-goal-independent-review-20261002/candidate/src:/workspace/vm-goal-independent-review-20261002/candidate",
+        "PYTHONDONTWRITEBYTECODE": "1"
+      },
+      "started_at": "2026-10-02T00:00:40.676400+00:00",
+      "ended_at": "2026-10-02T00:00:44.965647+00:00",
+      "wall_seconds": 4.289256944999977,
+      "exit_code": 0,
+      "raw_file": "public-candidate.raw.txt",
+      "raw_sha256": "30dd59a898e67e237094077f40eb4fe562ac91f4d4831e78c92659a14c779095"
+    },
+    {
+      "name": "input-audit",
+      "argv": [
+        "/workspace/cloud-setup/venv/bin/python",
+        "/workspace/vm-goal-independent-review-20261002/audit_inputs.py"
+      ],
+      "cwd": "/workspace/vibemarshal",
+      "started_at": "2026-10-02T00:01:36.496162+00:00",
+      "ended_at": "2026-10-02T00:01:36.704684+00:00",
+      "wall_seconds": 0.2085245069999928,
+      "exit_code": 0,
+      "raw_file": "input-audit.raw.txt",
+      "raw_sha256": "0f4b776d9ce92549d687816582c536ca51d79a982a99f3df51e3ae65c34e08e2"
+    },
+    {
+      "name": "repository-final-status",
+      "argv": [
+        "git",
+        "status",
+        "--porcelain=v1"
+      ],
+      "cwd": "/workspace/vibemarshal",
+      "started_at": "2026-10-02T00:01:36.704831+00:00",
+      "ended_at": "2026-10-02T00:01:36.748902+00:00",
+      "wall_seconds": 0.04408062800001744,
+      "exit_code": 0,
+      "raw_file": "repository-final-status.raw.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "repository-final-head",
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD"
+      ],
+      "cwd": "/workspace/vibemarshal",
+      "started_at": "2026-10-02T00:01:36.749013+00:00",
+      "ended_at": "2026-10-02T00:01:36.750797+00:00",
+      "wall_seconds": 0.0017876340000384516,
+      "exit_code": 0,
+      "raw_file": "repository-final-head.raw.txt",
+      "raw_sha256": "2da79b9bab55ffdb7612f06cc54f008d15f4b51c84a52fbf17c6501846d60da9"
+    }
+  ],
+  "blocking_finding": {
+    "id": "B1",
+    "candidate_location": "src/flowmarshal/engine/service.py:6754",
+    "type": "proposed stricter policy and compatibility change, not explicit documented rule",
+    "finding": "successive PASS on identical valid evidence: historical PASS ID accepted by baseline but rejected atomically by candidate",
+    "parent_action": "Separate/relax latest-ID equality or explicitly approve/document the policy; preserve safety guards; do not edit frozen candidate in this review"
+  },
+  "ordering_observation": {
+    "type": "existing baseline/dispatcher semantics; not new candidate regression",
+    "integration_order": "evaluated_at,rowid",
+    "task_order": "effective worker epoch and History sequence",
+    "later_recorded_backdated_integration_fail": "both versions accept; no explicit append-order integration contract found"
+  },
+  "not_run": [
+    "native Windows",
+    "whole public provider E2E",
+    "live providers",
+    "operational DB/profile/keys",
+    "installed wheel verification",
+    "actual concurrent process race/fault",
+    "independent semantic Validator provider receipt path"
+  ],
+  "publication": "LOCAL_ONLY_PARENT_REVIEW_PENDING_NO_LIBRARY_NO_COMMIT_NO_PUSH_NO_MERGE"
+}
