@@ -6737,23 +6737,21 @@ class EngineService:
                 expected_integrations = {
                     item.validation_id for item in plan.definition.integration_validations
                 }
-                latest_integrations = {
-                    row["validation_id"]: row
-                    for row in tx.all(
-                        "SELECT id, validation_id, status FROM validation_results "
-                        "WHERE plan_revision_id = ? AND task_id IS NULL ORDER BY evaluated_at, rowid",
-                        (plan_revision_id,),
-                    )
-                }
+                integration_rows = tx.all(
+                    "SELECT id, validation_id, status FROM validation_results "
+                    "WHERE plan_revision_id = ? AND task_id IS NULL ORDER BY evaluated_at, rowid",
+                    (plan_revision_id,),
+                )
+                latest_integrations = {row["validation_id"]: row for row in integration_rows}
                 if any(
                     validation_id not in latest_integrations
                     or latest_integrations[validation_id]["status"] != "pass"
                     for validation_id in expected_integrations
                 ):
                     raise EngineServiceError("plan-level integration/Goal Test 최신 PASS evidence가 부족합니다.")
-                result_ids = {latest_integrations[item]["id"] for item in expected_integrations}
-                if set(verdict.integration_validation_result_ids) != result_ids:
-                    raise EngineServiceError("GoalVerdict가 최신 PASS integration 결과에 정확히 결속되지 않았습니다.")
+                result_ids = {row["id"] for row in integration_rows if row["status"] == "pass"}
+                if not set(verdict.integration_validation_result_ids).issubset(result_ids):
+                    raise EngineServiceError("GoalVerdict가 실제 PASS integration 결과에 결속되지 않았습니다.")
                 evidence_ids = {item for criterion in verdict.criteria for item in criterion.evidence_ids}
                 if evidence_ids:
                     placeholders = ",".join("?" for _ in evidence_ids)

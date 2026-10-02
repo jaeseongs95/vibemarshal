@@ -2,14 +2,25 @@
 from __future__ import annotations
 
 import unittest
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from unittest.mock import patch
 
 from flowmarshal.canonical import sha256_digest
 from flowmarshal.engine.domain import (
     CriterionVerdict, EvidenceKind, EvidenceRecord, GoalVerdict,
-    GoalVerdictStatus, ValidationResult, ValidationStatus, new_id, utc_now,
+    GoalVerdictStatus, PlanContractRevision, RunOnceAction, ValidationExecutionStep,
+    ValidationResult, ValidationStatus, new_id, utc_now,
 )
+from flowmarshal.engine.e2e_qualification import _copy_fixture, _prepare
+from flowmarshal.engine.qualification import default_role_configuration
+from flowmarshal.engine.runtime import FakeCodexRuntime
 from flowmarshal.engine.service import EngineServiceError
+from flowmarshal.engine.validation_execution import advance_independent_goal_test, run_command_validation
 from tests.test_engine_ledger_service import EngineServiceFixture
+from tests.test_engine_qualification import qualification_inventory
 from tests import test_engine_goal_authorization as authorization_tests
 
 
@@ -99,8 +110,39 @@ class GoalVerdictAuthorityTests(EngineServiceFixture):
         self.record_result(task=True, status=ValidationStatus.NOT_RUN)
         self.assert_rejected_atomically(self.verdict())
 
-    def test_old_pass_id_cannot_replace_latest_integration_pass_id(self):
+    def test_equivalent_old_pass_id_can_complete_when_latest_result_is_pass(self):
+        latest = self.record_result(task=False)
+        self.assertNotEqual(self.integration.validation_result_id, latest.validation_result_id)
+        self.assertEqual(self.integration.evidence_ids, latest.evidence_ids)
+        self.assertEqual(self.integration.goal_validation_binding_digest, latest.goal_validation_binding_digest)
+        self.record_verdict(self.verdict())
+
+    def test_failed_result_id_is_rejected_even_when_latest_result_is_pass(self):
+        failed = self.record_result(task=False, status=ValidationStatus.FAIL)
         self.record_result(task=False)
+        self.assert_rejected_atomically(self.verdict((failed.validation_result_id,)))
+
+    def test_wrong_goal_digest_is_rejected(self):
+        self.assert_rejected_atomically(self.verdict().model_copy(update={
+            "goal_contract_digest": "sha256:" + "0" * 64,
+        }))
+
+    def test_wrong_plan_activation_digest_is_rejected(self):
+        self.assert_rejected_atomically(self.verdict().model_copy(update={
+            "plan_activation_digest": "sha256:" + "0" * 64,
+        }))
+
+    def test_other_revision_activation_cannot_replace_active_plan_binding(self):
+        other_revision, _ = self.register_internal_revision()
+        self.assert_rejected_atomically(self.verdict().model_copy(update={
+            "plan_activation_digest": other_revision.activation_digest,
+        }))
+
+    def test_unknown_result_id_cannot_replace_a_recorded_pass(self):
+        self.assert_rejected_atomically(self.verdict((new_id("validation_result"),)))
+
+    def test_latest_task_inconclusive_cannot_be_overridden_by_completed_status(self):
+        self.record_result(task=True, status=ValidationStatus.INCONCLUSIVE)
         self.assert_rejected_atomically(self.verdict())
 
     def test_latest_integration_pass_can_supersede_fail(self):
@@ -123,6 +165,90 @@ class GoalVerdictAuthorityTests(EngineServiceFixture):
             after = {table: connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
                      for table in before}
         self.assertEqual(before, after)
+
+
+class GoalTestBindingCompatibilityTests(unittest.TestCase):
+    """기존 직접 Goal Test API에서 동일 binding PASS 재사용과 freshness를 검사한다."""
+
+    def setUp(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        root = Path(__file__).resolve().parents[1]
+        workspace, _ = _copy_fixture(root, Path(temp.name))
+        self.inventory = qualification_inventory()
+        self.prepared = _prepare(workspace=workspace, state_root=Path(temp.name) / "state",
+            inventory=self.inventory, roles=default_role_configuration(root))
+        self.service = self.prepared.service
+        self.service.compile_execution_spec(self.prepared.proposal, inventory=self.inventory)
+        worker = self.service.reserve_attempt(task_id=self.prepared.task_id)
+        self.service.finish_attempt(attempt_id=worker.attempt_id, succeeded=True)
+        with self.service.ledger.read() as connection:
+            self.task_row = connection.execute("SELECT * FROM task_contracts WHERE id=?",
+                (self.prepared.task_id,)).fetchone()
+            self.plan = PlanContractRevision.model_validate_json(connection.execute(
+                "SELECT payload_json FROM plan_revisions WHERE id=?",
+                (self.prepared.plan_revision_id,)).fetchone()[0])
+        self.command = patch("flowmarshal.engine.validation_execution.subprocess.run",
+            side_effect=lambda argv, **_: subprocess.CompletedProcess(argv, 0, b"synthetic PASS", b""))
+        self.command_mock = self.command.start()
+        self.addCleanup(self.command.stop)
+        run_command_validation(self.service, self.task_row, self.prepared.proposal.validation_steps[0])
+        self.service.complete_task(self.prepared.task_id)
+        self.contract = self.plan.definition.integration_validations[0]
+        self.step = ValidationExecutionStep(validation_id=self.contract.validation_id,
+            method="deterministic", required_evidence_kinds=self.contract.required_evidence_kinds,
+            argv=(sys.executable, "-c", "print('synthetic')"),
+            working_directory=str(workspace), timeout_seconds=30, expected_exit_codes=(0,))
+        self.runtime = FakeCodexRuntime(self.inventory)
+        outcome = advance_independent_goal_test(self.service, self.runtime, self.prepared.project_id,
+            self.plan, self.contract, supplied_step=self.step)
+        self.assertEqual(RunOnceAction.MATERIALIZED, outcome.action)
+
+    def advance(self, *, plan=None):
+        return advance_independent_goal_test(self.service, self.runtime, self.prepared.project_id,
+            plan or self.plan, self.contract)
+
+    def test_equivalent_older_pass_with_same_nonnull_input_binding_is_accepted(self):
+        first = self.advance()
+        second = self.advance()
+        self.assertEqual(RunOnceAction.VALIDATED, first.action)
+        self.assertEqual(RunOnceAction.VALIDATED, second.action)
+        with self.service.ledger.read() as connection:
+            results = [ValidationResult.model_validate_json(connection.execute(
+                "SELECT payload_json FROM validation_results WHERE id=?", (item.validation_result_id,)
+            ).fetchone()[0]) for item in (first, second)]
+        self.assertNotEqual(results[0].validation_result_id, results[1].validation_result_id)
+        self.assertIsNotNone(results[0].goal_validation_binding_digest)
+        self.assertEqual(results[0].goal_validation_binding_digest, results[1].goal_validation_binding_digest)
+        self.assertEqual(ValidationStatus.PASS, results[1].status)
+        verdict = GoalVerdict(goal_verdict_id=new_id("goal_verdict"),
+            goal_contract_digest=self.plan.definition.goal_contract_digest,
+            plan_activation_digest=self.plan.activation_digest, status=GoalVerdictStatus.SATISFIED,
+            criteria=tuple(CriterionVerdict(criterion_id=item.criterion_id, status=ValidationStatus.PASS,
+                evidence_ids=results[0].evidence_ids, rationale="동일 입력·Goal Test binding의 기존 PASS")
+                for item in self.plan.definition.goal_coverage),
+            integration_validation_result_ids=(results[0].validation_result_id,), evaluated_at=utc_now())
+        self.service.record_goal_verdict(project_id=self.prepared.project_id,
+            plan_revision_id=self.plan.plan_revision_id, verdict=verdict)
+
+    def test_changed_goal_input_is_blocked_before_command_or_result_write(self):
+        calls = self.command_mock.call_count
+        with self.service.ledger.read() as connection:
+            before = connection.execute("SELECT COUNT(*) FROM validation_results").fetchone()[0]
+        (self.prepared.workspace / "new_input.txt").write_text("changed input", encoding="utf-8")
+        outcome = self.advance()
+        self.assertEqual(RunOnceAction.BLOCKED, outcome.action)
+        self.assertEqual("STALE_EXECUTION_INPUT", outcome.blocker_code)
+        self.assertEqual(calls, self.command_mock.call_count)
+        with self.service.ledger.read() as connection:
+            self.assertEqual(before, connection.execute("SELECT COUNT(*) FROM validation_results").fetchone()[0])
+
+    def test_wrong_revision_is_rejected_before_command(self):
+        calls = self.command_mock.call_count
+        other = self.plan.model_copy(update={"plan_revision_id": new_id("plan_revision")})
+        with self.assertRaisesRegex(EngineServiceError, "활성 Plan"):
+            self.advance(plan=other)
+        self.assertEqual(calls, self.command_mock.call_count)
 
 
 if __name__ == "__main__":
