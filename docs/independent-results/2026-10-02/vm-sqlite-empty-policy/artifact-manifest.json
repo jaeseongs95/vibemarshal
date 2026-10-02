@@ -1,0 +1,163 @@
+{
+  "kind": "sanitized-private-github-independent-policy-payload",
+  "date_utc": "2026-10-02",
+  "repository": "jaeseongs95/vibemarshal",
+  "branch": "dot/vm-sqlite-empty-policy-20261002",
+  "required_parent": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "changed_path_prefix": "docs/independent-results/2026-10-02/vm-sqlite-empty-policy/",
+  "source_or_spec_changes": false,
+  "source_go": null,
+  "policy_verdict": "conditional_consensus",
+  "assurance": "independent",
+  "effective_model_observations": "NOT_OBSERVABLE",
+  "new_human_approval_gate": false,
+  "library_uploaded": false,
+  "payload_stage": "prepared_for_authorized_branch_push",
+  "remote_verification_receipt": "recorded after push outside this immutable payload",
+  "private_transcripts_or_profiles_included": false,
+  "credentials_included": false,
+  "operational_or_binary_fixture_databases_included": false,
+  "publication_counterexamples_or_broad_tests_rerun": false,
+  "artifacts": [
+    {
+      "path": "REPORT.md",
+      "sha256": "1637a34cda4ca5450a1d1aa6f50501baaa452e587bd4b15bc096765803785ebf",
+      "bytes": 15476
+    },
+    {
+      "path": "REPRODUCE.md",
+      "sha256": "f85eaa124ca5a0024daafea22c865faba8ec76fbb0fe02fdc3acebae6b27e51c",
+      "bytes": 5122
+    },
+    {
+      "path": "auxiliary-evidence.md",
+      "sha256": "8bd306c92654d7415a7887cbf4c2419a66238448974541e1110e12949b1db065",
+      "bytes": 2942
+    },
+    {
+      "path": "auxiliary_counterexamples.py",
+      "sha256": "7c92ca2cc1075c3c5c43877271ba66b86fcef68dafdd64b6cee9f6fb4ef2527e",
+      "bytes": 1700
+    },
+    {
+      "path": "capability-preflight.json",
+      "sha256": "2f89b45b53a02957cb5168232dbad6fb3ca3c2ca3b5dba58271f977b16360490",
+      "bytes": 3401
+    },
+    {
+      "path": "completed-local-report.md",
+      "sha256": "e34b0f893a9e8febca32fdc010c0431d5b99c3cfb2a39b91a32b4297c7c9fb7c",
+      "bytes": 14877
+    },
+    {
+      "path": "counterexample-results.json",
+      "sha256": "37fc7d805ac53c7410f30c8aeec9b55565ae4b628f9f144d215086707a156ad3",
+      "bytes": 4356
+    },
+    {
+      "path": "decision-record.json",
+      "sha256": "5ff908853d5c8cf92d9b0192f3d7725e99304764c2de7f7116059bedfc67d87b",
+      "bytes": 27313
+    },
+    {
+      "path": "decision-record.v1.schema.json",
+      "sha256": "af181dcd574356dff20136b08af527eb9e1f0a0d47a371a087791f87179735a3",
+      "bytes": 22836
+    },
+    {
+      "path": "dropped-history.json",
+      "sha256": "ff44c095f62cb795770af83089c01ee53a77703c0bc6be3eefad3e6f95115070",
+      "bytes": 291
+    },
+    {
+      "path": "edge-results.json",
+      "sha256": "b0e1c372371165980f3a2c1cc024d38074021fc1c0dd3a84262186205aca9f02",
+      "bytes": 959
+    },
+    {
+      "path": "edge_counterexamples.py",
+      "sha256": "53206512661e7151dc90e398aa6058ef7f0d2e8d5ab334e629766bdf52e991b8",
+      "bytes": 4001
+    },
+    {
+      "path": "header-observations.json",
+      "sha256": "6090af356bf3b5af83592132d50fb8f78752b8ffe55c628020246ef5db36be3b",
+      "bytes": 923
+    },
+    {
+      "path": "header_counterexamples.py",
+      "sha256": "600619c4bf9d5636960d33a8b5bb0987601dcfe063197c68b41e6b88c119f1d1",
+      "bytes": 2831
+    },
+    {
+      "path": "identity-lifecycle.json",
+      "sha256": "f5f6de5acf3bae3f3423d05e293d3dca38cd6b86e7b0b0514ce1c0c0132582ab",
+      "bytes": 5165
+    },
+    {
+      "path": "initial-preflight/REPORT.md",
+      "sha256": "bcef58205696e07b75cdb704216fff30bcae6735f3ea5f25b157b457da1ac5c9",
+      "bytes": 6395
+    },
+    {
+      "path": "initial-preflight/artifact-manifest.json",
+      "sha256": "627530eec17820bda2bcd1b1eed5c6a1993fc487f01f7c63faad2bd120bda251",
+      "bytes": 3287
+    },
+    {
+      "path": "initial-preflight/decision-record.json",
+      "sha256": "47cb6d29124da1bce7f4e42b783fb6f04c42b7347c8cbc7533c806a5a9b21e20",
+      "bytes": 6479
+    },
+    {
+      "path": "initial-preflight/decision-record.v1.schema.json",
+      "sha256": "af181dcd574356dff20136b08af527eb9e1f0a0d47a371a087791f87179735a3",
+      "bytes": 22836
+    },
+    {
+      "path": "judge-dossier-portable.json",
+      "sha256": "b1eeddbb76953f9a207ce3b1e2eb742d180669c9c6c2e46003f259410b3555a2",
+      "bytes": 13556
+    },
+    {
+      "path": "judge-dossier.json",
+      "sha256": "321d5beeac7fa64ba42cc21753f01e62e26a9327d3b7b07338fc4685672d94bc",
+      "bytes": 13435
+    },
+    {
+      "path": "judge-verdict.json",
+      "sha256": "52e56f3cd375007cb539daec771154020e19dd5c472beae31d5ec65d357e2f40",
+      "bytes": 3270
+    },
+    {
+      "path": "policy_counterexamples.py",
+      "sha256": "2c21282d1ec9014dbbcb6d8be0ab8463f232bb60e63dd07db44e0421374b1642",
+      "bytes": 6305
+    },
+    {
+      "path": "prepublication-artifact-manifest.json",
+      "sha256": "9a4b2ca21596f1561b4689ee0ef87688709952beeceae2be39f0c567fdb24652",
+      "bytes": 3351
+    },
+    {
+      "path": "provenance-collision.json",
+      "sha256": "f8a3f15885b51035d98905303d55946aaf6e09308166b8ae5d2d729ba5ebb9c2",
+      "bytes": 356
+    },
+    {
+      "path": "publication-provenance.json",
+      "sha256": "8ca4f7e2a7e564f62ad75f0e6b0a241708e2737368256044363ee12a6d804d66",
+      "bytes": 1636
+    },
+    {
+      "path": "source-inventory.json",
+      "sha256": "76dad45face60f43005312b12efbb3d26830c30ba51df023ca27ccb2d182b160",
+      "bytes": 2172
+    },
+    {
+      "path": "validate_decision_record.py",
+      "sha256": "a020f2d4be5c09b2bc3f58b9336be33f6183c71a8ac55e8f3963e1c4d0e532d2",
+      "bytes": 4200
+    }
+  ]
+}

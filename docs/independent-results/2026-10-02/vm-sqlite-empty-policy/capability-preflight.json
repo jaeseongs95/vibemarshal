@@ -1,0 +1,85 @@
+{
+  "revision": "corrected-preflight-after-parent-routing-clarification",
+  "previous_artifacts_preserved": "initial-preflight/",
+  "correction": "현재 Coordinator가 자기 model을 재선택할 도구를 요구한 이전 stop은 사용자 요구에 없는 추가 prerequisite였다. 부모의 명시 dispatch 요청 evidence를 받은 뒤 이를 수정했다.",
+  "routing_evidence": {
+    "provenance": "parent-reported exposed cloud_threads.create admission, relayed by user message",
+    "thread_id": "01a0f9d3-1635-735f-a6dd-e15cad99103b",
+    "turn_id": "01a0f9d3-1e32-77c9-8c3e-ef8000f10828",
+    "requested_model": "gpt-6.1-sol",
+    "requested_thinking": "high",
+    "admitted_status": "started",
+    "independently_requeried": false,
+    "effective_model": null,
+    "effective_reasoning": null,
+    "effective_status": "NOT_OBSERVABLE"
+  },
+  "required_capabilities": [
+    "explicit gpt-6.1-sol/high request for coordinator and each actual participant",
+    "blind fork_turns:none reviewers",
+    "separate fresh Judge",
+    "source/contract access and evidence verification",
+    "bounded worker budget and exposed lifecycle observations"
+  ],
+  "missing_capabilities": [],
+  "strict": true,
+  "grade": "MEDIUM",
+  "distinct_worker_cap": 5,
+  "grade_reason": "고정된 v3 초기화 acceptance predicate의 좁은 정책 검토; recovery, provenance/계약, 최소 대안의 세 failure function을 분리한다. 제품 실행 또는 release qualification이 아니다.",
+  "reviewers": [
+    {
+      "worker_id": "/root/sqlite_recovery",
+      "failure_function": "부분 실패/재시도 일관성",
+      "request": {
+        "model": "gpt-6.1-sol",
+        "reasoning_effort": "high",
+        "fork_turns": "none"
+      },
+      "spawn_response": "/root/sqlite_recovery",
+      "observed_status": "running",
+      "actual_model": null,
+      "actual_reasoning": null
+    },
+    {
+      "worker_id": "/root/sqlite_contract",
+      "failure_function": "foreign data/legacy 계약과 provenance 경계",
+      "request": {
+        "model": "gpt-6.1-sol",
+        "reasoning_effort": "high",
+        "fork_turns": "none"
+      },
+      "spawn_response": "/root/sqlite_contract",
+      "observed_status": "running",
+      "actual_model": null,
+      "actual_reasoning": null
+    },
+    {
+      "worker_id": "/root/sqlite_minimal",
+      "failure_function": "불필요한 범위/복잡성과 더 작은 coherent alternative",
+      "request": {
+        "model": "gpt-6.1-sol",
+        "reasoning_effort": "high",
+        "fork_turns": "none"
+      },
+      "spawn_response": "/root/sqlite_minimal",
+      "observed_status": "running",
+      "actual_model": null,
+      "actual_reasoning": null
+    }
+  ],
+  "judge": {
+    "status": "not_instantiated",
+    "reserved": true
+  },
+  "specialist": {
+    "status": "not_instantiated",
+    "reserve_count": 1,
+    "admission": "bounded Stage 6 only"
+  },
+  "identity_limits": [
+    "worker_id는 spawn/list 도구가 반환한 canonical name이다. provider participant UUID가 아니다.",
+    "exposed tool advertised support와 request admission을 effective model/effort 관측으로 승격하지 않는다.",
+    "숨은 model internals/credentials/transcripts를 조사하지 않는다."
+  ],
+  "publication_note": "게시용 locator 변경만 했다. prepublication manifest의 capability-preflight hash는 원 local snapshot이다."
+}

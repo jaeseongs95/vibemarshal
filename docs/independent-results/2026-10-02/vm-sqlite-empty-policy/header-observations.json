@@ -1,0 +1,30 @@
+{
+  "observations": [
+    {
+      "case": "pristine-wal-rollback",
+      "coordinator_readonly_observation": {
+        "application_id": 0,
+        "user_version": 0,
+        "schema_version": 0,
+        "freelist_count": 0,
+        "objects": [],
+        "main_sha256": "0ab48b25cba617ed3a4acca0161813b314c095ef63544bb4af60769eb1012977",
+        "main_bytes": 4096
+      }
+    },
+    {
+      "case": "external-pristine-wal",
+      "coordinator_readonly_observation": {
+        "application_id": 0,
+        "user_version": 0,
+        "schema_version": 0,
+        "freelist_count": 0,
+        "objects": [],
+        "main_sha256": "0ab48b25cba617ed3a4acca0161813b314c095ef63544bb4af60769eb1012977",
+        "main_bytes": 4096
+      }
+    }
+  ],
+  "method": "source-derived reviewer DDL-denial probe followed by Coordinator readonly query; see auxiliary-evidence.md",
+  "limits": "not a narrower initializer qualification"
+}

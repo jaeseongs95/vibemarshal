@@ -1,0 +1,115 @@
+{
+  "skill_version": "1.0.0",
+  "schema_version": "1.0",
+  "preflight": {
+    "required_capabilities": [
+      "현재 Coordinator의 gpt-6.1-sol/high 명시 dispatch 요청을 노출된 수단으로 설정 또는 확인",
+      "fork_turns:none blind reviewer 2명",
+      "reviewer와 분리한 fresh Judge 1명",
+      "gpt-6.1-sol/high child override",
+      "worker cap과 lifecycle 상태 관측",
+      "pinned source/contract 접근과 hash 검증"
+    ],
+    "observed_capabilities": [
+      "collaboration.spawn_agent는 fork_turns:none과 model/reasoning_effort override를 노출한다.",
+      "노출된 model override 목록은 gpt-6.1-sol과 high를 지원 조합으로 광고한다. provider model/list 관측은 아니다.",
+      "호스트 지침은 동시 슬롯 7개를 명시한다.",
+      "collaboration.list_agents 실제 결과는 /root running 한 개이며 model/effort/dispatch request를 포함하지 않는다.",
+      "현재 도구 목록에는 coordinator의 model/effort 설정 또는 dispatch request 조회 도구가 없다.",
+      "base source, 계약, evidence commit와 pinned AGS skill을 읽을 수 있다.",
+      "patch SHA-256은 사용자가 지정한 값과 일치한다."
+    ],
+    "missing_capabilities": [
+      "현재 이미 실행 중인 Coordinator에 gpt-6.1-sol/high를 명시 설정하거나 해당 dispatch 요청을 확인할 노출된 capability: NOT_OBSERVABLE"
+    ],
+    "supported_models_reasoning": [
+      "gpt-6.1-sol/high: collaboration.spawn_agent 도구 설명의 advertised support; provider inventory/effective 적용은 NOT_OBSERVABLE"
+    ]
+  },
+  "case_brief": {
+    "decision": "application_id=0, user_version=0, sqlite_master 전체가 빈 existing SQLite 파일을 허용하는 확장이 failed bootstrap/crash retry의 최소 일관적 recovery rule인지 검토한다.",
+    "facts": [
+      "사용자는 VM base 32bb0f9와 evidence commit 8a159ed4, pinned AGS ba85fdc를 지정했다.",
+      "이 산출물은 Stage 0 preflight-only이며 SQLite 정책 verdict가 없다."
+    ],
+    "assumptions": [],
+    "constraints": [
+      "Coordinator와 실제 reviewer/Judge는 gpt-6.1-sol/high를 명시 요청하며 fallback하지 않는다.",
+      "strict required capability가 없거나 관찰 불가면 worker를 생성하지 않는다.",
+      "독립 관점과 fresh Judge를 분리하고 writer를 reviewer로 재사용하지 않는다.",
+      "제품·spec 변경, 새 GO, 운영 효과, 20-run race benchmark 반복 및 Library upload를 하지 않는다.",
+      "과거 실패 제안과 evidence를 보존하고 private GitHub-ready artifact만 준비한다.",
+      "새 mandatory human approval gate를 만들지 않는다."
+    ],
+    "unknowns": [
+      "현재 Coordinator의 host dispatch requested model/effort와 effective model/effort는 NOT_OBSERVABLE."
+    ],
+    "success_criteria": [
+      "strict preflight를 충족한 별도 독립 review와 필요한 fresh Judge 판정을 VM root에 전달"
+    ],
+    "failure_modes": [
+      "사용자 요청값이나 도구의 지원 목록을 현재 Coordinator의 실제 dispatch/effective 적용 증거로 오인",
+      "strict shortfall 뒤 single-agent 정책 verdict를 대체 제출"
+    ]
+  },
+  "run": {
+    "id": "vm-sqlite-decision-preflight-32bb0f9",
+    "stage": "MEDIUM",
+    "strict": true,
+    "worker_cap": 4,
+    "workers": [],
+    "completed_worker_ids": [],
+    "reused_worker_ids": [],
+    "failures": [],
+    "fresh_judge_id": null,
+    "candidate_skill_sha256": null,
+    "assurance": "provisional",
+    "specialist_additions": [],
+    "redeliberations": [],
+    "judge_fallback": null,
+    "capability_shortfall": true
+  },
+  "panel_manifest": [],
+  "constraints": [
+    "Coordinator와 실제 reviewer/Judge는 gpt-6.1-sol/high를 명시 요청하며 fallback하지 않는다.",
+    "strict required capability가 없거나 관찰 불가면 worker를 생성하지 않는다.",
+    "독립 관점과 fresh Judge를 분리하고 writer를 reviewer로 재사용하지 않는다.",
+    "제품·spec 변경, 새 GO, 운영 효과, 20-run race benchmark 반복 및 Library upload를 하지 않는다.",
+    "과거 실패 제안과 evidence를 보존하고 private GitHub-ready artifact만 준비한다.",
+    "새 mandatory human approval gate를 만들지 않는다."
+  ],
+  "required_constraints": [
+    "Coordinator와 실제 reviewer/Judge는 gpt-6.1-sol/high를 명시 요청하며 fallback하지 않는다.",
+    "strict required capability가 없거나 관찰 불가면 worker를 생성하지 않는다.",
+    "독립 관점과 fresh Judge를 분리하고 writer를 reviewer로 재사용하지 않는다.",
+    "제품·spec 변경, 새 GO, 운영 효과, 20-run race benchmark 반복 및 Library upload를 하지 않는다.",
+    "과거 실패 제안과 evidence를 보존하고 private GitHub-ready artifact만 준비한다.",
+    "새 mandatory human approval gate를 만들지 않는다."
+  ],
+  "material_claims": [],
+  "cross_examination": {
+    "decision": "skip",
+    "reason": "strict Stage 0 capability shortfall; substantive stage에 진입하지 않음",
+    "trigger_items": [],
+    "selected_item_ids": [],
+    "coverage": [],
+    "followups": []
+  },
+  "issue_ledger": [],
+  "axis_decisions": [],
+  "consensus_proposal": null,
+  "observability": {
+    "wall_time": "NOT_OBSERVABLE",
+    "tokens": "NOT_OBSERVABLE",
+    "tool_calls": "NOT_OBSERVABLE",
+    "worker_count": 0
+  },
+  "method_notes": [
+    "MEDIUM 선택: 좁은 초기화 정책 질문, 고정된 source/evidence와 disposable counterexample 범위. 실제 변경 또는 release audit가 아니다.",
+    "예정 예산은 blind reviewer 2명 + 별도 fresh Judge 1명 + bounded specialist reserve 1명. 모두 미생성이다.",
+    "requested target은 사용자 명시 gpt-6.1-sol/high. host가 현재 Coordinator에 보낸 실제 dispatch 요청은 관찰되지 않는다. effective 값도 null/NOT_OBSERVABLE이다.",
+    "효과적인 model/effort 관측 자체를 새로운 필수 조건으로 만들지 않는다. shortfall은 현재 Coordinator의 명시 요청을 설정/확인할 노출된 수단 부재다.",
+    "worker spawn 시도 0, completion 0, Judge 0, fabricated participant ID 0. /root는 list_agents에서 관찰된 현재 Coordinator의 canonical name이며 provider identity가 아니다.",
+    "artifact는 Library에 올리지 않으며 private GitHub-ready local handoff만 준비한다."
+  ]
+}

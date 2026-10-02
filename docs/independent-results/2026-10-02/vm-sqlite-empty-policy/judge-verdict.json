@@ -1,0 +1,71 @@
+{
+  "provenance": "Coordinator-normalized Fresh Judge verdict; no raw Judge output stored",
+  "judge_id": "/root/sqlite_judge",
+  "status": "conditional_consensus",
+  "executive_verdict": "v3 삼중predicate의 일관성은 인정하되 unique/smallest acceptance라는 설명은 거절한다. all logical-empty container 할당을 선택하면 v3는 조건부 타당; fresh DELETE retry만 목표이면 recovery/lock 뒤 size0 제한 후보를 우선 검토한다.",
+  "axis_decisions": [
+    {
+      "axis": "Recovery scope",
+      "decision": "v3 일관적. fresh DELETE bootstrap retry에는 nonzero-empty 전체 수용이 필수가 아니다. writable SQLite recovery/lock 이후 상태 판단을 보존해야 한다.",
+      "evidence_claim_ids": [
+        "C1",
+        "C3",
+        "C4",
+        "C9"
+      ]
+    },
+    {
+      "axis": "Provenance and ownership",
+      "decision": "동일 main bytes의 external-empty와 rollback-empty를 항상 구분할 수 없다. 같은 관측 상태를 함께 허용하거나 함께 거절할 수 있다. broader 모든 상태를 받아야 한다는 의무는 아니다.",
+      "evidence_claim_ids": [
+        "C2",
+        "C6"
+      ]
+    },
+    {
+      "axis": "Foreign-data / legacy contract",
+      "decision": "현재 객체/nonzero identity/committed WAL과 intact legacy/runtime 거절을 유지한다. logically-empty 과거 사용 파일까지 채택하는 효과는 별도 정책이며 physical-history 보존을 주장할 수 없다.",
+      "evidence_claim_ids": [
+        "C5",
+        "C6",
+        "C8"
+      ]
+    },
+    {
+      "axis": "Minimality and alternatives",
+      "decision": "v3는 단순한 logical-empty 할당 정책이다. 유일하거나 smallest acceptance는 아니다. recovery 뒤 size0 restriction과 schema_version0/freelist0 restriction은 더 좁은 coherent 후보이나 미qualification이다.",
+      "evidence_claim_ids": [
+        "C3",
+        "C4",
+        "C7"
+      ]
+    },
+    {
+      "axis": "Policy authority and assurance limits",
+      "decision": "VM root가 기존 권한 안에서 recovery 지원 범위를 선택한다. 새 human approval/marker/framework gate는 불필요하다. 본 검토는 source 적용/GO/qualification 판정이 아니다.",
+      "evidence_claim_ids": [
+        "C8",
+        "C9"
+      ]
+    }
+  ],
+  "conditions": [
+    "VM root 결정기록에 지원 recovery/할당 범위를 명시한다. 이것은 새 인간승인 gate가 아니다.",
+    "v3 선택 시 external-empty/DROP-history-empty 수용과 provenance/forensic 보장 부재를 명시한다.",
+    "어느candidate든 recovery/lock 뒤 판정, bootstrap 원자성과foreign/legacy거절을 유지한다.",
+    "narrower candidate를 선택하면 해당 author 구현 및 범위에 맞는 후속검증으로 검증한다. 이 정책review를 구현acceptance/GO로 쓰지 않는다."
+  ],
+  "remaining_options": [
+    "v3 logical-empty container allocation",
+    "fresh DELETE retry: recovered size0 restriction",
+    "pristine WAL residue: schema_version0/freelist0 restriction 후보"
+  ],
+  "unresolved_issue_ids": [
+    "I4",
+    "I5"
+  ],
+  "requested_model": "gpt-6.1-sol",
+  "requested_reasoning": "high",
+  "effective_model": null,
+  "effective_reasoning": null
+}

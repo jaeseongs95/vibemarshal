@@ -1,0 +1,30 @@
+{
+  "kind": "authorized-independent-policy-evidence-publication",
+  "repository": "jaeseongs95/vibemarshal",
+  "branch": "dot/vm-sqlite-empty-policy-20261002",
+  "expected_parent": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "branch_preinspection": {
+    "local_branch_exists": false,
+    "remote_branch_exists": false,
+    "source": "git branch --list and git ls-remote --heads, observed before worktree creation"
+  },
+  "scope": "policy evidence additions only; no implementation or source GO",
+  "conditional_consensus": "v3 is coherent but not uniquely minimal; VM root defines supported recovery scope; no new human approval gate",
+  "historical_preflight": "initial-preflight/ preserves original stop; corrected after parent explicit coordinator routing evidence",
+  "effective_model_proof": "NOT_OBSERVABLE; request/admission/advertised support are separately recorded",
+  "publication_step_counterexamples_rerun": false,
+  "publication_step_broad_tests": false,
+  "prepared_replay_utility_status": {
+    "auxiliary_counterexamples": "recipe extracted from prior executed SQL; this script file NOT_RUN in publication",
+    "header_counterexamples": "NOT_RUN portable replay utility for prior source-derived experiment"
+  },
+  "excluded_categories": [
+    "private transcripts",
+    "raw reviewer/Judge outputs",
+    "credentials",
+    "private profiles",
+    "operational DB/WAL/journal",
+    "binary fixture databases"
+  ],
+  "remote_verification": "after normal branch push: compare remote ref, exact single parent, all artifact bytes/hash manifest and changed-path allowlist; receipt is external to this immutable commit"
+}

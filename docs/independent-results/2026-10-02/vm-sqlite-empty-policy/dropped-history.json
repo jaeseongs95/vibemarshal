@@ -1,0 +1,10 @@
+{
+  "application_id": 0,
+  "user_version": 0,
+  "schema_version": 2,
+  "freelist_count": 1,
+  "objects": [],
+  "synthetic_marker_remains_in_bytes": true,
+  "bytes": 8192,
+  "limit": "Shows a possible logically empty former-use state; marker is synthetic probe data, not a product marker."
+}

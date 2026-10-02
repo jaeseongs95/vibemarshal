@@ -1,0 +1,51 @@
+{
+  "base_commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "base_tree": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d",
+  "evidence_commit": "8a159ed4b79058aba8e6302358733696b33d11ff",
+  "ags_commit": "ba85fdcf245b9910674d88fffdd125f6f0454027",
+  "source_identity": [
+    {
+      "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+      "path": "AGENTS.md",
+      "sha256": "f6d5a37f3bb61be891f7ecf6a8a993f2e7b70b94f02d5148e47ea13f1695e989",
+      "local_bytes_equal": true
+    },
+    {
+      "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+      "path": "src/flowmarshal/engine/ledger.py",
+      "sha256": "cecb5d6b50e736933005c6c849d6018992434ccdc8a9b13cb012f8e5fc5c0d41",
+      "local_bytes_equal": true
+    },
+    {
+      "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+      "path": "docs/engine-cutover-adr.md",
+      "sha256": "2409b45c2c073168d676387ec82515647ad80b7990c5c23fc2644ac2f2bfa63e",
+      "local_bytes_equal": true
+    },
+    {
+      "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+      "path": "docs/redesign-1.0-contract.md",
+      "sha256": "19c483be40fabae92d90e7b5abc49ecb08f024ecacc559b6a29e3178bf85188c",
+      "local_bytes_equal": true
+    },
+    {
+      "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+      "path": "docs/orchestration-redesign.md",
+      "sha256": "49607830382492a5adfcec52803d24edca59fa8bcf5e70269f8a571387bcd0b5",
+      "local_bytes_equal": true
+    },
+    {
+      "commit": "8a159ed4b79058aba8e6302358733696b33d11ff",
+      "path": "docs/independent-results/2026-10-02/vm-sqlite/revision3/atomic-initialize-v3.patch",
+      "sha256": "40339ffa0ef57f5d6152c289344c7fda0011c70c0ea40338861495c3fa170a89"
+    },
+    {
+      "commit": "8a159ed4b79058aba8e6302358733696b33d11ff",
+      "path": "docs/independent-results/2026-10-02/vm-sqlite-review/final/REVIEW-final.md",
+      "sha256": "df8129831cdf34a85c9ab2e701aa21913aec4b4774cd0750c6fde6da0948e8fa"
+    }
+  ],
+  "source_unchanged": true,
+  "prior_preflight_original_artifact_hashes_preserved": true,
+  "note": "첫 preflight stop은 부모 routing clarification 뒤 수정됨. prior record는 현재 panel record를 대체하지 않는다."
+}

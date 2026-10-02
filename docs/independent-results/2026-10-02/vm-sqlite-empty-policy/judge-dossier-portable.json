@@ -1,0 +1,236 @@
+{
+  "case_brief": {
+    "decision": "v3의 existing SQLite(두identity0/전체sqlite_master 공백) 초기화 허용은 failed partial bootstrap/crash retry의 가장 작은 일관적 recovery rule인가? source-grounded policy tradeoff를 판정하라.",
+    "constraints": [
+      "Coordinator와 실제 reviewer/Judge는 gpt-6.1-sol/high를 명시 요청하며 fallback하지 않는다.",
+      "strict required capability가 없거나 관찰 불가면 worker를 생성하지 않는다.",
+      "독립 관점과 fresh Judge를 분리하고 writer를 reviewer로 재사용하지 않는다.",
+      "제품·spec 변경, 새 GO, 운영 효과, 20-run race benchmark 반복 및 Library upload를 하지 않는다.",
+      "과거 실패 제안과 evidence를 보존하고 private GitHub-ready artifact만 준비한다.",
+      "새 mandatory human approval gate를 만들지 않는다."
+    ],
+    "success_criteria": [
+      "provenance 구분의 가능/불가능을 실제 증거와 연결",
+      "현재foreigndata/legacy/runtime 변환 거절 보존",
+      "작은coherent alternative와 범위 tradeoff 평가",
+      "새 승인 gate/marker/framework를 무조건 만들지 않음",
+      "제품/spec 변경 또는 GO 없이 VM root 결정 입력 반환"
+    ]
+  },
+  "material_claims": [
+    {
+      "id": "C1",
+      "statement": "Base는 nonexistent/zero-byte만 신규로 분류한다. v3는 BEGIN IMMEDIATE 뒤 동일 connection에서 application_id=0,user_version=0,전체 sqlite_master 공백을 분류하고 bootstrap을 transaction으로 수행하며 WAL은 commit 뒤 설정한다.",
+      "provenance": [
+        {
+          "locator": "base src/flowmarshal/engine/ledger.py:794-853; evidence commit v3 patch SHA256 40339ffa0ef57f5d6152c289344c7fda0011c70c0ea40338861495c3fa170a89",
+          "verification_status": "verified",
+          "verification_note": "Coordinator가 실제 source와 전체 patch를 읽고 hash/HEAD를 확인했다."
+        }
+      ]
+    },
+    {
+      "id": "C2",
+      "statement": "external WAL-only empty DB와 WAL 상태에서 초기화 DDL/identity를 rollback한 DB의 전체 main bytes가 동일한 4096-byte 반례가 있다. 동일 관측 상태에서 둘만 구분하는 content-only provenance rule은 불가능하다.",
+      "provenance": [
+        {
+          "locator": "provenance-collision.json",
+          "verification_status": "verified",
+          "verification_note": "Coordinator 별도 disposable 재현. 두 전체 DB SHA256=0ab48b25cba617ed3a4acca0161813b314c095ef63544bb4af60769eb1012977. 파일 내용의 동일 사례 하나가 항상 구분 가능하다는 주장을 반증한다."
+        }
+      ]
+    },
+    {
+      "id": "C3",
+      "statement": "root의 실제 v3 imported source probes에서 fresh DELETE metadata rollback/process-exit는 recovered size0/identity0/empty를 남겼고, WAL-precreated 같은 실패는 recovered4096/identity0/empty를 남겼다. 관측된 fresh retry에는 모든 nonzero-empty 수용이 필수는 아니다.",
+      "provenance": [
+        {
+          "locator": "policy_counterexamples.py; counterexample-results.json: delete-bootstrap-rollback,wal-bootstrap-rollback,metadata-crash-delete,metadata-crash-wal",
+          "verification_status": "verified",
+          "verification_note": "Coordinator가 base src를 임시 추출한 뒤 정확한 v3 patch를 적용하고 실제 source import하여 실행. Linux/Python3.12.14/SQLite3.53.1. power-loss/모든 crash 지점 보장 아님."
+        }
+      ]
+    },
+    {
+      "id": "C4",
+      "statement": "fresh DELETE cache-spill crash는 recovery 전 main573440/journal1024 byte이며 base readonly identity precheck가 실패하지만, writable BEGIN IMMEDIATE recovery 뒤 main0/두identity0/전체schemaempty로 돌아온다. 좁은 size rule도 SQLite recovery 이후 잠금 안에서 판단해야 한다.",
+      "provenance": [
+        {
+          "locator": "edge_counterexamples.py; edge-results.json:fresh-delete-spill",
+          "verification_status": "verified",
+          "verification_note": "Coordinator full source import 별도 process exit 1회. baseline 실제 source subprocess 거절과 writer-locked recovered state 직접 확인. narrower initializer 구현 또는 qualification은 하지 않음."
+        }
+      ]
+    },
+    {
+      "id": "C5",
+      "statement": "v3는 외부 table/row, view-only, sqlite_sequence만 남은 DB, nonzero application_id 또는 user_version 상태를 거절한다. committed table/row가 WAL에만 있어 main은 작은 header처럼 보인 경우도 거절하고 main/WAL bytes 및 row를 보존했다.",
+      "provenance": [
+        {
+          "locator": "counterexample-results.json:foreign-plain-table,foreign-view-only,foreign-sequence-after-drop,foreign-application-id-only,historical-version-only; edge-results.json:foreign-committed-in-wal",
+          "verification_status": "verified",
+          "verification_note": "Coordinator의 실제 v3 source disposable 실행으로 해당 cases 확인. 모든 임의 손상/악의적 Engine identity 위조 방어를 증명하지 않는다."
+        }
+      ]
+    },
+    {
+      "id": "C6",
+      "statement": "CREATE/INSERT/DROP 뒤 두 identity0/전체schemaempty인 DB도 v3가 수용한다. secure_delete=OFF에서 synthetic 삭제 문자열이 남는 8192-byte 동일 tuple 반례가 있다. 논리적 emptiness는 never-used나 forensic-byte preservation이 아니다.",
+      "provenance": [
+        {
+          "locator": "counterexample-results.json:dropped-data-with-freelist; dropped-history.json; https://www.sqlite.org/pragma.html#pragma_secure_delete",
+          "verification_status": "verified",
+          "verification_note": "Coordinator가 v3 수용과 별도 SQLite dropped-history/물리 문자열 잔존을 직접 관찰. synthetic marker는 probe 데이터이며 product marker가 아니다."
+        }
+      ]
+    },
+    {
+      "id": "C7",
+      "statement": "schema_version0/freelist0 추가는 pristine WAL rollback를 허용하면서 관측된 DROP-history(schema_version2/freelist1)를 제외하는 작은 state restriction이다. 이는 coherent acceptance 축소 후보이지 provenance 인증이나 모든 지원환경 복구 보장 증명이 아니다.",
+      "provenance": [
+        {
+          "locator": "header-observations.json; auxiliary-evidence.md; dropped-history.json; https://www.sqlite.org/pragma.html#pragma_schema_version",
+          "verification_status": "verified",
+          "verification_note": "Coordinator가 재현 script/output를 확인하고 두 stage4 synthetic DB를 mode=ro로 직접 조회해 추가 값0/0/empty 확인. DROP 값2/1은 root 직접 재현. schema_version 읽기 safe라는 공식본문 확인. alternative 자체 미구현/미qualification."
+        }
+      ]
+    },
+    {
+      "id": "C8",
+      "statement": "ADR/D11/원장/legacy 계약은 separate new schema4 DB, 원본/history 보존, prototype/operating DB 자동 제자리 변환 금지를 요구한다. unmarked logically-empty existing file의 취급과 'new DB'의 물리 파일 출처 범위는 명시하지 않는다. runtime _assert_identity의 기존 Engine/historical 거절 경계는 v3에서 유지된다.",
+      "provenance": [
+        {
+          "locator": "base docs/engine-cutover-adr.md:14-15; docs/redesign-1.0-contract.md:98-100; docs/orchestration-redesign.md:361-365,501-507; src/flowmarshal/engine/ledger.py:816-853; exact v3 patch",
+          "verification_status": "verified",
+          "verification_note": "Coordinator 실제 관련 본문과 identity 함수 대조. 문서 자체가 unobservable provenance를 판별하거나 external-empty 수용을 승인했다는 뜻은 아니다."
+        }
+      ]
+    },
+    {
+      "id": "C9",
+      "statement": "postcommit WAL 또는 artifact-directory 실패는 bootstrap commit 뒤 일어난다. 초기화 예외가 DB 생성 취소나 빈 상태를 보장하지 않으며 완성 Engine DB의 기존 identity 경로가 재시도 대상일 수 있다.",
+      "provenance": [
+        {
+          "locator": "exact v3 patch: connection.commit then journal_mode=WAL then artifact_root.mkdir; preserved independent REVIEW-final.md at evidence commit",
+          "verification_status": "verified",
+          "verification_note": "Coordinator 코드 순서 직접 확인. 가능 상태에 관한 source-grounded 추론이며 새 power-loss/후속 오류 시험 또는 모든 cleanup 성공 보장 아님."
+        }
+      ]
+    }
+  ],
+  "issue_ledger": [
+    {
+      "issue_id": "I1",
+      "status": "CONFIRMED",
+      "rationale": "C2의 전체byte 동일 반례가 provenance의 항상 구분 가능성을 반증한다.",
+      "required_evidence": [
+        "직접 file content collision"
+      ],
+      "available_evidence": [
+        "C2"
+      ]
+    },
+    {
+      "issue_id": "I2",
+      "status": "REFUTED",
+      "rationale": "'세 조건이 모든 crash retry의 유일한 최소 acceptance'라는 보편 명제는 C3/C4/C7의 좁은 coherent 대안과 scope 구분으로 반증된다.",
+      "required_evidence": [
+        "fresh failure 회복 상태와 더 작은 state restrictions"
+      ],
+      "available_evidence": [
+        "C3",
+        "C4",
+        "C7"
+      ]
+    },
+    {
+      "issue_id": "I3",
+      "status": "CONFIRMED",
+      "rationale": "C5/C8에 따라 intact foreign objects/nonzero identity와 역사 runtime 변환 거절 경계는 유지되어야 한다. C6 때문에 physical-history absence까지 주장할 수 없다.",
+      "required_evidence": [
+        "source identity boundary",
+        "foreign/WAL cases",
+        "dropped-history counterexample"
+      ],
+      "available_evidence": [
+        "C5",
+        "C6",
+        "C8"
+      ]
+    },
+    {
+      "issue_id": "I4",
+      "status": "UNRESOLVED",
+      "rationale": "기존 계약은 external logically-empty file 할당과 pristine-only recovery 중 제품 정책 선택을 정하지 않는다. 이는 VM root의 범위 결정이며 새 인간 승인 gate가 아니다.",
+      "required_evidence": [
+        "명확한 회복 지원 범위 결정"
+      ],
+      "available_evidence": [
+        "C8"
+      ]
+    },
+    {
+      "issue_id": "I5",
+      "status": "UNRESOLVED",
+      "rationale": "narrower candidate의 전체 지원 환경/경합/fault qualification은 이 정책 검토에서 구현·실행하지 않았다.",
+      "required_evidence": [
+        "선택하는 별도 candidate의 범위에 맞는 후속 검증"
+      ],
+      "available_evidence": [
+        "C3",
+        "C4",
+        "C7"
+      ]
+    }
+  ],
+  "cross_examination_summary": [
+    {
+      "item": "T1",
+      "origin": "/root/sqlite_contract",
+      "reviewed_by": "/root/sqlite_minimal",
+      "result": "content-identical provenance 반례는 동일 관측 상태의 구분 불가능성만 입증한다. 모든 logically-empty 상태를 받아야 한다는 최소 acceptance 근거는 아니다."
+    },
+    {
+      "item": "T2",
+      "origin": "/root/sqlite_minimal",
+      "reviewed_by": "/root/sqlite_contract",
+      "result": "fresh DELETE retry와 과거 upfront-WAL의 nonzero residue retry를 분리해야 한다. lock/recovery 후 size0 restriction도 앞 범위에는 coherent하나 전체qualification은 미실행."
+    },
+    {
+      "item": "T3",
+      "origin": "/root/sqlite_minimal",
+      "reviewed_by": "/root/sqlite_recovery",
+      "result": "schema_version0/freelist0은 관측pristineWAL rollback를 허용하며 일부DROP-history를 제외한다. provenance는 인증 못한다. 더 작은 coherent acceptance 후보를 배제하지 않음."
+    }
+  ],
+  "adaptive_summary": {
+    "specialist_used": false,
+    "redeliberation_used": false,
+    "reason": "확인된 소수material counterexample와 세 failure function의 1회씩 cross-examination으로 질문 범위 충분. 남은 정책 선택/플랫폼 qualification은 specialist로 해결하는 이 범위의 evidence gap이 아니다."
+  },
+  "candidate_axes": [
+    "Recovery scope",
+    "Provenance and ownership",
+    "Foreign-data / legacy contract",
+    "Minimality and alternatives",
+    "Policy authority and assurance limits"
+  ],
+  "candidate_decisions": [
+    {
+      "option": "삼중 predicate v3",
+      "tradeoff": "logical-empty container allocation을 정책으로 선택하면 간단·일관적이고 nonzero-empty retry를 포괄한다. external-empty와 DROP-history-empty도 수용."
+    },
+    {
+      "option": "recovery 뒤 size0로 제한",
+      "tradeoff": "fresh DELETE-file retry에는 좁은 coherent 후보. 기존 nonzero WAL empty residue를 보존·거절하고 다른 새 경로에서 복구할 수 있음. readonly precheck/초기stat 기준으로 돌아가면 hotjournal/race 문제."
+    },
+    {
+      "option": "추가schema_version0/freelist0",
+      "tradeoff": "일부 past-use empty 상태를 작은 조건으로 제외하면서 관측pristineWAL rollback를 포함하는 후보. actual author implementation/qualification 아님."
+    }
+  ],
+  "allowed_evidence_root": "/workspace/scratch/vm-sqlite-decision-panel",
+  "raw_reviewer_output_included": false,
+  "requested_verdict": "추천 범위와 exact minimality qualification, 축별 verified claim 연결, 필수조치와 선택대안, remaining blockers. source 적용/GO 승인 판정 아님.",
+  "publication_note": "Locator를 bundle-relative로 정리한 게시용 사본. 실제 Judge에게 전달한 원본은 judge-dossier.json이며 material statements/verification status는 같다."
+}

@@ -1,0 +1,187 @@
+{
+  "python": "3.12.14",
+  "sqlite": "3.53.1",
+  "base": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "patch_sha256": "40339ffa0ef57f5d6152c289344c7fda0011c70c0ea40338861495c3fa170a89",
+  "cases": [
+    {
+      "case": "external-vacuum",
+      "before": {
+        "size": 4096,
+        "application_id": 0,
+        "user_version": 0,
+        "objects": [],
+        "journal_mode": "delete",
+        "integrity": "ok"
+      },
+      "accepted": true,
+      "rejected_bytes_preserved": false
+    },
+    {
+      "case": "external-wal-header",
+      "before": {
+        "size": 4096,
+        "application_id": 0,
+        "user_version": 0,
+        "objects": [],
+        "journal_mode": "wal",
+        "integrity": "ok"
+      },
+      "accepted": true,
+      "rejected_bytes_preserved": false
+    },
+    {
+      "case": "foreign-plain-table",
+      "before": {
+        "size": 8192,
+        "application_id": 0,
+        "user_version": 0,
+        "objects": [
+          [
+            "table",
+            "foreign_data"
+          ]
+        ],
+        "journal_mode": "delete",
+        "integrity": "ok"
+      },
+      "accepted": false,
+      "rejected_bytes_preserved": true
+    },
+    {
+      "case": "foreign-view-only",
+      "before": {
+        "size": 4096,
+        "application_id": 0,
+        "user_version": 0,
+        "objects": [
+          [
+            "view",
+            "foreign_view"
+          ]
+        ],
+        "journal_mode": "delete",
+        "integrity": "ok"
+      },
+      "accepted": false,
+      "rejected_bytes_preserved": true
+    },
+    {
+      "case": "foreign-sequence-after-drop",
+      "before": {
+        "size": 12288,
+        "application_id": 0,
+        "user_version": 0,
+        "objects": [
+          [
+            "table",
+            "sqlite_sequence"
+          ]
+        ],
+        "journal_mode": "delete",
+        "integrity": "ok"
+      },
+      "accepted": false,
+      "rejected_bytes_preserved": true
+    },
+    {
+      "case": "foreign-application-id-only",
+      "before": {
+        "size": 4096,
+        "application_id": 12345,
+        "user_version": 0,
+        "objects": [],
+        "journal_mode": "delete",
+        "integrity": "ok"
+      },
+      "accepted": false,
+      "rejected_bytes_preserved": true
+    },
+    {
+      "case": "historical-version-only",
+      "before": {
+        "size": 4096,
+        "application_id": 0,
+        "user_version": 3,
+        "objects": [],
+        "journal_mode": "delete",
+        "integrity": "ok"
+      },
+      "accepted": false,
+      "rejected_bytes_preserved": true
+    },
+    {
+      "case": "dropped-data-with-freelist",
+      "before": {
+        "size": 8192,
+        "application_id": 0,
+        "user_version": 0,
+        "objects": [],
+        "journal_mode": "delete",
+        "integrity": "ok"
+      },
+      "accepted": true,
+      "rejected_bytes_preserved": false
+    },
+    {
+      "case": "delete-bootstrap-rollback",
+      "before": {
+        "size": 0,
+        "application_id": 0,
+        "user_version": 0,
+        "objects": [],
+        "journal_mode": "delete",
+        "integrity": "ok"
+      },
+      "retry_success": true,
+      "old_size_predicate_would_accept": true
+    },
+    {
+      "case": "wal-bootstrap-rollback",
+      "before": {
+        "size": 4096,
+        "application_id": 0,
+        "user_version": 0,
+        "objects": [],
+        "journal_mode": "wal",
+        "integrity": "ok"
+      },
+      "retry_success": true,
+      "old_size_predicate_would_accept": false
+    },
+    {
+      "case": "metadata-crash-delete",
+      "before": {
+        "size": 0,
+        "application_id": 0,
+        "user_version": 0,
+        "objects": [],
+        "journal_mode": "delete",
+        "integrity": "ok"
+      },
+      "retry_success": true,
+      "old_size_predicate_would_accept": true
+    },
+    {
+      "case": "metadata-crash-wal",
+      "before": {
+        "size": 4096,
+        "application_id": 0,
+        "user_version": 0,
+        "objects": [],
+        "journal_mode": "wal",
+        "integrity": "ok"
+      },
+      "retry_success": true,
+      "old_size_predicate_would_accept": false
+    }
+  ],
+  "case_count": 12,
+  "status": "PASS",
+  "limits": [
+    "synthetic only",
+    "2 process exits; no power-loss durability proof",
+    "no race benchmark",
+    "empty schema does not prove no historical bytes"
+  ]
+}

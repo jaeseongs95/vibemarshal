@@ -1,0 +1,38 @@
+{
+  "sqlite": "3.53.1",
+  "python": "3.12.14",
+  "status": "PASS",
+  "cases": {
+    "fresh-delete-spill": {
+      "process_exit": 75,
+      "before_recovery": {
+        "main_bytes": 573440,
+        "journal_bytes": 1024
+      },
+      "baseline_readonly_precheck": {
+        "type": "OperationalError",
+        "message": "attempt to write a readonly database"
+      },
+      "writer_locked_recovered_state": {
+        "main_bytes": 0,
+        "application_id": 0,
+        "user_version": 0,
+        "schema_version": 0,
+        "freelist_count": 0,
+        "objects": []
+      }
+    },
+    "foreign-committed-in-wal": {
+      "main_bytes": 4096,
+      "wal_bytes": 12392,
+      "rejected": true,
+      "main_and_wal_bytes_preserved": true,
+      "row_preserved": 7
+    }
+  },
+  "limits": [
+    "Linux synthetic; no Windows or power loss proof",
+    "one spill process exit, no race benchmark",
+    "does not implement or qualify a narrower candidate"
+  ]
+}

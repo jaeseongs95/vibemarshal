@@ -1,0 +1,184 @@
+{
+  "coordinator_routing": {
+    "provenance": "parent-reported exposed cloud_threads.create admission, relayed by user message",
+    "thread_id": "01a0f9d3-1635-735f-a6dd-e15cad99103b",
+    "turn_id": "01a0f9d3-1e32-77c9-8c3e-ef8000f10828",
+    "requested_model": "gpt-6.1-sol",
+    "requested_thinking": "high",
+    "admitted_status": "started",
+    "independently_requeried": false,
+    "effective_model": null,
+    "effective_reasoning": null,
+    "effective_status": "NOT_OBSERVABLE"
+  },
+  "events": [
+    {
+      "seq": 1,
+      "tool": "collaboration.spawn_agent",
+      "role": "reviewer",
+      "id": "/root/sqlite_recovery",
+      "request": {
+        "fork_turns": "none",
+        "model": "gpt-6.1-sol",
+        "reasoning_effort": "high"
+      },
+      "admitted": true
+    },
+    {
+      "seq": 2,
+      "tool": "collaboration.spawn_agent",
+      "role": "reviewer",
+      "id": "/root/sqlite_contract",
+      "request": {
+        "fork_turns": "none",
+        "model": "gpt-6.1-sol",
+        "reasoning_effort": "high"
+      },
+      "admitted": true
+    },
+    {
+      "seq": 3,
+      "tool": "collaboration.spawn_agent",
+      "role": "reviewer",
+      "id": "/root/sqlite_minimal",
+      "request": {
+        "fork_turns": "none",
+        "model": "gpt-6.1-sol",
+        "reasoning_effort": "high"
+      },
+      "admitted": true
+    },
+    {
+      "seq": 4,
+      "tool": "collaboration.list_agents",
+      "running_ids": [
+        "/root",
+        "/root/sqlite_contract",
+        "/root/sqlite_minimal",
+        "/root/sqlite_recovery"
+      ]
+    },
+    {
+      "seq": 5,
+      "tool": "exposed child FINAL_ANSWER notification",
+      "phase": "round1",
+      "completed_id": "/root/sqlite_contract"
+    },
+    {
+      "seq": 6,
+      "tool": "exposed child FINAL_ANSWER notification",
+      "phase": "round1",
+      "completed_id": "/root/sqlite_minimal"
+    },
+    {
+      "seq": 7,
+      "tool": "collaboration.followup_task",
+      "phase": "cross_examination",
+      "id": "/root/sqlite_contract",
+      "trigger_ids": [
+        "T2"
+      ],
+      "reuse": true
+    },
+    {
+      "seq": 8,
+      "tool": "collaboration.followup_task",
+      "phase": "cross_examination",
+      "id": "/root/sqlite_minimal",
+      "trigger_ids": [
+        "T1"
+      ],
+      "reuse": true
+    },
+    {
+      "seq": 9,
+      "tool": "exposed child FINAL_ANSWER notification",
+      "phase": "cross_examination",
+      "completed_id": "/root/sqlite_contract"
+    },
+    {
+      "seq": 10,
+      "tool": "exposed child FINAL_ANSWER notification",
+      "phase": "cross_examination",
+      "completed_id": "/root/sqlite_minimal"
+    },
+    {
+      "seq": 11,
+      "tool": "exposed child FINAL_ANSWER notification",
+      "phase": "round1",
+      "completed_id": "/root/sqlite_recovery"
+    },
+    {
+      "seq": 12,
+      "tool": "collaboration.followup_task",
+      "phase": "cross_examination",
+      "id": "/root/sqlite_recovery",
+      "trigger_ids": [
+        "T3"
+      ],
+      "reuse": true
+    },
+    {
+      "seq": 13,
+      "tool": "exposed child FINAL_ANSWER notification",
+      "phase": "cross_examination",
+      "completed_id": "/root/sqlite_recovery"
+    },
+    {
+      "seq": 14,
+      "tool": "collaboration.spawn_agent",
+      "role": "fresh_judge",
+      "id": "/root/sqlite_judge",
+      "request": {
+        "fork_turns": "none",
+        "model": "gpt-6.1-sol",
+        "reasoning_effort": "high"
+      },
+      "admitted": true,
+      "dossier_path": "judge-dossier.json",
+      "prior_participation": false,
+      "dossier_sha256": "321d5beeac7fa64ba42cc21753f01e62e26a9327d3b7b07338fc4685672d94bc",
+      "dossier_material_statements_frozen": true
+    },
+    {
+      "seq": 15,
+      "tool": "collaboration.list_agents",
+      "completed_ids": [
+        "/root/sqlite_contract",
+        "/root/sqlite_minimal",
+        "/root/sqlite_recovery"
+      ],
+      "running_ids": [
+        "/root",
+        "/root/sqlite_judge"
+      ]
+    },
+    {
+      "seq": 16,
+      "tool": "exposed child FINAL_ANSWER notification",
+      "phase": "final_judge",
+      "completed_id": "/root/sqlite_judge"
+    },
+    {
+      "seq": 17,
+      "tool": "collaboration.list_agents",
+      "completed_ids": [
+        "/root/sqlite_contract",
+        "/root/sqlite_minimal",
+        "/root/sqlite_recovery",
+        "/root/sqlite_judge"
+      ],
+      "running_ids": [
+        "/root"
+      ]
+    }
+  ],
+  "limits": [
+    "seq는 기록된 lifecycle 사건의 관측 순서이며 절대시각/완전 tool-call transcript가 아니다.",
+    "일부reviewer cross-exam은 다른reviewer의 round1 완료 전에 진행됐다. Judge는 모든reviewer의 round1/cross-exam 완료 뒤 생성됐다.",
+    "canonical names는 도구 응답 identity이며 provider UUID/실제 격리·effective 설정의 외부 증명이 아니다.",
+    "모든actual/effective model/effort는 provider 미제공 null; fallback 없음.",
+    "raw role outputs 또는 대화 transcript를 포함하지 않는다.",
+    "judge-dossier-portable.json은 locator만 portable로 정리한 게시용 사본이며 Judge의 실제 briefing은 원본 judge-dossier.json이다."
+  ]
+}

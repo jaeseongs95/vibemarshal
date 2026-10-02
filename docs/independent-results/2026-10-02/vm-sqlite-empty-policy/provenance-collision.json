@@ -1,0 +1,8 @@
+{
+  "external_empty_sha256": "0ab48b25cba617ed3a4acca0161813b314c095ef63544bb4af60769eb1012977",
+  "rollback_empty_sha256": "0ab48b25cba617ed3a4acca0161813b314c095ef63544bb4af60769eb1012977",
+  "byte_equal": true,
+  "bytes": 4096,
+  "sqlite": "3.53.1",
+  "limits": "whole-file identical counterexample only; not proof every failure history is identical"
+}

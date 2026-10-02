@@ -1,0 +1,1011 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Independent Deliberation Panel DecisionRecord v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "case_brief",
+    "run",
+    "panel_manifest",
+    "constraints",
+    "required_constraints",
+    "material_claims",
+    "cross_examination",
+    "issue_ledger",
+    "axis_decisions",
+    "consensus_proposal",
+    "observability",
+    "method_notes",
+    "skill_version",
+    "preflight"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "type": "string"
+    },
+    "case_brief": {
+      "$ref": "#/$defs/caseBrief"
+    },
+    "run": {
+      "$ref": "#/$defs/run"
+    },
+    "panel_manifest": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/worker"
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "required_constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "material_claims": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/claim"
+      }
+    },
+    "cross_examination": {
+      "$ref": "#/$defs/crossExam"
+    },
+    "issue_ledger": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/issue"
+      }
+    },
+    "axis_decisions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/axis"
+      }
+    },
+    "consensus_proposal": {
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "action",
+        "supported_by_verified_claims",
+        "satisfied_constraints",
+        "axis_alignment",
+        "conditions",
+        "unresolved_dissent",
+        "no_consensus_reason",
+        "remaining_options",
+        "decision_owner"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "consensus",
+            "conditional_consensus",
+            "no_consensus"
+          ],
+          "type": "string"
+        },
+        "action": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "supported_by_verified_claims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "satisfied_constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "axis_alignment": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "axis",
+              "decision_ref"
+            ],
+            "properties": {
+              "axis": {
+                "type": "string"
+              },
+              "decision_ref": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unresolved_dissent": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "statement",
+              "material"
+            ],
+            "properties": {
+              "statement": {
+                "type": "string"
+              },
+              "material": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "no_consensus_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "remaining_options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "decision_owner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "observability": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "wall_time",
+        "tokens",
+        "tool_calls",
+        "worker_count"
+      ],
+      "properties": {
+        "wall_time": {
+          "anyOf": [
+            {
+              "type": "number",
+              "minimum": 0
+            },
+            {
+              "type": "string",
+              "const": "NOT_OBSERVABLE"
+            }
+          ]
+        },
+        "tokens": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "string",
+              "const": "NOT_OBSERVABLE"
+            }
+          ]
+        },
+        "tool_calls": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "string",
+              "const": "NOT_OBSERVABLE"
+            }
+          ]
+        },
+        "worker_count": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0
+            },
+            {
+              "type": "string",
+              "const": "NOT_OBSERVABLE"
+            }
+          ]
+        }
+      }
+    },
+    "method_notes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "skill_version": {
+      "const": "1.0.0",
+      "type": "string"
+    },
+    "preflight": {
+      "$ref": "#/$defs/preflight"
+    }
+  },
+  "$defs": {
+    "worker": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "role",
+        "status",
+        "is_judge",
+        "instantiated",
+        "requested_model",
+        "actual_model",
+        "requested_reasoning",
+        "actual_reasoning",
+        "fallback_reason",
+        "classification",
+        "blind_round1",
+        "context_isolated",
+        "participated_stages"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "enum": [
+            "planned",
+            "running",
+            "completed",
+            "failed",
+            "skipped",
+            "reused"
+          ],
+          "type": "string"
+        },
+        "is_judge": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "instantiated": {
+          "type": "boolean"
+        },
+        "requested_model": {
+          "type": "string"
+        },
+        "actual_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "requested_reasoning": {
+          "type": "string"
+        },
+        "actual_reasoning": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fallback_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "classification": {
+          "type": "string",
+          "enum": [
+            "reviewer",
+            "judge",
+            "adaptive_specialist"
+          ]
+        },
+        "blind_round1": {
+          "type": "boolean"
+        },
+        "context_isolated": {
+          "type": "boolean"
+        },
+        "participated_stages": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "round1",
+              "cross_examination",
+              "evidence",
+              "adaptive_specialist",
+              "redeliberation",
+              "final_judge"
+            ]
+          }
+        }
+      }
+    },
+    "run": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "stage",
+        "strict",
+        "worker_cap",
+        "workers",
+        "completed_worker_ids",
+        "reused_worker_ids",
+        "failures",
+        "fresh_judge_id",
+        "candidate_skill_sha256",
+        "assurance",
+        "specialist_additions",
+        "redeliberations",
+        "judge_fallback",
+        "capability_shortfall"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "stage": {
+          "enum": [
+            "LOW",
+            "MEDIUM",
+            "HIGH",
+            "CRITICAL"
+          ],
+          "type": "string"
+        },
+        "strict": {
+          "type": "boolean"
+        },
+        "worker_cap": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        },
+        "workers": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/worker"
+          }
+        },
+        "completed_worker_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reused_worker_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "failures": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "worker_id",
+              "reason"
+            ],
+            "properties": {
+              "worker_id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "fresh_judge_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "candidate_skill_sha256": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "description": "Evaluation-only deterministic SHA-256 of the complete candidate skill package, excluding generated evaluation results.",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "assurance": {
+          "enum": [
+            "independent",
+            "partially_independent",
+            "single_agent",
+            "provisional"
+          ],
+          "type": "string"
+        },
+        "specialist_additions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "reason",
+              "admission_reason",
+              "worker_id",
+              "classification",
+              "admission"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "reason": {
+                "type": "string"
+              },
+              "admission_reason": {
+                "type": "string"
+              },
+              "worker_id": {
+                "type": "string"
+              },
+              "classification": {
+                "const": "adaptive_specialist",
+                "type": "string"
+              },
+              "admission": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": [
+                  "material_gap",
+                  "distinct_capability",
+                  "verdict_change_possible",
+                  "cap_available"
+                ],
+                "properties": {
+                  "material_gap": {
+                    "const": true,
+                    "type": "boolean"
+                  },
+                  "distinct_capability": {
+                    "const": true,
+                    "type": "boolean"
+                  },
+                  "verdict_change_possible": {
+                    "const": true,
+                    "type": "boolean"
+                  },
+                  "cap_available": {
+                    "const": true,
+                    "type": "boolean"
+                  }
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "redeliberations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "impacted_scope",
+              "participant_worker_ids",
+              "reason",
+              "non_independent"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "impacted_scope": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "participant_worker_ids": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 2,
+                "items": {
+                  "type": "string"
+                }
+              },
+              "reason": {
+                "type": "string"
+              },
+              "non_independent": {
+                "const": true,
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "judge_fallback": {
+          "type": [
+            "null",
+            "object"
+          ],
+          "required": [
+            "reason",
+            "provisional"
+          ],
+          "properties": {
+            "reason": {
+              "type": "string",
+              "minLength": 1
+            },
+            "provisional": {
+              "const": true,
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "capability_shortfall": {
+          "type": "boolean"
+        }
+      }
+    },
+    "caseBrief": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "facts",
+        "assumptions",
+        "constraints",
+        "unknowns",
+        "success_criteria",
+        "failure_modes"
+      ],
+      "properties": {
+        "decision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "facts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unknowns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "success_criteria": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "failure_modes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "issue_id",
+        "status",
+        "rationale",
+        "required_evidence",
+        "available_evidence"
+      ],
+      "properties": {
+        "issue_id": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "CONFIRMED",
+            "REFUTED",
+            "PARTIALLY_SUPPORTED",
+            "UNRESOLVED",
+            "NOT_OBSERVABLE"
+          ],
+          "type": "string"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "required_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "available_evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "statement",
+        "provenance"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "statement": {
+          "type": "string",
+          "minLength": 1
+        },
+        "provenance": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "locator",
+              "verification_status",
+              "verification_note"
+            ],
+            "properties": {
+              "locator": {
+                "type": "string",
+                "minLength": 1
+              },
+              "verification_status": {
+                "enum": [
+                  "verified",
+                  "unverified",
+                  "refuted",
+                  "not_observable"
+                ],
+                "type": "string"
+              },
+              "verification_note": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "crossExam": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "decision",
+        "reason",
+        "trigger_items",
+        "selected_item_ids",
+        "coverage",
+        "followups"
+      ],
+      "properties": {
+        "decision": {
+          "enum": [
+            "run",
+            "skip"
+          ],
+          "type": "string"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "trigger_items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "origin_reviewer"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "origin_reviewer": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "selected_item_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "coverage": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "item_id",
+              "reviewer_ids"
+            ],
+            "properties": {
+              "item_id": {
+                "type": "string"
+              },
+              "reviewer_ids": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "followups": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "reviewer_id",
+              "item_ids"
+            ],
+            "properties": {
+              "reviewer_id": {
+                "type": "string"
+              },
+              "item_ids": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 2,
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      }
+    },
+    "axis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "axis",
+        "decision",
+        "evidence_claim_ids"
+      ],
+      "properties": {
+        "axis": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_claim_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "consensus": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "action",
+        "supported_by_verified_claims",
+        "satisfied_constraints",
+        "axis_alignment",
+        "conditions",
+        "unresolved_dissent",
+        "no_consensus_reason",
+        "remaining_options",
+        "decision_owner"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "consensus",
+            "conditional_consensus",
+            "no_consensus"
+          ],
+          "type": "string"
+        },
+        "action": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "supported_by_verified_claims": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "satisfied_constraints": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "axis_alignment": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "axis",
+              "decision_ref"
+            ],
+            "properties": {
+              "axis": {
+                "type": "string"
+              },
+              "decision_ref": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unresolved_dissent": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "statement",
+              "material"
+            ],
+            "properties": {
+              "statement": {
+                "type": "string"
+              },
+              "material": {
+                "type": "boolean"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "no_consensus_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "remaining_options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "decision_owner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "preflight": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required_capabilities",
+        "observed_capabilities",
+        "missing_capabilities",
+        "supported_models_reasoning"
+      ],
+      "properties": {
+        "required_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "observed_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "missing_capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "supported_models_reasoning": {
+          "anyOf": [
+            {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            {
+              "type": "string",
+              "const": "NOT_OBSERVABLE"
+            }
+          ]
+        }
+      }
+    }
+  }
+}
