@@ -1,0 +1,6 @@
+/workspace/vm-e-r2-evidence/reviewer-boundary.bundle is okay
+The bundle contains this ref:
+f862dc4f948dde8b6f429bcbaa073f03ce41a70f refs/heads/dot/vm-goal-verdict-proposal-r2-20261002
+The bundle requires this ref:
+d6956481a964f1b84fb88baa03218a3034f8978d 
+The bundle uses this hash algorithm: sha1

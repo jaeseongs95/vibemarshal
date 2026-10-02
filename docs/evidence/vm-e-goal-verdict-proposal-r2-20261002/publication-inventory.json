@@ -1,0 +1,393 @@
+{
+  "format": "vm-e-r2-publication-v1",
+  "implementation_candidate": "f862dc4f948dde8b6f429bcbaa073f03ce41a70f",
+  "candidate_tree": "9388e2ade7f28341034b7d8c0271e59dcf4bc847",
+  "candidate_parent": "927f9d2936635d8c987c2a3a4092e6e4dc2c742b",
+  "remote_before": "d6956481a964f1b84fb88baa03218a3034f8978d",
+  "mode": "same proposal branch fast-forward only",
+  "product_files": [
+    "src/flowmarshal/engine/service.py",
+    "tests/test_engine_goal_verdict_authority.py"
+  ],
+  "source_scope": "record_goal_verdict only; AST range excluded comparison confirms all outside bytes unchanged from original base",
+  "evidence_separate": true,
+  "files": [
+    {
+      "path": "before_frozen.py",
+      "source": "/workspace/vm-e-r2-evidence/before_frozen.py",
+      "bytes": 1091,
+      "sha256": "349de1eed8fcb5b0a6487d734953bfe50f2935dce1c2da0d2ac628b71131a373",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "commands.jsonl",
+      "source": "/workspace/vm-e-r2-evidence/commands.jsonl",
+      "bytes": 10366,
+      "sha256": "ddcac0dd2810b8bf30f39dd8d7fb73f3d5ce30725bcff53de477f9762e23be67",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "frozen-r1-before.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/frozen-r1-before.raw.txt",
+      "bytes": 5381,
+      "sha256": "8f5360806920db0d429fcbb19f31bafdf9f944453f17098a31e11e9dcd3fcb23",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "frozen-r2-status.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/frozen-r2-status.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "old-proposal-preserved.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/old-proposal-preserved.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "prepare_report.py",
+      "source": "/workspace/vm-e-r2-evidence/prepare_report.py",
+      "bytes": 7681,
+      "sha256": "005eb1e8c0648b93a1e300fb66cffb9468bfb00e83cf9ae7eb1592753627404c",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "r1-compatibility-before.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/r1-compatibility-before.raw.txt",
+      "bytes": 5554,
+      "sha256": "ae19027d4541dba9f81290cba78116e9dbc377f8e57c0f5048459c5ac1078a7a",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "r1-patch-check.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/r1-patch-check.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "r2-bundle-verify.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/r2-bundle-verify.raw.txt",
+      "bytes": 292,
+      "sha256": "33d8eb0d01e5fa33ba85f7ead29f23cd2fe3bbb2b08244cdbd39dcf39af046a5",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "r2-commit.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/r2-commit.raw.txt",
+      "bytes": 192,
+      "sha256": "de09333165b3afbe632c5c0e3bdd0de6d4d4f8465cdbc0fb414a4633504ffb3a",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "r2-diff.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/r2-diff.raw.txt",
+      "bytes": 11750,
+      "sha256": "e634a173b2bf17401f4bbe7c05a772ac0e0d73632787aa3929e291bcfb3158ce",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "r2-identity.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/r2-identity.raw.txt",
+      "bytes": 123,
+      "sha256": "b73f9aa2ff8c7d2c362e68bcf8127afd5903f255df22114be6d904ff65ef4173",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "r2-local-bundle.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/r2-local-bundle.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "r2-ownership.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/r2-ownership.raw.txt",
+      "bytes": 89,
+      "sha256": "301b10f95860b271d92a540d81425fb0c6a67813f5eb512bae31bf22019a723b",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "r2-stage.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/r2-stage.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "r2-staged-diff-check.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/r2-staged-diff-check.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "r2-targeted-after.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/r2-targeted-after.raw.txt",
+      "bytes": 3651,
+      "sha256": "83a2c97b1a6a548f0fcd168fd893de22cea84f28baf41c90a8e9b2e8debee154",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "r2.patch",
+      "source": "/workspace/vm-e-r2-evidence/r2.patch",
+      "bytes": 11750,
+      "sha256": "e634a173b2bf17401f4bbe7c05a772ac0e0d73632787aa3929e291bcfb3158ce",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "report.json",
+      "source": "/workspace/vm-e-r2-evidence/report.json",
+      "bytes": 12192,
+      "sha256": "4e13d5d4e7377d0e22eb8f0ffebac0f122b088c853d2dec6579a7879a949a115",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "report.txt",
+      "source": "/workspace/vm-e-r2-evidence/report.txt",
+      "bytes": 3547,
+      "sha256": "ff94aa5365b7ffb5567bd61c2c0bfd415f52e0323977c934db68b9d2e30733a2",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "reviewer-boundary-after.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/reviewer-boundary-after.raw.txt",
+      "bytes": 3651,
+      "sha256": "6a24e3ed361ad90e22e4019c72292bd62a6c6730f2bb29130b79b2e39ce9b7f1",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "reviewer-boundary-bundle-verify.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/reviewer-boundary-bundle-verify.raw.txt",
+      "bytes": 298,
+      "sha256": "5a9165ca715a40cc584b2245340d0b6fe37e7273389f397e0253bbd0196bb4aa",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "reviewer-boundary-bundle.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/reviewer-boundary-bundle.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "reviewer-boundary-commit.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/reviewer-boundary-commit.raw.txt",
+      "bytes": 174,
+      "sha256": "d0a24f74c5b1811bee1f96b0b52c667efda8f8830eac982b2810079977d05211",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "reviewer-boundary-diff-check.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/reviewer-boundary-diff-check.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "reviewer-boundary-final.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/reviewer-boundary-final.raw.txt",
+      "bytes": 3651,
+      "sha256": "f523897df66e7e2d3fdbf08741e51f36cdd6d3e39e83c90f3e8851a159fcd4d4",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "reviewer-boundary-patch-check.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/reviewer-boundary-patch-check.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "reviewer-boundary-r1-before.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/reviewer-boundary-r1-before.raw.txt",
+      "bytes": 5374,
+      "sha256": "7e35e1b683e859dab567026d2746a64b25aa14994c72bd02f5fd6cb4afa65e56",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "reviewer-boundary-report.json",
+      "source": "/workspace/vm-e-r2-evidence/reviewer-boundary-report.json",
+      "bytes": 18516,
+      "sha256": "32b9c27701d677758d4f709f182b2da3f28fac2bb30a4c9edbac46e775ae2b1c",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "reviewer-boundary-report.txt",
+      "source": "/workspace/vm-e-r2-evidence/reviewer-boundary-report.txt",
+      "bytes": 3841,
+      "sha256": "80d802510e07160919aa2774e480aa89f169020896bf05b99774ee9e156e9cc2",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "reviewer-boundary-stage.raw.txt",
+      "source": "/workspace/vm-e-r2-evidence/reviewer-boundary-stage.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "reviewer-boundary.patch",
+      "source": "/workspace/vm-e-r2-evidence/reviewer-boundary.patch",
+      "bytes": 17341,
+      "sha256": "45f1ce52322e880994afaa3ccf2f2d231fbf95420551574e6e71af6f75125df4",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "run.py",
+      "source": "/workspace/vm-e-r2-evidence/run.py",
+      "bytes": 1092,
+      "sha256": "0252ea7991d7024b0a8c4bd4d714969a508d1e7423082da9ee8c9aee2a922564",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "publication-preflight/remote-preflight.raw.txt",
+      "source": "/workspace/vm-e-r2-publication/remote-preflight.raw.txt",
+      "bytes": 147,
+      "sha256": "5d2e28008bc6e3db49f19dae465f4dadd62c017fbebd62389ac43c8066813ae9",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "publication-preflight/remote-fetch-before.raw.txt",
+      "source": "/workspace/vm-e-r2-publication/remote-fetch-before.raw.txt",
+      "bytes": 121,
+      "sha256": "9113f2d0c0cab01aeef1ac7a181408c68df66c8a3180608be851fe644d49822f",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "publication-preflight/ancestry-and-product-scope.raw.txt",
+      "source": "/workspace/vm-e-r2-publication/ancestry-and-product-scope.raw.txt",
+      "bytes": 1467,
+      "sha256": "7267141155174f9f910c061205b6456ce59400fbc72c6f5a0eb717a760d59c47",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "publication-preflight/run.py",
+      "source": "/workspace/vm-e-r2-publication/run.py",
+      "bytes": 1095,
+      "sha256": "0aa6cabe41b29950f18ef24d701da1007820acd77cb2f4387d56d68e25f09230",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "publication-preflight/verify_scope.py",
+      "source": "/workspace/vm-e-r2-publication/verify_scope.py",
+      "bytes": 2223,
+      "sha256": "593075e38ef009184ed41a8e28486e371533905280585102ddd5cce873eb9bd9",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "publication-preflight/prepare_artifacts.py",
+      "source": "/workspace/vm-e-r2-publication/prepare_artifacts.py",
+      "bytes": 8994,
+      "sha256": "4ee4ac0a50a5b97e36d8a7421079ef68b73610ccb7f3d0ab2af35fdf6edfd0bc",
+      "sanitization": "utf8 text, no NUL/symlink/binary/credential pattern; synthetic fixture reports only; preserved original bytes"
+    },
+    {
+      "path": "cumulative-product.diff",
+      "bytes": 21606,
+      "sha256": "7c65093a8eef1c04d4046fa8ed0457906c382ed97176a3611e141b2659843dd5",
+      "origin": "exact git diff scoped to product files"
+    },
+    {
+      "path": "compatibility-boundary.diff",
+      "bytes": 17341,
+      "sha256": "45f1ce52322e880994afaa3ccf2f2d231fbf95420551574e6e71af6f75125df4",
+      "origin": "exact git diff scoped to product files"
+    },
+    {
+      "path": "publication-preflight/prepare-revision-packet.raw.txt",
+      "source": "/workspace/vm-e-r2-publication/prepare-revision-packet.raw.txt",
+      "bytes": 222,
+      "sha256": "9eeee472a8b445a832f7490315ae58ca75ee38b9c76c5b04d7d1dd39a0878642",
+      "sanitization": "utf8/no NUL/no credential patterns; local artifact verification only"
+    },
+    {
+      "path": "publication-preflight/stage-revision-evidence.raw.txt",
+      "source": "/workspace/vm-e-r2-publication/stage-revision-evidence.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitization": "utf8/no NUL/no credential patterns; local artifact verification only"
+    },
+    {
+      "path": "publication-preflight/staged-evidence-diff-check.raw.txt",
+      "source": "/workspace/vm-e-r2-publication/staged-evidence-diff-check.raw.txt",
+      "bytes": 3741,
+      "sha256": "273a5617309a3a0cbff29c91370fefb1023ae2c4e1374be693fc8d7873b46f5d",
+      "sanitization": "utf8/no NUL/no credential patterns; local artifact verification only"
+    },
+    {
+      "path": "publication-preflight/verify-artifact-stage.raw.txt",
+      "source": "/workspace/vm-e-r2-publication/verify-artifact-stage.raw.txt",
+      "bytes": 245,
+      "sha256": "6e71e7dc2b9747af5750084971b214aff69f13a294461c8b624d3ef80c8d9ffb",
+      "sanitization": "utf8/no NUL/no credential patterns; local artifact verification only"
+    },
+    {
+      "path": "publication-preflight/restage-revision-evidence.raw.txt",
+      "source": "/workspace/vm-e-r2-publication/restage-revision-evidence.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitization": "utf8/no NUL/no credential patterns; local artifact verification only"
+    },
+    {
+      "path": "publication-preflight/verify-artifact-stage-final.raw.txt",
+      "source": "/workspace/vm-e-r2-publication/verify-artifact-stage-final.raw.txt",
+      "bytes": 200,
+      "sha256": "5923c5cdd6c14156be19ccba15d525fddf044b72a65b46ffec07680a932af1fa",
+      "sanitization": "utf8/no NUL/no credential patterns; local artifact verification only"
+    },
+    {
+      "path": "publication-preflight/generated-evidence-whitespace-check.raw.txt",
+      "source": "/workspace/vm-e-r2-publication/generated-evidence-whitespace-check.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitization": "utf8/no NUL/no credential patterns; local artifact verification only"
+    },
+    {
+      "path": "publication-preflight/cumulative-product-whitespace-check.raw.txt",
+      "source": "/workspace/vm-e-r2-publication/cumulative-product-whitespace-check.raw.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "sanitization": "utf8/no NUL/no credential patterns; local artifact verification only"
+    },
+    {
+      "path": "publication-preflight/verify_artifact_stage.py",
+      "source": "/workspace/vm-e-r2-publication/verify_artifact_stage.py",
+      "bytes": 1239,
+      "sha256": "424136e10bd775646917890e474bdd887b5c7b521fd7e509231d470f06638948",
+      "sanitization": "utf8/no NUL/no credential patterns; local artifact verification only"
+    },
+    {
+      "path": "publication-preflight/commands.jsonl",
+      "source": "/workspace/vm-e-r2-publication/commands.jsonl",
+      "bytes": 4855,
+      "sha256": "bc2a109b8f023a1499917c7b2620197c66cc3357e9773e92b3f8655ac4527670",
+      "sanitization": "utf8/no NUL/no credential patterns; local artifact verification only",
+      "source_snapshot_type": "append-only snapshot through cumulative-product-whitespace-check; later commands retained in local publication log and final readback report"
+    }
+  ],
+  "excluded": [
+    "fixtures/ synthetic SQLite DB/temp state",
+    "*.bundle binary local transfer files",
+    "operational DB/profile/keys/native/provider transcripts"
+  ],
+  "model": {
+    "requested": "gpt-6.1-sol/high",
+    "provider_observed_model": null,
+    "provider_observed_effort": null
+  },
+  "new_tests": 0,
+  "main_merge": false,
+  "force": false,
+  "source_GO": false,
+  "F07_exception": false,
+  "artifact_check_notes": {
+    "initial_whitespace_check_exit": 2,
+    "reason": "append-only publication command log grew after snapshot; final verifier checks immutable snapshot hash and prefix preservation",
+    "initial_inventory_comparison_exit": 1,
+    "final_checks": "all manifest hashes/original bytes and artifact-only scope PASS; generated and product whitespace PASS"
+  }
+}

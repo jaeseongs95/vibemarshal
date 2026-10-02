@@ -1,0 +1,2 @@
+[dot/vm-goal-verdict-proposal-r2-20261002 927f9d2] 제안 수정: 최신 실패 보호를 유지하며 유효한 이전 PASS 결속 허용
+ 2 files changed, 137 insertions(+), 13 deletions(-)

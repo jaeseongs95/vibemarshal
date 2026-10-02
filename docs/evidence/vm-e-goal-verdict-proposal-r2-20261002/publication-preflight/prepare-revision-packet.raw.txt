@@ -1,0 +1,1 @@
+{"packet": "/workspace/vm-e-r2/docs/evidence/vm-e-goal-verdict-proposal-r2-20261002", "copied_original_text_files": 40, "generated_files": 4, "all_scans_pass": true, "original_bytes_preserved": true, "no_new_tests": true}

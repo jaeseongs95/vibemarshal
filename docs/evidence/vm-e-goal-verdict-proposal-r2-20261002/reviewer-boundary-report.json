@@ -1,0 +1,470 @@
+{
+  "format": "vm-e-goal-verdict-r2-reviewer-boundary-v2",
+  "generated_at": "2026-10-02T00:21:13.093201+00:00",
+  "identity": {
+    "implementation_commit": "f862dc4f948dde8b6f429bcbaa073f03ce41a70f",
+    "candidate_tree": "9388e2ade7f28341034b7d8c0271e59dcf4bc847",
+    "parent_commit": "927f9d2936635d8c987c2a3a4092e6e4dc2c742b",
+    "old_implementation_commit": "98bb122970f82bb5fcef122003ee10c7eb787cf4",
+    "old_implementation_tree": "1bcc8378c86f30aca46fd757545f07d458d65dd3",
+    "original_direct_base": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+    "local_branch": "dot/vm-goal-verdict-proposal-r2-20261002",
+    "candidate_clean": true,
+    "old_proposal_HEAD": "d6956481a964f1b84fb88baa03218a3034f8978d",
+    "old_proposal_clean": true,
+    "proposal_diff_base": "d6956481a964f1b84fb88baa03218a3034f8978d"
+  },
+  "status": "FROZEN_LOCAL_REVISION_AWAITING_PARENT_CHECK_NOT_PUBLISHED",
+  "authority": "현재 parent의 명시 결정: 최신-ID 동등성은 미승인 강화이므로 제거하고 확인된 최신 실패·state 보호만 유지",
+  "review_task": "01a0f9e2-ed1d-7296-815a-14270ae95034",
+  "independent_report_read": false,
+  "review_detail_source": "parent 제공 최소 counterexample과 보존 요구 사용; reviewer 로컬 94f0aac315c9813156e5d9758ed7b590685a3da6 직접 읽기/게시 없음",
+  "source_change": "record_goal_verdict에서 필수 integration의 최신 PASS gate를 유지하고 result ID 검사를 원래 same-Plan 실제 PASS subset 규칙으로 복구",
+  "preserved": [
+    "최신 Task FAIL/INCONCLUSIVE/NOT_RUN 차단",
+    "최신 integration FAIL/INCONCLUSIVE 차단",
+    "active Plan 확인과 superseded Plan state 전이 차단",
+    "기존 Goal/Plan digest, 같은 Plan에 기록된 PASS result ID, evidence 존재 검사",
+    "기존 Goal Test 입력 freshness·active revision·command operation binding 검증"
+  ],
+  "compatibility": [
+    "legacy 동일 binding/evidence의 이전 PASS ID 허용",
+    "동일 non-null Goal Test binding에서 실제 직접 API로 기록한 이전 PASS ID 허용"
+  ],
+  "before": {
+    "revision": "98bb122970f82bb5fcef122003ee10c7eb787cf4",
+    "tests": 17,
+    "passed": 15,
+    "compatibility_errors": 2,
+    "label": "reviewer-boundary-r1-before"
+  },
+  "after": {
+    "tests": 18,
+    "passed": 18,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "label": "reviewer-boundary-final",
+    "breakdown": "R2 집중 회귀 17개 + 기존 변조 operation binding 검사 1개"
+  },
+  "file_ownership": [
+    {
+      "owner": "VM E single writer",
+      "path": "src/flowmarshal/engine/service.py",
+      "candidate_bytes_sha256": "284805343517f29621381a9c1b045fe03492b83bbcc3c4ee2bed7d8781d02261"
+    },
+    {
+      "owner": "VM E single writer",
+      "path": "tests/test_engine_goal_verdict_authority.py",
+      "candidate_bytes_sha256": "22411153cbb9bb4bdf6d36c2b337aae4a6b9aee9e11007d3f15ca1dc839f017e"
+    }
+  ],
+  "numstat": "9\t11\tsrc/flowmarshal/engine/service.py\n174\t8\ttests/test_engine_goal_verdict_authority.py",
+  "diff": {
+    "path": "/workspace/vm-e-r2-evidence/reviewer-boundary.patch",
+    "sha256": "45f1ce52322e880994afaa3ccf2f2d231fbf95420551574e6e71af6f75125df4"
+  },
+  "local_bundle": {
+    "path": "/workspace/vm-e-r2-evidence/reviewer-boundary.bundle",
+    "sha256": "e22c72073dfce476f7f4d46680f3e49c0ab98ae20ed126e859a1aecb297c20a9",
+    "prerequisite": "d6956481a964f1b84fb88baa03218a3034f8978d",
+    "verified": true
+  },
+  "regression_bytes_sha256": "22411153cbb9bb4bdf6d36c2b337aae4a6b9aee9e11007d3f15ca1dc839f017e",
+  "commands": [
+    {
+      "label": "r1-compatibility-before",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "/workspace/cloud-setup/venv/bin/python",
+        "-m",
+        "unittest",
+        "tests.test_engine_goal_verdict_authority",
+        "-v"
+      ],
+      "started_at": "2026-10-02T00:11:32.710203+00:00",
+      "duration_seconds": 3.188163659000111,
+      "exit_code": 1,
+      "raw_path": "/workspace/vm-e-r2-evidence/r1-compatibility-before.raw.txt",
+      "raw_sha256": "ae19027d4541dba9f81290cba78116e9dbc377f8e57c0f5048459c5ac1078a7a"
+    },
+    {
+      "label": "r2-targeted-after",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "/workspace/cloud-setup/venv/bin/python",
+        "-m",
+        "unittest",
+        "tests.test_engine_goal_verdict_authority",
+        "tests.test_engine_validation_operation_binding.ValidationOperationBindingTests.test_tampered_operation_binding_is_rejected_before_recording",
+        "-v"
+      ],
+      "started_at": "2026-10-02T00:12:03.426682+00:00",
+      "duration_seconds": 3.268628248999903,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/r2-targeted-after.raw.txt",
+      "raw_sha256": "83a2c97b1a6a548f0fcd168fd893de22cea84f28baf41c90a8e9b2e8debee154"
+    },
+    {
+      "label": "frozen-r1-before",
+      "cwd": "/workspace/vm-e-proposal",
+      "argv": [
+        "/workspace/cloud-setup/venv/bin/python",
+        "/workspace/vm-e-r2-evidence/before_frozen.py"
+      ],
+      "started_at": "2026-10-02T00:13:09.096137+00:00",
+      "duration_seconds": 2.9516921019999245,
+      "exit_code": 1,
+      "raw_path": "/workspace/vm-e-r2-evidence/frozen-r1-before.raw.txt",
+      "raw_sha256": "8f5360806920db0d429fcbb19f31bafdf9f944453f17098a31e11e9dcd3fcb23"
+    },
+    {
+      "label": "r2-stage",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "git",
+        "add",
+        "src/flowmarshal/engine/service.py",
+        "tests/test_engine_goal_verdict_authority.py"
+      ],
+      "started_at": "2026-10-02T00:13:52.455706+00:00",
+      "duration_seconds": 0.11340652200033219,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/r2-stage.raw.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "r2-staged-diff-check",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "git",
+        "diff",
+        "--cached",
+        "--check"
+      ],
+      "started_at": "2026-10-02T00:13:52.703551+00:00",
+      "duration_seconds": 0.0057480810000924976,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/r2-staged-diff-check.raw.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "r2-commit",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "git",
+        "-c",
+        "user.name=VM E Proposal",
+        "-c",
+        "user.email=vm-e@synthetic.invalid",
+        "commit",
+        "-m",
+        "제안 수정: 최신 실패 보호를 유지하며 유효한 이전 PASS 결속 허용"
+      ],
+      "started_at": "2026-10-02T00:13:52.871661+00:00",
+      "duration_seconds": 0.018087556999944354,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/r2-commit.raw.txt",
+      "raw_sha256": "de09333165b3afbe632c5c0e3bdd0de6d4d4f8465cdbc0fb414a4633504ffb3a"
+    },
+    {
+      "label": "r2-identity",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "git",
+        "rev-parse",
+        "HEAD",
+        "HEAD^{tree}",
+        "HEAD^"
+      ],
+      "started_at": "2026-10-02T00:13:53.046657+00:00",
+      "duration_seconds": 0.0017367929999636544,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/r2-identity.raw.txt",
+      "raw_sha256": "b73f9aa2ff8c7d2c362e68bcf8127afd5903f255df22114be6d904ff65ef4173"
+    },
+    {
+      "label": "r2-diff",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "git",
+        "diff",
+        "--binary",
+        "d6956481a964f1b84fb88baa03218a3034f8978d",
+        "HEAD"
+      ],
+      "started_at": "2026-10-02T00:13:53.201579+00:00",
+      "duration_seconds": 0.0069303860000218265,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/r2-diff.raw.txt",
+      "raw_sha256": "e634a173b2bf17401f4bbe7c05a772ac0e0d73632787aa3929e291bcfb3158ce"
+    },
+    {
+      "label": "r2-ownership",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "git",
+        "diff",
+        "--numstat",
+        "d6956481a964f1b84fb88baa03218a3034f8978d",
+        "HEAD"
+      ],
+      "started_at": "2026-10-02T00:13:53.378746+00:00",
+      "duration_seconds": 0.0060362760000316484,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/r2-ownership.raw.txt",
+      "raw_sha256": "301b10f95860b271d92a540d81425fb0c6a67813f5eb512bae31bf22019a723b"
+    },
+    {
+      "label": "r2-local-bundle",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "git",
+        "bundle",
+        "create",
+        "/workspace/vm-e-r2-evidence/r2-proposal.bundle",
+        "d6956481a964f1b84fb88baa03218a3034f8978d..dot/vm-goal-verdict-proposal-r2-20261002"
+      ],
+      "started_at": "2026-10-02T00:14:26.243351+00:00",
+      "duration_seconds": 0.010748793999937334,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/r2-local-bundle.raw.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "r2-bundle-verify",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "git",
+        "bundle",
+        "verify",
+        "/workspace/vm-e-r2-evidence/r2-proposal.bundle"
+      ],
+      "started_at": "2026-10-02T00:14:26.410384+00:00",
+      "duration_seconds": 0.0051606339998215844,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/r2-bundle-verify.raw.txt",
+      "raw_sha256": "33d8eb0d01e5fa33ba85f7ead29f23cd2fe3bbb2b08244cdbd39dcf39af046a5"
+    },
+    {
+      "label": "r1-patch-check",
+      "cwd": "/workspace/vm-e-proposal",
+      "argv": [
+        "git",
+        "apply",
+        "--check",
+        "/workspace/vm-e-r2-evidence/r2.patch"
+      ],
+      "started_at": "2026-10-02T00:14:26.578883+00:00",
+      "duration_seconds": 0.0043460950000735465,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/r1-patch-check.raw.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "frozen-r2-status",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "git",
+        "status",
+        "--porcelain"
+      ],
+      "started_at": "2026-10-02T00:14:26.746563+00:00",
+      "duration_seconds": 0.0418313280001712,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/frozen-r2-status.raw.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "old-proposal-preserved",
+      "cwd": "/workspace/vm-e-proposal",
+      "argv": [
+        "git",
+        "status",
+        "--porcelain"
+      ],
+      "started_at": "2026-10-02T00:14:26.973039+00:00",
+      "duration_seconds": 0.0406832490002671,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/old-proposal-preserved.raw.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "reviewer-boundary-after",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "/workspace/cloud-setup/venv/bin/python",
+        "-m",
+        "unittest",
+        "tests.test_engine_goal_verdict_authority",
+        "tests.test_engine_validation_operation_binding.ValidationOperationBindingTests.test_tampered_operation_binding_is_rejected_before_recording",
+        "-v"
+      ],
+      "started_at": "2026-10-02T00:19:35.648479+00:00",
+      "duration_seconds": 3.3239607099999375,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/reviewer-boundary-after.raw.txt",
+      "raw_sha256": "6a24e3ed361ad90e22e4019c72292bd62a6c6730f2bb29130b79b2e39ce9b7f1"
+    },
+    {
+      "label": "reviewer-boundary-final",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "/workspace/cloud-setup/venv/bin/python",
+        "-m",
+        "unittest",
+        "tests.test_engine_goal_verdict_authority",
+        "tests.test_engine_validation_operation_binding.ValidationOperationBindingTests.test_tampered_operation_binding_is_rejected_before_recording",
+        "-v"
+      ],
+      "started_at": "2026-10-02T00:19:53.092545+00:00",
+      "duration_seconds": 3.1471941730001163,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/reviewer-boundary-final.raw.txt",
+      "raw_sha256": "f523897df66e7e2d3fdbf08741e51f36cdd6d3e39e83c90f3e8851a159fcd4d4"
+    },
+    {
+      "label": "reviewer-boundary-r1-before",
+      "cwd": "/workspace/vm-e-proposal",
+      "argv": [
+        "/workspace/cloud-setup/venv/bin/python",
+        "/workspace/vm-e-r2-evidence/before_frozen.py"
+      ],
+      "started_at": "2026-10-02T00:19:56.375271+00:00",
+      "duration_seconds": 2.9762467559999095,
+      "exit_code": 1,
+      "raw_path": "/workspace/vm-e-r2-evidence/reviewer-boundary-r1-before.raw.txt",
+      "raw_sha256": "7e35e1b683e859dab567026d2746a64b25aa14994c72bd02f5fd6cb4afa65e56"
+    },
+    {
+      "label": "reviewer-boundary-diff-check",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "started_at": "2026-10-02T00:20:10.298697+00:00",
+      "duration_seconds": 0.008468162999633932,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/reviewer-boundary-diff-check.raw.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "reviewer-boundary-stage",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "git",
+        "add",
+        "--",
+        "tests/test_engine_goal_verdict_authority.py"
+      ],
+      "started_at": "2026-10-02T00:20:10.473737+00:00",
+      "duration_seconds": 0.007237484000143013,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/reviewer-boundary-stage.raw.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "reviewer-boundary-commit",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "git",
+        "-c",
+        "user.name=VM E Proposal",
+        "-c",
+        "user.email=vm-e@synthetic.invalid",
+        "commit",
+        "-m",
+        "회귀 보강: 이전 PASS ID 및 증거·Attempt·receipt 보존 확인"
+      ],
+      "started_at": "2026-10-02T00:20:10.635552+00:00",
+      "duration_seconds": 0.017276481999942916,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/reviewer-boundary-commit.raw.txt",
+      "raw_sha256": "d0a24f74c5b1811bee1f96b0b52c667efda8f8830eac982b2810079977d05211"
+    },
+    {
+      "label": "reviewer-boundary-bundle",
+      "cwd": "/workspace/vm-e-r2",
+      "argv": [
+        "git",
+        "bundle",
+        "create",
+        "/workspace/vm-e-r2-evidence/reviewer-boundary.bundle",
+        "dot/vm-goal-verdict-proposal-r2-20261002",
+        "^d6956481a964f1b84fb88baa03218a3034f8978d"
+      ],
+      "started_at": "2026-10-02T00:20:29.116137+00:00",
+      "duration_seconds": 0.011375577000308112,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/reviewer-boundary-bundle.raw.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "label": "reviewer-boundary-bundle-verify",
+      "cwd": "/workspace/vm-e-proposal",
+      "argv": [
+        "git",
+        "bundle",
+        "verify",
+        "/workspace/vm-e-r2-evidence/reviewer-boundary.bundle"
+      ],
+      "started_at": "2026-10-02T00:20:29.288577+00:00",
+      "duration_seconds": 0.004432121000263578,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/reviewer-boundary-bundle-verify.raw.txt",
+      "raw_sha256": "5a9165ca715a40cc584b2245340d0b6fe37e7273389f397e0253bbd0196bb4aa"
+    },
+    {
+      "label": "reviewer-boundary-patch-check",
+      "cwd": "/workspace/vm-e-proposal",
+      "argv": [
+        "git",
+        "apply",
+        "--check",
+        "/workspace/vm-e-r2-evidence/reviewer-boundary.patch"
+      ],
+      "started_at": "2026-10-02T00:20:29.454549+00:00",
+      "duration_seconds": 0.0029007620000811585,
+      "exit_code": 0,
+      "raw_path": "/workspace/vm-e-r2-evidence/reviewer-boundary-patch-check.raw.txt",
+      "raw_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "test_limits": [
+    "직접 Core service/Goal Test API와 기존 synthetic fixture의 bounded 테스트",
+    "직접 Goal Test API에서는 기존 supervisor=None 경로를 사용; production Dispatcher의 D1 guard를 패치하거나 해제하지 않음",
+    "validation command는 CompletedProcess synthetic stub; 실제 native command나 live provider 실행 없음",
+    "입력 변경 검사는 Goal Test API에서 command/result write 이전 BLOCKED를 확인하며 Core 완료 writer에 새 freshness 정책을 추가한 것이 아님",
+    "같은 입력/binding 이전 PASS 재사용을 허용하기 위해 기존 freshness 또는 binding 검증을 변경하지 않음",
+    "NOT_RUN: 실제 Windows runtime/semantic terminal 경로, public vertical E2E, process fault/race, broad 118 portable tests, SQLite campaign",
+    "동등하지 않은 과거 입력을 자동 재승인하거나 E03의 대체 강화 정책을 새로 도입하지 않음"
+  ],
+  "operations": {
+    "provider_calls": 0,
+    "fallback": 0,
+    "force": false,
+    "rebase": false,
+    "merge": false,
+    "push_or_publication": false,
+    "Library": false,
+    "source_or_F07_GO": false,
+    "F07_first_four_gate_preserved": true
+  },
+  "model": {
+    "requested": "gpt-6.1-sol/high",
+    "provider_observed_model": null,
+    "provider_observed_effort": null,
+    "reason": "turn별 provider receipt 노출 없음"
+  },
+  "historical_r2_report": {
+    "path": "/workspace/vm-e-r2-evidence/report.json",
+    "sha256": "4e13d5d4e7377d0e22eb8f0ffebac0f122b088c853d2dec6579a7879a949a115",
+    "commit": "927f9d2936635d8c987c2a3a4092e6e4dc2c742b",
+    "unchanged": true
+  },
+  "counterexample": "old_pass=self.integration; record_result(task=False)로 동일 validation/evidence 새 PASS; old_pass ID를 제출하여 성공 및 저장 ID 보존 확인",
+  "preservation": "두 PASS/모든 evidence/Attempt/runtime intent/runtime receipt 행 전후 tuple 완전 동일. 두 fixture에 공식 writer로 합성 receipt를 기록하고 각 보존 table이 비어 있지 않음도 확인. 최신 FAIL/INCONCLUSIVE 및 superseded Plan 거부는 GoalVerdict/history/project/Plan와 이 5개 table의 모든 행 원자적 불변 확인.",
+  "source_delta_since_r2": "없음; 후속 commit은 동일 회귀 파일만 +48/-8"
+}

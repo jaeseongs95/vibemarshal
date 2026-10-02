@@ -1,0 +1,72 @@
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/compatibility-boundary.diff:44: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/compatibility-boundary.diff:51: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/compatibility-boundary.diff:67: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/compatibility-boundary.diff:68: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/compatibility-boundary.diff:98: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/compatibility-boundary.diff:118: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/compatibility-boundary.diff:163: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/compatibility-boundary.diff:185: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/compatibility-boundary.diff:186: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2-bundle-verify.raw.txt:5: trailing whitespace.
++d6956481a964f1b84fb88baa03218a3034f8978d 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2-diff.raw.txt:44: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2-diff.raw.txt:51: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2-diff.raw.txt:67: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2-diff.raw.txt:68: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2-diff.raw.txt:72: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2-diff.raw.txt:108: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2-diff.raw.txt:112: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2-diff.raw.txt:113: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2.patch:44: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2.patch:51: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2.patch:67: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2.patch:68: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2.patch:72: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2.patch:108: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2.patch:112: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/r2.patch:113: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/reviewer-boundary-bundle-verify.raw.txt:5: trailing whitespace.
++d6956481a964f1b84fb88baa03218a3034f8978d 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/reviewer-boundary.patch:44: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/reviewer-boundary.patch:51: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/reviewer-boundary.patch:67: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/reviewer-boundary.patch:68: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/reviewer-boundary.patch:98: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/reviewer-boundary.patch:118: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/reviewer-boundary.patch:163: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/reviewer-boundary.patch:185: trailing whitespace.
++ 
+docs/evidence/vm-e-goal-verdict-proposal-r2-20261002/reviewer-boundary.patch:186: trailing whitespace.
++ 

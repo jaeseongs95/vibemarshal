@@ -1,0 +1,8 @@
+{
+  "artifact_only": true,
+  "added_files": 44,
+  "product_changes_in_artifact_commit": 0,
+  "all_manifest_hashes_verified": true,
+  "original_evidence_bytes_verified": true,
+  "no_new_tests": true
+}

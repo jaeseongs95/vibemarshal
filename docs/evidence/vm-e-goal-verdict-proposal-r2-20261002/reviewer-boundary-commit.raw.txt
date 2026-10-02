@@ -1,0 +1,2 @@
+[dot/vm-goal-verdict-proposal-r2-20261002 f862dc4] 회귀 보강: 이전 PASS ID 및 증거·Attempt·receipt 보존 확인
+ 1 file changed, 48 insertions(+), 8 deletions(-)

@@ -1,0 +1,27 @@
+VM E R2 최종 reviewer boundary: LOCAL ONLY; parent 확인 대기.
+candidate: f862dc4f948dde8b6f429bcbaa073f03ce41a70f
+tree: 9388e2ade7f28341034b7d8c0271e59dcf4bc847
+parent: 927f9d2936635d8c987c2a3a4092e6e4dc2c742b
+원 base: 32bb0f9dd9f024045d24487312b50f5b703573a3 / tree 27e18c0c7853c1d35a98d5437cebf0ba703ed42d
+proposal diff base/bundle prerequisite: d6956481a964f1b84fb88baa03218a3034f8978d
+old_pass=self.integration; record_result(task=False)로 동일 validation/evidence 새 PASS; old_pass ID를 제출하여 성공 및 저장 ID 보존 확인
+두 PASS/모든 evidence/Attempt/runtime intent/runtime receipt 행 전후 tuple 완전 동일. 두 fixture에 공식 writer로 합성 receipt를 기록하고 각 보존 table이 비어 있지 않음도 확인. 최신 FAIL/INCONCLUSIVE 및 superseded Plan 거부는 GoalVerdict/history/project/Plan와 이 5개 table의 모든 행 원자적 불변 확인.
+없음; 후속 commit은 동일 회귀 파일만 +48/-8
+최종 전체 proposal 소유: record_goal_verdict 한 메서드 +9/-11, 동일 회귀 파일 +174/-8.
+before 17개: 15 PASS + 이전 PASS 거부 2 ERROR; after 집중 18/18 PASS.
+기존 후보·원 evidence·R2 927f9d 보고서/patch/bundle 보존. 신규 remote push/merge/force/Library/GO 없음.
+patch SHA256: 45f1ce52322e880994afaa3ccf2f2d231fbf95420551574e6e71af6f75125df4
+bundle SHA256: e22c72073dfce476f7f4d46680f3e49c0ab98ae20ed126e859a1aecb297c20a9
+reviewer-boundary-final: cwd=/workspace/vm-e-r2; argv=["/workspace/cloud-setup/venv/bin/python", "-m", "unittest", "tests.test_engine_goal_verdict_authority", "tests.test_engine_validation_operation_binding.ValidationOperationBindingTests.test_tampered_operation_binding_is_rejected_before_recording", "-v"]; exit=0; UTC=2026-10-02T00:19:53.092545+00:00; wall=3.147194s; rawSHA256=f523897df66e7e2d3fdbf08741e51f36cdd6d3e39e83c90f3e8851a159fcd4d4
+reviewer-boundary-r1-before: cwd=/workspace/vm-e-proposal; argv=["/workspace/cloud-setup/venv/bin/python", "/workspace/vm-e-r2-evidence/before_frozen.py"]; exit=1; UTC=2026-10-02T00:19:56.375271+00:00; wall=2.976247s; rawSHA256=7e35e1b683e859dab567026d2746a64b25aa14994c72bd02f5fd6cb4afa65e56
+reviewer-boundary-bundle-verify: cwd=/workspace/vm-e-proposal; argv=["git", "bundle", "verify", "/workspace/vm-e-r2-evidence/reviewer-boundary.bundle"]; exit=0; UTC=2026-10-02T00:20:29.288577+00:00; wall=0.004432s; rawSHA256=5a9165ca715a40cc584b2245340d0b6fe37e7273389f397e0253bbd0196bb4aa
+reviewer-boundary-patch-check: cwd=/workspace/vm-e-proposal; argv=["git", "apply", "--check", "/workspace/vm-e-r2-evidence/reviewer-boundary.patch"]; exit=0; UTC=2026-10-02T00:20:29.454549+00:00; wall=0.002901s; rawSHA256=e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+직접 Core service/Goal Test API와 기존 synthetic fixture의 bounded 테스트
+직접 Goal Test API에서는 기존 supervisor=None 경로를 사용; production Dispatcher의 D1 guard를 패치하거나 해제하지 않음
+validation command는 CompletedProcess synthetic stub; 실제 native command나 live provider 실행 없음
+입력 변경 검사는 Goal Test API에서 command/result write 이전 BLOCKED를 확인하며 Core 완료 writer에 새 freshness 정책을 추가한 것이 아님
+같은 입력/binding 이전 PASS 재사용을 허용하기 위해 기존 freshness 또는 binding 검증을 변경하지 않음
+NOT_RUN: 실제 Windows runtime/semantic terminal 경로, public vertical E2E, process fault/race, broad 118 portable tests, SQLite campaign
+동등하지 않은 과거 입력을 자동 재승인하거나 E03의 대체 강화 정책을 새로 도입하지 않음
+requested gpt-6.1-sol/high; provider observed model/effort unknown (turn receipt 미노출), 추가 provider/model calls/fallback 0.
+남은 절차: parent 확인 전 게시/merge 없음. 실행 blocker 없음.

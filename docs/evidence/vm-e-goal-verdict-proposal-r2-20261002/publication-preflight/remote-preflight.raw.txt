@@ -1,0 +1,2 @@
+d6956481a964f1b84fb88baa03218a3034f8978d	refs/heads/dot/vm-goal-verdict-proposal-20261002
+32bb0f9dd9f024045d24487312b50f5b703573a3	refs/heads/main

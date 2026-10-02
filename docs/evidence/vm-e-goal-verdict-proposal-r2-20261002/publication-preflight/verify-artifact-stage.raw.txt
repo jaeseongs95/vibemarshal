@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "/workspace/vm-e-r2-publication/verify_artifact_stage.py", line 13, in <module>
+    assert content==Path(item['source']).read_bytes()
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError

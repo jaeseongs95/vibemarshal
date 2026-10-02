@@ -1,0 +1,40 @@
+{
+  "chain": [
+    {
+      "commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+      "tree": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d",
+      "parents": "12ac9e65096f86b203729dabeacac96b06148a9b 549afd868649da56bc4d2aeca1331d7c10bf3da6"
+    },
+    {
+      "commit": "98bb122970f82bb5fcef122003ee10c7eb787cf4",
+      "tree": "1bcc8378c86f30aca46fd757545f07d458d65dd3",
+      "parents": "32bb0f9dd9f024045d24487312b50f5b703573a3"
+    },
+    {
+      "commit": "d6956481a964f1b84fb88baa03218a3034f8978d",
+      "tree": "1704a25216db5aab79c064c1dcf66d73941c2635",
+      "parents": "98bb122970f82bb5fcef122003ee10c7eb787cf4"
+    },
+    {
+      "commit": "927f9d2936635d8c987c2a3a4092e6e4dc2c742b",
+      "tree": "f452be554c527f44aa2be8ef88d3123381e53177",
+      "parents": "d6956481a964f1b84fb88baa03218a3034f8978d"
+    },
+    {
+      "commit": "f862dc4f948dde8b6f429bcbaa073f03ce41a70f",
+      "tree": "9388e2ade7f28341034b7d8c0271e59dcf4bc847",
+      "parents": "927f9d2936635d8c987c2a3a4092e6e4dc2c742b"
+    }
+  ],
+  "remote_before": "d6956481a964f1b84fb88baa03218a3034f8978d",
+  "candidate_descends_from_remote": true,
+  "publication_mode": "FAST_FORWARD_ONLY_SAME_PROPOSAL_BRANCH",
+  "changed_product_files": [
+    "src/flowmarshal/engine/service.py",
+    "tests/test_engine_goal_verdict_authority.py"
+  ],
+  "source_change_only_record_goal_verdict": true,
+  "prior_artifact_files_unchanged_since_d695": true,
+  "working_tree_clean": true,
+  "no_tests_run": true
+}

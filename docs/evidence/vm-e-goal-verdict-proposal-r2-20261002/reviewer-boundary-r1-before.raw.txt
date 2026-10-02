@@ -1,0 +1,45 @@
+test_current_task_and_integration_pass_can_complete (vm_e_r2_regression.GoalVerdictAuthorityTests.test_current_task_and_integration_pass_can_complete) ... ok
+test_equivalent_old_pass_id_can_complete_when_latest_result_is_pass (vm_e_r2_regression.GoalVerdictAuthorityTests.test_equivalent_old_pass_id_can_complete_when_latest_result_is_pass) ... ERROR
+test_failed_result_id_is_rejected_even_when_latest_result_is_pass (vm_e_r2_regression.GoalVerdictAuthorityTests.test_failed_result_id_is_rejected_even_when_latest_result_is_pass) ... ok
+test_latest_integration_fail_cannot_be_overridden_by_old_pass (vm_e_r2_regression.GoalVerdictAuthorityTests.test_latest_integration_fail_cannot_be_overridden_by_old_pass) ... ok
+test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass (vm_e_r2_regression.GoalVerdictAuthorityTests.test_latest_integration_inconclusive_cannot_be_overridden_by_old_pass) ... ok
+test_latest_integration_pass_can_supersede_fail (vm_e_r2_regression.GoalVerdictAuthorityTests.test_latest_integration_pass_can_supersede_fail) ... ok
+test_latest_task_fail_cannot_be_overridden_by_completed_status (vm_e_r2_regression.GoalVerdictAuthorityTests.test_latest_task_fail_cannot_be_overridden_by_completed_status) ... ok
+test_latest_task_inconclusive_cannot_be_overridden_by_completed_status (vm_e_r2_regression.GoalVerdictAuthorityTests.test_latest_task_inconclusive_cannot_be_overridden_by_completed_status) ... ok
+test_latest_task_not_run_cannot_be_overridden_by_completed_status (vm_e_r2_regression.GoalVerdictAuthorityTests.test_latest_task_not_run_cannot_be_overridden_by_completed_status) ... ok
+test_other_revision_activation_cannot_replace_active_plan_binding (vm_e_r2_regression.GoalVerdictAuthorityTests.test_other_revision_activation_cannot_replace_active_plan_binding) ... ok
+test_superseded_plan_verdict_cannot_clear_current_active_plan (vm_e_r2_regression.GoalVerdictAuthorityTests.test_superseded_plan_verdict_cannot_clear_current_active_plan) ... ok
+test_unknown_result_id_cannot_replace_a_recorded_pass (vm_e_r2_regression.GoalVerdictAuthorityTests.test_unknown_result_id_cannot_replace_a_recorded_pass) ... ok
+test_wrong_goal_digest_is_rejected (vm_e_r2_regression.GoalVerdictAuthorityTests.test_wrong_goal_digest_is_rejected) ... ok
+test_wrong_plan_activation_digest_is_rejected (vm_e_r2_regression.GoalVerdictAuthorityTests.test_wrong_plan_activation_digest_is_rejected) ... ok
+test_changed_goal_input_is_blocked_before_command_or_result_write (vm_e_r2_regression.GoalTestBindingCompatibilityTests.test_changed_goal_input_is_blocked_before_command_or_result_write) ... ok
+test_equivalent_older_pass_with_same_nonnull_input_binding_is_accepted (vm_e_r2_regression.GoalTestBindingCompatibilityTests.test_equivalent_older_pass_with_same_nonnull_input_binding_is_accepted) ... ERROR
+test_wrong_revision_is_rejected_before_command (vm_e_r2_regression.GoalTestBindingCompatibilityTests.test_wrong_revision_is_rejected_before_command) ... ok
+
+======================================================================
+ERROR: test_equivalent_old_pass_id_can_complete_when_latest_result_is_pass (vm_e_r2_regression.GoalVerdictAuthorityTests.test_equivalent_old_pass_id_can_complete_when_latest_result_is_pass)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-r2/tests/test_engine_goal_verdict_authority.py", line 141, in test_equivalent_old_pass_id_can_complete_when_latest_result_is_pass
+    self.record_verdict(verdict)
+  File "/workspace/vm-e-r2/tests/test_engine_goal_verdict_authority.py", line 93, in record_verdict
+    self.service.record_goal_verdict(project_id=self.project_id,
+  File "/workspace/vm-e-proposal/src/flowmarshal/engine/service.py", line 6756, in record_goal_verdict
+    raise EngineServiceError("GoalVerdict가 최신 PASS integration 결과에 정확히 결속되지 않았습니다.")
+flowmarshal.engine.service.EngineServiceError: GoalVerdict가 최신 PASS integration 결과에 정확히 결속되지 않았습니다.
+
+======================================================================
+ERROR: test_equivalent_older_pass_with_same_nonnull_input_binding_is_accepted (vm_e_r2_regression.GoalTestBindingCompatibilityTests.test_equivalent_older_pass_with_same_nonnull_input_binding_is_accepted)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/vm-e-r2/tests/test_engine_goal_verdict_authority.py", line 265, in test_equivalent_older_pass_with_same_nonnull_input_binding_is_accepted
+    self.service.record_goal_verdict(project_id=self.prepared.project_id,
+  File "/workspace/vm-e-proposal/src/flowmarshal/engine/service.py", line 6756, in record_goal_verdict
+    raise EngineServiceError("GoalVerdict가 최신 PASS integration 결과에 정확히 결속되지 않았습니다.")
+flowmarshal.engine.service.EngineServiceError: GoalVerdict가 최신 PASS integration 결과에 정확히 결속되지 않았습니다.
+
+----------------------------------------------------------------------
+Ran 17 tests in 1.802s
+
+FAILED (errors=2)
+{"service_import": "/workspace/vm-e-proposal/src/flowmarshal/engine/service.py", "revision_under_test": "98bb122970f82bb5fcef122003ee10c7eb787cf4", "regression_file": "/workspace/vm-e-r2/tests/test_engine_goal_verdict_authority.py"}
