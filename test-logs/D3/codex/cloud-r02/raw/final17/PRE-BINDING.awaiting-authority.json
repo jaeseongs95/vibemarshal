@@ -1,0 +1,31 @@
+{
+  "state": "TEMPLATE_AND_ACTUAL_EVIDENCE_BOUND_NOT_ISSUED",
+  "templatePin": {
+    "bytes": 71960,
+    "sha256": "88892c55145ff1e17923f206bf788003a8dd468caede8fd610fab7e5c9079730"
+  },
+  "boundPin": {
+    "bytes": 62190,
+    "sha256": "411772680b475502e20cf74fe5c2197b6e1086568e58e49f92b6994c0b581e92"
+  },
+  "VM2SealPin": {
+    "bytes": 12365,
+    "sha256": "e468d8cb0bdecc8979b359026f90e51a06c49ab0f10a01a64780cde5f3351888"
+  },
+  "actualEvidenceBound": true,
+  "finalDirectPRE": null,
+  "issuedTokens": null,
+  "issuedCommand": null,
+  "productAttempt": null,
+  "sourceAuditIndependence": "partial; R037 STATIC_SOURCE_ONLY",
+  "firstProductObservationGap": [
+    "natural D-to-M import/audit/loader",
+    "binding20",
+    "new helper origin observations"
+  ],
+  "helperNames": 17,
+  "helperJournalEventCount": null,
+  "runRootCurrentAbsentFreshness": "NOT_RUN; historical observation only",
+  "900SecondHotGuard": "WRITTEN_AND_STATIC_CHECKED_NOT_RUN",
+  "product3": "NOT_RUN"
+}

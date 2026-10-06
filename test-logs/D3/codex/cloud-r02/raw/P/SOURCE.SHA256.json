@@ -1,0 +1,70 @@
+{
+  "BASELINE76.after-C5.actual.json": {
+    "bytes": 160966,
+    "sha256": "e9704f0efb11ab7e0eab4bb3a9c55f11cc182cfb30679751297b2988c327b5cd"
+  },
+  "BUILD-R02-SOURCE-METADATA.py": {
+    "bytes": 8206,
+    "sha256": "8419dff0cd96bebeb1c5887715d5ae5be1b2ab0dfd69935b15fc409ea1781511"
+  },
+  "LAUNCH.UNISSUED.SOURCE-DRAFT.template.txt": {
+    "bytes": 4164,
+    "sha256": "eb00c1b8a7a7f9779aca4c9a361234c4b28859e390f9e451a41fed608ecfd9e6"
+  },
+  "manifest.json": {
+    "bytes": 13558,
+    "sha256": "ff64e328bfc51fae2c96ebb605008d7ef2fb8fde15e4b36fd6de4d205bb6a3d0"
+  },
+  "ORIGINAL-BRANCH-EVIDENCE.json": {
+    "bytes": 18807,
+    "sha256": "d7904e403615e42384bf48c800871c379f9dce8639b355f695cc5baad7d66c0e"
+  },
+  "ORIGINAL76-INVENTORY.json": {
+    "bytes": 184790,
+    "sha256": "eb3e7e3d5f4b15550640d6f3ca883354c9338caae99ea41c0f09023f9245f7ff"
+  },
+  "ORIGINAL76-STATUS.ko.md": {
+    "bytes": 25197,
+    "sha256": "eb334ae0cb93981c4a59671cdf5e70b290f83cfd2b20c42ba3b3aa16bc2aa7f7"
+  },
+  "PREPARATION.COMMAND.UNISSUED.txt": {
+    "bytes": 505,
+    "sha256": "a4ea5117f8ef3c74940a3fd1785de345780925d6ab654cc4d8f9f49af54cbbaf"
+  },
+  "prepare-command.py": {
+    "bytes": 3144,
+    "sha256": "6b0eec027d07faaae75389fe11eae3c7b07bc1557b31315beaf22ec2655a7f04"
+  },
+  "pristine/scripts/flowmarshal_implementation_workflow.py": {
+    "bytes": 384699,
+    "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+  },
+  "pristine/scripts/flowmarshal_orchestrator_ledger.py": {
+    "bytes": 39264,
+    "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+  },
+  "pristine/tests/test_flowmarshal_direct_selection.py": {
+    "bytes": 14804,
+    "sha256": "56793b76b16712fffd1d2d732b3c858621fef15d1d85f2874f0545fba3ea6fe2"
+  },
+  "pristine/tests/test_flowmarshal_implementation_workflow.py": {
+    "bytes": 173219,
+    "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+  },
+  "README.ko.md": {
+    "bytes": 6080,
+    "sha256": "b5f6a9c61edc0a1a294868843b87e2556d72271a22c5fa913636d8258c6424ff"
+  },
+  "runner.py": {
+    "bytes": 31682,
+    "sha256": "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb"
+  },
+  "SOURCE.DIFF.patch": {
+    "bytes": 6585,
+    "sha256": "a97103eca8696923c240c8a53a94198797580b339f941c40a054cfa7dca3aeb9"
+  },
+  "STATIC-CHECKS.json": {
+    "bytes": 3270,
+    "sha256": "7c5e49c158f00d2b92231822563858736d76a0892ce53b4af19636026d98c0ef"
+  }
+}

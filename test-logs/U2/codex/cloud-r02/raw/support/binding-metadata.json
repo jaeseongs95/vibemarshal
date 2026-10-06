@@ -1,0 +1,22 @@
+{
+  "templateBytes": 6374,
+  "templateSHA256": "a78788b8178ae667db81823515b6503cb6a8b52e251223a6418e3562ed697ad9",
+  "boundBytes": 6399,
+  "boundSHA256": "beb4f505420d409790f0810d49bae66513a78e2f6e67d4ad643365afc52f2fa3",
+  "tokenValues": {
+    "__ISSUED_UTC__": "2026-10-04T18:03:03.000Z",
+    "__LAUNCH_NOT_AFTER_ISO__": "2026-10-04T18:05:03.000Z",
+    "__LAUNCH_NOT_AFTER_UTC__": "2026-10-04 18:05:03 UTC",
+    "__DISPATCH_PEER_ID__": "08151dd4-2745-48ee-a451-aca9a8af0268"
+  },
+  "tokenOccurrences": {
+    "__ISSUED_UTC__": 1,
+    "__LAUNCH_NOT_AFTER_ISO__": 1,
+    "__LAUNCH_NOT_AFTER_UTC__": 1,
+    "__DISPATCH_PEER_ID__": 1
+  },
+  "only4TokenNamesChanged": true,
+  "savedTemplateMatchesPinnedOriginal": true,
+  "actualNativeCmdMatchesBoundBytes": true,
+  "bindingValidatedAfterExecutionWithoutTemplateEvaluation": true
+}

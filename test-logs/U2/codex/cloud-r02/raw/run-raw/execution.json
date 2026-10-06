@@ -1,0 +1,62 @@
+{
+  "started_utc": "2026-10-04T18:03:36.539952+00:00",
+  "observed_utc": "2026-10-04T18:03:36.906365+00:00",
+  "pid": 4113,
+  "actual_exit": 0,
+  "terminal_observed": true,
+  "status": "PASS",
+  "timed_out": false,
+  "own_child_kill_error": null,
+  "raw_observation_error": null,
+  "observation_unknown": false,
+  "inputs_before": {
+    "runner.py": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+    "manifest.json": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+    "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+    "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+    "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+  },
+  "inputs_after_observation": {
+    "runner.py": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+    "manifest.json": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+    "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+    "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+    "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+  },
+  "files_observed": [
+    {
+      "path": "result.json",
+      "bytes": 582
+    },
+    {
+      "path": "postflight.json",
+      "bytes": 16395
+    },
+    {
+      "path": "invocation.json",
+      "bytes": 2022
+    },
+    {
+      "path": "stdout.txt",
+      "bytes": 0
+    },
+    {
+      "path": "preflight.json",
+      "bytes": 20316
+    },
+    {
+      "path": "helper-origin.jsonl",
+      "bytes": 10499
+    },
+    {
+      "path": "loader.json",
+      "bytes": 378
+    },
+    {
+      "path": "stderr.txt",
+      "bytes": 522
+    }
+  ],
+  "residual_observation_mutable": false,
+  "timeout_note": "Own child only kill/reap in same budget; no retry/global kill/cleanup"
+}

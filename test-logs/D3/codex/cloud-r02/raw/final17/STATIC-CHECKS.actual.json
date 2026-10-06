@@ -1,0 +1,103 @@
+{
+  "scope": "VM1 own static and stdlib-data self-verification; not independent PRE or product test",
+  "utc": "2026-10-05T11:16:35.587743+00:00",
+  "checks": {
+    "separateOriginSupplementExact": true,
+    "rawFalseAndUnknown3Preserved": true,
+    "postOriginalRawBindings": true,
+    "metadataBefore": true,
+    "metadataAfter": true,
+    "postP18": true,
+    "postF22": true,
+    "metadataAfterMatchKey": true,
+    "fixtureSource22Dicts": true,
+    "actualFixtureArgv": true,
+    "child1Retry0Native": true,
+    "fixtureParentBefore_mapped66": true,
+    "fixtureChildAfter_mapped66": true,
+    "fixtureParentAfter_mapped66": true,
+    "case_d3_allowed_imports_shape3": true,
+    "nativeArgumentNotStage_d3_allowed_imports_shape3": true,
+    "journal_d3_allowed_imports_shape3": true,
+    "case_d3_undeclared_import_caught_shape3": true,
+    "nativeArgumentNotStage_d3_undeclared_import_caught_shape3": true,
+    "journal_d3_undeclared_import_caught_shape3": true,
+    "case_d3_legacy_shape5_rejected": true,
+    "nativeArgumentNotStage_d3_legacy_shape5_rejected": true,
+    "journal_d3_legacy_shape5_rejected": true,
+    "case_d3_shape3_missing_journal_unknown": true,
+    "nativeArgumentNotStage_d3_shape3_missing_journal_unknown": true,
+    "missingJournalRetainsUnknown": true,
+    "case_d3_closure_declared_pair": true,
+    "nativeArgumentNotStage_d3_closure_declared_pair": true,
+    "journal_d3_closure_declared_pair": true,
+    "case_d3_closure_undeclared_module": true,
+    "nativeArgumentNotStage_d3_closure_undeclared_module": true,
+    "journal_d3_closure_undeclared_module": true,
+    "originalSyntheticCounts": true,
+    "d3_closure_declared_pair_closure": true,
+    "d3_closure_undeclared_module_closure": true,
+    "live53ExactPinsFromSealed75": true,
+    "bodyExactHereDoc": true,
+    "boundLiteralExactlyActualJSON": true,
+    "tokenCounts4Each1": true,
+    "noUnboundOrPermanentFalseGuard": true,
+    "onlyOneExecvStaticCall": true,
+    "printKeywordsValid": true,
+    "guardImportsStdlibOnly": true,
+    "exactArgvShlexRoundtrip": true,
+    "diffReconstruct_D3-LAUNCH.draft-to-completed.diff": true,
+    "diffReconstruct_D3-LAUNCH.r02-preparation-to-completed.diff": true,
+    "prepareFourTokens900AST": true,
+    "utf8NoBOMLFAllOwn": true
+  },
+  "passCount": 48,
+  "caseData": [
+    {
+      "name": "d3_allowed_imports_shape3",
+      "syntheticAcceptance": "PASS",
+      "effectState": "CLEAR",
+      "productPASS": false
+    },
+    {
+      "name": "d3_undeclared_import_caught_shape3",
+      "syntheticAcceptance": "FAIL",
+      "effectState": "DENIED",
+      "productPASS": false
+    },
+    {
+      "name": "d3_legacy_shape5_rejected",
+      "syntheticAcceptance": "FAIL",
+      "effectState": "CLEAR",
+      "productPASS": false
+    },
+    {
+      "name": "d3_shape3_missing_journal_unknown",
+      "syntheticAcceptance": "UNKNOWN",
+      "effectState": "UNKNOWN",
+      "productPASS": false
+    },
+    {
+      "name": "d3_closure_declared_pair",
+      "syntheticAcceptance": "PASS",
+      "effectState": "CLEAR",
+      "productPASS": false
+    },
+    {
+      "name": "d3_closure_undeclared_module",
+      "syntheticAcceptance": "PASS",
+      "effectState": "CLEAR",
+      "productPASS": false
+    }
+  ],
+  "ASTParseAndMemoryCompile": "PASS; compiled objects never executed",
+  "runtimeHotChecks": "NOT_RUN",
+  "prepareFunctionCalls": 0,
+  "candidateImportExecute": 0,
+  "guardExecutions": 0,
+  "fixtureExecutions": 0,
+  "productExecutions": 0,
+  "SQLiteProbes": 0,
+  "finalIndependentPRE": null,
+  "issuance": null
+}

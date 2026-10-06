@@ -1,0 +1,95 @@
+{
+  "status": "PREPARED_ONLY_DISPATCH_NOT_EXECUTED",
+  "utcObservedAfter": "2026-10-05T13:27:30.114109+00:00",
+  "host": "742382ba19ca",
+  "preparePid": 8289,
+  "prepareUtcBeforeExec": "2026-10-05T13:26:35.147612+00:00",
+  "prepareExit": 0,
+  "prepareAttempts": 1,
+  "argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "-I",
+    "-S",
+    "-B",
+    "-X",
+    "utf8",
+    "/workspace/vm-d3-source-24cf-r02/packet/prepare-command.py",
+    "--template",
+    "/workspace/vm-d3-source-24cf-r02/launch-preparation/D3-LAUNCH.UNISSUED.template.txt",
+    "--template-sha256",
+    "88892c55145ff1e17923f206bf788003a8dd468caede8fd610fab7e5c9079730",
+    "--tokens-json",
+    "/workspace/vm-d3-source-24cf-r02/issuance/issued-tokens.actual.json",
+    "--output",
+    "/workspace/vm-d3-source-24cf-r02/issuance/issued-command.actual.txt"
+  ],
+  "cwd": "/workspace/vm-d3-source-24cf-r02/pre-cwd",
+  "environment4": {
+    "HOME": "/workspace/vm-d3-source-24cf-r02/pre-home",
+    "TMPDIR": "/workspace/vm-d3-source-24cf-r02/pre-tmp",
+    "TMP": "/workspace/vm-d3-source-24cf-r02/pre-tmp",
+    "TEMP": "/workspace/vm-d3-source-24cf-r02/pre-tmp"
+  },
+  "tokensPin": {
+    "bytes": 233,
+    "sha256": "7becf8523adb0dde8c3c8364cee0c40aec604784be404a4f4903ae41df436ef3"
+  },
+  "outputPin": {
+    "bytes": 71986,
+    "sha256": "a08585f99eb010f1d3a80d8123ab6fa9aecff41c166877e026a3d9ed89d830d8"
+  },
+  "diffPin": {
+    "bytes": 530,
+    "sha256": "c9146c27be9b04aea55b916b5fa44e599082e3447b44e66defbba3c0be9a1e39"
+  },
+  "eachTokenOriginalCount": {
+    "__DISPATCH_PEER_ID__": 1,
+    "__ISSUED_UTC__": 1,
+    "__LAUNCH_NOT_AFTER_ISO__": 1,
+    "__LAUNCH_NOT_AFTER_UTC__": 1
+  },
+  "remainingFourTokens": 0,
+  "onlyFourSubstitutionsExact": true,
+  "prepareStdout": {
+    "pin": {
+      "bytes": 384,
+      "sha256": "d88b1bc3392f09e15fa20f56933187b0a7212103dc5fc16e292d6a4992e30605"
+    },
+    "text": "{\"scope\": \"command_preparation_only\", \"issued_by_this_script\": false, \"template_sha256\": \"88892c55145ff1e17923f206bf788003a8dd468caede8fd610fab7e5c9079730\", \"output\": \"/workspace/vm-d3-source-24cf-r02/issuance/issued-command.actual.txt\", \"bytes\": 71986, \"sha256\": \"a08585f99eb010f1d3a80d8123ab6fa9aecff41c166877e026a3d9ed89d830d8\", \"window_seconds\": 900, \"executed_command_count\": 0}\n"
+  },
+  "prepareStderr": {
+    "pin": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "text": ""
+  },
+  "source17PFExePREPinsUnchanged": true,
+  "unissuedNullOriginalUnchanged": true,
+  "preCwdEmpty": true,
+  "productRootAbsent": true,
+  "guardRunnerProductExecuted": 0,
+  "dummySyntheticMetadataRepeated": 0,
+  "externalJobs": "UNKNOWN",
+  "physicalPriorHostIdentity": "NOT_INDEPENDENTLY_PROVEN",
+  "native": {
+    "actualNativeRequest": {
+      "cmd": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 -I -S -B -X utf8 -c 'import os,sys,json,hashlib,difflib,datetime,socket,stat\nfrom pathlib import Path\nroot=Path(\"/workspace/vm-d3-source-24cf-r02\")\nstage=root/\"launch-preparation\"\nissuance=root/\"issuance\"\nexe=Path(\"/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12\")\ndeadline=datetime.datetime.fromisoformat(\"2026-10-05T13:35:49.589Z\")\ndef now(): return datetime.datetime.now(datetime.timezone.utc)\ndef pin(p):\n b=p.read_bytes()\n return {\"bytes\":len(b),\"sha256\":hashlib.sha256(b).hexdigest()}\ndef check(p,n,h):\n assert p.is_file() and not p.is_symlink(),str(p)\n v=pin(p); assert v=={\"bytes\":n,\"sha256\":h},str(p)\n return v\ndef canonical(p):\n assert p.is_absolute() and p.resolve(strict=False)==p,str(p)\n for q in [p,*p.parents]: assert not q.is_symlink(),str(q)\ncanonical(root); canonical(stage); canonical(issuance)\ncwd=root/\"pre-cwd\"\nassert Path.cwd()==cwd and not list(cwd.iterdir())\nfuture=Path(\"/workspace/vm-d3-run-24cf-r02\")\ncanonical(future)\nassert not os.path.lexists(future)\nassert now()<=deadline\npins={}\npins[\"exe\"]=check(exe,30894944,\"fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7\")\npins[\"preRaw\"]=check(root/\"evidence/linux-pre.stdout.json\",146121,\"1ae5fc8936ff4604d44cea11a85b2b96f58c0b0095612d9e1e036e32c66a1a77\")\ndef sealed(base,sealname,size,sha,count,total):\n check(base/sealname,size,sha)\n values=json.loads((base/sealname).read_bytes())\n assert len(values)==count\n actual={p.relative_to(base).as_posix() for p in base.rglob(\"*\") if p.is_file()}\n assert actual==set(values)|{sealname}\n assert sum(v[\"bytes\"] for v in values.values())+size==total\n for name,v in values.items():\n  p=base/name; canonical(p); check(p,v[\"bytes\"],v[\"sha256\"])\n return {\"files\":count+1,\"bytes\":total,\"allPinsMatch\":True,\"seal\":pin(base/sealname)}\npins[\"stage\"]=sealed(stage,\"PREPARATION.SHA256.json\",2254,\"f35a58bec14e29365123154a105a70388ee420bf34624e9e0f65bdbb3adb88d5\",16,416472)\npins[\"P\"]=sealed(root/\"packet\",\"SOURCE.SHA256.json\",2448,\"3cb53a85a030f614d265d0e2ce392f26628ac5a5e0f0ff7280f5cd3b06300a3e\",17,1081388)\npins[\"F\"]=sealed(Path(\"/workspace/vm-d3-c1-packet-24cf-r02-01\"),\"SOURCE.SHA256.json\",2850,\"c54bf9ce69722a93c0880f5b7099a3a5669999e2b086661b8444e46059e1b1d7\",21,273396)\ncheck(root/\"packet/prepare-command.py\",3144,\"6b0eec027d07faaae75389fe11eae3c7b07bc1557b31315beaf22ec2655a7f04\")\ncheck(stage/\"PREPARATION.ARGV.actual.json\",1538,\"f935304dec12d1014849e7d090e0fec56ed858b3d232f376d49ff06b43d877dc\")\ndoc=json.loads((stage/\"PREPARATION.ARGV.actual.json\").read_bytes())\nenv4={\"HOME\":str(root/\"pre-home\"),\"TMPDIR\":str(root/\"pre-tmp\"),\"TMP\":str(root/\"pre-tmp\"),\"TEMP\":str(root/\"pre-tmp\")}\nassert doc[\"environment4\"]==env4 and doc[\"cwd\"]==str(cwd)\nfor path in set(env4.values()): canonical(Path(path)); assert Path(path).is_dir()\nexpectedargv=[str(exe),\"-I\",\"-S\",\"-B\",\"-X\",\"utf8\",str(root/\"packet/prepare-command.py\"),\"--template\",str(stage/\"D3-LAUNCH.UNISSUED.template.txt\"),\"--template-sha256\",\"88892c55145ff1e17923f206bf788003a8dd468caede8fd610fab7e5c9079730\",\"--tokens-json\",str(issuance/\"issued-tokens.actual.json\"),\"--output\",str(issuance/\"issued-command.actual.txt\")]\nassert doc[\"argv\"]==expectedargv\ntemplate=(stage/\"D3-LAUNCH.UNISSUED.template.txt\").read_bytes()\ntokens={\"__DISPATCH_PEER_ID__\":\"4724d72d-6e08-4e14-a5d4-e9c76209c778\",\"__ISSUED_UTC__\":\"2026-10-05T13:20:49.589Z\",\"__LAUNCH_NOT_AFTER_ISO__\":\"2026-10-05T13:35:49.589Z\",\"__LAUNCH_NOT_AFTER_UTC__\":\"2026-10-05T13:35:49.589Z\"}\ntb=(json.dumps(tokens,indent=2)+\"\\n\").encode(\"utf-8\")\nassert len(tb)==233 and hashlib.sha256(tb).hexdigest()==\"7becf8523adb0dde8c3c8364cee0c40aec604784be404a4f4903ae41df436ef3\"\nexpected=template\nfor key,value in tokens.items():\n assert template.count(key.encode())==1\n expected=expected.replace(key.encode(),value.encode(),1)\nassert not any(key.encode() in expected for key in tokens)\nassert len(expected)==71986 and hashlib.sha256(expected).hexdigest()==\"a08585f99eb010f1d3a80d8123ab6fa9aecff41c166877e026a3d9ed89d830d8\"\ndiff=\"\".join(difflib.unified_diff(template.decode().splitlines(True),expected.decode().splitlines(True),fromfile=\"frozen-template\",tofile=\"Root-issued-expected-render\",n=0)).encode()\nassert len(diff)==530 and hashlib.sha256(diff).hexdigest()==\"c9146c27be9b04aea55b916b5fa44e599082e3447b44e66defbba3c0be9a1e39\"\nfiles=[\"issued-tokens.actual.json\",\"issued-command.actual.txt\",\"four-token-diff.actual.patch\",\"prepare-input-check.actual.json\",\"prepare.stdout.txt\",\"prepare.stderr.txt\"]\nfor name in files: assert not os.path.lexists(issuance/name),name\nassert now()<=deadline\ndef create(name,b):\n fd=os.open(issuance/name,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)\n with os.fdopen(fd,\"wb\") as f:f.write(b)\ncreate(\"issued-tokens.actual.json\",tb)\ncreate(\"four-token-diff.actual.patch\",diff)\ncheck(issuance/\"issued-tokens.actual.json\",233,\"7becf8523adb0dde8c3c8364cee0c40aec604784be404a4f4903ae41df436ef3\")\nfor k,v in env4.items(): os.environ[k]=v\nreceipt={\"scope\":\"EXACT_PREPARE_ONLY\",\"utcBeforeExec\":now().isoformat(),\"host\":socket.gethostname(),\"pid\":os.getpid(),\"argv\":expectedargv,\"cwd\":str(Path.cwd()),\"environment4\":env4,\"pins\":pins,\"tokenPin\":pin(issuance/\"issued-tokens.actual.json\"),\"expectedRenderedPin\":{\"bytes\":71986,\"sha256\":\"a08585f99eb010f1d3a80d8123ab6fa9aecff41c166877e026a3d9ed89d830d8\"},\"diffPin\":pin(issuance/\"four-token-diff.actual.patch\"),\"deadline\":\"2026-10-05T13:35:49.589Z\",\"prepareAttempts\":1,\"guardRunnerProductExecuted\":0,\"productRootAbsent\":not os.path.lexists(future),\"cwdEmpty\":not list(cwd.iterdir()),\"nativeToolCallId\":None,\"appCommandId\":None,\"providerExecutionId\":None,\"externalJobs\":\"UNKNOWN\"}\ncreate(\"prepare-input-check.actual.json\",(json.dumps(receipt,indent=2)+\"\\n\").encode())\nstdoutfd=os.open(issuance/\"prepare.stdout.txt\",os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)\nstderrfd=os.open(issuance/\"prepare.stderr.txt\",os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)\nassert now()<=deadline\nprint(json.dumps(receipt),flush=True)\nos.dup2(stdoutfd,1);os.dup2(stderrfd,2)\nos.close(stdoutfd);os.close(stderrfd)\nos.execv(str(exe),expectedargv)\n'",
+      "workdir": "/workspace/vm-d3-source-24cf-r02/pre-cwd",
+      "login": false,
+      "yield_time_ms": 1000,
+      "max_output_tokens": 5000
+    },
+    "actualNativeResult": {
+      "chunk_id": "b89edf",
+      "wall_time_seconds": 1.7914e-05,
+      "exit_code": 0,
+      "original_token_count": 559,
+      "output": "{\"scope\": \"EXACT_PREPARE_ONLY\", \"utcBeforeExec\": \"2026-10-05T13:26:35.147612+00:00\", \"host\": \"742382ba19ca\", \"pid\": 8289, \"argv\": [\"/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12\", \"-I\", \"-S\", \"-B\", \"-X\", \"utf8\", \"/workspace/vm-d3-source-24cf-r02/packet/prepare-command.py\", \"--template\", \"/workspace/vm-d3-source-24cf-r02/launch-preparation/D3-LAUNCH.UNISSUED.template.txt\", \"--template-sha256\", \"88892c55145ff1e17923f206bf788003a8dd468caede8fd610fab7e5c9079730\", \"--tokens-json\", \"/workspace/vm-d3-source-24cf-r02/issuance/issued-tokens.actual.json\", \"--output\", \"/workspace/vm-d3-source-24cf-r02/issuance/issued-command.actual.txt\"], \"cwd\": \"/workspace/vm-d3-source-24cf-r02/pre-cwd\", \"environment4\": {\"HOME\": \"/workspace/vm-d3-source-24cf-r02/pre-home\", \"TMPDIR\": \"/workspace/vm-d3-source-24cf-r02/pre-tmp\", \"TMP\": \"/workspace/vm-d3-source-24cf-r02/pre-tmp\", \"TEMP\": \"/workspace/vm-d3-source-24cf-r02/pre-tmp\"}, \"pins\": {\"exe\": {\"bytes\": 30894944, \"sha256\": \"fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7\"}, \"preRaw\": {\"bytes\": 146121, \"sha256\": \"1ae5fc8936ff4604d44cea11a85b2b96f58c0b0095612d9e1e036e32c66a1a77\"}, \"stage\": {\"files\": 17, \"bytes\": 416472, \"allPinsMatch\": true, \"seal\": {\"bytes\": 2254, \"sha256\": \"f35a58bec14e29365123154a105a70388ee420bf34624e9e0f65bdbb3adb88d5\"}}, \"P\": {\"files\": 18, \"bytes\": 1081388, \"allPinsMatch\": true, \"seal\": {\"bytes\": 2448, \"sha256\": \"3cb53a85a030f614d265d0e2ce392f26628ac5a5e0f0ff7280f5cd3b06300a3e\"}}, \"F\": {\"files\": 22, \"bytes\": 273396, \"allPinsMatch\": true, \"seal\": {\"bytes\": 2850, \"sha256\": \"c54bf9ce69722a93c0880f5b7099a3a5669999e2b086661b8444e46059e1b1d7\"}}}, \"tokenPin\": {\"bytes\": 233, \"sha256\": \"7becf8523adb0dde8c3c8364cee0c40aec604784be404a4f4903ae41df436ef3\"}, \"expectedRenderedPin\": {\"bytes\": 71986, \"sha256\": \"a08585f99eb010f1d3a80d8123ab6fa9aecff41c166877e026a3d9ed89d830d8\"}, \"diffPin\": {\"bytes\": 530, \"sha256\": \"c9146c27be9b04aea55b916b5fa44e599082e3447b44e66defbba3c0be9a1e39\"}, \"deadline\": \"2026-10-05T13:35:49.589Z\", \"prepareAttempts\": 1, \"guardRunnerProductExecuted\": 0, \"productRootAbsent\": true, \"cwdEmpty\": true, \"nativeToolCallId\": null, \"appCommandId\": null, \"providerExecutionId\": null, \"externalJobs\": \"UNKNOWN\"}\n"
+    },
+    "nativeToolCallId": null,
+    "appCommandId": null,
+    "providerExecutionId": null,
+    "outputChunkId": "b89edf"
+  }
+}

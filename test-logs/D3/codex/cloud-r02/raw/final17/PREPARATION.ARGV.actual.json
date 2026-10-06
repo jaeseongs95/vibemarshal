@@ -1,0 +1,37 @@
+{
+  "scope": "exact future preparation argv; NOT_EXECUTED and no authority issuance",
+  "cwd": "/workspace/vm-d3-source-24cf-r02/pre-cwd",
+  "environment4": {
+    "HOME": "/workspace/vm-d3-source-24cf-r02/pre-home",
+    "TMPDIR": "/workspace/vm-d3-source-24cf-r02/pre-tmp",
+    "TMP": "/workspace/vm-d3-source-24cf-r02/pre-tmp",
+    "TEMP": "/workspace/vm-d3-source-24cf-r02/pre-tmp"
+  },
+  "argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "-I",
+    "-S",
+    "-B",
+    "-X",
+    "utf8",
+    "/workspace/vm-d3-source-24cf-r02/packet/prepare-command.py",
+    "--template",
+    "/workspace/vm-d3-source-24cf-r02/launch-preparation/D3-LAUNCH.UNISSUED.template.txt",
+    "--template-sha256",
+    "88892c55145ff1e17923f206bf788003a8dd468caede8fd610fab7e5c9079730",
+    "--tokens-json",
+    "/workspace/vm-d3-source-24cf-r02/issuance/issued-tokens.actual.json",
+    "--output",
+    "/workspace/vm-d3-source-24cf-r02/issuance/issued-command.actual.txt"
+  ],
+  "templatePin": {
+    "bytes": 71960,
+    "sha256": "88892c55145ff1e17923f206bf788003a8dd468caede8fd610fab7e5c9079730"
+  },
+  "templateDeliveryDestinationPlannedOnly": "/workspace/vm-d3-source-24cf-r02/launch-preparation/D3-LAUNCH.UNISSUED.template.txt",
+  "tokensInputPlannedOnly": "/workspace/vm-d3-source-24cf-r02/issuance/issued-tokens.actual.json",
+  "outputPlannedOnly": "/workspace/vm-d3-source-24cf-r02/issuance/issued-command.actual.txt",
+  "issued_by_this_task": false,
+  "prepare_calls": 0,
+  "output_exists_observed": null
+}

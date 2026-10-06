@@ -1,0 +1,43 @@
+{
+  "scope": "stdlib data readback; no candidate import or execution",
+  "observedUtc": "2026-10-05T11:10:48.462870+00:00",
+  "checked": {
+    "P": {
+      "files": 19,
+      "bytes": 1259039,
+      "allPinsAndExactSetMatch": true
+    },
+    "F": {
+      "files": 23,
+      "bytes": 343533,
+      "allPinsAndExactSetMatch": true
+    },
+    "old14": {
+      "files": 14,
+      "bytes": 56489,
+      "allPinsAndExactSetMatch": true
+    },
+    "VM2": {
+      "files": 76,
+      "bytes": 5897328,
+      "allPinsAndExactSetMatch": true
+    },
+    "old13": {
+      "files": 13,
+      "bytes": 86331,
+      "allPinsAndExactSetMatch": true
+    },
+    "R037": {
+      "bytes": 8061,
+      "sha256": "5cc343cb2c6959527d13d6e368c4be0c7d0d93fbe18bb7a1c96a48441aaa06cb"
+    }
+  },
+  "liveCloudOriginalPins": 53,
+  "runtimeFilePinUniqueCount": 132,
+  "candidateExecutions": 0,
+  "fixtureExecutions": 0,
+  "prepareExecutions": 0,
+  "guardExecutions": 0,
+  "productExecutions": 0,
+  "SQLiteProbes": 0
+}

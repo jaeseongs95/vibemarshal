@@ -1,0 +1,9 @@
+--- frozen-template
++++ Root-issued-expected-render
+@@ -4,3 +4,3 @@
+-issued=datetime.datetime.fromisoformat('__ISSUED_UTC__')
+-deadline=datetime.datetime.fromisoformat('__LAUNCH_NOT_AFTER_ISO__')
+-context={'peerId':'__DISPATCH_PEER_ID__','launchNotAfterUtc':'__LAUNCH_NOT_AFTER_UTC__'}
++issued=datetime.datetime.fromisoformat('2026-10-05T13:20:49.589Z')
++deadline=datetime.datetime.fromisoformat('2026-10-05T13:35:49.589Z')
++context={'peerId':'4724d72d-6e08-4e14-a5d4-e9c76209c778','launchNotAfterUtc':'2026-10-05T13:35:49.589Z'}

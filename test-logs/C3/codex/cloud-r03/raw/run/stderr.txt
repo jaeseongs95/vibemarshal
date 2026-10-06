@@ -1,0 +1,8 @@
+test_json_output_is_ascii_safe_and_round_trips_unicode (test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_json_output_is_ascii_safe_and_round_trips_unicode) ... ok
+test_revision5_requires_typed_ancestor_inputs_and_evidence_contract (test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision5_requires_typed_ancestor_inputs_and_evidence_contract) ... ok
+test_same_path_accepts_only_drive_and_unc_extended_namespaces (test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_same_path_accepts_only_drive_and_unc_extended_namespaces) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.065s
+
+OK

@@ -1,0 +1,695 @@
+{
+  "scope": "C5 exact5/helper70f5/Linux3.12.14 supporting POST; no broader qualification claim",
+  "peerId": "a097931e-ffc2-443b-9b41-a03c5117e2d0",
+  "utc": "2026-10-04T21:07:45.244859+00:00",
+  "checks": {
+    "fourTokensOnly": true,
+    "source11Unchanged": true,
+    "fixture7Unchanged": true,
+    "runtime8Unchanged": true,
+    "exeUnchanged": true,
+    "metadataPinUnchanged": true,
+    "dummyReportPinsUnchanged": true,
+    "rawInputs5BeforeAfterEqual": true,
+    "exactFiveIdsObserved": true,
+    "loaderErrorsEmpty": true,
+    "nativeChildTerminalExit0NoTimeout": true,
+    "guardRawPass": true,
+    "parentCwdExact": true,
+    "preCwdEmpty": true,
+    "runrootCanonical": true,
+    "allCurrentModuleFilesRead": true
+  },
+  "guardRaw": {
+    "checks": {
+      "actualExecutable": true,
+      "actualFlags": true,
+      "actualParentCwd": true,
+      "allSourcePins": true,
+      "ancestorsNoSymlink": true,
+      "beforeDeadlineAtGuardEnd": true,
+      "beforeDeadlineAtGuardStart": true,
+      "canonicalURIUnambiguous": true,
+      "canonicalUpperFMZero": true,
+      "dummyExact14Expected": true,
+      "dummyExecutionEvidencePin": true,
+      "dummyFixedSource": true,
+      "dummyNativeTerminal": true,
+      "dummyResultEvidencePin": true,
+      "eightStdlibFilePins": true,
+      "exactFiveIds": true,
+      "exactFixture7": true,
+      "exactSource11": true,
+      "executablePin": true,
+      "fixtureCanonical": true,
+      "fixtureExternalPins": true,
+      "fixtureSealExternalPin": true,
+      "fixtureSixPins": true,
+      "linuxPython312": true,
+      "manifestExternalPin": true,
+      "metadataChecks": true,
+      "nonOverlap": true,
+      "parentCwdExactEmpty": true,
+      "preExternalPin": true,
+      "runnerExternalPin": true,
+      "runrootAbsent": true,
+      "runrootResolveExact": true,
+      "sealExternalPin": true,
+      "sourceCanonical": true,
+      "sourceTotalBytes": true
+    },
+    "currentUnreadableProcesses": "UNKNOWN",
+    "errors": [],
+    "externalJobs": "UNKNOWN",
+    "guardArgv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-X",
+      "utf8",
+      "-"
+    ],
+    "guardCwd": "/workspace/vm-c5-source-24cf-r03/pre-cwd",
+    "guardEndUtc": "2026-10-04T21:04:11.654300+00:00",
+    "guardStartUtc": "2026-10-04T21:04:11.615878+00:00",
+    "historicalUnreadableProcesses": "7 (prior phase; not current)",
+    "issuedUtc": "2026-10-04T21:00:58Z",
+    "launchNotAfterUtc": "2026-10-04T21:15:58Z",
+    "nativeCommandId": null,
+    "passed": true,
+    "peerId": "a097931e-ffc2-443b-9b41-a03c5117e2d0",
+    "runnerInvocationsSoFar": 0,
+    "scope": "UNISSUED_C5_LAUNCH_TEMPLATE_FRESHNESS_ONLY",
+    "source11": [
+      {
+        "bytes": 161539,
+        "match": true,
+        "path": "ORIGINAL76-INVENTORY.json",
+        "sha256": "3d9cd9641229dd9ffeaee608737036a6dff68bf4a7039e25e8c06bb315598ecd"
+      },
+      {
+        "bytes": 24833,
+        "match": true,
+        "path": "ORIGINAL76-STATUS.ko.md",
+        "sha256": "f3d088714012f013989b7c82e014bcf872289268df9b3c76d879c755f0b7abf3"
+      },
+      {
+        "bytes": 3319,
+        "match": true,
+        "path": "README.ko.md",
+        "sha256": "7fe160ad0b983227db2502b66cec45ec423062ede9d74033d82f33745fa62503"
+      },
+      {
+        "bytes": 33411,
+        "match": true,
+        "path": "SOURCE.DIFF.patch",
+        "sha256": "64725d1c6b008579132b645f176bdc3271ce3a1eb2e667666a6c4f711ee47004"
+      },
+      {
+        "bytes": 1425,
+        "match": true,
+        "path": "SOURCE.SHA256.json",
+        "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d"
+      },
+      {
+        "bytes": 2616,
+        "match": true,
+        "path": "STATIC-CHECKS.json",
+        "sha256": "651170804bd7537f4c1cced2075b54863e7b785b5baa0b36a575f7706b415d4c"
+      },
+      {
+        "bytes": 12335,
+        "match": true,
+        "path": "manifest.json",
+        "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1"
+      },
+      {
+        "bytes": 384699,
+        "match": true,
+        "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+        "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+      },
+      {
+        "bytes": 39264,
+        "match": true,
+        "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+        "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+      },
+      {
+        "bytes": 173219,
+        "match": true,
+        "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+      },
+      {
+        "bytes": 29404,
+        "match": true,
+        "path": "runner.py",
+        "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343"
+      }
+    ],
+    "status": "FRESHNESS_PASS_PENDING_NATIVE_DISPATCH",
+    "stdlib8": [
+      {
+        "bytes": 27637,
+        "match": true,
+        "name": "contextlib",
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+        "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6"
+      },
+      {
+        "bytes": 127125,
+        "match": true,
+        "name": "inspect",
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+        "sha256": "5c54ebf0bfdc25397750e5d0f63800751650ee50e65325ff3ea4069c9bfa5f75"
+      },
+      {
+        "bytes": 2501,
+        "match": true,
+        "name": "sqlite3",
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+        "sha256": "f7cc982617b68e147540ef352d38310fe4d25c2c9c2542b67d0590c871df09a8"
+      },
+      {
+        "bytes": 3631,
+        "match": true,
+        "name": "sqlite3.dbapi2",
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+        "sha256": "7c5c8d98df1f2c50c4062a3be2c0f0499190c179fa4fc281507a1ef763a98f28"
+      },
+      {
+        "bytes": 51655,
+        "match": true,
+        "name": "ssl",
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+        "sha256": "db62eeaae59c6e7087dcafb28087cd0bb092087381edc556f97c8cb614484380"
+      },
+      {
+        "bytes": 3487,
+        "match": true,
+        "name": "unittest",
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+        "sha256": "32ed48385c0377bc2900a76e9a6acc3705aeef402c72de8554b3c637420506f0"
+      },
+      {
+        "bytes": 106317,
+        "match": true,
+        "name": "unittest.mock",
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+        "sha256": "1de18141992c6742bff27e77c0cbe46d53d6a5ab1850574a536910508823fc5c"
+      },
+      {
+        "bytes": 88747,
+        "match": true,
+        "name": "subprocess",
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+        "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375"
+      }
+    ]
+  },
+  "dispatchRaw": {
+    "scope": "C5_OS_EXECV_DISPATCH",
+    "utc": "2026-10-04T21:04:11.654661+00:00",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-X",
+      "utf8",
+      "/workspace/vm-c5-source-24cf-r03/packet/runner.py",
+      "--run-root",
+      "/workspace/vm-c5-run-24cf-r03",
+      "--runner-sha256",
+      "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+      "--manifest-sha256",
+      "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+      "--timeout",
+      "300"
+    ],
+    "cwd": "/workspace/vm-c5-source-24cf-r03/pre-cwd",
+    "method": "os.execv same process replacement; no additional child",
+    "runnerInvocationRequested": 1,
+    "retries": 0
+  },
+  "outerStatusRaw": {
+    "status": "PASS",
+    "run_root": "/workspace/vm-c5-run-24cf-r03",
+    "actual_exit": 0
+  },
+  "resultRaw": {
+    "started_utc": "2026-10-04T21:04:11.890430+00:00",
+    "finished_utc": "2026-10-04T21:04:12.114359+00:00",
+    "test_ids": [
+      "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_carry_rehashes_all_evidence_files_without_freshness_contract",
+      "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_migration_backup_history_idempotence_tamper_cycle_and_readonly",
+      "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_record_direct_attempt_rejects_task_that_is_not_ready",
+      "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revalidate_success_rejects_ordinary_pending_task",
+      "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision_manifest_rejects_false_carry_and_incomplete_lineage"
+    ],
+    "testsRun": 5,
+    "wasSuccessful": true,
+    "failures": [],
+    "errors": [],
+    "skipped": [],
+    "expectedFailures": [],
+    "unexpectedSuccesses": [],
+    "unittest_exit": 0,
+    "effect_denials": {
+      "count": 0,
+      "logging_errors": 0
+    },
+    "suite_exit": 0
+  },
+  "executionRaw": {
+    "started_utc": "2026-10-04T21:04:11.717147+00:00",
+    "observed_utc": "2026-10-04T21:04:12.183911+00:00",
+    "pid": 5770,
+    "actual_exit": 0,
+    "terminal_observed": true,
+    "status": "PASS",
+    "timed_out": false,
+    "own_child_kill_error": null,
+    "raw_observation_error": null,
+    "observation_unknown": false,
+    "unittest_observation_unknown": false,
+    "effect_denial_claim_source": "result.json",
+    "effect_denial_observation": {
+      "state": "CLEAR",
+      "count": 0,
+      "journal_count": 0,
+      "logging_errors": 0,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inputs_before": {
+      "runner.py": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+      "manifest.json": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+      "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    },
+    "inputs_after_observation": {
+      "runner.py": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+      "manifest.json": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+      "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    },
+    "files_observed": [
+      {
+        "path": "result.json",
+        "bytes": 1073
+      },
+      {
+        "path": "postflight.json",
+        "bytes": 16684
+      },
+      {
+        "path": "invocation.json",
+        "bytes": 2022
+      },
+      {
+        "path": "stdout.txt",
+        "bytes": 0
+      },
+      {
+        "path": "preflight.json",
+        "bytes": 23302
+      },
+      {
+        "path": "effect-denials.jsonl",
+        "bytes": 0
+      },
+      {
+        "path": "helper-origin.jsonl",
+        "bytes": 20849
+      },
+      {
+        "path": "loader.json",
+        "bytes": 780
+      },
+      {
+        "path": "stderr.txt",
+        "bytes": 1107
+      }
+    ],
+    "residual_observation_mutable": false,
+    "timeout_note": "Own child only kill/reap in same budget; no retry/global kill/cleanup"
+  },
+  "loaderRaw": {
+    "utc": "2026-10-04T21:04:11.881525+00:00",
+    "ids": [
+      "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_carry_rehashes_all_evidence_files_without_freshness_contract",
+      "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_migration_backup_history_idempotence_tamper_cycle_and_readonly",
+      "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_record_direct_attempt_rejects_task_that_is_not_ready",
+      "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revalidate_success_rejects_ordinary_pending_task",
+      "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision_manifest_rejects_false_carry_and_incomplete_lineage"
+    ],
+    "count": 5,
+    "errors": []
+  },
+  "rawFileInventory": [
+    {
+      "path": "effect-denials.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    },
+    {
+      "path": "execution.json",
+      "bytes": 2554,
+      "sha256": "9f2c9caab54ca6fcd94e30342510d92a4eaf629da97846e2ff8ac0e870d21dc8",
+      "mode": "0o600"
+    },
+    {
+      "path": "helper-origin.jsonl",
+      "bytes": 20849,
+      "sha256": "ad2efd6ded37697f0b750cd2500cd66552e0fa5332bb772f47b138a1eed49d69",
+      "mode": "0o600"
+    },
+    {
+      "path": "invocation.json",
+      "bytes": 2022,
+      "sha256": "beebfc910f592927a7add24f997c87fe8ffe8d157451326be51389a0f6bd444b",
+      "mode": "0o600"
+    },
+    {
+      "path": "loader.json",
+      "bytes": 780,
+      "sha256": "c60575e98962e57f0803d7b5104124a8ac2bd948815a1a1437b958969f2d0bb4",
+      "mode": "0o600"
+    },
+    {
+      "path": "postflight.json",
+      "bytes": 16684,
+      "sha256": "e07bb57746822803ea85fa819dd49bda3f480b206ab14be73b303ae6cb4cd12f",
+      "mode": "0o600"
+    },
+    {
+      "path": "preflight.json",
+      "bytes": 23302,
+      "sha256": "fca24ff11a00d43ad859729fc50bca68c1b3ae19bec0c14289774cb03d5acef9",
+      "mode": "0o600"
+    },
+    {
+      "path": "result.json",
+      "bytes": 1073,
+      "sha256": "6b02e8282a8f2b1e0547042f2f36c5ec2e92123e48e638a6dcbbfe5960d1aacf",
+      "mode": "0o600"
+    },
+    {
+      "path": "stderr.txt",
+      "bytes": 1107,
+      "sha256": "e6e01d367b408ed4981ae60115c1a2fb86dd01f0ebe546d352b53aab010e87e8",
+      "mode": "0o600"
+    },
+    {
+      "path": "stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    }
+  ],
+  "rawFileCount": 10,
+  "rawBytes": 68371,
+  "missingFiles": [
+    "child-error.json"
+  ],
+  "missingObservation": "Missing files retained as absent; not synthesized. child-error.json absent in observed successful execution.",
+  "source11After": [
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/ORIGINAL76-INVENTORY.json",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/packet/ORIGINAL76-INVENTORY.json",
+      "bytes": 161539,
+      "sha256": "3d9cd9641229dd9ffeaee608737036a6dff68bf4a7039e25e8c06bb315598ecd",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/ORIGINAL76-STATUS.ko.md",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/packet/ORIGINAL76-STATUS.ko.md",
+      "bytes": 24833,
+      "sha256": "f3d088714012f013989b7c82e014bcf872289268df9b3c76d879c755f0b7abf3",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/README.ko.md",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/packet/README.ko.md",
+      "bytes": 3319,
+      "sha256": "7fe160ad0b983227db2502b66cec45ec423062ede9d74033d82f33745fa62503",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/SOURCE.DIFF.patch",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/packet/SOURCE.DIFF.patch",
+      "bytes": 33411,
+      "sha256": "64725d1c6b008579132b645f176bdc3271ce3a1eb2e667666a6c4f711ee47004",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/SOURCE.SHA256.json",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/packet/SOURCE.SHA256.json",
+      "bytes": 1425,
+      "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/STATIC-CHECKS.json",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/packet/STATIC-CHECKS.json",
+      "bytes": 2616,
+      "sha256": "651170804bd7537f4c1cced2075b54863e7b785b5baa0b36a575f7706b415d4c",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/manifest.json",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/packet/manifest.json",
+      "bytes": 12335,
+      "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/pristine/scripts/flowmarshal_implementation_workflow.py",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/packet/pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/packet/pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/runner.py",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/packet/runner.py",
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+      "matchesPrior": true
+    }
+  ],
+  "fixture7After": [
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/c1-fixture/EXTRACTIONS.json",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/c1-fixture/EXTRACTIONS.json",
+      "bytes": 2908,
+      "sha256": "1d6ffde24716ddc60bb2c9707754f47dc78d2a4f894252168361d1388dabf35f",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/c1-fixture/README.ko.md",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/c1-fixture/README.ko.md",
+      "bytes": 3872,
+      "sha256": "f515625c2ed314f4036f47e890c7c0933345364d18934b5b15be70829e34ce8d",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/c1-fixture/SOURCE-CHECKS.json",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/c1-fixture/SOURCE-CHECKS.json",
+      "bytes": 6209,
+      "sha256": "bf824a6d16116b1044ac3f7f8a569c82841c21b94054d6d47e438434ddaf1c55",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/c1-fixture/SOURCE.SHA256.json",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/c1-fixture/SOURCE.SHA256.json",
+      "bytes": 769,
+      "sha256": "2345d41939c978a165693f4417db6944fe983fad42706466f6f986bf617d739e",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/c1-fixture/fixture.py",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/c1-fixture/fixture.py",
+      "bytes": 20601,
+      "sha256": "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/c1-fixture/frozen/runner.py",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/c1-fixture/frozen/runner.py",
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+      "matchesPrior": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/c1-fixture/manifest.json",
+      "resolve": "/workspace/vm-c5-source-24cf-r03/c1-fixture/manifest.json",
+      "bytes": 12565,
+      "sha256": "15e10b1038f2ced4787e73cca5a19039132cf54b432191e3347aa394e3742b4a",
+      "matchesPrior": true
+    }
+  ],
+  "runtime8After": [
+    {
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "bytes": 27637,
+      "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6",
+      "matchesPrior": true
+    },
+    {
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+      "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+      "bytes": 127125,
+      "sha256": "5c54ebf0bfdc25397750e5d0f63800751650ee50e65325ff3ea4069c9bfa5f75",
+      "matchesPrior": true
+    },
+    {
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+      "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+      "bytes": 2501,
+      "sha256": "f7cc982617b68e147540ef352d38310fe4d25c2c9c2542b67d0590c871df09a8",
+      "matchesPrior": true
+    },
+    {
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+      "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+      "bytes": 3631,
+      "sha256": "7c5c8d98df1f2c50c4062a3be2c0f0499190c179fa4fc281507a1ef763a98f28",
+      "matchesPrior": true
+    },
+    {
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "bytes": 51655,
+      "sha256": "db62eeaae59c6e7087dcafb28087cd0bb092087381edc556f97c8cb614484380",
+      "matchesPrior": true
+    },
+    {
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+      "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+      "bytes": 3487,
+      "sha256": "32ed48385c0377bc2900a76e9a6acc3705aeef402c72de8554b3c637420506f0",
+      "matchesPrior": true
+    },
+    {
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "bytes": 106317,
+      "sha256": "1de18141992c6742bff27e77c0cbe46d53d6a5ab1850574a536910508823fc5c",
+      "matchesPrior": true
+    },
+    {
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "bytes": 88747,
+      "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375",
+      "matchesPrior": true
+    }
+  ],
+  "exeAfter": {
+    "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "bytes": 30894944,
+    "sha256": "fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7",
+    "matchesPrior": true
+  },
+  "metadataAfter": {
+    "bytes": 114902,
+    "sha256": "3e303efd982ac83f7ef9ac68efb75bd7f3d010ce2f69fc1084ea64057ac2a9a6"
+  },
+  "dummyEvidenceAfter": [
+    {
+      "path": "/workspace/vm-c5-c1-pre-24cf-r03-01/fixture-execution.json",
+      "bytes": 27276,
+      "sha256": "0120fb7f7145e1c0b9b51845ef2bc609cefa95963217cfbdbb980ec43490fa85"
+    },
+    {
+      "path": "/workspace/vm-c5-c1-pre-24cf-r03-01/fixture-child.json",
+      "bytes": 28686,
+      "sha256": "f97aa0543f2eea551c16f5f82837ec0c6c7f5111fb0d0cbeda102cef13e653e4"
+    }
+  ],
+  "helperOriginRows": 28,
+  "helperOriginPhases": {
+    "before": 14,
+    "accepted": 14,
+    "rejected": 0
+  },
+  "effectDenialObservationPostRaw": {
+    "state": "CLEAR",
+    "count": 0,
+    "journal_count": 0,
+    "logging_errors": 0,
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "effectDenialObservationExecutionRaw": {
+    "state": "CLEAR",
+    "count": 0,
+    "journal_count": 0,
+    "logging_errors": 0,
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "actualSource5After": {
+    "runner.py": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+    "manifest.json": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+    "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+    "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+    "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+  },
+  "moduleFileReadbackRows": 274,
+  "moduleFileUnknownRows": [],
+  "runrootDirectories": [
+    {
+      "path": "cwd",
+      "entries": 0,
+      "mode": "0o700"
+    },
+    {
+      "path": "home",
+      "entries": 0,
+      "mode": "0o700"
+    },
+    {
+      "path": "tmp",
+      "entries": 0,
+      "mode": "0o700"
+    }
+  ],
+  "preCwdEmpty": true,
+  "runrootCanonical": true,
+  "runnerCalls": 1,
+  "ownedChildCalls": 1,
+  "retry": 0,
+  "prior90b": "NOT_RUN immutable; no rerun",
+  "parentPID": null,
+  "nativeToolCallId": null,
+  "providerExecutionId": null,
+  "appCommandId": null,
+  "externalJobs": "UNKNOWN",
+  "OSContainment": "UNKNOWN",
+  "historicalUnreadableProcesses": "7 (prior phase); current UNKNOWN",
+  "cleanup": 0
+}

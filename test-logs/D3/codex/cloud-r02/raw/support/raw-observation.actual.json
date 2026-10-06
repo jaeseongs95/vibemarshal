@@ -1,0 +1,356 @@
+{
+  "scope": "D3_SELECTED3_ONLY_RAW_OBSERVATION_NOT_POST_VERDICT",
+  "utc": "2026-10-05T13:34:06.306507+00:00",
+  "result": {
+    "started_utc": "2026-10-05T13:30:28.490498+00:00",
+    "finished_utc": "2026-10-05T13:30:28.679151+00:00",
+    "test_ids": [
+      "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+      "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged",
+      "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject"
+    ],
+    "testsRun": 3,
+    "wasSuccessful": true,
+    "failures": [],
+    "errors": [],
+    "skipped": [],
+    "expectedFailures": [],
+    "unexpectedSuccesses": [],
+    "unittest_exit": 0,
+    "effect_denials": {
+      "count": 0,
+      "logging_errors": 0
+    },
+    "suite_exit": 0
+  },
+  "execution": {
+    "started_utc": "2026-10-05T13:30:28.301967+00:00",
+    "observed_utc": "2026-10-05T13:30:28.720660+00:00",
+    "pid": 8338,
+    "actual_exit": 0,
+    "terminal_observed": true,
+    "status": "PASS",
+    "timed_out": false,
+    "own_child_kill_error": null,
+    "raw_observation_error": null,
+    "observation_unknown": false,
+    "unittest_observation_unknown": false,
+    "effect_denial_claim_source": "result.json",
+    "effect_denial_observation": {
+      "state": "CLEAR",
+      "count": 0,
+      "journal_count": 0,
+      "logging_errors": 0,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "inputs_before": {
+      "runner.py": "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb",
+      "manifest.json": "ff64e328bfc51fae2c96ebb605008d7ef2fb8fde15e4b36fd6de4d205bb6a3d0",
+      "pristine/tests/test_flowmarshal_direct_selection.py": "56793b76b16712fffd1d2d732b3c858621fef15d1d85f2874f0545fba3ea6fe2",
+      "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    },
+    "inputs_after_observation": {
+      "runner.py": "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb",
+      "manifest.json": "ff64e328bfc51fae2c96ebb605008d7ef2fb8fde15e4b36fd6de4d205bb6a3d0",
+      "pristine/tests/test_flowmarshal_direct_selection.py": "56793b76b16712fffd1d2d732b3c858621fef15d1d85f2874f0545fba3ea6fe2",
+      "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    },
+    "files_observed": [
+      {
+        "path": "result.json",
+        "bytes": 724
+      },
+      {
+        "path": "postflight.json",
+        "bytes": 16947
+      },
+      {
+        "path": "invocation.json",
+        "bytes": 2151
+      },
+      {
+        "path": "stdout.txt",
+        "bytes": 0
+      },
+      {
+        "path": "preflight.json",
+        "bytes": 30324
+      },
+      {
+        "path": "effect-denials.jsonl",
+        "bytes": 0
+      },
+      {
+        "path": "helper-origin.jsonl",
+        "bytes": 25275
+      },
+      {
+        "path": "loader.json",
+        "bytes": 431
+      },
+      {
+        "path": "stderr.txt",
+        "bytes": 597
+      }
+    ],
+    "residual_observation_mutable": false,
+    "timeout_note": "Own child only kill/reap in same budget; no retry/global kill/cleanup"
+  },
+  "loader": {
+    "utc": "2026-10-05T13:30:28.483377+00:00",
+    "ids": [
+      "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+      "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged",
+      "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject"
+    ],
+    "count": 3,
+    "errors": []
+  },
+  "guardSummary": {
+    "checksCount": 407,
+    "failedChecks": [],
+    "errors": [],
+    "status": "FRESHNESS_AND_EVIDENCE_MATCH_PENDING_NATIVE_DISPATCH",
+    "scope": "D3_UNISSUED_FINAL_TEMPLATE_FRESHNESS_AND_PIN_RECHECK",
+    "dispatch": [
+      {
+        "scope": "D3_OS_EXECV_DISPATCH",
+        "utc": "2026-10-05T13:30:28.217687+00:00",
+        "argv": [
+          "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+          "-I",
+          "-S",
+          "-B",
+          "-X",
+          "utf8",
+          "/workspace/vm-d3-source-24cf-r02/packet/runner.py",
+          "--run-root",
+          "/workspace/vm-d3-run-24cf-r02",
+          "--runner-sha256",
+          "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb",
+          "--manifest-sha256",
+          "ff64e328bfc51fae2c96ebb605008d7ef2fb8fde15e4b36fd6de4d205bb6a3d0",
+          "--timeout",
+          "300"
+        ],
+        "cwd": "/workspace/vm-d3-source-24cf-r02/pre-cwd",
+        "childCwd": "/workspace/vm-d3-run-24cf-r02/cwd",
+        "childHOME": "/workspace/vm-d3-run-24cf-r02/home",
+        "childTMP": "/workspace/vm-d3-run-24cf-r02/tmp",
+        "method": "same process; runner owns one child",
+        "runnerInvocationRequested": 1,
+        "retry": 0
+      },
+      {
+        "status": "PASS",
+        "run_root": "/workspace/vm-d3-run-24cf-r02",
+        "actual_exit": 0
+      }
+    ]
+  },
+  "DToMBindingRaw": {
+    "test_module": "test_flowmarshal_direct_selection",
+    "fixture_module": "test_flowmarshal_implementation_workflow",
+    "fixture_aliases_same_objects": [
+      "impl",
+      "ns",
+      "connect",
+      "digest"
+    ],
+    "functions": [
+      {
+        "owner": "DirectSelectionTest",
+        "name": "setUp",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_direct_selection.py",
+        "globals_module": "test_flowmarshal_direct_selection"
+      },
+      {
+        "owner": "DirectSelectionTest",
+        "name": "selection",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_direct_selection.py",
+        "globals_module": "test_flowmarshal_direct_selection"
+      },
+      {
+        "owner": "DirectSelectionTest",
+        "name": "ref",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_direct_selection.py",
+        "globals_module": "test_flowmarshal_direct_selection"
+      },
+      {
+        "owner": "DirectSelectionTest",
+        "name": "record",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_direct_selection.py",
+        "globals_module": "test_flowmarshal_direct_selection"
+      },
+      {
+        "owner": "DirectSelectionTest",
+        "name": "counts",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_direct_selection.py",
+        "globals_module": "test_flowmarshal_direct_selection"
+      },
+      {
+        "owner": "test_flowmarshal_implementation_workflow",
+        "name": "ns",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      },
+      {
+        "owner": "test_flowmarshal_implementation_workflow",
+        "name": "connect",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      },
+      {
+        "owner": "test_flowmarshal_implementation_workflow",
+        "name": "digest",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      },
+      {
+        "owner": "ImplementationWorkflowTest",
+        "name": "setUp",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      },
+      {
+        "owner": "ImplementationWorkflowTest",
+        "name": "tearDown",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      },
+      {
+        "owner": "ImplementationWorkflowTest",
+        "name": "_make_v1",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      },
+      {
+        "owner": "ImplementationWorkflowTest",
+        "name": "_make_codex_state",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      },
+      {
+        "owner": "ImplementationWorkflowTest",
+        "name": "_manifest",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      },
+      {
+        "owner": "ImplementationWorkflowTest",
+        "name": "_task",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      },
+      {
+        "owner": "ImplementationWorkflowTest",
+        "name": "_write_manifest",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      },
+      {
+        "owner": "ImplementationWorkflowTest",
+        "name": "migrate",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      },
+      {
+        "owner": "ImplementationWorkflowTest",
+        "name": "begin",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      },
+      {
+        "owner": "ImplementationWorkflowTest",
+        "name": "evidence",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      },
+      {
+        "owner": "ImplementationWorkflowTest",
+        "name": "pass_fm00",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      },
+      {
+        "owner": "ImplementationWorkflowTest",
+        "name": "_record_direct",
+        "code_file": "/workspace/vm-d3-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+        "globals_module": "test_flowmarshal_implementation_workflow"
+      }
+    ]
+  },
+  "DToMBindingFunctionsCount": 20,
+  "helperJournalRows": 34,
+  "helperJournalPhaseCounts": {
+    "before": 17,
+    "accepted": 17
+  },
+  "helperJournalNamesByPhase": {
+    "accepted": [
+      "_backup_database",
+      "_install_writer_fence_triggers",
+      "_load_direct_selection",
+      "_load_evidence",
+      "command_begin",
+      "command_finish",
+      "command_migrate",
+      "command_ready_tasks",
+      "command_record_direct_attempt",
+      "command_register_revision",
+      "command_revalidate_success",
+      "command_review",
+      "command_status",
+      "command_task",
+      "command_verify",
+      "open_readonly",
+      "open_write"
+    ],
+    "before": [
+      "_backup_database",
+      "_install_writer_fence_triggers",
+      "_load_direct_selection",
+      "_load_evidence",
+      "command_begin",
+      "command_finish",
+      "command_migrate",
+      "command_ready_tasks",
+      "command_record_direct_attempt",
+      "command_register_revision",
+      "command_revalidate_success",
+      "command_review",
+      "command_status",
+      "command_task",
+      "command_verify",
+      "open_readonly",
+      "open_write"
+    ]
+  },
+  "helperDeclaredNamesCountObserved": 17,
+  "helperJournalTotal17NotAsserted": true,
+  "denialObservationRaw": {
+    "state": "CLEAR",
+    "count": 0,
+    "journal_count": 0,
+    "logging_errors": 0,
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "moduleBeforeCount": 138,
+  "moduleAfterCount": 138,
+  "missingRunFiles": [
+    "child-error.json"
+  ],
+  "missingMeaning": "NOT_OBSERVED; no replacement generated",
+  "externalJobs": "UNKNOWN",
+  "OSContainment": "UNKNOWN",
+  "physicalPriorHostIdentity": "NOT_INDEPENDENTLY_PROVEN",
+  "readDispatchAtomicity": "NOT_GUARANTEED",
+  "IOHardwall": "NOT_GUARANTEED",
+  "reruns": 0
+}

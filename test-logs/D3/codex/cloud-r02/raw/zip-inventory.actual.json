@@ -1,0 +1,296 @@
+{
+  "scope": "full original runroot files including zero bytes; explicit other raw inputs",
+  "missingRunFiles": [
+    "child-error.json"
+  ],
+  "entries": [
+    {
+      "entry": "F/SOURCE.SHA256.json",
+      "sourcePath": "/workspace/vm-d3-c1-packet-24cf-r02-01/SOURCE.SHA256.json",
+      "bytes": 2850,
+      "sha256": "c54bf9ce69722a93c0880f5b7099a3a5669999e2b086661b8444e46059e1b1d7"
+    },
+    {
+      "entry": "P/SOURCE.SHA256.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/packet/SOURCE.SHA256.json",
+      "bytes": 2448,
+      "sha256": "3cb53a85a030f614d265d0e2ce392f26628ac5a5e0f0ff7280f5cd3b06300a3e"
+    },
+    {
+      "entry": "P/manifest.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/packet/manifest.json",
+      "bytes": 13558,
+      "sha256": "ff64e328bfc51fae2c96ebb605008d7ef2fb8fde15e4b36fd6de4d205bb6a3d0"
+    },
+    {
+      "entry": "P/prepare-command.py",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/packet/prepare-command.py",
+      "bytes": 3144,
+      "sha256": "6b0eec027d07faaae75389fe11eae3c7b07bc1557b31315beaf22ec2655a7f04"
+    },
+    {
+      "entry": "P/runner.py",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/packet/runner.py",
+      "bytes": 31682,
+      "sha256": "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb"
+    },
+    {
+      "entry": "final17/BOUND-ACTUAL.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/BOUND-ACTUAL.json",
+      "bytes": 62190,
+      "sha256": "411772680b475502e20cf74fe5c2197b6e1086568e58e49f92b6994c0b581e92"
+    },
+    {
+      "entry": "final17/CURRENT-HANDOFF.ko.md",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/CURRENT-HANDOFF.ko.md",
+      "bytes": 5149,
+      "sha256": "b145319cacae4f4d6203fa5b4e1747aafeb320396332062c07910d61eb4bdef0"
+    },
+    {
+      "entry": "final17/D3-LAUNCH.UNISSUED.template.txt",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/D3-LAUNCH.UNISSUED.template.txt",
+      "bytes": 71960,
+      "sha256": "88892c55145ff1e17923f206bf788003a8dd468caede8fd610fab7e5c9079730"
+    },
+    {
+      "entry": "final17/D3-LAUNCH.draft-to-completed.diff",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/D3-LAUNCH.draft-to-completed.diff",
+      "bytes": 76270,
+      "sha256": "6a6d9d92b33947a34d383bb4bb8c466df9edb66951ebd523a1a80e1fab792d70"
+    },
+    {
+      "entry": "final17/D3-LAUNCH.r02-preparation-to-completed.diff",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/D3-LAUNCH.r02-preparation-to-completed.diff",
+      "bytes": 82970,
+      "sha256": "681739860e535bdf5825a321d4fc4a50b124b22a68aa73bead9a2fb1e10c7c6d"
+    },
+    {
+      "entry": "final17/DIRECT-APP-COMMANDS.actual.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/DIRECT-APP-COMMANDS.actual.json",
+      "bytes": 2229,
+      "sha256": "9d378d781411e5b90427cb0b0b68313362c5a3eff438db3424b59339f0797f5b"
+    },
+    {
+      "entry": "final17/GUARD-BODY.SOURCE.py",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/GUARD-BODY.SOURCE.py",
+      "bytes": 71658,
+      "sha256": "8dcbf21d459d3dc10cf17905b3dd8a12830a12ca7170224a1b9b1d96f3e23516"
+    },
+    {
+      "entry": "final17/INPUT-PINS.actual.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/INPUT-PINS.actual.json",
+      "bytes": 28435,
+      "sha256": "5b8cce56bafce60470e7624bc67b9d6b3696607a4106bd00a894ddf66af57110"
+    },
+    {
+      "entry": "final17/INPUT-REOBSERVATION.actual.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/INPUT-REOBSERVATION.actual.json",
+      "bytes": 987,
+      "sha256": "835d456d92dad3c182ec7c3820daeca13b297baa02653042baf7a43198eebbfe"
+    },
+    {
+      "entry": "final17/MANIFEST.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/MANIFEST.json",
+      "bytes": 2290,
+      "sha256": "be890741b49c351b0abae705dfba177f17a9b4d79a491a23b86d95c9b9a10698"
+    },
+    {
+      "entry": "final17/PRE-BINDING.awaiting-authority.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/PRE-BINDING.awaiting-authority.json",
+      "bytes": 983,
+      "sha256": "9741619e40e914dba56ea03fa191c3c1fc2bff3da83a4698ed2ce9a5efcac282"
+    },
+    {
+      "entry": "final17/PREPARATION.ARGV-BODY.ko.md",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/PREPARATION.ARGV-BODY.ko.md",
+      "bytes": 3205,
+      "sha256": "3093a5c3884b0ed467fccc728fd92f0ce6a5741367e9a3a14b2a8a8e25dff808"
+    },
+    {
+      "entry": "final17/PREPARATION.ARGV.actual.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/PREPARATION.ARGV.actual.json",
+      "bytes": 1538,
+      "sha256": "f935304dec12d1014849e7d090e0fec56ed858b3d232f376d49ff06b43d877dc"
+    },
+    {
+      "entry": "final17/PREPARATION.COMMAND.UNISSUED.txt",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/PREPARATION.COMMAND.UNISSUED.txt",
+      "bytes": 676,
+      "sha256": "4029dd8071c19d119faa8c50644c948f148db8260305ff300d2a33f2eae229c7"
+    },
+    {
+      "entry": "final17/PREPARATION.SHA256.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/PREPARATION.SHA256.json",
+      "bytes": 2254,
+      "sha256": "f35a58bec14e29365123154a105a70388ee420bf34624e9e0f65bdbb3adb88d5"
+    },
+    {
+      "entry": "final17/PREPARATION.TOKENS.UNISSUED.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/PREPARATION.TOKENS.UNISSUED.json",
+      "bytes": 133,
+      "sha256": "132d8125c51ddfa67439b49e4671d37991729e73a844180836b0f4463f6fa6c8"
+    },
+    {
+      "entry": "final17/STATIC-CHECKS.actual.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/launch-preparation/STATIC-CHECKS.actual.json",
+      "bytes": 3545,
+      "sha256": "193c70cb5b0648ab5e4f13db91022a67d6c9a8af2d467eac7523cccc97e1d212"
+    },
+    {
+      "entry": "issuance/dispatch.stderr.txt",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/issuance/dispatch.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "issuance/dispatch.stdout.txt",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/issuance/dispatch.stdout.txt",
+      "bytes": 75932,
+      "sha256": "a7e8cc94084f2bef8613842653ff4ab5582d51a41d02fc7e5a81107ff7fae18c"
+    },
+    {
+      "entry": "issuance/four-token-diff.actual.patch",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/issuance/four-token-diff.actual.patch",
+      "bytes": 530,
+      "sha256": "c9146c27be9b04aea55b916b5fa44e599082e3447b44e66defbba3c0be9a1e39"
+    },
+    {
+      "entry": "issuance/issued-command.actual.txt",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/issuance/issued-command.actual.txt",
+      "bytes": 71986,
+      "sha256": "a08585f99eb010f1d3a80d8123ab6fa9aecff41c166877e026a3d9ed89d830d8"
+    },
+    {
+      "entry": "issuance/issued-tokens.actual.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/issuance/issued-tokens.actual.json",
+      "bytes": 233,
+      "sha256": "7becf8523adb0dde8c3c8364cee0c40aec604784be404a4f4903ae41df436ef3"
+    },
+    {
+      "entry": "issuance/prepare-execution.actual.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/issuance/prepare-execution.actual.json",
+      "bytes": 12158,
+      "sha256": "178fc833ee46aa063ff52eaec1c93dafa9088920b6b9b23f1bb38d4c500acaf2"
+    },
+    {
+      "entry": "issuance/prepare-input-check.actual.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/issuance/prepare-input-check.actual.json",
+      "bytes": 2618,
+      "sha256": "88612d990e105290764aa4ac192f17bd29d462036ba28290cfaed4ad9de65102"
+    },
+    {
+      "entry": "issuance/prepare.stderr.txt",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/issuance/prepare.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "issuance/prepare.stdout.txt",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/issuance/prepare.stdout.txt",
+      "bytes": 384,
+      "sha256": "d88b1bc3392f09e15fa20f56933187b0a7212103dc5fc16e292d6a4992e30605"
+    },
+    {
+      "entry": "prior-pre/linux-pre.stderr.txt",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/evidence/linux-pre.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "prior-pre/linux-pre.stdout.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/evidence/linux-pre.stdout.json",
+      "bytes": 146121,
+      "sha256": "1ae5fc8936ff4604d44cea11a85b2b96f58c0b0095612d9e1e036e32c66a1a77"
+    },
+    {
+      "entry": "prior-pre/metadata-observer.py",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/evidence/metadata-observer.py",
+      "bytes": 8540,
+      "sha256": "815532b37de45889d8c078357710e4b4599d9d7e84b815384251818f55e90c1e"
+    },
+    {
+      "entry": "runroot/effect-denials.jsonl",
+      "sourcePath": "/workspace/vm-d3-run-24cf-r02/effect-denials.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "runroot/execution.json",
+      "sourcePath": "/workspace/vm-d3-run-24cf-r02/execution.json",
+      "bytes": 2806,
+      "sha256": "adcac33f5a9bc150cdbb6d7a50f899d996130b065323fe392e8eaab0c4ea910b"
+    },
+    {
+      "entry": "runroot/helper-origin.jsonl",
+      "sourcePath": "/workspace/vm-d3-run-24cf-r02/helper-origin.jsonl",
+      "bytes": 25275,
+      "sha256": "e57e640ddf4d222cca2e87cad3659a999fad25c030e944a551babdfbbc150313"
+    },
+    {
+      "entry": "runroot/invocation.json",
+      "sourcePath": "/workspace/vm-d3-run-24cf-r02/invocation.json",
+      "bytes": 2151,
+      "sha256": "2e8cbb61eb239f3cab21e9c6e37d1ef490ccea793aa12bddc9640659994a539b"
+    },
+    {
+      "entry": "runroot/loader.json",
+      "sourcePath": "/workspace/vm-d3-run-24cf-r02/loader.json",
+      "bytes": 431,
+      "sha256": "35b0d200c89c01f5200f34b6b5e8467260f7ca5f96bb558fc14060488103f7f6"
+    },
+    {
+      "entry": "runroot/postflight.json",
+      "sourcePath": "/workspace/vm-d3-run-24cf-r02/postflight.json",
+      "bytes": 16947,
+      "sha256": "443df35a1c289784e7007920ff33d1b0d09141df389f3e5be5144de918922268"
+    },
+    {
+      "entry": "runroot/preflight.json",
+      "sourcePath": "/workspace/vm-d3-run-24cf-r02/preflight.json",
+      "bytes": 30324,
+      "sha256": "b0326b6cce302e8acb206e0bf61b3c5e7841005e1067f67aee7cfbef8e95ee32"
+    },
+    {
+      "entry": "runroot/result.json",
+      "sourcePath": "/workspace/vm-d3-run-24cf-r02/result.json",
+      "bytes": 724,
+      "sha256": "054f1f113dbf50058fa16d7d4404b444a3bb5b3e38af2b795f7b4276c746c3ef"
+    },
+    {
+      "entry": "runroot/stderr.txt",
+      "sourcePath": "/workspace/vm-d3-run-24cf-r02/stderr.txt",
+      "bytes": 597,
+      "sha256": "da917cdd76c7b68c953f1c5eab3a18425ec9cc691b854aeea0be69ba4ab7dfe5"
+    },
+    {
+      "entry": "runroot/stdout.txt",
+      "sourcePath": "/workspace/vm-d3-run-24cf-r02/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "entry": "support/module-file-pins-post.actual.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/issuance/post-return-r01/module-file-pins-post.actual.json",
+      "bytes": 120143,
+      "sha256": "080a9c0677a52b67799772985420bdb4d9613dcbdd69273504cee28a6e36383f"
+    },
+    {
+      "entry": "support/native-dispatch-receipt.actual.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/issuance/post-return-r01/native-dispatch-receipt.actual.json",
+      "bytes": 3968,
+      "sha256": "e769a3a4957410c981008164cb9fc6d3f249433109e57d7a8a46b424fe5b295e"
+    },
+    {
+      "entry": "support/raw-observation.actual.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/issuance/post-return-r01/raw-observation.actual.json",
+      "bytes": 13475,
+      "sha256": "5877329097620d3498e150bf872cdcdf86b40dab399fd6df6432d6859b962026"
+    },
+    {
+      "entry": "support/source-input-pins-post.actual.json",
+      "sourcePath": "/workspace/vm-d3-source-24cf-r02/issuance/post-return-r01/source-input-pins-post.actual.json",
+      "bytes": 28805,
+      "sha256": "41e9374ae30c1064613348fcd7af93e8c5fb714cde3e5f1adc953e9a955f33dc"
+    }
+  ]
+}

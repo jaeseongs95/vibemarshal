@@ -1,0 +1,121 @@
+{
+  "schema": "c3-r03-r02-post-native-return-v1",
+  "scope": "selected helper70f5 exactC3 supporting raw; independent POST adjudication pending",
+  "createdUtc": "2026-10-04T15:00:52.649232+00:00",
+  "payloadCount": 16,
+  "inventory": [
+    {
+      "alias": "run/invocation.json",
+      "sourcePath": "/workspace/vm-common3-run-24cf-r03/invocation.json",
+      "bytes": 2072,
+      "sha256": "c6e11e33cf2b1ec2339d87b18740b67ff87b9d490c2c3c36c71161fd3907bdab"
+    },
+    {
+      "alias": "run/loader.json",
+      "sourcePath": "/workspace/vm-common3-run-24cf-r03/loader.json",
+      "bytes": 503,
+      "sha256": "67ca4a8570afddda8c57ecd634b9c51a45ec7b078ae38140d999722362b92b45"
+    },
+    {
+      "alias": "run/preflight.json",
+      "sourcePath": "/workspace/vm-common3-run-24cf-r03/preflight.json",
+      "bytes": 17871,
+      "sha256": "e88647d2815b8b923ea3b09fdf54e393789152a92afa9099d972f1799d3fd267"
+    },
+    {
+      "alias": "run/result.json",
+      "sourcePath": "/workspace/vm-common3-run-24cf-r03/result.json",
+      "bytes": 707,
+      "sha256": "98b90a2aaab88b697c52ce69b3f38d9027327838142bc3e4aa9cbcb31fb29989"
+    },
+    {
+      "alias": "run/postflight.json",
+      "sourcePath": "/workspace/vm-common3-run-24cf-r03/postflight.json",
+      "bytes": 16405,
+      "sha256": "e183a13a0a6e9a229e54f4d08d50f3c06a408521a1f349834ecf70cd60720ec6"
+    },
+    {
+      "alias": "run/execution.json",
+      "sourcePath": "/workspace/vm-common3-run-24cf-r03/execution.json",
+      "bytes": 2103,
+      "sha256": "5f4d80745d9dbff87ff290ba85162ce1b1b9b15264d41567793c5b5dcf830f8a"
+    },
+    {
+      "alias": "run/stdout.txt",
+      "sourcePath": "/workspace/vm-common3-run-24cf-r03/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "alias": "run/stderr.txt",
+      "sourcePath": "/workspace/vm-common3-run-24cf-r03/stderr.txt",
+      "bytes": 699,
+      "sha256": "b531e255674983caa1f3e354508296019e997e7e06bb38877ae0b1e12987bc6f"
+    },
+    {
+      "alias": "support/launch-freshness-r02.json",
+      "sourcePath": "/workspace/vm-common3-source-24cf-r03/evidence/launch-freshness-r02.json",
+      "bytes": 4635,
+      "sha256": "77c58e706fd50483c1b802a9e6597eca0011f060e95c1325ee52c21f14293363"
+    },
+    {
+      "alias": "support/execution-dispatch-r02.receipt.json",
+      "sourcePath": "/workspace/vm-common3-source-24cf-r03/evidence/execution-dispatch-r02.receipt.json",
+      "bytes": 756,
+      "sha256": "c00674a836c6406bc68bad4da6e5533ffde3c5b37b4c352edcbada75efe842a4"
+    },
+    {
+      "alias": "support/outer-execution-r02.receipt.json",
+      "sourcePath": "/workspace/vm-common3-source-24cf-r03/evidence/outer-execution-r02.receipt.json",
+      "bytes": 28834,
+      "sha256": "2a854219ab28afc3d9239c998a9ada25d632a80a049827f9783712b12ed47549"
+    },
+    {
+      "alias": "support/module-file-pins-post-r02.json",
+      "sourcePath": "/workspace/vm-common3-source-24cf-r03/evidence/module-file-pins-post-r02.json",
+      "bytes": 124930,
+      "sha256": "f584357eca7d1facecadda102235b2b8f0c6abf4c7874d95850956c2722958d6"
+    },
+    {
+      "alias": "support/outer-native-output-r02.txt",
+      "sourcePath": "/workspace/vm-common3-source-24cf-r03/evidence/outer-native-output-r02.txt",
+      "bytes": 4706,
+      "sha256": "7835ec4b9574a0111006e9950247dbd82f024bb8418583dacf1231fcab3ea43e"
+    },
+    {
+      "alias": "support/r02-native-command.sh",
+      "sourcePath": "/workspace/vm-common3-source-24cf-r03/evidence/r02-native-command.sh",
+      "bytes": 5399,
+      "sha256": "516646cf953649e46a1b2f2aa8ed022ef868d6a55397914da9ce3c17297e85da"
+    },
+    {
+      "alias": "support/module-file-pins-post-r02.command.sh",
+      "sourcePath": "/workspace/vm-common3-source-24cf-r03/evidence/module-file-pins-post-r02.command.sh",
+      "bytes": 4654,
+      "sha256": "c02614cef48f0894bfef4a16120ed872fd48b3fd6c8ceaa194a8c93fcae8defe"
+    },
+    {
+      "alias": "support/command-audit.json",
+      "sourcePath": "/workspace/vm-common3-source-24cf-r03/evidence/command-audit.json",
+      "bytes": 41792,
+      "sha256": "12731f1a22dd12a134bbe38c57f125e9512f260e34bd75b605816a8c19884cd9"
+    }
+  ],
+  "missingRawArtifacts": [
+    {
+      "path": "/workspace/vm-common3-run-24cf-r03/child-error.json",
+      "exists": false,
+      "meaning": "Not present; no synthetic replacement"
+    }
+  ],
+  "inventoryExcludesSelf": true,
+  "runnerInvocations": 1,
+  "ownChildInvocations": 1,
+  "retries": 0,
+  "r01NotRunPreserved": true,
+  "actualNativeIds": null,
+  "nativeIdBinding": "Root official App records separate from missing response field",
+  "nativeBuiltinsFilePins": null,
+  "externalJobs": "UNKNOWN",
+  "priorUnreadableProcesses": 7
+}

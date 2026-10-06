@@ -1,0 +1,2957 @@
+{
+  "scope": "U2_R02_POST_FILE_IO_PINS_ONLY_NOT_NEW_TEST_OR_ORACLE",
+  "utc": "2026-10-04T18:06:47.427833+00:00",
+  "binding": {
+    "templateBytes": 6374,
+    "templateSHA256": "a78788b8178ae667db81823515b6503cb6a8b52e251223a6418e3562ed697ad9",
+    "boundBytes": 6399,
+    "boundSHA256": "beb4f505420d409790f0810d49bae66513a78e2f6e67d4ad643365afc52f2fa3",
+    "tokenValues": {
+      "__ISSUED_UTC__": "2026-10-04T18:03:03.000Z",
+      "__LAUNCH_NOT_AFTER_ISO__": "2026-10-04T18:05:03.000Z",
+      "__LAUNCH_NOT_AFTER_UTC__": "2026-10-04 18:05:03 UTC",
+      "__DISPATCH_PEER_ID__": "08151dd4-2745-48ee-a451-aca9a8af0268"
+    },
+    "tokenOccurrences": {
+      "__ISSUED_UTC__": 1,
+      "__LAUNCH_NOT_AFTER_ISO__": 1,
+      "__LAUNCH_NOT_AFTER_UTC__": 1,
+      "__DISPATCH_PEER_ID__": 1
+    },
+    "only4TokenNamesChanged": true,
+    "savedTemplateMatchesPinnedOriginal": true,
+    "actualNativeCmdMatchesBoundBytes": true,
+    "bindingValidatedAfterExecutionWithoutTemplateEvaluation": true
+  },
+  "bindingArtifact": {
+    "path": "/workspace/vm-u2-source-24cf-r02/evidence/post-08151-r01/binding-metadata.json",
+    "bytes": 828,
+    "sha256": "0855c7e7fd56c2104a8b53e122b89b7ddc9babb52db77f327d1fe97d3d0a0430"
+  },
+  "rawFiles": [
+    {
+      "path": "invocation.json",
+      "exists": true,
+      "bytes": 2022,
+      "sha256": "650888224261b5b85e3b2367dd9a2e0f5e3f7dc62673a4041fd841ed22d4c1f0"
+    },
+    {
+      "path": "loader.json",
+      "exists": true,
+      "bytes": 378,
+      "sha256": "29d02d4b221f77d9a21d23a348f81ae2db206554b14590fa7cfb8ce6dabc0f17"
+    },
+    {
+      "path": "preflight.json",
+      "exists": true,
+      "bytes": 20316,
+      "sha256": "7e5d8da71dfbf813687b77b3e8c0f1186bc2dd0f8fafab1fa1c9b3318e4e056d"
+    },
+    {
+      "path": "result.json",
+      "exists": true,
+      "bytes": 582,
+      "sha256": "06a539d8782d5c8a011ca4ccb750ea5d5ce96c648bb376b6f6e9db7e2c4c4116"
+    },
+    {
+      "path": "postflight.json",
+      "exists": true,
+      "bytes": 16395,
+      "sha256": "897d9eda80e166211434c634669bf502c81ee38c37c746a9b7811280f3fbdf8a"
+    },
+    {
+      "path": "execution.json",
+      "exists": true,
+      "bytes": 2174,
+      "sha256": "0b4a66e9e30a38d59543c7f05ca16ac335332b40201de66223a0d2a5b11efc85"
+    },
+    {
+      "path": "stdout.txt",
+      "exists": true,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "stderr.txt",
+      "exists": true,
+      "bytes": 522,
+      "sha256": "3256f0e2dc8937066c507e68c2374c7a76ef7d4b8fff8432ca0a8c020c453e9a"
+    },
+    {
+      "path": "helper-origin.jsonl",
+      "exists": true,
+      "bytes": 10499,
+      "sha256": "39b6295d91e38367a90ebf25c7d2c77a0f1ae6401b7d2abd74bf264772bdeade"
+    },
+    {
+      "path": "child-error.json",
+      "exists": false,
+      "bytes": null,
+      "sha256": null
+    }
+  ],
+  "moduleMappings": {
+    "preflightCount": 137,
+    "postflightCount": 137
+  },
+  "moduleFilePins": [
+    {
+      "stage": "preflight",
+      "module": "__future__",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/__future__.py",
+      "bytes": 5218,
+      "sha256": "981d4c398849f9ebcab72300d9c1fe288fd6d7f28957b3b3fa3a493a5836d95c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/__future__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "__main__",
+      "path": "/workspace/vm-u2-source-24cf-r02/packet/runner.py",
+      "bytes": 20603,
+      "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "resolved": "/workspace/vm-u2-source-24cf-r02/packet/runner.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "_collections_abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_collections_abc.py",
+      "bytes": 32089,
+      "sha256": "d4945c8410c4bab351741b04bca3de066f7c27ed7e38df89e206a96617102ffb",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_collections_abc.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "_compression",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_compression.py",
+      "bytes": 5681,
+      "sha256": "3ad5d60627477a60939ee44fc1bb3a05dbe8fb52f0f75039b8f5d8f1a278b981",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_compression.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "_frozen_importlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap.py",
+      "bytes": 57057,
+      "sha256": "d112d54b7831cf4a818d4841d5ff8003b54df220a6dabafa61f67d7c7a5603f7",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "_frozen_importlib_external",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap_external.py",
+      "bytes": 69428,
+      "sha256": "e6ad72f3f0f9b65c99ab52598cd02ab748511dcdce1dd51f18dace9be9a680c6",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap_external.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "_weakrefset",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_weakrefset.py",
+      "bytes": 5893,
+      "sha256": "91895a451d06e9f521a1171b31b9b19bc9740f35af00d4fa106338ab7167c9ac",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_weakrefset.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/abc.py",
+      "bytes": 6538,
+      "sha256": "e558702a95cdce3febd289da021715d2b92bc43995b8a1bc58dfa1c3d8010287",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/abc.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "argparse",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/argparse.py",
+      "bytes": 101155,
+      "sha256": "7cc582dcb3b76e2c957f78a3f74e9809d6c311d6aab7bcaa2c9954d0cbff5f30",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/argparse.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "ast",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ast.py",
+      "bytes": 64452,
+      "sha256": "b515c23dbbc459329d3b802a3aac742cc456d7472e66f7ed6e9dc97e40596d7d",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ast.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/__init__.py",
+      "bytes": 1220,
+      "sha256": "61102f2b5f8fb832f0558cb66391f227970b3dd34ea2a621455587b4295e89a1",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.base_events",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_events.py",
+      "bytes": 78567,
+      "sha256": "53b71bbbd79e7fb2251460119afc379ebd71bbc599d9018313cc62ef218ae795",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_events.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.base_futures",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_futures.py",
+      "bytes": 1974,
+      "sha256": "2f3798c4b82f5ac77647908b157c924f734f36871d98970e72849ea9a9a07856",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_futures.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.base_subprocess",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_subprocess.py",
+      "bytes": 8869,
+      "sha256": "d69ba8f97bf8c89564cadce49427574ddb98103a5db6f04b98798240332e7adf",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_subprocess.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.base_tasks",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_tasks.py",
+      "bytes": 2672,
+      "sha256": "56efac65b63db927af336fa55eb5bda93c97a2defa4734ea8d695ed20fd6712a",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_tasks.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.constants",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/constants.py",
+      "bytes": 1413,
+      "sha256": "873fc2f9e66313c3c19c337269e704f204b59f9e91d6ecbec59f68335484d338",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/constants.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.coroutines",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/coroutines.py",
+      "bytes": 3342,
+      "sha256": "2feec17557c230a80cc2a6391bbb1c44b9f3341820b05667e36a4eb12b749436",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/coroutines.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.events",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/events.py",
+      "bytes": 29339,
+      "sha256": "6a18b7eee5926622c146e61a7eb39726b4656e07ca41d36b06936ffb2354f0ed",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/events.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.exceptions",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/exceptions.py",
+      "bytes": 1752,
+      "sha256": "a5971f88be14cd1417d59adf539ae48c5d818f95362a4e0eb00017e3690ab37b",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/exceptions.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.format_helpers",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/format_helpers.py",
+      "bytes": 2404,
+      "sha256": "6377b672b3f4ba8b6f0f7a5f0ea00cde24c8cddc0ca764e3329f302763477f59",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/format_helpers.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.futures",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/futures.py",
+      "bytes": 14340,
+      "sha256": "f6daaf2a051fc61ea146811d7d4b4db1cac31d7f4777aa4d10617812d78bd943",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/futures.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.locks",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/locks.py",
+      "bytes": 18995,
+      "sha256": "5234295a0456e9a6ba2e80446848b602cd9195bca4fca2c711c6e3f41989cd86",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/locks.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.log",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/log.py",
+      "bytes": 124,
+      "sha256": "80e4cc3ded4b138baba486519e7444801a23d6ac35f229d336a407a96af7e8d2",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/log.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.mixins",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/mixins.py",
+      "bytes": 481,
+      "sha256": "8f4a3e16eca845ebfba422550cbcee7340ec8166d2bff6b750a8ed0de6b9ae3c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/mixins.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.protocols",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/protocols.py",
+      "bytes": 6957,
+      "sha256": "1d1b49988c338b4ef06e30f9e92d9db2e00080c341f0a3f573bb8312deb8aff6",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/protocols.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.queues",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/queues.py",
+      "bytes": 7974,
+      "sha256": "8f020744ebd1f557dcb051a1530b504447660df906c2127a94bbcc8450ea7ef9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/queues.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.runners",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/runners.py",
+      "bytes": 7230,
+      "sha256": "739e0ecbb335cfec821a39f9e225583b5911bb6e3894ef93782005f852c54263",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/runners.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.selector_events",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/selector_events.py",
+      "bytes": 48332,
+      "sha256": "b77c4b8a85f1e1e2882a2bf3bd85a4b1c1fcfd7cb37ed0d8d8eb5f9a2ea44231",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/selector_events.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.sslproto",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/sslproto.py",
+      "bytes": 31899,
+      "sha256": "6c7fa1b81dc41850281cbf284c99ca18e824939fa5778860327040f3a80f6218",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/sslproto.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.staggered",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/staggered.py",
+      "bytes": 7077,
+      "sha256": "3998d04fcff2c8052af03f3f34dbd3bd510b2dadddd5f2629a2c1cccbecd136d",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/staggered.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.streams",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/streams.py",
+      "bytes": 27619,
+      "sha256": "6ec5c70fd95b0d51cc1e81cd21e8abe8c1b69650148d6bb75ab4aa4797319bd4",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/streams.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.subprocess",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/subprocess.py",
+      "bytes": 7737,
+      "sha256": "7b70605716334f63cc482123b2aaa3b7c5bb7138eeab63a037bd8068d43307c1",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/subprocess.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.taskgroups",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/taskgroups.py",
+      "bytes": 9559,
+      "sha256": "1d2bcd2da66524b45024841b94100cd6e7a7825a1b8f8ee125bf16b4ad0ca9bc",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/taskgroups.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.tasks",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/tasks.py",
+      "bytes": 37362,
+      "sha256": "6f6aad82d597fea1800004075b9a2481604da0035f1143af1eb267823ec460e3",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/tasks.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.threads",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/threads.py",
+      "bytes": 790,
+      "sha256": "39d37295383641565f0c08bd992e2f661dc8051eb17e890b834fce96bde0910e",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/threads.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.timeouts",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/timeouts.py",
+      "bytes": 5321,
+      "sha256": "3e40ca0dca3e54776579797837cd4936d73d04aae09fe0cf83ce1e5449d00163",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/timeouts.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.transports",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/transports.py",
+      "bytes": 10722,
+      "sha256": "940108bc133de399f38928cad3274f463096168d8a3ee5148f2478d3cb636f1c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/transports.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.trsock",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/trsock.py",
+      "bytes": 2475,
+      "sha256": "c0eac37debcc51b702b808f6b7ed3e417343f5ff5f57125dad600a27eb082328",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/trsock.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "asyncio.unix_events",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/unix_events.py",
+      "bytes": 53124,
+      "sha256": "1fff06cce78763800f05f4d2bebfcdbc07ebf9564ca7e7222e0d91e39dee08c9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/unix_events.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "base64",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/base64.py",
+      "bytes": 20635,
+      "sha256": "8d1f608dbf030d11d6ec4df9e4c55b73fb68cdfbd9f53a7c91684a93b55564b5",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/base64.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "bisect",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bisect.py",
+      "bytes": 3423,
+      "sha256": "f1cf7b85fc36b5da249813fc5ab97d9464f8cc1bc817f7146206fa2713e35999",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bisect.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "bz2",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bz2.py",
+      "bytes": 11847,
+      "sha256": "76ab3252924e71e859d7d90e8d3db13b6554975cfcac0fdadced4de7f8779330",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bz2.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "codecs",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/codecs.py",
+      "bytes": 36870,
+      "sha256": "7b7839e53a77961153240aecfe11edc8054d05b1dedd83894450dae21ec05785",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/codecs.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "collections",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/__init__.py",
+      "bytes": 52378,
+      "sha256": "7fdb04dd248ab37909f46d2085bfee56b32d7e91e49ad3a2fad99c453295659b",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "collections.abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/abc.py",
+      "bytes": 119,
+      "sha256": "9cb4208f99128a0489b6c8e6c61637617dd7d4250c59e065491957eda084dd10",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/abc.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "concurrent",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/__init__.py",
+      "bytes": 38,
+      "sha256": "87ad5c8954dd56fbbca04517bf87477ff4dce575170c7dd1281d7ef1f4214ac8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "concurrent.futures",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/__init__.py",
+      "bytes": 1583,
+      "sha256": "9b597f6de7da771109ca7bf96a1af5ea4d5fda69b27b39312d34966d987f73cd",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "concurrent.futures._base",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/_base.py",
+      "bytes": 22833,
+      "sha256": "8c6d5f09f7c535d40fa1c30ebfcb35e0601c2abf32286a82cf151af7ddf72473",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/_base.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "contextlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "bytes": 27637,
+      "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "preflight",
+      "module": "contextvars",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextvars.py",
+      "bytes": 129,
+      "sha256": "5ed260be8d1f4fe92261b7810b4bb1e8539c42093d7493f677d076e1a87f459a",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextvars.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "copy",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copy.py",
+      "bytes": 8412,
+      "sha256": "cbd25547933176fcf6bb05c2adc9f4796d15ac20b9b82dcf890daea7203daeab",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copy.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "copyreg",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copyreg.py",
+      "bytes": 7614,
+      "sha256": "c8eda41f05c6bf95a4da4726a530409d2485ae060b8d019b3a8034389a15d3e9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copyreg.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "dataclasses",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/dataclasses.py",
+      "bytes": 62085,
+      "sha256": "d242aea5fcf6408b1c1f622442f88f68b9526ce1f8bd2890d74a144677c427d9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/dataclasses.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "datetime",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/datetime.py",
+      "bytes": 268,
+      "sha256": "ef20dc6b3554cd585dddffdc573f1f9a7a54c522f2a3fb4576c44edbb1e14238",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/datetime.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "difflib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/difflib.py",
+      "bytes": 83368,
+      "sha256": "3eb2d371b4a171b063921de6bbf115108bc39de8bf72866315868ce2599213b7",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/difflib.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "dis",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/dis.py",
+      "bytes": 30227,
+      "sha256": "44c0b389c96124d8fb5cb0bc41c7a2aa7a6848ef4001b4000dcbd858efa4a1a2",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/dis.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "encodings",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/__init__.py",
+      "bytes": 5884,
+      "sha256": "78c4744d407690f321565488710b5aaf6486b5afa8d185637aa1e7633ab59cd8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "encodings.aliases",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/aliases.py",
+      "bytes": 15677,
+      "sha256": "6fdcc49ba23a0203ae6cf28e608f8e6297d7c4d77d52e651db3cb49b9564c6d2",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/aliases.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "encodings.utf_8",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/utf_8.py",
+      "bytes": 1005,
+      "sha256": "ba0cac060269583523ca9506473a755203037c57d466a11aa89a30a5f6756f3d",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/utf_8.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "enum",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/enum.py",
+      "bytes": 81540,
+      "sha256": "f35e542d8c4c1d2b5e910138d726fa48774925f3c4dc5462793ebcb66aa55501",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/enum.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "fnmatch",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/fnmatch.py",
+      "bytes": 5999,
+      "sha256": "6683da36e47af523f3f41e18ad244d837783e19e98911cc0b7415dea81494ebc",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/fnmatch.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "functools",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/functools.py",
+      "bytes": 37940,
+      "sha256": "de4a1d37c795e2a065124b5c49357893433bc6bb111b41277ccc9930ef08d4c9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/functools.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "genericpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/genericpath.py",
+      "bytes": 5572,
+      "sha256": "2b0b35d2206778af4081cf81dd9b513876e72c35a55bec941402e1fa62b1f1aa",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/genericpath.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "gettext",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/gettext.py",
+      "bytes": 21320,
+      "sha256": "a5c249a522b6b8e3aa6f1b12a8bcc09508b99ad612b58d2fc973db27ea3b7cc3",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/gettext.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "hashlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/hashlib.py",
+      "bytes": 9349,
+      "sha256": "6dbdebf270868b391080e21dc9687eddfaf321c965ad979f68d3f5c423c613ab",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/hashlib.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "heapq",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/heapq.py",
+      "bytes": 23024,
+      "sha256": "6d43277e5c76fc0f073cd388fcff852d14d068f6bb6d4886c340f8b75a1229a9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/heapq.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "importlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/__init__.py",
+      "bytes": 4784,
+      "sha256": "d540b5ac137fcb3e26a8d5f2939649e34373c6685f98a30a9f682cf231be5854",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "importlib._abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_abc.py",
+      "bytes": 1354,
+      "sha256": "80aab7931dc999dee581c8b8b56fcd973fe156335a96ceeaf6acfc03cebf10e8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_abc.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "importlib._bootstrap",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap.py",
+      "bytes": 57057,
+      "sha256": "d112d54b7831cf4a818d4841d5ff8003b54df220a6dabafa61f67d7c7a5603f7",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "importlib._bootstrap_external",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap_external.py",
+      "bytes": 69428,
+      "sha256": "e6ad72f3f0f9b65c99ab52598cd02ab748511dcdce1dd51f18dace9be9a680c6",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap_external.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "importlib.machinery",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/machinery.py",
+      "bytes": 880,
+      "sha256": "d045cd7ecf2a12b6ecbfbef79eb114e87ef2ebd756f5b705f73e6f3266e3dede",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/machinery.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "importlib.util",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/util.py",
+      "bytes": 10994,
+      "sha256": "671f2995653f673f6d5056a1089debef473bc28ae7114f7a8db71475733d6876",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/util.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "inspect",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+      "bytes": 127125,
+      "sha256": "5c54ebf0bfdc25397750e5d0f63800751650ee50e65325ff3ea4069c9bfa5f75",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "preflight",
+      "module": "io",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/io.py",
+      "bytes": 3582,
+      "sha256": "7cec3cb8ac004058dd0a5af246e6d950fb59c7ddd0058fda48bcb3fcb98d8822",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/io.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "ipaddress",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ipaddress.py",
+      "bytes": 81414,
+      "sha256": "ba8d3389ff084fcb232b48204ec04f2b3ea4bd0eadf7b18c814947d185de2c64",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ipaddress.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "json",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/__init__.py",
+      "bytes": 14020,
+      "sha256": "d5d41e2c29049515d295d81a6d40b4890fbec8d8482cfb401630f8ef2f77e4d5",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "json.decoder",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py",
+      "bytes": 12525,
+      "sha256": "382cd02af6f7efede5a6d4abbcda1015e5c7a75794b0016022878f9cf32a24f6",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "json.encoder",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/encoder.py",
+      "bytes": 16075,
+      "sha256": "52bfb1b66029cc70fa3bd7fe11df9f2e03922d413407a341b387a22c987f24f8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/encoder.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "json.scanner",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/scanner.py",
+      "bytes": 2434,
+      "sha256": "572958017eae8842eeddd0e3d18d3c56cc0a197348224915e1d87ce937841764",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/scanner.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "keyword",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/keyword.py",
+      "bytes": 1073,
+      "sha256": "18c2be738c04ad20ad375f6a71db34b3823c7f40b0340f5294d0e89f3c9b093b",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/keyword.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "linecache",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/linecache.py",
+      "bytes": 5800,
+      "sha256": "9eb9194707991b49f9fea67a5222b0e6a0e49c865cdffc69fbc80a1f829e77fb",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/linecache.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "locale",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/locale.py",
+      "bytes": 78599,
+      "sha256": "3988c5419552d5b9f0bef3695102376f79357f0f440e9cd1f32c501f966e6ef3",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/locale.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "logging",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/logging/__init__.py",
+      "bytes": 83437,
+      "sha256": "43f86bbc08fdd5c7b6e697abffe1381f534a92bb32e1f1aee8360d6a142592a1",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/logging/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "lzma",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/lzma.py",
+      "bytes": 13277,
+      "sha256": "58fb9d2fdc8a8af7b25e218f17ea3b51bdfa53bdf40f440ab33c605974ca5c2e",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/lzma.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "ntpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ntpath.py",
+      "bytes": 30404,
+      "sha256": "6c0d55ee892f98ef87b1ed3c50c9dfc7e267a98d2db47e08d3dc67529af56725",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ntpath.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "opcode",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/opcode.py",
+      "bytes": 13174,
+      "sha256": "192f6008508f28d3273bff42eaea9b01c8394dab1607cd36aea778bdd166c3a6",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/opcode.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "operator",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/operator.py",
+      "bytes": 10965,
+      "sha256": "b2af20f67667203c1730e686cc5d0427becc94db4c97f1d3efe3ed2158473f6a",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/operator.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "os",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/os.py",
+      "bytes": 40821,
+      "sha256": "54c43a1fc69c979c70d8f7d097174cee163bfe59937723ee353043dd4a0211e1",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/os.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "os.path",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "bytes": 17356,
+      "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "pathlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py",
+      "bytes": 51052,
+      "sha256": "10ba48ae8063cfe7589436041d0d4628c05f427c7709cf8e75e486f8930cc32c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "pkgutil",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pkgutil.py",
+      "bytes": 18281,
+      "sha256": "44300bc77f6f52ef2ad74d26e5053309c04f49eaa91c099356eb61426cde504f",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pkgutil.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "platform",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/platform.py",
+      "bytes": 43388,
+      "sha256": "f5ff83f15c841792be42709a6710dc8d7a9f72791c1ae4cad719b1fb0abe0a05",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/platform.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "posixpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "bytes": 17356,
+      "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "pprint",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pprint.py",
+      "bytes": 24158,
+      "sha256": "1585c8d74d7f485590db2af46680ae0a73737ca9fb66022b2bcbbc4c4925e203",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pprint.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "random",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/random.py",
+      "bytes": 34689,
+      "sha256": "de48263a837339c7e01cf9f3c4d756696e0e0775f7778eb9cf81ad5b00134569",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/random.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "re",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/__init__.py",
+      "bytes": 16315,
+      "sha256": "8ff3c37c63b917fcf8dc8d50993a502292a3dc159e41de4f4018c72a53d1c07b",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "re._casefix",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_casefix.py",
+      "bytes": 5444,
+      "sha256": "1b12d9136f23db6c3f6f26053fefc15ca964b886838c7b9c1fabf8d2efc1e5c8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_casefix.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "re._compiler",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_compiler.py",
+      "bytes": 26399,
+      "sha256": "c75620761098a70ed75b9accef63ef2881d8abb6d4e5cbfd10074bd165eefe4d",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_compiler.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "re._constants",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_constants.py",
+      "bytes": 5930,
+      "sha256": "fa4fdb200f238f9e7817b63892b0d69833d8165134801e775e10cc113348a375",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_constants.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "re._parser",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_parser.py",
+      "bytes": 41201,
+      "sha256": "a51a85b37cf3f44ba7ff25754da5f31306e4ccfa6eb3c017f9d37bdf4e770840",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_parser.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "reprlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/reprlib.py",
+      "bytes": 7148,
+      "sha256": "e177bc70da83a7fbcde6fd261dc15da34e8a20873b1cccd4f9a1f8f27cca3779",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/reprlib.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "selectors",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/selectors.py",
+      "bytes": 19671,
+      "sha256": "1eeb102373e18c96311203f30c516e785bd8642275aa0bd66e43a284c9692385",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/selectors.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "shutil",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/shutil.py",
+      "bytes": 56198,
+      "sha256": "53496e06742fe008fee2bccc8caeac77473e69923bec05358bd43eea467db1f8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/shutil.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "signal",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/signal.py",
+      "bytes": 2495,
+      "sha256": "0363c964c90ac0b3e515de5749205e6e6454051a1211058375d84d91eab6071a",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/signal.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "socket",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/socket.py",
+      "bytes": 37815,
+      "sha256": "7d4d4c66e6f4bcc961ab462c4f08002ca97def8713a4be1c7373bdbd970a5274",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/socket.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "sqlite3",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+      "bytes": 2501,
+      "sha256": "f7cc982617b68e147540ef352d38310fe4d25c2c9c2542b67d0590c871df09a8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "preflight",
+      "module": "sqlite3.dbapi2",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+      "bytes": 3631,
+      "sha256": "7c5c8d98df1f2c50c4062a3be2c0f0499190c179fa4fc281507a1ef763a98f28",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "preflight",
+      "module": "ssl",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "bytes": 51655,
+      "sha256": "db62eeaae59c6e7087dcafb28087cd0bb092087381edc556f97c8cb614484380",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "preflight",
+      "module": "stat",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/stat.py",
+      "bytes": 5485,
+      "sha256": "052af0327eae6941b69b05c088b3e748f79995635f80ac4cc7125eb333eb4c77",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/stat.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "string",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/string.py",
+      "bytes": 11786,
+      "sha256": "24aeae1f0526250f442022022bf98df9a823b1cb330543ee79e70e44907462e9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/string.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "struct",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/struct.py",
+      "bytes": 257,
+      "sha256": "9c231f9497caf513a22dee8f790b07f969b0e45854a0bdd6dd84b492e08c2856",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/struct.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "subprocess",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "bytes": 88747,
+      "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "preflight",
+      "module": "tempfile",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tempfile.py",
+      "bytes": 32386,
+      "sha256": "2eea4401f4f29d0d3647ed6fc8bcf6aa1daf879c8aa407a8ea310edac9dfc317",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tempfile.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "test_flowmarshal_implementation_workflow",
+      "path": "/workspace/vm-u2-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "resolved": "/workspace/vm-u2-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "textwrap",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/textwrap.py",
+      "bytes": 19718,
+      "sha256": "62867e40cdea6669b361f72af4d7daf0359f207c92cbeddfc7c7506397c1f31c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/textwrap.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "threading",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/threading.py",
+      "bytes": 60200,
+      "sha256": "846f450ae794e4aab823a163f8c71d27751148af33e91dd3de886686a4e8ebfb",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/threading.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "token",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/token.py",
+      "bytes": 2511,
+      "sha256": "1a4d994ce9744f4bfe2d964fc24d112a1e76796a08c2e45a2d73c82a8587f922",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/token.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "tokenize",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tokenize.py",
+      "bytes": 21570,
+      "sha256": "026f566ac63e60d69c8185a3880831b657accc5eac984fadf271fc99a5e5825d",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tokenize.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "traceback",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/traceback.py",
+      "bytes": 46393,
+      "sha256": "2c44af2848836d9af0c7b3547469695cd22586c64274d362eafcf466af284bd6",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/traceback.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "types",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/types.py",
+      "bytes": 10993,
+      "sha256": "345474ef027a1273f353da9bdc1f7c18f65335e72e681bcc0376774cc51f2405",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/types.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "typing",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/typing.py",
+      "bytes": 118836,
+      "sha256": "be92d60fb8382bb29ead21c128825d7c96d0e8c915b44f840791e49f5a8d554c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/typing.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "unittest",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+      "bytes": 3487,
+      "sha256": "32ed48385c0377bc2900a76e9a6acc3705aeef402c72de8554b3c637420506f0",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "preflight",
+      "module": "unittest.case",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/case.py",
+      "bytes": 57531,
+      "sha256": "45bac6d80a4fc3a0dea8340a80681e30b263f017b4a5002cb8f489a632e0f987",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/case.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "unittest.loader",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/loader.py",
+      "bytes": 21116,
+      "sha256": "7f0af414bfa7fe8612a424b14cfcf8a3c34fcac999d976461beb738ef8b211b8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/loader.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "unittest.main",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/main.py",
+      "bytes": 11991,
+      "sha256": "db58280574389c0d6cba9559cc51e1787f5b418c4e85d354aa55ca43335c487a",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/main.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "unittest.mock",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "bytes": 106317,
+      "sha256": "1de18141992c6742bff27e77c0cbe46d53d6a5ab1850574a536910508823fc5c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "preflight",
+      "module": "unittest.result",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/result.py",
+      "bytes": 9130,
+      "sha256": "5db286bdd3821d64150377e554d7edbdd58db7bb8b950772f977e9ec1d535617",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/result.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "unittest.runner",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/runner.py",
+      "bytes": 10368,
+      "sha256": "76d9beb9c21d0d367a1b040a921ad43f90b7971fcc8cacfccd6f9760bedf1ce2",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/runner.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "unittest.signals",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/signals.py",
+      "bytes": 2403,
+      "sha256": "f8286e818ca56e10e03745bc056cdfd31147678f9a1dc8cb6b0fe96ef9a4362a",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/signals.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "unittest.suite",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/suite.py",
+      "bytes": 13512,
+      "sha256": "ed2da92bc9f97c53403ee2d3d12cc53b16a96e85d596ebc887b5a93458f3f6bc",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/suite.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "unittest.util",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/util.py",
+      "bytes": 5215,
+      "sha256": "fdcc640c3505d16deab9c32eae7c3f5f67c3b5e81c563dc6698fa7fcf403854d",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/util.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "urllib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "urllib.parse",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/parse.py",
+      "bytes": 45676,
+      "sha256": "e6af7f475262f1de335bb2e41e26adb94d6103977cf5fe1ddc430dc6a3b1623f",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/parse.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "uuid",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/uuid.py",
+      "bytes": 29656,
+      "sha256": "fe357bff7241e9fd6f86ee81567fd20aeec2e17460428ea9b7924bebf57301fc",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/uuid.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "warnings",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/warnings.py",
+      "bytes": 21909,
+      "sha256": "6405e281882932205eae641b2d31fba7776f94517a206d289465a1caffbf310e",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/warnings.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "weakref",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/weakref.py",
+      "bytes": 21513,
+      "sha256": "56f8d313fb74019e53eb9287400702fbce788b7fe30e097b0b6e06296f3f080c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/weakref.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "preflight",
+      "module": "zipimport",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/zipimport.py",
+      "bytes": 27840,
+      "sha256": "a96f1d7a7b6aaf421a3cf382b94b1422f4f0ad452fdd0bb61d635b560d7a4e91",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/zipimport.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "__future__",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/__future__.py",
+      "bytes": 5218,
+      "sha256": "981d4c398849f9ebcab72300d9c1fe288fd6d7f28957b3b3fa3a493a5836d95c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/__future__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "__main__",
+      "path": "/workspace/vm-u2-source-24cf-r02/packet/runner.py",
+      "bytes": 20603,
+      "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "resolved": "/workspace/vm-u2-source-24cf-r02/packet/runner.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "_collections_abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_collections_abc.py",
+      "bytes": 32089,
+      "sha256": "d4945c8410c4bab351741b04bca3de066f7c27ed7e38df89e206a96617102ffb",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_collections_abc.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "_compression",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_compression.py",
+      "bytes": 5681,
+      "sha256": "3ad5d60627477a60939ee44fc1bb3a05dbe8fb52f0f75039b8f5d8f1a278b981",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_compression.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "_frozen_importlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap.py",
+      "bytes": 57057,
+      "sha256": "d112d54b7831cf4a818d4841d5ff8003b54df220a6dabafa61f67d7c7a5603f7",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "_frozen_importlib_external",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap_external.py",
+      "bytes": 69428,
+      "sha256": "e6ad72f3f0f9b65c99ab52598cd02ab748511dcdce1dd51f18dace9be9a680c6",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap_external.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "_weakrefset",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_weakrefset.py",
+      "bytes": 5893,
+      "sha256": "91895a451d06e9f521a1171b31b9b19bc9740f35af00d4fa106338ab7167c9ac",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_weakrefset.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/abc.py",
+      "bytes": 6538,
+      "sha256": "e558702a95cdce3febd289da021715d2b92bc43995b8a1bc58dfa1c3d8010287",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/abc.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "argparse",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/argparse.py",
+      "bytes": 101155,
+      "sha256": "7cc582dcb3b76e2c957f78a3f74e9809d6c311d6aab7bcaa2c9954d0cbff5f30",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/argparse.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "ast",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ast.py",
+      "bytes": 64452,
+      "sha256": "b515c23dbbc459329d3b802a3aac742cc456d7472e66f7ed6e9dc97e40596d7d",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ast.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/__init__.py",
+      "bytes": 1220,
+      "sha256": "61102f2b5f8fb832f0558cb66391f227970b3dd34ea2a621455587b4295e89a1",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.base_events",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_events.py",
+      "bytes": 78567,
+      "sha256": "53b71bbbd79e7fb2251460119afc379ebd71bbc599d9018313cc62ef218ae795",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_events.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.base_futures",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_futures.py",
+      "bytes": 1974,
+      "sha256": "2f3798c4b82f5ac77647908b157c924f734f36871d98970e72849ea9a9a07856",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_futures.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.base_subprocess",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_subprocess.py",
+      "bytes": 8869,
+      "sha256": "d69ba8f97bf8c89564cadce49427574ddb98103a5db6f04b98798240332e7adf",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_subprocess.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.base_tasks",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_tasks.py",
+      "bytes": 2672,
+      "sha256": "56efac65b63db927af336fa55eb5bda93c97a2defa4734ea8d695ed20fd6712a",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/base_tasks.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.constants",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/constants.py",
+      "bytes": 1413,
+      "sha256": "873fc2f9e66313c3c19c337269e704f204b59f9e91d6ecbec59f68335484d338",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/constants.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.coroutines",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/coroutines.py",
+      "bytes": 3342,
+      "sha256": "2feec17557c230a80cc2a6391bbb1c44b9f3341820b05667e36a4eb12b749436",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/coroutines.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.events",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/events.py",
+      "bytes": 29339,
+      "sha256": "6a18b7eee5926622c146e61a7eb39726b4656e07ca41d36b06936ffb2354f0ed",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/events.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.exceptions",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/exceptions.py",
+      "bytes": 1752,
+      "sha256": "a5971f88be14cd1417d59adf539ae48c5d818f95362a4e0eb00017e3690ab37b",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/exceptions.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.format_helpers",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/format_helpers.py",
+      "bytes": 2404,
+      "sha256": "6377b672b3f4ba8b6f0f7a5f0ea00cde24c8cddc0ca764e3329f302763477f59",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/format_helpers.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.futures",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/futures.py",
+      "bytes": 14340,
+      "sha256": "f6daaf2a051fc61ea146811d7d4b4db1cac31d7f4777aa4d10617812d78bd943",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/futures.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.locks",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/locks.py",
+      "bytes": 18995,
+      "sha256": "5234295a0456e9a6ba2e80446848b602cd9195bca4fca2c711c6e3f41989cd86",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/locks.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.log",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/log.py",
+      "bytes": 124,
+      "sha256": "80e4cc3ded4b138baba486519e7444801a23d6ac35f229d336a407a96af7e8d2",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/log.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.mixins",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/mixins.py",
+      "bytes": 481,
+      "sha256": "8f4a3e16eca845ebfba422550cbcee7340ec8166d2bff6b750a8ed0de6b9ae3c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/mixins.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.protocols",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/protocols.py",
+      "bytes": 6957,
+      "sha256": "1d1b49988c338b4ef06e30f9e92d9db2e00080c341f0a3f573bb8312deb8aff6",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/protocols.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.queues",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/queues.py",
+      "bytes": 7974,
+      "sha256": "8f020744ebd1f557dcb051a1530b504447660df906c2127a94bbcc8450ea7ef9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/queues.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.runners",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/runners.py",
+      "bytes": 7230,
+      "sha256": "739e0ecbb335cfec821a39f9e225583b5911bb6e3894ef93782005f852c54263",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/runners.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.selector_events",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/selector_events.py",
+      "bytes": 48332,
+      "sha256": "b77c4b8a85f1e1e2882a2bf3bd85a4b1c1fcfd7cb37ed0d8d8eb5f9a2ea44231",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/selector_events.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.sslproto",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/sslproto.py",
+      "bytes": 31899,
+      "sha256": "6c7fa1b81dc41850281cbf284c99ca18e824939fa5778860327040f3a80f6218",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/sslproto.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.staggered",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/staggered.py",
+      "bytes": 7077,
+      "sha256": "3998d04fcff2c8052af03f3f34dbd3bd510b2dadddd5f2629a2c1cccbecd136d",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/staggered.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.streams",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/streams.py",
+      "bytes": 27619,
+      "sha256": "6ec5c70fd95b0d51cc1e81cd21e8abe8c1b69650148d6bb75ab4aa4797319bd4",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/streams.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.subprocess",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/subprocess.py",
+      "bytes": 7737,
+      "sha256": "7b70605716334f63cc482123b2aaa3b7c5bb7138eeab63a037bd8068d43307c1",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/subprocess.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.taskgroups",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/taskgroups.py",
+      "bytes": 9559,
+      "sha256": "1d2bcd2da66524b45024841b94100cd6e7a7825a1b8f8ee125bf16b4ad0ca9bc",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/taskgroups.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.tasks",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/tasks.py",
+      "bytes": 37362,
+      "sha256": "6f6aad82d597fea1800004075b9a2481604da0035f1143af1eb267823ec460e3",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/tasks.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.threads",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/threads.py",
+      "bytes": 790,
+      "sha256": "39d37295383641565f0c08bd992e2f661dc8051eb17e890b834fce96bde0910e",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/threads.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.timeouts",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/timeouts.py",
+      "bytes": 5321,
+      "sha256": "3e40ca0dca3e54776579797837cd4936d73d04aae09fe0cf83ce1e5449d00163",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/timeouts.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.transports",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/transports.py",
+      "bytes": 10722,
+      "sha256": "940108bc133de399f38928cad3274f463096168d8a3ee5148f2478d3cb636f1c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/transports.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.trsock",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/trsock.py",
+      "bytes": 2475,
+      "sha256": "c0eac37debcc51b702b808f6b7ed3e417343f5ff5f57125dad600a27eb082328",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/trsock.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "asyncio.unix_events",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/unix_events.py",
+      "bytes": 53124,
+      "sha256": "1fff06cce78763800f05f4d2bebfcdbc07ebf9564ca7e7222e0d91e39dee08c9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/asyncio/unix_events.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "base64",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/base64.py",
+      "bytes": 20635,
+      "sha256": "8d1f608dbf030d11d6ec4df9e4c55b73fb68cdfbd9f53a7c91684a93b55564b5",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/base64.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "bisect",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bisect.py",
+      "bytes": 3423,
+      "sha256": "f1cf7b85fc36b5da249813fc5ab97d9464f8cc1bc817f7146206fa2713e35999",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bisect.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "bz2",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bz2.py",
+      "bytes": 11847,
+      "sha256": "76ab3252924e71e859d7d90e8d3db13b6554975cfcac0fdadced4de7f8779330",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bz2.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "codecs",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/codecs.py",
+      "bytes": 36870,
+      "sha256": "7b7839e53a77961153240aecfe11edc8054d05b1dedd83894450dae21ec05785",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/codecs.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "collections",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/__init__.py",
+      "bytes": 52378,
+      "sha256": "7fdb04dd248ab37909f46d2085bfee56b32d7e91e49ad3a2fad99c453295659b",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "collections.abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/abc.py",
+      "bytes": 119,
+      "sha256": "9cb4208f99128a0489b6c8e6c61637617dd7d4250c59e065491957eda084dd10",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/abc.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "concurrent",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/__init__.py",
+      "bytes": 38,
+      "sha256": "87ad5c8954dd56fbbca04517bf87477ff4dce575170c7dd1281d7ef1f4214ac8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "concurrent.futures",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/__init__.py",
+      "bytes": 1583,
+      "sha256": "9b597f6de7da771109ca7bf96a1af5ea4d5fda69b27b39312d34966d987f73cd",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "concurrent.futures._base",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/_base.py",
+      "bytes": 22833,
+      "sha256": "8c6d5f09f7c535d40fa1c30ebfcb35e0601c2abf32286a82cf151af7ddf72473",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/concurrent/futures/_base.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "contextlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "bytes": 27637,
+      "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "postflight",
+      "module": "contextvars",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextvars.py",
+      "bytes": 129,
+      "sha256": "5ed260be8d1f4fe92261b7810b4bb1e8539c42093d7493f677d076e1a87f459a",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextvars.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "copy",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copy.py",
+      "bytes": 8412,
+      "sha256": "cbd25547933176fcf6bb05c2adc9f4796d15ac20b9b82dcf890daea7203daeab",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copy.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "copyreg",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copyreg.py",
+      "bytes": 7614,
+      "sha256": "c8eda41f05c6bf95a4da4726a530409d2485ae060b8d019b3a8034389a15d3e9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copyreg.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "dataclasses",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/dataclasses.py",
+      "bytes": 62085,
+      "sha256": "d242aea5fcf6408b1c1f622442f88f68b9526ce1f8bd2890d74a144677c427d9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/dataclasses.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "datetime",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/datetime.py",
+      "bytes": 268,
+      "sha256": "ef20dc6b3554cd585dddffdc573f1f9a7a54c522f2a3fb4576c44edbb1e14238",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/datetime.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "difflib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/difflib.py",
+      "bytes": 83368,
+      "sha256": "3eb2d371b4a171b063921de6bbf115108bc39de8bf72866315868ce2599213b7",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/difflib.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "dis",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/dis.py",
+      "bytes": 30227,
+      "sha256": "44c0b389c96124d8fb5cb0bc41c7a2aa7a6848ef4001b4000dcbd858efa4a1a2",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/dis.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "encodings",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/__init__.py",
+      "bytes": 5884,
+      "sha256": "78c4744d407690f321565488710b5aaf6486b5afa8d185637aa1e7633ab59cd8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "encodings.aliases",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/aliases.py",
+      "bytes": 15677,
+      "sha256": "6fdcc49ba23a0203ae6cf28e608f8e6297d7c4d77d52e651db3cb49b9564c6d2",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/aliases.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "encodings.utf_8",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/utf_8.py",
+      "bytes": 1005,
+      "sha256": "ba0cac060269583523ca9506473a755203037c57d466a11aa89a30a5f6756f3d",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/utf_8.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "enum",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/enum.py",
+      "bytes": 81540,
+      "sha256": "f35e542d8c4c1d2b5e910138d726fa48774925f3c4dc5462793ebcb66aa55501",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/enum.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "fnmatch",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/fnmatch.py",
+      "bytes": 5999,
+      "sha256": "6683da36e47af523f3f41e18ad244d837783e19e98911cc0b7415dea81494ebc",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/fnmatch.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "functools",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/functools.py",
+      "bytes": 37940,
+      "sha256": "de4a1d37c795e2a065124b5c49357893433bc6bb111b41277ccc9930ef08d4c9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/functools.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "genericpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/genericpath.py",
+      "bytes": 5572,
+      "sha256": "2b0b35d2206778af4081cf81dd9b513876e72c35a55bec941402e1fa62b1f1aa",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/genericpath.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "gettext",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/gettext.py",
+      "bytes": 21320,
+      "sha256": "a5c249a522b6b8e3aa6f1b12a8bcc09508b99ad612b58d2fc973db27ea3b7cc3",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/gettext.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "hashlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/hashlib.py",
+      "bytes": 9349,
+      "sha256": "6dbdebf270868b391080e21dc9687eddfaf321c965ad979f68d3f5c423c613ab",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/hashlib.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "heapq",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/heapq.py",
+      "bytes": 23024,
+      "sha256": "6d43277e5c76fc0f073cd388fcff852d14d068f6bb6d4886c340f8b75a1229a9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/heapq.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "importlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/__init__.py",
+      "bytes": 4784,
+      "sha256": "d540b5ac137fcb3e26a8d5f2939649e34373c6685f98a30a9f682cf231be5854",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "importlib._abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_abc.py",
+      "bytes": 1354,
+      "sha256": "80aab7931dc999dee581c8b8b56fcd973fe156335a96ceeaf6acfc03cebf10e8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_abc.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "importlib._bootstrap",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap.py",
+      "bytes": 57057,
+      "sha256": "d112d54b7831cf4a818d4841d5ff8003b54df220a6dabafa61f67d7c7a5603f7",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "importlib._bootstrap_external",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap_external.py",
+      "bytes": 69428,
+      "sha256": "e6ad72f3f0f9b65c99ab52598cd02ab748511dcdce1dd51f18dace9be9a680c6",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap_external.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "importlib.machinery",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/machinery.py",
+      "bytes": 880,
+      "sha256": "d045cd7ecf2a12b6ecbfbef79eb114e87ef2ebd756f5b705f73e6f3266e3dede",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/machinery.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "importlib.util",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/util.py",
+      "bytes": 10994,
+      "sha256": "671f2995653f673f6d5056a1089debef473bc28ae7114f7a8db71475733d6876",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/util.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "inspect",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+      "bytes": 127125,
+      "sha256": "5c54ebf0bfdc25397750e5d0f63800751650ee50e65325ff3ea4069c9bfa5f75",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "postflight",
+      "module": "io",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/io.py",
+      "bytes": 3582,
+      "sha256": "7cec3cb8ac004058dd0a5af246e6d950fb59c7ddd0058fda48bcb3fcb98d8822",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/io.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "ipaddress",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ipaddress.py",
+      "bytes": 81414,
+      "sha256": "ba8d3389ff084fcb232b48204ec04f2b3ea4bd0eadf7b18c814947d185de2c64",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ipaddress.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "json",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/__init__.py",
+      "bytes": 14020,
+      "sha256": "d5d41e2c29049515d295d81a6d40b4890fbec8d8482cfb401630f8ef2f77e4d5",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "json.decoder",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py",
+      "bytes": 12525,
+      "sha256": "382cd02af6f7efede5a6d4abbcda1015e5c7a75794b0016022878f9cf32a24f6",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "json.encoder",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/encoder.py",
+      "bytes": 16075,
+      "sha256": "52bfb1b66029cc70fa3bd7fe11df9f2e03922d413407a341b387a22c987f24f8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/encoder.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "json.scanner",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/scanner.py",
+      "bytes": 2434,
+      "sha256": "572958017eae8842eeddd0e3d18d3c56cc0a197348224915e1d87ce937841764",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/scanner.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "keyword",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/keyword.py",
+      "bytes": 1073,
+      "sha256": "18c2be738c04ad20ad375f6a71db34b3823c7f40b0340f5294d0e89f3c9b093b",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/keyword.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "linecache",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/linecache.py",
+      "bytes": 5800,
+      "sha256": "9eb9194707991b49f9fea67a5222b0e6a0e49c865cdffc69fbc80a1f829e77fb",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/linecache.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "locale",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/locale.py",
+      "bytes": 78599,
+      "sha256": "3988c5419552d5b9f0bef3695102376f79357f0f440e9cd1f32c501f966e6ef3",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/locale.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "logging",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/logging/__init__.py",
+      "bytes": 83437,
+      "sha256": "43f86bbc08fdd5c7b6e697abffe1381f534a92bb32e1f1aee8360d6a142592a1",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/logging/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "lzma",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/lzma.py",
+      "bytes": 13277,
+      "sha256": "58fb9d2fdc8a8af7b25e218f17ea3b51bdfa53bdf40f440ab33c605974ca5c2e",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/lzma.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "ntpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ntpath.py",
+      "bytes": 30404,
+      "sha256": "6c0d55ee892f98ef87b1ed3c50c9dfc7e267a98d2db47e08d3dc67529af56725",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ntpath.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "opcode",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/opcode.py",
+      "bytes": 13174,
+      "sha256": "192f6008508f28d3273bff42eaea9b01c8394dab1607cd36aea778bdd166c3a6",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/opcode.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "operator",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/operator.py",
+      "bytes": 10965,
+      "sha256": "b2af20f67667203c1730e686cc5d0427becc94db4c97f1d3efe3ed2158473f6a",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/operator.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "os",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/os.py",
+      "bytes": 40821,
+      "sha256": "54c43a1fc69c979c70d8f7d097174cee163bfe59937723ee353043dd4a0211e1",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/os.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "os.path",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "bytes": 17356,
+      "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "pathlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py",
+      "bytes": 51052,
+      "sha256": "10ba48ae8063cfe7589436041d0d4628c05f427c7709cf8e75e486f8930cc32c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "pkgutil",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pkgutil.py",
+      "bytes": 18281,
+      "sha256": "44300bc77f6f52ef2ad74d26e5053309c04f49eaa91c099356eb61426cde504f",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pkgutil.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "platform",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/platform.py",
+      "bytes": 43388,
+      "sha256": "f5ff83f15c841792be42709a6710dc8d7a9f72791c1ae4cad719b1fb0abe0a05",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/platform.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "posixpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "bytes": 17356,
+      "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "pprint",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pprint.py",
+      "bytes": 24158,
+      "sha256": "1585c8d74d7f485590db2af46680ae0a73737ca9fb66022b2bcbbc4c4925e203",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pprint.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "random",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/random.py",
+      "bytes": 34689,
+      "sha256": "de48263a837339c7e01cf9f3c4d756696e0e0775f7778eb9cf81ad5b00134569",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/random.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "re",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/__init__.py",
+      "bytes": 16315,
+      "sha256": "8ff3c37c63b917fcf8dc8d50993a502292a3dc159e41de4f4018c72a53d1c07b",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "re._casefix",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_casefix.py",
+      "bytes": 5444,
+      "sha256": "1b12d9136f23db6c3f6f26053fefc15ca964b886838c7b9c1fabf8d2efc1e5c8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_casefix.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "re._compiler",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_compiler.py",
+      "bytes": 26399,
+      "sha256": "c75620761098a70ed75b9accef63ef2881d8abb6d4e5cbfd10074bd165eefe4d",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_compiler.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "re._constants",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_constants.py",
+      "bytes": 5930,
+      "sha256": "fa4fdb200f238f9e7817b63892b0d69833d8165134801e775e10cc113348a375",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_constants.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "re._parser",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_parser.py",
+      "bytes": 41201,
+      "sha256": "a51a85b37cf3f44ba7ff25754da5f31306e4ccfa6eb3c017f9d37bdf4e770840",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_parser.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "reprlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/reprlib.py",
+      "bytes": 7148,
+      "sha256": "e177bc70da83a7fbcde6fd261dc15da34e8a20873b1cccd4f9a1f8f27cca3779",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/reprlib.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "selectors",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/selectors.py",
+      "bytes": 19671,
+      "sha256": "1eeb102373e18c96311203f30c516e785bd8642275aa0bd66e43a284c9692385",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/selectors.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "shutil",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/shutil.py",
+      "bytes": 56198,
+      "sha256": "53496e06742fe008fee2bccc8caeac77473e69923bec05358bd43eea467db1f8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/shutil.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "signal",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/signal.py",
+      "bytes": 2495,
+      "sha256": "0363c964c90ac0b3e515de5749205e6e6454051a1211058375d84d91eab6071a",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/signal.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "socket",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/socket.py",
+      "bytes": 37815,
+      "sha256": "7d4d4c66e6f4bcc961ab462c4f08002ca97def8713a4be1c7373bdbd970a5274",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/socket.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "sqlite3",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+      "bytes": 2501,
+      "sha256": "f7cc982617b68e147540ef352d38310fe4d25c2c9c2542b67d0590c871df09a8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "postflight",
+      "module": "sqlite3.dbapi2",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+      "bytes": 3631,
+      "sha256": "7c5c8d98df1f2c50c4062a3be2c0f0499190c179fa4fc281507a1ef763a98f28",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "postflight",
+      "module": "ssl",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "bytes": 51655,
+      "sha256": "db62eeaae59c6e7087dcafb28087cd0bb092087381edc556f97c8cb614484380",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "postflight",
+      "module": "stat",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/stat.py",
+      "bytes": 5485,
+      "sha256": "052af0327eae6941b69b05c088b3e748f79995635f80ac4cc7125eb333eb4c77",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/stat.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "string",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/string.py",
+      "bytes": 11786,
+      "sha256": "24aeae1f0526250f442022022bf98df9a823b1cb330543ee79e70e44907462e9",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/string.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "struct",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/struct.py",
+      "bytes": 257,
+      "sha256": "9c231f9497caf513a22dee8f790b07f969b0e45854a0bdd6dd84b492e08c2856",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/struct.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "subprocess",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "bytes": 88747,
+      "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "postflight",
+      "module": "tempfile",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tempfile.py",
+      "bytes": 32386,
+      "sha256": "2eea4401f4f29d0d3647ed6fc8bcf6aa1daf879c8aa407a8ea310edac9dfc317",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tempfile.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "test_flowmarshal_implementation_workflow",
+      "path": "/workspace/vm-u2-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "resolved": "/workspace/vm-u2-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "textwrap",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/textwrap.py",
+      "bytes": 19718,
+      "sha256": "62867e40cdea6669b361f72af4d7daf0359f207c92cbeddfc7c7506397c1f31c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/textwrap.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "threading",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/threading.py",
+      "bytes": 60200,
+      "sha256": "846f450ae794e4aab823a163f8c71d27751148af33e91dd3de886686a4e8ebfb",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/threading.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "token",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/token.py",
+      "bytes": 2511,
+      "sha256": "1a4d994ce9744f4bfe2d964fc24d112a1e76796a08c2e45a2d73c82a8587f922",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/token.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "tokenize",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tokenize.py",
+      "bytes": 21570,
+      "sha256": "026f566ac63e60d69c8185a3880831b657accc5eac984fadf271fc99a5e5825d",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tokenize.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "traceback",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/traceback.py",
+      "bytes": 46393,
+      "sha256": "2c44af2848836d9af0c7b3547469695cd22586c64274d362eafcf466af284bd6",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/traceback.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "types",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/types.py",
+      "bytes": 10993,
+      "sha256": "345474ef027a1273f353da9bdc1f7c18f65335e72e681bcc0376774cc51f2405",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/types.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "typing",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/typing.py",
+      "bytes": 118836,
+      "sha256": "be92d60fb8382bb29ead21c128825d7c96d0e8c915b44f840791e49f5a8d554c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/typing.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "unittest",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+      "bytes": 3487,
+      "sha256": "32ed48385c0377bc2900a76e9a6acc3705aeef402c72de8554b3c637420506f0",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "postflight",
+      "module": "unittest.case",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/case.py",
+      "bytes": 57531,
+      "sha256": "45bac6d80a4fc3a0dea8340a80681e30b263f017b4a5002cb8f489a632e0f987",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/case.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "unittest.loader",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/loader.py",
+      "bytes": 21116,
+      "sha256": "7f0af414bfa7fe8612a424b14cfcf8a3c34fcac999d976461beb738ef8b211b8",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/loader.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "unittest.main",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/main.py",
+      "bytes": 11991,
+      "sha256": "db58280574389c0d6cba9559cc51e1787f5b418c4e85d354aa55ca43335c487a",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/main.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "unittest.mock",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "bytes": 106317,
+      "sha256": "1de18141992c6742bff27e77c0cbe46d53d6a5ab1850574a536910508823fc5c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "status": "FILE_PIN_OBSERVED",
+      "matchesPinnedPREStdlib": true
+    },
+    {
+      "stage": "postflight",
+      "module": "unittest.result",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/result.py",
+      "bytes": 9130,
+      "sha256": "5db286bdd3821d64150377e554d7edbdd58db7bb8b950772f977e9ec1d535617",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/result.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "unittest.runner",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/runner.py",
+      "bytes": 10368,
+      "sha256": "76d9beb9c21d0d367a1b040a921ad43f90b7971fcc8cacfccd6f9760bedf1ce2",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/runner.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "unittest.signals",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/signals.py",
+      "bytes": 2403,
+      "sha256": "f8286e818ca56e10e03745bc056cdfd31147678f9a1dc8cb6b0fe96ef9a4362a",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/signals.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "unittest.suite",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/suite.py",
+      "bytes": 13512,
+      "sha256": "ed2da92bc9f97c53403ee2d3d12cc53b16a96e85d596ebc887b5a93458f3f6bc",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/suite.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "unittest.util",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/util.py",
+      "bytes": 5215,
+      "sha256": "fdcc640c3505d16deab9c32eae7c3f5f67c3b5e81c563dc6698fa7fcf403854d",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/util.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "urllib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/__init__.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "urllib.parse",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/parse.py",
+      "bytes": 45676,
+      "sha256": "e6af7f475262f1de335bb2e41e26adb94d6103977cf5fe1ddc430dc6a3b1623f",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/parse.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "uuid",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/uuid.py",
+      "bytes": 29656,
+      "sha256": "fe357bff7241e9fd6f86ee81567fd20aeec2e17460428ea9b7924bebf57301fc",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/uuid.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "warnings",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/warnings.py",
+      "bytes": 21909,
+      "sha256": "6405e281882932205eae641b2d31fba7776f94517a206d289465a1caffbf310e",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/warnings.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "weakref",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/weakref.py",
+      "bytes": 21513,
+      "sha256": "56f8d313fb74019e53eb9287400702fbce788b7fe30e097b0b6e06296f3f080c",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/weakref.py",
+      "status": "FILE_PIN_OBSERVED"
+    },
+    {
+      "stage": "postflight",
+      "module": "zipimport",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/zipimport.py",
+      "bytes": 27840,
+      "sha256": "a96f1d7a7b6aaf421a3cf382b94b1422f4f0ad452fdd0bb61d635b560d7a4e91",
+      "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/zipimport.py",
+      "status": "FILE_PIN_OBSERVED"
+    }
+  ],
+  "mappingErrors": [],
+  "nativeBuiltinsFromPinnedPRE": [
+    {
+      "name": "_sqlite3",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "_ssl",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "_socket",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "_posixsubprocess",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "select",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "resource",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "_hashlib",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    }
+  ],
+  "nativeBuiltinLimit": "Fileless builtins remain null; accompanying stdlib file hashes do not attest frozen code bytes. No extra module imports to fill provenance.",
+  "source5BeforeAfterReadback": [
+    {
+      "path": "runner.py",
+      "bytes": 20603,
+      "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "before": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "executionAfter": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "postflightAfter": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "allEqual": true
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 5916,
+      "sha256": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "before": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "executionAfter": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "postflightAfter": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "allEqual": true
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "before": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "executionAfter": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "postflightAfter": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "allEqual": true
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "before": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "executionAfter": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "postflightAfter": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "allEqual": true
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "before": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "executionAfter": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "postflightAfter": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "allEqual": true
+    }
+  ],
+  "source5Unchanged": true,
+  "source15Readback": [
+    {
+      "path": "README.ko.md",
+      "bytes": 7129,
+      "sha256": "42a72ef4b84fd3b285ae1aecd2cb48baede4fbd95f67f53f3c5be6c976fba855",
+      "matchesGuard": true
+    },
+    {
+      "path": "SOURCE.DIFF.patch",
+      "bytes": 7305,
+      "sha256": "01d38f4ac1b6755c41d99e5940952ac1e0e1b95029fb66706f3489657783b591",
+      "matchesGuard": true
+    },
+    {
+      "path": "SOURCE.SHA256.json",
+      "bytes": 1995,
+      "sha256": "0c1c54b6643cfb514df94cf1160a41eca46c086dce0e042254658801afcc22d2",
+      "matchesGuard": true
+    },
+    {
+      "path": "STATIC-CHECKS.json",
+      "bytes": 9390,
+      "sha256": "e00bf43810e19196eb6e2081955ce8f6768f2784c7ec72ac78ba4d0e2ef37c81",
+      "matchesGuard": true
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 5916,
+      "sha256": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "matchesGuard": true
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "matchesGuard": true
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "matchesGuard": true
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "matchesGuard": true
+    },
+    {
+      "path": "regression/check_origin.py",
+      "bytes": 8497,
+      "sha256": "8321f2343c74a829b4e6509f0a0b2942a7808ffd81f84b45592d5fa6d0616098",
+      "matchesGuard": true
+    },
+    {
+      "path": "regression/dummy_helper.py",
+      "bytes": 300,
+      "sha256": "b42b7cf911d2f08cd5cf023c0b914f7d910411509c5b8d515304bce60ca9133f",
+      "matchesGuard": true
+    },
+    {
+      "path": "regression-capture/execution.json",
+      "bytes": 2441,
+      "sha256": "857378118c39c8dd58716717a6e0d794d5d0b6b365027bfb0ac2aa2c61585ed6",
+      "matchesGuard": true
+    },
+    {
+      "path": "regression-capture/result.json",
+      "bytes": 33704,
+      "sha256": "1ce8f75eae84b5f0de00a539943c2cac577721ee27d912cf0038866b2293286f",
+      "matchesGuard": true
+    },
+    {
+      "path": "regression-capture/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matchesGuard": true
+    },
+    {
+      "path": "regression-capture/stdout.txt",
+      "bytes": 30485,
+      "sha256": "aeddf4a96cc87c2b67677ab27fa23e2b600f747d594ca94db341de92354da56e",
+      "matchesGuard": true
+    },
+    {
+      "path": "runner.py",
+      "bytes": 20603,
+      "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "matchesGuard": true
+    }
+  ],
+  "source15Unchanged": true,
+  "postflightMatchesBeforeRaw": true,
+  "rawOrigins": {
+    "test": "/workspace/vm-u2-source-24cf-r02/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+    "helper": "/workspace/vm-u2-source-24cf-r02/packet/pristine/scripts/flowmarshal_implementation_workflow.py",
+    "legacy_import_only": "/workspace/vm-u2-source-24cf-r02/packet/pristine/scripts/flowmarshal_orchestrator_ledger.py"
+  },
+  "loaderIdsMatchManifest": true,
+  "loaderCount": 2,
+  "loaderErrorsRaw": [],
+  "resultIdsMatchLoader": true,
+  "resultRaw": {
+    "started_utc": "2026-10-04T18:03:36.736210+00:00",
+    "finished_utc": "2026-10-04T18:03:36.855973+00:00",
+    "test_ids": [
+      "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_migrates_additively_from_v2_and_preserves_history",
+      "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_writer_fence_rejects_missing_and_old_contract_versions"
+    ],
+    "testsRun": 2,
+    "wasSuccessful": true,
+    "failures": [],
+    "errors": [],
+    "skipped": [],
+    "expectedFailures": [],
+    "unexpectedSuccesses": [],
+    "suite_exit": 0
+  },
+  "helperOriginCounts": {
+    "before": 7,
+    "accepted": 7,
+    "rejected": 0
+  },
+  "helperOriginNames": [
+    "command_migrate",
+    "command_begin",
+    "command_verify",
+    "open_readonly",
+    "open_write",
+    "_backup_database",
+    "_install_writer_fence_triggers"
+  ],
+  "helperOriginRows": 14,
+  "helperOriginArtifact": {
+    "bytes": 10499,
+    "sha256": "39b6295d91e38367a90ebf25c7d2c77a0f1ae6401b7d2abd74bf264772bdeade"
+  },
+  "actualExecutionRaw": {
+    "started_utc": "2026-10-04T18:03:36.539952+00:00",
+    "observed_utc": "2026-10-04T18:03:36.906365+00:00",
+    "pid": 4113,
+    "actual_exit": 0,
+    "terminal_observed": true,
+    "status": "PASS",
+    "timed_out": false,
+    "own_child_kill_error": null,
+    "raw_observation_error": null,
+    "observation_unknown": false,
+    "inputs_before": {
+      "runner.py": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "manifest.json": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    },
+    "inputs_after_observation": {
+      "runner.py": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "manifest.json": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    },
+    "files_observed": [
+      {
+        "path": "result.json",
+        "bytes": 582
+      },
+      {
+        "path": "postflight.json",
+        "bytes": 16395
+      },
+      {
+        "path": "invocation.json",
+        "bytes": 2022
+      },
+      {
+        "path": "stdout.txt",
+        "bytes": 0
+      },
+      {
+        "path": "preflight.json",
+        "bytes": 20316
+      },
+      {
+        "path": "helper-origin.jsonl",
+        "bytes": 10499
+      },
+      {
+        "path": "loader.json",
+        "bytes": 378
+      },
+      {
+        "path": "stderr.txt",
+        "bytes": 522
+      }
+    ],
+    "residual_observation_mutable": false,
+    "timeout_note": "Own child only kill/reap in same budget; no retry/global kill/cleanup"
+  },
+  "actualInvocationRaw": {
+    "utc": "2026-10-04T18:03:36.539403+00:00",
+    "parent_argv": [
+      "/workspace/vm-u2-source-24cf-r02/packet/runner.py",
+      "--run-root",
+      "/workspace/vm-u2-run-24cf-r02",
+      "--runner-sha256",
+      "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "--manifest-sha256",
+      "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "--timeout",
+      "300"
+    ],
+    "parent_cwd": "/workspace/vm-u2-source-24cf-r02/pre-cwd",
+    "child_argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-X",
+      "utf8",
+      "/workspace/vm-u2-source-24cf-r02/packet/runner.py",
+      "--child",
+      "--run-root",
+      "/workspace/vm-u2-run-24cf-r02",
+      "--runner-sha256",
+      "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "--manifest-sha256",
+      "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "--deadline",
+      "40646.551613575"
+    ],
+    "child_cwd": "/workspace/vm-u2-run-24cf-r02/cwd",
+    "child_env": {
+      "HOME": "/workspace/vm-u2-run-24cf-r02/home",
+      "TMPDIR": "/workspace/vm-u2-run-24cf-r02/tmp",
+      "TMP": "/workspace/vm-u2-run-24cf-r02/tmp",
+      "TEMP": "/workspace/vm-u2-run-24cf-r02/tmp",
+      "PATH": "/bin:/usr/bin"
+    },
+    "deadline_monotonic": 40646.551613575,
+    "timeout_seconds": 300.0,
+    "inputs_before": {
+      "runner.py": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "manifest.json": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    },
+    "scope": "U2 only; own child timeout kill/reap, no retry/global kill/cleanup"
+  },
+  "nativeCommandId": null,
+  "providerNativeId": null,
+  "externalJobs": "UNKNOWN",
+  "priorUnreadableProcesses": 7,
+  "OSContainment": "UNKNOWN",
+  "runnerInvocations": 1,
+  "ownedChildInvocations": 1,
+  "retries": 0,
+  "productRerun": 0,
+  "scopeLimit": "Selected helper70f5 original2 U2 only; original76/currenthelper/Windows/qualification/Goal not covered"
+}

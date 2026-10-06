@@ -1,0 +1,143 @@
+{
+  "checks": {
+    "allSourcePins": true,
+    "ancestorsNoSymlink": true,
+    "beforeDeadlineAtGuardEnd": true,
+    "beforeDeadlineAtGuardStart": true,
+    "canonicalUpperFMZero": true,
+    "exactSource9": true,
+    "executablePin": true,
+    "linuxPython312": true,
+    "manifestExternalPin": true,
+    "nonOverlap": true,
+    "parentCwdExactEmpty": true,
+    "preExternalPin": true,
+    "runnerExternalPin": true,
+    "runrootAbsent": true,
+    "runrootResolveExact": true,
+    "sealExternalPin": true,
+    "sixStdlibFilePins": true,
+    "sourceTotalBytes": true
+  },
+  "errors": [],
+  "externalJobs": "UNKNOWN",
+  "guardArgv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "-I",
+    "-S",
+    "-B",
+    "-"
+  ],
+  "guardCwd": "/workspace/vm-common3-source-24cf-r03/pre-cwd",
+  "guardEndUtc": "2026-10-04T14:56:48.091527+00:00",
+  "guardStartUtc": "2026-10-04T14:56:48.048626+00:00",
+  "issuedUtc": "2026-10-04T14:56:17Z",
+  "launchNotAfterUtc": "2026-10-04T14:58:17.000Z",
+  "nativeCommandId": null,
+  "passed": true,
+  "peerId": "df1ecb87-c6c8-4004-b658-2f8bc3322b34",
+  "priorUnreadableProcesses": 7,
+  "runnerInvocationsSoFar": 0,
+  "scope": "SINGLE_LAUNCH_FRESHNESS_ONLY",
+  "source9": [
+    {
+      "bytes": 3904,
+      "match": true,
+      "path": "README.ko.md",
+      "sha256": "4d68300671e9b6728ee4877642d7673caefbe1225faca05c9985ca2f6143ac6f"
+    },
+    {
+      "bytes": 1729,
+      "match": true,
+      "path": "SOURCE.DIFF.patch",
+      "sha256": "0628ef2c7fdefea950e93f9304d9a29f34a0879823a31266d737145c326b4160"
+    },
+    {
+      "bytes": 1146,
+      "match": true,
+      "path": "SOURCE.SHA256.json",
+      "sha256": "321ee6055812cdd7b2648bdc27f67eaac6d7fd2bcde309c8ad1d503bf988bc86"
+    },
+    {
+      "bytes": 2992,
+      "match": true,
+      "path": "STATIC-CHECKS.json",
+      "sha256": "b54634a9a471c9c8ecfa2de276a100d854fff9bdb1f818d9e7072ec87a94c9bb"
+    },
+    {
+      "bytes": 3381,
+      "match": true,
+      "path": "manifest.json",
+      "sha256": "ae0260a8fd9803cc716a8eab504e34b9bdfd919f39695e8bced5a896c116c3ad"
+    },
+    {
+      "bytes": 384699,
+      "match": true,
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+    },
+    {
+      "bytes": 39264,
+      "match": true,
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    },
+    {
+      "bytes": 173219,
+      "match": true,
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+    },
+    {
+      "bytes": 15249,
+      "match": true,
+      "path": "runner.py",
+      "sha256": "457fd65598bc5cb5a87dd46abb7036bac9768db20a932053fb9670b201862136"
+    }
+  ],
+  "status": "FRESHNESS_PASS_PENDING_NATIVE_DISPATCH",
+  "stdlib6": [
+    {
+      "bytes": 2501,
+      "match": true,
+      "name": "sqlite3",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+      "sha256": "f7cc982617b68e147540ef352d38310fe4d25c2c9c2542b67d0590c871df09a8"
+    },
+    {
+      "bytes": 3631,
+      "match": true,
+      "name": "sqlite3.dbapi2",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+      "sha256": "7c5c8d98df1f2c50c4062a3be2c0f0499190c179fa4fc281507a1ef763a98f28"
+    },
+    {
+      "bytes": 51655,
+      "match": true,
+      "name": "ssl",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "sha256": "db62eeaae59c6e7087dcafb28087cd0bb092087381edc556f97c8cb614484380"
+    },
+    {
+      "bytes": 3487,
+      "match": true,
+      "name": "unittest",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+      "sha256": "32ed48385c0377bc2900a76e9a6acc3705aeef402c72de8554b3c637420506f0"
+    },
+    {
+      "bytes": 106317,
+      "match": true,
+      "name": "unittest.mock",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "sha256": "1de18141992c6742bff27e77c0cbe46d53d6a5ab1850574a536910508823fc5c"
+    },
+    {
+      "bytes": 88747,
+      "match": true,
+      "name": "subprocess",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375"
+    }
+  ]
+}

@@ -1,0 +1,25 @@
+{
+  "scope": "R02_OS_EXECV_DISPATCH",
+  "utc": "2026-10-04T14:56:48.091705+00:00",
+  "argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "-I",
+    "-S",
+    "-B",
+    "-X",
+    "utf8",
+    "/workspace/vm-common3-source-24cf-r03/packet/runner.py",
+    "--run-root",
+    "/workspace/vm-common3-run-24cf-r03",
+    "--runner-sha256",
+    "457fd65598bc5cb5a87dd46abb7036bac9768db20a932053fb9670b201862136",
+    "--manifest-sha256",
+    "ae0260a8fd9803cc716a8eab504e34b9bdfd919f39695e8bced5a896c116c3ad",
+    "--timeout",
+    "300"
+  ],
+  "cwd": "/workspace/vm-common3-source-24cf-r03/pre-cwd",
+  "method": "os.execv same process replacement; no additional child",
+  "runnerInvocationRequested": 1,
+  "retries": 0
+}

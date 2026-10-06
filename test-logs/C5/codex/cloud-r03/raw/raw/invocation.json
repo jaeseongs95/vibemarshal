@@ -1,0 +1,51 @@
+{
+  "utc": "2026-10-04T21:04:11.716414+00:00",
+  "parent_argv": [
+    "/workspace/vm-c5-source-24cf-r03/packet/runner.py",
+    "--run-root",
+    "/workspace/vm-c5-run-24cf-r03",
+    "--runner-sha256",
+    "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+    "--manifest-sha256",
+    "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+    "--timeout",
+    "300"
+  ],
+  "parent_cwd": "/workspace/vm-c5-source-24cf-r03/pre-cwd",
+  "child_argv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "-I",
+    "-S",
+    "-B",
+    "-X",
+    "utf8",
+    "/workspace/vm-c5-source-24cf-r03/packet/runner.py",
+    "--child",
+    "--run-root",
+    "/workspace/vm-c5-run-24cf-r03",
+    "--runner-sha256",
+    "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+    "--manifest-sha256",
+    "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+    "--deadline",
+    "51481.728602213"
+  ],
+  "child_cwd": "/workspace/vm-c5-run-24cf-r03/cwd",
+  "child_env": {
+    "HOME": "/workspace/vm-c5-run-24cf-r03/home",
+    "TMPDIR": "/workspace/vm-c5-run-24cf-r03/tmp",
+    "TMP": "/workspace/vm-c5-run-24cf-r03/tmp",
+    "TEMP": "/workspace/vm-c5-run-24cf-r03/tmp",
+    "PATH": "/bin:/usr/bin"
+  },
+  "deadline_monotonic": 51481.728602213,
+  "timeout_seconds": 300.0,
+  "inputs_before": {
+    "runner.py": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+    "manifest.json": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+    "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+    "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+    "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+  },
+  "scope": "C5 only; own child timeout kill/reap, no retry/global kill/cleanup"
+}

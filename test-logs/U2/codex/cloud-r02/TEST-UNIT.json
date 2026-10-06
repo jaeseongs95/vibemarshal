@@ -1,0 +1,17 @@
+{
+  "testUnit": "U2",
+  "vendor": "codex",
+  "testIds": [
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_migrates_additively_from_v2_and_preserves_history",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_writer_fence_rejects_missing_and_old_contract_versions"
+  ],
+  "historicalRunScope": "U2 2건, helper 70f5, Linux Python 3.12.14 -I -S -B -X utf8, 해당 Cloud 실행 1회 결과",
+  "postVerdictId": "R029",
+  "rawStatus": "PASS",
+  "auditIndependence": "PARTIAL (auditor prior advice and/or SOURCE/PRE participation); preserve verdict disclosure",
+  "officialTaskAcceptance": null,
+  "futureExecutionAuthority": null,
+  "originRoot": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw",
+  "captureMeaning": "기존 원자료의 바이트 동일 복사; 새 실행 없음",
+  "limits": "원래 절대경로/manifest는 역사적 provenance이며, 재배치된 source/runner의 실행 가능성을 뜻하지 않음"
+}

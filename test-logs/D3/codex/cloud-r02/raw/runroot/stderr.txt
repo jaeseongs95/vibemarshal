@@ -1,0 +1,8 @@
+test_changed_identity_or_schema_rejects_without_rows (test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows) ... ok
+test_selection_refs_and_required_check_cannot_be_forged (test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged) ... ok
+test_stale_success_and_evidence_tamper_reject (test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.189s
+
+OK

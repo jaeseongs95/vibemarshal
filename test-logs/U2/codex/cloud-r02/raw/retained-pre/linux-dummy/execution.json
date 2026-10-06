@@ -1,0 +1,110 @@
+{
+  "scope": "U2_R02_STDLIB_DUMMY_ONLY_NOT_PRODUCT",
+  "supervisorPid": 3457,
+  "childPid": 3458,
+  "actualChildArgv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "-I",
+    "-S",
+    "-B",
+    "-X",
+    "utf8",
+    "/workspace/vm-u2-source-24cf-r02/packet/regression/check_origin.py",
+    "--runner-sha256",
+    "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+    "--self-sha256",
+    "8321f2343c74a829b4e6509f0a0b2942a7808ffd81f84b45592d5fa6d0616098",
+    "--dummy-sha256",
+    "b42b7cf911d2f08cd5cf023c0b914f7d910411509c5b8d515304bce60ca9133f",
+    "--result",
+    "/workspace/vm-u2-source-24cf-r02/evidence/linux-dummy/result.json"
+  ],
+  "actualChildCwd": "/workspace/vm-u2-source-24cf-r02/pre-cwd",
+  "actualChildEnv": {
+    "HOME": "/workspace/vm-u2-source-24cf-r02",
+    "TMPDIR": "/workspace/vm-u2-source-24cf-r02/evidence/linux-dummy",
+    "TMP": "/workspace/vm-u2-source-24cf-r02/evidence/linux-dummy",
+    "TEMP": "/workspace/vm-u2-source-24cf-r02/evidence/linux-dummy",
+    "PATH": "/bin:/usr/bin"
+  },
+  "supervisorProfile": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "-I",
+    "-S",
+    "-B",
+    "-X",
+    "utf8",
+    "-"
+  ],
+  "startedUtc": "2026-10-04T17:24:57.287771+00:00",
+  "observedUtc": "2026-10-04T17:24:57.352161+00:00",
+  "startedMonotonic": 38027.300165656,
+  "deadlineMonotonic": 38057.300165656,
+  "elapsedMonotonic": 0.06439608799701091,
+  "budgetSeconds": 30,
+  "actualExit": 0,
+  "terminalObserved": true,
+  "timedOut": false,
+  "ownChildKillError": null,
+  "ownChildReapError": null,
+  "ownChildInvocations": 1,
+  "retries": 0,
+  "inputsBefore": {
+    "runner.py": {
+      "bytes": 20603,
+      "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee"
+    },
+    "regression/check_origin.py": {
+      "bytes": 8497,
+      "sha256": "8321f2343c74a829b4e6509f0a0b2942a7808ffd81f84b45592d5fa6d0616098"
+    },
+    "regression/dummy_helper.py": {
+      "bytes": 300,
+      "sha256": "b42b7cf911d2f08cd5cf023c0b914f7d910411509c5b8d515304bce60ca9133f"
+    }
+  },
+  "inputsAfter": {
+    "runner.py": {
+      "bytes": 20603,
+      "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee"
+    },
+    "regression/check_origin.py": {
+      "bytes": 8497,
+      "sha256": "8321f2343c74a829b4e6509f0a0b2942a7808ffd81f84b45592d5fa6d0616098"
+    },
+    "regression/dummy_helper.py": {
+      "bytes": 300,
+      "sha256": "b42b7cf911d2f08cd5cf023c0b914f7d910411509c5b8d515304bce60ca9133f"
+    }
+  },
+  "inputsUnchanged": true,
+  "rawFiles": [
+    {
+      "path": "/workspace/vm-u2-source-24cf-r02/evidence/linux-dummy/result.json",
+      "exists": true,
+      "bytes": 26440,
+      "sha256": "55b72eeb8c452bbc84dd7f9d9eb799c4c33b4678fc816dd1682da78e889cde8d"
+    },
+    {
+      "path": "/workspace/vm-u2-source-24cf-r02/evidence/linux-dummy/stdout.txt",
+      "exists": true,
+      "bytes": 23220,
+      "sha256": "4e0e8bea710f047e36d00744922d424a4b5d34a5c8a3028ac74b5011e6dccb05"
+    },
+    {
+      "path": "/workspace/vm-u2-source-24cf-r02/evidence/linux-dummy/stderr.txt",
+      "exists": true,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "resultParseError": null,
+  "resultStatusRaw": "DUMMY_REGRESSION_PASS",
+  "productImportsLoadersTestsFixturesWholeRunnerStarts": 0,
+  "futureRunRootCreated": false,
+  "nativeToolId": null,
+  "providerNativeId": null,
+  "externalJobs": "UNKNOWN",
+  "priorUnreadableProcesses": 7,
+  "OSContainment": "UNKNOWN"
+}

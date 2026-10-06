@@ -1,0 +1,22 @@
+{
+  "started_utc": "2026-10-05T13:30:28.490498+00:00",
+  "finished_utc": "2026-10-05T13:30:28.679151+00:00",
+  "test_ids": [
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged",
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject"
+  ],
+  "testsRun": 3,
+  "wasSuccessful": true,
+  "failures": [],
+  "errors": [],
+  "skipped": [],
+  "expectedFailures": [],
+  "unexpectedSuccesses": [],
+  "unittest_exit": 0,
+  "effect_denials": {
+    "count": 0,
+    "logging_errors": 0
+  },
+  "suite_exit": 0
+}

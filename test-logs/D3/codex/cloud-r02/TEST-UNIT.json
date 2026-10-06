@@ -1,0 +1,18 @@
+{
+  "testUnit": "D3",
+  "vendor": "codex",
+  "testIds": [
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged",
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject"
+  ],
+  "historicalRunScope": "D3 3건, helper 70f5, Linux Python 3.12.14 -I -S -B -X utf8, 해당 Cloud 실행 1회 결과",
+  "postVerdictId": "R040",
+  "rawStatus": "PASS",
+  "auditIndependence": "PARTIAL (auditor prior advice and/or SOURCE/PRE participation); preserve verdict disclosure",
+  "officialTaskAcceptance": null,
+  "futureExecutionAuthority": null,
+  "originRoot": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw",
+  "captureMeaning": "기존 원자료의 바이트 동일 복사; 새 실행 없음",
+  "limits": "원래 절대경로/manifest는 역사적 provenance이며, 재배치된 source/runner의 실행 가능성을 뜻하지 않음"
+}

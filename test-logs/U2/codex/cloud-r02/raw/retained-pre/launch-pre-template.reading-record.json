@@ -1,0 +1,257 @@
+{
+  "scope": "U2_R02_FIXED_TEMPLATE_PREPARATION_ONLY",
+  "peerMessageId": "3e8e721c-1ed4-497f-87aa-c91a318bbbff",
+  "utc": "2026-10-04T17:59:39.251889+00:00",
+  "checks": {
+    "templateBytesSha": true,
+    "templateUTF8LF": true,
+    "targetAbsent": true,
+    "PREAndDummyPins": true,
+    "externalSealPin": true,
+    "packet15Seal14": true,
+    "packet724947Bytes": true,
+    "externalSource5Pins": true,
+    "selectedStdlib8Pins": true,
+    "exeFixedPin": true,
+    "versionPlatformFlags": true,
+    "actualCwdExactEmpty": true,
+    "futureRunAbsentCanonical": true,
+    "rootsCanonicalNoSymlink": true,
+    "futureFMURIAbsent": true
+  },
+  "sourceRoot": "/workspace/vm-u2-source-24cf-r02",
+  "futureRunRoot": "/workspace/vm-u2-run-24cf-r02",
+  "actualCwd": "/workspace/vm-u2-source-24cf-r02/pre-cwd",
+  "template": {
+    "path": "/workspace/vm-u2-source-24cf-r02/evidence/launch-pre-template.sh",
+    "bytes": 6374,
+    "sha256": "a78788b8178ae667db81823515b6503cb6a8b52e251223a6418e3562ed697ad9",
+    "UTF8LF": true,
+    "saved": true,
+    "readbackMatches": true
+  },
+  "templatePlaceholderNames": [
+    "__DISPATCH_PEER_ID__",
+    "__ISSUED_UTC__",
+    "__LAUNCH_NOT_AFTER_ISO__",
+    "__LAUNCH_NOT_AFTER_UTC__"
+  ],
+  "seal": {
+    "bytes": 1995,
+    "sha256": "0c1c54b6643cfb514df94cf1160a41eca46c086dce0e042254658801afcc22d2"
+  },
+  "packetReadback": [
+    {
+      "path": "manifest.json",
+      "bytes": 5916,
+      "sha256": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "matches": true
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "matches": true
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "matches": true
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "matches": true
+    },
+    {
+      "path": "README.ko.md",
+      "bytes": 7129,
+      "sha256": "42a72ef4b84fd3b285ae1aecd2cb48baede4fbd95f67f53f3c5be6c976fba855",
+      "matches": true
+    },
+    {
+      "path": "regression/check_origin.py",
+      "bytes": 8497,
+      "sha256": "8321f2343c74a829b4e6509f0a0b2942a7808ffd81f84b45592d5fa6d0616098",
+      "matches": true
+    },
+    {
+      "path": "regression/dummy_helper.py",
+      "bytes": 300,
+      "sha256": "b42b7cf911d2f08cd5cf023c0b914f7d910411509c5b8d515304bce60ca9133f",
+      "matches": true
+    },
+    {
+      "path": "regression-capture/execution.json",
+      "bytes": 2441,
+      "sha256": "857378118c39c8dd58716717a6e0d794d5d0b6b365027bfb0ac2aa2c61585ed6",
+      "matches": true
+    },
+    {
+      "path": "regression-capture/result.json",
+      "bytes": 33704,
+      "sha256": "1ce8f75eae84b5f0de00a539943c2cac577721ee27d912cf0038866b2293286f",
+      "matches": true
+    },
+    {
+      "path": "regression-capture/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matches": true
+    },
+    {
+      "path": "regression-capture/stdout.txt",
+      "bytes": 30485,
+      "sha256": "aeddf4a96cc87c2b67677ab27fa23e2b600f747d594ca94db341de92354da56e",
+      "matches": true
+    },
+    {
+      "path": "runner.py",
+      "bytes": 20603,
+      "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "matches": true
+    },
+    {
+      "path": "SOURCE.DIFF.patch",
+      "bytes": 7305,
+      "sha256": "01d38f4ac1b6755c41d99e5940952ac1e0e1b95029fb66706f3489657783b591",
+      "matches": true
+    },
+    {
+      "path": "STATIC-CHECKS.json",
+      "bytes": 9390,
+      "sha256": "e00bf43810e19196eb6e2081955ce8f6768f2784c7ec72ac78ba4d0e2ef37c81",
+      "matches": true
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "linux-pre.stdout.json",
+      "bytes": 98011,
+      "sha256": "bad4ed5ef98f679338d065308a0c51cf0e3547d5586dd8af83f099ad90cd5abb",
+      "matches": true
+    },
+    {
+      "path": "linux-dummy/result.json",
+      "bytes": 26440,
+      "sha256": "55b72eeb8c452bbc84dd7f9d9eb799c4c33b4678fc816dd1682da78e889cde8d",
+      "matches": true
+    },
+    {
+      "path": "linux-dummy/execution.json",
+      "bytes": 3592,
+      "sha256": "658bf6c6595b8238b2e37263e8678a96aaef1848e7fb176c2b24a62faab896e5",
+      "matches": true
+    }
+  ],
+  "stdlib8": [
+    {
+      "name": "sqlite3",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+      "bytes": 2501,
+      "sha256": "f7cc982617b68e147540ef352d38310fe4d25c2c9c2542b67d0590c871df09a8",
+      "matches": true
+    },
+    {
+      "name": "sqlite3.dbapi2",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+      "bytes": 3631,
+      "sha256": "7c5c8d98df1f2c50c4062a3be2c0f0499190c179fa4fc281507a1ef763a98f28",
+      "matches": true
+    },
+    {
+      "name": "ssl",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "bytes": 51655,
+      "sha256": "db62eeaae59c6e7087dcafb28087cd0bb092087381edc556f97c8cb614484380",
+      "matches": true
+    },
+    {
+      "name": "unittest",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+      "bytes": 3487,
+      "sha256": "32ed48385c0377bc2900a76e9a6acc3705aeef402c72de8554b3c637420506f0",
+      "matches": true
+    },
+    {
+      "name": "unittest.mock",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "bytes": 106317,
+      "sha256": "1de18141992c6742bff27e77c0cbe46d53d6a5ab1850574a536910508823fc5c",
+      "matches": true
+    },
+    {
+      "name": "subprocess",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "bytes": 88747,
+      "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375",
+      "matches": true
+    },
+    {
+      "name": "contextlib",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "bytes": 27637,
+      "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6",
+      "matches": true
+    },
+    {
+      "name": "inspect",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+      "bytes": 127125,
+      "sha256": "5c54ebf0bfdc25397750e5d0f63800751650ee50e65325ff3ea4069c9bfa5f75",
+      "matches": true
+    }
+  ],
+  "python": {
+    "actualExecutable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "bytes": 30894944,
+    "sha256": "fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7",
+    "version": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+    "platform": "linux",
+    "actualProbeArgv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-X",
+      "utf8",
+      "-"
+    ],
+    "flags": {
+      "isolated": 1,
+      "noSite": 1,
+      "dontWriteBytecode": 1,
+      "utf8Mode": 1,
+      "ignoreEnvironment": 1,
+      "noUserSite": 1,
+      "safePath": true
+    },
+    "xoptions": {
+      "utf8": true
+    }
+  },
+  "productExecution": 0,
+  "templateEvaluation": 0,
+  "guardCalls": 0,
+  "dummyCalls": 0,
+  "SQLiteConnectsProbes": 0,
+  "installation": 0,
+  "networkProbes": 0,
+  "runRootCreated": false,
+  "launchWindowIssued": false,
+  "tokensSubstituted": false,
+  "nativeCommandId": null,
+  "providerNativeId": null,
+  "externalJobs": "UNKNOWN",
+  "priorUnreadableProcesses": 7,
+  "OSContainment": "UNKNOWN",
+  "PREReportedByRoot": {
+    "R028Bytes": 7786,
+    "R028Sha256": "93822148a5aee43c873a8a99dd3c76bab3b9ad6ed56a638f014c9a43d9394cc6",
+    "independentlyFetchedHere": false
+  },
+  "authority": "Current instruction authorizes preparation only; awaiting separate Root finite dispatch"
+}

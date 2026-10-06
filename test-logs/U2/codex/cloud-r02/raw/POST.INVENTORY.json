@@ -1,0 +1,157 @@
+{
+  "scope": "U2_R02_SELECTED_ORIGINAL2_POST_RAW_RETURN",
+  "utc": "2026-10-04T18:08:13.747325+00:00",
+  "peerMessageId": "08151dd4-2745-48ee-a451-aca9a8af0268",
+  "sourceRoot": "/workspace/vm-u2-source-24cf-r02",
+  "runRoot": "/workspace/vm-u2-run-24cf-r02",
+  "runnerInvocations": 1,
+  "ownedChildInvocations": 1,
+  "retries": 0,
+  "missingRawFiles": [
+    "child-error.json"
+  ],
+  "missingRawInterpretation": "child-error.json absent; all9 expected successful-run raw artifacts exist",
+  "nativeCommandId": null,
+  "providerNativeId": null,
+  "externalJobs": "UNKNOWN",
+  "priorUnreadableProcesses": 7,
+  "OSContainment": "UNKNOWN",
+  "scopeLimit": "helper70f5 exact2 only; no original76/currenthelper/Windows/qualification/Goal PASS expansion",
+  "payloadFiles": [
+    {
+      "path": "packet-pins/SOURCE.SHA256.json",
+      "bytes": 1995,
+      "sha256": "0c1c54b6643cfb514df94cf1160a41eca46c086dce0e042254658801afcc22d2"
+    },
+    {
+      "path": "packet-pins/manifest.json",
+      "bytes": 5916,
+      "sha256": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af"
+    },
+    {
+      "path": "retained-pre/command-audit.json",
+      "bytes": 63061,
+      "sha256": "a2709b23e7d31522187ac36b9c6eb86a89fa487e105c09252b7f9655eb7f558b"
+    },
+    {
+      "path": "retained-pre/launch-pre-template.reading-record.json",
+      "bytes": 8315,
+      "sha256": "c583843b8d16d5fbbf2e4d29d8da2e3a77e6de9db254176aa77aa73fbe0acfaf"
+    },
+    {
+      "path": "retained-pre/linux-dummy/execution.json",
+      "bytes": 3592,
+      "sha256": "658bf6c6595b8238b2e37263e8678a96aaef1848e7fb176c2b24a62faab896e5"
+    },
+    {
+      "path": "retained-pre/linux-dummy/result.json",
+      "bytes": 26440,
+      "sha256": "55b72eeb8c452bbc84dd7f9d9eb799c4c33b4678fc816dd1682da78e889cde8d"
+    },
+    {
+      "path": "retained-pre/linux-pre.stdout.json",
+      "bytes": 98011,
+      "sha256": "bad4ed5ef98f679338d065308a0c51cf0e3547d5586dd8af83f099ad90cd5abb"
+    },
+    {
+      "path": "retained-pre/source-materialization.json",
+      "bytes": 7286,
+      "sha256": "b45bb266ddf4a9c3c559502565e8069c6477cf09878ebd2507393eb2a5e48f21"
+    },
+    {
+      "path": "run-raw/execution.json",
+      "bytes": 2174,
+      "sha256": "0b4a66e9e30a38d59543c7f05ca16ac335332b40201de66223a0d2a5b11efc85"
+    },
+    {
+      "path": "run-raw/helper-origin.jsonl",
+      "bytes": 10499,
+      "sha256": "39b6295d91e38367a90ebf25c7d2c77a0f1ae6401b7d2abd74bf264772bdeade"
+    },
+    {
+      "path": "run-raw/invocation.json",
+      "bytes": 2022,
+      "sha256": "650888224261b5b85e3b2367dd9a2e0f5e3f7dc62673a4041fd841ed22d4c1f0"
+    },
+    {
+      "path": "run-raw/loader.json",
+      "bytes": 378,
+      "sha256": "29d02d4b221f77d9a21d23a348f81ae2db206554b14590fa7cfb8ce6dabc0f17"
+    },
+    {
+      "path": "run-raw/postflight.json",
+      "bytes": 16395,
+      "sha256": "897d9eda80e166211434c634669bf502c81ee38c37c746a9b7811280f3fbdf8a"
+    },
+    {
+      "path": "run-raw/preflight.json",
+      "bytes": 20316,
+      "sha256": "7e5d8da71dfbf813687b77b3e8c0f1186bc2dd0f8fafab1fa1c9b3318e4e056d"
+    },
+    {
+      "path": "run-raw/result.json",
+      "bytes": 582,
+      "sha256": "06a539d8782d5c8a011ca4ccb750ea5d5ce96c648bb376b6f6e9db7e2c4c4116"
+    },
+    {
+      "path": "run-raw/stderr.txt",
+      "bytes": 522,
+      "sha256": "3256f0e2dc8937066c507e68c2374c7a76ef7d4b8fff8432ca0a8c020c453e9a"
+    },
+    {
+      "path": "run-raw/stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "support/binding-metadata.json",
+      "bytes": 828,
+      "sha256": "0855c7e7fd56c2104a8b53e122b89b7ddc9babb52db77f327d1fe97d3d0a0430"
+    },
+    {
+      "path": "support/bound-command.sh",
+      "bytes": 6399,
+      "sha256": "beb4f505420d409790f0810d49bae66513a78e2f6e67d4ad643365afc52f2fa3"
+    },
+    {
+      "path": "support/dispatch.json",
+      "bytes": 660,
+      "sha256": "3b6fb6db6b8907ee627c623dfe9d6b0d2a6d4f7a2c65b467459c99a556daeb81"
+    },
+    {
+      "path": "support/execution-template.sh",
+      "bytes": 6374,
+      "sha256": "a78788b8178ae667db81823515b6503cb6a8b52e251223a6418e3562ed697ad9"
+    },
+    {
+      "path": "support/guard.json",
+      "bytes": 5526,
+      "sha256": "c843190be9c6cf489ce62b48ce625d0e72cbd7166799347659d698b647029f62"
+    },
+    {
+      "path": "support/native-execution.stdout.txt",
+      "bytes": 6268,
+      "sha256": "5c58e48bab5f0e1af00061ed52cf16d8b5bd9aac385e5436ee3bb6a867de5274"
+    },
+    {
+      "path": "support/native-terminal.json",
+      "bytes": 82,
+      "sha256": "87a608556cc541c1142cc764c9dc5a86f98bc33833efa5e87a3c6e7f6e62eab4"
+    },
+    {
+      "path": "support/outer-execution-receipt.json",
+      "bytes": 43457,
+      "sha256": "740c8ea00472aeb387a3e263c87438c92b241d728561f925de9f23b979880b44"
+    },
+    {
+      "path": "support/post-collector.receipt.json",
+      "bytes": 11526,
+      "sha256": "bcc01966a64c6b92babee01dce5b6bb5d395d959b0c06ffffef3f46a3333022e"
+    },
+    {
+      "path": "support/post-observation.json",
+      "bytes": 136566,
+      "sha256": "b1de2921d8823985be7000ec76dbcffcb4e46970198c41807dc4824edceb8b27"
+    }
+  ]
+}

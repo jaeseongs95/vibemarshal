@@ -1,0 +1,78 @@
+{
+  "started_utc": "2026-10-05T13:30:28.301967+00:00",
+  "observed_utc": "2026-10-05T13:30:28.720660+00:00",
+  "pid": 8338,
+  "actual_exit": 0,
+  "terminal_observed": true,
+  "status": "PASS",
+  "timed_out": false,
+  "own_child_kill_error": null,
+  "raw_observation_error": null,
+  "observation_unknown": false,
+  "unittest_observation_unknown": false,
+  "effect_denial_claim_source": "result.json",
+  "effect_denial_observation": {
+    "state": "CLEAR",
+    "count": 0,
+    "journal_count": 0,
+    "logging_errors": 0,
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "inputs_before": {
+    "runner.py": "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb",
+    "manifest.json": "ff64e328bfc51fae2c96ebb605008d7ef2fb8fde15e4b36fd6de4d205bb6a3d0",
+    "pristine/tests/test_flowmarshal_direct_selection.py": "56793b76b16712fffd1d2d732b3c858621fef15d1d85f2874f0545fba3ea6fe2",
+    "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+    "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+    "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+  },
+  "inputs_after_observation": {
+    "runner.py": "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb",
+    "manifest.json": "ff64e328bfc51fae2c96ebb605008d7ef2fb8fde15e4b36fd6de4d205bb6a3d0",
+    "pristine/tests/test_flowmarshal_direct_selection.py": "56793b76b16712fffd1d2d732b3c858621fef15d1d85f2874f0545fba3ea6fe2",
+    "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+    "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+    "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+  },
+  "files_observed": [
+    {
+      "path": "result.json",
+      "bytes": 724
+    },
+    {
+      "path": "postflight.json",
+      "bytes": 16947
+    },
+    {
+      "path": "invocation.json",
+      "bytes": 2151
+    },
+    {
+      "path": "stdout.txt",
+      "bytes": 0
+    },
+    {
+      "path": "preflight.json",
+      "bytes": 30324
+    },
+    {
+      "path": "effect-denials.jsonl",
+      "bytes": 0
+    },
+    {
+      "path": "helper-origin.jsonl",
+      "bytes": 25275
+    },
+    {
+      "path": "loader.json",
+      "bytes": 431
+    },
+    {
+      "path": "stderr.txt",
+      "bytes": 597
+    }
+  ],
+  "residual_observation_mutable": false,
+  "timeout_note": "Own child only kill/reap in same budget; no retry/global kill/cleanup"
+}

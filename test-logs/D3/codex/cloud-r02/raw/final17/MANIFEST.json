@@ -1,0 +1,64 @@
+{
+  "schema": "VM1_D3_R02_PREPARATION_COMPLETION_SOURCE_ONLY",
+  "sourceRevision": "r02-completion-01",
+  "target": "R037/P19/F23 + completed VM2 sealed75 payload",
+  "ownWriterOnly": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer1\\d3-pre-launch-r02-completion-01",
+  "immutablePredecessors": [
+    "writer1/d3-pre-launch-r01-01 frozen14",
+    "writer1/d3-pre-launch-r02-01 frozen13"
+  ],
+  "templatePin": {
+    "bytes": 71960,
+    "sha256": "88892c55145ff1e17923f206bf788003a8dd468caede8fd610fab7e5c9079730"
+  },
+  "boundPin": {
+    "bytes": 62190,
+    "sha256": "411772680b475502e20cf74fe5c2197b6e1086568e58e49f92b6994c0b581e92"
+  },
+  "VM2SealPin": {
+    "bytes": 12365,
+    "sha256": "e468d8cb0bdecc8979b359026f90e51a06c49ab0f10a01a64780cde5f3351888"
+  },
+  "exactSource18Bytes": 1081388,
+  "liveCloudOriginal53Pins": 53,
+  "runtimeFileUniquePins": 132,
+  "originalTestIds": [
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged",
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject"
+  ],
+  "helperSHA256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+  "helperNames17": [
+    "command_migrate",
+    "command_begin",
+    "command_verify",
+    "open_readonly",
+    "open_write",
+    "_backup_database",
+    "_install_writer_fence_triggers",
+    "command_status",
+    "command_task",
+    "command_register_revision",
+    "command_review",
+    "command_finish",
+    "command_revalidate_success",
+    "command_record_direct_attempt",
+    "command_ready_tasks",
+    "_load_evidence",
+    "_load_direct_selection"
+  ],
+  "syntheticCountsPreserved": {
+    "PASS": 3,
+    "FAIL": 2,
+    "UNKNOWN": 1
+  },
+  "original76HistoricalStatus": "10 PASS / 66 NOT_RUN; not independently audited whole76 classification",
+  "sourceAudit": "R037 partial independence; no PRE permission",
+  "remaining": [
+    "designated970 direct final PRE",
+    "Root valid issuance",
+    "future Cloud delivery and actual dispatch within approved scope"
+  ],
+  "allExecutionsInThisTask": 0,
+  "GitDBInstallAuthPaid": 0
+}

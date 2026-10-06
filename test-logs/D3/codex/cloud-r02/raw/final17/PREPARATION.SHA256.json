@@ -1,0 +1,66 @@
+{
+  "BOUND-ACTUAL.json": {
+    "bytes": 62190,
+    "sha256": "411772680b475502e20cf74fe5c2197b6e1086568e58e49f92b6994c0b581e92"
+  },
+  "CURRENT-HANDOFF.ko.md": {
+    "bytes": 5149,
+    "sha256": "b145319cacae4f4d6203fa5b4e1747aafeb320396332062c07910d61eb4bdef0"
+  },
+  "D3-LAUNCH.draft-to-completed.diff": {
+    "bytes": 76270,
+    "sha256": "6a6d9d92b33947a34d383bb4bb8c466df9edb66951ebd523a1a80e1fab792d70"
+  },
+  "D3-LAUNCH.r02-preparation-to-completed.diff": {
+    "bytes": 82970,
+    "sha256": "681739860e535bdf5825a321d4fc4a50b124b22a68aa73bead9a2fb1e10c7c6d"
+  },
+  "D3-LAUNCH.UNISSUED.template.txt": {
+    "bytes": 71960,
+    "sha256": "88892c55145ff1e17923f206bf788003a8dd468caede8fd610fab7e5c9079730"
+  },
+  "DIRECT-APP-COMMANDS.actual.json": {
+    "bytes": 2229,
+    "sha256": "9d378d781411e5b90427cb0b0b68313362c5a3eff438db3424b59339f0797f5b"
+  },
+  "GUARD-BODY.SOURCE.py": {
+    "bytes": 71658,
+    "sha256": "8dcbf21d459d3dc10cf17905b3dd8a12830a12ca7170224a1b9b1d96f3e23516"
+  },
+  "INPUT-PINS.actual.json": {
+    "bytes": 28435,
+    "sha256": "5b8cce56bafce60470e7624bc67b9d6b3696607a4106bd00a894ddf66af57110"
+  },
+  "INPUT-REOBSERVATION.actual.json": {
+    "bytes": 987,
+    "sha256": "835d456d92dad3c182ec7c3820daeca13b297baa02653042baf7a43198eebbfe"
+  },
+  "MANIFEST.json": {
+    "bytes": 2290,
+    "sha256": "be890741b49c351b0abae705dfba177f17a9b4d79a491a23b86d95c9b9a10698"
+  },
+  "PRE-BINDING.awaiting-authority.json": {
+    "bytes": 983,
+    "sha256": "9741619e40e914dba56ea03fa191c3c1fc2bff3da83a4698ed2ce9a5efcac282"
+  },
+  "PREPARATION.ARGV-BODY.ko.md": {
+    "bytes": 3205,
+    "sha256": "3093a5c3884b0ed467fccc728fd92f0ce6a5741367e9a3a14b2a8a8e25dff808"
+  },
+  "PREPARATION.ARGV.actual.json": {
+    "bytes": 1538,
+    "sha256": "f935304dec12d1014849e7d090e0fec56ed858b3d232f376d49ff06b43d877dc"
+  },
+  "PREPARATION.COMMAND.UNISSUED.txt": {
+    "bytes": 676,
+    "sha256": "4029dd8071c19d119faa8c50644c948f148db8260305ff300d2a33f2eae229c7"
+  },
+  "PREPARATION.TOKENS.UNISSUED.json": {
+    "bytes": 133,
+    "sha256": "132d8125c51ddfa67439b49e4671d37991729e73a844180836b0f4463f6fa6c8"
+  },
+  "STATIC-CHECKS.actual.json": {
+    "bytes": 3545,
+    "sha256": "193c70cb5b0648ab5e4f13db91022a67d6c9a8af2d467eac7523cccc97e1d212"
+  }
+}

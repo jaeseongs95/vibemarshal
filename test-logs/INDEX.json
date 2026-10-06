@@ -1,0 +1,897 @@
+{
+  "repository": "https://github.com/jaeseongs95/vibemarshal",
+  "branch": "codex/vm-test-logs-20261006",
+  "originalTestCount": 76,
+  "historicalScopedSuccessCount": 13,
+  "remainingCount": 63,
+  "officialAcceptance": "NOT_OBSERVED",
+  "cloudRunsCreatedByThisChange": 0,
+  "testUnits": [
+    {
+      "id": "C3",
+      "testIds": [
+        "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_json_output_is_ascii_safe_and_round_trips_unicode",
+        "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision5_requires_typed_ancestor_inputs_and_evidence_contract",
+        "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_same_path_accepts_only_drive_and_unc_extended_namespaces"
+      ],
+      "postVerdict": "R021"
+    },
+    {
+      "id": "U2",
+      "testIds": [
+        "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_migrates_additively_from_v2_and_preserves_history",
+        "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_writer_fence_rejects_missing_and_old_contract_versions"
+      ],
+      "postVerdict": "R029"
+    },
+    {
+      "id": "C5",
+      "testIds": [
+        "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_carry_rehashes_all_evidence_files_without_freshness_contract",
+        "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_migration_backup_history_idempotence_tamper_cycle_and_readonly",
+        "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_record_direct_attempt_rejects_task_that_is_not_ready",
+        "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revalidate_success_rejects_ordinary_pending_task",
+        "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision_manifest_rejects_false_carry_and_incomplete_lineage"
+      ],
+      "postVerdict": "R034"
+    },
+    {
+      "id": "D3",
+      "testIds": [
+        "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+        "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged",
+        "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject"
+      ],
+      "postVerdict": "R040"
+    }
+  ],
+  "copiedOriginalFiles": [
+    {
+      "path": "C3/codex/cloud-r03/raw/POST.INVENTORY.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\POST.INVENTORY.json",
+      "bytes": 4737,
+      "sha256": "6cfaa96c2f694971972409c19354e73e15e295eea5ee8f8aa33db8505267ee53",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/run/execution.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\run\\execution.json",
+      "bytes": 2103,
+      "sha256": "5f4d80745d9dbff87ff290ba85162ce1b1b9b15264d41567793c5b5dcf830f8a",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/run/invocation.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\run\\invocation.json",
+      "bytes": 2072,
+      "sha256": "c6e11e33cf2b1ec2339d87b18740b67ff87b9d490c2c3c36c71161fd3907bdab",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/run/loader.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\run\\loader.json",
+      "bytes": 503,
+      "sha256": "67ca4a8570afddda8c57ecd634b9c51a45ec7b078ae38140d999722362b92b45",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/run/postflight.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\run\\postflight.json",
+      "bytes": 16405,
+      "sha256": "e183a13a0a6e9a229e54f4d08d50f3c06a408521a1f349834ecf70cd60720ec6",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/run/preflight.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\run\\preflight.json",
+      "bytes": 17871,
+      "sha256": "e88647d2815b8b923ea3b09fdf54e393789152a92afa9099d972f1799d3fd267",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/run/result.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\run\\result.json",
+      "bytes": 707,
+      "sha256": "98b90a2aaab88b697c52ce69b3f38d9027327838142bc3e4aa9cbcb31fb29989",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/run/stderr.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\run\\stderr.txt",
+      "bytes": 699,
+      "sha256": "b531e255674983caa1f3e354508296019e997e7e06bb38877ae0b1e12987bc6f",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/run/stdout.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\run\\stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/support/command-audit.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\support\\command-audit.json",
+      "bytes": 41792,
+      "sha256": "12731f1a22dd12a134bbe38c57f125e9512f260e34bd75b605816a8c19884cd9",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/support/execution-dispatch-r02.receipt.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\support\\execution-dispatch-r02.receipt.json",
+      "bytes": 756,
+      "sha256": "c00674a836c6406bc68bad4da6e5533ffde3c5b37b4c352edcbada75efe842a4",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/support/launch-freshness-r02.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\support\\launch-freshness-r02.json",
+      "bytes": 4635,
+      "sha256": "77c58e706fd50483c1b802a9e6597eca0011f060e95c1325ee52c21f14293363",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/support/module-file-pins-post-r02.command.sh",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\support\\module-file-pins-post-r02.command.sh",
+      "bytes": 4654,
+      "sha256": "c02614cef48f0894bfef4a16120ed872fd48b3fd6c8ceaa194a8c93fcae8defe",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/support/module-file-pins-post-r02.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\support\\module-file-pins-post-r02.json",
+      "bytes": 124930,
+      "sha256": "f584357eca7d1facecadda102235b2b8f0c6abf4c7874d95850956c2722958d6",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/support/outer-execution-r02.receipt.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\support\\outer-execution-r02.receipt.json",
+      "bytes": 28834,
+      "sha256": "2a854219ab28afc3d9239c998a9ada25d632a80a049827f9783712b12ed47549",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/support/outer-native-output-r02.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\support\\outer-native-output-r02.txt",
+      "bytes": 4706,
+      "sha256": "7835ec4b9574a0111006e9950247dbd82f024bb8418583dacf1231fcab3ea43e",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/raw/support/r02-native-command.sh",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\support\\r02-native-command.sh",
+      "bytes": 5399,
+      "sha256": "516646cf953649e46a1b2f2aa8ed022ef868d6a55397914da9ce3c17297e85da",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C3/codex/cloud-r03/POST-VERDICT.ko.md",
+      "source": "D:\\claude\\독립감사관\\R-021-VM-C3-FINAL-R03-POST-VERDICT.ko.md",
+      "bytes": 6566,
+      "sha256": "f0d201c01f370b2ff992d35c355a400bad1c8285f3e4f83c42b3fb3cc2a2a260",
+      "kind": "original-post-verdict"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/packet-pins/manifest.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\packet-pins\\manifest.json",
+      "bytes": 5916,
+      "sha256": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/packet-pins/SOURCE.SHA256.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\packet-pins\\SOURCE.SHA256.json",
+      "bytes": 1995,
+      "sha256": "0c1c54b6643cfb514df94cf1160a41eca46c086dce0e042254658801afcc22d2",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/POST.INVENTORY.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\POST.INVENTORY.json",
+      "bytes": 5182,
+      "sha256": "e9f3ac976a95ef6f6e7c4e8c097d6e10c66e548312d8e059078a7f0d14b03972",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/retained-pre/command-audit.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\retained-pre\\command-audit.json",
+      "bytes": 63061,
+      "sha256": "a2709b23e7d31522187ac36b9c6eb86a89fa487e105c09252b7f9655eb7f558b",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/retained-pre/launch-pre-template.reading-record.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\retained-pre\\launch-pre-template.reading-record.json",
+      "bytes": 8315,
+      "sha256": "c583843b8d16d5fbbf2e4d29d8da2e3a77e6de9db254176aa77aa73fbe0acfaf",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/retained-pre/linux-dummy/execution.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\retained-pre\\linux-dummy\\execution.json",
+      "bytes": 3592,
+      "sha256": "658bf6c6595b8238b2e37263e8678a96aaef1848e7fb176c2b24a62faab896e5",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/retained-pre/linux-dummy/result.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\retained-pre\\linux-dummy\\result.json",
+      "bytes": 26440,
+      "sha256": "55b72eeb8c452bbc84dd7f9d9eb799c4c33b4678fc816dd1682da78e889cde8d",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/retained-pre/linux-pre.stdout.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\retained-pre\\linux-pre.stdout.json",
+      "bytes": 98011,
+      "sha256": "bad4ed5ef98f679338d065308a0c51cf0e3547d5586dd8af83f099ad90cd5abb",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/retained-pre/source-materialization.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\retained-pre\\source-materialization.json",
+      "bytes": 7286,
+      "sha256": "b45bb266ddf4a9c3c559502565e8069c6477cf09878ebd2507393eb2a5e48f21",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/run-raw/execution.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\run-raw\\execution.json",
+      "bytes": 2174,
+      "sha256": "0b4a66e9e30a38d59543c7f05ca16ac335332b40201de66223a0d2a5b11efc85",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/run-raw/helper-origin.jsonl",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\run-raw\\helper-origin.jsonl",
+      "bytes": 10499,
+      "sha256": "39b6295d91e38367a90ebf25c7d2c77a0f1ae6401b7d2abd74bf264772bdeade",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/run-raw/invocation.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\run-raw\\invocation.json",
+      "bytes": 2022,
+      "sha256": "650888224261b5b85e3b2367dd9a2e0f5e3f7dc62673a4041fd841ed22d4c1f0",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/run-raw/loader.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\run-raw\\loader.json",
+      "bytes": 378,
+      "sha256": "29d02d4b221f77d9a21d23a348f81ae2db206554b14590fa7cfb8ce6dabc0f17",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/run-raw/postflight.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\run-raw\\postflight.json",
+      "bytes": 16395,
+      "sha256": "897d9eda80e166211434c634669bf502c81ee38c37c746a9b7811280f3fbdf8a",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/run-raw/preflight.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\run-raw\\preflight.json",
+      "bytes": 20316,
+      "sha256": "7e5d8da71dfbf813687b77b3e8c0f1186bc2dd0f8fafab1fa1c9b3318e4e056d",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/run-raw/result.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\run-raw\\result.json",
+      "bytes": 582,
+      "sha256": "06a539d8782d5c8a011ca4ccb750ea5d5ce96c648bb376b6f6e9db7e2c4c4116",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/run-raw/stderr.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\run-raw\\stderr.txt",
+      "bytes": 522,
+      "sha256": "3256f0e2dc8937066c507e68c2374c7a76ef7d4b8fff8432ca0a8c020c453e9a",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\run-raw\\stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/support/binding-metadata.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\support\\binding-metadata.json",
+      "bytes": 828,
+      "sha256": "0855c7e7fd56c2104a8b53e122b89b7ddc9babb52db77f327d1fe97d3d0a0430",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/support/bound-command.sh",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\support\\bound-command.sh",
+      "bytes": 6399,
+      "sha256": "beb4f505420d409790f0810d49bae66513a78e2f6e67d4ad643365afc52f2fa3",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/support/dispatch.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\support\\dispatch.json",
+      "bytes": 660,
+      "sha256": "3b6fb6db6b8907ee627c623dfe9d6b0d2a6d4f7a2c65b467459c99a556daeb81",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/support/execution-template.sh",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\support\\execution-template.sh",
+      "bytes": 6374,
+      "sha256": "a78788b8178ae667db81823515b6503cb6a8b52e251223a6418e3562ed697ad9",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/support/guard.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\support\\guard.json",
+      "bytes": 5526,
+      "sha256": "c843190be9c6cf489ce62b48ce625d0e72cbd7166799347659d698b647029f62",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/support/native-execution.stdout.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\support\\native-execution.stdout.txt",
+      "bytes": 6268,
+      "sha256": "5c58e48bab5f0e1af00061ed52cf16d8b5bd9aac385e5436ee3bb6a867de5274",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/support/native-terminal.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\support\\native-terminal.json",
+      "bytes": 82,
+      "sha256": "87a608556cc541c1142cc764c9dc5a86f98bc33833efa5e87a3c6e7f6e62eab4",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/support/outer-execution-receipt.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\support\\outer-execution-receipt.json",
+      "bytes": 43457,
+      "sha256": "740c8ea00472aeb387a3e263c87438c92b241d728561f925de9f23b979880b44",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/support/post-collector.receipt.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\support\\post-collector.receipt.json",
+      "bytes": 11526,
+      "sha256": "bcc01966a64c6b92babee01dce5b6bb5d395d959b0c06ffffef3f46a3333022e",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/raw/support/post-observation.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\support\\post-observation.json",
+      "bytes": 136566,
+      "sha256": "b1de2921d8823985be7000ec76dbcffcb4e46970198c41807dc4824edceb8b27",
+      "kind": "original-raw"
+    },
+    {
+      "path": "U2/codex/cloud-r02/POST-VERDICT.ko.md",
+      "source": "D:\\claude\\독립감사관\\R-029-VM-U2-R02-POST-VERDICT.ko.md",
+      "bytes": 7231,
+      "sha256": "ba2fe9f0129f47e1295899374b06cc951f88bd22671059b73041e7b8c28ce192",
+      "kind": "original-post-verdict"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/candidate-source/manifest.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\candidate-source\\manifest.json",
+      "bytes": 12335,
+      "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/candidate-source/SOURCE.SHA256.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\candidate-source\\SOURCE.SHA256.json",
+      "bytes": 1425,
+      "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/prior-dummy/fixture-child.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\prior-dummy\\fixture-child.json",
+      "bytes": 28686,
+      "sha256": "f97aa0543f2eea551c16f5f82837ec0c6c7f5111fb0d0cbeda102cef13e653e4",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/prior-dummy/fixture-execution.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\prior-dummy\\fixture-execution.json",
+      "bytes": 27276,
+      "sha256": "0120fb7f7145e1c0b9b51845ef2bc609cefa95963217cfbdbb980ec43490fa85",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/prior-pre/linux-pre.stdout.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\prior-pre\\linux-pre.stdout.json",
+      "bytes": 114902,
+      "sha256": "3e303efd982ac83f7ef9ac68efb75bd7f3d010ce2f69fc1084ea64057ac2a9a6",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\raw\\effect-denials.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/raw/execution.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\raw\\execution.json",
+      "bytes": 2554,
+      "sha256": "9f2c9caab54ca6fcd94e30342510d92a4eaf629da97846e2ff8ac0e870d21dc8",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/raw/helper-origin.jsonl",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\raw\\helper-origin.jsonl",
+      "bytes": 20849,
+      "sha256": "ad2efd6ded37697f0b750cd2500cd66552e0fa5332bb772f47b138a1eed49d69",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/raw/invocation.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\raw\\invocation.json",
+      "bytes": 2022,
+      "sha256": "beebfc910f592927a7add24f997c87fe8ffe8d157451326be51389a0f6bd444b",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/raw/loader.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\raw\\loader.json",
+      "bytes": 780,
+      "sha256": "c60575e98962e57f0803d7b5104124a8ac2bd948815a1a1437b958969f2d0bb4",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/raw/postflight.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\raw\\postflight.json",
+      "bytes": 16684,
+      "sha256": "e07bb57746822803ea85fa819dd49bda3f480b206ab14be73b303ae6cb4cd12f",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/raw/preflight.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\raw\\preflight.json",
+      "bytes": 23302,
+      "sha256": "fca24ff11a00d43ad859729fc50bca68c1b3ae19bec0c14289774cb03d5acef9",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/raw/result.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\raw\\result.json",
+      "bytes": 1073,
+      "sha256": "6b02e8282a8f2b1e0547042f2f36c5ec2e92123e48e638a6dcbbfe5960d1aacf",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/raw/stderr.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\raw\\stderr.txt",
+      "bytes": 1107,
+      "sha256": "e6e01d367b408ed4981ae60115c1a2fb86dd01f0ebe546d352b53aab010e87e8",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/raw/stdout.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\raw\\stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/RETURN-INVENTORY.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\RETURN-INVENTORY.json",
+      "bytes": 3741,
+      "sha256": "3499c243ded13aa3b1802790ab2ee79f6b0bfdc2202878eca3b684d87caa2477",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/support/bound-command.sh",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\support\\bound-command.sh",
+      "bytes": 9844,
+      "sha256": "aa331819aab58ad6ce745cd4ad743f4fd81562f60a17b052a52d2b5128f51d6d",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/support/command-audit.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\support\\command-audit.json",
+      "bytes": 92906,
+      "sha256": "93cec2e5fb7a27118883ad79ee3d7b7da2bb3bb46eb818d7d5633364cfebf136",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/support/launch-template.sh",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\support\\launch-template.sh",
+      "bytes": 9825,
+      "sha256": "f51c32e3c9f3a5697be6ed149224812d5798e0e681d6794a6217f881da3d2456",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/support/module-file-pins-post.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\support\\module-file-pins-post.json",
+      "bytes": 127918,
+      "sha256": "d10de4e4c1aa8a53303c7ade6816e150893f6948ee0c9cecd48d6f3ff67a8881",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/support/native-template-response.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\support\\native-template-response.json",
+      "bytes": 31277,
+      "sha256": "1470c3bde2feafb1007b715890f419521c9ee2170cb464435dccc29be13e7e86",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/support/outer-native-output.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\support\\outer-native-output.txt",
+      "bytes": 6007,
+      "sha256": "b409eb6a358ca199c20168589472b97ac90de71b0c8574ed13309f7f23b5d5b9",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/raw/support/post-readback.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\raw\\support\\post-readback.json",
+      "bytes": 26292,
+      "sha256": "4f4c49ba6eef694cebeac84f6e55a7d5f523c5549c15989922f75ebe23a0a9f4",
+      "kind": "original-raw"
+    },
+    {
+      "path": "C5/codex/cloud-r03/POST-VERDICT.ko.md",
+      "source": "D:\\claude\\독립감사관\\R-034-VM-C5-R03-POST-VERDICT.ko.md",
+      "bytes": 8293,
+      "sha256": "076ef926c45b65dde05b6a870c61576aac85be801d9a26bcb12754bf0a0a82ee",
+      "kind": "original-post-verdict"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/F/SOURCE.SHA256.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\F\\SOURCE.SHA256.json",
+      "bytes": 2850,
+      "sha256": "c54bf9ce69722a93c0880f5b7099a3a5669999e2b086661b8444e46059e1b1d7",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/BOUND-ACTUAL.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\BOUND-ACTUAL.json",
+      "bytes": 62190,
+      "sha256": "411772680b475502e20cf74fe5c2197b6e1086568e58e49f92b6994c0b581e92",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/CURRENT-HANDOFF.ko.md",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\CURRENT-HANDOFF.ko.md",
+      "bytes": 5149,
+      "sha256": "b145319cacae4f4d6203fa5b4e1747aafeb320396332062c07910d61eb4bdef0",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/D3-LAUNCH.draft-to-completed.diff",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\D3-LAUNCH.draft-to-completed.diff",
+      "bytes": 76270,
+      "sha256": "6a6d9d92b33947a34d383bb4bb8c466df9edb66951ebd523a1a80e1fab792d70",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/D3-LAUNCH.r02-preparation-to-completed.diff",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\D3-LAUNCH.r02-preparation-to-completed.diff",
+      "bytes": 82970,
+      "sha256": "681739860e535bdf5825a321d4fc4a50b124b22a68aa73bead9a2fb1e10c7c6d",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/D3-LAUNCH.UNISSUED.template.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\D3-LAUNCH.UNISSUED.template.txt",
+      "bytes": 71960,
+      "sha256": "88892c55145ff1e17923f206bf788003a8dd468caede8fd610fab7e5c9079730",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/DIRECT-APP-COMMANDS.actual.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\DIRECT-APP-COMMANDS.actual.json",
+      "bytes": 2229,
+      "sha256": "9d378d781411e5b90427cb0b0b68313362c5a3eff438db3424b59339f0797f5b",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/GUARD-BODY.SOURCE.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\GUARD-BODY.SOURCE.py",
+      "bytes": 71658,
+      "sha256": "8dcbf21d459d3dc10cf17905b3dd8a12830a12ca7170224a1b9b1d96f3e23516",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/INPUT-PINS.actual.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\INPUT-PINS.actual.json",
+      "bytes": 28435,
+      "sha256": "5b8cce56bafce60470e7624bc67b9d6b3696607a4106bd00a894ddf66af57110",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/INPUT-REOBSERVATION.actual.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\INPUT-REOBSERVATION.actual.json",
+      "bytes": 987,
+      "sha256": "835d456d92dad3c182ec7c3820daeca13b297baa02653042baf7a43198eebbfe",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/MANIFEST.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\MANIFEST.json",
+      "bytes": 2290,
+      "sha256": "be890741b49c351b0abae705dfba177f17a9b4d79a491a23b86d95c9b9a10698",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/PRE-BINDING.awaiting-authority.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\PRE-BINDING.awaiting-authority.json",
+      "bytes": 983,
+      "sha256": "9741619e40e914dba56ea03fa191c3c1fc2bff3da83a4698ed2ce9a5efcac282",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/PREPARATION.ARGV-BODY.ko.md",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\PREPARATION.ARGV-BODY.ko.md",
+      "bytes": 3205,
+      "sha256": "3093a5c3884b0ed467fccc728fd92f0ce6a5741367e9a3a14b2a8a8e25dff808",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/PREPARATION.ARGV.actual.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\PREPARATION.ARGV.actual.json",
+      "bytes": 1538,
+      "sha256": "f935304dec12d1014849e7d090e0fec56ed858b3d232f376d49ff06b43d877dc",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/PREPARATION.COMMAND.UNISSUED.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\PREPARATION.COMMAND.UNISSUED.txt",
+      "bytes": 676,
+      "sha256": "4029dd8071c19d119faa8c50644c948f148db8260305ff300d2a33f2eae229c7",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/PREPARATION.SHA256.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\PREPARATION.SHA256.json",
+      "bytes": 2254,
+      "sha256": "f35a58bec14e29365123154a105a70388ee420bf34624e9e0f65bdbb3adb88d5",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/PREPARATION.TOKENS.UNISSUED.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\PREPARATION.TOKENS.UNISSUED.json",
+      "bytes": 133,
+      "sha256": "132d8125c51ddfa67439b49e4671d37991729e73a844180836b0f4463f6fa6c8",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/final17/STATIC-CHECKS.actual.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\final17\\STATIC-CHECKS.actual.json",
+      "bytes": 3545,
+      "sha256": "193c70cb5b0648ab5e4f13db91022a67d6c9a8af2d467eac7523cccc97e1d212",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\issuance\\dispatch.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/issuance/dispatch.stdout.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\issuance\\dispatch.stdout.txt",
+      "bytes": 75932,
+      "sha256": "a7e8cc94084f2bef8613842653ff4ab5582d51a41d02fc7e5a81107ff7fae18c",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/issuance/four-token-diff.actual.patch",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\issuance\\four-token-diff.actual.patch",
+      "bytes": 530,
+      "sha256": "c9146c27be9b04aea55b916b5fa44e599082e3447b44e66defbba3c0be9a1e39",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/issuance/issued-command.actual.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\issuance\\issued-command.actual.txt",
+      "bytes": 71986,
+      "sha256": "a08585f99eb010f1d3a80d8123ab6fa9aecff41c166877e026a3d9ed89d830d8",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/issuance/issued-tokens.actual.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\issuance\\issued-tokens.actual.json",
+      "bytes": 233,
+      "sha256": "7becf8523adb0dde8c3c8364cee0c40aec604784be404a4f4903ae41df436ef3",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/issuance/prepare-execution.actual.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\issuance\\prepare-execution.actual.json",
+      "bytes": 12158,
+      "sha256": "178fc833ee46aa063ff52eaec1c93dafa9088920b6b9b23f1bb38d4c500acaf2",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/issuance/prepare-input-check.actual.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\issuance\\prepare-input-check.actual.json",
+      "bytes": 2618,
+      "sha256": "88612d990e105290764aa4ac192f17bd29d462036ba28290cfaed4ad9de65102",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\issuance\\prepare.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/issuance/prepare.stdout.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\issuance\\prepare.stdout.txt",
+      "bytes": 384,
+      "sha256": "d88b1bc3392f09e15fa20f56933187b0a7212103dc5fc16e292d6a4992e30605",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/P/manifest.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\P\\manifest.json",
+      "bytes": 13558,
+      "sha256": "ff64e328bfc51fae2c96ebb605008d7ef2fb8fde15e4b36fd6de4d205bb6a3d0",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/P/prepare-command.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\P\\prepare-command.py",
+      "bytes": 3144,
+      "sha256": "6b0eec027d07faaae75389fe11eae3c7b07bc1557b31315beaf22ec2655a7f04",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/P/runner.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\P\\runner.py",
+      "bytes": 31682,
+      "sha256": "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/P/SOURCE.SHA256.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\P\\SOURCE.SHA256.json",
+      "bytes": 2448,
+      "sha256": "3cb53a85a030f614d265d0e2ce392f26628ac5a5e0f0ff7280f5cd3b06300a3e",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\prior-pre\\linux-pre.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stdout.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\prior-pre\\linux-pre.stdout.json",
+      "bytes": 146121,
+      "sha256": "1ae5fc8936ff4604d44cea11a85b2b96f58c0b0095612d9e1e036e32c66a1a77",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/prior-pre/metadata-observer.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\prior-pre\\metadata-observer.py",
+      "bytes": 8540,
+      "sha256": "815532b37de45889d8c078357710e4b4599d9d7e84b815384251818f55e90c1e",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\runroot\\effect-denials.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/runroot/execution.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\runroot\\execution.json",
+      "bytes": 2806,
+      "sha256": "adcac33f5a9bc150cdbb6d7a50f899d996130b065323fe392e8eaab0c4ea910b",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/runroot/helper-origin.jsonl",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\runroot\\helper-origin.jsonl",
+      "bytes": 25275,
+      "sha256": "e57e640ddf4d222cca2e87cad3659a999fad25c030e944a551babdfbbc150313",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/runroot/invocation.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\runroot\\invocation.json",
+      "bytes": 2151,
+      "sha256": "2e8cbb61eb239f3cab21e9c6e37d1ef490ccea793aa12bddc9640659994a539b",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/runroot/loader.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\runroot\\loader.json",
+      "bytes": 431,
+      "sha256": "35b0d200c89c01f5200f34b6b5e8467260f7ca5f96bb558fc14060488103f7f6",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/runroot/postflight.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\runroot\\postflight.json",
+      "bytes": 16947,
+      "sha256": "443df35a1c289784e7007920ff33d1b0d09141df389f3e5be5144de918922268",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/runroot/preflight.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\runroot\\preflight.json",
+      "bytes": 30324,
+      "sha256": "b0326b6cce302e8acb206e0bf61b3c5e7841005e1067f67aee7cfbef8e95ee32",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/runroot/result.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\runroot\\result.json",
+      "bytes": 724,
+      "sha256": "054f1f113dbf50058fa16d7d4404b444a3bb5b3e38af2b795f7b4276c746c3ef",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/runroot/stderr.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\runroot\\stderr.txt",
+      "bytes": 597,
+      "sha256": "da917cdd76c7b68c953f1c5eab3a18425ec9cc691b854aeea0be69ba4ab7dfe5",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\runroot\\stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/support/module-file-pins-post.actual.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\support\\module-file-pins-post.actual.json",
+      "bytes": 120143,
+      "sha256": "080a9c0677a52b67799772985420bdb4d9613dcbdd69273504cee28a6e36383f",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/support/native-dispatch-receipt.actual.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\support\\native-dispatch-receipt.actual.json",
+      "bytes": 3968,
+      "sha256": "e769a3a4957410c981008164cb9fc6d3f249433109e57d7a8a46b424fe5b295e",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/support/raw-observation.actual.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\support\\raw-observation.actual.json",
+      "bytes": 13475,
+      "sha256": "5877329097620d3498e150bf872cdcdf86b40dab399fd6df6432d6859b962026",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/support/source-input-pins-post.actual.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\support\\source-input-pins-post.actual.json",
+      "bytes": 28805,
+      "sha256": "41e9374ae30c1064613348fcd7af93e8c5fb714cde3e5f1adc953e9a955f33dc",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/raw/zip-inventory.actual.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\raw\\zip-inventory.actual.json",
+      "bytes": 12488,
+      "sha256": "05b8054c30b261b3c2b50d28d04d5229cc6ad0a848f2c10b3380d8f16d0b6262",
+      "kind": "original-raw"
+    },
+    {
+      "path": "D3/codex/cloud-r02/POST-VERDICT.ko.md",
+      "source": "D:\\claude\\독립감사관\\R-040-VM-D3-R02-SELECTED3-POST-VERDICT.ko.md",
+      "bytes": 7567,
+      "sha256": "3f574de18a54251faaced0688a6456d304edd5947669c0d41106dc2d4cd9bdda",
+      "kind": "original-post-verdict"
+    }
+  ]
+}

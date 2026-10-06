@@ -1,0 +1,33 @@
+{
+  "precheckRequest": {
+    "cmd": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 -I -S -B -X utf8 -c 'import json,hashlib,datetime,os\nfrom pathlib import Path\nr=Path(\"/workspace/vm-d3-source-24cf-r02\");s=r/\"launch-preparation\";i=r/\"issuance\"\ndef chk(p,n,h):\n b=p.read_bytes();assert len(b)==n and hashlib.sha256(b).hexdigest()==h;return b\ntb=chk(i/\"issued-tokens.actual.json\",233,\"7becf8523adb0dde8c3c8364cee0c40aec604784be404a4f4903ae41df436ef3\")\nvalues=json.loads(tb)\nassert values=={\"__DISPATCH_PEER_ID__\":\"4724d72d-6e08-4e14-a5d4-e9c76209c778\",\"__ISSUED_UTC__\":\"2026-10-05T13:20:49.589Z\",\"__LAUNCH_NOT_AFTER_ISO__\":\"2026-10-05T13:35:49.589Z\",\"__LAUNCH_NOT_AFTER_UTC__\":\"2026-10-05T13:35:49.589Z\"}\nt=chk(s/\"D3-LAUNCH.UNISSUED.template.txt\",71960,\"88892c55145ff1e17923f206bf788003a8dd468caede8fd610fab7e5c9079730\")\nexpected=t\nfor k,v in values.items():\n assert t.count(k.encode())==1\n expected=expected.replace(k.encode(),v.encode(),1)\nactual=chk(i/\"issued-command.actual.txt\",71986,\"a08585f99eb010f1d3a80d8123ab6fa9aecff41c166877e026a3d9ed89d830d8\")\nassert actual==expected and not any(k.encode() in actual for k in values)\nseal=json.loads(chk(s/\"PREPARATION.SHA256.json\",2254,\"f35a58bec14e29365123154a105a70388ee420bf34624e9e0f65bdbb3adb88d5\"))\nfor k,v in seal.items():chk(s/k,v[\"bytes\"],v[\"sha256\"])\nchk(s/\"BOUND-ACTUAL.json\",62190,\"411772680b475502e20cf74fe5c2197b6e1086568e58e49f92b6994c0b581e92\")\nassert Path.cwd()==r/\"pre-cwd\" and not list(Path.cwd().iterdir())\nassert not os.path.lexists(\"/workspace/vm-d3-run-24cf-r02\")\nfor n in [\"dispatch.stdout.txt\",\"dispatch.stderr.txt\"]:assert not os.path.lexists(i/n)\nnow=datetime.datetime.now(datetime.timezone.utc)\nassert now<=datetime.datetime.fromisoformat(values[\"__LAUNCH_NOT_AFTER_UTC__\"])\nprint(json.dumps({\"status\":\"DATA_VERIFIED_BEFORE_SINGLE_DISPATCH\",\"utc\":now.isoformat(),\"tokens\":values,\"outputBytes\":len(actual),\"outputSHA256\":hashlib.sha256(actual).hexdigest(),\"source17PinsMatch\":True,\"cwd\":str(Path.cwd()),\"cwdEmpty\":True,\"productRootAbsent\":True,\"guardExecuted\":0}))\n'",
+    "workdir": "/workspace/vm-d3-source-24cf-r02/pre-cwd",
+    "login": false,
+    "max_output_tokens": 1500
+  },
+  "precheckResult": {
+    "chunk_id": "286a5a",
+    "wall_time_seconds": 2.0709e-05,
+    "exit_code": 0,
+    "original_token_count": 145,
+    "output": "{\"status\": \"DATA_VERIFIED_BEFORE_SINGLE_DISPATCH\", \"utc\": \"2026-10-05T13:30:27.795152+00:00\", \"tokens\": {\"__DISPATCH_PEER_ID__\": \"4724d72d-6e08-4e14-a5d4-e9c76209c778\", \"__ISSUED_UTC__\": \"2026-10-05T13:20:49.589Z\", \"__LAUNCH_NOT_AFTER_ISO__\": \"2026-10-05T13:35:49.589Z\", \"__LAUNCH_NOT_AFTER_UTC__\": \"2026-10-05T13:35:49.589Z\"}, \"outputBytes\": 71986, \"outputSHA256\": \"a08585f99eb010f1d3a80d8123ab6fa9aecff41c166877e026a3d9ed89d830d8\", \"source17PinsMatch\": true, \"cwd\": \"/workspace/vm-d3-source-24cf-r02/pre-cwd\", \"cwdEmpty\": true, \"productRootAbsent\": true, \"guardExecuted\": 0}\n"
+  },
+  "dispatchRequest": {
+    "cmd": "set -o noclobber\nexec /usr/bin/env HOME=/workspace/vm-d3-source-24cf-r02/pre-home TMPDIR=/workspace/vm-d3-source-24cf-r02/pre-tmp TMP=/workspace/vm-d3-source-24cf-r02/pre-tmp TEMP=/workspace/vm-d3-source-24cf-r02/pre-tmp /bin/bash --noprofile --norc /workspace/vm-d3-source-24cf-r02/issuance/issued-command.actual.txt > /workspace/vm-d3-source-24cf-r02/issuance/dispatch.stdout.txt 2> /workspace/vm-d3-source-24cf-r02/issuance/dispatch.stderr.txt",
+    "workdir": "/workspace/vm-d3-source-24cf-r02/pre-cwd",
+    "login": false,
+    "yield_time_ms": 1000,
+    "max_output_tokens": 1000
+  },
+  "dispatchResult": {
+    "chunk_id": "4a551f",
+    "wall_time_seconds": 0.47972882,
+    "exit_code": 0,
+    "original_token_count": 0,
+    "output": ""
+  },
+  "nativeToolCallId": null,
+  "appCommandId": null,
+  "providerExecutionId": null,
+  "outputChunkId": "4a551f"
+}
