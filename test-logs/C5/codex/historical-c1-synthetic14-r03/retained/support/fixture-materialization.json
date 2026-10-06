@@ -1,0 +1,355 @@
+{
+  "scope": "C1_FIXTURE_SOURCE_MATERIALIZATION_AST_BINDING_ONLY",
+  "utc": "2026-10-04T20:10:18.686780+00:00",
+  "fixturePacket": "/workspace/vm-c5-source-24cf-r03/c1-fixture",
+  "fixture7Pins": [
+    {
+      "path": "EXTRACTIONS.json",
+      "bytes": 2908,
+      "sha256": "1d6ffde24716ddc60bb2c9707754f47dc78d2a4f894252168361d1388dabf35f"
+    },
+    {
+      "path": "README.ko.md",
+      "bytes": 3872,
+      "sha256": "f515625c2ed314f4036f47e890c7c0933345364d18934b5b15be70829e34ce8d"
+    },
+    {
+      "path": "SOURCE-CHECKS.json",
+      "bytes": 6209,
+      "sha256": "bf824a6d16116b1044ac3f7f8a569c82841c21b94054d6d47e438434ddaf1c55"
+    },
+    {
+      "path": "SOURCE.SHA256.json",
+      "bytes": 769,
+      "sha256": "2345d41939c978a165693f4417db6944fe983fad42706466f6f986bf617d739e"
+    },
+    {
+      "path": "fixture.py",
+      "bytes": 20601,
+      "sha256": "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208"
+    },
+    {
+      "path": "frozen/runner.py",
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 12565,
+      "sha256": "15e10b1038f2ced4787e73cca5a19039132cf54b432191e3347aa394e3742b4a"
+    }
+  ],
+  "sourceFiles": 7,
+  "sourceBytes": 76328,
+  "carrier": {
+    "bytes": 30845,
+    "sha256": "c213beaa39e3596b269c590cb650ffd0c0a1c8b073e9c5b7c804e2a8b112f4e8"
+  },
+  "ZIP": {
+    "bytes": 23133,
+    "sha256": "1f1522a62dcaf93e51c5a9390559e27931f4d47fe333fc9ea99e2aefb4d192ab"
+  },
+  "all6SealPinsVerified": true,
+  "safeZIPChecks": true,
+  "frozenRunnerMatchesCurrentCandidateBytes": true,
+  "candidate12Bindings": [
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/manifest.json",
+      "bytes": 12335,
+      "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+      "matches": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/ORIGINAL76-INVENTORY.json",
+      "bytes": 161539,
+      "sha256": "3d9cd9641229dd9ffeaee608737036a6dff68bf4a7039e25e8c06bb315598ecd",
+      "matches": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/ORIGINAL76-STATUS.ko.md",
+      "bytes": 24833,
+      "sha256": "f3d088714012f013989b7c82e014bcf872289268df9b3c76d879c755f0b7abf3",
+      "matches": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/README.ko.md",
+      "bytes": 3319,
+      "sha256": "7fe160ad0b983227db2502b66cec45ec423062ede9d74033d82f33745fa62503",
+      "matches": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/runner.py",
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+      "matches": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/SOURCE.DIFF.patch",
+      "bytes": 33411,
+      "sha256": "64725d1c6b008579132b645f176bdc3271ce3a1eb2e667666a6c4f711ee47004",
+      "matches": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/SOURCE.SHA256.json",
+      "bytes": 1425,
+      "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d",
+      "matches": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/STATIC-CHECKS.json",
+      "bytes": 2616,
+      "sha256": "651170804bd7537f4c1cced2075b54863e7b785b5baa0b36a575f7706b415d4c",
+      "matches": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/transport.zip",
+      "bytes": 152636,
+      "sha256": "14a320ac9c1ebb8c6716c591b1d5f3eeed2523d0e4d6b7bcce3f39c810007850",
+      "matches": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "matches": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "matches": true
+    },
+    {
+      "path": "/workspace/vm-c5-source-24cf-r03/packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "matches": true
+    }
+  ],
+  "EXTRACTIONSActualCatalog": {
+    "utc": {
+      "lines": [
+        [
+          28,
+          29
+        ]
+      ],
+      "ast_sha256": "1c7025ddba5ff6b1c91a7497865330afffc3337b1deee94b06d4e8671d8da3bd"
+    },
+    "save": {
+      "lines": [
+        [
+          36,
+          39
+        ]
+      ],
+      "ast_sha256": "224254bbba2f854c089ce2672be747c4721c34cbde51a29c824a9b1293c33753"
+    },
+    "effect_denial_counts": {
+      "lines": [
+        [
+          170,
+          173
+        ]
+      ],
+      "ast_sha256": "e99ad7773441fb1db716e0d68061fa881af5a6b79ff35f8db42ced83e3ab166f"
+    },
+    "observe_effect_denials": {
+      "lines": [
+        [
+          176,
+          215
+        ]
+      ],
+      "ast_sha256": "5a88cc2c467c0ee9478fed55fa379e1e993bdb7309642e915c0943bea930b9cb"
+    },
+    "residual_files": {
+      "lines": [
+        [
+          381,
+          394
+        ]
+      ],
+      "ast_sha256": "c2f710927db558620efd0cb64664ae2e4a5e442e15e0c18d398bd438cd69156a"
+    },
+    "guard_factory": {
+      "lines": [
+        [
+          232,
+          232
+        ],
+        [
+          233,
+          233
+        ],
+        [
+          234,
+          240
+        ],
+        [
+          242,
+          258
+        ],
+        [
+          260,
+          282
+        ]
+      ],
+      "ast_sha256": "3a24dbb4b22602383df34171494799a2d377ddc871e4cebd2bac3f90a4c34bcf"
+    },
+    "finish_synthetic": {
+      "lines": [
+        [
+          343,
+          351
+        ],
+        [
+          352,
+          354
+        ],
+        [
+          355,
+          355
+        ],
+        [
+          356,
+          356
+        ],
+        [
+          357,
+          358
+        ],
+        [
+          360,
+          360
+        ],
+        [
+          361,
+          365
+        ],
+        [
+          366,
+          367
+        ],
+        [
+          368,
+          368
+        ],
+        [
+          369,
+          374
+        ],
+        [
+          375,
+          376
+        ],
+        [
+          377,
+          377
+        ]
+      ],
+      "ast_sha256": "5832f9baa3fa6cfeb32c9bda4a722eedcb21d938453fa0ee2e8f60a76f01d95e"
+    },
+    "parent_acceptance": {
+      "lines": [
+        [
+          446,
+          446
+        ],
+        [
+          447,
+          447
+        ],
+        [
+          448,
+          452
+        ],
+        [
+          453,
+          454
+        ],
+        [
+          455,
+          455
+        ],
+        [
+          456,
+          486
+        ],
+        [
+          487,
+          487
+        ],
+        [
+          488,
+          488
+        ],
+        [
+          489,
+          490
+        ],
+        [
+          491,
+          494
+        ],
+        [
+          495,
+          499
+        ],
+        [
+          500,
+          507
+        ],
+        [
+          508,
+          519
+        ],
+        [
+          521,
+          521
+        ]
+      ],
+      "ast_sha256": "a2109abcf30bb6425ccd000eda9cbb449d9c53b78d7754af07590fa2cce93df9"
+    },
+    "capture_child_error": {
+      "lines": [
+        [
+          549,
+          564
+        ],
+        [
+          565,
+          565
+        ]
+      ],
+      "ast_sha256": "32acabb0bfb6b57bc08dbea8c5462a45b0d042a8138a5d6e47fcb02419644ac0"
+    },
+    "_selected_module": {
+      "ast_sha256": "1df96f4236055a441ee9b2b0195cd2b4b5d8b12161f5d9c251aea2be04c583c2"
+    }
+  },
+  "EXTRACTIONSBindingsMatch": true,
+  "ASTOnlyNoSelectedDefinitionsExecuted": true,
+  "requiredCaseNames": [
+    "normal_zero",
+    "caught_denial",
+    "uncaught_denial",
+    "init_io",
+    "write_io",
+    "flush_io",
+    "close_io",
+    "journal_missing",
+    "journal_partial",
+    "journal_corrupt",
+    "count_mismatch",
+    "pid_mismatch",
+    "post_counter_mismatch",
+    "bool_counter"
+  ],
+  "fixtureInvocations": 0,
+  "productImportsLoadersTests": 0,
+  "dummyRunCreated": false,
+  "futureProductRunCreated": false,
+  "nativeCommandId": null,
+  "providerNativeId": null
+}

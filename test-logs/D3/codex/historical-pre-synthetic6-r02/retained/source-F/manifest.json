@@ -1,0 +1,209 @@
+{
+  "schema": "vm-d3-c1-delta-preparation-r02-01",
+  "state": "SOURCE_PREPARATION_NOT_RUN",
+  "fixture": {
+    "bytes": 21705,
+    "sha256": "6289a2637f2f33ecd493cf6d8a47270e21c91e69c95f0ee5ce4f8b9920c67757"
+  },
+  "frozen_runner": {
+    "bytes": 31682,
+    "sha256": "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb"
+  },
+  "frozen_candidate_directory": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02",
+  "dummy_test_ids": [
+    "c1_d3_delta.synthetic_shape.0",
+    "c1_d3_delta.synthetic_shape.1",
+    "c1_d3_delta.synthetic_shape.2"
+  ],
+  "required_cases": [
+    {
+      "name": "d3_allowed_imports_shape3",
+      "events": [
+        "test_flowmarshal_direct_selection",
+        "test_flowmarshal_implementation_workflow"
+      ],
+      "synthetic_tests_run": 3,
+      "journal_fault": null,
+      "acceptance": "PASS",
+      "denial_state": "CLEAR",
+      "counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "stage_return": 0,
+      "caught": null,
+      "why": "changed exact D and M import predicate + new shape3 positive; synthetic audit events only",
+      "closure_action": null
+    },
+    {
+      "name": "d3_undeclared_import_caught_shape3",
+      "events": [
+        "test_flowmarshal_direct_selection.delta_not_authorized"
+      ],
+      "synthetic_tests_run": 3,
+      "journal_fault": null,
+      "acceptance": "FAIL",
+      "denial_state": "DENIED",
+      "counters": {
+        "count": 1,
+        "logging_errors": 0
+      },
+      "stage_return": 1,
+      "caught": {
+        "type": "RuntimeError",
+        "message": "C5 non-stdlib import: test_flowmarshal_direct_selection.delta_not_authorized"
+      },
+      "why": "same D prefix outside the exact pair must be denied even with successful synthetic shape3",
+      "closure_action": null
+    },
+    {
+      "name": "d3_legacy_shape5_rejected",
+      "events": [],
+      "synthetic_tests_run": 5,
+      "journal_fault": null,
+      "acceptance": "FAIL",
+      "denial_state": "CLEAR",
+      "counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "stage_return": 1,
+      "caught": null,
+      "why": "changed finish/parent must reject old count5; success flag and synthetic ID3 cannot hide mismatch",
+      "closure_action": null
+    },
+    {
+      "name": "d3_shape3_missing_journal_unknown",
+      "events": [],
+      "synthetic_tests_run": 3,
+      "journal_fault": "missing",
+      "acceptance": "UNKNOWN",
+      "denial_state": "UNKNOWN",
+      "counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "stage_return": 0,
+      "caught": null,
+      "why": "new shape3 does not establish clearance when required denial evidence is unavailable; preserve renamed journal",
+      "closure_action": null
+    },
+    {
+      "name": "d3_closure_declared_pair",
+      "events": [],
+      "synthetic_tests_run": 3,
+      "journal_fault": null,
+      "acceptance": "PASS",
+      "denial_state": "CLEAR",
+      "counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "stage_return": 0,
+      "caught": null,
+      "closure_action": "declared_pair",
+      "why": "exact actual closure permits only synthetic declared D/M names or rejects undeclared nonstdlib; no product import"
+    },
+    {
+      "name": "d3_closure_undeclared_module",
+      "events": [],
+      "synthetic_tests_run": 3,
+      "journal_fault": null,
+      "acceptance": "PASS",
+      "denial_state": "CLEAR",
+      "counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "stage_return": 0,
+      "caught": null,
+      "closure_action": "undeclared_probe",
+      "why": "exact actual closure permits only synthetic declared D/M names or rejects undeclared nonstdlib; no product import"
+    }
+  ],
+  "exact_extraction_catalog": "EXTRACTIONS.json",
+  "exact_comparison": "EXTRACTION-DELTA.json",
+  "prior_support": "PRIOR14-SUPPORT.json",
+  "future_execution": {
+    "actor": "existing Cloud only after Root/same970 new review; this artifact issues no permission",
+    "runtime": "Linux Python3.12 -I -S -B -X utf8; stdlib; no install/fallback",
+    "owned_child_count": 1,
+    "retry": 0,
+    "budget_seconds": 30,
+    "budget_scope": "deadline starts supervisor entry; only owned child wait/kill/reap shares 30s; OS/file I/O can exceed deadline, no hardwall guarantee",
+    "case_count": 6,
+    "selected_risk_group": "C1 changed import/count protocol4 + closure exact admission/denial2",
+    "synthetic_event": "sys.audit(import, fixed name, None, (), (), ()) only; no __import__/importlib/product loader",
+    "only_process_effect": "supervisor Popen of this fixture and timeout owned kill/reap; child launches0",
+    "native_exit": "one actual child native exit; per-case wrapper stage_return is not native exit",
+    "result_scope": "synthetic fixture MATCH/NOT_ACCEPTED; per-case synthetic acceptance PASS/FAIL/UNKNOWN is never product PASS",
+    "roots": "fresh owned absolute outside packet cwd/home/tmp/cases; no existing cleanup",
+    "fault": "one missing new journal by .before-fault rename; owned postflight original preserved before replacement",
+    "definitions": "exact r02 ten AST groups including actual closure; generated wrappers only; frozen full module never imported/executed",
+    "bindings": "MODULE=D/FIXTURE_MODULE=M strings from actual r02; exact actual closure now overrides runtime_files in extracted namespace. Child installs only synthetic ModuleType pair with owned FROZEN path, removes owned probe and pair. No actual D/M import/loader identity proof.",
+    "excluded": [
+      "original14 full rerun",
+      "original10/product3",
+      "SQLite",
+      "network/provider/Git/install/global-settings",
+      "official ledger",
+      "qualification",
+      "Goal/Windows/F6",
+      "native unhandled process exit"
+    ],
+    "argv_unissued": [
+      "python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-X",
+      "utf8",
+      "<packet>/fixture.py",
+      "--run-root",
+      "<freshRoot>",
+      "--fixture-sha256",
+      "6289a2637f2f33ecd493cf6d8a47270e21c91e69c95f0ee5ce4f8b9920c67757",
+      "--manifest-sha256",
+      "<externalPin>",
+      "--seal-sha256",
+      "<externalPin>"
+    ]
+  },
+  "original_D3_preparation_unchanged": {
+    "prepare-command.py": {
+      "bytes": 3144,
+      "sha256": "6b0eec027d07faaae75389fe11eae3c7b07bc1557b31315beaf22ec2655a7f04"
+    },
+    "launch_draft": {
+      "bytes": 4164,
+      "sha256": "eb00c1b8a7a7f9779aca4c9a361234c4b28859e390f9e451a41fed608ecfd9e6"
+    },
+    "window_seconds": 900,
+    "exact_issued_token_count": 4,
+    "issuance": "UNISSUED",
+    "PRE": "NOT_RUN"
+  },
+  "current_product_status": "Root count10 PASS/66 NOT_RUN unchanged; no new product observation",
+  "closure_delta": "CLOSURE-DELTA.json",
+  "C1_9_exact_reuse": "C1-9-EXACT-REUSE.json",
+  "current_verdict": {
+    "R036": {
+      "bytes": 4756,
+      "sha256": "9841eb25a47237afd4ba437df8262a12fc5856fcf8549a9ef9f4e9ccd2c7128a"
+    },
+    "state": "R035_SOURCE_PASS_WITHDRAWN; new r02 SOURCE/fixture/PRE NOT_RUN"
+  },
+  "source_reference_inventory": "SOURCE-CONSTANT-USAGES.json",
+  "old_r01_preparation": {
+    "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\d3-c1-ast-preparation-r01-01",
+    "scope": "historical 0aba source-only preparation, no execution",
+    "fixture": {
+      "bytes": 18330,
+      "sha256": "43d3525bc0ca843a42e9f3a75d13f97d83540f9c8d4dcf78cadd092bf911d7b4"
+    },
+    "seal": {
+      "bytes": 2156,
+      "sha256": "f0b61c37eb5701bd9170b7dd7ff9ce8a6ea20402682659f9d107393d55b39396"
+    }
+  }
+}

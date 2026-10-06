@@ -1,0 +1,95 @@
+{
+  "scope": "U2_R02_STAGING_PREFLIGHT_RO",
+  "utc": "2026-10-04T17:18:45.204946+00:00",
+  "paths": {
+    "source": {
+      "path": "/workspace/vm-u2-source-24cf-r02",
+      "lexists": false,
+      "resolve": "/workspace/vm-u2-source-24cf-r02",
+      "components": [
+        {
+          "path": "/",
+          "lexists": true,
+          "symlink": false,
+          "resolve": "/"
+        },
+        {
+          "path": "/workspace",
+          "lexists": true,
+          "symlink": false,
+          "resolve": "/workspace"
+        },
+        {
+          "path": "/workspace/vm-u2-source-24cf-r02",
+          "lexists": false,
+          "symlink": false,
+          "resolve": "/workspace/vm-u2-source-24cf-r02"
+        }
+      ],
+      "canonicalUpperFM": false,
+      "uriAmbiguousCharactersPresent": false,
+      "overlapOwned": []
+    },
+    "futureRun": {
+      "path": "/workspace/vm-u2-run-24cf-r02",
+      "lexists": false,
+      "resolve": "/workspace/vm-u2-run-24cf-r02",
+      "components": [
+        {
+          "path": "/",
+          "lexists": true,
+          "symlink": false,
+          "resolve": "/"
+        },
+        {
+          "path": "/workspace",
+          "lexists": true,
+          "symlink": false,
+          "resolve": "/workspace"
+        },
+        {
+          "path": "/workspace/vm-u2-run-24cf-r02",
+          "lexists": false,
+          "symlink": false,
+          "resolve": "/workspace/vm-u2-run-24cf-r02"
+        }
+      ],
+      "canonicalUpperFM": false,
+      "uriAmbiguousCharactersPresent": false,
+      "overlapOwned": []
+    }
+  },
+  "checks": {
+    "bothAbsent": true,
+    "bothCanonical": true,
+    "ancestorsNoSymlinks": true,
+    "noFM": true,
+    "noURIAmbiguity": true,
+    "noOwnedOverlap": true,
+    "sourceRunNonOverlap": true,
+    "parentWritable": true,
+    "exePinMatch": true
+  },
+  "executable": {
+    "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "bytes": 30894944,
+    "sha256": "fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7"
+  },
+  "workspaceInstructions": [
+    {
+      "path": "/AGENTS.md",
+      "exists": false
+    },
+    {
+      "path": "/workspace/AGENTS.md",
+      "exists": false
+    }
+  ],
+  "agentsSkillFiles": [],
+  "externalJobs": "UNKNOWN",
+  "priorUnreadableProcesses": 7,
+  "OSContainment": "UNKNOWN",
+  "productExecution": 0,
+  "writes": 0
+}

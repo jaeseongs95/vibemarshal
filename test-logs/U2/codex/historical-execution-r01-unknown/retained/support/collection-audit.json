@@ -1,0 +1,48 @@
+{
+  "scope": "U2_POST_SUPPORTING_COMMANDS_ONLY",
+  "nativeToolId": null,
+  "nativeIdNote": "tool results provide output chunk_id, not native command ID; parent official record binding remains separate",
+  "templateReadRequest": {
+    "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+    "reference": "library-file:fde1_bGliZmlsZV9IZXE5NW1relNKZmM4T0E4MVI0Z0xR_FileDrive_db4d605f7b6c8191aedb5f11c15c0007"
+  },
+  "templateReadCalls": 1,
+  "templateMetadataVerified": true,
+  "exactTemplateBytes": 5853,
+  "exactTemplateSha256": "876e85101ff682c2a5bf3d56436718ad8670b1333fbe07e8087241ca8158b46f",
+  "filledTokens": {
+    "__ISSUED_UTC__": "2026-10-04T16:22:56Z",
+    "__LAUNCH_NOT_AFTER_ISO__": "2026-10-04T16:24:56+00:00",
+    "__LAUNCH_NOT_AFTER_UTC__": "2026-10-04T16:24:56.000Z",
+    "__DISPATCH_PEER_ID__": "e63798e7-5076-446b-9a6e-4df59f5793db"
+  },
+  "postRootCreation": {
+    "chunk_id": "dd4959",
+    "wall_time_seconds": 0.000028354,
+    "exit_code": 0,
+    "original_token_count": 15,
+    "output": "/workspace/vm-u2-source-24cf-r01/evidence/u2-post-e637-r01\n"
+  },
+  "collector": {
+    "command": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 -I -S -B -X utf8 /workspace/vm-u2-source-24cf-r01/evidence/u2-post-e637-r01/post-collector.py",
+    "cwd": "/workspace/vm-u2-source-24cf-r01/pre-cwd",
+    "login": false,
+    "result": {
+      "chunk_id": "ea85b6",
+      "wall_time_seconds": 0.000042741,
+      "exit_code": 0,
+      "original_token_count": 359,
+      "output": "{\n  \"artifact\": {\n    \"path\": \"/workspace/vm-u2-source-24cf-r01/evidence/u2-post-e637-r01/post-observation.json\",\n    \"bytes\": 13937,\n    \"sha256\": \"821a44d8587a2871f015842870075056fa6aff6bcda8e4e0d3d42c1ca6f7bb6f\"\n  },\n  \"status\": \"UNKNOWN\",\n  \"exit\": 2,\n  \"loaderCount\": 2,\n  \"loaderErrors\": [],\n  \"testsRun\": null,\n  \"resultArrays\": {\n    \"failures\": null,\n    \"errors\": null,\n    \"skipped\": null,\n    \"expectedFailures\": null,\n    \"unexpectedSuccesses\": null\n  },\n  \"source5Unchanged\": true,\n  \"missingRawFiles\": [\n    \"preflight.json\",\n    \"result.json\",\n    \"postflight.json\"\n  ],\n  \"childError\": {\n    \"utc\": \"2026-10-04T16:23:38.820199+00:00\",\n    \"status\": \"ERROR\",\n    \"traceback\": \"Traceback (most recent call last):\\n  File \\\"/workspace/vm-u2-source-24cf-r01/packet/runner.py\\\", line 319, in main\\n    return child(args, Path(args.run_root)) if args.child else supervise(args)\\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\\n  File \\\"/workspace/vm-u2-source-24cf-r01/packet/runner.py\\\", line 168, in child\\n    raise RuntimeError(\\\"helper code origin mismatch\\\")\\nRuntimeError: helper code origin mismatch\\n\"\n  },\n  \"moduleMappingErrors\": [\n    {\n      \"file\": \"preflight.json\",\n      \"field\": \"module_files\",\n      \"status\": \"UNKNOWN_MAPPING_ABSENT\"\n    },\n    {\n      \"file\": \"postflight.json\",\n      \"field\": \"module_files_after\",\n      \"status\": \"UNKNOWN_MAPPING_ABSENT\"\n    }\n  ],\n  \"stdlibPREReadbackMismatches\": []\n}\n"
+    }
+  },
+  "runnerStaticReadResult": {
+    "chunk_id": "75e6f8",
+    "wall_time_seconds": 0.000021591,
+    "exit_code": 0,
+    "original_token_count": 206,
+    "output": "154:    origins = {\n159:    if list(origins.values()) != [str(PACKET / name) for name in SOURCE_PATHS]:\n160:        raise RuntimeError(\"source origins mismatch: \" + repr(origins))\n163:        if Path(method.__func__.__code__.co_filename).resolve() != Path(origins[\"test\"]):\n167:        if Path(getattr(module.impl, name).__code__.co_filename).resolve() != Path(origins[\"helper\"]):\n168:            raise RuntimeError(\"helper code origin mismatch\")\n169:    save(root / \"preflight.json\", {\n173:        \"origins\": origins, \"module_files\": closure(), \"inputs_before\": before,\n178:    result = unittest.TextTestRunner(stream=sys.stderr, verbosity=2).run(suite)\n193:    save(root / \"result.json\", data)\n195:    save(root / \"postflight.json\", {\n197:        \"module_files_after\": closure(),\n268:    raw_path = root / \"result.json\"\n"
+  },
+  "archiveNote": "*.exact.sh and native-execution.exact.output.txt contain exact bytes recovered programmatically from native structuredContent and execution receipt; newline-normalized intermediate patch copies are excluded",
+  "runnerInvocations": 1,
+  "retries": 0
+}

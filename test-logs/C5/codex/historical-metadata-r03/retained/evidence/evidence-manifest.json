@@ -1,0 +1,172 @@
+{
+  "scope": "C5_R03_PREPARATION_RAW_ONLY_NOT_PRODUCT_PASS_OR_GO",
+  "utc": "2026-10-04T19:50:42.653111+00:00",
+  "sourceRoot": "/workspace/vm-c5-source-24cf-r03",
+  "productStatus": "NOT_RUN",
+  "dummyCalls": 0,
+  "sourceFileCount": 11,
+  "sourceBytes": 866064,
+  "localFiles": [
+    {
+      "path": "carrier.base64.txt",
+      "bytes": 203517,
+      "sha256": "0693bac5e36a7adc9794f69219ef25f31c1fdfee3ce377651ae2cea8ff285bda",
+      "includedInReturn": false
+    },
+    {
+      "path": "evidence/command-audit.json",
+      "bytes": 42945,
+      "sha256": "9bb81903e6067b8b73f43000ccfb31e5acdccf8299570f8836523b28e7738b4e",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/linux-pre-command.sh",
+      "bytes": 9631,
+      "sha256": "1777afc9d28b611b11af2026fc8cbf71e45a498fed23b04936a872e1f47deb9a",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/linux-pre.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/linux-pre.stdout.json",
+      "bytes": 114902,
+      "sha256": "3e303efd982ac83f7ef9ac68efb75bd7f3d010ce2f69fc1084ea64057ac2a9a6",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/materialization.stdout.json",
+      "bytes": 6106,
+      "sha256": "887d5424b9684569a800ca6f39e536ef1bd89f536a64c2915193cb3221d96a67",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/native-page-response.json",
+      "bytes": 407799,
+      "sha256": "7b4ff6ad40bcea17c64b309bdfea0d096885b51f3a0508fa5567f0cd08d35591",
+      "includedInReturn": false
+    },
+    {
+      "path": "evidence/preflight-command.sh",
+      "bytes": 2231,
+      "sha256": "956e507bf2b4551c3d6a8b5fbf9ccca1afd90e45b469071438dc46aade8f417a",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/preflight-root.stdout.json",
+      "bytes": 2288,
+      "sha256": "56e31ed64867a8cff23de45089e710e6155e5d0315e939ab687f9cbbd4217651",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/preparation-summary.json",
+      "bytes": 6686,
+      "sha256": "06b2071fd794d14db2a1ab89cbfc20ab96268ca94671f6668f2250268b9530c9",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/root-create.stdout.json",
+      "bytes": 189,
+      "sha256": "2f822967042d7b4835a908b8b7b0ec42e2cda0a1a7271abbe0cebbd94326a135",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/source-materialization-command.sh",
+      "bytes": 4469,
+      "sha256": "223dc8345bec38421ca41cfc14ec647bf794fa9a89b8901bc9666d7abff7af14",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/source-materialization.json",
+      "bytes": 6106,
+      "sha256": "887d5424b9684569a800ca6f39e536ef1bd89f536a64c2915193cb3221d96a67",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/transport-stream-audit.json",
+      "bytes": 587341,
+      "sha256": "fa19374bfcd11e79f874bb1e9ca27d42f4bef0078dd93b5403a8094fa993b673",
+      "includedInReturn": false
+    },
+    {
+      "path": "packet/ORIGINAL76-INVENTORY.json",
+      "bytes": 161539,
+      "sha256": "3d9cd9641229dd9ffeaee608737036a6dff68bf4a7039e25e8c06bb315598ecd",
+      "includedInReturn": true
+    },
+    {
+      "path": "packet/ORIGINAL76-STATUS.ko.md",
+      "bytes": 24833,
+      "sha256": "f3d088714012f013989b7c82e014bcf872289268df9b3c76d879c755f0b7abf3",
+      "includedInReturn": true
+    },
+    {
+      "path": "packet/README.ko.md",
+      "bytes": 3319,
+      "sha256": "7fe160ad0b983227db2502b66cec45ec423062ede9d74033d82f33745fa62503",
+      "includedInReturn": true
+    },
+    {
+      "path": "packet/SOURCE.DIFF.patch",
+      "bytes": 33411,
+      "sha256": "64725d1c6b008579132b645f176bdc3271ce3a1eb2e667666a6c4f711ee47004",
+      "includedInReturn": false
+    },
+    {
+      "path": "packet/SOURCE.SHA256.json",
+      "bytes": 1425,
+      "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d",
+      "includedInReturn": true
+    },
+    {
+      "path": "packet/STATIC-CHECKS.json",
+      "bytes": 2616,
+      "sha256": "651170804bd7537f4c1cced2075b54863e7b785b5baa0b36a575f7706b415d4c",
+      "includedInReturn": true
+    },
+    {
+      "path": "packet/manifest.json",
+      "bytes": 12335,
+      "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+      "includedInReturn": true
+    },
+    {
+      "path": "packet/pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "includedInReturn": false
+    },
+    {
+      "path": "packet/pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "includedInReturn": false
+    },
+    {
+      "path": "packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "includedInReturn": false
+    },
+    {
+      "path": "packet/runner.py",
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+      "includedInReturn": false
+    },
+    {
+      "path": "transport.zip",
+      "bytes": 152636,
+      "sha256": "14a320ac9c1ebb8c6716c591b1d5f3eeed2523d0e4d6b7bcce3f39c810007850",
+      "includedInReturn": false
+    }
+  ],
+  "retainedLocalLargeFiles": "native-page-response.json / transport-stream-audit.json / original carrier / transport.zip retained intact, hashes listed; source original carrier already held by Root. Source3 / runner / diff retained pinned; no product code executed.",
+  "nativeCommandId": null,
+  "providerNativeId": null,
+  "externalJobs": "UNKNOWN",
+  "OSContainment": "UNKNOWN"
+}

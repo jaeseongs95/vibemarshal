@@ -1,0 +1,252 @@
+{
+  "documentKind": "LOCAL_DERIVED_HISTORICAL_RECOVERY_INDEX",
+  "group": "C3",
+  "testUnit": "C3",
+  "testPurpose": "기존 C3 공통 계약·소스 materialization/PRE 증거",
+  "historicalArchiveFolder": "historical-source-r03-recovered-evidence-20261006",
+  "recoveryDate": "2026-10-06",
+  "recoveryMeaning": "Historical original bytes now locally recovered; date is not a new run date",
+  "originalRows": [
+    {
+      "sourceRow": 0,
+      "group": "C3",
+      "testUnit": "C3",
+      "testPurpose": "기존 C3 공통 계약·소스 materialization/PRE 증거",
+      "historicalArchiveFolder": "historical-source-r03-recovered-evidence-20261006",
+      "localOriginalPath": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-cloud-missing11-readback-r01\\raw\\vm-common3-source-24cf-r03\\evidence\\linux-pre-command.sh",
+      "originalCloudPath": "/workspace/vm-common3-source-24cf-r03/evidence/linux-pre-command.sh",
+      "originalHistoricalPin": {
+        "bytes": 3897,
+        "sha256": "590dd7ad2028381f3a136c0ccb2d838551341197bec3da72042b38b8f9275ecd"
+      },
+      "localOriginalPin": {
+        "bytes": 3897,
+        "sha256": "590dd7ad2028381f3a136c0ccb2d838551341197bec3da72042b38b8f9275ecd"
+      },
+      "publicRelativePath": "payload/test-logs/C3/codex/historical-source-r03-recovered-evidence-20261006/retained/evidence/linux-pre-command.sh",
+      "publicPin": {
+        "bytes": 3897,
+        "sha256": "590dd7ad2028381f3a136c0ccb2d838551341197bec3da72042b38b8f9275ecd"
+      },
+      "disposition": "PUBLIC_COPY_UNCHANGED",
+      "originMeaning": "Historical original bytes recovered locally today; no new Cloud test run",
+      "historicalMissingClaim": {
+        "manifest": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c3-r03-01/evidence-manifest.json",
+        "jsonPointer": "/evidencePins/1",
+        "pinBasis": "Historical manifest value; remote file bytes not read this request",
+        "coverage": "HISTORICAL_PIN_REMOTE_BYTES_NOT_LOCALLY_OBSERVED",
+        "currentRemoteExistence": "UNKNOWN"
+      },
+      "sourceZIPMember": "C3/linux-pre-command.sh",
+      "currentCloudROPinMatchAsReportedByRoot": true,
+      "CloudROClaimSource": "RAW11-READBACK/AVAILABILITY metadata, not this writer observing Cloud",
+      "disclosureReviewSourceRow": 0
+    },
+    {
+      "sourceRow": 1,
+      "group": "C3",
+      "testUnit": "C3",
+      "testPurpose": "기존 C3 공통 계약·소스 materialization/PRE 증거",
+      "historicalArchiveFolder": "historical-source-r03-recovered-evidence-20261006",
+      "localOriginalPath": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-cloud-missing11-readback-r01\\raw\\vm-common3-source-24cf-r03\\evidence\\native-page-response.json",
+      "originalCloudPath": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+      "originalHistoricalPin": {
+        "bytes": 312406,
+        "sha256": "3edce17441151e7801fa5542836a16612a81b4acf0a77523098c4a3caf0bdea1"
+      },
+      "localOriginalPin": {
+        "bytes": 312406,
+        "sha256": "3edce17441151e7801fa5542836a16612a81b4acf0a77523098c4a3caf0bdea1"
+      },
+      "publicRelativePath": "payload/test-logs/C3/codex/historical-source-r03-recovered-evidence-20261006/retained/evidence/native-page-response.json",
+      "publicPin": {
+        "bytes": 312406,
+        "sha256": "3edce17441151e7801fa5542836a16612a81b4acf0a77523098c4a3caf0bdea1"
+      },
+      "disposition": "PUBLIC_COPY_UNCHANGED",
+      "originMeaning": "Historical original bytes recovered locally today; no new Cloud test run",
+      "historicalMissingClaim": {
+        "manifest": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c3-r03-01/evidence-manifest.json",
+        "jsonPointer": "/evidencePins/4",
+        "pinBasis": "Historical manifest value; remote file bytes not read this request",
+        "coverage": "HISTORICAL_PIN_REMOTE_BYTES_NOT_LOCALLY_OBSERVED",
+        "currentRemoteExistence": "UNKNOWN"
+      },
+      "sourceZIPMember": "C3/native-page-response.json",
+      "currentCloudROPinMatchAsReportedByRoot": true,
+      "CloudROClaimSource": "RAW11-READBACK/AVAILABILITY metadata, not this writer observing Cloud",
+      "disclosureReviewSourceRow": 1
+    },
+    {
+      "sourceRow": 2,
+      "group": "C3",
+      "testUnit": "C3",
+      "testPurpose": "기존 C3 공통 계약·소스 materialization/PRE 증거",
+      "historicalArchiveFolder": "historical-source-r03-recovered-evidence-20261006",
+      "localOriginalPath": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-cloud-missing11-readback-r01\\raw\\vm-common3-source-24cf-r03\\evidence\\source-materialization-command.sh",
+      "originalCloudPath": "/workspace/vm-common3-source-24cf-r03/evidence/source-materialization-command.sh",
+      "originalHistoricalPin": {
+        "bytes": 3764,
+        "sha256": "1296c1b95c3ee7e7a8814024ad0997ddf6fb190cb433aed7c09f5beb5a6f1b6b"
+      },
+      "localOriginalPin": {
+        "bytes": 3764,
+        "sha256": "1296c1b95c3ee7e7a8814024ad0997ddf6fb190cb433aed7c09f5beb5a6f1b6b"
+      },
+      "publicRelativePath": "payload/test-logs/C3/codex/historical-source-r03-recovered-evidence-20261006/retained/evidence/source-materialization-command.sh",
+      "publicPin": {
+        "bytes": 3764,
+        "sha256": "1296c1b95c3ee7e7a8814024ad0997ddf6fb190cb433aed7c09f5beb5a6f1b6b"
+      },
+      "disposition": "PUBLIC_COPY_UNCHANGED",
+      "originMeaning": "Historical original bytes recovered locally today; no new Cloud test run",
+      "historicalMissingClaim": {
+        "manifest": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c3-r03-01/evidence-manifest.json",
+        "jsonPointer": "/evidencePins/5",
+        "pinBasis": "Historical manifest value; remote file bytes not read this request",
+        "coverage": "HISTORICAL_PIN_REMOTE_BYTES_NOT_LOCALLY_OBSERVED",
+        "currentRemoteExistence": "UNKNOWN"
+      },
+      "sourceZIPMember": "C3/source-materialization-command.sh",
+      "currentCloudROPinMatchAsReportedByRoot": true,
+      "CloudROClaimSource": "RAW11-READBACK/AVAILABILITY metadata, not this writer observing Cloud",
+      "disclosureReviewSourceRow": 2
+    },
+    {
+      "sourceRow": 3,
+      "group": "C3",
+      "testUnit": "C3",
+      "testPurpose": "기존 C3 공통 계약·소스 materialization/PRE 증거",
+      "historicalArchiveFolder": "historical-source-r03-recovered-evidence-20261006",
+      "localOriginalPath": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-cloud-missing11-readback-r01\\raw\\vm-common3-source-24cf-r03\\evidence\\source-materialization.stdout.txt",
+      "originalCloudPath": "/workspace/vm-common3-source-24cf-r03/evidence/source-materialization.stdout.txt",
+      "originalHistoricalPin": {
+        "bytes": 10495,
+        "sha256": "f693ab3a5e76cf23ec3ac6f736b71497117ffdc58e459e3489e5b8d8fc06e006"
+      },
+      "localOriginalPin": {
+        "bytes": 10495,
+        "sha256": "f693ab3a5e76cf23ec3ac6f736b71497117ffdc58e459e3489e5b8d8fc06e006"
+      },
+      "publicRelativePath": "payload/test-logs/C3/codex/historical-source-r03-recovered-evidence-20261006/retained/evidence/source-materialization.stdout.txt",
+      "publicPin": {
+        "bytes": 10495,
+        "sha256": "f693ab3a5e76cf23ec3ac6f736b71497117ffdc58e459e3489e5b8d8fc06e006"
+      },
+      "disposition": "PUBLIC_COPY_UNCHANGED",
+      "originMeaning": "Historical original bytes recovered locally today; no new Cloud test run",
+      "historicalMissingClaim": {
+        "manifest": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c3-r03-01/evidence-manifest.json",
+        "jsonPointer": "/evidencePins/7",
+        "pinBasis": "Historical manifest value; remote file bytes not read this request",
+        "coverage": "HISTORICAL_PIN_REMOTE_BYTES_NOT_LOCALLY_OBSERVED",
+        "currentRemoteExistence": "UNKNOWN"
+      },
+      "sourceZIPMember": "C3/source-materialization.stdout.txt",
+      "currentCloudROPinMatchAsReportedByRoot": true,
+      "CloudROClaimSource": "RAW11-READBACK/AVAILABILITY metadata, not this writer observing Cloud",
+      "disclosureReviewSourceRow": 3
+    },
+    {
+      "sourceRow": 4,
+      "group": "C3",
+      "testUnit": "C3",
+      "testPurpose": "기존 C3 공통 계약·소스 materialization/PRE 증거",
+      "historicalArchiveFolder": "historical-source-r03-recovered-evidence-20261006",
+      "localOriginalPath": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-cloud-missing11-readback-r01\\raw\\vm-common3-source-24cf-r03\\evidence\\transport-stream-audit.json",
+      "originalCloudPath": "/workspace/vm-common3-source-24cf-r03/evidence/transport-stream-audit.json",
+      "originalHistoricalPin": {
+        "bytes": 28355,
+        "sha256": "3363d4e2c4111b0f1fa5f2a2f6a6dce5f67ce79fe4c4bd7295cfe839505160d2"
+      },
+      "localOriginalPin": {
+        "bytes": 28355,
+        "sha256": "3363d4e2c4111b0f1fa5f2a2f6a6dce5f67ce79fe4c4bd7295cfe839505160d2"
+      },
+      "publicRelativePath": "payload/test-logs/C3/codex/historical-source-r03-recovered-evidence-20261006/retained/evidence/transport-stream-audit.json",
+      "publicPin": {
+        "bytes": 28355,
+        "sha256": "3363d4e2c4111b0f1fa5f2a2f6a6dce5f67ce79fe4c4bd7295cfe839505160d2"
+      },
+      "disposition": "PUBLIC_COPY_UNCHANGED",
+      "originMeaning": "Historical original bytes recovered locally today; no new Cloud test run",
+      "historicalMissingClaim": {
+        "manifest": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c3-r03-01/evidence-manifest.json",
+        "jsonPointer": "/evidencePins/8",
+        "pinBasis": "Historical manifest value; remote file bytes not read this request",
+        "coverage": "HISTORICAL_PIN_REMOTE_BYTES_NOT_LOCALLY_OBSERVED",
+        "currentRemoteExistence": "UNKNOWN"
+      },
+      "sourceZIPMember": "C3/transport-stream-audit.json",
+      "currentCloudROPinMatchAsReportedByRoot": true,
+      "CloudROClaimSource": "RAW11-READBACK/AVAILABILITY metadata, not this writer observing Cloud",
+      "disclosureReviewSourceRow": 4
+    },
+    {
+      "sourceRow": 5,
+      "group": "C3",
+      "testUnit": "C3",
+      "testPurpose": "기존 C3 공통 계약·소스 materialization/PRE 증거",
+      "historicalArchiveFolder": "historical-source-r03-recovered-evidence-20261006",
+      "localOriginalPath": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-cloud-missing11-readback-r01\\raw\\vm-common3-source-24cf-r03\\evidence\\zip-inspection.stdout.json",
+      "originalCloudPath": "/workspace/vm-common3-source-24cf-r03/evidence/zip-inspection.stdout.json",
+      "originalHistoricalPin": {
+        "bytes": 3486,
+        "sha256": "3f8dec7101d0096b08a7b11946a5db8604f1a48c095dd3312f4c1c30e0247875"
+      },
+      "localOriginalPin": {
+        "bytes": 3486,
+        "sha256": "3f8dec7101d0096b08a7b11946a5db8604f1a48c095dd3312f4c1c30e0247875"
+      },
+      "publicRelativePath": "payload/test-logs/C3/codex/historical-source-r03-recovered-evidence-20261006/retained/evidence/zip-inspection.stdout.json",
+      "publicPin": {
+        "bytes": 3486,
+        "sha256": "3f8dec7101d0096b08a7b11946a5db8604f1a48c095dd3312f4c1c30e0247875"
+      },
+      "disposition": "PUBLIC_COPY_UNCHANGED",
+      "originMeaning": "Historical original bytes recovered locally today; no new Cloud test run",
+      "historicalMissingClaim": {
+        "manifest": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c3-r03-01/evidence-manifest.json",
+        "jsonPointer": "/evidencePins/9",
+        "pinBasis": "Historical manifest value; remote file bytes not read this request",
+        "coverage": "HISTORICAL_PIN_REMOTE_BYTES_NOT_LOCALLY_OBSERVED",
+        "currentRemoteExistence": "UNKNOWN"
+      },
+      "sourceZIPMember": "C3/zip-inspection.stdout.json",
+      "currentCloudROPinMatchAsReportedByRoot": true,
+      "CloudROClaimSource": "RAW11-READBACK/AVAILABILITY metadata, not this writer observing Cloud",
+      "disclosureReviewSourceRow": 5
+    }
+  ],
+  "sharedTransportZIP": {
+    "pathFromPreparationRoot": "payload/test-logs/C3/codex/historical-source-r03-recovered-evidence-20261006/cloud-return/historical.raw11.zip",
+    "pin": {
+      "bytes": 1809756,
+      "sha256": "9937469f4a0691e7554a1f3101c20e8eb37a9e78fb5a6e9d0781b0413c82fe67"
+    },
+    "sharedUnits": [
+      "C3",
+      "U2",
+      "C5"
+    ],
+    "sharedGroups": [
+      "C3",
+      "U2r01",
+      "U2r02",
+      "C5"
+    ],
+    "storedExactlyOnce": true
+  },
+  "earlierUnrecoveredUNKNOWNMetadata": "Preserved as the fact at the earlier observation time; not rewritten",
+  "currentCloudROObservation": "Root-reported metadata only; direct local source pin readback is separate",
+  "newCloudProductPASS": null,
+  "pastRuntimeEnvironmentEquivalence": "NOT_PROVEN",
+  "CloudFinalManifestReference": "NOT_OBSERVED; carriers obtained from original upload audit instead",
+  "sourceCodeTreatment": "data only; no source import or execution",
+  "effects": {
+    "CloudCalls": 0,
+    "productExecution": 0,
+    "issuance": 0,
+    "publicPublication": 0
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "scope": "non_product_dummy",
+  "name": "init_io",
+  "pid": 5265,
+  "caught": null,
+  "outer_error_capture": true,
+  "stage_return": 2,
+  "stage_return_is_not_native_exit": true,
+  "final_counters": {
+    "count": 0,
+    "logging_errors": 1
+  },
+  "fault_observations": [
+    {
+      "operation": "init",
+      "count_before_fault": 0
+    }
+  ],
+  "routing_disabled_between_cases": true,
+  "synthetic_unittest_shape": false,
+  "actual_product_tests_or_loader": 0
+}

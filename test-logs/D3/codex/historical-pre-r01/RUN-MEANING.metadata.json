@@ -1,0 +1,20 @@
+{
+  "recordKind": "LOCAL_DERIVED_ARCHIVE_MEANING",
+  "testUnit": "D3",
+  "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+  "historicalArchiveFolder": "historical-pre-r01",
+  "currentCloudExecution": 0,
+  "actualNativeReturnClaim": "Only rows explicitly marked LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE; captures/PRE requests/local notes are not Cloud product execution returns",
+  "sourceRows": 15,
+  "publicCopyRows": 12,
+  "excludedRows": 3,
+  "historicalMeanings": [
+    "Local App extract/supporting manifest; preserve observed/truncated/null limits",
+    "Raw classifier false/UNKNOWN preserved"
+  ],
+  "fixtureIsNotProductPASS": true,
+  "priorNOTRUNUNKNOWNRetained": true,
+  "futureExecutionAuthority": null,
+  "sourceOrPreVerdictNotIssued": true,
+  "sameContentPinDoesNotMergeRunLineage": true
+}

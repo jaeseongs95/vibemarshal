@@ -1,0 +1,268 @@
+{
+  "scope": "C5_R03_PREPARATION_RAW_ONLY_NOT_PRODUCT_PASS_OR_GO",
+  "utc": "2026-10-04T19:50:42.653111+00:00",
+  "sourceRoot": "/workspace/vm-c5-source-24cf-r03",
+  "packet11AfterPRE": [
+    {
+      "path": "ORIGINAL76-INVENTORY.json",
+      "bytes": 161539,
+      "sha256": "3d9cd9641229dd9ffeaee608737036a6dff68bf4a7039e25e8c06bb315598ecd",
+      "unchanged": true
+    },
+    {
+      "path": "ORIGINAL76-STATUS.ko.md",
+      "bytes": 24833,
+      "sha256": "f3d088714012f013989b7c82e014bcf872289268df9b3c76d879c755f0b7abf3",
+      "unchanged": true
+    },
+    {
+      "path": "README.ko.md",
+      "bytes": 3319,
+      "sha256": "7fe160ad0b983227db2502b66cec45ec423062ede9d74033d82f33745fa62503",
+      "unchanged": true
+    },
+    {
+      "path": "SOURCE.DIFF.patch",
+      "bytes": 33411,
+      "sha256": "64725d1c6b008579132b645f176bdc3271ce3a1eb2e667666a6c4f711ee47004",
+      "unchanged": true
+    },
+    {
+      "path": "SOURCE.SHA256.json",
+      "bytes": 1425,
+      "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d",
+      "unchanged": true
+    },
+    {
+      "path": "STATIC-CHECKS.json",
+      "bytes": 2616,
+      "sha256": "651170804bd7537f4c1cced2075b54863e7b785b5baa0b36a575f7706b415d4c",
+      "unchanged": true
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 12335,
+      "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+      "unchanged": true
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "unchanged": true
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "unchanged": true
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "unchanged": true
+    },
+    {
+      "path": "runner.py",
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+      "unchanged": true
+    }
+  ],
+  "sourceUnchanged": true,
+  "freshPREArtifact": {
+    "bytes": 114902,
+    "sha256": "3e303efd982ac83f7ef9ac68efb75bd7f3d010ce2f69fc1084ea64057ac2a9a6"
+  },
+  "PREActualPID": 4630,
+  "PREStartedUtc": "2026-10-04T19:47:11.914809+00:00",
+  "PREObservedUtc": "2026-10-04T19:47:11.973171+00:00",
+  "productStatus": "NOT_RUN",
+  "dummyCalls": 0,
+  "SQLiteConnectsSQLProbes": 0,
+  "SQLiteActualURICapabilityBackupUDFTrigger": "UNKNOWN_NOT_RUN",
+  "futureRunRoot": "/workspace/vm-c5-run-24cf-r03",
+  "futureRunRootAbsent": true,
+  "preCwdHomeTmpEmpty": true,
+  "permissions": [
+    {
+      "path": ".",
+      "mode": "0o700",
+      "directory": true
+    },
+    {
+      "path": "carrier.base64.txt",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "pre-tmp",
+      "mode": "0o700",
+      "directory": true
+    },
+    {
+      "path": "evidence",
+      "mode": "0o700",
+      "directory": true
+    },
+    {
+      "path": "pre-cwd",
+      "mode": "0o700",
+      "directory": true
+    },
+    {
+      "path": "packet",
+      "mode": "0o700",
+      "directory": true
+    },
+    {
+      "path": "pre-home",
+      "mode": "0o700",
+      "directory": true
+    },
+    {
+      "path": "transport.zip",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "evidence/native-page-response.json",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "evidence/root-create.stdout.json",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "evidence/linux-pre.stdout.json",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "evidence/preflight-root.stdout.json",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "evidence/source-materialization.json",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "evidence/transport-stream-audit.json",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "evidence/linux-pre-command.sh",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "evidence/materialization.stdout.json",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "evidence/preflight-command.sh",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "evidence/linux-pre.stderr.txt",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "evidence/command-audit.json",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "evidence/source-materialization-command.sh",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "packet/SOURCE.SHA256.json",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "packet/runner.py",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "packet/ORIGINAL76-INVENTORY.json",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "packet/SOURCE.DIFF.patch",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "packet/pristine",
+      "mode": "0o700",
+      "directory": true
+    },
+    {
+      "path": "packet/STATIC-CHECKS.json",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "packet/ORIGINAL76-STATUS.ko.md",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "packet/manifest.json",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "packet/README.ko.md",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "packet/pristine/scripts",
+      "mode": "0o700",
+      "directory": true
+    },
+    {
+      "path": "packet/pristine/tests",
+      "mode": "0o700",
+      "directory": true
+    },
+    {
+      "path": "packet/pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "packet/pristine/scripts/flowmarshal_implementation_workflow.py",
+      "mode": "0o600",
+      "directory": false
+    },
+    {
+      "path": "packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "mode": "0o600",
+      "directory": false
+    }
+  ],
+  "nativeCommandId": null,
+  "providerNativeId": null,
+  "externalJobs": "UNKNOWN",
+  "unreadableProcesses": "UNKNOWN; old7 retained",
+  "OSContainment": "UNKNOWN",
+  "nativePeerToolAvailable": false,
+  "oldRootsModified": 0,
+  "installationNetworkProviderGitCleanup": 0
+}

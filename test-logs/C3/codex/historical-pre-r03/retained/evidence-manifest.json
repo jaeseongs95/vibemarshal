@@ -1,0 +1,137 @@
+{
+  "scope": "SOURCE_AND_LINUX_PRE_EVIDENCE_ONLY_NO_GO",
+  "utc": "2026-10-04T13:54:58.340341+00:00",
+  "root": "/workspace/vm-common3-source-24cf-r03",
+  "sourcePinReadback": [
+    {
+      "path": "README.ko.md",
+      "bytes": 3904,
+      "sha256": "4d68300671e9b6728ee4877642d7673caefbe1225faca05c9985ca2f6143ac6f"
+    },
+    {
+      "path": "SOURCE.DIFF.patch",
+      "bytes": 1729,
+      "sha256": "0628ef2c7fdefea950e93f9304d9a29f34a0879823a31266d737145c326b4160"
+    },
+    {
+      "path": "SOURCE.SHA256.json",
+      "bytes": 1146,
+      "sha256": "321ee6055812cdd7b2648bdc27f67eaac6d7fd2bcde309c8ad1d503bf988bc86"
+    },
+    {
+      "path": "STATIC-CHECKS.json",
+      "bytes": 2992,
+      "sha256": "b54634a9a471c9c8ecfa2de276a100d854fff9bdb1f818d9e7072ec87a94c9bb"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 3381,
+      "sha256": "ae0260a8fd9803cc716a8eab504e34b9bdfd919f39695e8bced5a896c116c3ad"
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+    },
+    {
+      "path": "runner.py",
+      "bytes": 15249,
+      "sha256": "457fd65598bc5cb5a87dd46abb7036bac9768db20a932053fb9670b201862136"
+    }
+  ],
+  "evidencePins": [
+    {
+      "path": "evidence/command-audit.json",
+      "bytes": 41792,
+      "sha256": "12731f1a22dd12a134bbe38c57f125e9512f260e34bd75b605816a8c19884cd9",
+      "mode": "0o600"
+    },
+    {
+      "path": "evidence/linux-pre-command.sh",
+      "bytes": 3897,
+      "sha256": "590dd7ad2028381f3a136c0ccb2d838551341197bec3da72042b38b8f9275ecd",
+      "mode": "0o600"
+    },
+    {
+      "path": "evidence/linux-pre.stdout.json",
+      "bytes": 9799,
+      "sha256": "2de9b103aaba3a77d3f087b42d816896d9cbf7a233d7d7567e2e381236431e8a",
+      "mode": "0o600"
+    },
+    {
+      "path": "evidence/materialization-initial-audit.json",
+      "bytes": 3454,
+      "sha256": "9574e70f9f40b019b809789103e6e2a24020294f49a9bdfa1650d0f945b8a000",
+      "mode": "0o600"
+    },
+    {
+      "path": "evidence/native-page-response.json",
+      "bytes": 312406,
+      "sha256": "3edce17441151e7801fa5542836a16612a81b4acf0a77523098c4a3caf0bdea1",
+      "mode": "0o600"
+    },
+    {
+      "path": "evidence/source-materialization-command.sh",
+      "bytes": 3764,
+      "sha256": "1296c1b95c3ee7e7a8814024ad0997ddf6fb190cb433aed7c09f5beb5a6f1b6b",
+      "mode": "0o600"
+    },
+    {
+      "path": "evidence/source-materialization.json",
+      "bytes": 3166,
+      "sha256": "b1b38eabdfd1b9595c3b65f8938963104358515024580c8c944fc61907379a59",
+      "mode": "0o600"
+    },
+    {
+      "path": "evidence/source-materialization.stdout.txt",
+      "bytes": 10495,
+      "sha256": "f693ab3a5e76cf23ec3ac6f736b71497117ffdc58e459e3489e5b8d8fc06e006",
+      "mode": "0o600"
+    },
+    {
+      "path": "evidence/transport-stream-audit.json",
+      "bytes": 28355,
+      "sha256": "3363d4e2c4111b0f1fa5f2a2f6a6dce5f67ce79fe4c4bd7295cfe839505160d2",
+      "mode": "0o600"
+    },
+    {
+      "path": "evidence/zip-inspection.stdout.json",
+      "bytes": 3486,
+      "sha256": "3f8dec7101d0096b08a7b11946a5db8604f1a48c095dd3312f4c1c30e0247875",
+      "mode": "0o600"
+    },
+    {
+      "path": "carrier.base64.txt",
+      "bytes": 155777,
+      "sha256": "534c71a90a36c81c69eb912f8782520bcd9e2ee8eb774d48f30e307c64fbccd4",
+      "mode": "0o600"
+    },
+    {
+      "path": "source.zip",
+      "bytes": 116830,
+      "sha256": "0763a488d0d780bfc243acc0d104c77f5128e78a8d9f04b422c496fcdfb63a7d",
+      "mode": "0o600"
+    }
+  ],
+  "nativeResponseWholeObjectSaved": true,
+  "nativeTextEqualsCarrier": true,
+  "nativeApiAttempts": 1,
+  "nativeApiRetries": 0,
+  "preCwdEmpty": true,
+  "runrootExists": false,
+  "runnerProductImportsLoadersTestsSqliteConnectsClaims": 0,
+  "installNetworkProbeGlobalWritesCleanup": 0,
+  "sourcePreVerdict": "PENDING independent review",
+  "nativeIds": null,
+  "note": "Manifest excludes itself; actual parent official call IDs may be bound independently."
+}

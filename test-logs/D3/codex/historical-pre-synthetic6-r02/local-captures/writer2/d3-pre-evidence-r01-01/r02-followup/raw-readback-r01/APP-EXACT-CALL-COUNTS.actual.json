@@ -1,0 +1,26 @@
+{
+  "scope": "Direct App completed-turn command inventory; exact metadata/fixture command repeats checked without execution",
+  "threadId": "01a0f9a1-b7f5-73a0-b34d-a7cb4e270006",
+  "turns": [
+    {
+      "id": "01a10934-d8bb-7441-9a3a-b02ebad0bf3b",
+      "status": "completed"
+    }
+  ],
+  "commandRecords": 213,
+  "exactCalls": [
+    {
+      "id": "exec-b8a942e1-a864-441a-940c-7397d2e92949",
+      "exactCommandMatches": [
+        "exec-b8a942e1-a864-441a-940c-7397d2e92949"
+      ]
+    },
+    {
+      "id": "exec-f5ae6bd5-af41-443f-a6e1-43426e708cf2",
+      "exactCommandMatches": [
+        "exec-f5ae6bd5-af41-443f-a6e1-43426e708cf2"
+      ]
+    }
+  ],
+  "limit": "Counts exact recorded commands in returned turn; not OS-wide process inventory or provider/native ID observation"
+}

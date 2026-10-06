@@ -1,0 +1,246 @@
+{
+  "scope": "U2_R02_SOURCE_MATERIALIZATION_ONLY",
+  "utc": "2026-10-04T17:21:32.891448+00:00",
+  "nativeToolId": null,
+  "packetRoot": "/workspace/vm-u2-source-24cf-r02/packet",
+  "carrier": {
+    "bytes": 177681,
+    "sha256": "11f88bc60623e74ad11855e9440411d83f8896527dc12bb956d526fb54bc3cd8"
+  },
+  "zip": {
+    "bytes": 133260,
+    "sha256": "15e9898c20210576204681b2365b0cf488c2c19cd2e45205f13e5ffb98810e68"
+  },
+  "sourceFiles": 15,
+  "sourceBytes": 724947,
+  "seal": {
+    "path": "SOURCE.SHA256.json",
+    "bytes": 1995,
+    "sha256": "0c1c54b6643cfb514df94cf1160a41eca46c086dce0e042254658801afcc22d2"
+  },
+  "all14SealPinsVerified": true,
+  "externalPins": {
+    "runner.py": {
+      "bytes": 20603,
+      "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee"
+    },
+    "manifest.json": {
+      "bytes": 5916,
+      "sha256": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af"
+    },
+    "pristine/tests/test_flowmarshal_implementation_workflow.py": {
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+    },
+    "pristine/scripts/flowmarshal_implementation_workflow.py": {
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+    },
+    "pristine/scripts/flowmarshal_orchestrator_ledger.py": {
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    },
+    "regression/check_origin.py": {
+      "bytes": 8497,
+      "sha256": "8321f2343c74a829b4e6509f0a0b2942a7808ffd81f84b45592d5fa6d0616098"
+    },
+    "regression/dummy_helper.py": {
+      "bytes": 300,
+      "sha256": "b42b7cf911d2f08cd5cf023c0b914f7d910411509c5b8d515304bce60ca9133f"
+    }
+  },
+  "inventory": [
+    {
+      "path": "README.ko.md",
+      "bytes": 7129,
+      "sha256": "42a72ef4b84fd3b285ae1aecd2cb48baede4fbd95f67f53f3c5be6c976fba855",
+      "mode": "0o600"
+    },
+    {
+      "path": "SOURCE.DIFF.patch",
+      "bytes": 7305,
+      "sha256": "01d38f4ac1b6755c41d99e5940952ac1e0e1b95029fb66706f3489657783b591",
+      "mode": "0o600"
+    },
+    {
+      "path": "SOURCE.SHA256.json",
+      "bytes": 1995,
+      "sha256": "0c1c54b6643cfb514df94cf1160a41eca46c086dce0e042254658801afcc22d2",
+      "mode": "0o600"
+    },
+    {
+      "path": "STATIC-CHECKS.json",
+      "bytes": 9390,
+      "sha256": "e00bf43810e19196eb6e2081955ce8f6768f2784c7ec72ac78ba4d0e2ef37c81",
+      "mode": "0o600"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 5916,
+      "sha256": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "mode": "0o600"
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "mode": "0o600"
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "mode": "0o600"
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "mode": "0o600"
+    },
+    {
+      "path": "regression-capture/execution.json",
+      "bytes": 2441,
+      "sha256": "857378118c39c8dd58716717a6e0d794d5d0b6b365027bfb0ac2aa2c61585ed6",
+      "mode": "0o600"
+    },
+    {
+      "path": "regression-capture/result.json",
+      "bytes": 33704,
+      "sha256": "1ce8f75eae84b5f0de00a539943c2cac577721ee27d912cf0038866b2293286f",
+      "mode": "0o600"
+    },
+    {
+      "path": "regression-capture/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    },
+    {
+      "path": "regression-capture/stdout.txt",
+      "bytes": 30485,
+      "sha256": "aeddf4a96cc87c2b67677ab27fa23e2b600f747d594ca94db341de92354da56e",
+      "mode": "0o600"
+    },
+    {
+      "path": "regression/check_origin.py",
+      "bytes": 8497,
+      "sha256": "8321f2343c74a829b4e6509f0a0b2942a7808ffd81f84b45592d5fa6d0616098",
+      "mode": "0o600"
+    },
+    {
+      "path": "regression/dummy_helper.py",
+      "bytes": 300,
+      "sha256": "b42b7cf911d2f08cd5cf023c0b914f7d910411509c5b8d515304bce60ca9133f",
+      "mode": "0o600"
+    },
+    {
+      "path": "runner.py",
+      "bytes": 20603,
+      "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "mode": "0o600"
+    }
+  ],
+  "safeZipPolicyPassed": true,
+  "zipAttributes": [
+    {
+      "path": "README.ko.md",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "SOURCE.DIFF.patch",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "SOURCE.SHA256.json",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "STATIC-CHECKS.json",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "manifest.json",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "regression-capture/execution.json",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "regression-capture/result.json",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "regression-capture/stderr.txt",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "regression-capture/stdout.txt",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "regression/check_origin.py",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "regression/dummy_helper.py",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "runner.py",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    }
+  ],
+  "original3AndExact2SameAsR01": true,
+  "testIds": [
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_migrates_additively_from_v2_and_preserves_history",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_writer_fence_rejects_missing_and_old_contract_versions"
+  ],
+  "regressionCapturePreservedUnmodified": true,
+  "futureRunRootCreated": false,
+  "productRunnerImportsLoadersTestsFixturesClaims": 0,
+  "sourceProvenance": "Root-pinned native carrier; helper70f5; Windows regression bytes preserved; no qualification claim"
+}

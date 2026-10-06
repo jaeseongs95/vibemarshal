@@ -1,0 +1,384 @@
+{
+  "schema": "vm-c1-non-product-preparation-r03-01",
+  "source_preparation_state": "NOT_RUN",
+  "fixture": {
+    "bytes": 20601,
+    "sha256": "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208"
+  },
+  "frozen_runner": {
+    "bytes": 29404,
+    "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343"
+  },
+  "frozen_candidate_directory": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03",
+  "frozen_candidate_files_preserved": {
+    "manifest.json": {
+      "bytes": 12335,
+      "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1"
+    },
+    "ORIGINAL76-INVENTORY.json": {
+      "bytes": 161539,
+      "sha256": "3d9cd9641229dd9ffeaee608737036a6dff68bf4a7039e25e8c06bb315598ecd"
+    },
+    "ORIGINAL76-STATUS.ko.md": {
+      "bytes": 24833,
+      "sha256": "f3d088714012f013989b7c82e014bcf872289268df9b3c76d879c755f0b7abf3"
+    },
+    "README.ko.md": {
+      "bytes": 3319,
+      "sha256": "7fe160ad0b983227db2502b66cec45ec423062ede9d74033d82f33745fa62503"
+    },
+    "runner.py": {
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343"
+    },
+    "SOURCE.DIFF.patch": {
+      "bytes": 33411,
+      "sha256": "64725d1c6b008579132b645f176bdc3271ce3a1eb2e667666a6c4f711ee47004"
+    },
+    "SOURCE.SHA256.json": {
+      "bytes": 1425,
+      "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d"
+    },
+    "STATIC-CHECKS.json": {
+      "bytes": 2616,
+      "sha256": "651170804bd7537f4c1cced2075b54863e7b785b5baa0b36a575f7706b415d4c"
+    },
+    "transport.zip": {
+      "bytes": 152636,
+      "sha256": "14a320ac9c1ebb8c6716c591b1d5f3eeed2523d0e4d6b7bcce3f39c810007850"
+    },
+    "pristine/scripts/flowmarshal_implementation_workflow.py": {
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+    },
+    "pristine/scripts/flowmarshal_orchestrator_ledger.py": {
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    },
+    "pristine/tests/test_flowmarshal_implementation_workflow.py": {
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+    }
+  },
+  "dummy_test_ids": [
+    "c1_non_product.synthetic_shape.0",
+    "c1_non_product.synthetic_shape.1",
+    "c1_non_product.synthetic_shape.2",
+    "c1_non_product.synthetic_shape.3",
+    "c1_non_product.synthetic_shape.4"
+  ],
+  "required_cases": [
+    {
+      "name": "normal_zero",
+      "acceptance": "PASS",
+      "denial_state": "CLEAR",
+      "final_counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "synthetic_event": false,
+      "outer_error_capture": false,
+      "native_shape_unobserved": false,
+      "state": "REQUIRED_NOT_RUN",
+      "observer_fields": {
+        "count": 0,
+        "journal_count": 0,
+        "logging_errors": 0,
+        "bytes": 0
+      }
+    },
+    {
+      "name": "caught_denial",
+      "acceptance": "FAIL",
+      "denial_state": "DENIED",
+      "final_counters": {
+        "count": 1,
+        "logging_errors": 0
+      },
+      "synthetic_event": true,
+      "outer_error_capture": false,
+      "native_shape_unobserved": false,
+      "state": "REQUIRED_NOT_RUN",
+      "observer_fields": {
+        "count": 1,
+        "journal_count": 1,
+        "logging_errors": 0
+      }
+    },
+    {
+      "name": "uncaught_denial",
+      "acceptance": "FAIL",
+      "denial_state": "DENIED",
+      "final_counters": {
+        "count": 1,
+        "logging_errors": 0
+      },
+      "synthetic_event": true,
+      "outer_error_capture": true,
+      "native_shape_unobserved": true,
+      "state": "REQUIRED_NOT_RUN",
+      "observer_fields": {
+        "count": 1,
+        "journal_count": 1,
+        "logging_errors": 0
+      }
+    },
+    {
+      "name": "init_io",
+      "acceptance": "UNKNOWN",
+      "denial_state": "UNKNOWN",
+      "final_counters": {
+        "count": 0,
+        "logging_errors": 1
+      },
+      "synthetic_event": false,
+      "outer_error_capture": true,
+      "native_shape_unobserved": true,
+      "state": "REQUIRED_NOT_RUN",
+      "io_fault": "init",
+      "observer_fields": {
+        "count": null,
+        "journal_count": null,
+        "error_type": "ValueError"
+      }
+    },
+    {
+      "name": "write_io",
+      "acceptance": "UNKNOWN",
+      "denial_state": "UNKNOWN",
+      "final_counters": {
+        "count": 1,
+        "logging_errors": 1
+      },
+      "synthetic_event": true,
+      "outer_error_capture": false,
+      "native_shape_unobserved": false,
+      "state": "REQUIRED_NOT_RUN",
+      "io_fault": "write",
+      "observer_fields": {
+        "count": 1,
+        "journal_count": 0,
+        "logging_errors": 1,
+        "error_type": "ValueError"
+      }
+    },
+    {
+      "name": "flush_io",
+      "acceptance": "UNKNOWN",
+      "denial_state": "UNKNOWN",
+      "final_counters": {
+        "count": 1,
+        "logging_errors": 1
+      },
+      "synthetic_event": true,
+      "outer_error_capture": false,
+      "native_shape_unobserved": false,
+      "state": "REQUIRED_NOT_RUN",
+      "io_fault": "flush",
+      "observer_fields": {
+        "count": 1,
+        "journal_count": 1,
+        "logging_errors": 1,
+        "error_type": "ValueError"
+      }
+    },
+    {
+      "name": "close_io",
+      "acceptance": "UNKNOWN",
+      "denial_state": "UNKNOWN",
+      "final_counters": {
+        "count": 1,
+        "logging_errors": 1
+      },
+      "synthetic_event": true,
+      "outer_error_capture": false,
+      "native_shape_unobserved": false,
+      "state": "REQUIRED_NOT_RUN",
+      "io_fault": "close",
+      "observer_fields": {
+        "count": 1,
+        "journal_count": 1,
+        "logging_errors": 0,
+        "protocol_error_type": "ValueError"
+      }
+    },
+    {
+      "name": "journal_missing",
+      "acceptance": "UNKNOWN",
+      "denial_state": "UNKNOWN",
+      "final_counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "synthetic_event": false,
+      "outer_error_capture": false,
+      "native_shape_unobserved": false,
+      "state": "REQUIRED_NOT_RUN",
+      "observer_fields": {
+        "count": null,
+        "journal_count": null,
+        "error_type": "ValueError"
+      }
+    },
+    {
+      "name": "journal_partial",
+      "acceptance": "UNKNOWN",
+      "denial_state": "UNKNOWN",
+      "final_counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "synthetic_event": false,
+      "outer_error_capture": false,
+      "native_shape_unobserved": false,
+      "state": "REQUIRED_NOT_RUN",
+      "observer_fields": {
+        "count": 0,
+        "journal_count": null,
+        "error_type": "ValueError"
+      }
+    },
+    {
+      "name": "journal_corrupt",
+      "acceptance": "UNKNOWN",
+      "denial_state": "UNKNOWN",
+      "final_counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "synthetic_event": false,
+      "outer_error_capture": false,
+      "native_shape_unobserved": false,
+      "state": "REQUIRED_NOT_RUN",
+      "observer_fields": {
+        "count": 0,
+        "journal_count": null,
+        "error_type": "JSONDecodeError"
+      }
+    },
+    {
+      "name": "count_mismatch",
+      "acceptance": "UNKNOWN",
+      "denial_state": "UNKNOWN",
+      "final_counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "synthetic_event": false,
+      "outer_error_capture": false,
+      "native_shape_unobserved": false,
+      "state": "REQUIRED_NOT_RUN",
+      "observer_fields": {
+        "count": 1,
+        "journal_count": 0,
+        "error_type": "ValueError"
+      }
+    },
+    {
+      "name": "pid_mismatch",
+      "acceptance": "UNKNOWN",
+      "denial_state": "UNKNOWN",
+      "final_counters": {
+        "count": 1,
+        "logging_errors": 0
+      },
+      "synthetic_event": true,
+      "outer_error_capture": false,
+      "native_shape_unobserved": false,
+      "state": "REQUIRED_NOT_RUN",
+      "observer_fields": {
+        "count": 1,
+        "journal_count": null,
+        "error_type": "ValueError"
+      }
+    },
+    {
+      "name": "post_counter_mismatch",
+      "acceptance": "UNKNOWN",
+      "denial_state": "UNKNOWN",
+      "final_counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "synthetic_event": false,
+      "outer_error_capture": false,
+      "native_shape_unobserved": false,
+      "state": "REQUIRED_NOT_RUN",
+      "observer_fields": {
+        "count": 0,
+        "journal_count": 0,
+        "protocol_error_type": "ValueError"
+      }
+    },
+    {
+      "name": "bool_counter",
+      "acceptance": "UNKNOWN",
+      "denial_state": "UNKNOWN",
+      "final_counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "synthetic_event": false,
+      "outer_error_capture": false,
+      "native_shape_unobserved": false,
+      "state": "REQUIRED_NOT_RUN",
+      "observer_fields": {
+        "count": null,
+        "journal_count": null,
+        "error_type": "ValueError"
+      }
+    }
+  ],
+  "extraction_catalog": "EXTRACTIONS.json",
+  "future_execution": {
+    "actor": "existing Cloud actor only, after Root cold-read and same Claude970 source acceptance/new PRE",
+    "runtime": "Linux Python3.12 -I -S -B -X utf8; stdlib only; no install/fallback",
+    "owned_child_count": 1,
+    "budget_seconds": 30,
+    "retry": 0,
+    "kill_reap": "only owned Popen, 3s reap reserve in same budget; no hardwall guarantee on OS/file IO",
+    "roots": "CreateNew absolute root outside packet; fresh cwd/home/tmp/cases; source packet read-only",
+    "argv_template": [
+      "python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-X",
+      "utf8",
+      "<absolute packet>/fixture.py",
+      "--run-root",
+      "<fresh absolute PRE root>",
+      "--fixture-sha256",
+      "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208",
+      "--manifest-sha256",
+      "<manifest pin>",
+      "--seal-sha256",
+      "<seal pin>"
+    ],
+    "only_process_effect": "supervisor owned child Popen and timeout kill/reap; no child process launch",
+    "synthetic_event": "sys.audit(os.system, fixed dummy argument) only; no actual os.system/command/network/provider/Git/SQLite/product/import/discovery",
+    "audit_scope": "one child dispatcher; current frozen audit only for current case; None between cases and no hook in parent",
+    "uncaught_case": "payload does not catch RuntimeError; outer fixture catches it via exact frozen main error-handler AST so all cases share one child. It does not reproduce an uncaught OS-process exit.",
+    "native_exit": "only actual owned child exit is native; per-case frozen finish/capture return is explicitly non-native stage_return",
+    "parent_inputs": "exact frozen parent predicate uses actual child PID/native exit/terminal/timeout and actual fixture source before/after; manifest test_ids are synthetic IDs",
+    "oracle": "required labels/denial counters/observer fields/RuntimeError/count-before-IO faults, not copied product oracle",
+    "result_scope": "fixture MATCH/NOT_ACCEPTED only; no product PASS; no Goal/qualification/Windows/F6/C5 product result",
+    "fault_ownership": "only new case journals/result/postflight; preserve original bytes by owned .before-fault rename then CreateNew fault payload; no deletion, repair, retry or existing cleanup",
+    "finalizer": "close only remaining owned fixture stream underlying handle after observations; recorded errors/counters/raw bytes are retained"
+  },
+  "extracted_without_reimplementation": {
+    "top_definitions": [
+      "utc",
+      "save",
+      "effect_denial_counts",
+      "observe_effect_denials",
+      "residual_files"
+    ],
+    "guard_factory": "child.body[5:10], exact init/deny/audit nodes; only return tuple added",
+    "finish_synthetic": "child.body[31:43] exact data/ok/native-shape/result/close/observe/postflight/return; inputs and closure bound to fixture source/runtime observers",
+    "parent_acceptance": "supervise.body[12:25]+body[26], exact raw-read/denial/post/native-shape/status/execution/return; no effect-launch/init or print node",
+    "capture_child_error": "main except.body[2:4], exact child stream close/error-json/PID/counters/return2",
+    "definitions_compile_only_now": "full frozen module never imported or executed; future exec only selected AST definitions verified by catalogue"
+  },
+  "preparation_verification": "AST/compile/hash/ZIP only; product/import/loader/dummy/Cloud execution0"
+}

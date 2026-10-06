@@ -1,0 +1,2064 @@
+{
+  "documentKind": "HistoricalTestUnitPublicationCurrent.v1",
+  "createdUTC": "2026-10-06T06:23:08.925181+00:00",
+  "testUnit": "D3",
+  "exactTestIds": [
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged",
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject"
+  ],
+  "original76Scoped13Remaining63": {
+    "original": 76,
+    "historicalScopedSuccess": 13,
+    "remaining": 63,
+    "officialAcceptance": null,
+    "newTestExecutions": 0
+  },
+  "historicalStatusMeaningKo": "PRE・synthetic・NOT_RUN・UNKNOWN은 역사적 준비/실행 기록이며 새 제품 PASS나 실행 승인으로 바꾸지 않는다.",
+  "environmentMeaning": {
+    "cloudSession": "REUSED existing Codex Cloud thread",
+    "newProductSessionCreated": false,
+    "containerIdentity": "UNKNOWN",
+    "environmentBootFreshness": "UNKNOWN",
+    "guardOwnedRunRootFreshness": "Distinct claim; not OS isolation or independent audit"
+  },
+  "currentSourceRows": [
+    {
+      "sourceRow": 215,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_R1",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/fresh-r01-native/raw/evidence/command-audit.json",
+      "originalPin": {
+        "bytes": 745468,
+        "sha256": "fc3fc19e414449d6ab6cc5dfa0c4408428f6c631eec23c938aa657a28d0dddf9"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/retained/evidence/command-audit.json",
+      "publicPin": {
+        "bytes": 745468,
+        "sha256": "fc3fc19e414449d6ab6cc5dfa0c4408428f6c631eec23c938aa657a28d0dddf9"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "EXCLUDED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 216,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_R1",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/fresh-r01-native/raw/evidence/linux-pre.stderr.txt",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/retained/evidence/linux-pre.stderr.txt",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 217,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_R1",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/fresh-r01-native/raw/evidence/linux-pre.stdout.json",
+      "originalPin": {
+        "bytes": 126095,
+        "sha256": "666843586879554740da9dc781117516536c2d6cfa80e8aa8a96cf93a37b85fa"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/retained/evidence/linux-pre.stdout.json",
+      "publicPin": {
+        "bytes": 126095,
+        "sha256": "666843586879554740da9dc781117516536c2d6cfa80e8aa8a96cf93a37b85fa"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 218,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_R1",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/fresh-r01-native/raw/evidence/native-page-response.json",
+      "originalPin": {
+        "bytes": 502654,
+        "sha256": "9391c9c68ed5a5525dd902597198adb498d7cce6191f7e144a254a54c5bfec98"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/retained/evidence/native-page-response.json",
+      "publicPin": {
+        "bytes": 502654,
+        "sha256": "9391c9c68ed5a5525dd902597198adb498d7cce6191f7e144a254a54c5bfec98"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "EXCLUDED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 219,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_R1",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/fresh-r01-native/raw/evidence/preflight.json",
+      "originalPin": {
+        "bytes": 3865,
+        "sha256": "54e79cd47b7ce4fc716ffc0a4d3b33a9c94ae11cb774a0ebbf2892f88e8bbae3"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/retained/evidence/preflight.json",
+      "publicPin": {
+        "bytes": 3865,
+        "sha256": "54e79cd47b7ce4fc716ffc0a4d3b33a9c94ae11cb774a0ebbf2892f88e8bbae3"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 220,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_R1",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/fresh-r01-native/raw/evidence/readback.json",
+      "originalPin": {
+        "bytes": 9637,
+        "sha256": "449ac1095ef4af2904d604efdb41c8d9c18d7211b085f53d5cb74684125e7501"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/retained/evidence/readback.json",
+      "publicPin": {
+        "bytes": 9637,
+        "sha256": "449ac1095ef4af2904d604efdb41c8d9c18d7211b085f53d5cb74684125e7501"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 221,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_R1",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/fresh-r01-native/raw/evidence/source-delta-receipt.json",
+      "originalPin": {
+        "bytes": 577,
+        "sha256": "1b9495b44691c8feb8713dbe1cb6d8c0a2a974f3814a4e2fe8d56956dc41311f"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/retained/evidence/source-delta-receipt.json",
+      "publicPin": {
+        "bytes": 577,
+        "sha256": "1b9495b44691c8feb8713dbe1cb6d8c0a2a974f3814a4e2fe8d56956dc41311f"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 222,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_R1",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/fresh-r01-native/raw/evidence/source-materialization.json",
+      "originalPin": {
+        "bytes": 7548,
+        "sha256": "afb1c00382b8315b5fb44604ea6cdfc6bd01c92a773f519f830ca34fd9874f8a"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/retained/evidence/source-materialization.json",
+      "publicPin": {
+        "bytes": 7548,
+        "sha256": "afb1c00382b8315b5fb44604ea6cdfc6bd01c92a773f519f830ca34fd9874f8a"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 223,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_R1",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/fresh-r01-native/raw/RETURN-INVENTORY.json",
+      "originalPin": {
+        "bytes": 5603,
+        "sha256": "430ea7a9211d025b637721daa357ce4348e365db08c297ffd455a43800ec7b2a"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/retained/RETURN-INVENTORY.json",
+      "publicPin": {
+        "bytes": 5603,
+        "sha256": "430ea7a9211d025b637721daa357ce4348e365db08c297ffd455a43800ec7b2a"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 224,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_R1",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/fresh-r01-native/raw/source/manifest.json",
+      "originalPin": {
+        "bytes": 12308,
+        "sha256": "1cc235f35e68e0426f8c020237f96ebb5b3aadbc0db90cfd36f817dda0c9dea5"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/retained/source/manifest.json",
+      "publicPin": {
+        "bytes": 12308,
+        "sha256": "1cc235f35e68e0426f8c020237f96ebb5b3aadbc0db90cfd36f817dda0c9dea5"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 225,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_R1",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/fresh-r01-native/raw/source/SOURCE.SHA256.json",
+      "originalPin": {
+        "bytes": 2446,
+        "sha256": "de7fb149f4336b2ca56a82715b88f2bd6ba306713b2789d28be0dd06cb0b10cd"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/retained/source/SOURCE.SHA256.json",
+      "publicPin": {
+        "bytes": 2446,
+        "sha256": "de7fb149f4336b2ca56a82715b88f2bd6ba306713b2789d28be0dd06cb0b10cd"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 226,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_R1",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/fresh-r01-native/return.zip",
+      "originalPin": {
+        "bytes": 902724,
+        "sha256": "f7824ec66d46a1284a363062b401c16e2723161d36457dac24fd60a5147fe714"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/cloud-return/return.original-reviewed.zip",
+      "publicPin": {
+        "bytes": 902724,
+        "sha256": "f7824ec66d46a1284a363062b401c16e2723161d36457dac24fd60a5147fe714"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_ZIP_FILTERED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": {
+        "path": "test-logs/D3/codex/historical-pre-r01/cloud-return/disclosure-filtered-return.zip",
+        "pin": {
+          "bytes": 30733,
+          "sha256": "b9c1f84a564e8ef96f549d06e3905ce234280c342444509d348cc2c1dc82d9f3"
+        },
+        "meaningKo": "인코딩 내용 검토 전 일부 멤버를 제외한 초기 가공 ZIP. 현재 검토된 원본 ZIP과 구분해 보존한다."
+      },
+      "deletion": null
+    },
+    {
+      "sourceRow": 227,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/evidence/collector-schema-failure.json",
+      "originalPin": {
+        "bytes": 14495,
+        "sha256": "f460cf59a202110b6f895c28fb50059f1d520dfd2d74f4ab36da1212fe0f1c9b"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/evidence/collector-schema-failure.json",
+      "publicPin": {
+        "bytes": 14495,
+        "sha256": "f460cf59a202110b6f895c28fb50059f1d520dfd2d74f4ab36da1212fe0f1c9b"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 228,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/evidence/command-audit.json",
+      "originalPin": {
+        "bytes": 1053050,
+        "sha256": "c42673478bb4640ea43e1fde4e2653989c5d1b9a9d56156a9cf4c180b465a004"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/evidence/command-audit.json",
+      "publicPin": {
+        "bytes": 1053050,
+        "sha256": "c42673478bb4640ea43e1fde4e2653989c5d1b9a9d56156a9cf4c180b465a004"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "EXCLUDED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 229,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/evidence/F-materialization.json",
+      "originalPin": {
+        "bytes": 13275,
+        "sha256": "f8c5d219184408ac314d89685af6c14ee25628817e8327cef6facea20f46c92c"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/evidence/F-materialization.json",
+      "publicPin": {
+        "bytes": 13275,
+        "sha256": "f8c5d219184408ac314d89685af6c14ee25628817e8327cef6facea20f46c92c"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 230,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/evidence/F-native-response.json",
+      "originalPin": {
+        "bytes": 187884,
+        "sha256": "c7de379a1d51b64c1b8d7b8bbe6dc8d515b553bc873e0e85da1f064bc52387d1"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/evidence/F-native-response.json",
+      "publicPin": {
+        "bytes": 187884,
+        "sha256": "c7de379a1d51b64c1b8d7b8bbe6dc8d515b553bc873e0e85da1f064bc52387d1"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 231,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/evidence/fixture-module-pins-post.json",
+      "originalPin": {
+        "bytes": 124639,
+        "sha256": "b2e3bf46fdc90a46a5aca723ac66915dc812a0090abdb7be8e1354e700064a22"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/evidence/fixture-module-pins-post.json",
+      "publicPin": {
+        "bytes": 124639,
+        "sha256": "b2e3bf46fdc90a46a5aca723ac66915dc812a0090abdb7be8e1354e700064a22"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 232,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/evidence/linux-pre.stderr.txt",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/evidence/linux-pre.stderr.txt",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 233,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/evidence/linux-pre.stdout.json",
+      "originalPin": {
+        "bytes": 146121,
+        "sha256": "1ae5fc8936ff4604d44cea11a85b2b96f58c0b0095612d9e1e036e32c66a1a77"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/evidence/linux-pre.stdout.json",
+      "publicPin": {
+        "bytes": 146121,
+        "sha256": "1ae5fc8936ff4604d44cea11a85b2b96f58c0b0095612d9e1e036e32c66a1a77"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stdout.json"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 234,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/evidence/metadata-observer.py",
+      "originalPin": {
+        "bytes": 8540,
+        "sha256": "815532b37de45889d8c078357710e4b4599d9d7e84b815384251818f55e90c1e"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/evidence/metadata-observer.py",
+      "publicPin": {
+        "bytes": 8540,
+        "sha256": "815532b37de45889d8c078357710e4b4599d9d7e84b815384251818f55e90c1e"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "D3/codex/cloud-r02/raw/prior-pre/metadata-observer.py"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 235,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/evidence/origin-null-additional-evidence.json",
+      "originalPin": {
+        "bytes": 3085,
+        "sha256": "c7e842ec8381b57b4fb66355b3900fe987746c9ba3a705ef13fe17aed0c3a68b"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/evidence/origin-null-additional-evidence.json",
+      "publicPin": {
+        "bytes": 3085,
+        "sha256": "c7e842ec8381b57b4fb66355b3900fe987746c9ba3a705ef13fe17aed0c3a68b"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 236,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/evidence/P-materialization.json",
+      "originalPin": {
+        "bytes": 11523,
+        "sha256": "05551156648c3faf999915a3d36c0175688aec1d040261f2dffc14ed260a938c"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/evidence/P-materialization.json",
+      "publicPin": {
+        "bytes": 11523,
+        "sha256": "05551156648c3faf999915a3d36c0175688aec1d040261f2dffc14ed260a938c"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 237,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/evidence/P-native-response.json",
+      "originalPin": {
+        "bytes": 474590,
+        "sha256": "45898000a959d21a311ead7a41ffefb89923841009c8b99ed9879c01f71528e0"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/evidence/P-native-response.json",
+      "publicPin": {
+        "bytes": 474590,
+        "sha256": "45898000a959d21a311ead7a41ffefb89923841009c8b99ed9879c01f71528e0"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 238,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/evidence/post-readback.json",
+      "originalPin": {
+        "bytes": 187751,
+        "sha256": "8ca3e9c59e468970c76e962984ae12ce29d6ba3000fd7bebdc7877875e5701c8"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/evidence/post-readback.json",
+      "publicPin": {
+        "bytes": 187751,
+        "sha256": "8ca3e9c59e468970c76e962984ae12ce29d6ba3000fd7bebdc7877875e5701c8"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 239,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/evidence/stdlib-typing.source.py",
+      "originalPin": {
+        "bytes": 118836,
+        "sha256": "be92d60fb8382bb29ead21c128825d7c96d0e8c915b44f840791e49f5a8d554c"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/evidence/stdlib-typing.source.py",
+      "publicPin": {
+        "bytes": 118836,
+        "sha256": "be92d60fb8382bb29ead21c128825d7c96d0e8c915b44f840791e49f5a8d554c"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 240,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_allowed_imports_shape3/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_allowed_imports_shape3/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 241,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_allowed_imports_shape3/execution.json",
+      "originalPin": {
+        "bytes": 7420,
+        "sha256": "edc29aaae41f527f99621ec9df76899059f5d75d7ac5b1dfb737d641d736c9aa"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_allowed_imports_shape3/execution.json",
+      "publicPin": {
+        "bytes": 7420,
+        "sha256": "edc29aaae41f527f99621ec9df76899059f5d75d7ac5b1dfb737d641d736c9aa"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 242,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_allowed_imports_shape3/fixture-observation.json",
+      "originalPin": {
+        "bytes": 589,
+        "sha256": "a4d303e01575a3978161739149205dc855bdfce27df5f6735ef39b05184dc197"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_allowed_imports_shape3/fixture-observation.json",
+      "publicPin": {
+        "bytes": 589,
+        "sha256": "a4d303e01575a3978161739149205dc855bdfce27df5f6735ef39b05184dc197"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 243,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_allowed_imports_shape3/postflight.json",
+      "originalPin": {
+        "bytes": 10959,
+        "sha256": "91a06541a8ff2f938f221ff935fb28a65f038145671d6a6afb3d59166c3f5022"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_allowed_imports_shape3/postflight.json",
+      "publicPin": {
+        "bytes": 10959,
+        "sha256": "91a06541a8ff2f938f221ff935fb28a65f038145671d6a6afb3d59166c3f5022"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 244,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_allowed_imports_shape3/result.json",
+      "originalPin": {
+        "bytes": 497,
+        "sha256": "fab4bcfa9c9b846dc3c607d8ab8177a6397c41c60aa2ef95bd4b85d08011b4f1"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_allowed_imports_shape3/result.json",
+      "publicPin": {
+        "bytes": 497,
+        "sha256": "fab4bcfa9c9b846dc3c607d8ab8177a6397c41c60aa2ef95bd4b85d08011b4f1"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 245,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_closure_declared_pair/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_closure_declared_pair/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 246,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_closure_declared_pair/execution.json",
+      "originalPin": {
+        "bytes": 7420,
+        "sha256": "56f4aba3bbfc5a1514bef977c111cae6ff81d388eee0d9e8fa4bd1fc7e489562"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_closure_declared_pair/execution.json",
+      "publicPin": {
+        "bytes": 7420,
+        "sha256": "56f4aba3bbfc5a1514bef977c111cae6ff81d388eee0d9e8fa4bd1fc7e489562"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 247,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_closure_declared_pair/fixture-observation.json",
+      "originalPin": {
+        "bytes": 721,
+        "sha256": "4dc0838905b75bb965fbd9a5f4f3c85d7e6a1c2c3083020c285392e7c6006309"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_closure_declared_pair/fixture-observation.json",
+      "publicPin": {
+        "bytes": 721,
+        "sha256": "4dc0838905b75bb965fbd9a5f4f3c85d7e6a1c2c3083020c285392e7c6006309"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 248,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_closure_declared_pair/postflight.json",
+      "originalPin": {
+        "bytes": 10959,
+        "sha256": "016e89d98217fc9b4c36d15627e74df7ccccb4e4aead23fcab348a01c8561c81"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_closure_declared_pair/postflight.json",
+      "publicPin": {
+        "bytes": 10959,
+        "sha256": "016e89d98217fc9b4c36d15627e74df7ccccb4e4aead23fcab348a01c8561c81"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 249,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_closure_declared_pair/result.json",
+      "originalPin": {
+        "bytes": 497,
+        "sha256": "13ac92557cbc73ec959c41ea4c3f5f05b5136c9100533ae0cd0a598046adc1d1"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_closure_declared_pair/result.json",
+      "publicPin": {
+        "bytes": 497,
+        "sha256": "13ac92557cbc73ec959c41ea4c3f5f05b5136c9100533ae0cd0a598046adc1d1"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 250,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_closure_undeclared_module/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_closure_undeclared_module/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 251,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_closure_undeclared_module/execution.json",
+      "originalPin": {
+        "bytes": 7420,
+        "sha256": "c66ed4b45e331b87a8e56444849026c30b275855b148c2e0cf559c07d4e25509"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_closure_undeclared_module/execution.json",
+      "publicPin": {
+        "bytes": 7420,
+        "sha256": "c66ed4b45e331b87a8e56444849026c30b275855b148c2e0cf559c07d4e25509"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 252,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_closure_undeclared_module/fixture-observation.json",
+      "originalPin": {
+        "bytes": 720,
+        "sha256": "bf38bcd48fd4e9c9423ea26a87696cc0852197f4b1890cbab99d87cb269d626e"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_closure_undeclared_module/fixture-observation.json",
+      "publicPin": {
+        "bytes": 720,
+        "sha256": "bf38bcd48fd4e9c9423ea26a87696cc0852197f4b1890cbab99d87cb269d626e"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 253,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_closure_undeclared_module/postflight.json",
+      "originalPin": {
+        "bytes": 10959,
+        "sha256": "bea60e18dc5b18c6e464f39201636e7f226dbc542c62dadbb0635c0bac2005ac"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_closure_undeclared_module/postflight.json",
+      "publicPin": {
+        "bytes": 10959,
+        "sha256": "bea60e18dc5b18c6e464f39201636e7f226dbc542c62dadbb0635c0bac2005ac"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 254,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_closure_undeclared_module/result.json",
+      "originalPin": {
+        "bytes": 497,
+        "sha256": "1c21b2d4eb6ad1bc86a9018f3a3a27022011c10c536b1f6da9b1457c55c59cb8"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_closure_undeclared_module/result.json",
+      "publicPin": {
+        "bytes": 497,
+        "sha256": "1c21b2d4eb6ad1bc86a9018f3a3a27022011c10c536b1f6da9b1457c55c59cb8"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 255,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_legacy_shape5_rejected/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_legacy_shape5_rejected/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 256,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_legacy_shape5_rejected/execution.json",
+      "originalPin": {
+        "bytes": 7420,
+        "sha256": "51f8aec303527b3131522fda3c7e5a184c2d7425b1aa4cf12563059abd65e8e7"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_legacy_shape5_rejected/execution.json",
+      "publicPin": {
+        "bytes": 7420,
+        "sha256": "51f8aec303527b3131522fda3c7e5a184c2d7425b1aa4cf12563059abd65e8e7"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 257,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_legacy_shape5_rejected/fixture-observation.json",
+      "originalPin": {
+        "bytes": 498,
+        "sha256": "3292b7a02026408234564c131131b93c56591d9b343d396cd8e1e3baadd99e65"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_legacy_shape5_rejected/fixture-observation.json",
+      "publicPin": {
+        "bytes": 498,
+        "sha256": "3292b7a02026408234564c131131b93c56591d9b343d396cd8e1e3baadd99e65"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 258,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_legacy_shape5_rejected/postflight.json",
+      "originalPin": {
+        "bytes": 10959,
+        "sha256": "cdd6e8dabe22348f35eb1f13e5e4b9b3d1618e689b8561e4d8d2424ad54aa2cf"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_legacy_shape5_rejected/postflight.json",
+      "publicPin": {
+        "bytes": 10959,
+        "sha256": "cdd6e8dabe22348f35eb1f13e5e4b9b3d1618e689b8561e4d8d2424ad54aa2cf"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 259,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_legacy_shape5_rejected/result.json",
+      "originalPin": {
+        "bytes": 497,
+        "sha256": "4c1dee94623d06907c252443eff4dc775dbe51f1054cdf161cd00ccb904040d3"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_legacy_shape5_rejected/result.json",
+      "publicPin": {
+        "bytes": 497,
+        "sha256": "4c1dee94623d06907c252443eff4dc775dbe51f1054cdf161cd00ccb904040d3"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 260,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_shape3_missing_journal_unknown/effect-denials.jsonl.before-fault",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_shape3_missing_journal_unknown/effect-denials.jsonl.before-fault",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 261,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_shape3_missing_journal_unknown/execution.json",
+      "originalPin": {
+        "bytes": 7499,
+        "sha256": "56e4cd9f5b258e50819ae30d686d646601820b03d9a75708dff1ae4705de2c21"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_shape3_missing_journal_unknown/execution.json",
+      "publicPin": {
+        "bytes": 7499,
+        "sha256": "56e4cd9f5b258e50819ae30d686d646601820b03d9a75708dff1ae4705de2c21"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 262,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_shape3_missing_journal_unknown/fixture-observation.json",
+      "originalPin": {
+        "bytes": 506,
+        "sha256": "014795c5b8e63fc8d4579b5487bf195ae4ce91a60a7fa32eac668f854c9403a4"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_shape3_missing_journal_unknown/fixture-observation.json",
+      "publicPin": {
+        "bytes": 506,
+        "sha256": "014795c5b8e63fc8d4579b5487bf195ae4ce91a60a7fa32eac668f854c9403a4"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 263,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_shape3_missing_journal_unknown/postflight.json",
+      "originalPin": {
+        "bytes": 10121,
+        "sha256": "edfb853905b8deeac85a02c8eff4c23ea5c1ef879c64a02ed4145d66f317ed65"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_shape3_missing_journal_unknown/postflight.json",
+      "publicPin": {
+        "bytes": 10121,
+        "sha256": "edfb853905b8deeac85a02c8eff4c23ea5c1ef879c64a02ed4145d66f317ed65"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 264,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_shape3_missing_journal_unknown/postflight.json.before-fault",
+      "originalPin": {
+        "bytes": 10959,
+        "sha256": "af1486e7c3053a0f4b77e414fe0c0f9e77022d0597a9ed3037ad14de1c19879a"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_shape3_missing_journal_unknown/postflight.json.before-fault",
+      "publicPin": {
+        "bytes": 10959,
+        "sha256": "af1486e7c3053a0f4b77e414fe0c0f9e77022d0597a9ed3037ad14de1c19879a"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 265,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_shape3_missing_journal_unknown/result.json",
+      "originalPin": {
+        "bytes": 497,
+        "sha256": "db187735ca27235220a4722354ee6af62b1d6465a79ae4846177871277641e0f"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_shape3_missing_journal_unknown/result.json",
+      "publicPin": {
+        "bytes": 497,
+        "sha256": "db187735ca27235220a4722354ee6af62b1d6465a79ae4846177871277641e0f"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 266,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_undeclared_import_caught_shape3/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 121,
+        "sha256": "9b3099ff72a6589cef94e3424e71c93edd170699d76c017a2e328f8305b45802"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_undeclared_import_caught_shape3/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 121,
+        "sha256": "9b3099ff72a6589cef94e3424e71c93edd170699d76c017a2e328f8305b45802"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 267,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_undeclared_import_caught_shape3/execution.json",
+      "originalPin": {
+        "bytes": 7425,
+        "sha256": "1c7a3e164ab181e3b8e9d892738e811c49a73f746677b32fde7491024b93b7b2"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_undeclared_import_caught_shape3/execution.json",
+      "publicPin": {
+        "bytes": 7425,
+        "sha256": "1c7a3e164ab181e3b8e9d892738e811c49a73f746677b32fde7491024b93b7b2"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 268,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_undeclared_import_caught_shape3/fixture-observation.json",
+      "originalPin": {
+        "bytes": 694,
+        "sha256": "b76578c51b672b4bf496be5b13fb26dbc982f8733450b22de9965c5d425e74b7"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_undeclared_import_caught_shape3/fixture-observation.json",
+      "publicPin": {
+        "bytes": 694,
+        "sha256": "b76578c51b672b4bf496be5b13fb26dbc982f8733450b22de9965c5d425e74b7"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 269,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_undeclared_import_caught_shape3/postflight.json",
+      "originalPin": {
+        "bytes": 10962,
+        "sha256": "ba4ebc03d54ebc387f3972f2811dec43c00281ea19b142268c7f452a0dc7952b"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_undeclared_import_caught_shape3/postflight.json",
+      "publicPin": {
+        "bytes": 10962,
+        "sha256": "ba4ebc03d54ebc387f3972f2811dec43c00281ea19b142268c7f452a0dc7952b"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 270,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/cases/d3_undeclared_import_caught_shape3/result.json",
+      "originalPin": {
+        "bytes": 497,
+        "sha256": "6749dbc1e1ab7346992148960fb8e23ec1e843234d4081349fd511cd18b5eb3d"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/cases/d3_undeclared_import_caught_shape3/result.json",
+      "publicPin": {
+        "bytes": 497,
+        "sha256": "6749dbc1e1ab7346992148960fb8e23ec1e843234d4081349fd511cd18b5eb3d"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 271,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/fixture-child.json",
+      "originalPin": {
+        "bytes": 29989,
+        "sha256": "c966ade46ab7d850722471ed193fc0728f7c52021f0edc47d413ac103c7d1b63"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/fixture-child.json",
+      "publicPin": {
+        "bytes": 29989,
+        "sha256": "c966ade46ab7d850722471ed193fc0728f7c52021f0edc47d413ac103c7d1b63"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 272,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/fixture-execution.json",
+      "originalPin": {
+        "bytes": 27935,
+        "sha256": "709c6bc90b357cb267145c74c4406767c09c57c293e0d5b57a269b0187c55f0e"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/fixture-execution.json",
+      "publicPin": {
+        "bytes": 27935,
+        "sha256": "709c6bc90b357cb267145c74c4406767c09c57c293e0d5b57a269b0187c55f0e"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 273,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/invocation.json",
+      "originalPin": {
+        "bytes": 23430,
+        "sha256": "55e51455c6ceb72d952717807c1a9c86b1e1d3d3e98f5df3c29f6262c050d901"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/invocation.json",
+      "publicPin": {
+        "bytes": 23430,
+        "sha256": "55e51455c6ceb72d952717807c1a9c86b1e1d3d3e98f5df3c29f6262c050d901"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 274,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/stderr.txt",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/stderr.txt",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 275,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/fixture-raw/stdout.txt",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/fixture-raw/stdout.txt",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 276,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/RETURN-INVENTORY.json",
+      "originalPin": {
+        "bytes": 26678,
+        "sha256": "7d63ecac45c132f17bf9b6d744fb268aa9a6d42702704dc70584d41a36910a0a"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/RETURN-INVENTORY.json",
+      "publicPin": {
+        "bytes": 26678,
+        "sha256": "7d63ecac45c132f17bf9b6d744fb268aa9a6d42702704dc70584d41a36910a0a"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 277,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/source-F/manifest.json",
+      "originalPin": {
+        "bytes": 7668,
+        "sha256": "47fcacedda73bb433703232da533004e9bf171ce8cb7bf8d32dec391630087d4"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/source-F/manifest.json",
+      "publicPin": {
+        "bytes": 7668,
+        "sha256": "47fcacedda73bb433703232da533004e9bf171ce8cb7bf8d32dec391630087d4"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 278,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/source-F/SOURCE.SHA256.json",
+      "originalPin": {
+        "bytes": 2850,
+        "sha256": "c54bf9ce69722a93c0880f5b7099a3a5669999e2b086661b8444e46059e1b1d7"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/source-F/SOURCE.SHA256.json",
+      "publicPin": {
+        "bytes": 2850,
+        "sha256": "c54bf9ce69722a93c0880f5b7099a3a5669999e2b086661b8444e46059e1b1d7"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "D3/codex/cloud-r02/raw/F/SOURCE.SHA256.json"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 279,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/source-P/manifest.json",
+      "originalPin": {
+        "bytes": 13558,
+        "sha256": "ff64e328bfc51fae2c96ebb605008d7ef2fb8fde15e4b36fd6de4d205bb6a3d0"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/source-P/manifest.json",
+      "publicPin": {
+        "bytes": 13558,
+        "sha256": "ff64e328bfc51fae2c96ebb605008d7ef2fb8fde15e4b36fd6de4d205bb6a3d0"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "D3/codex/cloud-r02/raw/P/manifest.json",
+        "D3/codex/cloud-r02/source-packet/manifest.json"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 280,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/raw/source-P/SOURCE.SHA256.json",
+      "originalPin": {
+        "bytes": 2448,
+        "sha256": "3cb53a85a030f614d265d0e2ce392f26628ac5a5e0f0ff7280f5cd3b06300a3e"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/retained/source-P/SOURCE.SHA256.json",
+      "publicPin": {
+        "bytes": 2448,
+        "sha256": "3cb53a85a030f614d265d0e2ce392f26628ac5a5e0f0ff7280f5cd3b06300a3e"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "D3/codex/cloud-r02/raw/P/SOURCE.SHA256.json",
+        "D3/codex/cloud-r02/source-packet/SOURCE.SHA256.json"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 281,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "D3_PRE_SYNTHETIC6_R2",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/native/return.zip",
+      "originalPin": {
+        "bytes": 1331174,
+        "sha256": "fcd332b4d96a51f777177bdff1326c145516a21e4d6ddee6f1c5004331e6f1b2"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/cloud-return/return.original-reviewed.zip",
+      "publicPin": {
+        "bytes": 1331174,
+        "sha256": "fcd332b4d96a51f777177bdff1326c145516a21e4d6ddee6f1c5004331e6f1b2"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_ZIP_FILTERED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": {
+        "path": "test-logs/D3/codex/historical-pre-synthetic6-r02/cloud-return/disclosure-filtered-return.zip",
+        "pin": {
+          "bytes": 678403,
+          "sha256": "92d31401bb01bf44bd74f3a89d01390be395b741ccb4171efcbe385e117b5640"
+        },
+        "meaningKo": "인코딩 내용 검토 전 일부 멤버를 제외한 초기 가공 ZIP. 현재 검토된 원본 ZIP과 구분해 보존한다."
+      },
+      "deletion": null
+    },
+    {
+      "sourceRow": 289,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-post-execution-r02-local-capture",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-d3-execution-r02-01/post-return-readback-r01/ROOT-ACTUAL-APP-RECORDS.actual.json",
+      "originalPin": {
+        "bytes": 122648,
+        "sha256": "4eb43a9321a3838055d840123985c4049763e54b7b1982d7b9107fd8e7c809f0"
+      },
+      "publicPath": "test-logs/D3/codex/historical-post-execution-r02-local-capture/local-captures/lead-d3-execution-r02-01/post-return-readback-r01/ROOT-ACTUAL-APP-RECORDS.actual.json",
+      "publicPin": {
+        "bytes": 122648,
+        "sha256": "4eb43a9321a3838055d840123985c4049763e54b7b1982d7b9107fd8e7c809f0"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 290,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-post-execution-r02-local-capture",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-d3-execution-r02-01/post-return-readback-r01/NATIVE-RETURN-MANIFEST.actual.json",
+      "originalPin": {
+        "bytes": 59205,
+        "sha256": "b8cb0db4a0702d73c08badf53d00549d433731a33bc1acbdf9a3a245d9ec2c2c"
+      },
+      "publicPath": "test-logs/D3/codex/historical-post-execution-r02-local-capture/local-captures/lead-d3-execution-r02-01/post-return-readback-r01/NATIVE-RETURN-MANIFEST.actual.json",
+      "publicPin": {
+        "bytes": 59205,
+        "sha256": "b8cb0db4a0702d73c08badf53d00549d433731a33bc1acbdf9a3a245d9ec2c2c"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 294,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/API-RETURN-MANIFEST.actual.json",
+      "originalPin": {
+        "bytes": 33537,
+        "sha256": "3389c2480f829ef572c14d48e138f4ca80699ece49fb26c89f8db5076a1a4e7a"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/local-captures/writer2/d3-pre-evidence-r01-01/API-RETURN-MANIFEST.actual.json",
+      "publicPin": {
+        "bytes": 33537,
+        "sha256": "3389c2480f829ef572c14d48e138f4ca80699ece49fb26c89f8db5076a1a4e7a"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 295,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-d3-r02-01/cloud-return-readback-r01/NATIVE-RETURN-MANIFEST.actual.json",
+      "originalPin": {
+        "bytes": 69185,
+        "sha256": "5114ece0ae37c196465a4cc178f1e52c312dd20a9c1d71041e00fb2f9ad866b4"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/local-captures/lead-pre-d3-r02-01/cloud-return-readback-r01/NATIVE-RETURN-MANIFEST.actual.json",
+      "publicPin": {
+        "bytes": 69185,
+        "sha256": "5114ece0ae37c196465a4cc178f1e52c312dd20a9c1d71041e00fb2f9ad866b4"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 296,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-d3-r02-01/cloud-return-readback-r01/APP-COMMAND-READBACK.actual.json",
+      "originalPin": {
+        "bytes": 2663,
+        "sha256": "6f7e13c83e3e400ceff72e1f4acd66bfb32ecb2c48887cfcc8e2745a74d6b514"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/local-captures/lead-pre-d3-r02-01/cloud-return-readback-r01/APP-COMMAND-READBACK.actual.json",
+      "publicPin": {
+        "bytes": 2663,
+        "sha256": "6f7e13c83e3e400ceff72e1f4acd66bfb32ecb2c48887cfcc8e2745a74d6b514"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 297,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/FRESH-R01-APP-COMMANDS.actual.json",
+      "originalPin": {
+        "bytes": 1819812,
+        "sha256": "27b8068bcf72ddcd9e071c14c4c2933afb8b0c53c1f8cfb8d1b5ca565394fd42"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/local-captures/writer2/d3-pre-evidence-r01-01/FRESH-R01-APP-COMMANDS.actual.json",
+      "publicPin": {
+        "bytes": 1819812,
+        "sha256": "27b8068bcf72ddcd9e071c14c4c2933afb8b0c53c1f8cfb8d1b5ca565394fd42"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "EXCLUDED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 298,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-pre-r01",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/FRESH-R01-APP-SELECTED.actual.json",
+      "originalPin": {
+        "bytes": 12245,
+        "sha256": "cdfe780d1027545cf10981d9c60915bf3df89c43b0ddac0a240de4a99ddcebdb"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-r01/local-captures/writer2/d3-pre-evidence-r01-01/FRESH-R01-APP-SELECTED.actual.json",
+      "publicPin": {
+        "bytes": 12245,
+        "sha256": "cdfe780d1027545cf10981d9c60915bf3df89c43b0ddac0a240de4a99ddcebdb"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 299,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/APP-EXACT-CALL-COUNTS.actual.json",
+      "originalPin": {
+        "bytes": 787,
+        "sha256": "96b40758d72efbb6fed4a5f33e31d4c7bd1afd4350896a4f14908a97aa78b1c5"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/local-captures/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/APP-EXACT-CALL-COUNTS.actual.json",
+      "publicPin": {
+        "bytes": 787,
+        "sha256": "96b40758d72efbb6fed4a5f33e31d4c7bd1afd4350896a4f14908a97aa78b1c5"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 300,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/API-RETURN-MANIFEST.actual.json",
+      "originalPin": {
+        "bytes": 69185,
+        "sha256": "5114ece0ae37c196465a4cc178f1e52c312dd20a9c1d71041e00fb2f9ad866b4"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/local-captures/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/API-RETURN-MANIFEST.actual.json",
+      "publicPin": {
+        "bytes": 69185,
+        "sha256": "5114ece0ae37c196465a4cc178f1e52c312dd20a9c1d71041e00fb2f9ad866b4"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 301,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-post-execution-r02-local-capture",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-post-execution-r02-01/raw-readback-r01/DIRECT-APP-OBSERVATION.actual.json",
+      "originalPin": {
+        "bytes": 103214,
+        "sha256": "e9b06151f08d5f5c48189751d518b9d44412c13faf125f1bfbea69039b7cf0ac"
+      },
+      "publicPath": "test-logs/D3/codex/historical-post-execution-r02-local-capture/local-captures/writer2/d3-post-execution-r02-01/raw-readback-r01/DIRECT-APP-OBSERVATION.actual.json",
+      "publicPin": {
+        "bytes": 103214,
+        "sha256": "e9b06151f08d5f5c48189751d518b9d44412c13faf125f1bfbea69039b7cf0ac"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 302,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-post-execution-r02-local-capture",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-post-execution-r02-01/raw-readback-r01/NATIVE-RETURN-MANIFEST.actual.json",
+      "originalPin": {
+        "bytes": 59205,
+        "sha256": "b8cb0db4a0702d73c08badf53d00549d433731a33bc1acbdf9a3a245d9ec2c2c"
+      },
+      "publicPath": "test-logs/D3/codex/historical-post-execution-r02-local-capture/local-captures/writer2/d3-post-execution-r02-01/raw-readback-r01/NATIVE-RETURN-MANIFEST.actual.json",
+      "publicPin": {
+        "bytes": 59205,
+        "sha256": "b8cb0db4a0702d73c08badf53d00549d433731a33bc1acbdf9a3a245d9ec2c2c"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 303,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/DIRECT-APP-SELECTED.actual.json",
+      "originalPin": {
+        "bytes": 2914,
+        "sha256": "7c43e48ab7fc02f8dafe82ada03c73ac073736e096b2bbcde54b4f9b8f789aa3"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/local-captures/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/DIRECT-APP-SELECTED.actual.json",
+      "publicPin": {
+        "bytes": 2220,
+        "sha256": "b781730f452cc9b90da8a97375a2e121d427070bf53344f8a95b4ea150994936"
+      },
+      "currentDisposition": "CURSOR_FIELD_REMOVED_JSON_RESERIALIZED",
+      "priorInitialDisposition": "EXCLUDED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": {
+        "jsonPointer": "/page/nextCursor",
+        "fieldCount": 1,
+        "valueType": "string",
+        "valueUTF8Bytes": 672,
+        "valueSHA256": "e8908bb4f8caaba049596e073e2e47e556df5e5097b16e964507d62aa51d34ab",
+        "hashMeaning": "SHA256 of original string UTF-8 bytes, without JSON quotes",
+        "reasonKo": "연속 조회용 불투명 cursor의 내부 바이너리 형식과 의미가 확인되지 않아 공개용 사본에서 제외한다. 운영 credential·profile·DB 제거로 분류하지 않는다."
+      }
+    },
+    {
+      "sourceRow": 304,
+      "testUnit": "D3",
+      "testPurpose": "direct selection identity/binding/stale/tamper 및 PRE/synthetic6 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-pre-synthetic6-r02",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/METADATA-APP-ORIGIN-CHECKS.actual.json",
+      "originalPin": {
+        "bytes": 15500,
+        "sha256": "20dd337ea044a1e0b5fce71b19a3e3a1c13e9cb03084dbfaf9d727ef9a9296a4"
+      },
+      "publicPath": "test-logs/D3/codex/historical-pre-synthetic6-r02/local-captures/writer2/d3-pre-evidence-r01-01/r02-followup/raw-readback-r01/METADATA-APP-ORIGIN-CHECKS.actual.json",
+      "publicPin": {
+        "bytes": 15500,
+        "sha256": "20dd337ea044a1e0b5fce71b19a3e3a1c13e9cb03084dbfaf9d727ef9a9296a4"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    }
+  ],
+  "locallyRecoveredCloudOriginals": [],
+  "disclosureReviewReferences": [
+    {
+      "localReviewLocator": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer3\\parallel-cloud-publication-prep-r01\\PUBLICATION-MAP.json",
+      "pin": {
+        "bytes": 587774,
+        "sha256": "2064fc9e6d638ff22905a8cccbfa4bf5b50a8cdfc703387a5a2ca6acfbd76373"
+      },
+      "meaning": "Root checked source/payload seals/pins; writer disclosure analysis, not independent release audit"
+    },
+    {
+      "localReviewLocator": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer3\\parallel-cloud-publication-prep-r01\\DISCLOSURE-REVIEW.json",
+      "pin": {
+        "bytes": 191027,
+        "sha256": "c4bf3499fdc2f1407e626a11bd22ebb9290606e5b611a9f7f64f866519e39b35"
+      },
+      "meaning": "Root checked source/payload seals/pins; writer disclosure analysis, not independent release audit"
+    },
+    {
+      "localReviewLocator": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer1\\encoded-disclosure-followup-r01\\REVIEW.json",
+      "pin": {
+        "bytes": 46123,
+        "sha256": "db10efc86c12a0e2c245cebb094ce901c400734ad3fbc0cb0b4a744683383a18"
+      },
+      "meaning": "Root checked source/payload seals/pins; writer disclosure analysis, not independent release audit"
+    },
+    {
+      "localReviewLocator": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer1\\encoded-disclosure-redacted2-r01\\REVIEW.json",
+      "pin": {
+        "bytes": 12839,
+        "sha256": "f37a8277a0b2af49b34d847fd49f40188a135330cd219c047737a5c84811b203"
+      },
+      "meaning": "Root checked source/payload seals/pins; writer disclosure analysis, not independent release audit"
+    },
+    {
+      "localReviewLocator": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer3\\recovered-cloud11-publication-prep-r01\\PUBLICATION-MAP.json",
+      "pin": {
+        "bytes": 42680,
+        "sha256": "26c5d37a5a227e2ff72da6833fff8750680aeeee129b08ade05491b753a4a3e9"
+      },
+      "meaning": "Root checked source/payload seals/pins; writer disclosure analysis, not independent release audit"
+    },
+    {
+      "localReviewLocator": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer3\\recovered-cloud11-publication-prep-r01\\DISCLOSURE-REVIEW.json",
+      "pin": {
+        "bytes": 128077,
+        "sha256": "585aa8c04aace447a074001493712a9fb022c9e513e0f0b9ac31fdb43a17b76c"
+      },
+      "meaning": "Root checked source/payload seals/pins; writer disclosure analysis, not independent release audit"
+    }
+  ],
+  "limitsKo": [
+    "305개 알려진 로컬 lineage와 추가 회수된 Cloud 원본 11개를 대조했다. 관측하지 못한 Cloud 전체 파일의 완전성을 주장하지 않는다.",
+    "초기8개 제외/ZIP멤버4개 제외/원본11개 미회수 표시는 당시 기록으로 유지한다. 이 문서가 후속 공개 상태를 제공한다.",
+    "2개 JSON의 /page/nextCursor만 삭제하고 전체를 UTF-8/LF로 재직렬화했다. 삭제값은 원본 보존본에 있으며 공개 문서에는 SHA만 기록한다.",
+    "I1 실제 후보 SOURCE/PRE・Windows9・Git/CLI・qualification・Goal은 별도 HOLD를 유지한다."
+  ],
+  "counts": {
+    "knownHistoricalSourceRows": 80,
+    "originalByteCopies": 79,
+    "cursorRedactedCopies": 1,
+    "originalZIPsWithPriorDerivedCopies": 2,
+    "locallyRecoveredAdditionalOriginals": 0
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "scope": "C5_R03_PRE_STAGING_RO",
+  "utc": "2026-10-04T19:41:51.424928+00:00",
+  "paths": {
+    "source": {
+      "path": "/workspace/vm-c5-source-24cf-r03",
+      "lexists": false,
+      "resolve": "/workspace/vm-c5-source-24cf-r03",
+      "components": [
+        {
+          "path": "/",
+          "lexists": true,
+          "symlink": false,
+          "resolve": "/"
+        },
+        {
+          "path": "/workspace",
+          "lexists": true,
+          "symlink": false,
+          "resolve": "/workspace"
+        },
+        {
+          "path": "/workspace/vm-c5-source-24cf-r03",
+          "lexists": false,
+          "symlink": false,
+          "resolve": "/workspace/vm-c5-source-24cf-r03"
+        }
+      ],
+      "workspaceOverlaps": [],
+      "upperFM": false,
+      "uriAmbiguous": false
+    },
+    "futureRun": {
+      "path": "/workspace/vm-c5-run-24cf-r03",
+      "lexists": false,
+      "resolve": "/workspace/vm-c5-run-24cf-r03",
+      "components": [
+        {
+          "path": "/",
+          "lexists": true,
+          "symlink": false,
+          "resolve": "/"
+        },
+        {
+          "path": "/workspace",
+          "lexists": true,
+          "symlink": false,
+          "resolve": "/workspace"
+        },
+        {
+          "path": "/workspace/vm-c5-run-24cf-r03",
+          "lexists": false,
+          "symlink": false,
+          "resolve": "/workspace/vm-c5-run-24cf-r03"
+        }
+      ],
+      "workspaceOverlaps": [],
+      "upperFM": false,
+      "uriAmbiguous": false
+    }
+  },
+  "checks": {
+    "bothAbsent": true,
+    "canonical": true,
+    "noSymlink": true,
+    "nonOverlap": true,
+    "noFM": true,
+    "noURI": true,
+    "sourceRunNonOverlap": true,
+    "parentWritableSearchable": true,
+    "exeFixedPin": true
+  },
+  "knownExe": {
+    "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "bytes": 30894944,
+    "sha256": "fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7"
+  },
+  "externalJobs": "UNKNOWN",
+  "unreadableProcessObservation": "UNKNOWN; prior evidence 7 retained without current process enumeration",
+  "OSContainment": "UNKNOWN",
+  "writes": 0,
+  "productExecution": 0
+}

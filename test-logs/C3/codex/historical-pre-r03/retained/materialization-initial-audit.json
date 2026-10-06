@@ -1,0 +1,37 @@
+{
+  "scope": "SOURCE_MATERIALIZATION_AND_PRE_ONLY",
+  "request": {
+    "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+    "reference": "library-file:fde1_bGliZmlsZV9rSUhVV3FTN0JfSERnYUFhREZjMndn_FileDrive_db4d605f7b6c8191aedb5f11c15c0007"
+  },
+  "nativeStartUtc": {
+    "current_time": "2026-10-04 13:48:48 UTC"
+  },
+  "nativeEndUtc": {
+    "current_time": "2026-10-04 13:48:50 UTC"
+  },
+  "nativeApiAttempts": 1,
+  "retries": 0,
+  "nativeApiRecordId": null,
+  "nativeApiRecordIdNote": "Not a returned response field; parent may bind from official record",
+  "responseSerialization": "Entire MCP returned object JSON.stringify; ASCII escaped UTF8, trailing LF; not raw HTTP transport",
+  "textPointer": "/structuredContent/text",
+  "preflightCommand": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 -I -S -B - <<'PY'\nimport pathlib,os,json,datetime\nw=pathlib.Path('/workspace');r=w/'vm-common3-source-24cf-r03';run=w/'vm-common3-run-24cf-r03'\nowned=[p for p in w.iterdir() if p.name.startswith(('ags-','vm-private-','vm-common3-')) or p.name=='agent-governance-suite']\nprocs=[];unreadable=0\nfor p in pathlib.Path('/proc').iterdir():\n if not p.name.isdigit() or int(p.name)==os.getpid():continue\n try:\n  cwd=os.readlink(p/'cwd');exe=os.readlink(p/'exe')\n  if any(cwd==str(a) or cwd.startswith(str(a)+'/') for a in owned):procs.append({'pid':int(p.name),'cwd':cwd,'executable':exe})\n except OSError:unreadable+=1\nout={'utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'root':str(r),'resolved':str(r.resolve()),'exists':r.exists(),'lexists':os.path.lexists(r),'isSymlink':r.is_symlink(),'parentSymlink':w.is_symlink(),'workspaceWritable':os.access(w,os.W_OK),'runrootExists':os.path.lexists(run),'nonOverlap':all(not r.resolve().is_relative_to(p.resolve()) and not p.resolve().is_relative_to(r.resolve()) for p in owned if p!=r),'ownedCwdProcesses':procs,'unreadableProcesses':unreadable,'externalJobs':'UNKNOWN; no platform reservations API observed','workspaceAGENTS':(w/'AGENTS.md').read_text() if (w/'AGENTS.md').is_file() else None,'agentsSkills':[str(p) for p in (w/'.agents').rglob('SKILL.md')] if (w/'.agents').is_dir() else []}\nprint(json.dumps(out,indent=2))\nif out['lexists'] or not out['nonOverlap'] or out['parentSymlink'] or not out['workspaceWritable'] or procs:raise SystemExit(2)\nPY",
+  "preflightResult": {
+    "chunk_id": "788a47",
+    "wall_time_seconds": 0.000028263,
+    "exit_code": 0,
+    "original_token_count": 123,
+    "output": "{\n  \"utc\": \"2026-10-04T13:48:33.371566+00:00\",\n  \"root\": \"/workspace/vm-common3-source-24cf-r03\",\n  \"resolved\": \"/workspace/vm-common3-source-24cf-r03\",\n  \"exists\": false,\n  \"lexists\": false,\n  \"isSymlink\": false,\n  \"parentSymlink\": false,\n  \"workspaceWritable\": true,\n  \"runrootExists\": false,\n  \"nonOverlap\": true,\n  \"ownedCwdProcesses\": [],\n  \"unreadableProcesses\": 7,\n  \"externalJobs\": \"UNKNOWN; no platform reservations API observed\",\n  \"workspaceAGENTS\": null,\n  \"agentsSkills\": []\n}\n"
+  },
+  "rootCreateResult": {
+    "chunk_id": "371d77",
+    "wall_time_seconds": 0.000022032,
+    "exit_code": 0,
+    "original_token_count": 0,
+    "output": ""
+  },
+  "providerActorHostAttestation": null,
+  "sourceProvenance": "Exact VM lead PageID/reference plus externally supplied carrier/ZIP/seal pins; not live Git checkout attestation",
+  "productRunnerImportLoaderTestsClaims": 0
+}

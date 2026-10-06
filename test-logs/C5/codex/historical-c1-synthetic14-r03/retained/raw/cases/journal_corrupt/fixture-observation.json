@@ -1,0 +1,17 @@
+{
+  "scope": "non_product_dummy",
+  "name": "journal_corrupt",
+  "pid": 5265,
+  "caught": null,
+  "outer_error_capture": false,
+  "stage_return": 0,
+  "stage_return_is_not_native_exit": true,
+  "final_counters": {
+    "count": 0,
+    "logging_errors": 0
+  },
+  "fault_observations": [],
+  "routing_disabled_between_cases": true,
+  "synthetic_unittest_shape": true,
+  "actual_product_tests_or_loader": 0
+}

@@ -1,0 +1,306 @@
+{
+  "schema": "vm-after-c5-direct-neg3-source-r01",
+  "test_ids": [
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged",
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject"
+  ],
+  "sources": {
+    "pristine/tests/test_flowmarshal_direct_selection.py": {
+      "original_path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+      "bytes": 14804,
+      "sha256": "56793b76b16712fffd1d2d732b3c858621fef15d1d85f2874f0545fba3ea6fe2"
+    },
+    "pristine/tests/test_flowmarshal_implementation_workflow.py": {
+      "original_path": "D:/codex/자동화템플릿/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+    },
+    "pristine/scripts/flowmarshal_implementation_workflow.py": {
+      "original_path": "C:/Users/sjs95/Documents/Codex/2026-10-03/task-8/direct-selection-candidate-dev3-01/guard-fixture-r02/candidate/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+    },
+    "pristine/scripts/flowmarshal_orchestrator_ledger.py": {
+      "original_path": "D:/codex/자동화템플릿/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    }
+  },
+  "runner": {
+    "path": "runner.py",
+    "bytes": 31666,
+    "sha256": "0aba0adde14a93ea88dbef8ad6a0130024f49f1058608c6cf0cf7c45124ae3f0"
+  },
+  "runtime": {
+    "platform": "linux",
+    "python_major_minor": [
+      3,
+      12
+    ],
+    "argv_flags": [
+      "-I",
+      "-S",
+      "-B",
+      "-X",
+      "utf8"
+    ],
+    "stdlib_only_python_dependencies": true,
+    "install": false,
+    "native_stdlib_extensions": "Linux SQLite backup/URI/UDF/trigger support and original module native imports require new PRE; no install/fallback",
+    "site_startup": "isolated no-site profile, no .pth/sitecustomize consumption; not original Q startup",
+    "origin_stdlib_binding": "New PRE pins contextlib.py and inspect.py actual runtime bytes/closure; wrapper validation references same runtime contextlib.contextmanager, no literal filename whitelist"
+  },
+  "contract": {
+    "source_only_candidate": true,
+    "test_scope": "exact original D3 direct-selection rejection, 8 source variants; no positive admission or CLI",
+    "self_child_count": 1,
+    "test_child_subprocess_count": 0,
+    "retry": 0,
+    "network_provider_git_install_calls": 0,
+    "windows_native_observer_calls": 0,
+    "legacy_mode": "original M import seam only, no CLI",
+    "controller_wait_reap_budget_max_seconds": 300,
+    "own_child_timeout_kill_reap": true,
+    "global_process_kill": false,
+    "cleanup_existing": false,
+    "reap_reserve_seconds": "min(5,timeout/10), within same deadline",
+    "wall_clock_limit": "OS creation/kill calls and capture not hardwall guaranteed; failed reap UNKNOWN",
+    "cwd": "new run-root/cwd, initially empty",
+    "HOME": "new run-root/home",
+    "TMPDIR_TMP_TEMP": "new run-root/tmp",
+    "writes": "owned run-root raw capture and original per-test private TMP plan/proof/manifest/revision-manifest/evidence/SQLite/backups/atomic rename/journal/WAL/SHM; original teardown only; additional owned raw effect-denials.jsonl only, plus counter fields in existing result/postflight/child-error/execution JSON",
+    "audit_seams": "same common C1 audit seams; exact local module names D and M only, origin/globals bound; not arbitrary import whitelist",
+    "audit_not_os_sandbox": true,
+    "timeout_residual": "Denial/source/residual evidence gaps remain UNKNOWN even if owned child reaped; otherwise timed_out is TIMEOUT. Native timeout/exit and <=300s owned-child wait/kill/reap remain recorded; no retry/global kill/cleanup.",
+    "result_before_extra_observation": true,
+    "pristine_before_after": "four original source files, runner, manifest",
+    "no_expanded_pass": [
+      "original76",
+      "Windows",
+      "F6",
+      "qualification",
+      "R2",
+      "ledger4",
+      "current-helper",
+      "Goal acceptance",
+      "prior C3/U2/C5 or dummy rerun"
+    ],
+    "sqlite_uri": "Only literal file:{canonical absolute private TMP path}?mode=ro; no authority, percent escape, fragment, extra query or other mode; original uri=True caller pinned",
+    "helper_origin_checks": "Original14 first plus command_ready_tasks/_load_evidence/_load_direct_selection; same decorator/path/code/globals policy",
+    "helper_origin_journal": "CreateNew before/accepted/rejected journal for exact17 names; common policy unchanged",
+    "effect_denials": {
+      "journal": "owned run-root/effect-denials.jsonl CreateNew, required even empty",
+      "record": "count before refusal; sequence/pid/utc/event/reason only, no args/import-name/target path; write+flush; original RuntimeError always; recursive logging/I/O sets unknown evidence",
+      "child": "Original unittest fields/unittest_exit retained, effect counters copied, suite_exit1 for refusal or2 for logging error; result saved before journal-close/read/post-source observations",
+      "parent": "Required regular JSONL, sequence/PID/counters/logging-error/child post observations match. CLEAR0 only PASS; valid DENIED FAIL; missing/corrupt/IO/mismatch UNKNOWN",
+      "uncaught_before_suite": "Existing child-error.json gains PID/counters; matching DENIED proves FAIL while unittest result remains unobserved, never fabricated",
+      "timeout": "Same owned-child wait/kill/reap budget and native timeout/exit retained; missing denial evidence is UNKNOWN even if owned child termination observed",
+      "fresh_runtime_validation": "NOT_RUN; future bounded C1 caught-RuntimeError/normal-zero/I/O-unknown dummy required by new PRE"
+    }
+  },
+  "source_evidence": {
+    "actual_run_state": "NOT_RUN",
+    "new_SOURCE_PRE_required": true,
+    "selected_methods": {
+      "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 157,
+        "end": 168,
+        "method_AST_sha256": "c9cc7b61be75c54f699ba9093ecda751359aa956b243cd692fe89d78c07a41fb"
+      },
+      "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 204,
+        "end": 217,
+        "method_AST_sha256": "d4f6e81fb68c83225b97da355258b7d5863d2e4f4fdac57e4bc546b9b3d0fb44"
+      },
+      "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 183,
+        "end": 189,
+        "method_AST_sha256": "f0738d4d234e65ef27f318785c1fa52b3d7fe0659cc0cb8c382842e11d80484d"
+      }
+    },
+    "risk_group": "direct-selection pre-effect input/evidence rejection using original D plain-import M fixture",
+    "helper_origin_names": [
+      "command_migrate",
+      "command_begin",
+      "command_verify",
+      "open_readonly",
+      "open_write",
+      "_backup_database",
+      "_install_writer_fence_triggers",
+      "command_status",
+      "command_task",
+      "command_register_revision",
+      "command_review",
+      "command_finish",
+      "command_revalidate_success",
+      "command_record_direct_attempt",
+      "command_ready_tasks",
+      "_load_evidence",
+      "_load_direct_selection"
+    ],
+    "helper_origin_count": 17,
+    "helper_decorators": {
+      "command_migrate": {
+        "lines": [
+          1693,
+          1845
+        ],
+        "decorators": []
+      },
+      "command_begin": {
+        "lines": [
+          2843,
+          2921
+        ],
+        "decorators": []
+      },
+      "command_verify": {
+        "lines": [
+          6742,
+          7008
+        ],
+        "decorators": []
+      },
+      "open_readonly": {
+        "lines": [
+          742,
+          751
+        ],
+        "decorators": [
+          "contextmanager"
+        ]
+      },
+      "open_write": {
+        "lines": [
+          754,
+          778
+        ],
+        "decorators": []
+      },
+      "_backup_database": {
+        "lines": [
+          1435,
+          1452
+        ],
+        "decorators": []
+      },
+      "_install_writer_fence_triggers": {
+        "lines": [
+          801,
+          819
+        ],
+        "decorators": []
+      },
+      "command_status": {
+        "lines": [
+          2650,
+          2652
+        ],
+        "decorators": []
+      },
+      "command_task": {
+        "lines": [
+          2714,
+          2753
+        ],
+        "decorators": []
+      },
+      "command_register_revision": {
+        "lines": [
+          1913,
+          2070
+        ],
+        "decorators": []
+      },
+      "command_review": {
+        "lines": [
+          5319,
+          5455
+        ],
+        "decorators": []
+      },
+      "command_finish": {
+        "lines": [
+          6524,
+          6568
+        ],
+        "decorators": []
+      },
+      "command_revalidate_success": {
+        "lines": [
+          5458,
+          5610
+        ],
+        "decorators": []
+      },
+      "command_record_direct_attempt": {
+        "lines": [
+          6175,
+          6320
+        ],
+        "decorators": []
+      },
+      "command_ready_tasks": {
+        "lines": [
+          5773,
+          5809
+        ],
+        "decorators": []
+      },
+      "_load_evidence": {
+        "lines": [
+          5183,
+          5299
+        ],
+        "decorators": []
+      },
+      "_load_direct_selection": {
+        "lines": [
+          6001,
+          6127
+        ],
+        "decorators": []
+      }
+    },
+    "natural_import_binding": "D and unqualified M only, canonical case IDs D; no tests namespace, sys.modules alias assignment, invented initializer or changed assertion",
+    "branch_evidence": "ORIGINAL-BRANCH-EVIDENCE.json",
+    "C5_baseline_runner": {
+      "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03\\runner.py",
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343"
+    },
+    "C5_POST": {
+      "path": "D:\\claude\\독립감사관\\R-034-VM-C5-R03-POST-VERDICT.ko.md",
+      "bytes": 8293,
+      "sha256": "076ef926c45b65dde05b6a870c61576aac85be801d9a26bcb12754bf0a0a82ee",
+      "scope": "prior exact5/helper70f5/Linux3.12.14 only; partial independence/transport copies/full76 classification not audited"
+    },
+    "previous_completed_not_rerun": true,
+    "Root_count10_remaining66_is_not_official_ledger": true,
+    "original76_inventory": "ORIGINAL76-INVENTORY.json",
+    "unselected_concrete_reasons": "ORIGINAL76-INVENTORY.json",
+    "actual_global_import_closure": "NOT_RUN; source4 and original globals pinned; runtime observation required in new PRE/actual selected run",
+    "prior_C1_dummy14": "not rerun; common C1 AST evidence reused only for preserved functions, not new D3 observation"
+  },
+  "issuance": {
+    "issuer": "Root only under current human scope; this candidate issues none",
+    "window_seconds": 900,
+    "window_minutes": 15,
+    "exact_token_keys": [
+      "__LAUNCH_NOT_AFTER_ISO__",
+      "__DISPATCH_PEER_ID__",
+      "__ISSUED_UTC__",
+      "__LAUNCH_NOT_AFTER_UTC__"
+    ],
+    "actual_ID_and_times": "UNISSUED",
+    "preparation_source": "prepare-command.py",
+    "preparation_invocation": "PREPARATION.COMMAND.UNISSUED.txt",
+    "native_template": "LAUNCH.UNISSUED.SOURCE-DRAFT.template.txt",
+    "template_state": "SOURCE_DRAFT_PRE_UNBOUND_NOT_RUN",
+    "future_rule": "Root must bind new PRE evidence/paths/runtime/source seal into separate final template, include preparation command in PRE review. Only after actual final template audited may issuer substitute the designated4 values, preserving all other bytes including .__name__."
+  }
+}

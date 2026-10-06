@@ -1,0 +1,87 @@
+{
+  "schema": "u2-r01-source-pre-native-return-v1",
+  "scope": "Source/PRE raw only; U2 runner and products NOT_RUN; no GO",
+  "createdUtc": "2026-10-04T15:56:57.884923+00:00",
+  "payloadCount": 12,
+  "inventory": [
+    {
+      "alias": "prepare/source-materialization.json",
+      "sourcePath": "/workspace/vm-u2-source-24cf-r01/evidence/source-materialization.json",
+      "bytes": 2661,
+      "sha256": "a98d43d77a4d01155edbe93284c2f9f7db57b3c18c931966c0335c0eeb26206d"
+    },
+    {
+      "alias": "prepare/linux-pre.stdout.json",
+      "sourcePath": "/workspace/vm-u2-source-24cf-r01/evidence/linux-pre.stdout.json",
+      "bytes": 61394,
+      "sha256": "670c44ffb3d57073bfa21ea8491a4ad372ef7c08623cb6f42106dfecf763cf9c"
+    },
+    {
+      "alias": "prepare/linux-pre.stderr.txt",
+      "sourcePath": "/workspace/vm-u2-source-24cf-r01/evidence/linux-pre.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "alias": "prepare/runroot-ro.json",
+      "sourcePath": "/workspace/vm-u2-source-24cf-r01/evidence/runroot-ro.json",
+      "bytes": 8575,
+      "sha256": "47846571d84fba4010216c41bf792c1d94475bf2cefce0a23d5ddcd04bc3400c"
+    },
+    {
+      "alias": "prepare/command-audit.json",
+      "sourcePath": "/workspace/vm-u2-source-24cf-r01/evidence/command-audit.json",
+      "bytes": 58548,
+      "sha256": "83b9e897eeb68471abe79a186d55ccdbce0ae8eacf4ee828f718a13bcd8fd218"
+    },
+    {
+      "alias": "prepare/materialization-initial-audit.json",
+      "sourcePath": "/workspace/vm-u2-source-24cf-r01/evidence/materialization-initial-audit.json",
+      "bytes": 4397,
+      "sha256": "588440da77f4413bd887ec52582a90d237a95f48cc80c3e792c10dd195190df0"
+    },
+    {
+      "alias": "prepare/transport-stream-audit.json",
+      "sourcePath": "/workspace/vm-u2-source-24cf-r01/evidence/transport-stream-audit.json",
+      "bytes": 31010,
+      "sha256": "fbf9eadae1174b0c1d4cc450a4418c2ca81171aae85ca920166524bdaa84bcca"
+    },
+    {
+      "alias": "prepare/linux-pre-first-capture-truncated.json",
+      "sourcePath": "/workspace/vm-u2-source-24cf-r01/evidence/linux-pre-first-capture-truncated.json",
+      "bytes": 11418,
+      "sha256": "466af853b3d37e4be4122078cc2148906c04abd4f9267ab41a8c3697bd712a1a"
+    },
+    {
+      "alias": "prepare/source-materialization-command.sh",
+      "sourcePath": "/workspace/vm-u2-source-24cf-r01/evidence/source-materialization-command.sh",
+      "bytes": 4305,
+      "sha256": "f8b50415637228fba9629e4a7ff7ca2cb9ccdd14a6949ffd88a3d70315227056"
+    },
+    {
+      "alias": "prepare/linux-pre-command.sh",
+      "sourcePath": "/workspace/vm-u2-source-24cf-r01/evidence/linux-pre-command.sh",
+      "bytes": 5683,
+      "sha256": "fec9b5ee684cf6eff85bbae475d1b1011d546b6951154bc911145c0ebc6ced50"
+    },
+    {
+      "alias": "prepare/runroot-ro-command.sh",
+      "sourcePath": "/workspace/vm-u2-source-24cf-r01/evidence/runroot-ro-command.sh",
+      "bytes": 4572,
+      "sha256": "2d03a202b01604604fcd041e921fae775eda84c858ccbe3b699561fa019ec3e0"
+    },
+    {
+      "alias": "prepare/evidence-manifest.json",
+      "sourcePath": "/workspace/vm-u2-source-24cf-r01/evidence/evidence-manifest.json",
+      "bytes": 6212,
+      "sha256": "f8adce71b320c40481f50a662b65394293294babd6fd2703d5509f7dc81373ff"
+    }
+  ],
+  "inventoryExcludesSelf": true,
+  "localNativeFullResponseOmittedFromReturn": "Retained and pinned locally as evidence/native-page-response.json; original source Page reference already held by Root. Returned command-audit preserves actual request/metadata/IDs-null without retransmitting original base64.",
+  "sourcePacketIncluded": false,
+  "sourcePacketPinEvidence": "prepare/source-materialization.json and prepare/evidence-manifest.json",
+  "productExecution": 0,
+  "metadataCollectors": 2,
+  "firstTruncatedCapturePreserved": true
+}

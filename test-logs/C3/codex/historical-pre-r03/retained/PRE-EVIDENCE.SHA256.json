@@ -1,0 +1,34 @@
+{
+  "linux-pre.stdout.json": {
+    "bytes": 9799,
+    "sha256": "2de9b103aaba3a77d3f087b42d816896d9cbf7a233d7d7567e2e381236431e8a"
+  },
+  "runroot-ro-r01.json": {
+    "bytes": 8813,
+    "sha256": "6b296a218ca4c1a62b15d8b9be7896714c0d2cc60cb054ccaee0d6076fb5126b"
+  },
+  "evidence-manifest.json": {
+    "bytes": 4423,
+    "sha256": "fee0c821ac1f86d17c1aeeda7cde47cf35d251b3f323d37a3648ed1ef630dfca"
+  },
+  "materialization-initial-audit.json": {
+    "bytes": 3454,
+    "sha256": "9574e70f9f40b019b809789103e6e2a24020294f49a9bdfa1650d0f945b8a000"
+  },
+  "source-materialization.json": {
+    "bytes": 3166,
+    "sha256": "b1b38eabdfd1b9595c3b65f8938963104358515024580c8c944fc61907379a59"
+  },
+  "APP-CRITICAL-RECORDS.actual.json": {
+    "bytes": 16896,
+    "sha256": "6dd62245466e7d3584cd7790e14e38e3a8608e6239de763dd4a9e3b6338f01d9"
+  },
+  "PRE-REQUEST.ko.txt": {
+    "bytes": 7381,
+    "sha256": "051327ab98a1cc4c99d663b74d644955cbeffb51edfeff6f9469dc8ed9985368"
+  },
+  "NATIVE-RETURN-AND-READBACK.actual.json": {
+    "bytes": 14911,
+    "sha256": "c636d3f319c57958449ab79c92da6cede255eeb6f523ef0a94e4730de3dea5d5"
+  }
+}

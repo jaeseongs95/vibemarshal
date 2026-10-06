@@ -1,0 +1,40 @@
+{
+  "recordKind": "LOCAL_DERIVED_UNRECOVERED_HISTORICAL_PIN_CLAIMS",
+  "testUnit": "C5",
+  "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+  "originalFileBodiesPresent": false,
+  "newRetrievals": 0,
+  "currentRemoteExistence": "UNKNOWN",
+  "isCloudExecutionReturn": false,
+  "historicalClaims": [
+    {
+      "testUnit": "C5",
+      "originalCloudPath": "/workspace/vm-c5-source-24cf-r03/evidence/native-page-response.json",
+      "bytes": 407799,
+      "sha256": "7b4ff6ad40bcea17c64b309bdfea0d096885b51f3a0508fa5567f0cd08d35591",
+      "pinBasis": "Historical manifest value; remote file bytes not read this request",
+      "manifest": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/evidence/evidence-manifest.json",
+      "jsonPointer": "/localFiles/6",
+      "manifestPathLine": 47,
+      "includedInReturn": false,
+      "archivePathsWithSameINDEXPin": [],
+      "coverage": "HISTORICAL_PIN_REMOTE_BYTES_NOT_LOCALLY_OBSERVED",
+      "currentRemoteExistence": "UNKNOWN"
+    },
+    {
+      "testUnit": "C5",
+      "originalCloudPath": "/workspace/vm-c5-source-24cf-r03/evidence/transport-stream-audit.json",
+      "bytes": 587341,
+      "sha256": "fa19374bfcd11e79f874bb1e9ca27d42f4bef0078dd93b5403a8094fa993b673",
+      "pinBasis": "Historical manifest value; remote file bytes not read this request",
+      "manifest": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/evidence/evidence-manifest.json",
+      "jsonPointer": "/localFiles/13",
+      "manifestPathLine": 89,
+      "includedInReturn": false,
+      "archivePathsWithSameINDEXPin": [],
+      "coverage": "HISTORICAL_PIN_REMOTE_BYTES_NOT_LOCALLY_OBSERVED",
+      "currentRemoteExistence": "UNKNOWN"
+    }
+  ],
+  "effect": "metadata only, no original retrieval or PASS assertion"
+}

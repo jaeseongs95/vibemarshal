@@ -1,0 +1,10 @@
+{
+  "peerId": "78854f8f-0ed8-4d33-8e7f-4ffb81d67ee4",
+  "sourceThread": "01a10240-a26a-79d3-948a-463988e039bf",
+  "utcRecorded": "2026-10-04T22:51:24.525462+00:00",
+  "parentReportedFinding": "r01 runner0aba closure95 statically allows D but rejects M; product reproduction0. VM4 prepares r02 separately.",
+  "workerIndependentVerification": "NOT_PERFORMED; no product or fixture execution or source fix",
+  "scope": "Preserve and return actual r01 source18/runtime metadata; do not label r02; no additional materialization",
+  "productExecCount": 0,
+  "fixtureExecCount": 0
+}

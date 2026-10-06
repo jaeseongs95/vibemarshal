@@ -1,0 +1,694 @@
+{
+  "scope": "U2_R02_PREPARATION_EVIDENCE_NOT_PRODUCT_PASS_OR_EXECUTION_GO",
+  "utc": "2026-10-04T17:29:46.645956+00:00",
+  "checks": {
+    "packet15Unchanged": true,
+    "original2IDsPreserved": true,
+    "dummyTerminalExit0": true,
+    "dummy11Cases": true,
+    "accepted2": true,
+    "rejected9": true,
+    "allExpectedMatch": true,
+    "journal22AndPhases": true,
+    "cycleValueError": true,
+    "nestedUnwrapTrueButRejected": true,
+    "codeLessRejected": true,
+    "bodyCalls0": true,
+    "productEffects0": true,
+    "only4ValidatorAst": true,
+    "dummyInputsUnchanged": true,
+    "stdoutMatchesRawResult": true,
+    "stderrEmpty": true,
+    "futureRunAbsent": true,
+    "preCwdEmpty": true,
+    "selectedStdlibUnchanged": true,
+    "contextlibDummyPinMatchesPRE": true,
+    "inspectDummyPinMatchesPRE": true,
+    "privatePermissions": true
+  },
+  "sourceRoot": "/workspace/vm-u2-source-24cf-r02",
+  "futureRunRoot": "/workspace/vm-u2-run-24cf-r02",
+  "productStatus": "NOT_RUN",
+  "sourceFiles": 15,
+  "sourceBytes": 724947,
+  "packetReadbackAfterDummy": [
+    {
+      "path": "README.ko.md",
+      "bytes": 7129,
+      "sha256": "42a72ef4b84fd3b285ae1aecd2cb48baede4fbd95f67f53f3c5be6c976fba855",
+      "matchesSealedStaging": true
+    },
+    {
+      "path": "SOURCE.DIFF.patch",
+      "bytes": 7305,
+      "sha256": "01d38f4ac1b6755c41d99e5940952ac1e0e1b95029fb66706f3489657783b591",
+      "matchesSealedStaging": true
+    },
+    {
+      "path": "SOURCE.SHA256.json",
+      "bytes": 1995,
+      "sha256": "0c1c54b6643cfb514df94cf1160a41eca46c086dce0e042254658801afcc22d2",
+      "matchesSealedStaging": true
+    },
+    {
+      "path": "STATIC-CHECKS.json",
+      "bytes": 9390,
+      "sha256": "e00bf43810e19196eb6e2081955ce8f6768f2784c7ec72ac78ba4d0e2ef37c81",
+      "matchesSealedStaging": true
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 5916,
+      "sha256": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "matchesSealedStaging": true
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "matchesSealedStaging": true
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "matchesSealedStaging": true
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "matchesSealedStaging": true
+    },
+    {
+      "path": "regression-capture/execution.json",
+      "bytes": 2441,
+      "sha256": "857378118c39c8dd58716717a6e0d794d5d0b6b365027bfb0ac2aa2c61585ed6",
+      "matchesSealedStaging": true
+    },
+    {
+      "path": "regression-capture/result.json",
+      "bytes": 33704,
+      "sha256": "1ce8f75eae84b5f0de00a539943c2cac577721ee27d912cf0038866b2293286f",
+      "matchesSealedStaging": true
+    },
+    {
+      "path": "regression-capture/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "matchesSealedStaging": true
+    },
+    {
+      "path": "regression-capture/stdout.txt",
+      "bytes": 30485,
+      "sha256": "aeddf4a96cc87c2b67677ab27fa23e2b600f747d594ca94db341de92354da56e",
+      "matchesSealedStaging": true
+    },
+    {
+      "path": "regression/check_origin.py",
+      "bytes": 8497,
+      "sha256": "8321f2343c74a829b4e6509f0a0b2942a7808ffd81f84b45592d5fa6d0616098",
+      "matchesSealedStaging": true
+    },
+    {
+      "path": "regression/dummy_helper.py",
+      "bytes": 300,
+      "sha256": "b42b7cf911d2f08cd5cf023c0b914f7d910411509c5b8d515304bce60ca9133f",
+      "matchesSealedStaging": true
+    },
+    {
+      "path": "runner.py",
+      "bytes": 20603,
+      "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "matchesSealedStaging": true
+    }
+  ],
+  "stdlibSelectedFileReadback": [
+    {
+      "name": "sqlite3",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+      "builtin": false,
+      "bytes": 2501,
+      "sha256": "f7cc982617b68e147540ef352d38310fe4d25c2c9c2542b67d0590c871df09a8",
+      "matchesPRE": true
+    },
+    {
+      "name": "sqlite3.dbapi2",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+      "builtin": false,
+      "bytes": 3631,
+      "sha256": "7c5c8d98df1f2c50c4062a3be2c0f0499190c179fa4fc281507a1ef763a98f28",
+      "matchesPRE": true
+    },
+    {
+      "name": "_sqlite3",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null,
+      "status": "NULL_NO_FILE_FROM_PRE"
+    },
+    {
+      "name": "ssl",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "builtin": false,
+      "bytes": 51655,
+      "sha256": "db62eeaae59c6e7087dcafb28087cd0bb092087381edc556f97c8cb614484380",
+      "matchesPRE": true
+    },
+    {
+      "name": "_ssl",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null,
+      "status": "NULL_NO_FILE_FROM_PRE"
+    },
+    {
+      "name": "_socket",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null,
+      "status": "NULL_NO_FILE_FROM_PRE"
+    },
+    {
+      "name": "unittest",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+      "builtin": false,
+      "bytes": 3487,
+      "sha256": "32ed48385c0377bc2900a76e9a6acc3705aeef402c72de8554b3c637420506f0",
+      "matchesPRE": true
+    },
+    {
+      "name": "unittest.mock",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "builtin": false,
+      "bytes": 106317,
+      "sha256": "1de18141992c6742bff27e77c0cbe46d53d6a5ab1850574a536910508823fc5c",
+      "matchesPRE": true
+    },
+    {
+      "name": "subprocess",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "builtin": false,
+      "bytes": 88747,
+      "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375",
+      "matchesPRE": true
+    },
+    {
+      "name": "_posixsubprocess",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null,
+      "status": "NULL_NO_FILE_FROM_PRE"
+    },
+    {
+      "name": "select",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null,
+      "status": "NULL_NO_FILE_FROM_PRE"
+    },
+    {
+      "name": "resource",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null,
+      "status": "NULL_NO_FILE_FROM_PRE"
+    },
+    {
+      "name": "_hashlib",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null,
+      "status": "NULL_NO_FILE_FROM_PRE"
+    },
+    {
+      "name": "contextlib",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "builtin": false,
+      "bytes": 27637,
+      "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6",
+      "matchesPRE": true
+    },
+    {
+      "name": "inspect",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+      "builtin": false,
+      "bytes": 127125,
+      "sha256": "5c54ebf0bfdc25397750e5d0f63800751650ee50e65325ff3ea4069c9bfa5f75",
+      "matchesPRE": true
+    }
+  ],
+  "PREArtifact": {
+    "bytes": 98011,
+    "sha256": "bad4ed5ef98f679338d065308a0c51cf0e3547d5586dd8af83f099ad90cd5abb"
+  },
+  "dummyRawResult": {
+    "bytes": 26440,
+    "sha256": "55b72eeb8c452bbc84dd7f9d9eb799c4c33b4678fc816dd1682da78e889cde8d"
+  },
+  "dummyStatus": "DUMMY_REGRESSION_PASS",
+  "dummyActualExit": 0,
+  "dummyOwnChildPid": 3458,
+  "dummyOwnCalls": 1,
+  "retries": 0,
+  "dummyCases": [
+    {
+      "case": "valid_plain",
+      "expected_accept": true,
+      "observed_accept": true
+    },
+    {
+      "case": "valid_stdlib_contextmanager_old_guard_rejects",
+      "expected_accept": true,
+      "observed_accept": true
+    },
+    {
+      "case": "wrong_plain_origin",
+      "expected_accept": false,
+      "observed_accept": false
+    },
+    {
+      "case": "genuine_wrapper_wrong_wrapped_origin",
+      "expected_accept": false,
+      "observed_accept": false
+    },
+    {
+      "case": "fake_wrapper_code_even_with_expected_filename",
+      "expected_accept": false,
+      "observed_accept": false
+    },
+    {
+      "case": "spoof_wrapped_metadata_wrong_closure",
+      "expected_accept": false,
+      "observed_accept": false
+    },
+    {
+      "case": "correct_filename_wrong_original_globals",
+      "expected_accept": false,
+      "observed_accept": false
+    },
+    {
+      "case": "wrong_imported_decorator_binding",
+      "expected_accept": false,
+      "observed_accept": false
+    },
+    {
+      "case": "cycle_wrapped_metadata",
+      "expected_accept": false,
+      "observed_accept": false
+    },
+    {
+      "case": "code_less_object",
+      "expected_accept": false,
+      "observed_accept": false
+    },
+    {
+      "case": "normal_nested_chain_not_in_pinned_single_decorator_contract",
+      "expected_accept": false,
+      "observed_accept": false
+    }
+  ],
+  "cycleError": "ValueError",
+  "nestedUnwrapsToOriginal": true,
+  "nullObjectJournal": [
+    {
+      "utc": "2026-10-04T17:24:57.338466+00:00",
+      "phase": "before",
+      "case": "code_less_object",
+      "name": "open_readonly",
+      "expected_source": "/workspace/vm-u2-source-24cf-r02/packet/regression/dummy_helper.py",
+      "exposed_type": "object",
+      "exposed_object_id": 139659556614416,
+      "exposed_co_filename": null,
+      "exposed_co_name": null,
+      "wrapped_type": null,
+      "wrapped_object_id": null,
+      "wrapped_co_filename": null,
+      "wrapped_co_name": null,
+      "exposed_globals_bound": false,
+      "wrapped_globals_bound": false,
+      "imported_contextmanager_is_stdlib": true
+    },
+    {
+      "utc": "2026-10-04T17:24:57.338473+00:00",
+      "phase": "rejected",
+      "case": "code_less_object",
+      "name": "open_readonly",
+      "expected_source": "/workspace/vm-u2-source-24cf-r02/packet/regression/dummy_helper.py",
+      "exposed_type": "object",
+      "exposed_object_id": 139659556614416,
+      "exposed_co_filename": null,
+      "exposed_co_name": null,
+      "wrapped_type": null,
+      "wrapped_object_id": null,
+      "wrapped_co_filename": null,
+      "wrapped_co_name": null,
+      "exposed_globals_bound": false,
+      "wrapped_globals_bound": false,
+      "imported_contextmanager_is_stdlib": true,
+      "error": "helper origin requires function: open_readonly"
+    }
+  ],
+  "nativePageResponseShape": {
+    "topKeys": [
+      "content",
+      "isError",
+      "structuredContent"
+    ],
+    "structuredContentKeys": [
+      "byte_size",
+      "kind",
+      "mime_type",
+      "page_id",
+      "reference",
+      "sha256",
+      "text"
+    ],
+    "actualTextPointer": "/structuredContent/text",
+    "kind": "text",
+    "mimeType": "text/plain",
+    "bytes": 177681,
+    "sha256": "11f88bc60623e74ad11855e9440411d83f8896527dc12bb956d526fb54bc3cd8",
+    "pageId": "page_1e8d25a4f6848191b5edf529528f1ce6",
+    "reference": "library-file:fde1_bGliZmlsZV9HdUNLdElwTFdrT24zXzBGSlpqaERR_FileDrive_db4d605f7b6c8191aedb5f11c15c0007"
+  },
+  "retainedLargeTransportFiles": {
+    "native-page-response.json": {
+      "bytes": 356127,
+      "sha256": "d6bfc20d2b470ffa5f101c9b896520ad025a26ba5286b1b9f9af4d6bff46e1aa"
+    },
+    "transport-stream-audit.json": {
+      "bytes": 512350,
+      "sha256": "92351c2526b462449f79e98c6a7e88299c76e1868c1d5f3dde68ea23e7da043d"
+    },
+    "carrier.base64.txt": {
+      "bytes": 177681,
+      "sha256": "11f88bc60623e74ad11855e9440411d83f8896527dc12bb956d526fb54bc3cd8"
+    },
+    "source.zip": {
+      "bytes": 133260,
+      "sha256": "15e9898c20210576204681b2365b0cf488c2c19cd2e45205f13e5ffb98810e68"
+    }
+  },
+  "retainedTransportNote": "Full response and actual streaming commands are retained locally; native return ZIP carries this identity/hash record and preparation commands/raw PRE/dummy. Pinned source carrier is already held by Root.",
+  "permissions": [
+    {
+      "path": ".",
+      "directory": true,
+      "mode": "0o700",
+      "matches": true
+    },
+    {
+      "path": "source.zip",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "carrier.base64.txt",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence",
+      "directory": true,
+      "mode": "0o700",
+      "matches": true
+    },
+    {
+      "path": "pre-cwd",
+      "directory": true,
+      "mode": "0o700",
+      "matches": true
+    },
+    {
+      "path": "packet",
+      "directory": true,
+      "mode": "0o700",
+      "matches": true
+    },
+    {
+      "path": "evidence/native-page-response.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/root-create.stdout.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/linux-pre.stdout.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/preflight-root.stdout.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/source-materialization.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/transport-stream-audit.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/linux-pre-command.sh",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/materialization.stdout.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/linux-dummy",
+      "directory": true,
+      "mode": "0o700",
+      "matches": true
+    },
+    {
+      "path": "evidence/preflight-command.sh",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/runroot-ro-command.sh",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/linux-pre.stderr.txt",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/runroot-ro.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/command-audit.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/source-materialization-command.sh",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/SOURCE.SHA256.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/regression",
+      "directory": true,
+      "mode": "0o700",
+      "matches": true
+    },
+    {
+      "path": "packet/runner.py",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/SOURCE.DIFF.patch",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/pristine",
+      "directory": true,
+      "mode": "0o700",
+      "matches": true
+    },
+    {
+      "path": "packet/STATIC-CHECKS.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/manifest.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/regression-capture",
+      "directory": true,
+      "mode": "0o700",
+      "matches": true
+    },
+    {
+      "path": "packet/README.ko.md",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/linux-dummy/result.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/linux-dummy/stdout.txt",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/linux-dummy/native-execution.stdout.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/linux-dummy/execution.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/linux-dummy/supervisor-command.sh",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "evidence/linux-dummy/stderr.txt",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/regression/check_origin.py",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/regression/dummy_helper.py",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/pristine/scripts",
+      "directory": true,
+      "mode": "0o700",
+      "matches": true
+    },
+    {
+      "path": "packet/pristine/tests",
+      "directory": true,
+      "mode": "0o700",
+      "matches": true
+    },
+    {
+      "path": "packet/regression-capture/result.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/regression-capture/stdout.txt",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/regression-capture/execution.json",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/regression-capture/stderr.txt",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/pristine/scripts/flowmarshal_implementation_workflow.py",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    },
+    {
+      "path": "packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "directory": false,
+      "mode": "0o600",
+      "matches": true
+    }
+  ],
+  "sqliteActualUriBackupUdfTrigger": "UNKNOWN_NOT_RUN",
+  "SQLiteConnectsSQLFixtures": 0,
+  "externalJobs": "UNKNOWN",
+  "priorUnreadableProcesses": 7,
+  "OSContainment": "UNKNOWN",
+  "nativeToolId": null,
+  "providerNativeId": null,
+  "oldRootsModified": 0,
+  "cleanup": 0
+}

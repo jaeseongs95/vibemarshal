@@ -1,0 +1,111 @@
+{
+  "started_utc": "2026-10-04T20:10:58.727572+00:00",
+  "observed_utc": "2026-10-04T20:10:58.870470+00:00",
+  "pid": 5265,
+  "actual_exit": 0,
+  "terminal_observed": true,
+  "status": "UNKNOWN",
+  "timed_out": false,
+  "own_child_kill_error": null,
+  "raw_observation_error": null,
+  "observation_unknown": true,
+  "unittest_observation_unknown": false,
+  "effect_denial_claim_source": "result.json",
+  "effect_denial_observation": {
+    "state": "UNKNOWN",
+    "count": null,
+    "journal_count": null,
+    "logging_errors": null,
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "error_type": "ValueError"
+  },
+  "inputs_before": {
+    "EXTRACTIONS.json": {
+      "bytes": 2908,
+      "sha256": "1d6ffde24716ddc60bb2c9707754f47dc78d2a4f894252168361d1388dabf35f"
+    },
+    "README.ko.md": {
+      "bytes": 3872,
+      "sha256": "f515625c2ed314f4036f47e890c7c0933345364d18934b5b15be70829e34ce8d"
+    },
+    "SOURCE-CHECKS.json": {
+      "bytes": 6209,
+      "sha256": "bf824a6d16116b1044ac3f7f8a569c82841c21b94054d6d47e438434ddaf1c55"
+    },
+    "fixture.py": {
+      "bytes": 20601,
+      "sha256": "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208"
+    },
+    "frozen/runner.py": {
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343"
+    },
+    "manifest.json": {
+      "bytes": 12565,
+      "sha256": "15e10b1038f2ced4787e73cca5a19039132cf54b432191e3347aa394e3742b4a"
+    },
+    "SOURCE.SHA256.json": {
+      "bytes": 769,
+      "sha256": "2345d41939c978a165693f4417db6944fe983fad42706466f6f986bf617d739e"
+    }
+  },
+  "inputs_after_observation": {
+    "EXTRACTIONS.json": {
+      "bytes": 2908,
+      "sha256": "1d6ffde24716ddc60bb2c9707754f47dc78d2a4f894252168361d1388dabf35f"
+    },
+    "README.ko.md": {
+      "bytes": 3872,
+      "sha256": "f515625c2ed314f4036f47e890c7c0933345364d18934b5b15be70829e34ce8d"
+    },
+    "SOURCE-CHECKS.json": {
+      "bytes": 6209,
+      "sha256": "bf824a6d16116b1044ac3f7f8a569c82841c21b94054d6d47e438434ddaf1c55"
+    },
+    "fixture.py": {
+      "bytes": 20601,
+      "sha256": "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208"
+    },
+    "frozen/runner.py": {
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343"
+    },
+    "manifest.json": {
+      "bytes": 12565,
+      "sha256": "15e10b1038f2ced4787e73cca5a19039132cf54b432191e3347aa394e3742b4a"
+    },
+    "SOURCE.SHA256.json": {
+      "bytes": 769,
+      "sha256": "2345d41939c978a165693f4417db6944fe983fad42706466f6f986bf617d739e"
+    }
+  },
+  "files_observed": [
+    {
+      "path": "result.json",
+      "bytes": 526
+    },
+    {
+      "path": "postflight.json.before-fault",
+      "bytes": 19813
+    },
+    {
+      "path": "postflight.json",
+      "bytes": 16208
+    },
+    {
+      "path": "fixture-observation.json",
+      "bytes": 402
+    },
+    {
+      "path": "result.json.before-fault",
+      "bytes": 586
+    },
+    {
+      "path": "effect-denials.jsonl",
+      "bytes": 0
+    }
+  ],
+  "residual_observation_mutable": false,
+  "timeout_note": "Own child only kill/reap in same budget; no retry/global kill/cleanup"
+}

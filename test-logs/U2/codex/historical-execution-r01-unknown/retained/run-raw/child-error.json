@@ -1,0 +1,5 @@
+{
+  "utc": "2026-10-04T16:23:38.820199+00:00",
+  "status": "ERROR",
+  "traceback": "Traceback (most recent call last):\n  File \"/workspace/vm-u2-source-24cf-r01/packet/runner.py\", line 319, in main\n    return child(args, Path(args.run_root)) if args.child else supervise(args)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/vm-u2-source-24cf-r01/packet/runner.py\", line 168, in child\n    raise RuntimeError(\"helper code origin mismatch\")\nRuntimeError: helper code origin mismatch\n"
+}

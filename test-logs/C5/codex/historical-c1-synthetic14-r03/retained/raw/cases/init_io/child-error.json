@@ -1,0 +1,10 @@
+{
+  "utc": "2026-10-04T20:10:58.787720+00:00",
+  "status": "ERROR",
+  "traceback": "Traceback (most recent call last):\n  File \"/workspace/vm-c5-source-24cf-r03/c1-fixture/frozen/runner.py\", line 235, in guard_factory\n    denial_stream = (root / \"effect-denials.jsonl\").open(\"x\", encoding=\"utf-8\", newline=\"\\n\")\n                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/vm-c5-source-24cf-r03/c1-fixture/fixture.py\", line 178, in open\n    raise OSError(\"owned synthetic journal initialization fault\")\nOSError: owned synthetic journal initialization fault\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"/workspace/vm-c5-source-24cf-r03/c1-fixture/fixture.py\", line 257, in child\n    state, stream, hook = bound[\"guard_factory\"](\n                          ^^^^^^^^^^^^^^^^^^^^^^^\n  File \"/workspace/vm-c5-source-24cf-r03/c1-fixture/frozen/runner.py\", line 240, in guard_factory\n    raise RuntimeError(\"C5 denial journal initialization failed\") from error\nRuntimeError: C5 denial journal initialization failed\n",
+  "pid": 5265,
+  "effect_denials": {
+    "count": 0,
+    "logging_errors": 1
+  }
+}

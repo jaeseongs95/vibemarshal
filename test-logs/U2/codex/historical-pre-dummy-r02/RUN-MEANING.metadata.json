@@ -1,0 +1,20 @@
+{
+  "recordKind": "LOCAL_DERIVED_ARCHIVE_MEANING",
+  "testUnit": "U2",
+  "testPurpose": "schema migration·writer fence 및 해당 PRE/dummy·이전 UNKNOWN 증거",
+  "historicalArchiveFolder": "historical-pre-dummy-r02",
+  "currentCloudExecution": 0,
+  "actualNativeReturnClaim": "Only rows explicitly marked LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE; captures/PRE requests/local notes are not Cloud product execution returns",
+  "sourceRows": 33,
+  "publicCopyRows": 33,
+  "excludedRows": 0,
+  "historicalMeanings": [
+    "Local App extract/supporting manifest; preserve observed/truncated/null limits",
+    "PRE and stdlib dummy; separate from product exact2"
+  ],
+  "fixtureIsNotProductPASS": true,
+  "priorNOTRUNUNKNOWNRetained": true,
+  "futureExecutionAuthority": null,
+  "sourceOrPreVerdictNotIssued": true,
+  "sameContentPinDoesNotMergeRunLineage": true
+}

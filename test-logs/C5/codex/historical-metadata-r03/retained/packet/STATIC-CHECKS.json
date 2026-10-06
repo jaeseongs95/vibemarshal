@@ -1,0 +1,53 @@
+{
+  "observed_utc": "2026-10-04T19:25:25.858231+00:00",
+  "method": "metadata AST/compile/hash only; candidate functions never imported/executed",
+  "actual_product_candidate_import_loader_dummy_cloud_runs": 0,
+  "compiled_in_memory_files": [
+    "runner.py",
+    "pristine/tests/test_flowmarshal_implementation_workflow.py",
+    "pristine/scripts/flowmarshal_implementation_workflow.py",
+    "pristine/scripts/flowmarshal_orchestrator_ledger.py"
+  ],
+  "r02_runner_full_AST_same_after_schema_literal_normalization": true,
+  "original3_and_ID5_unchanged": true,
+  "original76_inventory_status_r01_bytes_unchanged": true,
+  "r02_cold_recheck": "Tool f9a677 exit0, seal10/ZIP11/every-payload-byte equality/audit-predicate same/unchanged9 function AST/compile4",
+  "r03_delta": "Metadata-only timeout description consistency fix; runner schema literal and manifest identity updated, full AST same after schema normalization. C1 code unchanged from r02.",
+  "r02_pins": {
+    "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r02",
+    "state": "Frozen source preparation only, SOURCE/PRE/POST NOT_RUN; all12 files preserved",
+    "runner": {
+      "bytes": 29404,
+      "sha256": "35b478ef92ceedaaa70a1639ee3979e68ff1ae9ea3f2aea2d51ca711067c9cea"
+    },
+    "manifest": {
+      "bytes": 11186,
+      "sha256": "7c0648076adc84e5e8dc8b202c9049fa64e8b8acf585089241aee6344d397e13"
+    },
+    "seal": {
+      "bytes": 1425,
+      "sha256": "c851627426f2ee719852d5f8bc36299f45ba8005cc6e3a1d1dc839d89a48bfc7"
+    },
+    "zip": {
+      "bytes": 148441,
+      "sha256": "6a4b415cf6f173a3b3357e51163877deac66d2aff2b8c9db6fb76a5cd538f72a"
+    }
+  },
+  "previous_files_preserved": 81,
+  "previous_fingerprint": "3d94ff4f0d82d19a09597a8a747a401e997833a4189aa7f1886411c633cbd28c",
+  "required_future_dummy_NOT_RUN": [
+    "normal zero required empty journal/PASS",
+    "caught RuntimeError retains denial and FAIL",
+    "uncaught guard denial/FAIL with native unittest unobserved",
+    "journal initialization/write/flush/close/read/missing/corrupt/mismatch => UNKNOWN"
+  ],
+  "r01_R030_pin": {
+    "path": "D:\\claude\\독립감사관\\R-030-VM-NEXT-COMMON5-R01-SOURCE-VERDICT.ko.md",
+    "bytes": 7387,
+    "sha256": "c943f4af0d3dafabac571c16f2b21b31447356432a8daf8d92b064486e7b17e8",
+    "state": "SOURCE STATIC PASS for r01 only; not PRE/POST or r02 approval",
+    "limits": "R030 inventory/status/Root proof content unread, partial independence preserved"
+  },
+  "new_SOURCE_PRE_POST": "NOT_RUN",
+  "no_current_76_or_Windows_or_Goal_PASS": true
+}

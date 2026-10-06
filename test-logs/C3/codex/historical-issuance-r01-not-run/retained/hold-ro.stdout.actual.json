@@ -1,0 +1,73 @@
+{
+  "utc": "2026-10-04T14:44:50.704823+00:00",
+  "scope": "HOLD_READ_ONLY_STATE_NO_RUN",
+  "evidenceFiles": [
+    {
+      "path": "/workspace/vm-common3-source-24cf-r03/evidence/launch-freshness-r01.json",
+      "bytes": 4635,
+      "sha256": "d6877881b375f7370d01d46a0d754d8c3b4924092d2499c5e00d01869fdc25bf"
+    },
+    {
+      "path": "/workspace/vm-common3-source-24cf-r03/evidence/execution-dispatch-r01.receipt.json",
+      "bytes": 1137,
+      "sha256": "029681c7daf551d2b20ac2ab939adb5f9b22aa25a3ff97fdfb6b5305efc0f153"
+    },
+    {
+      "path": "/workspace/vm-common3-source-24cf-r03/evidence/linux-pre.stdout.json",
+      "bytes": 9799,
+      "sha256": "2de9b103aaba3a77d3f087b42d816896d9cbf7a233d7d7567e2e381236431e8a"
+    }
+  ],
+  "guardRecordedUtc": "2026-10-04T14:42:44.356566+00:00",
+  "guardRecordedPass": true,
+  "dispatchPreparationRecord": {
+    "scope": "EXACT_SINGLE_NATIVE_DISPATCH_RECEIPT_NOT_APPROVAL",
+    "issuedUtc": "2026-10-04T14:41:13Z",
+    "launchNotAfterUtc": "2026-10-04T14:43:13.000Z",
+    "preparedUtc": "2026-10-04T14:42:44.356566+00:00",
+    "guardPassed": true,
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-X",
+      "utf8",
+      "/workspace/vm-common3-source-24cf-r03/packet/runner.py",
+      "--run-root",
+      "/workspace/vm-common3-run-24cf-r03",
+      "--runner-sha256",
+      "457fd65598bc5cb5a87dd46abb7036bac9768db20a932053fb9670b201862136",
+      "--manifest-sha256",
+      "ae0260a8fd9803cc716a8eab504e34b9bdfd919f39695e8bced5a896c116c3ad",
+      "--timeout",
+      "300"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03/pre-cwd",
+    "status": "NATIVE_DISPATCH_PENDING",
+    "requestedRunnerInvocations": 1,
+    "retries": 0,
+    "actualStartUtc": null,
+    "actualExit": null,
+    "nativeExecutionId": null,
+    "note": "Actual native invocation/outcome is preserved in outer-execution-r01.receipt.json after the same-session observation; this file is immutable dispatch preparation evidence."
+  },
+  "runrootLexists": false,
+  "preCwdEmpty": true,
+  "sourceFileCount": 9,
+  "sourceBytes": 625583,
+  "sourcePinsUnchanged": true,
+  "outerAndPostArtifactPresence": {
+    "outer-native-start-r01.utc": false,
+    "outer-native-end-r01.utc": false,
+    "outer-native-exit-r01.txt": false,
+    "outer-native-stdout-r01.txt": false,
+    "outer-native-stderr-r01.txt": false,
+    "outer-execution-r01.receipt.json": false,
+    "module-file-pins-post-r01.json": false
+  },
+  "filesystemWrites": 0,
+  "runnerImportsLoadersTests": 0,
+  "externalJobs": "UNKNOWN",
+  "priorUnreadableProcesses": 7
+}

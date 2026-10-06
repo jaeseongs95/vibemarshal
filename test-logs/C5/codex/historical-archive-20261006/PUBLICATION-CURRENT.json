@@ -1,0 +1,3416 @@
+{
+  "documentKind": "HistoricalTestUnitPublicationCurrent.v1",
+  "createdUTC": "2026-10-06T06:23:08.925181+00:00",
+  "testUnit": "C5",
+  "exactTestIds": [
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_carry_rehashes_all_evidence_files_without_freshness_contract",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_migration_backup_history_idempotence_tamper_cycle_and_readonly",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_record_direct_attempt_rejects_task_that_is_not_ready",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revalidate_success_rejects_ordinary_pending_task",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision_manifest_rejects_false_carry_and_incomplete_lineage"
+  ],
+  "original76Scoped13Remaining63": {
+    "original": 76,
+    "historicalScopedSuccess": 13,
+    "remaining": 63,
+    "officialAcceptance": null,
+    "newTestExecutions": 0
+  },
+  "historicalStatusMeaningKo": "PRE・synthetic・NOT_RUN・UNKNOWN은 역사적 준비/실행 기록이며 새 제품 PASS나 실행 승인으로 바꾸지 않는다.",
+  "environmentMeaning": {
+    "cloudSession": "REUSED existing Codex Cloud thread",
+    "newProductSessionCreated": false,
+    "containerIdentity": "UNKNOWN",
+    "environmentBootFreshness": "UNKNOWN",
+    "guardOwnedRunRootFreshness": "Distinct claim; not OS isolation or independent audit"
+  },
+  "currentSourceRows": [
+    {
+      "sourceRow": 84,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/evidence/command-audit.json",
+      "originalPin": {
+        "bytes": 42945,
+        "sha256": "9bb81903e6067b8b73f43000ccfb31e5acdccf8299570f8836523b28e7738b4e"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/evidence/command-audit.json",
+      "publicPin": {
+        "bytes": 42945,
+        "sha256": "9bb81903e6067b8b73f43000ccfb31e5acdccf8299570f8836523b28e7738b4e"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 85,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/evidence/evidence-manifest.json",
+      "originalPin": {
+        "bytes": 5872,
+        "sha256": "0de534e0dc402e535994a9bdc9166f1e54c6abcb387a6acfb11ac9847f5f24b4"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/evidence/evidence-manifest.json",
+      "publicPin": {
+        "bytes": 5872,
+        "sha256": "0de534e0dc402e535994a9bdc9166f1e54c6abcb387a6acfb11ac9847f5f24b4"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 86,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/evidence/linux-pre-command.sh",
+      "originalPin": {
+        "bytes": 9631,
+        "sha256": "1777afc9d28b611b11af2026fc8cbf71e45a498fed23b04936a872e1f47deb9a"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/evidence/linux-pre-command.sh",
+      "publicPin": {
+        "bytes": 9631,
+        "sha256": "1777afc9d28b611b11af2026fc8cbf71e45a498fed23b04936a872e1f47deb9a"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 87,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/evidence/linux-pre.stderr.txt",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/evidence/linux-pre.stderr.txt",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 88,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/evidence/linux-pre.stdout.json",
+      "originalPin": {
+        "bytes": 114902,
+        "sha256": "3e303efd982ac83f7ef9ac68efb75bd7f3d010ce2f69fc1084ea64057ac2a9a6"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/evidence/linux-pre.stdout.json",
+      "publicPin": {
+        "bytes": 114902,
+        "sha256": "3e303efd982ac83f7ef9ac68efb75bd7f3d010ce2f69fc1084ea64057ac2a9a6"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C5/codex/cloud-r03/raw/prior-pre/linux-pre.stdout.json"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 89,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/evidence/materialization.stdout.json",
+      "originalPin": {
+        "bytes": 6106,
+        "sha256": "887d5424b9684569a800ca6f39e536ef1bd89f536a64c2915193cb3221d96a67"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/evidence/materialization.stdout.json",
+      "publicPin": {
+        "bytes": 6106,
+        "sha256": "887d5424b9684569a800ca6f39e536ef1bd89f536a64c2915193cb3221d96a67"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 90,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/evidence/preflight-command.sh",
+      "originalPin": {
+        "bytes": 2231,
+        "sha256": "956e507bf2b4551c3d6a8b5fbf9ccca1afd90e45b469071438dc46aade8f417a"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/evidence/preflight-command.sh",
+      "publicPin": {
+        "bytes": 2231,
+        "sha256": "956e507bf2b4551c3d6a8b5fbf9ccca1afd90e45b469071438dc46aade8f417a"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 91,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/evidence/preflight-root.stdout.json",
+      "originalPin": {
+        "bytes": 2288,
+        "sha256": "56e31ed64867a8cff23de45089e710e6155e5d0315e939ab687f9cbbd4217651"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/evidence/preflight-root.stdout.json",
+      "publicPin": {
+        "bytes": 2288,
+        "sha256": "56e31ed64867a8cff23de45089e710e6155e5d0315e939ab687f9cbbd4217651"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 92,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/evidence/preparation-summary.json",
+      "originalPin": {
+        "bytes": 6686,
+        "sha256": "06b2071fd794d14db2a1ab89cbfc20ab96268ca94671f6668f2250268b9530c9"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/evidence/preparation-summary.json",
+      "publicPin": {
+        "bytes": 6686,
+        "sha256": "06b2071fd794d14db2a1ab89cbfc20ab96268ca94671f6668f2250268b9530c9"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 93,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/evidence/root-create.stdout.json",
+      "originalPin": {
+        "bytes": 189,
+        "sha256": "2f822967042d7b4835a908b8b7b0ec42e2cda0a1a7271abbe0cebbd94326a135"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/evidence/root-create.stdout.json",
+      "publicPin": {
+        "bytes": 189,
+        "sha256": "2f822967042d7b4835a908b8b7b0ec42e2cda0a1a7271abbe0cebbd94326a135"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 94,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/evidence/source-materialization-command.sh",
+      "originalPin": {
+        "bytes": 4469,
+        "sha256": "223dc8345bec38421ca41cfc14ec647bf794fa9a89b8901bc9666d7abff7af14"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/evidence/source-materialization-command.sh",
+      "publicPin": {
+        "bytes": 4469,
+        "sha256": "223dc8345bec38421ca41cfc14ec647bf794fa9a89b8901bc9666d7abff7af14"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 95,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/evidence/source-materialization.json",
+      "originalPin": {
+        "bytes": 6106,
+        "sha256": "887d5424b9684569a800ca6f39e536ef1bd89f536a64c2915193cb3221d96a67"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/evidence/source-materialization.json",
+      "publicPin": {
+        "bytes": 6106,
+        "sha256": "887d5424b9684569a800ca6f39e536ef1bd89f536a64c2915193cb3221d96a67"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 96,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/packet/manifest.json",
+      "originalPin": {
+        "bytes": 12335,
+        "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/packet/manifest.json",
+      "publicPin": {
+        "bytes": 12335,
+        "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C5/codex/cloud-r03/raw/candidate-source/manifest.json",
+        "C5/codex/cloud-r03/source-packet/manifest.json"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 97,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/packet/ORIGINAL76-INVENTORY.json",
+      "originalPin": {
+        "bytes": 161539,
+        "sha256": "3d9cd9641229dd9ffeaee608737036a6dff68bf4a7039e25e8c06bb315598ecd"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/packet/ORIGINAL76-INVENTORY.json",
+      "publicPin": {
+        "bytes": 161539,
+        "sha256": "3d9cd9641229dd9ffeaee608737036a6dff68bf4a7039e25e8c06bb315598ecd"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C5/codex/cloud-r03/source-packet/ORIGINAL76-INVENTORY.json"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 98,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/packet/ORIGINAL76-STATUS.ko.md",
+      "originalPin": {
+        "bytes": 24833,
+        "sha256": "f3d088714012f013989b7c82e014bcf872289268df9b3c76d879c755f0b7abf3"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/packet/ORIGINAL76-STATUS.ko.md",
+      "publicPin": {
+        "bytes": 24833,
+        "sha256": "f3d088714012f013989b7c82e014bcf872289268df9b3c76d879c755f0b7abf3"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C5/codex/cloud-r03/source-packet/ORIGINAL76-STATUS.ko.md"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 99,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/packet/README.ko.md",
+      "originalPin": {
+        "bytes": 3319,
+        "sha256": "7fe160ad0b983227db2502b66cec45ec423062ede9d74033d82f33745fa62503"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/packet/README.ko.md",
+      "publicPin": {
+        "bytes": 3319,
+        "sha256": "7fe160ad0b983227db2502b66cec45ec423062ede9d74033d82f33745fa62503"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C5/codex/cloud-r03/source-packet/README.ko.md"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 100,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/packet/SOURCE.SHA256.json",
+      "originalPin": {
+        "bytes": 1425,
+        "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/packet/SOURCE.SHA256.json",
+      "publicPin": {
+        "bytes": 1425,
+        "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C5/codex/cloud-r03/raw/candidate-source/SOURCE.SHA256.json",
+        "C5/codex/cloud-r03/source-packet/SOURCE.SHA256.json"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 101,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/packet/STATIC-CHECKS.json",
+      "originalPin": {
+        "bytes": 2616,
+        "sha256": "651170804bd7537f4c1cced2075b54863e7b785b5baa0b36a575f7706b415d4c"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/packet/STATIC-CHECKS.json",
+      "publicPin": {
+        "bytes": 2616,
+        "sha256": "651170804bd7537f4c1cced2075b54863e7b785b5baa0b36a575f7706b415d4c"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C5/codex/cloud-r03/source-packet/STATIC-CHECKS.json"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 102,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-raw/PRE.INVENTORY.json",
+      "originalPin": {
+        "bytes": 3321,
+        "sha256": "c0fa917ae931bc58cbaadeeb060a442d6ec523d4d22d3d44d58b62f5fa9c5a44"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/retained/PRE.INVENTORY.json",
+      "publicPin": {
+        "bytes": 3321,
+        "sha256": "c0fa917ae931bc58cbaadeeb060a442d6ec523d4d22d3d44d58b62f5fa9c5a44"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 103,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_METADATA",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/metadata-return.zip",
+      "originalPin": {
+        "bytes": 71989,
+        "sha256": "dbb013af30dee31b5916ab1774be0d6e87118800d429afbdeb6cb44b80b47287"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/cloud-return/original-return.zip",
+      "publicPin": {
+        "bytes": 71989,
+        "sha256": "dbb013af30dee31b5916ab1774be0d6e87118800d429afbdeb6cb44b80b47287"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 104,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/candidate-source/manifest.json",
+      "originalPin": {
+        "bytes": 12335,
+        "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/candidate-source/manifest.json",
+      "publicPin": {
+        "bytes": 12335,
+        "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C5/codex/cloud-r03/raw/candidate-source/manifest.json",
+        "C5/codex/cloud-r03/source-packet/manifest.json"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 105,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/candidate-source/SOURCE.SHA256.json",
+      "originalPin": {
+        "bytes": 1425,
+        "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/candidate-source/SOURCE.SHA256.json",
+      "publicPin": {
+        "bytes": 1425,
+        "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C5/codex/cloud-r03/raw/candidate-source/SOURCE.SHA256.json",
+        "C5/codex/cloud-r03/source-packet/SOURCE.SHA256.json"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 106,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/fixture-source/EXTRACTIONS.json",
+      "originalPin": {
+        "bytes": 2908,
+        "sha256": "1d6ffde24716ddc60bb2c9707754f47dc78d2a4f894252168361d1388dabf35f"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/fixture-source/EXTRACTIONS.json",
+      "publicPin": {
+        "bytes": 2908,
+        "sha256": "1d6ffde24716ddc60bb2c9707754f47dc78d2a4f894252168361d1388dabf35f"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 107,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/fixture-source/fixture.py",
+      "originalPin": {
+        "bytes": 20601,
+        "sha256": "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/fixture-source/fixture.py",
+      "publicPin": {
+        "bytes": 20601,
+        "sha256": "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 108,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/fixture-source/frozen/runner.py",
+      "originalPin": {
+        "bytes": 29404,
+        "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/fixture-source/frozen/runner.py",
+      "publicPin": {
+        "bytes": 29404,
+        "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C5/codex/cloud-r03/source-packet/runner.py"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 109,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/fixture-source/manifest.json",
+      "originalPin": {
+        "bytes": 12565,
+        "sha256": "15e10b1038f2ced4787e73cca5a19039132cf54b432191e3347aa394e3742b4a"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/fixture-source/manifest.json",
+      "publicPin": {
+        "bytes": 12565,
+        "sha256": "15e10b1038f2ced4787e73cca5a19039132cf54b432191e3347aa394e3742b4a"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 110,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/fixture-source/README.ko.md",
+      "originalPin": {
+        "bytes": 3872,
+        "sha256": "f515625c2ed314f4036f47e890c7c0933345364d18934b5b15be70829e34ce8d"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/fixture-source/README.ko.md",
+      "publicPin": {
+        "bytes": 3872,
+        "sha256": "f515625c2ed314f4036f47e890c7c0933345364d18934b5b15be70829e34ce8d"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 111,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/fixture-source/SOURCE-CHECKS.json",
+      "originalPin": {
+        "bytes": 6209,
+        "sha256": "bf824a6d16116b1044ac3f7f8a569c82841c21b94054d6d47e438434ddaf1c55"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/fixture-source/SOURCE-CHECKS.json",
+      "publicPin": {
+        "bytes": 6209,
+        "sha256": "bf824a6d16116b1044ac3f7f8a569c82841c21b94054d6d47e438434ddaf1c55"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 112,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/fixture-source/SOURCE.SHA256.json",
+      "originalPin": {
+        "bytes": 769,
+        "sha256": "2345d41939c978a165693f4417db6944fe983fad42706466f6f986bf617d739e"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/fixture-source/SOURCE.SHA256.json",
+      "publicPin": {
+        "bytes": 769,
+        "sha256": "2345d41939c978a165693f4417db6944fe983fad42706466f6f986bf617d739e"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 113,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/prior-pre/linux-pre.stdout.json",
+      "originalPin": {
+        "bytes": 114902,
+        "sha256": "3e303efd982ac83f7ef9ac68efb75bd7f3d010ce2f69fc1084ea64057ac2a9a6"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/prior-pre/linux-pre.stdout.json",
+      "publicPin": {
+        "bytes": 114902,
+        "sha256": "3e303efd982ac83f7ef9ac68efb75bd7f3d010ce2f69fc1084ea64057ac2a9a6"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C5/codex/cloud-r03/raw/prior-pre/linux-pre.stdout.json"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 114,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/bool_counter/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/bool_counter/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 115,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/bool_counter/execution.json",
+      "originalPin": {
+        "bytes": 3215,
+        "sha256": "25908ac88c5dab2cf8a3ecc90ec3c68754de756fe2afcf42b8659093e9f0db22"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/bool_counter/execution.json",
+      "publicPin": {
+        "bytes": 3215,
+        "sha256": "25908ac88c5dab2cf8a3ecc90ec3c68754de756fe2afcf42b8659093e9f0db22"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 116,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/bool_counter/fixture-observation.json",
+      "originalPin": {
+        "bytes": 402,
+        "sha256": "cafd1c61f86f505f8d913af483eba1ccf86a3217620a571459ff88d0ed46c514"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/bool_counter/fixture-observation.json",
+      "publicPin": {
+        "bytes": 402,
+        "sha256": "cafd1c61f86f505f8d913af483eba1ccf86a3217620a571459ff88d0ed46c514"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 117,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/bool_counter/postflight.json",
+      "originalPin": {
+        "bytes": 16208,
+        "sha256": "cde8f55584c25449302ecdcc6c88237cf2dfed4a2113146c1144aa4bbc3f4ddc"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/bool_counter/postflight.json",
+      "publicPin": {
+        "bytes": 16208,
+        "sha256": "cde8f55584c25449302ecdcc6c88237cf2dfed4a2113146c1144aa4bbc3f4ddc"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 118,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/bool_counter/postflight.json.before-fault",
+      "originalPin": {
+        "bytes": 19813,
+        "sha256": "18eba0db06e4cadbaae15a8037795786e6ddbc2f256a7359ba1e64d0f4f5db2d"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/bool_counter/postflight.json.before-fault",
+      "publicPin": {
+        "bytes": 19813,
+        "sha256": "18eba0db06e4cadbaae15a8037795786e6ddbc2f256a7359ba1e64d0f4f5db2d"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 119,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/bool_counter/result.json",
+      "originalPin": {
+        "bytes": 526,
+        "sha256": "d12a8280190e08bb48857774c358e827444ce2b8a3651eea47443b293406f6d8"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/bool_counter/result.json",
+      "publicPin": {
+        "bytes": 526,
+        "sha256": "d12a8280190e08bb48857774c358e827444ce2b8a3651eea47443b293406f6d8"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 120,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/bool_counter/result.json.before-fault",
+      "originalPin": {
+        "bytes": 586,
+        "sha256": "b31477aa9d5c359d64774a1e33bf1bde72d2d635fa17094cf88d9e8b5c3be462"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/bool_counter/result.json.before-fault",
+      "publicPin": {
+        "bytes": 586,
+        "sha256": "b31477aa9d5c359d64774a1e33bf1bde72d2d635fa17094cf88d9e8b5c3be462"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 121,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/caught_denial/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 125,
+        "sha256": "5227db4f1debfc6d916a929e6826f7d1baca2ff6a9162a1e398dae84dc679abb"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/caught_denial/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 125,
+        "sha256": "5227db4f1debfc6d916a929e6826f7d1baca2ff6a9162a1e398dae84dc679abb"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 122,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/caught_denial/execution.json",
+      "originalPin": {
+        "bytes": 3021,
+        "sha256": "bbc1cbc786c9233e79c577ad3aa114bdd5741fc34a839c6b9e38e4086b12e415"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/caught_denial/execution.json",
+      "publicPin": {
+        "bytes": 3021,
+        "sha256": "bbc1cbc786c9233e79c577ad3aa114bdd5741fc34a839c6b9e38e4086b12e415"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 123,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/caught_denial/fixture-observation.json",
+      "originalPin": {
+        "bytes": 481,
+        "sha256": "81f315bf575734793a399bcf18e9952d3306376123ea5d43d4f429c13664b3d9"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/caught_denial/fixture-observation.json",
+      "publicPin": {
+        "bytes": 481,
+        "sha256": "81f315bf575734793a399bcf18e9952d3306376123ea5d43d4f429c13664b3d9"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 124,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/caught_denial/postflight.json",
+      "originalPin": {
+        "bytes": 19816,
+        "sha256": "503ac4b2b0c3b15040b44765ad9b4819d9baea736020813d160ac47d0c610bbf"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/caught_denial/postflight.json",
+      "publicPin": {
+        "bytes": 19816,
+        "sha256": "503ac4b2b0c3b15040b44765ad9b4819d9baea736020813d160ac47d0c610bbf"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 125,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/caught_denial/result.json",
+      "originalPin": {
+        "bytes": 586,
+        "sha256": "8ce48fcdaef1877d11f0c4d14a76257d138c2679032f05043bcfbffb301c738c"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/caught_denial/result.json",
+      "publicPin": {
+        "bytes": 586,
+        "sha256": "8ce48fcdaef1877d11f0c4d14a76257d138c2679032f05043bcfbffb301c738c"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 126,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/close_io/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 125,
+        "sha256": "6e6610f58c1dc99910291a2ceebd91ce289227ba0059a2be7562568a73e8b90b"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/close_io/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 125,
+        "sha256": "6e6610f58c1dc99910291a2ceebd91ce289227ba0059a2be7562568a73e8b90b"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 127,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/close_io/execution.json",
+      "originalPin": {
+        "bytes": 3065,
+        "sha256": "19b42bc93ae03d0935c5204f3044dc83675f3ce473dbdb628cf9baef5df309cf"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/close_io/execution.json",
+      "publicPin": {
+        "bytes": 3065,
+        "sha256": "19b42bc93ae03d0935c5204f3044dc83675f3ce473dbdb628cf9baef5df309cf"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 128,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/close_io/fixture-observation.json",
+      "originalPin": {
+        "bytes": 549,
+        "sha256": "5abcd610da81427f787c1306df7d8890dc792703870c7cd56525e27e7ee31a86"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/close_io/fixture-observation.json",
+      "publicPin": {
+        "bytes": 549,
+        "sha256": "5abcd610da81427f787c1306df7d8890dc792703870c7cd56525e27e7ee31a86"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 129,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/close_io/postflight.json",
+      "originalPin": {
+        "bytes": 19849,
+        "sha256": "ec2421f29467e56c2a3e93660c9626ab4a0013da7c7aa87067b50ccee825a041"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/close_io/postflight.json",
+      "publicPin": {
+        "bytes": 19849,
+        "sha256": "ec2421f29467e56c2a3e93660c9626ab4a0013da7c7aa87067b50ccee825a041"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 130,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/close_io/result.json",
+      "originalPin": {
+        "bytes": 586,
+        "sha256": "3b746b310b52f249a9b0081e48723b87236f64284bf95af190b06eacaa7f574d"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/close_io/result.json",
+      "publicPin": {
+        "bytes": 586,
+        "sha256": "3b746b310b52f249a9b0081e48723b87236f64284bf95af190b06eacaa7f574d"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 131,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/count_mismatch/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/count_mismatch/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 132,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/count_mismatch/execution.json",
+      "originalPin": {
+        "bytes": 3206,
+        "sha256": "46ace23a9b7f1cc6df9756cde2801f601bfdd1eb14c75c2a0cba9091d2d52a65"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/count_mismatch/execution.json",
+      "publicPin": {
+        "bytes": 3206,
+        "sha256": "46ace23a9b7f1cc6df9756cde2801f601bfdd1eb14c75c2a0cba9091d2d52a65"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 133,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/count_mismatch/fixture-observation.json",
+      "originalPin": {
+        "bytes": 404,
+        "sha256": "3655e9347129049fce77c72a37bfbb04544bf11660b5c31e081ab392b99b0af7"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/count_mismatch/fixture-observation.json",
+      "publicPin": {
+        "bytes": 404,
+        "sha256": "3655e9347129049fce77c72a37bfbb04544bf11660b5c31e081ab392b99b0af7"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 134,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/count_mismatch/postflight.json",
+      "originalPin": {
+        "bytes": 16195,
+        "sha256": "284f5d42f5abee4d8b1c5cc8611b7c9f04cf0cac7839035918676c55ea65ce49"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/count_mismatch/postflight.json",
+      "publicPin": {
+        "bytes": 16195,
+        "sha256": "284f5d42f5abee4d8b1c5cc8611b7c9f04cf0cac7839035918676c55ea65ce49"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 135,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/count_mismatch/postflight.json.before-fault",
+      "originalPin": {
+        "bytes": 19813,
+        "sha256": "77438540afbb1a89c9118bf336d41347b89b784fd8227fd3ff5e91a5f74e8785"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/count_mismatch/postflight.json.before-fault",
+      "publicPin": {
+        "bytes": 19813,
+        "sha256": "77438540afbb1a89c9118bf336d41347b89b784fd8227fd3ff5e91a5f74e8785"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 136,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/count_mismatch/result.json",
+      "originalPin": {
+        "bytes": 522,
+        "sha256": "7a2bd132d2bdb6e465e6164d197228893287638267362101213a88f0cb89bd34"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/count_mismatch/result.json",
+      "publicPin": {
+        "bytes": 522,
+        "sha256": "7a2bd132d2bdb6e465e6164d197228893287638267362101213a88f0cb89bd34"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 137,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/count_mismatch/result.json.before-fault",
+      "originalPin": {
+        "bytes": 586,
+        "sha256": "dac7a3b19027ddb51ece879d7e5b5cf38ed880b8fe74fcb16d3bf2e434bdec2f"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/count_mismatch/result.json.before-fault",
+      "publicPin": {
+        "bytes": 586,
+        "sha256": "dac7a3b19027ddb51ece879d7e5b5cf38ed880b8fe74fcb16d3bf2e434bdec2f"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 138,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/flush_io/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 125,
+        "sha256": "ff35105f499f76853f010ec8769756e6c95b102456b8839534b73dcc4cd40d9f"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/flush_io/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 125,
+        "sha256": "ff35105f499f76853f010ec8769756e6c95b102456b8839534b73dcc4cd40d9f"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 139,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/flush_io/execution.json",
+      "originalPin": {
+        "bytes": 3056,
+        "sha256": "423dec94c2845fed199e897efcd1dedf34d61724a00a80aa792c4c1d6c67da4b"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/flush_io/execution.json",
+      "publicPin": {
+        "bytes": 3056,
+        "sha256": "423dec94c2845fed199e897efcd1dedf34d61724a00a80aa792c4c1d6c67da4b"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 140,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/flush_io/fixture-observation.json",
+      "originalPin": {
+        "bytes": 549,
+        "sha256": "14d964d3c66374629ef90e1575f9dbfc550feb30b9f5935de8ab5d40c84cb33f"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/flush_io/fixture-observation.json",
+      "publicPin": {
+        "bytes": 549,
+        "sha256": "14d964d3c66374629ef90e1575f9dbfc550feb30b9f5935de8ab5d40c84cb33f"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 141,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/flush_io/postflight.json",
+      "originalPin": {
+        "bytes": 19849,
+        "sha256": "df5f6b69c8904deca97cd7a8bcd13bbf1aabb02751d212f5be3f209c9395c915"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/flush_io/postflight.json",
+      "publicPin": {
+        "bytes": 19849,
+        "sha256": "df5f6b69c8904deca97cd7a8bcd13bbf1aabb02751d212f5be3f209c9395c915"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 142,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/flush_io/result.json",
+      "originalPin": {
+        "bytes": 586,
+        "sha256": "e4fc4afeda889d00fc137552499b3042346d841f6d89211aecfc76514feb3993"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/flush_io/result.json",
+      "publicPin": {
+        "bytes": 586,
+        "sha256": "e4fc4afeda889d00fc137552499b3042346d841f6d89211aecfc76514feb3993"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 143,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/init_io/child-error.json",
+      "originalPin": {
+        "bytes": 1253,
+        "sha256": "c772ba5c5c75c5fc0b6c742e14f1c7d175e8536140f19988f90c994304deebf8"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/init_io/child-error.json",
+      "publicPin": {
+        "bytes": 1253,
+        "sha256": "c772ba5c5c75c5fc0b6c742e14f1c7d175e8536140f19988f90c994304deebf8"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 144,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/init_io/execution.json",
+      "originalPin": {
+        "bytes": 2924,
+        "sha256": "863af6f1571fa6536ebb60a769e1b61ee5c6714e92b8214a262832a8beb7b2d8"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/init_io/execution.json",
+      "publicPin": {
+        "bytes": 2924,
+        "sha256": "863af6f1571fa6536ebb60a769e1b61ee5c6714e92b8214a262832a8beb7b2d8"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 145,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/init_io/fixture-observation.json",
+      "originalPin": {
+        "bytes": 469,
+        "sha256": "2b247a5369f5f6944ebadc4df43ade81abfd1cc1c6091549d42ec4084f68d349"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/init_io/fixture-observation.json",
+      "publicPin": {
+        "bytes": 469,
+        "sha256": "2b247a5369f5f6944ebadc4df43ade81abfd1cc1c6091549d42ec4084f68d349"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 146,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_corrupt/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 9,
+        "sha256": "60498ebafa3f473a2a72c1242e8c3202bf50a6d81dfc721958be1550f46faf33"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_corrupt/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 9,
+        "sha256": "60498ebafa3f473a2a72c1242e8c3202bf50a6d81dfc721958be1550f46faf33"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 147,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_corrupt/effect-denials.jsonl.before-fault",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_corrupt/effect-denials.jsonl.before-fault",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 148,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_corrupt/execution.json",
+      "originalPin": {
+        "bytes": 3221,
+        "sha256": "23436379e43f48408a8c71c3fe305ea0c9bad874f22dbd89fd128181793f8266"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_corrupt/execution.json",
+      "publicPin": {
+        "bytes": 3221,
+        "sha256": "23436379e43f48408a8c71c3fe305ea0c9bad874f22dbd89fd128181793f8266"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 149,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_corrupt/fixture-observation.json",
+      "originalPin": {
+        "bytes": 405,
+        "sha256": "427883dce2853d222a4076f14af7ad715530614ba2a3ff15b6eabab775252296"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_corrupt/fixture-observation.json",
+      "publicPin": {
+        "bytes": 405,
+        "sha256": "427883dce2853d222a4076f14af7ad715530614ba2a3ff15b6eabab775252296"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 150,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_corrupt/postflight.json",
+      "originalPin": {
+        "bytes": 16203,
+        "sha256": "036f84bfcc117f61efbae09cac96c1d059c02253e49be322fbb0c766167e47b0"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_corrupt/postflight.json",
+      "publicPin": {
+        "bytes": 16203,
+        "sha256": "036f84bfcc117f61efbae09cac96c1d059c02253e49be322fbb0c766167e47b0"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 151,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_corrupt/postflight.json.before-fault",
+      "originalPin": {
+        "bytes": 19813,
+        "sha256": "d18af60eaec32e5761528570dae425d947c45d81a8b85dbbff444fec03b1556a"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_corrupt/postflight.json.before-fault",
+      "publicPin": {
+        "bytes": 19813,
+        "sha256": "d18af60eaec32e5761528570dae425d947c45d81a8b85dbbff444fec03b1556a"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 152,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_corrupt/result.json",
+      "originalPin": {
+        "bytes": 586,
+        "sha256": "a6a6464325f7cf3ea1e8c7c92af13cdd92000bee0774bd8d1a95a3de1dc7f78a"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_corrupt/result.json",
+      "publicPin": {
+        "bytes": 586,
+        "sha256": "a6a6464325f7cf3ea1e8c7c92af13cdd92000bee0774bd8d1a95a3de1dc7f78a"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 153,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_missing/effect-denials.jsonl.before-fault",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_missing/effect-denials.jsonl.before-fault",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 154,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_missing/execution.json",
+      "originalPin": {
+        "bytes": 3095,
+        "sha256": "99dee08cbddec6825c7b3226d4744b80bf480aa1bb6216cc40163c857b50acbb"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_missing/execution.json",
+      "publicPin": {
+        "bytes": 3095,
+        "sha256": "99dee08cbddec6825c7b3226d4744b80bf480aa1bb6216cc40163c857b50acbb"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 155,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_missing/fixture-observation.json",
+      "originalPin": {
+        "bytes": 405,
+        "sha256": "d847f5a18c3c0ff1c277b8e70e87d79650e235cf1cb7d452a967b8f1bbe63c59"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_missing/fixture-observation.json",
+      "publicPin": {
+        "bytes": 405,
+        "sha256": "d847f5a18c3c0ff1c277b8e70e87d79650e235cf1cb7d452a967b8f1bbe63c59"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 156,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_missing/postflight.json",
+      "originalPin": {
+        "bytes": 16145,
+        "sha256": "83a26f2741538388dddf0ba72b3cffe7d27fe0af31de06ab09cc15420b98ae94"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_missing/postflight.json",
+      "publicPin": {
+        "bytes": 16145,
+        "sha256": "83a26f2741538388dddf0ba72b3cffe7d27fe0af31de06ab09cc15420b98ae94"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 157,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_missing/postflight.json.before-fault",
+      "originalPin": {
+        "bytes": 19813,
+        "sha256": "2861f0da668e65c89635b1c363c25ee2bd226a899605ccb0713e26af9d35a207"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_missing/postflight.json.before-fault",
+      "publicPin": {
+        "bytes": 19813,
+        "sha256": "2861f0da668e65c89635b1c363c25ee2bd226a899605ccb0713e26af9d35a207"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 158,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_missing/result.json",
+      "originalPin": {
+        "bytes": 586,
+        "sha256": "361ba2b06a23c07db1cb10f13187faeda2a7ce1c94e6264606166e90bd0b2b95"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_missing/result.json",
+      "publicPin": {
+        "bytes": 586,
+        "sha256": "361ba2b06a23c07db1cb10f13187faeda2a7ce1c94e6264606166e90bd0b2b95"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 159,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_partial/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 1,
+        "sha256": "021fb596db81e6d02bf3d2586ee3981fe519f275c0ac9ca76bbcf2ebb4097d96"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_partial/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 1,
+        "sha256": "021fb596db81e6d02bf3d2586ee3981fe519f275c0ac9ca76bbcf2ebb4097d96"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 160,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_partial/effect-denials.jsonl.before-fault",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_partial/effect-denials.jsonl.before-fault",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 161,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_partial/execution.json",
+      "originalPin": {
+        "bytes": 3216,
+        "sha256": "800977b17de1dd3aa7c48b22f19b79c128c3284a030286cf65caac9d3b4b7088"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_partial/execution.json",
+      "publicPin": {
+        "bytes": 3216,
+        "sha256": "800977b17de1dd3aa7c48b22f19b79c128c3284a030286cf65caac9d3b4b7088"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 162,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_partial/fixture-observation.json",
+      "originalPin": {
+        "bytes": 405,
+        "sha256": "988b465cad7a10161328e03b23b91bff57c0754094f421b0d2f47d84ca7edca1"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_partial/fixture-observation.json",
+      "publicPin": {
+        "bytes": 405,
+        "sha256": "988b465cad7a10161328e03b23b91bff57c0754094f421b0d2f47d84ca7edca1"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 163,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_partial/postflight.json",
+      "originalPin": {
+        "bytes": 16198,
+        "sha256": "ca8283667fab4159d25a0eab08e59865d6d4c3249bd594156d5a76c04464db0e"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_partial/postflight.json",
+      "publicPin": {
+        "bytes": 16198,
+        "sha256": "ca8283667fab4159d25a0eab08e59865d6d4c3249bd594156d5a76c04464db0e"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 164,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_partial/postflight.json.before-fault",
+      "originalPin": {
+        "bytes": 19813,
+        "sha256": "ecb03076c8f67bb4586d189631357b55e630f0b9f28fa4f161c0b68e594aa6df"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_partial/postflight.json.before-fault",
+      "publicPin": {
+        "bytes": 19813,
+        "sha256": "ecb03076c8f67bb4586d189631357b55e630f0b9f28fa4f161c0b68e594aa6df"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 165,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/journal_partial/result.json",
+      "originalPin": {
+        "bytes": 586,
+        "sha256": "1611f50cb2e0671f61d6066297225b49e116a2c8fefd36e2be2b6b96c2c4336c"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/journal_partial/result.json",
+      "publicPin": {
+        "bytes": 586,
+        "sha256": "1611f50cb2e0671f61d6066297225b49e116a2c8fefd36e2be2b6b96c2c4336c"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 166,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/normal_zero/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/normal_zero/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 167,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/normal_zero/execution.json",
+      "originalPin": {
+        "bytes": 3016,
+        "sha256": "4c1a7b557d6330f694bea7be31707ea874c8fa7d576df7a96526756c0392a3b4"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/normal_zero/execution.json",
+      "publicPin": {
+        "bytes": 3016,
+        "sha256": "4c1a7b557d6330f694bea7be31707ea874c8fa7d576df7a96526756c0392a3b4"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 168,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/normal_zero/fixture-observation.json",
+      "originalPin": {
+        "bytes": 401,
+        "sha256": "d8a13fa4058e3d3567287986d7be8e61bd52903a8a60cee3d443812b39e46ee2"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/normal_zero/fixture-observation.json",
+      "publicPin": {
+        "bytes": 401,
+        "sha256": "d8a13fa4058e3d3567287986d7be8e61bd52903a8a60cee3d443812b39e46ee2"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 169,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/normal_zero/postflight.json",
+      "originalPin": {
+        "bytes": 19813,
+        "sha256": "bda0d6fac7c30a206b36c19775e9fa0387e6e89eac69c64a65ceca624df939a3"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/normal_zero/postflight.json",
+      "publicPin": {
+        "bytes": 19813,
+        "sha256": "bda0d6fac7c30a206b36c19775e9fa0387e6e89eac69c64a65ceca624df939a3"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 170,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/normal_zero/result.json",
+      "originalPin": {
+        "bytes": 586,
+        "sha256": "6ce53099b0d6e21e90a66a63a2a1d71cd8d2f833ed12067f86ed47e041218a65"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/normal_zero/result.json",
+      "publicPin": {
+        "bytes": 586,
+        "sha256": "6ce53099b0d6e21e90a66a63a2a1d71cd8d2f833ed12067f86ed47e041218a65"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 171,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/pid_mismatch/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 125,
+        "sha256": "7c49b2621fdd6b1de56f4e55994169d019d35d1e4481ea3dc87b905574651425"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/pid_mismatch/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 125,
+        "sha256": "7c49b2621fdd6b1de56f4e55994169d019d35d1e4481ea3dc87b905574651425"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 172,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/pid_mismatch/effect-denials.jsonl.before-fault",
+      "originalPin": {
+        "bytes": 125,
+        "sha256": "101d8c6c2737800f8d3a86feb39fe5e9b896d0ca226219b7d57f2e83fc737cde"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/pid_mismatch/effect-denials.jsonl.before-fault",
+      "publicPin": {
+        "bytes": 125,
+        "sha256": "101d8c6c2737800f8d3a86feb39fe5e9b896d0ca226219b7d57f2e83fc737cde"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 173,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/pid_mismatch/execution.json",
+      "originalPin": {
+        "bytes": 3222,
+        "sha256": "17f5f2a16cdd542ec5035b11626f1920f048eb29fd60d496b034dad34b49f223"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/pid_mismatch/execution.json",
+      "publicPin": {
+        "bytes": 3222,
+        "sha256": "17f5f2a16cdd542ec5035b11626f1920f048eb29fd60d496b034dad34b49f223"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 174,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/pid_mismatch/fixture-observation.json",
+      "originalPin": {
+        "bytes": 480,
+        "sha256": "5bc6e1125be13a312342db640bd7eb01cf1dc0990a02d4a6e81706903d053d37"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/pid_mismatch/fixture-observation.json",
+      "publicPin": {
+        "bytes": 480,
+        "sha256": "5bc6e1125be13a312342db640bd7eb01cf1dc0990a02d4a6e81706903d053d37"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 175,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/pid_mismatch/postflight.json",
+      "originalPin": {
+        "bytes": 16200,
+        "sha256": "3fec0a1cb31fb9783fd55e044e5587e3f48725a4d98ec14b4af98282fbf31d44"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/pid_mismatch/postflight.json",
+      "publicPin": {
+        "bytes": 16200,
+        "sha256": "3fec0a1cb31fb9783fd55e044e5587e3f48725a4d98ec14b4af98282fbf31d44"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 176,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/pid_mismatch/postflight.json.before-fault",
+      "originalPin": {
+        "bytes": 19816,
+        "sha256": "0370349165e3d2292896103c6477665365710dbcbcdd4b1834f953a1d31486fa"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/pid_mismatch/postflight.json.before-fault",
+      "publicPin": {
+        "bytes": 19816,
+        "sha256": "0370349165e3d2292896103c6477665365710dbcbcdd4b1834f953a1d31486fa"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 177,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/pid_mismatch/result.json",
+      "originalPin": {
+        "bytes": 586,
+        "sha256": "2979e1fb3a5ea372a763328eb5a23dc9f7834e395863d174a94ee2d159fe3565"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/pid_mismatch/result.json",
+      "publicPin": {
+        "bytes": 586,
+        "sha256": "2979e1fb3a5ea372a763328eb5a23dc9f7834e395863d174a94ee2d159fe3565"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 178,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/post_counter_mismatch/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/post_counter_mismatch/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 179,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/post_counter_mismatch/execution.json",
+      "originalPin": {
+        "bytes": 3141,
+        "sha256": "0e15c53707ac4470c22839ed8a0b9c0e63175d01c8b8df06d4ddedb70cf5cf7a"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/post_counter_mismatch/execution.json",
+      "publicPin": {
+        "bytes": 3141,
+        "sha256": "0e15c53707ac4470c22839ed8a0b9c0e63175d01c8b8df06d4ddedb70cf5cf7a"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 180,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/post_counter_mismatch/fixture-observation.json",
+      "originalPin": {
+        "bytes": 411,
+        "sha256": "36375dfcc342dcf55bc81d4b42bf4df3ed2588777f016e018d4d3fec04878c4f"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/post_counter_mismatch/fixture-observation.json",
+      "publicPin": {
+        "bytes": 411,
+        "sha256": "36375dfcc342dcf55bc81d4b42bf4df3ed2588777f016e018d4d3fec04878c4f"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 181,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/post_counter_mismatch/postflight.json",
+      "originalPin": {
+        "bytes": 16165,
+        "sha256": "86f39b9b0d5ebd21e6d73e4992cfa124f511f70aae7768bdb9c5ceb0baa0c624"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/post_counter_mismatch/postflight.json",
+      "publicPin": {
+        "bytes": 16165,
+        "sha256": "86f39b9b0d5ebd21e6d73e4992cfa124f511f70aae7768bdb9c5ceb0baa0c624"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 182,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/post_counter_mismatch/postflight.json.before-fault",
+      "originalPin": {
+        "bytes": 19813,
+        "sha256": "35e0c0fc1224f48c893418e41d4be70564f9cda0ca5e0414b6c506642d7c7243"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/post_counter_mismatch/postflight.json.before-fault",
+      "publicPin": {
+        "bytes": 19813,
+        "sha256": "35e0c0fc1224f48c893418e41d4be70564f9cda0ca5e0414b6c506642d7c7243"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 183,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/post_counter_mismatch/result.json",
+      "originalPin": {
+        "bytes": 586,
+        "sha256": "dd1402c8a8dc794612d70b5a5dc1126ca831b8d5f073c2e232e137a7c375aa9a"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/post_counter_mismatch/result.json",
+      "publicPin": {
+        "bytes": 586,
+        "sha256": "dd1402c8a8dc794612d70b5a5dc1126ca831b8d5f073c2e232e137a7c375aa9a"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 184,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/uncaught_denial/child-error.json",
+      "originalPin": {
+        "bytes": 913,
+        "sha256": "636462cb5992d6318d961079d874062492ce6e9d0b14da94a7d2e5a027e32e43"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/uncaught_denial/child-error.json",
+      "publicPin": {
+        "bytes": 913,
+        "sha256": "636462cb5992d6318d961079d874062492ce6e9d0b14da94a7d2e5a027e32e43"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 185,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/uncaught_denial/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 125,
+        "sha256": "10cd58613c3f87d0b16a699b7a13b13d001cd911818db5c6a0b1b5e21f950530"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/uncaught_denial/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 125,
+        "sha256": "10cd58613c3f87d0b16a699b7a13b13d001cd911818db5c6a0b1b5e21f950530"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 186,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/uncaught_denial/execution.json",
+      "originalPin": {
+        "bytes": 3010,
+        "sha256": "8000898acef0b3c76755a4290361d14b54f88558ee4a0cad380873530151ec66"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/uncaught_denial/execution.json",
+      "publicPin": {
+        "bytes": 3010,
+        "sha256": "8000898acef0b3c76755a4290361d14b54f88558ee4a0cad380873530151ec66"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 187,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/uncaught_denial/fixture-observation.json",
+      "originalPin": {
+        "bytes": 405,
+        "sha256": "b82ee02540c12899f675d78c96925f8390562a50398ba3545b5dfec167efcfb9"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/uncaught_denial/fixture-observation.json",
+      "publicPin": {
+        "bytes": 405,
+        "sha256": "b82ee02540c12899f675d78c96925f8390562a50398ba3545b5dfec167efcfb9"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 188,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/write_io/effect-denials.jsonl",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/write_io/effect-denials.jsonl",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 189,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/write_io/execution.json",
+      "originalPin": {
+        "bytes": 3052,
+        "sha256": "eb6836fa77aa010c07af8d31b89924d7efc542a68d70437dbe6b78ba7f5cc830"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/write_io/execution.json",
+      "publicPin": {
+        "bytes": 3052,
+        "sha256": "eb6836fa77aa010c07af8d31b89924d7efc542a68d70437dbe6b78ba7f5cc830"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 190,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/write_io/fixture-observation.json",
+      "originalPin": {
+        "bytes": 549,
+        "sha256": "07ddb78ca3d44f6ccdf8451dd3e42f1522d5db6792e25d6e2d00126f600198dc"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/write_io/fixture-observation.json",
+      "publicPin": {
+        "bytes": 549,
+        "sha256": "07ddb78ca3d44f6ccdf8451dd3e42f1522d5db6792e25d6e2d00126f600198dc"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 191,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/write_io/postflight.json",
+      "originalPin": {
+        "bytes": 19847,
+        "sha256": "dc340ce645f491766c601102249288c6fde321774d307e49662e43138f58d3de"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/write_io/postflight.json",
+      "publicPin": {
+        "bytes": 19847,
+        "sha256": "dc340ce645f491766c601102249288c6fde321774d307e49662e43138f58d3de"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 192,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/cases/write_io/result.json",
+      "originalPin": {
+        "bytes": 586,
+        "sha256": "04c3036710585baadb3dc1647462a7a0ef12acd1c327e781f8ac7cf9de9cf027"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/cases/write_io/result.json",
+      "publicPin": {
+        "bytes": 586,
+        "sha256": "04c3036710585baadb3dc1647462a7a0ef12acd1c327e781f8ac7cf9de9cf027"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 193,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/fixture-child.json",
+      "originalPin": {
+        "bytes": 28686,
+        "sha256": "f97aa0543f2eea551c16f5f82837ec0c6c7f5111fb0d0cbeda102cef13e653e4"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/fixture-child.json",
+      "publicPin": {
+        "bytes": 28686,
+        "sha256": "f97aa0543f2eea551c16f5f82837ec0c6c7f5111fb0d0cbeda102cef13e653e4"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C5/codex/cloud-r03/raw/prior-dummy/fixture-child.json"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 194,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/fixture-execution.json",
+      "originalPin": {
+        "bytes": 27276,
+        "sha256": "0120fb7f7145e1c0b9b51845ef2bc609cefa95963217cfbdbb980ec43490fa85"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/fixture-execution.json",
+      "publicPin": {
+        "bytes": 27276,
+        "sha256": "0120fb7f7145e1c0b9b51845ef2bc609cefa95963217cfbdbb980ec43490fa85"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C5/codex/cloud-r03/raw/prior-dummy/fixture-execution.json"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 195,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/invocation.json",
+      "originalPin": {
+        "bytes": 21243,
+        "sha256": "f7aa69925dd9fdfb63a91375340ccf48b64c08397eff92aa85f8990e791852c3"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/invocation.json",
+      "publicPin": {
+        "bytes": 21243,
+        "sha256": "f7aa69925dd9fdfb63a91375340ccf48b64c08397eff92aa85f8990e791852c3"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 196,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/stderr.txt",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/stderr.txt",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 197,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/raw/stdout.txt",
+      "originalPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/raw/stdout.txt",
+      "publicPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C3/codex/cloud-r03/raw/run/stdout.txt",
+        "U2/codex/cloud-r02/raw/run-raw/stdout.txt",
+        "C5/codex/cloud-r03/raw/raw/effect-denials.jsonl",
+        "C5/codex/cloud-r03/raw/raw/stdout.txt",
+        "D3/codex/cloud-r02/raw/issuance/dispatch.stderr.txt",
+        "D3/codex/cloud-r02/raw/issuance/prepare.stderr.txt",
+        "D3/codex/cloud-r02/raw/prior-pre/linux-pre.stderr.txt",
+        "D3/codex/cloud-r02/raw/runroot/effect-denials.jsonl",
+        "D3/codex/cloud-r02/raw/runroot/stdout.txt",
+        "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 198,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/RETURN-INVENTORY.json",
+      "originalPin": {
+        "bytes": 18297,
+        "sha256": "121d5ec1cb3c3c82e5d1a968afe8fed92e14ea98b6ed109f68f931e252a4350c"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/RETURN-INVENTORY.json",
+      "publicPin": {
+        "bytes": 18297,
+        "sha256": "121d5ec1cb3c3c82e5d1a968afe8fed92e14ea98b6ed109f68f931e252a4350c"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 199,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/support/command-audit.json",
+      "originalPin": {
+        "bytes": 92102,
+        "sha256": "fdb18713a87f0504c98b1071df2a8e961bbde59bd3fec41906e0a9b16151fddb"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/support/command-audit.json",
+      "publicPin": {
+        "bytes": 92102,
+        "sha256": "fdb18713a87f0504c98b1071df2a8e961bbde59bd3fec41906e0a9b16151fddb"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "EXCLUDED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 200,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/support/command-records.json",
+      "originalPin": {
+        "bytes": 117859,
+        "sha256": "ffbcb03682603d68f48ac27f273d54a6bed44057311e81ecdda885cb5409f11f"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/support/command-records.json",
+      "publicPin": {
+        "bytes": 117859,
+        "sha256": "ffbcb03682603d68f48ac27f273d54a6bed44057311e81ecdda885cb5409f11f"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 201,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/support/fixture-materialization.json",
+      "originalPin": {
+        "bytes": 8290,
+        "sha256": "df2f420d69016ef49b7ea4b97c8d0a2076a996280a97ebf578877604c4fa2775"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/support/fixture-materialization.json",
+      "publicPin": {
+        "bytes": 8290,
+        "sha256": "df2f420d69016ef49b7ea4b97c8d0a2076a996280a97ebf578877604c4fa2775"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 202,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/support/native-page-response.json",
+      "originalPin": {
+        "bytes": 62453,
+        "sha256": "392fb75a8435b6bee54554d2e6a7ccd8b874ac8d90c42f963c9e06738ea9c5f8"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/support/native-page-response.json",
+      "publicPin": {
+        "bytes": 62453,
+        "sha256": "392fb75a8435b6bee54554d2e6a7ccd8b874ac8d90c42f963c9e06738ea9c5f8"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 203,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/support/outer-command.sh",
+      "originalPin": {
+        "bytes": 450,
+        "sha256": "6dd4b8732dec8301747c65466d84e7fd68e080938b1d43a1cc020ad14f0fc9c9"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/support/outer-command.sh",
+      "publicPin": {
+        "bytes": 450,
+        "sha256": "6dd4b8732dec8301747c65466d84e7fd68e080938b1d43a1cc020ad14f0fc9c9"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 204,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/support/outer-native-output.txt",
+      "originalPin": {
+        "bytes": 134,
+        "sha256": "bd38138fa5cf1761f9a8e798167628a48ec85076a0c3102b153ecda9839c1afc"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/support/outer-native-output.txt",
+      "publicPin": {
+        "bytes": 134,
+        "sha256": "bd38138fa5cf1761f9a8e798167628a48ec85076a0c3102b153ecda9839c1afc"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 205,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/dummy-raw/support/post-readback.json",
+      "originalPin": {
+        "bytes": 150750,
+        "sha256": "c8f5f9cbda62db619dcabcd6aef1338345eb360d20be1cbec99ae716857a0a9e"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/retained/support/post-readback.json",
+      "publicPin": {
+        "bytes": 150750,
+        "sha256": "c8f5f9cbda62db619dcabcd6aef1338345eb360d20be1cbec99ae716857a0a9e"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 206,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_SYNTHETIC14",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/c1-return.zip",
+      "originalPin": {
+        "bytes": 312973,
+        "sha256": "d8fd1b5f67c74100880f59e07aee2616db8dfdbff7a82ff1859b5d4e2f3a81db"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/cloud-return/return.original-reviewed.zip",
+      "publicPin": {
+        "bytes": 312973,
+        "sha256": "d8fd1b5f67c74100880f59e07aee2616db8dfdbff7a82ff1859b5d4e2f3a81db"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_ZIP_FILTERED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": {
+        "path": "test-logs/C5/codex/historical-c1-synthetic14-r03/cloud-return/disclosure-filtered-return.zip",
+        "pin": {
+          "bytes": 256924,
+          "sha256": "ead63286f724d8931824e41dad9237aff5bfe14794970aa04311f093f8b6089d"
+        },
+        "meaningKo": "인코딩 내용 검토 전 일부 멤버를 제외한 초기 가공 ZIP. 현재 검토된 원본 ZIP과 구분해 보존한다."
+      },
+      "deletion": null
+    },
+    {
+      "sourceRow": 207,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_NOT_RUN",
+      "historicalRunFolder": "historical-issuance-r01-not-run",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-launch-c5-r03-01/NOT-RUN-raw/bound-command-NOT-EXECUTED.sh",
+      "originalPin": {
+        "bytes": 9844,
+        "sha256": "c525b1910437567ecbe98f379900fd2cc2ed2fe585b3149132c9e1134d664394"
+      },
+      "publicPath": "test-logs/C5/codex/historical-issuance-r01-not-run/retained/bound-command-NOT-EXECUTED.sh",
+      "publicPin": {
+        "bytes": 9844,
+        "sha256": "c525b1910437567ecbe98f379900fd2cc2ed2fe585b3149132c9e1134d664394"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 208,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_NOT_RUN",
+      "historicalRunFolder": "historical-issuance-r01-not-run",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-launch-c5-r03-01/NOT-RUN-raw/launch-template.sh",
+      "originalPin": {
+        "bytes": 9825,
+        "sha256": "f51c32e3c9f3a5697be6ed149224812d5798e0e681d6794a6217f881da3d2456"
+      },
+      "publicPath": "test-logs/C5/codex/historical-issuance-r01-not-run/retained/launch-template.sh",
+      "publicPin": {
+        "bytes": 9825,
+        "sha256": "f51c32e3c9f3a5697be6ed149224812d5798e0e681d6794a6217f881da3d2456"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [
+        "C5/codex/cloud-r03/raw/support/launch-template.sh"
+      ],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 209,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_NOT_RUN",
+      "historicalRunFolder": "historical-issuance-r01-not-run",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-launch-c5-r03-01/NOT-RUN-raw/not-run-command-audit.json",
+      "originalPin": {
+        "bytes": 88509,
+        "sha256": "2b381d7b3e9e2e034df270f1cfc5adc63e1ce86a090fcd46ea0dcfe0b0fede0b"
+      },
+      "publicPath": "test-logs/C5/codex/historical-issuance-r01-not-run/retained/not-run-command-audit.json",
+      "publicPin": {
+        "bytes": 88509,
+        "sha256": "2b381d7b3e9e2e034df270f1cfc5adc63e1ce86a090fcd46ea0dcfe0b0fede0b"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 210,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_NOT_RUN",
+      "historicalRunFolder": "historical-issuance-r01-not-run",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-launch-c5-r03-01/NOT-RUN-raw/not-run-readback.json",
+      "originalPin": {
+        "bytes": 9488,
+        "sha256": "4c436e68aada6dec1ced5d11bb5e2fb4fbca1af6a3d29068be3d37fdbe13e6e8"
+      },
+      "publicPath": "test-logs/C5/codex/historical-issuance-r01-not-run/retained/not-run-readback.json",
+      "publicPin": {
+        "bytes": 9488,
+        "sha256": "4c436e68aada6dec1ced5d11bb5e2fb4fbca1af6a3d29068be3d37fdbe13e6e8"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 211,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_NOT_RUN",
+      "historicalRunFolder": "historical-issuance-r01-not-run",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-launch-c5-r03-01/NOT-RUN-raw/preparation-command.sh",
+      "originalPin": {
+        "bytes": 56088,
+        "sha256": "e0b52502ff00741c4b057a3362e2cc5626c7dec9ff0b1c8af2ee46e049c7106c"
+      },
+      "publicPath": "test-logs/C5/codex/historical-issuance-r01-not-run/retained/preparation-command.sh",
+      "publicPin": {
+        "bytes": 56088,
+        "sha256": "e0b52502ff00741c4b057a3362e2cc5626c7dec9ff0b1c8af2ee46e049c7106c"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 212,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_NOT_RUN",
+      "historicalRunFolder": "historical-issuance-r01-not-run",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-launch-c5-r03-01/NOT-RUN-raw/preparation-native-output.txt",
+      "originalPin": {
+        "bytes": 89,
+        "sha256": "a29d5661403667d90963ba1bdcc2cc64ecf9ccd2ab1dee8b777327e37b98e14f"
+      },
+      "publicPath": "test-logs/C5/codex/historical-issuance-r01-not-run/retained/preparation-native-output.txt",
+      "publicPin": {
+        "bytes": 89,
+        "sha256": "a29d5661403667d90963ba1bdcc2cc64ecf9ccd2ab1dee8b777327e37b98e14f"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 213,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_NOT_RUN",
+      "historicalRunFolder": "historical-issuance-r01-not-run",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-launch-c5-r03-01/NOT-RUN-raw/RETURN-INVENTORY.json",
+      "originalPin": {
+        "bytes": 1020,
+        "sha256": "73ec8c0eec8e7fd131e722577865eef53239193bf202fd3c9bfe577ae0fcd017"
+      },
+      "publicPath": "test-logs/C5/codex/historical-issuance-r01-not-run/retained/RETURN-INVENTORY.json",
+      "publicPin": {
+        "bytes": 1020,
+        "sha256": "73ec8c0eec8e7fd131e722577865eef53239193bf202fd3c9bfe577ae0fcd017"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 214,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "C5_NOT_RUN",
+      "historicalRunFolder": "historical-issuance-r01-not-run",
+      "originKind": "LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-launch-c5-r03-01/NOT-RUN-return.zip",
+      "originalPin": {
+        "bytes": 53850,
+        "sha256": "360428c956a87ba69f867fb0f30fe1490b1b1f624c50a5aeb1fbcd0858104a70"
+      },
+      "publicPath": "test-logs/C5/codex/historical-issuance-r01-not-run/cloud-return/original-return.zip",
+      "publicPin": {
+        "bytes": 53850,
+        "sha256": "360428c956a87ba69f867fb0f30fe1490b1b1f624c50a5aeb1fbcd0858104a70"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 284,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-metadata-r03",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/ROOT-METADATA-APP-RECORDS.actual.json",
+      "originalPin": {
+        "bytes": 33421,
+        "sha256": "1246434b07c0391d4a1124532f10bba1f3aa348afd2367246852f398e727e806"
+      },
+      "publicPath": "test-logs/C5/codex/historical-metadata-r03/local-captures/lead-pre-c5-r03-01/ROOT-METADATA-APP-RECORDS.actual.json",
+      "publicPin": {
+        "bytes": 33421,
+        "sha256": "1246434b07c0391d4a1124532f10bba1f3aa348afd2367246852f398e727e806"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 285,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/ROOT-DUMMY-APP-RECORDS.actual.json",
+      "originalPin": {
+        "bytes": 63126,
+        "sha256": "75401a6912bb366770430dae9dcc6eeac0762089fe556382d85ed79d5db4b8d9"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/local-captures/lead-pre-c5-r03-01/ROOT-DUMMY-APP-RECORDS.actual.json",
+      "publicPin": {
+        "bytes": 63126,
+        "sha256": "75401a6912bb366770430dae9dcc6eeac0762089fe556382d85ed79d5db4b8d9"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 287,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-c1-synthetic14-r03",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-c5-r03-01/C1-NATIVE-RETURN-MANIFEST.actual.json",
+      "originalPin": {
+        "bytes": 32385,
+        "sha256": "1d1f57f9e57d6b33f6f55cde342bc79e3e031bbff8b67b1dffd63aa8978615aa"
+      },
+      "publicPath": "test-logs/C5/codex/historical-c1-synthetic14-r03/local-captures/lead-pre-c5-r03-01/C1-NATIVE-RETURN-MANIFEST.actual.json",
+      "publicPin": {
+        "bytes": 32385,
+        "sha256": "1d1f57f9e57d6b33f6f55cde342bc79e3e031bbff8b67b1dffd63aa8978615aa"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 288,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-issuance-r01-not-run",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-launch-c5-r03-01/ROOT-C5-APP-RECORDS.actual.json",
+      "originalPin": {
+        "bytes": 196752,
+        "sha256": "efe2ecd92342a555594ebbccf63a9bb32e51facf41c442d1dc4daf9130a38917"
+      },
+      "publicPath": "test-logs/C5/codex/historical-issuance-r01-not-run/local-captures/lead-launch-c5-r03-01/ROOT-C5-APP-RECORDS.actual.json",
+      "publicPin": {
+        "bytes": 196752,
+        "sha256": "efe2ecd92342a555594ebbccf63a9bb32e51facf41c442d1dc4daf9130a38917"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "EXCLUDED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    },
+    {
+      "sourceRow": 291,
+      "testUnit": "C5",
+      "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+      "sourceGroup": "LOCAL_APP_AND_RETURN_MANIFEST",
+      "historicalRunFolder": "historical-post-execution-r03-local-capture",
+      "originKind": "LOCAL_RETAINED_APP_EXTRACT_OR_RETURN_MANIFEST",
+      "originalSource": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-post-c5-r03-01/ROOT-C5-ACTUAL-APP-COMMANDS.json",
+      "originalPin": {
+        "bytes": 99312,
+        "sha256": "ae5c3bf3fe5910a089567f2d223b8702dd79099f1ded7f687f486626436cfc24"
+      },
+      "publicPath": "test-logs/C5/codex/historical-post-execution-r03-local-capture/local-captures/lead-post-c5-r03-01/ROOT-C5-ACTUAL-APP-COMMANDS.json",
+      "publicPin": {
+        "bytes": 99312,
+        "sha256": "ae5c3bf3fe5910a089567f2d223b8702dd79099f1ded7f687f486626436cfc24"
+      },
+      "currentDisposition": "ORIGINAL_BYTES",
+      "priorInitialDisposition": "PUBLIC_COPY_UNCHANGED",
+      "sameEarlierArchiveContentPaths": [],
+      "derivedZIPPreserved": null,
+      "deletion": null
+    }
+  ],
+  "locallyRecoveredCloudOriginals": [
+    {
+      "testUnit": "C5",
+      "testPurpose": "기존 C5 r03 evidence/history/carry/revalidation 준비 증거",
+      "group": "C5",
+      "originalCloudPath": "/workspace/vm-c5-source-24cf-r03/evidence/native-page-response.json",
+      "originalPin": {
+        "bytes": 407799,
+        "sha256": "7b4ff6ad40bcea17c64b309bdfea0d096885b51f3a0508fa5567f0cd08d35591"
+      },
+      "publicPath": "test-logs/C5/codex/historical-source-r03-recovered-evidence-20261006/retained/evidence/native-page-response.json",
+      "publicPin": {
+        "bytes": 407799,
+        "sha256": "7b4ff6ad40bcea17c64b309bdfea0d096885b51f3a0508fa5567f0cd08d35591"
+      },
+      "originMeaning": "Historical original bytes recovered on 2026-10-06; no new test run",
+      "priorMissingClaimMeaning": "Historical missing-file claim retained unchanged; current original locally recovered/pin-verified."
+    },
+    {
+      "testUnit": "C5",
+      "testPurpose": "기존 C5 r03 evidence/history/carry/revalidation 준비 증거",
+      "group": "C5",
+      "originalCloudPath": "/workspace/vm-c5-source-24cf-r03/evidence/transport-stream-audit.json",
+      "originalPin": {
+        "bytes": 587341,
+        "sha256": "fa19374bfcd11e79f874bb1e9ca27d42f4bef0078dd93b5403a8094fa993b673"
+      },
+      "publicPath": "test-logs/C5/codex/historical-source-r03-recovered-evidence-20261006/retained/evidence/transport-stream-audit.json",
+      "publicPin": {
+        "bytes": 587341,
+        "sha256": "fa19374bfcd11e79f874bb1e9ca27d42f4bef0078dd93b5403a8094fa993b673"
+      },
+      "originMeaning": "Historical original bytes recovered on 2026-10-06; no new test run",
+      "priorMissingClaimMeaning": "Historical missing-file claim retained unchanged; current original locally recovered/pin-verified."
+    }
+  ],
+  "disclosureReviewReferences": [
+    {
+      "localReviewLocator": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer3\\parallel-cloud-publication-prep-r01\\PUBLICATION-MAP.json",
+      "pin": {
+        "bytes": 587774,
+        "sha256": "2064fc9e6d638ff22905a8cccbfa4bf5b50a8cdfc703387a5a2ca6acfbd76373"
+      },
+      "meaning": "Root checked source/payload seals/pins; writer disclosure analysis, not independent release audit"
+    },
+    {
+      "localReviewLocator": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer3\\parallel-cloud-publication-prep-r01\\DISCLOSURE-REVIEW.json",
+      "pin": {
+        "bytes": 191027,
+        "sha256": "c4bf3499fdc2f1407e626a11bd22ebb9290606e5b611a9f7f64f866519e39b35"
+      },
+      "meaning": "Root checked source/payload seals/pins; writer disclosure analysis, not independent release audit"
+    },
+    {
+      "localReviewLocator": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer1\\encoded-disclosure-followup-r01\\REVIEW.json",
+      "pin": {
+        "bytes": 46123,
+        "sha256": "db10efc86c12a0e2c245cebb094ce901c400734ad3fbc0cb0b4a744683383a18"
+      },
+      "meaning": "Root checked source/payload seals/pins; writer disclosure analysis, not independent release audit"
+    },
+    {
+      "localReviewLocator": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer1\\encoded-disclosure-redacted2-r01\\REVIEW.json",
+      "pin": {
+        "bytes": 12839,
+        "sha256": "f37a8277a0b2af49b34d847fd49f40188a135330cd219c047737a5c84811b203"
+      },
+      "meaning": "Root checked source/payload seals/pins; writer disclosure analysis, not independent release audit"
+    },
+    {
+      "localReviewLocator": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer3\\recovered-cloud11-publication-prep-r01\\PUBLICATION-MAP.json",
+      "pin": {
+        "bytes": 42680,
+        "sha256": "26c5d37a5a227e2ff72da6833fff8750680aeeee129b08ade05491b753a4a3e9"
+      },
+      "meaning": "Root checked source/payload seals/pins; writer disclosure analysis, not independent release audit"
+    },
+    {
+      "localReviewLocator": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer3\\recovered-cloud11-publication-prep-r01\\DISCLOSURE-REVIEW.json",
+      "pin": {
+        "bytes": 128077,
+        "sha256": "585aa8c04aace447a074001493712a9fb022c9e513e0f0b9ac31fdb43a17b76c"
+      },
+      "meaning": "Root checked source/payload seals/pins; writer disclosure analysis, not independent release audit"
+    }
+  ],
+  "limitsKo": [
+    "305개 알려진 로컬 lineage와 추가 회수된 Cloud 원본 11개를 대조했다. 관측하지 못한 Cloud 전체 파일의 완전성을 주장하지 않는다.",
+    "초기8개 제외/ZIP멤버4개 제외/원본11개 미회수 표시는 당시 기록으로 유지한다. 이 문서가 후속 공개 상태를 제공한다.",
+    "2개 JSON의 /page/nextCursor만 삭제하고 전체를 UTF-8/LF로 재직렬화했다. 삭제값은 원본 보존본에 있으며 공개 문서에는 SHA만 기록한다.",
+    "I1 실제 후보 SOURCE/PRE・Windows9・Git/CLI・qualification・Goal은 별도 HOLD를 유지한다."
+  ],
+  "counts": {
+    "knownHistoricalSourceRows": 136,
+    "originalByteCopies": 136,
+    "cursorRedactedCopies": 0,
+    "originalZIPsWithPriorDerivedCopies": 1,
+    "locallyRecoveredAdditionalOriginals": 2
+  }
+}

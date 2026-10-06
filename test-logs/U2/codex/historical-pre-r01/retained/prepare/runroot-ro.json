@@ -1,0 +1,275 @@
+{
+  "scope": "U2_FUTURE_RUNROOT_RO_NO_EXECUTION_GO",
+  "utc": "2026-10-04T15:54:00.257863+00:00",
+  "path": "/workspace/vm-u2-run-24cf-r01",
+  "resolveStrictFalse": "/workspace/vm-u2-run-24cf-r01",
+  "lexists": false,
+  "ancestorComponents": [
+    {
+      "path": "/",
+      "lexists": true,
+      "symlink": false,
+      "resolveStrictFalse": "/",
+      "ownerUid": 65534,
+      "mode": "0o755",
+      "isDirectory": true
+    },
+    {
+      "path": "/workspace",
+      "lexists": true,
+      "symlink": false,
+      "resolveStrictFalse": "/workspace",
+      "ownerUid": 1000,
+      "mode": "0o755",
+      "isDirectory": true
+    },
+    {
+      "path": "/workspace/vm-u2-run-24cf-r01",
+      "lexists": false,
+      "symlink": false,
+      "resolveStrictFalse": "/workspace/vm-u2-run-24cf-r01"
+    }
+  ],
+  "allAncestorNoSymlink": true,
+  "uppercaseFMComponents": [],
+  "uriAmbiguousCharactersPresent": {
+    "percent": false,
+    "fragment": false,
+    "query": false,
+    "NUL": false
+  },
+  "sourceRootResolve": "/workspace/vm-u2-source-24cf-r01",
+  "packetResolve": "/workspace/vm-u2-source-24cf-r01/packet",
+  "ownedNonOverlap": [
+    {
+      "path": "/workspace/agent-governance-suite",
+      "resolved": "/workspace/agent-governance-suite",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-a7c-w06w07",
+      "resolved": "/workspace/ags-a7c-w06w07",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-a7c-w06w07-evidence",
+      "resolved": "/workspace/ags-a7c-w06w07-evidence",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-a7c-w06w07-evidence.tar.gz",
+      "resolved": "/workspace/ags-a7c-w06w07-evidence.tar.gz",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-claude-loginhelp-20261001T1322-ops",
+      "resolved": "/workspace/ags-claude-loginhelp-20261001T1322-ops",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-claude-loginhelp-20261001T1322.outer.cleanup.json",
+      "resolved": "/workspace/ags-claude-loginhelp-20261001T1322.outer.cleanup.json",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-claude-ro-649c398b",
+      "resolved": "/workspace/ags-claude-ro-649c398b",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-dev-shm-support-997ac9db",
+      "resolved": "/workspace/ags-dev-shm-support-997ac9db",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-g18-preparation",
+      "resolved": "/workspace/ags-g18-preparation",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-g18-preparation.tar.gz",
+      "resolved": "/workspace/ags-g18-preparation.tar.gz",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-g18-publication-receipt.json",
+      "resolved": "/workspace/ags-g18-publication-receipt.json",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-g18-publish",
+      "resolved": "/workspace/ags-g18-publish",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-git3-nativefs-ro-20261001",
+      "resolved": "/workspace/ags-git3-nativefs-ro-20261001",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-git3-private-e794857cc9314f3d9d228dff28f5f286",
+      "resolved": "/workspace/ags-git3-private-e794857cc9314f3d9d228dff28f5f286",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-nativefirst-44474353",
+      "resolved": "/workspace/ags-nativefirst-44474353",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-nativefirst-depro-bfb5864b",
+      "resolved": "/workspace/ags-nativefirst-depro-bfb5864b",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-public-history-owned-c56b5d8a4e3d4199aa75d23fca814baf",
+      "resolved": "/workspace/ags-public-history-owned-c56b5d8a4e3d4199aa75d23fca814baf",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-public-history-stage-c56b5d8a4e3d4199aa75d23fca814baf",
+      "resolved": "/workspace/ags-public-history-stage-c56b5d8a4e3d4199aa75d23fca814baf",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-related3-r4-b52e6344",
+      "resolved": "/workspace/ags-related3-r4-b52e6344",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-tmp-metadata-1374ad87",
+      "resolved": "/workspace/ags-tmp-metadata-1374ad87",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-tmp-probe-53f793f4",
+      "resolved": "/workspace/ags-tmp-probe-53f793f4",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-w05-0f1e949d",
+      "resolved": "/workspace/ags-w05-0f1e949d",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-w05-0f1e949d-evidence",
+      "resolved": "/workspace/ags-w05-0f1e949d-evidence",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-w05-0f1e949d-sanitized-evidence.tar.gz",
+      "resolved": "/workspace/ags-w05-0f1e949d-sanitized-evidence.tar.gz",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-w05-0f1e949d-transport",
+      "resolved": "/workspace/ags-w05-0f1e949d-transport",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-w05-clock-private-handoff.json",
+      "resolved": "/workspace/ags-w05-clock-private-handoff.json",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-w05-clock-private-preparation",
+      "resolved": "/workspace/ags-w05-clock-private-preparation",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-w05-clock-private-preparation-r2",
+      "resolved": "/workspace/ags-w05-clock-private-preparation-r2",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-w05-f1-library-intake-zTcxAWl0",
+      "resolved": "/workspace/ags-w05-f1-library-intake-zTcxAWl0",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-w05-fixture-two-line-private-preparation",
+      "resolved": "/workspace/ags-w05-fixture-two-line-private-preparation",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-w05-fixture-two-line-private-preparation-r2",
+      "resolved": "/workspace/ags-w05-fixture-two-line-private-preparation-r2",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-w05-publish",
+      "resolved": "/workspace/ags-w05-publish",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-w06w07-publication-receipt.json",
+      "resolved": "/workspace/ags-w06w07-publication-receipt.json",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/ags-w06w07-publish",
+      "resolved": "/workspace/ags-w06w07-publish",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/vm-common3-run-24cf-r03",
+      "resolved": "/workspace/vm-common3-run-24cf-r03",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/vm-common3-source-24cf-r03",
+      "resolved": "/workspace/vm-common3-source-24cf-r03",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/vm-private-env-24cf-ledger4-r01",
+      "resolved": "/workspace/vm-private-env-24cf-ledger4-r01",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/vm-private-ro-24cf-01a0f9a1",
+      "resolved": "/workspace/vm-private-ro-24cf-01a0f9a1",
+      "overlap": false
+    },
+    {
+      "path": "/workspace/vm-u2-source-24cf-r01",
+      "resolved": "/workspace/vm-u2-source-24cf-r01",
+      "overlap": false
+    }
+  ],
+  "allNonOverlap": true,
+  "parentAvailable": true,
+  "parentWritable": true,
+  "preCwd": {
+    "path": "/workspace/vm-u2-source-24cf-r01/pre-cwd",
+    "resolve": "/workspace/vm-u2-source-24cf-r01/pre-cwd",
+    "isSymlink": false,
+    "empty": true
+  },
+  "futureArgv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "-I",
+    "-S",
+    "-B",
+    "-X",
+    "utf8",
+    "/workspace/vm-u2-source-24cf-r01/packet/runner.py",
+    "--run-root",
+    "/workspace/vm-u2-run-24cf-r01",
+    "--runner-sha256",
+    "d00cf8b8d901915d9f7141bbbaae4e674535e9756dd4b0598d95063f79250af3",
+    "--manifest-sha256",
+    "07add40aeaea69d60bc88c64f477818a780a039e92e85b7bdcbe435fbea75162",
+    "--timeout",
+    "300"
+  ],
+  "futureArgvExecuted": false,
+  "childContract": "runner owns child1/retry0, private HOME/TMP/cwd, timeout300 wait/reap; UNKNOWN preserved",
+  "externalJobs": "UNKNOWN; no new global reservations/process safety inquiry",
+  "priorUnreadableProcesses": 7,
+  "nativeCommandId": null,
+  "runrootCreated": false,
+  "runnerProductImportsLoadersTestsFixturesProbesGO": 0,
+  "sourcePreDecisions": "PENDING independent SOURCE/PRE plus exact future instruction",
+  "freshness": "Read-only snapshot; execution freshness not granted"
+}

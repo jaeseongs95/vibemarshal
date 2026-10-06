@@ -1,0 +1,35 @@
+{
+  "scope": "C5_NOT_RUN_PREPARATION_FAILURE",
+  "files": [
+    {
+      "path": "bound-command-NOT-EXECUTED.sh",
+      "bytes": 9844,
+      "sha256": "c525b1910437567ecbe98f379900fd2cc2ed2fe585b3149132c9e1134d664394"
+    },
+    {
+      "path": "launch-template.sh",
+      "bytes": 9825,
+      "sha256": "f51c32e3c9f3a5697be6ed149224812d5798e0e681d6794a6217f881da3d2456"
+    },
+    {
+      "path": "not-run-command-audit.json",
+      "bytes": 88509,
+      "sha256": "2b381d7b3e9e2e034df270f1cfc5adc63e1ce86a090fcd46ea0dcfe0b0fede0b"
+    },
+    {
+      "path": "not-run-readback.json",
+      "bytes": 9488,
+      "sha256": "4c436e68aada6dec1ced5d11bb5e2fb4fbca1af6a3d29068be3d37fdbe13e6e8"
+    },
+    {
+      "path": "preparation-command.sh",
+      "bytes": 56088,
+      "sha256": "e0b52502ff00741c4b057a3362e2cc5626c7dec9ff0b1c8af2ee46e049c7106c"
+    },
+    {
+      "path": "preparation-native-output.txt",
+      "bytes": 89,
+      "sha256": "a29d5661403667d90963ba1bdcc2cc64ecf9ccd2ab1dee8b777327e37b98e14f"
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "started_utc": "2026-10-04T23:23:32.769088+00:00",
+  "finished_utc": "2026-10-04T23:23:32.769093+00:00",
+  "test_ids": [
+    "c1_d3_delta.synthetic_shape.0",
+    "c1_d3_delta.synthetic_shape.1",
+    "c1_d3_delta.synthetic_shape.2"
+  ],
+  "testsRun": 3,
+  "wasSuccessful": true,
+  "failures": [],
+  "errors": [],
+  "skipped": [],
+  "expectedFailures": [],
+  "unexpectedSuccesses": [],
+  "unittest_exit": 0,
+  "effect_denials": {
+    "count": 0,
+    "logging_errors": 0
+  },
+  "suite_exit": 0
+}

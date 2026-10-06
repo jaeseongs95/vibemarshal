@@ -1,0 +1,10 @@
+{
+  "utc": "2026-10-04T20:10:58.787250+00:00",
+  "status": "ERROR",
+  "traceback": "Traceback (most recent call last):\n  File \"/workspace/vm-c5-source-24cf-r03/c1-fixture/fixture.py\", line 262, in child\n    sys.audit(\"os.system\", \"C1 synthetic event only; no OS command\")\n  File \"/workspace/vm-c5-source-24cf-r03/c1-fixture/fixture.py\", line 245, in dispatch\n    hook(event, values)\n  File \"/workspace/vm-c5-source-24cf-r03/c1-fixture/frozen/runner.py\", line 264, in audit\n    deny(event, \"prohibited_effect\", \"C5 prohibited effect: \" + event)\n  File \"/workspace/vm-c5-source-24cf-r03/c1-fixture/frozen/runner.py\", line 258, in deny\n    raise RuntimeError(message)  # Reject before the operation even when logging failed.\n    ^^^^^^^^^^^^^^^^^^^^^^^^^^^\nRuntimeError: C5 prohibited effect: os.system\n",
+  "pid": 5265,
+  "effect_denials": {
+    "count": 1,
+    "logging_errors": 0
+  }
+}

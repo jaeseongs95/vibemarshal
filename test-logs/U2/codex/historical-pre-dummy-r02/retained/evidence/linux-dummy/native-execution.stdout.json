@@ -1,0 +1,101 @@
+{
+  "scope": "U2_R02_STDLIB_DUMMY_ONLY_NOT_PRODUCT",
+  "childPid": 3458,
+  "startedUtc": "2026-10-04T17:24:57.287771+00:00",
+  "observedUtc": "2026-10-04T17:24:57.352161+00:00",
+  "elapsedMonotonic": 0.06439608799701091,
+  "actualExit": 0,
+  "terminalObserved": true,
+  "timedOut": false,
+  "resultStatusRaw": "DUMMY_REGRESSION_PASS",
+  "inputsUnchanged": true,
+  "caseCount": 11,
+  "acceptedCount": 2,
+  "rejectedCount": 9,
+  "journalRows": 22,
+  "cases": [
+    {
+      "case": "valid_plain",
+      "expectedAccept": true,
+      "observedAccept": true
+    },
+    {
+      "case": "valid_stdlib_contextmanager_old_guard_rejects",
+      "expectedAccept": true,
+      "observedAccept": true
+    },
+    {
+      "case": "wrong_plain_origin",
+      "expectedAccept": false,
+      "observedAccept": false
+    },
+    {
+      "case": "genuine_wrapper_wrong_wrapped_origin",
+      "expectedAccept": false,
+      "observedAccept": false
+    },
+    {
+      "case": "fake_wrapper_code_even_with_expected_filename",
+      "expectedAccept": false,
+      "observedAccept": false
+    },
+    {
+      "case": "spoof_wrapped_metadata_wrong_closure",
+      "expectedAccept": false,
+      "observedAccept": false
+    },
+    {
+      "case": "correct_filename_wrong_original_globals",
+      "expectedAccept": false,
+      "observedAccept": false
+    },
+    {
+      "case": "wrong_imported_decorator_binding",
+      "expectedAccept": false,
+      "observedAccept": false
+    },
+    {
+      "case": "cycle_wrapped_metadata",
+      "expectedAccept": false,
+      "observedAccept": false
+    },
+    {
+      "case": "code_less_object",
+      "expectedAccept": false,
+      "observedAccept": false
+    },
+    {
+      "case": "normal_nested_chain_not_in_pinned_single_decorator_contract",
+      "expectedAccept": false,
+      "observedAccept": false
+    }
+  ],
+  "cycleError": "ValueError",
+  "nestedUnwrapsToOriginal": true,
+  "oldGuardAcceptsValidDecorated": false,
+  "dummyBodyCalls": 0,
+  "nullObjectObservation": {
+    "error": "helper origin requires function: open_readonly"
+  },
+  "rawFiles": [
+    {
+      "path": "/workspace/vm-u2-source-24cf-r02/evidence/linux-dummy/result.json",
+      "exists": true,
+      "bytes": 26440,
+      "sha256": "55b72eeb8c452bbc84dd7f9d9eb799c4c33b4678fc816dd1682da78e889cde8d"
+    },
+    {
+      "path": "/workspace/vm-u2-source-24cf-r02/evidence/linux-dummy/stdout.txt",
+      "exists": true,
+      "bytes": 23220,
+      "sha256": "4e0e8bea710f047e36d00744922d424a4b5d34a5c8a3028ac74b5011e6dccb05"
+    },
+    {
+      "path": "/workspace/vm-u2-source-24cf-r02/evidence/linux-dummy/stderr.txt",
+      "exists": true,
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "productExecution": 0
+}

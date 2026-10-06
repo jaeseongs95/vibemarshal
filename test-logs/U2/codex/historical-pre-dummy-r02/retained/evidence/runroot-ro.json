@@ -1,0 +1,121 @@
+{
+  "scope": "U2_R02_PRE_RUNROOT_RO_ONLY",
+  "utc": "2026-10-04T17:23:40.491739+00:00",
+  "sourceRoot": "/workspace/vm-u2-source-24cf-r02",
+  "sourceResolve": "/workspace/vm-u2-source-24cf-r02",
+  "sourceIsEmpty": false,
+  "sourceFreshEmptyBeforeStaging": "Created as empty root, then supplied pinned packet15; source root is now populated intentionally",
+  "packetRoot": "/workspace/vm-u2-source-24cf-r02/packet",
+  "preCwd": "/workspace/vm-u2-source-24cf-r02/pre-cwd",
+  "preCwdResolve": "/workspace/vm-u2-source-24cf-r02/pre-cwd",
+  "futureRunRoot": "/workspace/vm-u2-run-24cf-r02",
+  "futureRunResolve": "/workspace/vm-u2-run-24cf-r02",
+  "futureRunAncestors": [
+    {
+      "path": "/",
+      "lexists": true,
+      "symlink": false,
+      "resolve": "/"
+    },
+    {
+      "path": "/workspace",
+      "lexists": true,
+      "symlink": false,
+      "resolve": "/workspace"
+    },
+    {
+      "path": "/workspace/vm-u2-run-24cf-r02",
+      "lexists": false,
+      "symlink": false,
+      "resolve": "/workspace/vm-u2-run-24cf-r02"
+    }
+  ],
+  "sourceAncestors": [
+    {
+      "path": "/",
+      "lexists": true,
+      "symlink": false,
+      "resolve": "/"
+    },
+    {
+      "path": "/workspace",
+      "lexists": true,
+      "symlink": false,
+      "resolve": "/workspace"
+    },
+    {
+      "path": "/workspace/vm-u2-source-24cf-r02",
+      "lexists": true,
+      "symlink": false,
+      "resolve": "/workspace/vm-u2-source-24cf-r02"
+    }
+  ],
+  "ownedRootsCompared": [
+    "/workspace/agent-governance-suite",
+    "/workspace/ags-claude-loginhelp-20261001T1322-ops",
+    "/workspace/ags-claude-loginhelp-20261001T1322.outer.cleanup.json",
+    "/workspace/ags-claude-ro-649c398b",
+    "/workspace/ags-dev-shm-support-997ac9db",
+    "/workspace/ags-git3-nativefs-ro-20261001",
+    "/workspace/ags-git3-private-e794857cc9314f3d9d228dff28f5f286",
+    "/workspace/ags-nativefirst-44474353",
+    "/workspace/ags-nativefirst-depro-bfb5864b",
+    "/workspace/ags-public-history-owned-c56b5d8a4e3d4199aa75d23fca814baf",
+    "/workspace/ags-public-history-stage-c56b5d8a4e3d4199aa75d23fca814baf",
+    "/workspace/ags-related3-r4-b52e6344",
+    "/workspace/ags-tmp-metadata-1374ad87",
+    "/workspace/ags-tmp-probe-53f793f4",
+    "/workspace/ags-w05-0f1e949d",
+    "/workspace/ags-a7c-w06w07-evidence",
+    "/workspace/ags-a7c-w06w07-evidence.tar.gz",
+    "/workspace/ags-w05-clock-private-handoff.json",
+    "/workspace/ags-w05-0f1e949d-evidence",
+    "/workspace/vm-u2-run-24cf-r01",
+    "/workspace/ags-w05-fixture-two-line-private-preparation",
+    "/workspace/vm-u2-source-24cf-r02",
+    "/workspace/ags-g18-publication-receipt.json",
+    "/workspace/ags-w05-clock-private-preparation",
+    "/workspace/vm-common3-run-24cf-r03",
+    "/workspace/ags-w06w07-publish",
+    "/workspace/ags-a7c-w06w07",
+    "/workspace/ags-w05-f1-library-intake-zTcxAWl0",
+    "/workspace/vm-private-env-24cf-ledger4-r01",
+    "/workspace/vm-u2-source-24cf-r01",
+    "/workspace/ags-w05-0f1e949d-transport",
+    "/workspace/ags-g18-preparation",
+    "/workspace/ags-g18-preparation.tar.gz",
+    "/workspace/ags-w06w07-publication-receipt.json",
+    "/workspace/ags-w05-clock-private-preparation-r2",
+    "/workspace/ags-w05-publish",
+    "/workspace/ags-g18-publish",
+    "/workspace/ags-w05-0f1e949d-sanitized-evidence.tar.gz",
+    "/workspace/vm-common3-source-24cf-r03",
+    "/workspace/vm-private-ro-24cf-01a0f9a1",
+    "/workspace/ags-w05-fixture-two-line-private-preparation-r2"
+  ],
+  "checks": {
+    "futureRunAbsent": true,
+    "futureRunResolveExact": true,
+    "futureAncestorsNoSymlink": true,
+    "uppercaseFMAbsent": true,
+    "uriCharactersAbsent": true,
+    "runOwnedNonOverlap": true,
+    "sourceOwnedNonOverlap": true,
+    "sourceRunNonOverlap": true,
+    "sourceResolveExact": true,
+    "sourceAncestorsNoSymlink": true,
+    "packetResolveExact": true,
+    "preCwdResolveExact": true,
+    "preCwdNoSymlink": true,
+    "preCwdEmpty": true,
+    "parentWritable": true,
+    "parentSearchable": true
+  },
+  "runRootCreated": false,
+  "externalJobs": "UNKNOWN",
+  "priorUnreadableProcesses": 7,
+  "OSContainment": "UNKNOWN",
+  "nativeToolId": null,
+  "productExecution": 0,
+  "futureProductDispatch": "NOT_RUN; requires separate new fixed template/PRE/instruction"
+}

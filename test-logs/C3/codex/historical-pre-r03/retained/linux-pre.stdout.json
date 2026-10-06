@@ -1,0 +1,314 @@
+{
+  "scope": "SELECTED_STDLIB_C3_PRE_METADATA_ONLY",
+  "utc": "2026-10-04T13:52:51.007223+00:00",
+  "actualArgv": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "-I",
+    "-S",
+    "-B",
+    "-X",
+    "utf8",
+    "-"
+  ],
+  "cwd": "/workspace/vm-common3-source-24cf-r03/pre-cwd",
+  "preCwdEmpty": true,
+  "python": {
+    "executable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "resolved": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "bytes": 30894944,
+    "sha256": "fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7",
+    "version": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+    "platform": "linux",
+    "osName": "posix",
+    "prefix": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python",
+    "basePrefix": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python",
+    "flags": "sys.flags(debug=0, inspect=0, interactive=0, optimize=0, dont_write_bytecode=1, no_user_site=1, no_site=1, ignore_environment=1, verbose=0, bytes_warning=0, quiet=0, hash_randomization=1, isolated=1, dev_mode=False, utf8_mode=1, warn_default_encoding=0, safe_path=True, int_max_str_digits=4300)",
+    "xoptions": {
+      "utf8": true
+    }
+  },
+  "startupSysPath": [
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python312.zip",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12",
+    "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/lib-dynload"
+  ],
+  "startupModuleCount": 23,
+  "startupModules": [
+    {
+      "name": "__main__",
+      "origin": null,
+      "file": "<stdin>"
+    },
+    {
+      "name": "_abc",
+      "origin": "built-in",
+      "file": null
+    },
+    {
+      "name": "_codecs",
+      "origin": "built-in",
+      "file": null
+    },
+    {
+      "name": "_frozen_importlib",
+      "origin": "frozen",
+      "file": null
+    },
+    {
+      "name": "_frozen_importlib_external",
+      "origin": "frozen",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap_external.py"
+    },
+    {
+      "name": "_imp",
+      "origin": "built-in",
+      "file": null
+    },
+    {
+      "name": "_io",
+      "origin": "built-in",
+      "file": null
+    },
+    {
+      "name": "_signal",
+      "origin": "built-in",
+      "file": null
+    },
+    {
+      "name": "_thread",
+      "origin": "built-in",
+      "file": null
+    },
+    {
+      "name": "_warnings",
+      "origin": "built-in",
+      "file": null
+    },
+    {
+      "name": "_weakref",
+      "origin": "built-in",
+      "file": null
+    },
+    {
+      "name": "abc",
+      "origin": "frozen",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/abc.py"
+    },
+    {
+      "name": "builtins",
+      "origin": "built-in",
+      "file": null
+    },
+    {
+      "name": "codecs",
+      "origin": "frozen",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/codecs.py"
+    },
+    {
+      "name": "encodings",
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/__init__.py",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/__init__.py"
+    },
+    {
+      "name": "encodings.aliases",
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/aliases.py",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/aliases.py"
+    },
+    {
+      "name": "encodings.utf_8",
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/utf_8.py",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/utf_8.py"
+    },
+    {
+      "name": "io",
+      "origin": "frozen",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/io.py"
+    },
+    {
+      "name": "marshal",
+      "origin": "built-in",
+      "file": null
+    },
+    {
+      "name": "posix",
+      "origin": "built-in",
+      "file": null
+    },
+    {
+      "name": "sys",
+      "origin": "built-in",
+      "file": null
+    },
+    {
+      "name": "time",
+      "origin": "built-in",
+      "file": null
+    },
+    {
+      "name": "zipimport",
+      "origin": "frozen",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/zipimport.py"
+    }
+  ],
+  "startupNonStdlibOrigins": [
+    {
+      "name": "__main__",
+      "origin": null,
+      "file": "<stdin>"
+    }
+  ],
+  "startupSiteImported": false,
+  "siteOrPkgPathPresent": false,
+  "selectedStdlibAndNativePins": [
+    {
+      "name": "sqlite3",
+      "loaded": true,
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+      "builtin": false,
+      "bytes": 2501,
+      "sha256": "f7cc982617b68e147540ef352d38310fe4d25c2c9c2542b67d0590c871df09a8"
+    },
+    {
+      "name": "sqlite3.dbapi2",
+      "loaded": true,
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+      "builtin": false,
+      "bytes": 3631,
+      "sha256": "7c5c8d98df1f2c50c4062a3be2c0f0499190c179fa4fc281507a1ef763a98f28"
+    },
+    {
+      "name": "_sqlite3",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "ssl",
+      "loaded": true,
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "builtin": false,
+      "bytes": 51655,
+      "sha256": "db62eeaae59c6e7087dcafb28087cd0bb092087381edc556f97c8cb614484380"
+    },
+    {
+      "name": "_ssl",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "_socket",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "unittest",
+      "loaded": true,
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+      "builtin": false,
+      "bytes": 3487,
+      "sha256": "32ed48385c0377bc2900a76e9a6acc3705aeef402c72de8554b3c637420506f0"
+    },
+    {
+      "name": "unittest.mock",
+      "loaded": true,
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "builtin": false,
+      "bytes": 106317,
+      "sha256": "1de18141992c6742bff27e77c0cbe46d53d6a5ab1850574a536910508823fc5c"
+    },
+    {
+      "name": "subprocess",
+      "loaded": true,
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "file": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "builtin": false,
+      "bytes": 88747,
+      "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375"
+    },
+    {
+      "name": "_posixsubprocess",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "select",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "resource",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "_hashlib",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    }
+  ],
+  "sqliteVersion": "3.53.1",
+  "opensslVersion": "OpenSSL 3.5.8 25 Aug 2026",
+  "postProbeNonStdlibOrigins": [
+    {
+      "name": "__main__",
+      "origin": null,
+      "file": "<stdin>"
+    }
+  ],
+  "selectedSyscallSymbols": {
+    "fork": true,
+    "posix_spawn": true,
+    "waitpid": true,
+    "kill": true,
+    "pipe": true,
+    "open": true,
+    "mkdir": true,
+    "read": true,
+    "write": true
+  },
+  "subprocessPopenSymbol": true,
+  "selectedSyscallsActuallyExercised": "Private root mkdir/CreateNew/write/read/stat already observed; fork/Popen/wait/kill/socket NOT exercised",
+  "rootMode": "0o700",
+  "rootOsWritable": true,
+  "runrootExists": false,
+  "runrootCreated": false,
+  "permissionProfile": "managed workspace-write; writable /workspace and /tmp; network restricted; this task writes only accepted source root",
+  "containmentLimit": "Workspace write permission is broader than this task root; runner audit hooks are not OS syscall containment. Future child lifecycle/SQLite target closure unobserved",
+  "providerActorNativeHostRecord": null,
+  "productRunnerImportsLoadersTestsSqliteConnectsClaims": 0,
+  "pydanticFallback": false,
+  "originalQ76StartupEquivalent": false,
+  "independentSourcePreGo": "PENDING; this is preparation evidence only"
+}

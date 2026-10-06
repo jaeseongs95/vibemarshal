@@ -1,0 +1,254 @@
+{
+  "scope": "U2_R02_PREPARATION_ONLY_NATIVE_RETURN",
+  "utc": "2026-10-04T17:31:18.332278+00:00",
+  "sourceRoot": "/workspace/vm-u2-source-24cf-r02",
+  "futureRunRoot": "/workspace/vm-u2-run-24cf-r02",
+  "productStatus": "NOT_RUN",
+  "stdlibDummy": "DUMMY_REGRESSION_PASS",
+  "nativeToolId": null,
+  "providerNativeId": null,
+  "externalJobs": "UNKNOWN",
+  "priorUnreadableProcesses": 7,
+  "OSContainment": "UNKNOWN",
+  "localFiles": [
+    {
+      "path": "carrier.base64.txt",
+      "bytes": 177681,
+      "sha256": "11f88bc60623e74ad11855e9440411d83f8896527dc12bb956d526fb54bc3cd8",
+      "includedInReturn": false
+    },
+    {
+      "path": "evidence/command-audit.json",
+      "bytes": 63061,
+      "sha256": "a2709b23e7d31522187ac36b9c6eb86a89fa487e105c09252b7f9655eb7f558b",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/linux-dummy/execution.json",
+      "bytes": 3592,
+      "sha256": "658bf6c6595b8238b2e37263e8678a96aaef1848e7fb176c2b24a62faab896e5",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/linux-dummy/native-execution.stdout.json",
+      "bytes": 2765,
+      "sha256": "5a34c49b30a9b1dbb2dcd5c4b85782ef4e9c76343f00090f0fe1add2b32e757d",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/linux-dummy/result.json",
+      "bytes": 26440,
+      "sha256": "55b72eeb8c452bbc84dd7f9d9eb799c4c33b4678fc816dd1682da78e889cde8d",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/linux-dummy/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/linux-dummy/stdout.txt",
+      "bytes": 23220,
+      "sha256": "4e0e8bea710f047e36d00744922d424a4b5d34a5c8a3028ac74b5011e6dccb05",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/linux-dummy/supervisor-command.sh",
+      "bytes": 5224,
+      "sha256": "a998adb6959c839fe2d5e35373ac21efe142e1e8a24a3ef697ffa689562ed6e5",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/linux-pre-command.sh",
+      "bytes": 6356,
+      "sha256": "311cd24f7e4cdd701d119fbbe505e3d1f04a76ecb0698f140223e36913f729cd",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/linux-pre.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/linux-pre.stdout.json",
+      "bytes": 98011,
+      "sha256": "bad4ed5ef98f679338d065308a0c51cf0e3547d5586dd8af83f099ad90cd5abb",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/materialization.stdout.json",
+      "bytes": 7286,
+      "sha256": "b45bb266ddf4a9c3c559502565e8069c6477cf09878ebd2507393eb2a5e48f21",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/native-page-response.json",
+      "bytes": 356127,
+      "sha256": "d6bfc20d2b470ffa5f101c9b896520ad025a26ba5286b1b9f9af4d6bff46e1aa",
+      "includedInReturn": false
+    },
+    {
+      "path": "evidence/preflight-command.sh",
+      "bytes": 2691,
+      "sha256": "719de56217eb1a31fbbf6457dd3e76c50ca6d645725ac49b17c15cfa4a586e0e",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/preflight-root.stdout.json",
+      "bytes": 2475,
+      "sha256": "f0f55fb374341b4aaeeba912e07321371109c65b0f78d72a6d38bee9359c1e36",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/preparation-summary.json",
+      "bytes": 18882,
+      "sha256": "86b9ec130860adce93cd84cfb306e7f88afe9c3391ecd9ef8c0227688bdf368d",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/root-create.stdout.json",
+      "bytes": 193,
+      "sha256": "d1266727a275f375315c1d820ae90cbfdec6437e2e61602e50991976d6853b6f",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/runroot-ro-command.sh",
+      "bytes": 2738,
+      "sha256": "64d0f05a04b36831bf2d18ed64f1fa6b8deb07b7c8dc9a9136502fc0eb843144",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/runroot-ro.json",
+      "bytes": 4264,
+      "sha256": "e349cc9f93e7681b5d533aab02b56c5859c6daa04c6596562846253f2015c787",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/source-materialization-command.sh",
+      "bytes": 4960,
+      "sha256": "223580509cf82ad8f4d11e359bde6b13399beaf34c4ee83f2675be068e316191",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/source-materialization.json",
+      "bytes": 7286,
+      "sha256": "b45bb266ddf4a9c3c559502565e8069c6477cf09878ebd2507393eb2a5e48f21",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/summary-command-audit.json",
+      "bytes": 10677,
+      "sha256": "6daf1a344b78be0ae9b67adfc318f97528a075df91fb9cb41936b752bca316b0",
+      "includedInReturn": true
+    },
+    {
+      "path": "evidence/transport-stream-audit.json",
+      "bytes": 512350,
+      "sha256": "92351c2526b462449f79e98c6a7e88299c76e1868c1d5f3dde68ea23e7da043d",
+      "includedInReturn": false
+    },
+    {
+      "path": "packet/README.ko.md",
+      "bytes": 7129,
+      "sha256": "42a72ef4b84fd3b285ae1aecd2cb48baede4fbd95f67f53f3c5be6c976fba855",
+      "includedInReturn": false
+    },
+    {
+      "path": "packet/SOURCE.DIFF.patch",
+      "bytes": 7305,
+      "sha256": "01d38f4ac1b6755c41d99e5940952ac1e0e1b95029fb66706f3489657783b591",
+      "includedInReturn": false
+    },
+    {
+      "path": "packet/SOURCE.SHA256.json",
+      "bytes": 1995,
+      "sha256": "0c1c54b6643cfb514df94cf1160a41eca46c086dce0e042254658801afcc22d2",
+      "includedInReturn": true
+    },
+    {
+      "path": "packet/STATIC-CHECKS.json",
+      "bytes": 9390,
+      "sha256": "e00bf43810e19196eb6e2081955ce8f6768f2784c7ec72ac78ba4d0e2ef37c81",
+      "includedInReturn": false
+    },
+    {
+      "path": "packet/manifest.json",
+      "bytes": 5916,
+      "sha256": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "includedInReturn": true
+    },
+    {
+      "path": "packet/pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "includedInReturn": false
+    },
+    {
+      "path": "packet/pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "includedInReturn": false
+    },
+    {
+      "path": "packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "includedInReturn": false
+    },
+    {
+      "path": "packet/regression/check_origin.py",
+      "bytes": 8497,
+      "sha256": "8321f2343c74a829b4e6509f0a0b2942a7808ffd81f84b45592d5fa6d0616098",
+      "includedInReturn": true
+    },
+    {
+      "path": "packet/regression/dummy_helper.py",
+      "bytes": 300,
+      "sha256": "b42b7cf911d2f08cd5cf023c0b914f7d910411509c5b8d515304bce60ca9133f",
+      "includedInReturn": true
+    },
+    {
+      "path": "packet/regression-capture/execution.json",
+      "bytes": 2441,
+      "sha256": "857378118c39c8dd58716717a6e0d794d5d0b6b365027bfb0ac2aa2c61585ed6",
+      "includedInReturn": true
+    },
+    {
+      "path": "packet/regression-capture/result.json",
+      "bytes": 33704,
+      "sha256": "1ce8f75eae84b5f0de00a539943c2cac577721ee27d912cf0038866b2293286f",
+      "includedInReturn": true
+    },
+    {
+      "path": "packet/regression-capture/stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "includedInReturn": true
+    },
+    {
+      "path": "packet/regression-capture/stdout.txt",
+      "bytes": 30485,
+      "sha256": "aeddf4a96cc87c2b67677ab27fa23e2b600f747d594ca94db341de92354da56e",
+      "includedInReturn": true
+    },
+    {
+      "path": "packet/runner.py",
+      "bytes": 20603,
+      "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "includedInReturn": true
+    },
+    {
+      "path": "source.zip",
+      "bytes": 133260,
+      "sha256": "15e9898c20210576204681b2365b0cf488c2c19cd2e45205f13e5ffb98810e68",
+      "includedInReturn": false
+    }
+  ],
+  "retainedLocalLargeData": "native-page-response.json, transport-stream-audit.json, carrier and source ZIP remain intact; full hashes in this manifest. Original pristine3 retained with pins; input source carrier already held by Root.",
+  "packetSourceFiles": 15,
+  "packetBytes": 724947,
+  "oldRootsModified": 0,
+  "futureRunRootCreated": false
+}

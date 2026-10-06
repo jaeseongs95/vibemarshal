@@ -1,2 +1,3 @@
 **/raw/** -text -diff
 **/source-packet/** -text -diff
+**/historical-*/** -text -diff

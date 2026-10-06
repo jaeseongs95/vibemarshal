@@ -14,7 +14,20 @@
         "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision5_requires_typed_ancestor_inputs_and_evidence_contract",
         "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_same_path_accepts_only_drive_and_unc_extended_namespaces"
       ],
-      "postVerdict": "R021"
+      "postVerdict": "R021",
+      "historicalArchiveCurrentMap": {
+        "testUnit": "C3",
+        "path": "C3/codex/historical-archive-20261006/PUBLICATION-CURRENT.json",
+        "bytes": 25856,
+        "sha256": "f4863c2c0fb25f916c6b18fa55ca44e198bab560e527d430740cf4c8cc15f46b",
+        "counts": {
+          "knownHistoricalSourceRows": 15,
+          "originalByteCopies": 15,
+          "cursorRedactedCopies": 0,
+          "originalZIPsWithPriorDerivedCopies": 0,
+          "locallyRecoveredAdditionalOriginals": 6
+        }
+      }
     },
     {
       "id": "U2",
@@ -22,7 +35,20 @@
         "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_migrates_additively_from_v2_and_preserves_history",
         "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_writer_fence_rejects_missing_and_old_contract_versions"
       ],
-      "postVerdict": "R029"
+      "postVerdict": "R029",
+      "historicalArchiveCurrentMap": {
+        "testUnit": "U2",
+        "path": "U2/codex/historical-archive-20261006/PUBLICATION-CURRENT.json",
+        "bytes": 91468,
+        "sha256": "030c6d67385f31a1c46dc6584d82962a6f594a01bea03fefeba3c8dc1b69e6c1",
+        "counts": {
+          "knownHistoricalSourceRows": 74,
+          "originalByteCopies": 73,
+          "cursorRedactedCopies": 1,
+          "originalZIPsWithPriorDerivedCopies": 0,
+          "locallyRecoveredAdditionalOriginals": 3
+        }
+      }
     },
     {
       "id": "C5",
@@ -33,7 +59,20 @@
         "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revalidate_success_rejects_ordinary_pending_task",
         "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision_manifest_rejects_false_carry_and_incomplete_lineage"
       ],
-      "postVerdict": "R034"
+      "postVerdict": "R034",
+      "historicalArchiveCurrentMap": {
+        "testUnit": "C5",
+        "path": "C5/codex/historical-archive-20261006/PUBLICATION-CURRENT.json",
+        "bytes": 165502,
+        "sha256": "5d8f0ed263a54050979b4bf816c961a490a54a7c56373eb8d11c350a86115d6a",
+        "counts": {
+          "knownHistoricalSourceRows": 136,
+          "originalByteCopies": 136,
+          "cursorRedactedCopies": 0,
+          "originalZIPsWithPriorDerivedCopies": 1,
+          "locallyRecoveredAdditionalOriginals": 2
+        }
+      }
     },
     {
       "id": "D3",
@@ -42,7 +81,20 @@
         "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged",
         "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject"
       ],
-      "postVerdict": "R040"
+      "postVerdict": "R040",
+      "historicalArchiveCurrentMap": {
+        "testUnit": "D3",
+        "path": "D3/codex/historical-archive-20261006/PUBLICATION-CURRENT.json",
+        "bytes": 104691,
+        "sha256": "2e468cd0fe491d1a161699c41f6c3734a03e565b3cec84d4d45ac7efa957e366",
+        "counts": {
+          "knownHistoricalSourceRows": 80,
+          "originalByteCopies": 79,
+          "cursorRedactedCopies": 1,
+          "originalZIPsWithPriorDerivedCopies": 2,
+          "locallyRecoveredAdditionalOriginals": 0
+        }
+      }
     }
   ],
   "copiedOriginalFiles": [
@@ -1326,5 +1378,90 @@
     "commit": "1abd15779bb5b4e70222b9020793507fa2cca1eb",
     "copiedOriginalFiles": 121
   },
-  "publicationScope": "사용자가 승인한 기존 C3/U2/C5/D3 Cloud 반환물 전체와 동일 input pin의 증명 소스. source-packet은 원본 로컬 보존본을 Cloud invocation hash와 대조한 사본이다."
+  "publicationScope": "사용자가 승인한 테스트 단위별 Cloud 증거 보관. 기존 공개199파일과 알려진305개 추가 lineage, 회수된 Cloud 원본11개 및 공유 반환ZIP을 연결한다. 2개 JSON은 불투명 페이지 cursor 필드만 제외한 가공본이며 원본과 변경 SHA를 공개 map에 기록한다. 관측하지 못한 전체 Cloud 파일의 완전성이나 새 테스트 PASS는 주장하지 않는다.",
+  "historicalArchiveExtension": {
+    "basePublishedCommit": "6931af994f61cd6aa033640d82edf660dab619a6",
+    "sourceRowCountMeaning": "File lineage records; includes shared hashes, never additional tests or unique content count",
+    "knownLocalSourceRows": 305,
+    "currentOriginalByteCopiesFor305": 303,
+    "currentCursorRedactedJSONCopies": 2,
+    "priorFilteredZIPCopiesRetained": 3,
+    "initialContextAndClaimFilesRetained": 17,
+    "newCloudOriginalsRecoveredLocally": 11,
+    "recoveredRawBytes": 2554954,
+    "originalRaw11TransportZIPs": 1,
+    "recoveryIndexes": 4,
+    "newCurrentUnitMaps": 4,
+    "samePriorINDEXContentPinLineageRows": 58,
+    "currentSourceMaps": [
+      {
+        "testUnit": "C3",
+        "path": "C3/codex/historical-archive-20261006/PUBLICATION-CURRENT.json",
+        "bytes": 25856,
+        "sha256": "f4863c2c0fb25f916c6b18fa55ca44e198bab560e527d430740cf4c8cc15f46b",
+        "counts": {
+          "knownHistoricalSourceRows": 15,
+          "originalByteCopies": 15,
+          "cursorRedactedCopies": 0,
+          "originalZIPsWithPriorDerivedCopies": 0,
+          "locallyRecoveredAdditionalOriginals": 6
+        }
+      },
+      {
+        "testUnit": "U2",
+        "path": "U2/codex/historical-archive-20261006/PUBLICATION-CURRENT.json",
+        "bytes": 91468,
+        "sha256": "030c6d67385f31a1c46dc6584d82962a6f594a01bea03fefeba3c8dc1b69e6c1",
+        "counts": {
+          "knownHistoricalSourceRows": 74,
+          "originalByteCopies": 73,
+          "cursorRedactedCopies": 1,
+          "originalZIPsWithPriorDerivedCopies": 0,
+          "locallyRecoveredAdditionalOriginals": 3
+        }
+      },
+      {
+        "testUnit": "C5",
+        "path": "C5/codex/historical-archive-20261006/PUBLICATION-CURRENT.json",
+        "bytes": 165502,
+        "sha256": "5d8f0ed263a54050979b4bf816c961a490a54a7c56373eb8d11c350a86115d6a",
+        "counts": {
+          "knownHistoricalSourceRows": 136,
+          "originalByteCopies": 136,
+          "cursorRedactedCopies": 0,
+          "originalZIPsWithPriorDerivedCopies": 1,
+          "locallyRecoveredAdditionalOriginals": 2
+        }
+      },
+      {
+        "testUnit": "D3",
+        "path": "D3/codex/historical-archive-20261006/PUBLICATION-CURRENT.json",
+        "bytes": 104691,
+        "sha256": "2e468cd0fe491d1a161699c41f6c3734a03e565b3cec84d4d45ac7efa957e366",
+        "counts": {
+          "knownHistoricalSourceRows": 80,
+          "originalByteCopies": 79,
+          "cursorRedactedCopies": 1,
+          "originalZIPsWithPriorDerivedCopies": 2,
+          "locallyRecoveredAdditionalOriginals": 0
+        }
+      }
+    ],
+    "recoveryTransport": {
+      "path": "C3/codex/historical-source-r03-recovered-evidence-20261006/cloud-return/historical.raw11.zip",
+      "bytes": 1809756,
+      "sha256": "9937469f4a0691e7554a1f3101c20e8eb37a9e78fb5a6e9d0781b0413c82fe67",
+      "finalNativeManifestReference": "UNOBSERVED",
+      "pinBasis": "Observed App upload receipts/11 native reference bodies/chunk+ZIP+member+historical pins checked by Root"
+    },
+    "disclosure": {
+      "literalCredentialFindingsInReviewedScope": 0,
+      "unsupportedOpaqueCursorFieldsRemoved": 2,
+      "globalSecretAbsenceClaim": false,
+      "independentPublicReleaseAuditClaim": false
+    },
+    "newProductTests": 0,
+    "currentCloudEnvironment": "REUSED logical session; container/env/boot identity UNKNOWN",
+    "originalExisting182DataPinsPreserved": true
+  }
 }

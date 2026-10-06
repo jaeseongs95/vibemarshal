@@ -1,0 +1,54 @@
+{
+  "recordKind": "LOCAL_DERIVED_UNRECOVERED_HISTORICAL_PIN_CLAIMS",
+  "testUnit": "U2",
+  "testPurpose": "schema migration·writer fence 및 해당 PRE/dummy·이전 UNKNOWN 증거",
+  "originalFileBodiesPresent": false,
+  "newRetrievals": 0,
+  "currentRemoteExistence": "UNKNOWN",
+  "isCloudExecutionReturn": false,
+  "historicalClaims": [
+    {
+      "testUnit": "U2",
+      "originalCloudPath": "/workspace/vm-u2-source-24cf-r01/evidence/native-page-response.json",
+      "bytes": 328934,
+      "sha256": "c4d063841c66e52313f5ca7b08688bb923984302b5ff1ea713feab6dc1130e73",
+      "pinBasis": "Historical manifest value; remote file bytes not read this request",
+      "manifest": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-u2-r01-01/raw/prepare/evidence-manifest.json",
+      "jsonPointer": "/allOwnedFilePins/7",
+      "manifestPathLine": 42,
+      "includedInReturn": null,
+      "archivePathsWithSameINDEXPin": [],
+      "coverage": "HISTORICAL_PIN_REMOTE_BYTES_NOT_LOCALLY_OBSERVED",
+      "currentRemoteExistence": "UNKNOWN"
+    },
+    {
+      "testUnit": "U2",
+      "originalCloudPath": "/workspace/vm-u2-source-24cf-r02/evidence/native-page-response.json",
+      "bytes": 356127,
+      "sha256": "d6bfc20d2b470ffa5f101c9b896520ad025a26ba5286b1b9f9af4d6bff46e1aa",
+      "pinBasis": "Historical manifest value; remote file bytes not read this request",
+      "manifest": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-u2-r02-01/raw/evidence/evidence-manifest.json",
+      "jsonPointer": "/localFiles/12",
+      "manifestPathLine": 87,
+      "includedInReturn": false,
+      "archivePathsWithSameINDEXPin": [],
+      "coverage": "HISTORICAL_PIN_REMOTE_BYTES_NOT_LOCALLY_OBSERVED",
+      "currentRemoteExistence": "UNKNOWN"
+    },
+    {
+      "testUnit": "U2",
+      "originalCloudPath": "/workspace/vm-u2-source-24cf-r02/evidence/transport-stream-audit.json",
+      "bytes": 512350,
+      "sha256": "92351c2526b462449f79e98c6a7e88299c76e1868c1d5f3dde68ea23e7da043d",
+      "pinBasis": "Historical manifest value; remote file bytes not read this request",
+      "manifest": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-u2-r02-01/raw/evidence/evidence-manifest.json",
+      "jsonPointer": "/localFiles/22",
+      "manifestPathLine": 147,
+      "includedInReturn": false,
+      "archivePathsWithSameINDEXPin": [],
+      "coverage": "HISTORICAL_PIN_REMOTE_BYTES_NOT_LOCALLY_OBSERVED",
+      "currentRemoteExistence": "UNKNOWN"
+    }
+  ],
+  "effect": "metadata only, no original retrieval or PASS assertion"
+}

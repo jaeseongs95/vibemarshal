@@ -1,0 +1,187 @@
+{
+  "scope": "U2_SOURCE_AND_PRE_EVIDENCE_ONLY_NOT_READY_OR_GO",
+  "utc": "2026-10-04T15:56:57.884378+00:00",
+  "root": "/workspace/vm-u2-source-24cf-r01",
+  "allOwnedFilePins": [
+    {
+      "path": "carrier.base64.txt",
+      "bytes": 164041,
+      "sha256": "f44359ff00b782bf262675ee7140a1a35632a6cd0f1dc96d717ee0cdbbbbd554"
+    },
+    {
+      "path": "evidence/command-audit.json",
+      "bytes": 58548,
+      "sha256": "83b9e897eeb68471abe79a186d55ccdbce0ae8eacf4ee828f718a13bcd8fd218"
+    },
+    {
+      "path": "evidence/linux-pre-command.sh",
+      "bytes": 5683,
+      "sha256": "fec9b5ee684cf6eff85bbae475d1b1011d546b6951154bc911145c0ebc6ced50"
+    },
+    {
+      "path": "evidence/linux-pre-first-capture-truncated.json",
+      "bytes": 11418,
+      "sha256": "466af853b3d37e4be4122078cc2148906c04abd4f9267ab41a8c3697bd712a1a"
+    },
+    {
+      "path": "evidence/linux-pre.stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "evidence/linux-pre.stdout.json",
+      "bytes": 61394,
+      "sha256": "670c44ffb3d57073bfa21ea8491a4ad372ef7c08623cb6f42106dfecf763cf9c"
+    },
+    {
+      "path": "evidence/materialization-initial-audit.json",
+      "bytes": 4397,
+      "sha256": "588440da77f4413bd887ec52582a90d237a95f48cc80c3e792c10dd195190df0"
+    },
+    {
+      "path": "evidence/native-page-response.json",
+      "bytes": 328934,
+      "sha256": "c4d063841c66e52313f5ca7b08688bb923984302b5ff1ea713feab6dc1130e73"
+    },
+    {
+      "path": "evidence/runroot-ro-command.sh",
+      "bytes": 4572,
+      "sha256": "2d03a202b01604604fcd041e921fae775eda84c858ccbe3b699561fa019ec3e0"
+    },
+    {
+      "path": "evidence/runroot-ro.json",
+      "bytes": 8575,
+      "sha256": "47846571d84fba4010216c41bf792c1d94475bf2cefce0a23d5ddcd04bc3400c"
+    },
+    {
+      "path": "evidence/source-materialization-command.sh",
+      "bytes": 4305,
+      "sha256": "f8b50415637228fba9629e4a7ff7ca2cb9ccdd14a6949ffd88a3d70315227056"
+    },
+    {
+      "path": "evidence/source-materialization.json",
+      "bytes": 2661,
+      "sha256": "a98d43d77a4d01155edbe93284c2f9f7db57b3c18c931966c0335c0eeb26206d"
+    },
+    {
+      "path": "evidence/transport-stream-audit.json",
+      "bytes": 31010,
+      "sha256": "fbf9eadae1174b0c1d4cc450a4418c2ca81171aae85ca920166524bdaa84bcca"
+    },
+    {
+      "path": "packet/README.ko.md",
+      "bytes": 8883,
+      "sha256": "dfe5333ce1cdaa8edf425008fab739e8accd0fd1f4eac8cf679b99fba95a47b9"
+    },
+    {
+      "path": "packet/SOURCE.DIFF.patch",
+      "bytes": 6741,
+      "sha256": "781d3eb5a6b82deb02cc1d8f66138d134e2c52e2455428649a5321d477b37774"
+    },
+    {
+      "path": "packet/SOURCE.SHA256.json",
+      "bytes": 1146,
+      "sha256": "7b8e95952e3e1f9b85d9a0e90dd75ad3cc2bf4272640a5d86b7612b82c9d4463"
+    },
+    {
+      "path": "packet/STATIC-CHECKS.json",
+      "bytes": 7688,
+      "sha256": "5d9ceb9492d70970c7c9c1a440ce48ed7eb6dc14606909c7cabdfb9b928e4d14"
+    },
+    {
+      "path": "packet/manifest.json",
+      "bytes": 4525,
+      "sha256": "07add40aeaea69d60bc88c64f477818a780a039e92e85b7bdcbe435fbea75162"
+    },
+    {
+      "path": "packet/pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+    },
+    {
+      "path": "packet/pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    },
+    {
+      "path": "packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+    },
+    {
+      "path": "packet/runner.py",
+      "bytes": 15932,
+      "sha256": "d00cf8b8d901915d9f7141bbbaae4e674535e9756dd4b0598d95063f79250af3"
+    },
+    {
+      "path": "source.zip",
+      "bytes": 123028,
+      "sha256": "77702c59561cface04e08b23bcbb07282cf636c1d80296a1fcf81fe31fe5cff6"
+    }
+  ],
+  "source9Readback": [
+    {
+      "path": "README.ko.md",
+      "bytes": 8883,
+      "sha256": "dfe5333ce1cdaa8edf425008fab739e8accd0fd1f4eac8cf679b99fba95a47b9"
+    },
+    {
+      "path": "SOURCE.DIFF.patch",
+      "bytes": 6741,
+      "sha256": "781d3eb5a6b82deb02cc1d8f66138d134e2c52e2455428649a5321d477b37774"
+    },
+    {
+      "path": "SOURCE.SHA256.json",
+      "bytes": 1146,
+      "sha256": "7b8e95952e3e1f9b85d9a0e90dd75ad3cc2bf4272640a5d86b7612b82c9d4463"
+    },
+    {
+      "path": "STATIC-CHECKS.json",
+      "bytes": 7688,
+      "sha256": "5d9ceb9492d70970c7c9c1a440ce48ed7eb6dc14606909c7cabdfb9b928e4d14"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 4525,
+      "sha256": "07add40aeaea69d60bc88c64f477818a780a039e92e85b7bdcbe435fbea75162"
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+    },
+    {
+      "path": "runner.py",
+      "bytes": 15932,
+      "sha256": "d00cf8b8d901915d9f7141bbbaae4e674535e9756dd4b0598d95063f79250af3"
+    }
+  ],
+  "sourceTotalBytes": 642097,
+  "sourcePinMatch": true,
+  "original3SameAsC3": true,
+  "carrierNativeTextEqual": true,
+  "preCwdEmpty": true,
+  "futureRunrootCreated": false,
+  "runnerProductImportsLoadersTestsFixturesProbesGO": 0,
+  "nativeSourceReadAttempts": 1,
+  "nativeReadRetries": 0,
+  "metadataCollectors": 2,
+  "metadataFirstCaptureTruncated": true,
+  "metadataCompleteCaptureFile": "evidence/linux-pre.stdout.json",
+  "sourcePreDecision": "PENDING",
+  "sqliteCompileAndFunctionalBehavior": "UNKNOWN_NOT_EXECUTED; connection prohibited",
+  "nativeIds": null,
+  "externalJobs": "UNKNOWN",
+  "priorUnreadableProcesses": 7,
+  "manifestExcludesSelf": true
+}

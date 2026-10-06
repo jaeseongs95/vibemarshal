@@ -1,0 +1,3825 @@
+{
+  "prepared_utc": "2026-10-04T18:47:56.166511+00:00",
+  "canonical76": {
+    "path": "D:\\fm70-isolated76-ae4c72ab\\argv-manifest.json",
+    "bytes": 31004,
+    "sha256": "7d9466232de00419968bd5127cfef01a2946b0f0c3ad4a361d1d01d4804396b9"
+  },
+  "source_pins": [
+    {
+      "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+      "bytes": 14804,
+      "sha256": "56793b76b16712fffd1d2d732b3c858621fef15d1d85f2874f0545fba3ea6fe2"
+    },
+    {
+      "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+    },
+    {
+      "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_same_tick_handoff.py",
+      "bytes": 3283,
+      "sha256": "7ce7041367087523b8e944061fcc97a2cb4e7faaba04442f259c65cd280cc57b"
+    },
+    {
+      "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_workflow_integration.py",
+      "bytes": 7401,
+      "sha256": "44ff1bf4a3407ce64d1dae842b2f6a9123d6a10f045fc040da3efa08fa9f2498"
+    },
+    {
+      "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+    },
+    {
+      "path": "D:\\codex\\자동화템플릿\\scripts\\flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    }
+  ],
+  "module_counts": {
+    "test_flowmarshal_direct_selection": 12,
+    "test_flowmarshal_implementation_workflow": 60,
+    "test_flowmarshal_same_tick_handoff": 1,
+    "test_flowmarshal_workflow_integration": 3
+  },
+  "completed_unique": 5,
+  "remaining_not_run": 71,
+  "selected_not_run": 5,
+  "not_selected_not_run": 66,
+  "category_counts": {
+    "MODULE_IDENTITY_REVIEW_16": 16,
+    "EFFECT_BRANCH_REVIEW_41": 41,
+    "WINDOWS_PROFILE_REQUIRED_9": 9,
+    "NEXT_COMMON_5": 5,
+    "COMPLETED_5": 5
+  },
+  "evidence": {
+    "C3": {
+      "scope": "helper70f5 exact IDs / Linux Python3.12.14 -I -S -B -X utf8 / transported copies",
+      "result": {
+        "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\run\\result.json",
+        "bytes": 707,
+        "sha256": "98b90a2aaab88b697c52ce69b3f38d9027327838142bc3e4aa9cbcb31fb29989"
+      },
+      "loader": {
+        "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\run\\loader.json",
+        "bytes": 503,
+        "sha256": "67ca4a8570afddda8c57ecd634b9c51a45ec7b078ae38140d999722362b92b45"
+      },
+      "execution": {
+        "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\raw\\run\\execution.json",
+        "bytes": 2103,
+        "sha256": "5f4d80745d9dbff87ff290ba85162ce1b1b9b15264d41567793c5b5dcf830f8a"
+      },
+      "verdict": {
+        "path": "D:\\claude\\독립감사관\\R-021-VM-C3-FINAL-R03-POST-VERDICT.ko.md",
+        "bytes": 6566,
+        "sha256": "f0d201c01f370b2ff992d35c355a400bad1c8285f3e4f83c42b3fb3cc2a2a260"
+      },
+      "source_input_pins": {
+        "runner.py": "457fd65598bc5cb5a87dd46abb7036bac9768db20a932053fb9670b201862136",
+        "manifest.json": "ae0260a8fd9803cc716a8eab504e34b9bdfd919f39695e8bced5a896c116c3ad",
+        "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+        "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+        "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+      }
+    },
+    "U2": {
+      "scope": "helper70f5 exact IDs / Linux Python3.12.14 -I -S -B -X utf8 / transported copies",
+      "result": {
+        "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\run-raw\\result.json",
+        "bytes": 582,
+        "sha256": "06a539d8782d5c8a011ca4ccb750ea5d5ce96c648bb376b6f6e9db7e2c4c4116"
+      },
+      "loader": {
+        "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\run-raw\\loader.json",
+        "bytes": 378,
+        "sha256": "29d02d4b221f77d9a21d23a348f81ae2db206554b14590fa7cfb8ce6dabc0f17"
+      },
+      "execution": {
+        "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw\\run-raw\\execution.json",
+        "bytes": 2174,
+        "sha256": "0b4a66e9e30a38d59543c7f05ca16ac335332b40201de66223a0d2a5b11efc85"
+      },
+      "verdict": {
+        "path": "D:\\claude\\독립감사관\\R-029-VM-U2-R02-POST-VERDICT.ko.md",
+        "bytes": 7231,
+        "sha256": "ba2fe9f0129f47e1295899374b06cc951f88bd22671059b73041e7b8c28ce192"
+      },
+      "source_input_pins": {
+        "runner.py": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+        "manifest.json": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+        "pristine/tests/test_flowmarshal_implementation_workflow.py": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+        "pristine/scripts/flowmarshal_implementation_workflow.py": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+        "pristine/scripts/flowmarshal_orchestrator_ledger.py": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+      }
+    }
+  },
+  "r01_history": {
+    "path": "D:\\claude\\독립감사관\\R-025-VM-U2-R01-POST-VERDICT.ko.md",
+    "bytes": 5539,
+    "sha256": "3bb0245607316699f64872ecc2e960bb4fc49c95e7d9cffbde78864b4b01a1fa",
+    "result": "UNKNOWN, original tests not run"
+  },
+  "selected_exact_ids": [
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_carry_rehashes_all_evidence_files_without_freshness_contract",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_migration_backup_history_idempotence_tamper_cycle_and_readonly",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_record_direct_attempt_rejects_task_that_is_not_ready",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revalidate_success_rejects_ordinary_pending_task",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision_manifest_rejects_false_carry_and_incomplete_lineage"
+  ],
+  "rows": [
+    {
+      "id": "test_flowmarshal_direct_selection.DirectSelectionTest.test_active_dispatch_and_expired_lease_preserved",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 191,
+        "end": 202
+      },
+      "named_calls": [
+        "c.execute",
+        "connect",
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.counts",
+        "self.fx.reserve_fm01",
+        "self.record",
+        "self.selection"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "line": 11,
+        "name": "test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    },
+    {
+      "id": "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 157,
+        "end": 168
+      },
+      "named_calls": [
+        "copy.deepcopy",
+        "self.assertEqual",
+        "self.assertRaises",
+        "self.counts",
+        "self.record",
+        "self.selection",
+        "self.subTest"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "line": 11,
+        "name": "test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    },
+    {
+      "id": "test_flowmarshal_direct_selection.DirectSelectionTest.test_default_preserved_opt_in_records_second_and_event",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 96,
+        "end": 113
+      },
+      "named_calls": [
+        "c.execute",
+        "c.execute(\"SELECT payload_json FROM orchestration_events WHERE event_type='implementation_task.direct_attempt_recorded' ORDER BY event_id DESC LIMIT 1\").fetchone",
+        "c.execute(\"SELECT status FROM implementation_tasks WHERE task_id='FM-01'\").fetchone",
+        "connect",
+        "digest",
+        "json.loads",
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.assertTrue",
+        "self.counts",
+        "self.prepare",
+        "self.record",
+        "self.selection"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "line": 11,
+        "name": "test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    },
+    {
+      "id": "test_flowmarshal_direct_selection.DirectSelectionTest.test_failed_dependency_and_unknown_effect_are_not_bypassed",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 126,
+        "end": 138
+      },
+      "named_calls": [
+        "c.execute",
+        "c.execute(\"SELECT spec_sha256 FROM implementation_tasks WHERE task_id='FM-03'\").fetchone",
+        "connect",
+        "selected.update",
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.counts",
+        "self.fail_first",
+        "self.record",
+        "self.selection"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "line": 11,
+        "name": "test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    },
+    {
+      "id": "test_flowmarshal_direct_selection.DirectSelectionTest.test_failed_independent_selection_cannot_complete_workflow",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 115,
+        "end": 124
+      },
+      "named_calls": [
+        "impl.command_finish",
+        "impl.command_status",
+        "ns",
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.assertTrue",
+        "self.fail_first",
+        "self.prepare",
+        "self.record",
+        "self.selection",
+        "str"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "line": 11,
+        "name": "test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    },
+    {
+      "id": "test_flowmarshal_direct_selection.DirectSelectionTest.test_new_failure_after_assignment_requires_new_review",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 170,
+        "end": 181
+      },
+      "named_calls": [
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.counts",
+        "self.fail_first",
+        "self.record",
+        "self.selection"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "line": 11,
+        "name": "test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    },
+    {
+      "id": "test_flowmarshal_direct_selection.DirectSelectionTest.test_preparation_survives_lease_release_and_records_in_new_run_via_cli",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 254,
+        "end": 279
+      },
+      "named_calls": [
+        "c.execute",
+        "c.execute(\"SELECT run_id,payload_json FROM orchestration_events WHERE event_type='implementation_task.direct_attempt_recorded' ORDER BY event_id DESC LIMIT 1\").fetchone",
+        "connect",
+        "data['files'].extend",
+        "dict",
+        "evidence.read_text",
+        "evidence.write_text",
+        "impl.command_finish",
+        "json.dumps",
+        "json.loads",
+        "ns",
+        "self.assertEqual",
+        "self.assertNotEqual",
+        "self.assertTrue",
+        "self.fx.begin",
+        "self.fx.evidence",
+        "self.prepare",
+        "self.ref",
+        "self.selection",
+        "str",
+        "subprocess.run"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "line": 11,
+        "name": "test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [
+        267
+      ],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    },
+    {
+      "id": "test_flowmarshal_direct_selection.DirectSelectionTest.test_ready_tasks_is_read_only_and_cli_option_parses",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 219,
+        "end": 231
+      },
+      "named_calls": [
+        "dict",
+        "json.loads",
+        "self.assertEqual",
+        "self.assertFalse",
+        "self.assertIn",
+        "self.counts",
+        "self.ready",
+        "str",
+        "subprocess.run"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "line": 11,
+        "name": "test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [
+        226,
+        229
+      ],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    },
+    {
+      "id": "test_flowmarshal_direct_selection.DirectSelectionTest.test_recovery_priority_and_stale_bootstrap_diagnostic",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 233,
+        "end": 252
+      },
+      "named_calls": [
+        "impl.command_register_recovery",
+        "len",
+        "ns",
+        "self.assertEqual",
+        "self.assertIn",
+        "self.assertRaisesRegex",
+        "self.assertTrue",
+        "self.counts",
+        "self.fail_first",
+        "self.fx.proof.write_text",
+        "self.prepare",
+        "self.ready",
+        "self.selection",
+        "str"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "line": 11,
+        "name": "test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    },
+    {
+      "id": "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 204,
+        "end": 217
+      },
+      "named_calls": [
+        "evidence.read_text",
+        "evidence.write_text",
+        "json.dumps",
+        "json.loads",
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.counts",
+        "self.fx.evidence",
+        "self.record",
+        "self.selection"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "line": 11,
+        "name": "test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    },
+    {
+      "id": "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 183,
+        "end": 189
+      },
+      "named_calls": [
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.counts",
+        "self.fx.proof.write_text",
+        "self.record",
+        "self.selection"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "line": 11,
+        "name": "test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    },
+    {
+      "id": "test_flowmarshal_direct_selection.DirectSelectionTest.test_unprepared_and_superseded_preparations_rejected",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "start": 140,
+        "end": 155
+      },
+      "named_calls": [
+        "copy.deepcopy",
+        "self.assertEqual",
+        "self.assertGreater",
+        "self.assertRaisesRegex",
+        "self.assertTrue",
+        "self.counts",
+        "self.prepare",
+        "self.record",
+        "self.selection"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+        "line": 11,
+        "name": "test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_activation_decision_binds_target_spec_and_source_snapshot",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 3165,
+        "end": 3192
+      },
+      "named_calls": [
+        "decision_path.read_text",
+        "decision_path.write_text",
+        "impl.command_activate_revision",
+        "impl.command_finish",
+        "json.dumps",
+        "json.loads",
+        "ns",
+        "self._activation_decision",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.register_revision",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_activation_decision_binds_target_spec_and_source_snapshot",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 3165,
+          "end": 3192
+        },
+        {
+          "node": "t:_activation_decision",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 297,
+          "end": 322
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_capture_create_receipt_accepts_windows_extended_length_cwd",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 946,
+        "end": 976
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "impl.command_capture_create_receipt",
+        "json.dumps",
+        "json.loads",
+        "ns",
+        "raw.write_text",
+        "receipt.read_text",
+        "self._record_created_thread_policy",
+        "self.assertEqual",
+        "self.assertTrue",
+        "self.begin",
+        "self.claim_dispatch",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "WINDOWS_PROFILE_REQUIRED_9",
+      "reason_ko": "원 WINDIR/System32/cmd.exe 또는 실제 cwd extended-prefix 의미. 현 Linux profile에서 원 의미 보존 불가; 제품 전체 불가능 판정 아님.",
+      "windows_source_lines": [
+        957
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_capture_create_receipt_binds_actual_full_access_policy",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 919,
+        "end": 944
+      },
+      "named_calls": [
+        "impl.command_capture_create_receipt",
+        "impl.command_confirm",
+        "json.dumps",
+        "ns",
+        "raw.write_text",
+        "self._record_created_thread_policy",
+        "self.assertEqual",
+        "self.assertTrue",
+        "self.begin",
+        "self.claim_dispatch",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_capture_create_receipt_binds_actual_full_access_policy",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 919,
+          "end": 944
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_capture_create_receipt_rejects_workspace_policy_before_confirm",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 999,
+        "end": 1026
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute('SELECT status,thread_id,client_thread_id FROM dispatches WHERE dispatch_id=?', (reserved['dispatch_id'],)).fetchone",
+        "impl.command_capture_create_receipt",
+        "json.dumps",
+        "ns",
+        "raw.write_text",
+        "self._record_created_thread_policy",
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.claim_dispatch",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_capture_create_receipt_rejects_workspace_policy_before_confirm",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 999,
+          "end": 1026
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_carried_task_attempt_invalidates_carry_in_the_reservation_transaction",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 3342,
+        "end": 3403
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT COUNT(*) FROM implementation_task_attempts WHERE workflow_id=?\\n                     AND workflow_revision=2 AND task_id='FM-00'\", (impl.WORKFLOW_ID,)).fetchone",
+        "connection.execute(\"SELECT attempt_no,status FROM implementation_task_attempts WHERE workflow_id=?\\n                     AND workflow_revision=2 AND task_id='FM-00'\", (impl.WORKFLOW_ID,)).fetchone",
+        "connection.execute(\"SELECT invalidated_at,invalidated_by_attempt_no\\n                   FROM implementation_task_carry_forwards WHERE workflow_id=?\\n                     AND to_workflow_revision=2 AND to_task_id='FM-00'\", (impl.WORKFLOW_ID,)).fetchone",
+        "impl.command_reopen_stale",
+        "impl.command_review",
+        "ns",
+        "self.activate_revision2_fixture",
+        "self.assertEqual",
+        "self.assertIsNotNone",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.evidence",
+        "self.proof.write_text",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_carried_task_attempt_invalidates_carry_in_the_reservation_transaction",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 3342,
+          "end": 3403
+        },
+        {
+          "node": "t:activate_revision2_fixture",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 349,
+          "end": 363
+        },
+        {
+          "node": "t:activate_revision",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 339,
+          "end": 347
+        },
+        {
+          "node": "t:_activation_decision",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 297,
+          "end": 322
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_carry_rehashes_all_evidence_files_without_freshness_contract",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 3149,
+        "end": 3163
+      },
+      "named_calls": [
+        "impl.command_finish",
+        "ns",
+        "self.assertEqual",
+        "self.begin",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.proof.write_text",
+        "self.register_revision",
+        "str"
+      ],
+      "classification": "NEXT_COMMON_5",
+      "reason_ko": "새 SOURCE/PRE 필요. 원 fixture/SQLite 경계에서 한 묶음으로 준비.",
+      "named_snapshot_path": null
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_confirm_rejects_create_request_that_differs_from_assignment",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 901,
+        "end": 917
+      },
+      "named_calls": [
+        "impl.canonical_json",
+        "impl.canonical_json(data['request']).encode",
+        "impl.command_confirm",
+        "impl.sha256_bytes",
+        "json.dumps",
+        "json.loads",
+        "ns",
+        "receipt.read_text",
+        "receipt.write_text",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.create_receipt",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_confirm_rejects_create_request_that_differs_from_assignment",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 901,
+          "end": 917
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_confirm_rejects_legacy_utf8_correction_receipt_v3_without_policy",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1619,
+        "end": 1649
+      },
+      "named_calls": [
+        "copy.deepcopy",
+        "impl.canonical_json",
+        "impl.canonical_json(initial_request).encode",
+        "impl.command_confirm",
+        "impl.isoformat",
+        "impl.sha256_bytes",
+        "initial_request['prompt'].replace",
+        "json.dumps",
+        "ns",
+        "receipt.write_text",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_confirm_rejects_legacy_utf8_correction_receipt_v3_without_policy",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 1619,
+          "end": 1649
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_confirm_rejects_replacement_character_and_legacy_envelope",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1588,
+        "end": 1617
+      },
+      "named_calls": [
+        "corrupted.read_text",
+        "corrupted.write_text",
+        "impl.command_confirm",
+        "impl.isoformat",
+        "json.dumps",
+        "json.loads",
+        "legacy.write_text",
+        "ns",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.create_receipt",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_confirm_rejects_replacement_character_and_legacy_envelope",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 1588,
+          "end": 1617
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_confirm_rejects_utf8_correction_that_is_not_exact_assignment",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1651,
+        "end": 1683
+      },
+      "named_calls": [
+        "copy.deepcopy",
+        "impl.canonical_json",
+        "impl.canonical_json(initial_request).encode",
+        "impl.command_confirm",
+        "impl.isoformat",
+        "impl.sha256_bytes",
+        "initial_request['prompt'].replace",
+        "json.dumps",
+        "ns",
+        "receipt.write_text",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str",
+        "wrong_prompt.encode"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_confirm_rejects_utf8_correction_that_is_not_exact_assignment",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 1651,
+          "end": 1683
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_confirm_requires_exact_raw_receipt_and_rejects_unverified_client_identity",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1729,
+        "end": 1770
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute('SELECT status,thread_id,client_thread_id FROM dispatches WHERE dispatch_id=?', (reserved['dispatch_id'],)).fetchone",
+        "impl.command_confirm",
+        "json.dumps",
+        "json.loads",
+        "ns",
+        "self.assertEqual",
+        "self.assertRaises",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.create_receipt",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str",
+        "wrong_binding.read_text",
+        "wrong_binding.write_text"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_confirm_requires_exact_raw_receipt_and_rejects_unverified_client_identity",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 1729,
+          "end": 1770
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_dependency_freshness_blocks_downstream_ready_after_tamper",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2492,
+        "end": 2533
+      },
+      "named_calls": [
+        "(self.root / 'dependency-evaluator.artifact').write_text",
+        "artifact.write_text",
+        "bindings.append",
+        "digest",
+        "evidence['files'].append",
+        "evidence_path.read_text",
+        "evidence_path.write_text",
+        "impl.command_confirm",
+        "impl.command_observe",
+        "impl.command_review",
+        "impl.command_status",
+        "json.dumps",
+        "json.loads",
+        "ns",
+        "self._task",
+        "self._write_manifest",
+        "self.assertEqual",
+        "self.begin",
+        "self.create_receipt",
+        "self.evidence",
+        "self.manifest['tasks'].append",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "sorted",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_dependency_freshness_blocks_downstream_ready_after_tamper",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2492,
+          "end": 2533
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_draft_does_not_steal_dispatch_binding_and_activation_waits_for_review",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 3059,
+        "end": 3109
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT status FROM implementation_tasks WHERE workflow_id=?\\n                   AND workflow_revision=1 AND task_id='FM-01' AND task_revision=1\", (impl.WORKFLOW_ID,)).fetchone",
+        "connection.execute(\"SELECT status FROM implementation_tasks WHERE workflow_id=?\\n                   AND workflow_revision=2 AND task_id='FM-01-A' AND task_revision=1\", (impl.WORKFLOW_ID,)).fetchone",
+        "impl.command_confirm",
+        "impl.command_finish",
+        "impl.command_observe",
+        "impl.command_review",
+        "ns",
+        "self.activate_revision",
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.create_receipt",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.register_revision",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_draft_does_not_steal_dispatch_binding_and_activation_waits_for_review",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 3059,
+          "end": 3109
+        },
+        {
+          "node": "t:activate_revision",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 339,
+          "end": 347
+        },
+        {
+          "node": "t:_activation_decision",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 297,
+          "end": 322
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_evaluation_freshness_contract_blocks_stale_completion",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2135,
+        "end": 2227
+      },
+      "named_calls": [
+        "(self.root / 'evaluator.artifact').write_text",
+        "Path",
+        "artifact.write_text",
+        "bindings.append",
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT COUNT(*) FROM implementation_task_dispatches WHERE task_id='FM-01'\").fetchone",
+        "connection.execute(\"SELECT attempt_no,status,evidence_sha256,purpose_key FROM implementation_task_attempts WHERE task_id='FM-01' ORDER BY attempt_no\").fetchall",
+        "digest",
+        "evidence['files'].append",
+        "evidence_path.read_text",
+        "evidence_path.write_text",
+        "history[1][3].endswith",
+        "impl.command_confirm",
+        "impl.command_observe",
+        "impl.command_revalidate_success",
+        "impl.command_review",
+        "impl.command_status",
+        "impl.command_verify",
+        "impl.isoformat",
+        "json.dumps",
+        "json.loads",
+        "len",
+        "ns",
+        "revalidation_path.write_text",
+        "self._write_manifest",
+        "self.assertEqual",
+        "self.assertFalse",
+        "self.assertIn",
+        "self.assertRaises",
+        "self.assertTrue",
+        "self.begin",
+        "self.create_receipt",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "sorted",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_evaluation_freshness_contract_blocks_stale_completion",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2135,
+          "end": 2227
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_exhausted_recovery_budget_requires_user_decision_in_status_and_registration",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2785,
+        "end": 2843
+      },
+      "named_calls": [
+        "impl.command_confirm",
+        "impl.command_finish",
+        "impl.command_observe",
+        "impl.command_register_recovery",
+        "impl.command_reserve_next",
+        "impl.command_review",
+        "impl.command_status",
+        "impl.command_verify",
+        "ns",
+        "self._write_manifest",
+        "self.assertEqual",
+        "self.assertFalse",
+        "self.assertTrue",
+        "self.begin",
+        "self.create_receipt",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_exhausted_recovery_budget_requires_user_decision_in_status_and_registration",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2785,
+          "end": 2843
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_expired_lease_and_old_client_binding_preserve_unknown_intent",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1685,
+        "end": 1727
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT COUNT(*) FROM orchestration_events WHERE run_id=? AND event_type='implementation_run.skipped_locked'\", (skipped['run_id'],)).fetchone",
+        "connection.execute(\"SELECT owner_run_id FROM orchestration_locks WHERE lock_name='scheduler'\").fetchone",
+        "connection.execute('SELECT active_dispatch_id FROM orchestration_state').fetchone",
+        "connection.execute('SELECT outcome FROM orchestration_runs WHERE run_id=?', (run['run_id'],)).fetchone",
+        "connection.execute('SELECT status,thread_id FROM dispatches WHERE dispatch_id=?', (reserved['dispatch_id'],)).fetchone",
+        "impl.command_confirm",
+        "impl.command_finish",
+        "impl.isoformat",
+        "impl.utc_now",
+        "ns",
+        "self.assertEqual",
+        "self.assertFalse",
+        "self.assertRaises",
+        "self.assertTrue",
+        "self.begin",
+        "self.create_receipt",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str",
+        "timedelta"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_expired_lease_and_old_client_binding_preserve_unknown_intent",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 1685,
+          "end": 1727
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_explicit_no_effect_rejection_requires_review_before_recovery",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2942,
+        "end": 3000
+      },
+      "named_calls": [
+        "impl.command_configure_reasoning_policy",
+        "impl.command_register_recovery",
+        "impl.command_reject_creation",
+        "impl.command_review",
+        "impl.command_status",
+        "impl.command_task",
+        "impl.command_verify",
+        "impl.isoformat",
+        "json.dumps",
+        "json.loads",
+        "ns",
+        "receipt_path.read_text",
+        "receipt_path.write_text",
+        "self.assertEqual",
+        "self.assertFalse",
+        "self.assertIsNone",
+        "self.assertTrue",
+        "self.begin",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_explicit_no_effect_rejection_requires_review_before_recovery",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2942,
+          "end": 3000
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_fail_review_recovery_uses_direct_evidence_and_has_no_deadlock",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2634,
+        "end": 2732
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT 1 FROM implementation_task_dependencies\\n                   WHERE task_id='FM-01' AND depends_on_task_id=?\", (recovery['recovery_task_id'],)).fetchone",
+        "connection.execute('SELECT lineage_root_task_id,registration_no FROM implementation_recoveries ORDER BY registration_no').fetchall",
+        "connection.execute('SELECT project_id FROM implementation_tasks WHERE task_id=?', (recovery['recovery_task_id'],)).fetchone",
+        "impl.command_configure_reasoning_policy",
+        "impl.command_confirm",
+        "impl.command_finish",
+        "impl.command_observe",
+        "impl.command_register_recovery",
+        "impl.command_reserve_next",
+        "impl.command_review",
+        "impl.command_status",
+        "ns",
+        "self.assertEqual",
+        "self.assertIsNone",
+        "self.assertTrue",
+        "self.begin",
+        "self.create_receipt",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.proof.write_text",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_fail_review_recovery_uses_direct_evidence_and_has_no_deadlock",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2634,
+          "end": 2732
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_fm00_gate_one_active_binding_and_completed_is_not_done",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 854,
+        "end": 899
+      },
+      "named_calls": [
+        "impl.command_confirm",
+        "impl.command_observe",
+        "impl.command_reserve_next",
+        "impl.command_review",
+        "impl.command_status",
+        "impl.command_task",
+        "ns",
+        "self.assertEqual",
+        "self.assertNotIn",
+        "self.assertRaises",
+        "self.assertTrue",
+        "self.begin",
+        "self.create_receipt",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_fm00_gate_one_active_binding_and_completed_is_not_done",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 854,
+          "end": 899
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_interrupted_turn_requires_bound_provenance_and_never_becomes_failure",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1772,
+        "end": 1845
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT status,failure_fingerprint FROM implementation_task_attempts WHERE task_id='FM-01'\").fetchone",
+        "connection.execute(\"SELECT status,failure_fingerprint FROM implementation_tasks WHERE task_id='FM-01'\").fetchone",
+        "connection.execute('SELECT active_dispatch_id FROM orchestration_state WHERE singleton=1').fetchone",
+        "forged.read_text",
+        "forged.write_text",
+        "impl.command_confirm",
+        "impl.command_observe",
+        "impl.command_status",
+        "impl.command_verify",
+        "json.dumps",
+        "json.loads",
+        "ns",
+        "receipt.read_text",
+        "receipt.write_text",
+        "self.assertEqual",
+        "self.assertFalse",
+        "self.assertIn",
+        "self.assertIsNone",
+        "self.assertRaisesRegex",
+        "self.assertTrue",
+        "self.begin",
+        "self.create_receipt",
+        "self.interrupt_receipt",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_interrupted_turn_requires_bound_provenance_and_never_becomes_failure",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 1772,
+          "end": 1845
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_json_output_is_ascii_safe_and_round_trips_unicode",
+      "actual_result": "PASS_SCOPE_LIMITED",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 560,
+        "end": 567
+      },
+      "named_calls": [
+        "impl.json_output",
+        "io.StringIO",
+        "json.loads",
+        "output.getvalue",
+        "redirect_stdout",
+        "rendered.isascii",
+        "self.assertEqual",
+        "self.assertTrue"
+      ],
+      "classification": "COMPLETED_5",
+      "evidence_group": "C3",
+      "reason_ko": "고정 helper70f5/Linux no-site 반송 결과와 R021/R029 한정."
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_launch_claim_compare_and_set_has_one_winner_under_barrier",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1363,
+        "end": 1404
+      },
+      "named_calls": [
+        "barrier.wait",
+        "connect",
+        "connection.execute",
+        "connection.execute('SELECT COUNT(*) FROM implementation_launch_claims WHERE dispatch_id=?', (reserved['dispatch_id'],)).fetchone",
+        "connection.execute('SELECT d.*,j.workflow_id,j.workflow_revision,j.task_id,j.task_revision,\\n                          j.attempt_no,j.assignment_sha256,j.confirmed_at\\n                   FROM dispatches d JOIN implementation_task_dispatches j\\n                     ON j.dispatch_id=d.dispatch_id WHERE d.dispatch_id=?', (reserved['dispatch_id'],)).fetchone",
+        "dict",
+        "failures.append",
+        "impl._claim_launch_intent",
+        "outcomes.append",
+        "range",
+        "self.assertEqual",
+        "self.assertFalse",
+        "self.begin",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "sorted",
+        "str",
+        "threading.Barrier",
+        "threading.Thread",
+        "worker.join",
+        "worker.start"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_launch_claim_compare_and_set_has_one_winner_under_barrier",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 1363,
+          "end": 1404
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_launch_claim_survives_lease_takeover_and_blocks_all_relaunches",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1406,
+        "end": 1446
+      },
+      "named_calls": [
+        "Path",
+        "connect",
+        "connection.execute",
+        "connection.execute('SELECT d.*,j.workflow_id,j.workflow_revision,j.task_id,j.task_revision,\\n                          j.attempt_no,j.assignment_sha256,j.confirmed_at\\n                   FROM dispatches d JOIN implementation_task_dispatches j\\n                     ON j.dispatch_id=d.dispatch_id WHERE d.dispatch_id=?', (reserved['dispatch_id'],)).fetchone",
+        "dict",
+        "impl._claim_launch_intent",
+        "impl.command_launch_codex_exec",
+        "impl.isoformat",
+        "impl.utc_now",
+        "mock.patch.object",
+        "ns",
+        "popen.assert_not_called",
+        "self._record_created_thread_policy",
+        "self.assertRaisesRegex",
+        "self.assertTrue",
+        "self.begin",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str",
+        "timedelta"
+      ],
+      "classification": "WINDOWS_PROFILE_REQUIRED_9",
+      "reason_ko": "원 WINDIR/System32/cmd.exe 또는 실제 cwd extended-prefix 의미. 현 Linux profile에서 원 의미 보존 불가; 제품 전체 불가능 판정 아님.",
+      "windows_source_lines": [
+        1437,
+        1437
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_launch_codex_exec_rechecks_lease_after_streams_open_before_popen",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1156,
+        "end": 1194
+      },
+      "named_calls": [
+        "Path",
+        "connect",
+        "connection.execute",
+        "impl.command_launch_codex_exec",
+        "impl.isoformat",
+        "impl.utc_now",
+        "kwargs.get",
+        "mock.patch.object",
+        "ns",
+        "original_open",
+        "popen.assert_not_called",
+        "self._record_created_thread_policy",
+        "self.assertRaisesRegex",
+        "self.assertTrue",
+        "self.begin",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str",
+        "timedelta"
+      ],
+      "classification": "WINDOWS_PROFILE_REQUIRED_9",
+      "reason_ko": "원 WINDIR/System32/cmd.exe 또는 실제 cwd extended-prefix 의미. 현 Linux profile에서 원 의미 보존 불가; 제품 전체 불가능 판정 아님.",
+      "windows_source_lines": [
+        1189,
+        1189
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_launch_codex_exec_recovers_existing_launch_without_relaunch",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1275,
+        "end": 1327
+      },
+      "named_calls": [
+        "Path",
+        "Path(recovered['receipt_path']).read_text",
+        "connect",
+        "connection.execute",
+        "connection.execute('SELECT intent_origin,process_id,thread_id,receipt_sha256\\n                   FROM implementation_launch_claims WHERE dispatch_id=?', (reserved['dispatch_id'],)).fetchone",
+        "events_path.write_text",
+        "impl.command_confirm",
+        "impl.command_launch_codex_exec",
+        "impl.command_verify",
+        "json.dumps",
+        "json.loads",
+        "mock.patch.object",
+        "ns",
+        "output_dir.mkdir",
+        "popen.assert_not_called",
+        "prompt_path.write_text",
+        "self._record_created_thread_policy",
+        "self.assertEqual",
+        "self.assertFalse",
+        "self.assertTrue",
+        "self.begin",
+        "self.claim_dispatch",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "WINDOWS_PROFILE_REQUIRED_9",
+      "reason_ko": "원 WINDIR/System32/cmd.exe 또는 실제 cwd extended-prefix 의미. 현 Linux profile에서 원 의미 보존 불가; 제품 전체 불가능 판정 아님.",
+      "windows_source_lines": [
+        1303,
+        1303
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_launch_codex_exec_rejects_claimless_receipt_and_direct_confirm",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1196,
+        "end": 1236
+      },
+      "named_calls": [
+        "Path",
+        "impl.command_confirm",
+        "impl.command_launch_codex_exec",
+        "impl.isoformat",
+        "json.dumps",
+        "mock.patch.object",
+        "ns",
+        "output_dir.mkdir",
+        "popen.assert_not_called",
+        "receipt_path.write_text",
+        "self._record_created_thread_policy",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "WINDOWS_PROFILE_REQUIRED_9",
+      "reason_ko": "원 WINDIR/System32/cmd.exe 또는 실제 cwd extended-prefix 의미. 현 Linux profile에서 원 의미 보존 불가; 제품 전체 불가능 판정 아님.",
+      "windows_source_lines": [
+        1223,
+        1223
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_launch_codex_exec_rejects_multiple_thread_started_identities",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1329,
+        "end": 1361
+      },
+      "named_calls": [
+        "'\\n'.join",
+        "Path",
+        "Path(f'{prefix}-create-receipt-v4.json').exists",
+        "Path(f'{prefix}-events.jsonl').write_text",
+        "Path(f'{prefix}-prompt.txt').write_text",
+        "impl.command_launch_codex_exec",
+        "json.dumps",
+        "mock.patch.object",
+        "ns",
+        "output_dir.mkdir",
+        "popen.assert_not_called",
+        "self._record_created_thread_policy",
+        "self.assertFalse",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.claim_dispatch",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "WINDOWS_PROFILE_REQUIRED_9",
+      "reason_ko": "원 WINDIR/System32/cmd.exe 또는 실제 cwd extended-prefix 의미. 현 Linux profile에서 원 의미 보존 불가; 제품 전체 불가능 판정 아님.",
+      "windows_source_lines": [
+        1356,
+        1356
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_launch_codex_exec_requires_one_thread_started_for_existing_receipt",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1238,
+        "end": 1273
+      },
+      "named_calls": [
+        "Path",
+        "impl.command_launch_codex_exec",
+        "impl.isoformat",
+        "json.dumps",
+        "mock.patch.object",
+        "ns",
+        "output_dir.mkdir",
+        "popen.assert_not_called",
+        "receipt_path.write_text",
+        "self._record_created_thread_policy",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.claim_dispatch",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "WINDOWS_PROFILE_REQUIRED_9",
+      "reason_ko": "원 WINDIR/System32/cmd.exe 또는 실제 cwd extended-prefix 의미. 현 Linux profile에서 원 의미 보존 불가; 제품 전체 불가능 판정 아님.",
+      "windows_source_lines": [
+        1269,
+        1269
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_launch_codex_exec_retries_transient_policy_observation",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1101,
+        "end": 1154
+      },
+      "named_calls": [
+        "(json.dumps({'type': 'thread.started', 'thread_id': thread_id}) + '\\n').encode",
+        "FakeProcess",
+        "Path",
+        "Path(launched['receipt_path']).is_file",
+        "ValueError",
+        "impl.command_launch_codex_exec",
+        "json.dumps",
+        "kwargs['stdout'].flush",
+        "kwargs['stdout'].write",
+        "mock.patch.object",
+        "ns",
+        "original_observe",
+        "self._record_created_thread_policy",
+        "self.assertEqual",
+        "self.assertGreaterEqual",
+        "self.assertTrue",
+        "self.begin",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "WINDOWS_PROFILE_REQUIRED_9",
+      "reason_ko": "원 WINDIR/System32/cmd.exe 또는 실제 cwd extended-prefix 의미. 현 Linux profile에서 원 의미 보존 불가; 제품 전체 불가능 판정 아님.",
+      "windows_source_lines": [
+        1146,
+        1146
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_launch_codex_exec_uses_explicit_full_access_and_captures_v4_receipt",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1028,
+        "end": 1099
+      },
+      "named_calls": [
+        "(json.dumps({'type': 'thread.started', 'thread_id': thread_id}) + '\\n').encode",
+        "FakeProcess",
+        "Path",
+        "Path(launched['receipt_path']).read_text",
+        "connect",
+        "connection.execute",
+        "connection.execute('SELECT intent_origin,process_id,thread_id,receipt_sha256,resolved_by_run_id\\n                   FROM implementation_launch_claims WHERE dispatch_id=?', (reserved['dispatch_id'],)).fetchone",
+        "impl.command_confirm",
+        "impl.command_launch_codex_exec",
+        "impl.command_verify",
+        "json.dumps",
+        "json.loads",
+        "kwargs['stdout'].flush",
+        "kwargs['stdout'].write",
+        "mock.patch.object",
+        "ns",
+        "self._record_created_thread_policy",
+        "self.assertEqual",
+        "self.assertIn",
+        "self.assertNotIn",
+        "self.assertTrue",
+        "self.begin",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "WINDOWS_PROFILE_REQUIRED_9",
+      "reason_ko": "원 WINDIR/System32/cmd.exe 또는 실제 cwd extended-prefix 의미. 현 Linux profile에서 원 의미 보존 불가; 제품 전체 불가능 판정 아님.",
+      "windows_source_lines": [
+        1061,
+        1068,
+        1061,
+        1068
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_legacy_digest_contract_revalidates_already_stored_success_evidence",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2535,
+        "end": 2575
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT spec_sha256 FROM implementation_tasks WHERE task_id='FM-01'\").fetchone",
+        "impl.LEGACY_EVIDENCE_CONTRACTS_BY_TASK_SPEC_SHA256.get",
+        "impl.command_confirm",
+        "impl.command_observe",
+        "impl.command_review",
+        "impl.command_status",
+        "impl.command_verify",
+        "ns",
+        "self.assertEqual",
+        "self.assertIn",
+        "self.assertTrue",
+        "self.begin",
+        "self.create_receipt",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_legacy_digest_contract_revalidates_already_stored_success_evidence",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2535,
+          "end": 2575
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_migration_backup_history_idempotence_tamper_cycle_and_readonly",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 756,
+        "end": 807
+      },
+      "named_calls": [
+        "Path",
+        "backup.is_file",
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT COUNT(*) FROM orchestration_events WHERE event_type='legacy.event'\").fetchone",
+        "connection.execute(\"SELECT assignment_digest FROM dispatches WHERE dispatch_id='legacy-dispatch'\").fetchone",
+        "connection.execute(\"SELECT value_json FROM metadata WHERE key='external_action_required'\").fetchone",
+        "connection.execute(\"SELECT value_json FROM metadata WHERE key='scheduler_health'\").fetchone",
+        "connection.execute('SELECT COUNT(*) FROM dispatches').fetchone",
+        "connection.execute('SELECT COUNT(*) FROM orchestration_runs').fetchone",
+        "connection.execute('SELECT lifecycle_status,current_phase FROM orchestration_state').fetchone",
+        "copy.deepcopy",
+        "digest",
+        "impl.command_migrate",
+        "impl.command_status",
+        "impl.command_task",
+        "impl.command_verify",
+        "impl.load_manifest",
+        "json.loads",
+        "missing_db.parent.exists",
+        "ns",
+        "self._write_manifest",
+        "self.assertEqual",
+        "self.assertFalse",
+        "self.assertIsNone",
+        "self.assertRaises",
+        "self.assertTrue",
+        "self.migrate",
+        "str"
+      ],
+      "classification": "NEXT_COMMON_5",
+      "reason_ko": "새 SOURCE/PRE 필요. 원 fixture/SQLite 경계에서 한 묶음으로 준비.",
+      "named_snapshot_path": null
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_policy_mismatch_reopens_same_task_without_duplicate_recovery",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1498,
+        "end": 1586
+      },
+      "named_calls": [
+        "Path",
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT status,active_attempt_no,attempt_count FROM implementation_tasks WHERE task_id='FM-01'\").fetchone",
+        "connection.execute(\"SELECT status,evidence_sha256 FROM implementation_task_attempts WHERE task_id='FM-01' AND attempt_no=1\").fetchone",
+        "connection.execute('SELECT COUNT(*) FROM implementation_recoveries').fetchone",
+        "decision.read_text",
+        "decision.write_text",
+        "decision_data['remediation']['files'].append",
+        "digest",
+        "hashlib.sha256",
+        "hashlib.sha256(b'PERMISSION_POLICY_MISMATCH:workspace-on-request').hexdigest",
+        "impl.command_confirm",
+        "impl.command_finish",
+        "impl.command_observe",
+        "impl.command_reopen_policy_mismatch",
+        "impl.command_reserve_next",
+        "impl.command_review",
+        "impl.command_verify",
+        "json.dumps",
+        "json.loads",
+        "mutable_remediation.write_text",
+        "ns",
+        "self.assertEqual",
+        "self.assertIsNotNone",
+        "self.assertTrue",
+        "self.begin",
+        "self.create_receipt",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.policy_retry_decision",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_policy_mismatch_reopens_same_task_without_duplicate_recovery",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 1498,
+          "end": 1586
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_record_direct_attempt_completes_ready_task_without_dispatch",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2394,
+        "end": 2441
+      },
+      "named_calls": [
+        "attempt['purpose_key'].endswith",
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT * FROM implementation_task_attempts WHERE task_id='FM-01'\").fetchone",
+        "connection.execute(\"SELECT * FROM implementation_tasks WHERE task_id='FM-01'\").fetchone",
+        "connection.execute(\"SELECT payload_json FROM orchestration_events\\n                   WHERE event_type='implementation_task.direct_attempt_recorded'\").fetchone",
+        "connection.execute('SELECT COUNT(*) FROM dispatches').fetchone",
+        "connection.execute('SELECT active_dispatch_id FROM orchestration_state WHERE singleton=1').fetchone",
+        "impl.command_status",
+        "json.loads",
+        "ns",
+        "self._record_direct",
+        "self.assertEqual",
+        "self.assertFalse",
+        "self.assertIsNone",
+        "self.assertTrue",
+        "self.begin",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_record_direct_attempt_completes_ready_task_without_dispatch",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2394,
+          "end": 2441
+        },
+        {
+          "node": "t:_record_direct",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2386,
+          "end": 2392
+        },
+        {
+          "node": "h:command_record_direct_attempt",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 6175,
+          "end": 6320
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_record_direct_attempt_rejects_bootstrap_and_active_dispatch",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2456,
+        "end": 2466
+      },
+      "named_calls": [
+        "self._record_direct",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_record_direct_attempt_rejects_bootstrap_and_active_dispatch",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2456,
+          "end": 2466
+        },
+        {
+          "node": "t:_record_direct",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2386,
+          "end": 2392
+        },
+        {
+          "node": "h:command_record_direct_attempt",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 6175,
+          "end": 6320
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_record_direct_attempt_rejects_task_that_is_not_ready",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2443,
+        "end": 2454
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT status FROM implementation_tasks WHERE task_id='FM-01'\").fetchone",
+        "self._record_direct",
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.evidence",
+        "self.migrate"
+      ],
+      "classification": "NEXT_COMMON_5",
+      "reason_ko": "새 SOURCE/PRE 필요. 원 fixture/SQLite 경계에서 한 묶음으로 준비.",
+      "branch_sensitive": {
+        "potential_path": [
+          {
+            "node": "t:test_record_direct_attempt_rejects_task_that_is_not_ready",
+            "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+            "start": 2443,
+            "end": 2454
+          },
+          {
+            "node": "t:_record_direct",
+            "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+            "start": 2386,
+            "end": 2392
+          },
+          {
+            "node": "h:command_record_direct_attempt",
+            "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+            "start": 6175,
+            "end": 6320
+          },
+          {
+            "node": "h:_capture_execution_source_snapshot",
+            "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+            "start": 2129,
+            "end": 2190
+          },
+          {
+            "node": "h:_capture_source_snapshot",
+            "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+            "start": 2089,
+            "end": 2126
+          }
+        ],
+        "proof": "M2443–2454: FM-00 미검토. helper6230–6233 READY 원 regex 거절이6240 snapshot 전; audit 금지 RuntimeError는 해당 regex 불일치. 실제 branch NOT_RUN."
+      }
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_record_direct_attempt_with_finding_marks_task_failed",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2468,
+        "end": 2490
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT status,failure_fingerprint FROM implementation_task_attempts WHERE task_id='FM-01'\").fetchone",
+        "connection.execute(\"SELECT status,failure_fingerprint FROM implementation_tasks WHERE task_id='FM-01'\").fetchone",
+        "impl.command_status",
+        "ns",
+        "self._record_direct",
+        "self.assertEqual",
+        "self.begin",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_record_direct_attempt_with_finding_marks_task_failed",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2468,
+          "end": 2490
+        },
+        {
+          "node": "t:_record_direct",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2386,
+          "end": 2392
+        },
+        {
+          "node": "h:command_record_direct_attempt",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 6175,
+          "end": 6320
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_registered_multistage_dag_and_specs_are_the_only_next_stage_authority",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2577,
+        "end": 2632
+      },
+      "named_calls": [
+        "hashlib.sha256",
+        "hashlib.sha256(impl.canonical_json(expected_spec).encode('utf-8')).hexdigest",
+        "impl.canonical_json",
+        "impl.canonical_json(expected_spec).encode",
+        "impl.command_confirm",
+        "impl.command_finish",
+        "impl.command_observe",
+        "impl.command_reserve_next",
+        "impl.command_review",
+        "impl.command_status",
+        "impl.command_task",
+        "next",
+        "ns",
+        "pass_next",
+        "self._task",
+        "self._write_manifest",
+        "self.assertEqual",
+        "self.begin",
+        "self.create_receipt",
+        "self.evidence",
+        "self.manifest_path.write_text",
+        "self.migrate",
+        "self.pass_fm00",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_registered_multistage_dag_and_specs_are_the_only_next_stage_authority",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2577,
+          "end": 2632
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_reopen_historical_interruption_is_append_only_idempotent_and_reserves_attempt_two",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1847,
+        "end": 1948
+      },
+      "named_calls": [
+        "conflicting.write_text",
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT COUNT(*) FROM orchestration_events WHERE event_type='implementation_task.interruption_reopened' AND entity_id=?\", (task_id,)).fetchone",
+        "connection.execute('SELECT * FROM implementation_task_attempts WHERE task_id=? AND attempt_no=1', (task_id,)).fetchone",
+        "connection.execute('SELECT * FROM implementation_task_dispatches WHERE dispatch_id=?', (fixture['recovery']['dispatch_id'],)).fetchone",
+        "connection.execute('SELECT COUNT(*) FROM implementation_recoveries').fetchone",
+        "connection.execute('SELECT evidence_sha256,evidence_json,outcome FROM implementation_evidence WHERE task_id=? AND attempt_no=1', (task_id,)).fetchone",
+        "connection.execute('SELECT status,attempt_count,active_attempt_no,failure_fingerprint FROM implementation_tasks WHERE task_id=?', (task_id,)).fetchone",
+        "dict",
+        "digest",
+        "fixture['decision'].read_text",
+        "impl.command_finish",
+        "impl.command_reopen_interrupted",
+        "impl.command_reserve_next",
+        "impl.command_verify",
+        "json.dumps",
+        "json.loads",
+        "ns",
+        "self.assertEqual",
+        "self.assertFalse",
+        "self.assertRaisesRegex",
+        "self.assertTrue",
+        "self.begin",
+        "self.historical_interrupted_recovery",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_reopen_historical_interruption_is_append_only_idempotent_and_reserves_attempt_two",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 1847,
+          "end": 1948
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_reopen_historical_interruption_rejects_forged_known_origin",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1998,
+        "end": 2048
+      },
+      "named_calls": [
+        "fixture['interrupt'].read_text",
+        "forged.write_text",
+        "guessed_request.write_text",
+        "hidden_origin.write_text",
+        "impl.command_reopen_interrupted",
+        "json.dumps",
+        "json.loads",
+        "ns",
+        "self.assertRaisesRegex",
+        "self.historical_interrupted_recovery",
+        "self.interruption_reopen_decision",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_reopen_historical_interruption_rejects_forged_known_origin",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 1998,
+          "end": 2048
+        },
+        {
+          "node": "t:historical_interrupted_recovery",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 665,
+          "end": 754
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_reopen_historical_interruption_rejects_non_recovery_and_active_dispatch",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2050,
+        "end": 2080
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "impl.command_reopen_interrupted",
+        "ns",
+        "self.assertRaisesRegex",
+        "self.historical_interrupted_recovery",
+        "self.interrupt_receipt",
+        "self.interruption_reopen_decision",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_reopen_historical_interruption_rejects_non_recovery_and_active_dispatch",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2050,
+          "end": 2080
+        },
+        {
+          "node": "t:historical_interrupted_recovery",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 665,
+          "end": 754
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_reopen_historical_interruption_rejects_receipt_and_decision_binding_mismatches",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1950,
+        "end": 1996
+      },
+      "named_calls": [
+        "bad_receipt.write_text",
+        "bad_turn_receipt.write_text",
+        "decision_path.write_text",
+        "dict",
+        "fixture['decision'].read_text",
+        "fixture['interrupt'].read_text",
+        "impl.command_reopen_interrupted",
+        "json.dumps",
+        "json.loads",
+        "ns",
+        "self.assertRaisesRegex",
+        "self.historical_interrupted_recovery",
+        "self.interruption_reopen_decision",
+        "self.subTest",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_reopen_historical_interruption_rejects_receipt_and_decision_binding_mismatches",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 1950,
+          "end": 1996
+        },
+        {
+          "node": "t:historical_interrupted_recovery",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 665,
+          "end": 754
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_reserve_enforces_main_checkout_before_creating_attempt",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2900,
+        "end": 2940
+      },
+      "named_calls": [
+        "(source / 'tracked.txt').write_text",
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT COUNT(*) FROM implementation_task_attempts WHERE task_id='FM-01'\").fetchone",
+        "self._write_manifest",
+        "self.assertEqual",
+        "self.assertIn",
+        "self.assertRaisesRegex",
+        "self.assertTrue",
+        "self.begin",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "source.mkdir",
+        "str",
+        "subprocess.run",
+        "subprocess.run(['git', '-C', str(source), 'rev-parse', 'HEAD'], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True).stdout.strip"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_reserve_enforces_main_checkout_before_creating_attempt",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2900,
+          "end": 2940
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revalidate_success_rejects_forged_legacy_reopen_event",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2287,
+        "end": 2373
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT COUNT(*) FROM implementation_task_attempts WHERE task_id='FM-01'\").fetchone",
+        "connection.execute(\"SELECT COUNT(*) FROM implementation_task_dispatches WHERE task_id='FM-01'\").fetchone",
+        "connection.execute('SELECT last_insert_rowid()').fetchone",
+        "digest",
+        "first.read_text",
+        "first.write_text",
+        "fresh.read_text",
+        "fresh.write_text",
+        "impl.canonical_json",
+        "impl.command_confirm",
+        "impl.command_observe",
+        "impl.command_revalidate_success",
+        "impl.command_review",
+        "json.dumps",
+        "json.loads",
+        "ns",
+        "proof.write_text",
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.create_receipt",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_revalidate_success_rejects_forged_legacy_reopen_event",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2287,
+          "end": 2373
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revalidate_success_rejects_ordinary_pending_task",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2375,
+        "end": 2384
+      },
+      "named_calls": [
+        "impl.command_revalidate_success",
+        "ns",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "str"
+      ],
+      "classification": "NEXT_COMMON_5",
+      "reason_ko": "새 SOURCE/PRE 필요. 원 fixture/SQLite 경계에서 한 묶음으로 준비.",
+      "named_snapshot_path": null
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revalidate_success_repairs_legacy_reopen_without_dispatch",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2229,
+        "end": 2285
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT COUNT(*) FROM implementation_task_dispatches WHERE task_id='FM-01'\").fetchone",
+        "connection.execute(\"SELECT attempt_no,status FROM implementation_task_attempts WHERE task_id='FM-01' ORDER BY attempt_no\").fetchall",
+        "digest",
+        "first.read_text",
+        "first.write_text",
+        "fresh.read_text",
+        "fresh.write_text",
+        "impl.command_confirm",
+        "impl.command_observe",
+        "impl.command_reopen_stale",
+        "impl.command_revalidate_success",
+        "impl.command_review",
+        "impl.command_status",
+        "json.dumps",
+        "json.loads",
+        "legacy_proof.write_text",
+        "ns",
+        "self.assertEqual",
+        "self.assertTrue",
+        "self.begin",
+        "self.create_receipt",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_revalidate_success_repairs_legacy_reopen_without_dispatch",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2229,
+          "end": 2285
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision5_requires_typed_ancestor_inputs_and_evidence_contract",
+      "actual_result": "PASS_SCOPE_LIMITED",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 809,
+        "end": 852
+      },
+      "named_calls": [
+        "copy.deepcopy",
+        "digest",
+        "impl.validate_manifest",
+        "next",
+        "parent_path.write_text",
+        "self._revision2_manifest",
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "str",
+        "target.pop",
+        "target['inputs'].append"
+      ],
+      "classification": "COMPLETED_5",
+      "evidence_group": "C3",
+      "reason_ko": "고정 helper70f5/Linux no-site 반송 결과와 R021/R029 한정."
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision_draft_is_inert_then_activation_is_atomic_and_cas_guarded",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 3003,
+        "end": 3057
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT invalidated_at,invalidated_by_attempt_no\\n                   FROM implementation_task_carry_forwards\\n                   WHERE workflow_id=? AND to_workflow_revision=2 AND to_task_id='FM-00'\", (impl.WORKFLOW_ID,)).fetchone",
+        "connection.execute('SELECT task_id,task_revision FROM implementation_tasks\\n                   WHERE workflow_id=? AND workflow_revision=2 ORDER BY order_index', (impl.WORKFLOW_ID,)).fetchall",
+        "connection.execute('SELECT workflow_revision,state FROM implementation_workflows\\n                   WHERE workflow_id=? ORDER BY workflow_revision', (impl.WORKFLOW_ID,)).fetchall",
+        "impl.command_finish",
+        "impl.command_status",
+        "impl.command_workflow_head",
+        "ns",
+        "self.activate_revision",
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.assertTrue",
+        "self.begin",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.register_revision",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_revision_draft_is_inert_then_activation_is_atomic_and_cas_guarded",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 3003,
+          "end": 3057
+        },
+        {
+          "node": "t:activate_revision",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 339,
+          "end": 347
+        },
+        {
+          "node": "t:_activation_decision",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 297,
+          "end": 322
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision_manifest_rejects_false_carry_and_incomplete_lineage",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 3111,
+        "end": 3128
+      },
+      "named_calls": [
+        "copy.deepcopy",
+        "duplicate['tasks'].append",
+        "self._revision2_manifest",
+        "self.assertRaisesRegex",
+        "self.migrate",
+        "self.register_revision"
+      ],
+      "classification": "NEXT_COMMON_5",
+      "reason_ko": "새 SOURCE/PRE 필요. 원 fixture/SQLite 경계에서 한 묶음으로 준비.",
+      "named_snapshot_path": null
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision_registration_and_activation_honor_manifest_guard",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 3130,
+        "end": 3147
+      },
+      "named_calls": [
+        "impl.command_finish",
+        "ns",
+        "self._revision2_manifest",
+        "self.activate_revision",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.register_revision",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_revision_registration_and_activation_honor_manifest_guard",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 3130,
+          "end": 3147
+        },
+        {
+          "node": "t:activate_revision",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 339,
+          "end": 347
+        },
+        {
+          "node": "t:_activation_decision",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 297,
+          "end": 322
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision_two_can_rollback_before_its_first_attempt_or_dispatch",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 3276,
+        "end": 3309
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute('SELECT COUNT(*) FROM implementation_task_attempts\\n                   WHERE workflow_id=? AND workflow_revision=2', (impl.WORKFLOW_ID,)).fetchone",
+        "connection.execute('SELECT COUNT(*) FROM implementation_task_dispatches\\n                   WHERE workflow_id=? AND workflow_revision=2', (impl.WORKFLOW_ID,)).fetchone",
+        "connection.execute('SELECT workflow_revision,state FROM implementation_workflows\\n                   WHERE workflow_id=? ORDER BY workflow_revision', (impl.WORKFLOW_ID,)).fetchall",
+        "impl.command_status",
+        "ns",
+        "self.activate_revision",
+        "self.activate_revision2_fixture",
+        "self.assertEqual",
+        "self.assertFalse",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_revision_two_can_rollback_before_its_first_attempt_or_dispatch",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 3276,
+          "end": 3309
+        },
+        {
+          "node": "t:activate_revision",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 339,
+          "end": 347
+        },
+        {
+          "node": "t:_activation_decision",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 297,
+          "end": 322
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision_two_history_permanently_blocks_rollback_to_revision_one",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 3311,
+        "end": 3340
+      },
+      "named_calls": [
+        "impl.command_confirm",
+        "impl.command_finish",
+        "impl.command_observe",
+        "impl.command_reserve_next",
+        "impl.command_review",
+        "impl.command_workflow_head",
+        "ns",
+        "self.activate_revision",
+        "self.activate_revision2_fixture",
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.begin",
+        "self.create_receipt",
+        "self.evidence",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_revision_two_history_permanently_blocks_rollback_to_revision_one",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 3311,
+          "end": 3340
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision_two_recovery_survives_verify_first_and_is_reserved_next_tick",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2734,
+        "end": 2783
+      },
+      "named_calls": [
+        "impl.command_confirm",
+        "impl.command_finish",
+        "impl.command_observe",
+        "impl.command_register_recovery",
+        "impl.command_reserve_next",
+        "impl.command_review",
+        "impl.command_verify",
+        "ns",
+        "self.activate_revision2_fixture",
+        "self.assertEqual",
+        "self.assertNotIn",
+        "self.assertTrue",
+        "self.begin",
+        "self.create_receipt",
+        "self.evidence",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_revision_two_recovery_survives_verify_first_and_is_reserved_next_tick",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2734,
+          "end": 2783
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_same_path_accepts_only_drive_and_unc_extended_namespaces",
+      "actual_result": "PASS_SCOPE_LIMITED",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 978,
+        "end": 997
+      },
+      "named_calls": [
+        "Path.cwd",
+        "impl._same_path",
+        "self.assertFalse",
+        "self.assertTrue"
+      ],
+      "classification": "COMPLETED_5",
+      "evidence_group": "C3",
+      "reason_ko": "고정 helper70f5/Linux no-site 반송 결과와 R021/R029 한정."
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_migrates_additively_from_v2_and_preserves_history",
+      "actual_result": "PASS_SCOPE_LIMITED",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 3194,
+        "end": 3233
+      },
+      "named_calls": [
+        "Path",
+        "Path(upgraded['backup_path']).is_file",
+        "connect",
+        "connection.execute",
+        "connection.execute('SELECT COUNT(*) FROM implementation_tasks').fetchone",
+        "connection.execute('SELECT minimum_writer_version FROM implementation_writer_contract WHERE singleton=1').fetchone",
+        "digest",
+        "impl.command_verify",
+        "ns",
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.assertTrue",
+        "self.begin",
+        "self.migrate",
+        "str"
+      ],
+      "classification": "COMPLETED_5",
+      "evidence_group": "U2",
+      "reason_ko": "고정 helper70f5/Linux no-site 반송 결과와 R021/R029 한정."
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_writer_fence_rejects_missing_and_old_contract_versions",
+      "actual_result": "PASS_SCOPE_LIMITED",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 3235,
+        "end": 3274
+      },
+      "named_calls": [
+        "connect",
+        "connection.close",
+        "connection.create_function",
+        "connection.execute",
+        "impl.command_verify",
+        "impl.isoformat",
+        "ns",
+        "self.assertRaises",
+        "self.assertRaisesRegex",
+        "self.assertTrue",
+        "self.migrate",
+        "sqlite3.connect",
+        "str"
+      ],
+      "classification": "COMPLETED_5",
+      "evidence_group": "U2",
+      "reason_ko": "고정 helper70f5/Linux no-site 반송 결과와 R021/R029 한정."
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_task_reasoning_policy_starts_medium_and_escalates_after_reviewed_failure",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2082,
+        "end": 2133
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute('SELECT model,reasoning_effort,escalation_step,policy_revision FROM implementation_dispatch_model_bindings WHERE dispatch_id=?', (reserved['dispatch_id'],)).fetchone",
+        "impl.command_configure_reasoning_policy",
+        "impl.command_confirm",
+        "impl.command_observe",
+        "impl.command_review",
+        "impl.command_task",
+        "impl.command_verify",
+        "ns",
+        "self.assertEqual",
+        "self.assertTrue",
+        "self.begin",
+        "self.create_receipt",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_task_reasoning_policy_starts_medium_and_escalates_after_reviewed_failure",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2082,
+          "end": 2133
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_terminal_observation_is_idempotent_and_never_regresses_to_running",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 1448,
+        "end": 1496
+      },
+      "named_calls": [
+        "conflicting.update",
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT status FROM implementation_task_attempts WHERE task_id='FM-01'\").fetchone",
+        "connection.execute(\"SELECT status FROM implementation_tasks WHERE task_id='FM-01'\").fetchone",
+        "connection.execute('SELECT status,last_turn_id,wait_cursor,summary_sha256 FROM dispatches WHERE dispatch_id=?', (reserved['dispatch_id'],)).fetchone",
+        "dict",
+        "impl.command_confirm",
+        "impl.command_observe",
+        "ns",
+        "self.assertEqual",
+        "self.assertRaisesRegex",
+        "self.assertTrue",
+        "self.begin",
+        "self.create_receipt",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_terminal_observation_is_idempotent_and_never_regresses_to_running",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 1448,
+          "end": 1496
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_verify_rejects_orphaned_recovery_marker",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2858,
+        "end": 2898
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "impl.command_confirm",
+        "impl.command_observe",
+        "impl.command_register_recovery",
+        "impl.command_review",
+        "impl.command_verify",
+        "ns",
+        "self.assertFalse",
+        "self.assertIn",
+        "self.begin",
+        "self.create_receipt",
+        "self.evidence",
+        "self.migrate",
+        "self.pass_fm00",
+        "self.reserve_fm01",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_verify_rejects_orphaned_recovery_marker",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2858,
+          "end": 2898
+        },
+        {
+          "node": "t:reserve_fm01",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 432,
+          "end": 433
+        },
+        {
+          "node": "h:command_reserve_next",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2987,
+          "end": 3121
+        },
+        {
+          "node": "h:_capture_execution_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2129,
+          "end": 2190
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_verify_rejects_same_count_wrong_lineage_tuple",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+        "start": 2845,
+        "end": 2856
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "decision.encode",
+        "hashlib.sha256",
+        "hashlib.sha256(decision.encode('utf-8')).hexdigest",
+        "impl.command_verify",
+        "ns",
+        "self.activate_revision2_fixture",
+        "self.assertFalse",
+        "self.assertIn",
+        "str"
+      ],
+      "classification": "EFFECT_BRANCH_REVIEW_41",
+      "reason_ko": "named-call 잠재 Git snapshot 경로. 실제 도달/사전 거절 분기를 추가 검토해야 함; 전부 실제 subprocess를 호출한다고 단정하지 않음.",
+      "snapshot_witness": [
+        {
+          "node": "t:test_verify_rejects_same_count_wrong_lineage_tuple",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 2845,
+          "end": 2856
+        },
+        {
+          "node": "t:activate_revision2_fixture",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 349,
+          "end": 363
+        },
+        {
+          "node": "t:activate_revision",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 339,
+          "end": 347
+        },
+        {
+          "node": "t:_activation_decision",
+          "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+          "start": 297,
+          "end": 322
+        },
+        {
+          "node": "h:_capture_source_snapshot",
+          "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+          "start": 2089,
+          "end": 2126
+        }
+      ]
+    },
+    {
+      "id": "test_flowmarshal_same_tick_handoff.SameTickHandoffTest.test_terminal_review_run_can_reserve_exactly_one_next_ready_task",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_same_tick_handoff.py",
+        "start": 20,
+        "end": 82
+      },
+      "named_calls": [
+        "fixture._task",
+        "fixture._write_manifest",
+        "fixture.begin",
+        "fixture.create_receipt",
+        "fixture.evidence",
+        "fixture.manifest['tasks'].append",
+        "fixture.migrate",
+        "fixture.pass_fm00",
+        "fixture.reserve_fm01",
+        "impl.command_confirm",
+        "impl.command_finish",
+        "impl.command_observe",
+        "impl.command_reserve_next",
+        "impl.command_review",
+        "impl.command_status",
+        "ns",
+        "self.assertEqual",
+        "self.assertRaises",
+        "str"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_same_tick_handoff.py",
+        "line": 3,
+        "name": "tests.test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    },
+    {
+      "id": "test_flowmarshal_workflow_integration.WorkflowIntegrationTest.test_expired_owner_is_fenced_and_same_evidence_cannot_repeat_recovery",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_workflow_integration.py",
+        "start": 108,
+        "end": 132
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "f.begin",
+        "f.evidence",
+        "f.pass_fm00",
+        "f.reserve_fm01",
+        "impl.command_finish",
+        "impl.command_register_recovery",
+        "impl.command_review",
+        "impl.isoformat",
+        "impl.utc_now",
+        "ns",
+        "self.assertEqual",
+        "self.assertFalse",
+        "self.assertRaises",
+        "self.assertTrue",
+        "self.observe_completed",
+        "str",
+        "timedelta"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_workflow_integration.py",
+        "line": 9,
+        "name": "tests.test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    },
+    {
+      "id": "test_flowmarshal_workflow_integration.WorkflowIntegrationTest.test_missing_tampered_and_unrun_checks_cannot_complete_bootstrap",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_workflow_integration.py",
+        "start": 37,
+        "end": 61
+      },
+      "named_calls": [
+        "evidence.read_text",
+        "evidence.write_text",
+        "f.begin",
+        "f.evidence",
+        "impl.command_finish",
+        "impl.command_review",
+        "impl.command_task",
+        "json.dumps",
+        "json.loads",
+        "ns",
+        "self.assertEqual",
+        "self.assertNotEqual",
+        "self.assertRaises",
+        "self.subTest",
+        "str"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_workflow_integration.py",
+        "line": 9,
+        "name": "tests.test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결.",
+      "common_next_note": "bootstrap-only 공통 통합 후보. 원 tests namespace/origin의 다중모듈 payload 미준비라 이번에는 미선정."
+    },
+    {
+      "id": "test_flowmarshal_workflow_integration.WorkflowIntegrationTest.test_recovery_success_revalidates_original_new_attempt_then_completes",
+      "actual_result": "NOT_RUN",
+      "source": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_workflow_integration.py",
+        "start": 63,
+        "end": 106
+      },
+      "named_calls": [
+        "connect",
+        "connection.execute",
+        "connection.execute(\"SELECT attempt_no,status FROM implementation_task_attempts WHERE task_id='FM-01' ORDER BY attempt_no\").fetchall",
+        "f.begin",
+        "f.evidence",
+        "f.pass_fm00",
+        "f.reserve_fm01",
+        "impl.command_finish",
+        "impl.command_register_recovery",
+        "impl.command_reserve_next",
+        "impl.command_review",
+        "impl.command_status",
+        "impl.command_verify",
+        "ns",
+        "self.assertEqual",
+        "self.assertNotEqual",
+        "self.assertTrue",
+        "self.observe_completed",
+        "str"
+      ],
+      "classification": "MODULE_IDENTITY_REVIEW_16",
+      "reason_ko": "M-only payload 밖의 원 module ID. namespace/origin/fixture 및 subprocess 분기 미결, 최종제외/플랫폼 불가능 판정 아님.",
+      "original_import": {
+        "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_workflow_integration.py",
+        "line": 9,
+        "name": "tests.test_flowmarshal_implementation_workflow"
+      },
+      "direct_subprocess_call_lines": [],
+      "related_effect_roots": "D prepare→helper6143/6164 snapshot; D record→6240; H/I reserve→3024/3032. 개별 branch 도달은 미결."
+    }
+  ],
+  "limits": [
+    "Static named-call paths overapproximate branches and miss dynamic calls. No runtime original76 discovery.",
+    "Completed results verified as transported copies, not direct Cloud original. R029 discloses partial audit independence.",
+    "No product/candidate runner/test import/dummy/Cloud execution in this preparation.",
+    "Categories describe preparation only, not product states/final impossibility. Currenthelper10a/Windows/F6/Q14/qualification/Goal are outside PASS scope."
+  ]
+}

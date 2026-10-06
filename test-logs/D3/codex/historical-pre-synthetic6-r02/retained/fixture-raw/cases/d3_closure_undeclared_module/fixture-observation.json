@@ -1,0 +1,26 @@
+{
+  "scope": "non_product_delta",
+  "name": "d3_closure_undeclared_module",
+  "pid": 7284,
+  "caught": null,
+  "outer_error_capture": false,
+  "closure_observation": {
+    "outcome": "REJECTED",
+    "type": "RuntimeError",
+    "message": "non-stdlib module: test_flowmarshal_direct_selection.closure_not_authorized",
+    "actual_product_import": 0,
+    "synthetic_module_objects": true
+  },
+  "stage_return": 0,
+  "stage_return_is_not_native_exit": true,
+  "final_counters": {
+    "count": 0,
+    "logging_errors": 0
+  },
+  "synthetic_import_events": [],
+  "actual_import_calls": 0,
+  "synthetic_tests_run": 3,
+  "synthetic_ID_count": 3,
+  "actual_product_tests_or_loader": 0,
+  "routing_disabled_between_cases": true
+}

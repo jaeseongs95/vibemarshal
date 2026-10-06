@@ -1,0 +1,113 @@
+{
+  "utc": "2026-10-04T22:44:40.566636+00:00",
+  "pid": 6057,
+  "paths": [
+    {
+      "path": "/workspace/vm-d3-source-24cf-r01",
+      "resolve": "/workspace/vm-d3-source-24cf-r01",
+      "lexists": false,
+      "ancestors": [
+        {
+          "path": "/",
+          "symlink": false,
+          "resolve": "/"
+        },
+        {
+          "path": "/workspace",
+          "symlink": false,
+          "resolve": "/workspace"
+        },
+        {
+          "path": "/workspace/vm-d3-source-24cf-r01",
+          "symlink": false,
+          "resolve": "/workspace/vm-d3-source-24cf-r01"
+        }
+      ],
+      "canonicalUpperFMZero": true,
+      "canonicalURIUnambiguous": true,
+      "nonOverlap": true
+    },
+    {
+      "path": "/workspace/vm-d3-run-24cf-r01",
+      "resolve": "/workspace/vm-d3-run-24cf-r01",
+      "lexists": false,
+      "ancestors": [
+        {
+          "path": "/",
+          "symlink": false,
+          "resolve": "/"
+        },
+        {
+          "path": "/workspace",
+          "symlink": false,
+          "resolve": "/workspace"
+        },
+        {
+          "path": "/workspace/vm-d3-run-24cf-r01",
+          "symlink": false,
+          "resolve": "/workspace/vm-d3-run-24cf-r01"
+        }
+      ],
+      "canonicalUpperFMZero": true,
+      "canonicalURIUnambiguous": true,
+      "nonOverlap": true
+    }
+  ],
+  "createdOnly": "/workspace/vm-d3-source-24cf-r01",
+  "futureRunCreated": false,
+  "externalJobs": "UNKNOWN",
+  "OSContainment": "UNKNOWN",
+  "ownedRootsObserved": [
+    "/workspace/agent-governance-suite",
+    "/workspace/ags-claude-loginhelp-20261001T1322-ops",
+    "/workspace/ags-claude-loginhelp-20261001T1322.outer.cleanup.json",
+    "/workspace/ags-claude-ro-649c398b",
+    "/workspace/ags-dev-shm-support-997ac9db",
+    "/workspace/ags-git3-nativefs-ro-20261001",
+    "/workspace/ags-git3-private-e794857cc9314f3d9d228dff28f5f286",
+    "/workspace/ags-nativefirst-44474353",
+    "/workspace/ags-nativefirst-depro-bfb5864b",
+    "/workspace/ags-public-history-owned-c56b5d8a4e3d4199aa75d23fca814baf",
+    "/workspace/ags-public-history-stage-c56b5d8a4e3d4199aa75d23fca814baf",
+    "/workspace/ags-related3-r4-b52e6344",
+    "/workspace/ags-tmp-metadata-1374ad87",
+    "/workspace/ags-tmp-probe-53f793f4",
+    "/workspace/ags-w05-0f1e949d",
+    "/workspace/vm-c5-run-24cf-r03",
+    "/workspace/ags-a7c-w06w07-evidence",
+    "/workspace/ags-a7c-w06w07-evidence.tar.gz",
+    "/workspace/ags-w05-clock-private-handoff.json",
+    "/workspace/ags-w05-0f1e949d-evidence",
+    "/workspace/vm-u2-run-24cf-r01",
+    "/workspace/ags-w05-fixture-two-line-private-preparation",
+    "/workspace/vm-u2-source-24cf-r02",
+    "/workspace/vm-c5-source-24cf-r03",
+    "/workspace/ags-g18-publication-receipt.json",
+    "/workspace/ags-w05-clock-private-preparation",
+    "/workspace/vm-common3-run-24cf-r03",
+    "/workspace/ags-w06w07-publish",
+    "/workspace/ags-a7c-w06w07",
+    "/workspace/ags-w05-f1-library-intake-zTcxAWl0",
+    "/workspace/vm-private-env-24cf-ledger4-r01",
+    "/workspace/vm-u2-source-24cf-r01",
+    "/workspace/ags-w05-0f1e949d-transport",
+    "/workspace/ags-g18-preparation",
+    "/workspace/ags-g18-preparation.tar.gz",
+    "/workspace/ags-w06w07-publication-receipt.json",
+    "/workspace/ags-w05-clock-private-preparation-r2",
+    "/workspace/ags-w05-publish",
+    "/workspace/vm-u2-run-24cf-r02",
+    "/workspace/ags-g18-publish",
+    "/workspace/ags-w05-0f1e949d-sanitized-evidence.tar.gz",
+    "/workspace/vm-common3-source-24cf-r03",
+    "/workspace/vm-c5-c1-pre-24cf-r03-01",
+    "/workspace/vm-private-ro-24cf-01a0f9a1",
+    "/workspace/ags-w05-fixture-two-line-private-preparation-r2"
+  ],
+  "AGENTS": {
+    "/AGENTS.md": "ABSENT",
+    "/workspace/AGENTS.md": "ABSENT"
+  },
+  "relevantLocalSkills": "No SKILL.md found under /workspace/.agents (rg exit1)",
+  "sourceOrProductExecution": 0
+}

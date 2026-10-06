@@ -1,0 +1,37 @@
+{
+  "scope": "U2_SOURCE_MATERIALIZATION_AND_STDLIB_PRE_ONLY",
+  "sourceRoot": "/workspace/vm-u2-source-24cf-r01",
+  "nativeRequest": {
+    "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+    "reference": "library-file:fde1_bGliZmlsZV9pSmFsdERKRVl6VWlFbngyclA0cXZn_FileDrive_db4d605f7b6c8191aedb5f11c15c0007"
+  },
+  "nativeStart": {
+    "current_time": "2026-10-04 15:49:07 UTC"
+  },
+  "nativeEnd": {
+    "current_time": "2026-10-04 15:49:09 UTC"
+  },
+  "nativeApiCalls": 1,
+  "retries": 0,
+  "nativeApiId": null,
+  "textPointer": "/structuredContent/text",
+  "responseSerialization": "Entire MCP object JSON.stringify, ASCII escaped UTF8, LF; not raw HTTP transport",
+  "preflightCommand": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 -I -S -B - <<'PY'\nimport pathlib,os,json,datetime\nroot=pathlib.Path('/workspace/vm-u2-source-24cf-r01');run=pathlib.Path('/workspace/vm-u2-run-24cf-r01')\ndef components(p):\n return [{'path':str(a),'lexists':os.path.lexists(a),'symlink':a.is_symlink(),'resolveStrictFalse':str(a.resolve(strict=False))} for a in [pathlib.Path('/'),*reversed(p.parents[:-1]),p]]\nowned=[p for p in pathlib.Path('/workspace').iterdir() if p.name.startswith(('ags-','vm-')) or p.name=='agent-governance-suite']\nout={'scope':'U2_SOURCE_ROOT_PREFLIGHT_RO','utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'sourceRoot':str(root),'sourceLexists':os.path.lexists(root),'sourceResolve':str(root.resolve(strict=False)),'sourceAncestors':components(root),'nonOverlap':all(not root.resolve().is_relative_to(p.resolve()) and not p.resolve().is_relative_to(root.resolve()) for p in owned),'parentWritable':os.access(root.parent,os.W_OK),'futureRunrootLexists':os.path.lexists(run),'futureRunrootResolve':str(run.resolve(strict=False)),'futureRunrootAncestors':components(run),'jobs':'UNKNOWN; no new global process or reservations inquiry','previousUnreadableProcesses':7,'filesystemWrites':0,'productExecution':0}\nprint(json.dumps(out,indent=2))\nif out['sourceLexists'] or out['sourceResolve']!=str(root) or any(x['symlink'] for x in out['sourceAncestors']) or not out['nonOverlap'] or not out['parentWritable']:raise SystemExit(2)\nPY",
+  "preflightResult": {
+    "chunk_id": "049b6e",
+    "wall_time_seconds": 0.000025408,
+    "exit_code": 0,
+    "original_token_count": 350,
+    "output": "{\n  \"scope\": \"U2_SOURCE_ROOT_PREFLIGHT_RO\",\n  \"utc\": \"2026-10-04T15:48:49.697340+00:00\",\n  \"sourceRoot\": \"/workspace/vm-u2-source-24cf-r01\",\n  \"sourceLexists\": false,\n  \"sourceResolve\": \"/workspace/vm-u2-source-24cf-r01\",\n  \"sourceAncestors\": [\n    {\n      \"path\": \"/\",\n      \"lexists\": true,\n      \"symlink\": false,\n      \"resolveStrictFalse\": \"/\"\n    },\n    {\n      \"path\": \"/workspace\",\n      \"lexists\": true,\n      \"symlink\": false,\n      \"resolveStrictFalse\": \"/workspace\"\n    },\n    {\n      \"path\": \"/workspace/vm-u2-source-24cf-r01\",\n      \"lexists\": false,\n      \"symlink\": false,\n      \"resolveStrictFalse\": \"/workspace/vm-u2-source-24cf-r01\"\n    }\n  ],\n  \"nonOverlap\": true,\n  \"parentWritable\": true,\n  \"futureRunrootLexists\": false,\n  \"futureRunrootResolve\": \"/workspace/vm-u2-run-24cf-r01\",\n  \"futureRunrootAncestors\": [\n    {\n      \"path\": \"/\",\n      \"lexists\": true,\n      \"symlink\": false,\n      \"resolveStrictFalse\": \"/\"\n    },\n    {\n      \"path\": \"/workspace\",\n      \"lexists\": true,\n      \"symlink\": false,\n      \"resolveStrictFalse\": \"/workspace\"\n    },\n    {\n      \"path\": \"/workspace/vm-u2-run-24cf-r01\",\n      \"lexists\": false,\n      \"symlink\": false,\n      \"resolveStrictFalse\": \"/workspace/vm-u2-run-24cf-r01\"\n    }\n  ],\n  \"jobs\": \"UNKNOWN; no new global process or reservations inquiry\",\n  \"previousUnreadableProcesses\": 7,\n  \"filesystemWrites\": 0,\n  \"productExecution\": 0\n}\n"
+  },
+  "rootCreateCommand": "/usr/bin/mkdir -m 700 -- /workspace/vm-u2-source-24cf-r01\n/usr/bin/mkdir -m 700 -- /workspace/vm-u2-source-24cf-r01/evidence /workspace/vm-u2-source-24cf-r01/pre-cwd",
+  "rootCreateResult": {
+    "chunk_id": "ab81fb",
+    "wall_time_seconds": 0.000019958,
+    "exit_code": 0,
+    "original_token_count": 0,
+    "output": ""
+  },
+  "authenticatedProviderActorNativeHostRecord": null,
+  "productRunnerImportsLoadersTestsFixturesProbesGO": 0
+}

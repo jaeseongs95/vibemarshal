@@ -1,0 +1,876 @@
+{
+  "scope": "non_product_delta",
+  "pid": 7284,
+  "argv": [
+    "/workspace/vm-d3-c1-packet-24cf-r02-01/fixture.py",
+    "--child",
+    "--run-root",
+    "/workspace/vm-d3-c1-run-24cf-r02-01",
+    "--fixture-sha256",
+    "6289a2637f2f33ecd493cf6d8a47270e21c91e69c95f0ee5ce4f8b9920c67757",
+    "--manifest-sha256",
+    "47fcacedda73bb433703232da533004e9bf171ce8cb7bf8d32dec391630087d4",
+    "--seal-sha256",
+    "c54bf9ce69722a93c0880f5b7099a3a5669999e2b086661b8444e46059e1b1d7",
+    "--deadline",
+    "59572.706321879"
+  ],
+  "cwd": "/workspace/vm-d3-c1-run-24cf-r02-01/cwd",
+  "utc": "2026-10-04T23:23:32.787882+00:00",
+  "python": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+  "executable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+  "source_before": {
+    "C1-9-EXACT-REUSE.json": {
+      "bytes": 4961,
+      "sha256": "dcb8e3ab5051fbd4a08a0a30df4111b8213fa7eb6eb3fff7213e7ec353d99986"
+    },
+    "CLOSURE-DELTA.json": {
+      "bytes": 1232,
+      "sha256": "2151bdf22629c5b5870fc2c3c7010cc26b17d6830efc8e63fb822f534e92a656"
+    },
+    "CURRENT-R036-CORRECTION.actual.ko.md": {
+      "bytes": 4756,
+      "sha256": "9841eb25a47237afd4ba437df8262a12fc5856fcf8549a9ef9f4e9ccd2c7128a"
+    },
+    "EXTRACTION-AND-CASE-MAPPING.ko.md": {
+      "bytes": 7161,
+      "sha256": "b8c6a33fa7610ac6b9b224eabab1a05d558d7aa36046032bb185c45e3b8bb546"
+    },
+    "EXTRACTION-DELTA.json": {
+      "bytes": 15749,
+      "sha256": "23e2e749bfd95d979676f091b2a74efc4667cce9cbf2ebd7072285a1e2ccf169"
+    },
+    "EXTRACTIONS.json": {
+      "bytes": 3075,
+      "sha256": "fb5271454dca67a9148a02db0d24dee92d1be66f2cc79705767debaed59c77d0"
+    },
+    "FIXTURE-SOURCE.DIFF.patch": {
+      "bytes": 7085,
+      "sha256": "b4a6b97f132bb8c234f4b55ae61d3cbacda5f99c0f8c2430b21285078ffd5544"
+    },
+    "fixture.py": {
+      "bytes": 21705,
+      "sha256": "6289a2637f2f33ecd493cf6d8a47270e21c91e69c95f0ee5ce4f8b9920c67757"
+    },
+    "frozen/runner.py": {
+      "bytes": 31682,
+      "sha256": "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb"
+    },
+    "IMMUTABLE-INPUTS.json": {
+      "bytes": 15203,
+      "sha256": "eb359c8da8be435bc69af989a3964d64aeb5d62eb5efc988515767da3f79ad23"
+    },
+    "manifest.json": {
+      "bytes": 7668,
+      "sha256": "47fcacedda73bb433703232da533004e9bf171ce8cb7bf8d32dec391630087d4"
+    },
+    "PREPARATION.COMMAND.UNISSUED.txt": {
+      "bytes": 213,
+      "sha256": "c3c8faf1decb785ce685ca2ee182972c4ef9f0990075d5e46080562f03ce20c3"
+    },
+    "prior/EXTRACTIONS.r03.json": {
+      "bytes": 2908,
+      "sha256": "1d6ffde24716ddc60bb2c9707754f47dc78d2a4f894252168361d1388dabf35f"
+    },
+    "prior/fixture-execution.r03.actual.json": {
+      "bytes": 27276,
+      "sha256": "0120fb7f7145e1c0b9b51845ef2bc609cefa95963217cfbdbb980ec43490fa85"
+    },
+    "prior/runner-r03.py": {
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343"
+    },
+    "PRIOR14-SUPPORT.json": {
+      "bytes": 53337,
+      "sha256": "dbfaea9a52f3c2c02bb1169e310873f98fa48e87eaec92fd1c641964faf6cc8b"
+    },
+    "README.ko.md": {
+      "bytes": 2723,
+      "sha256": "0849b14459132234319b150e050f6bcd93eedca5868eeb2b7a8f150b2c0106bb"
+    },
+    "SOURCE-BUILDER.py": {
+      "bytes": 21278,
+      "sha256": "a7e9694e4c24c123a4b632ba9bfd8e9171e13aeea64d3159d5474667f9c97915"
+    },
+    "SOURCE-CONSTANT-USAGES.json": {
+      "bytes": 9880,
+      "sha256": "77d2fdba8b73657b18c2545c2cbdc7e675c1fda40ec77b8048a9e9ad82f61b30"
+    },
+    "SOURCE-CONSTANT-USAGES.ko.md": {
+      "bytes": 2632,
+      "sha256": "09c4bd3b9813b01c8e66c3d8dd67107bd64b02de6ebef92a0a134b5304486aeb"
+    },
+    "STATIC-CHECKS.json": {
+      "bytes": 618,
+      "sha256": "32dfe8d13b8b8960e8f1f3100b897347e43667e1420fec67f8157ae9328f2992"
+    },
+    "SOURCE.SHA256.json": {
+      "bytes": 2850,
+      "sha256": "c54bf9ce69722a93c0880f5b7099a3a5669999e2b086661b8444e46059e1b1d7"
+    }
+  },
+  "source_after": {
+    "C1-9-EXACT-REUSE.json": {
+      "bytes": 4961,
+      "sha256": "dcb8e3ab5051fbd4a08a0a30df4111b8213fa7eb6eb3fff7213e7ec353d99986"
+    },
+    "CLOSURE-DELTA.json": {
+      "bytes": 1232,
+      "sha256": "2151bdf22629c5b5870fc2c3c7010cc26b17d6830efc8e63fb822f534e92a656"
+    },
+    "CURRENT-R036-CORRECTION.actual.ko.md": {
+      "bytes": 4756,
+      "sha256": "9841eb25a47237afd4ba437df8262a12fc5856fcf8549a9ef9f4e9ccd2c7128a"
+    },
+    "EXTRACTION-AND-CASE-MAPPING.ko.md": {
+      "bytes": 7161,
+      "sha256": "b8c6a33fa7610ac6b9b224eabab1a05d558d7aa36046032bb185c45e3b8bb546"
+    },
+    "EXTRACTION-DELTA.json": {
+      "bytes": 15749,
+      "sha256": "23e2e749bfd95d979676f091b2a74efc4667cce9cbf2ebd7072285a1e2ccf169"
+    },
+    "EXTRACTIONS.json": {
+      "bytes": 3075,
+      "sha256": "fb5271454dca67a9148a02db0d24dee92d1be66f2cc79705767debaed59c77d0"
+    },
+    "FIXTURE-SOURCE.DIFF.patch": {
+      "bytes": 7085,
+      "sha256": "b4a6b97f132bb8c234f4b55ae61d3cbacda5f99c0f8c2430b21285078ffd5544"
+    },
+    "fixture.py": {
+      "bytes": 21705,
+      "sha256": "6289a2637f2f33ecd493cf6d8a47270e21c91e69c95f0ee5ce4f8b9920c67757"
+    },
+    "frozen/runner.py": {
+      "bytes": 31682,
+      "sha256": "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb"
+    },
+    "IMMUTABLE-INPUTS.json": {
+      "bytes": 15203,
+      "sha256": "eb359c8da8be435bc69af989a3964d64aeb5d62eb5efc988515767da3f79ad23"
+    },
+    "manifest.json": {
+      "bytes": 7668,
+      "sha256": "47fcacedda73bb433703232da533004e9bf171ce8cb7bf8d32dec391630087d4"
+    },
+    "PREPARATION.COMMAND.UNISSUED.txt": {
+      "bytes": 213,
+      "sha256": "c3c8faf1decb785ce685ca2ee182972c4ef9f0990075d5e46080562f03ce20c3"
+    },
+    "prior/EXTRACTIONS.r03.json": {
+      "bytes": 2908,
+      "sha256": "1d6ffde24716ddc60bb2c9707754f47dc78d2a4f894252168361d1388dabf35f"
+    },
+    "prior/fixture-execution.r03.actual.json": {
+      "bytes": 27276,
+      "sha256": "0120fb7f7145e1c0b9b51845ef2bc609cefa95963217cfbdbb980ec43490fa85"
+    },
+    "prior/runner-r03.py": {
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343"
+    },
+    "PRIOR14-SUPPORT.json": {
+      "bytes": 53337,
+      "sha256": "dbfaea9a52f3c2c02bb1169e310873f98fa48e87eaec92fd1c641964faf6cc8b"
+    },
+    "README.ko.md": {
+      "bytes": 2723,
+      "sha256": "0849b14459132234319b150e050f6bcd93eedca5868eeb2b7a8f150b2c0106bb"
+    },
+    "SOURCE-BUILDER.py": {
+      "bytes": 21278,
+      "sha256": "a7e9694e4c24c123a4b632ba9bfd8e9171e13aeea64d3159d5474667f9c97915"
+    },
+    "SOURCE-CONSTANT-USAGES.json": {
+      "bytes": 9880,
+      "sha256": "77d2fdba8b73657b18c2545c2cbdc7e675c1fda40ec77b8048a9e9ad82f61b30"
+    },
+    "SOURCE-CONSTANT-USAGES.ko.md": {
+      "bytes": 2632,
+      "sha256": "09c4bd3b9813b01c8e66c3d8dd67107bd64b02de6ebef92a0a134b5304486aeb"
+    },
+    "STATIC-CHECKS.json": {
+      "bytes": 618,
+      "sha256": "32dfe8d13b8b8960e8f1f3100b897347e43667e1420fec67f8157ae9328f2992"
+    },
+    "SOURCE.SHA256.json": {
+      "bytes": 2850,
+      "sha256": "c54bf9ce69722a93c0880f5b7099a3a5669999e2b086661b8444e46059e1b1d7"
+    }
+  },
+  "cases": [
+    {
+      "scope": "non_product_delta",
+      "name": "d3_allowed_imports_shape3",
+      "pid": 7284,
+      "caught": null,
+      "outer_error_capture": false,
+      "closure_observation": null,
+      "stage_return": 0,
+      "stage_return_is_not_native_exit": true,
+      "final_counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "synthetic_import_events": [
+        "test_flowmarshal_direct_selection",
+        "test_flowmarshal_implementation_workflow"
+      ],
+      "actual_import_calls": 0,
+      "synthetic_tests_run": 3,
+      "synthetic_ID_count": 3,
+      "actual_product_tests_or_loader": 0,
+      "routing_disabled_between_cases": true
+    },
+    {
+      "scope": "non_product_delta",
+      "name": "d3_undeclared_import_caught_shape3",
+      "pid": 7284,
+      "caught": {
+        "type": "RuntimeError",
+        "message": "C5 non-stdlib import: test_flowmarshal_direct_selection.delta_not_authorized"
+      },
+      "outer_error_capture": false,
+      "closure_observation": null,
+      "stage_return": 1,
+      "stage_return_is_not_native_exit": true,
+      "final_counters": {
+        "count": 1,
+        "logging_errors": 0
+      },
+      "synthetic_import_events": [
+        "test_flowmarshal_direct_selection.delta_not_authorized"
+      ],
+      "actual_import_calls": 0,
+      "synthetic_tests_run": 3,
+      "synthetic_ID_count": 3,
+      "actual_product_tests_or_loader": 0,
+      "routing_disabled_between_cases": true
+    },
+    {
+      "scope": "non_product_delta",
+      "name": "d3_legacy_shape5_rejected",
+      "pid": 7284,
+      "caught": null,
+      "outer_error_capture": false,
+      "closure_observation": null,
+      "stage_return": 1,
+      "stage_return_is_not_native_exit": true,
+      "final_counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "synthetic_import_events": [],
+      "actual_import_calls": 0,
+      "synthetic_tests_run": 5,
+      "synthetic_ID_count": 3,
+      "actual_product_tests_or_loader": 0,
+      "routing_disabled_between_cases": true
+    },
+    {
+      "scope": "non_product_delta",
+      "name": "d3_shape3_missing_journal_unknown",
+      "pid": 7284,
+      "caught": null,
+      "outer_error_capture": false,
+      "closure_observation": null,
+      "stage_return": 0,
+      "stage_return_is_not_native_exit": true,
+      "final_counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "synthetic_import_events": [],
+      "actual_import_calls": 0,
+      "synthetic_tests_run": 3,
+      "synthetic_ID_count": 3,
+      "actual_product_tests_or_loader": 0,
+      "routing_disabled_between_cases": true
+    },
+    {
+      "scope": "non_product_delta",
+      "name": "d3_closure_declared_pair",
+      "pid": 7284,
+      "caught": null,
+      "outer_error_capture": false,
+      "closure_observation": {
+        "outcome": "ACCEPTED",
+        "declared_pair_observed": true,
+        "mapped_owned_frozen_path": "/workspace/vm-d3-c1-packet-24cf-r02-01/frozen/runner.py",
+        "actual_product_import": 0,
+        "synthetic_module_objects": true
+      },
+      "stage_return": 0,
+      "stage_return_is_not_native_exit": true,
+      "final_counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "synthetic_import_events": [],
+      "actual_import_calls": 0,
+      "synthetic_tests_run": 3,
+      "synthetic_ID_count": 3,
+      "actual_product_tests_or_loader": 0,
+      "routing_disabled_between_cases": true
+    },
+    {
+      "scope": "non_product_delta",
+      "name": "d3_closure_undeclared_module",
+      "pid": 7284,
+      "caught": null,
+      "outer_error_capture": false,
+      "closure_observation": {
+        "outcome": "REJECTED",
+        "type": "RuntimeError",
+        "message": "non-stdlib module: test_flowmarshal_direct_selection.closure_not_authorized",
+        "actual_product_import": 0,
+        "synthetic_module_objects": true
+      },
+      "stage_return": 0,
+      "stage_return_is_not_native_exit": true,
+      "final_counters": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "synthetic_import_events": [],
+      "actual_import_calls": 0,
+      "synthetic_tests_run": 3,
+      "synthetic_ID_count": 3,
+      "actual_product_tests_or_loader": 0,
+      "routing_disabled_between_cases": true
+    }
+  ],
+  "source_unchanged": true,
+  "module_files_after": [
+    {
+      "module": "__main__",
+      "path": "/workspace/vm-d3-c1-packet-24cf-r02-01/fixture.py",
+      "pin": {
+        "bytes": 21705,
+        "sha256": "6289a2637f2f33ecd493cf6d8a47270e21c91e69c95f0ee5ce4f8b9920c67757"
+      }
+    },
+    {
+      "module": "_collections_abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_collections_abc.py",
+      "pin": {
+        "bytes": 32089,
+        "sha256": "d4945c8410c4bab351741b04bca3de066f7c27ed7e38df89e206a96617102ffb"
+      }
+    },
+    {
+      "module": "_compression",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_compression.py",
+      "pin": {
+        "bytes": 5681,
+        "sha256": "3ad5d60627477a60939ee44fc1bb3a05dbe8fb52f0f75039b8f5d8f1a278b981"
+      }
+    },
+    {
+      "module": "_frozen_importlib_external",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap_external.py",
+      "pin": {
+        "bytes": 69428,
+        "sha256": "e6ad72f3f0f9b65c99ab52598cd02ab748511dcdce1dd51f18dace9be9a680c6"
+      }
+    },
+    {
+      "module": "_weakrefset",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_weakrefset.py",
+      "pin": {
+        "bytes": 5893,
+        "sha256": "91895a451d06e9f521a1171b31b9b19bc9740f35af00d4fa106338ab7167c9ac"
+      }
+    },
+    {
+      "module": "abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/abc.py",
+      "pin": {
+        "bytes": 6538,
+        "sha256": "e558702a95cdce3febd289da021715d2b92bc43995b8a1bc58dfa1c3d8010287"
+      }
+    },
+    {
+      "module": "argparse",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/argparse.py",
+      "pin": {
+        "bytes": 101155,
+        "sha256": "7cc582dcb3b76e2c957f78a3f74e9809d6c311d6aab7bcaa2c9954d0cbff5f30"
+      }
+    },
+    {
+      "module": "ast",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ast.py",
+      "pin": {
+        "bytes": 64452,
+        "sha256": "b515c23dbbc459329d3b802a3aac742cc456d7472e66f7ed6e9dc97e40596d7d"
+      }
+    },
+    {
+      "module": "bisect",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bisect.py",
+      "pin": {
+        "bytes": 3423,
+        "sha256": "f1cf7b85fc36b5da249813fc5ab97d9464f8cc1bc817f7146206fa2713e35999"
+      }
+    },
+    {
+      "module": "bz2",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bz2.py",
+      "pin": {
+        "bytes": 11847,
+        "sha256": "76ab3252924e71e859d7d90e8d3db13b6554975cfcac0fdadced4de7f8779330"
+      }
+    },
+    {
+      "module": "codecs",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/codecs.py",
+      "pin": {
+        "bytes": 36870,
+        "sha256": "7b7839e53a77961153240aecfe11edc8054d05b1dedd83894450dae21ec05785"
+      }
+    },
+    {
+      "module": "collections",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/__init__.py",
+      "pin": {
+        "bytes": 52378,
+        "sha256": "7fdb04dd248ab37909f46d2085bfee56b32d7e91e49ad3a2fad99c453295659b"
+      }
+    },
+    {
+      "module": "collections.abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/abc.py",
+      "pin": {
+        "bytes": 119,
+        "sha256": "9cb4208f99128a0489b6c8e6c61637617dd7d4250c59e065491957eda084dd10"
+      }
+    },
+    {
+      "module": "contextlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "pin": {
+        "bytes": 27637,
+        "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6"
+      }
+    },
+    {
+      "module": "copy",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copy.py",
+      "pin": {
+        "bytes": 8412,
+        "sha256": "cbd25547933176fcf6bb05c2adc9f4796d15ac20b9b82dcf890daea7203daeab"
+      }
+    },
+    {
+      "module": "copyreg",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copyreg.py",
+      "pin": {
+        "bytes": 7614,
+        "sha256": "c8eda41f05c6bf95a4da4726a530409d2485ae060b8d019b3a8034389a15d3e9"
+      }
+    },
+    {
+      "module": "datetime",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/datetime.py",
+      "pin": {
+        "bytes": 268,
+        "sha256": "ef20dc6b3554cd585dddffdc573f1f9a7a54c522f2a3fb4576c44edbb1e14238"
+      }
+    },
+    {
+      "module": "encodings",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/__init__.py",
+      "pin": {
+        "bytes": 5884,
+        "sha256": "78c4744d407690f321565488710b5aaf6486b5afa8d185637aa1e7633ab59cd8"
+      }
+    },
+    {
+      "module": "encodings.aliases",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/aliases.py",
+      "pin": {
+        "bytes": 15677,
+        "sha256": "6fdcc49ba23a0203ae6cf28e608f8e6297d7c4d77d52e651db3cb49b9564c6d2"
+      }
+    },
+    {
+      "module": "encodings.utf_8",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/utf_8.py",
+      "pin": {
+        "bytes": 1005,
+        "sha256": "ba0cac060269583523ca9506473a755203037c57d466a11aa89a30a5f6756f3d"
+      }
+    },
+    {
+      "module": "enum",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/enum.py",
+      "pin": {
+        "bytes": 81540,
+        "sha256": "f35e542d8c4c1d2b5e910138d726fa48774925f3c4dc5462793ebcb66aa55501"
+      }
+    },
+    {
+      "module": "fnmatch",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/fnmatch.py",
+      "pin": {
+        "bytes": 5999,
+        "sha256": "6683da36e47af523f3f41e18ad244d837783e19e98911cc0b7415dea81494ebc"
+      }
+    },
+    {
+      "module": "functools",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/functools.py",
+      "pin": {
+        "bytes": 37940,
+        "sha256": "de4a1d37c795e2a065124b5c49357893433bc6bb111b41277ccc9930ef08d4c9"
+      }
+    },
+    {
+      "module": "genericpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/genericpath.py",
+      "pin": {
+        "bytes": 5572,
+        "sha256": "2b0b35d2206778af4081cf81dd9b513876e72c35a55bec941402e1fa62b1f1aa"
+      }
+    },
+    {
+      "module": "gettext",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/gettext.py",
+      "pin": {
+        "bytes": 21320,
+        "sha256": "a5c249a522b6b8e3aa6f1b12a8bcc09508b99ad612b58d2fc973db27ea3b7cc3"
+      }
+    },
+    {
+      "module": "hashlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/hashlib.py",
+      "pin": {
+        "bytes": 9349,
+        "sha256": "6dbdebf270868b391080e21dc9687eddfaf321c965ad979f68d3f5c423c613ab"
+      }
+    },
+    {
+      "module": "io",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/io.py",
+      "pin": {
+        "bytes": 3582,
+        "sha256": "7cec3cb8ac004058dd0a5af246e6d950fb59c7ddd0058fda48bcb3fcb98d8822"
+      }
+    },
+    {
+      "module": "ipaddress",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ipaddress.py",
+      "pin": {
+        "bytes": 81414,
+        "sha256": "ba8d3389ff084fcb232b48204ec04f2b3ea4bd0eadf7b18c814947d185de2c64"
+      }
+    },
+    {
+      "module": "json",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/__init__.py",
+      "pin": {
+        "bytes": 14020,
+        "sha256": "d5d41e2c29049515d295d81a6d40b4890fbec8d8482cfb401630f8ef2f77e4d5"
+      }
+    },
+    {
+      "module": "json.decoder",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py",
+      "pin": {
+        "bytes": 12525,
+        "sha256": "382cd02af6f7efede5a6d4abbcda1015e5c7a75794b0016022878f9cf32a24f6"
+      }
+    },
+    {
+      "module": "json.encoder",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/encoder.py",
+      "pin": {
+        "bytes": 16075,
+        "sha256": "52bfb1b66029cc70fa3bd7fe11df9f2e03922d413407a341b387a22c987f24f8"
+      }
+    },
+    {
+      "module": "json.scanner",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/scanner.py",
+      "pin": {
+        "bytes": 2434,
+        "sha256": "572958017eae8842eeddd0e3d18d3c56cc0a197348224915e1d87ce937841764"
+      }
+    },
+    {
+      "module": "keyword",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/keyword.py",
+      "pin": {
+        "bytes": 1073,
+        "sha256": "18c2be738c04ad20ad375f6a71db34b3823c7f40b0340f5294d0e89f3c9b093b"
+      }
+    },
+    {
+      "module": "linecache",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/linecache.py",
+      "pin": {
+        "bytes": 5800,
+        "sha256": "9eb9194707991b49f9fea67a5222b0e6a0e49c865cdffc69fbc80a1f829e77fb"
+      }
+    },
+    {
+      "module": "locale",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/locale.py",
+      "pin": {
+        "bytes": 78599,
+        "sha256": "3988c5419552d5b9f0bef3695102376f79357f0f440e9cd1f32c501f966e6ef3"
+      }
+    },
+    {
+      "module": "lzma",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/lzma.py",
+      "pin": {
+        "bytes": 13277,
+        "sha256": "58fb9d2fdc8a8af7b25e218f17ea3b51bdfa53bdf40f440ab33c605974ca5c2e"
+      }
+    },
+    {
+      "module": "ntpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ntpath.py",
+      "pin": {
+        "bytes": 30404,
+        "sha256": "6c0d55ee892f98ef87b1ed3c50c9dfc7e267a98d2db47e08d3dc67529af56725"
+      }
+    },
+    {
+      "module": "operator",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/operator.py",
+      "pin": {
+        "bytes": 10965,
+        "sha256": "b2af20f67667203c1730e686cc5d0427becc94db4c97f1d3efe3ed2158473f6a"
+      }
+    },
+    {
+      "module": "os",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/os.py",
+      "pin": {
+        "bytes": 40821,
+        "sha256": "54c43a1fc69c979c70d8f7d097174cee163bfe59937723ee353043dd4a0211e1"
+      }
+    },
+    {
+      "module": "os.path",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "pin": {
+        "bytes": 17356,
+        "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9"
+      }
+    },
+    {
+      "module": "pathlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py",
+      "pin": {
+        "bytes": 51052,
+        "sha256": "10ba48ae8063cfe7589436041d0d4628c05f427c7709cf8e75e486f8930cc32c"
+      }
+    },
+    {
+      "module": "posixpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "pin": {
+        "bytes": 17356,
+        "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9"
+      }
+    },
+    {
+      "module": "random",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/random.py",
+      "pin": {
+        "bytes": 34689,
+        "sha256": "de48263a837339c7e01cf9f3c4d756696e0e0775f7778eb9cf81ad5b00134569"
+      }
+    },
+    {
+      "module": "re",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/__init__.py",
+      "pin": {
+        "bytes": 16315,
+        "sha256": "8ff3c37c63b917fcf8dc8d50993a502292a3dc159e41de4f4018c72a53d1c07b"
+      }
+    },
+    {
+      "module": "re._casefix",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_casefix.py",
+      "pin": {
+        "bytes": 5444,
+        "sha256": "1b12d9136f23db6c3f6f26053fefc15ca964b886838c7b9c1fabf8d2efc1e5c8"
+      }
+    },
+    {
+      "module": "re._compiler",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_compiler.py",
+      "pin": {
+        "bytes": 26399,
+        "sha256": "c75620761098a70ed75b9accef63ef2881d8abb6d4e5cbfd10074bd165eefe4d"
+      }
+    },
+    {
+      "module": "re._constants",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_constants.py",
+      "pin": {
+        "bytes": 5930,
+        "sha256": "fa4fdb200f238f9e7817b63892b0d69833d8165134801e775e10cc113348a375"
+      }
+    },
+    {
+      "module": "re._parser",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_parser.py",
+      "pin": {
+        "bytes": 41201,
+        "sha256": "a51a85b37cf3f44ba7ff25754da5f31306e4ccfa6eb3c017f9d37bdf4e770840"
+      }
+    },
+    {
+      "module": "reprlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/reprlib.py",
+      "pin": {
+        "bytes": 7148,
+        "sha256": "e177bc70da83a7fbcde6fd261dc15da34e8a20873b1cccd4f9a1f8f27cca3779"
+      }
+    },
+    {
+      "module": "selectors",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/selectors.py",
+      "pin": {
+        "bytes": 19671,
+        "sha256": "1eeb102373e18c96311203f30c516e785bd8642275aa0bd66e43a284c9692385"
+      }
+    },
+    {
+      "module": "shutil",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/shutil.py",
+      "pin": {
+        "bytes": 56198,
+        "sha256": "53496e06742fe008fee2bccc8caeac77473e69923bec05358bd43eea467db1f8"
+      }
+    },
+    {
+      "module": "signal",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/signal.py",
+      "pin": {
+        "bytes": 2495,
+        "sha256": "0363c964c90ac0b3e515de5749205e6e6454051a1211058375d84d91eab6071a"
+      }
+    },
+    {
+      "module": "stat",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/stat.py",
+      "pin": {
+        "bytes": 5485,
+        "sha256": "052af0327eae6941b69b05c088b3e748f79995635f80ac4cc7125eb333eb4c77"
+      }
+    },
+    {
+      "module": "subprocess",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "pin": {
+        "bytes": 88747,
+        "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375"
+      }
+    },
+    {
+      "module": "tempfile",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tempfile.py",
+      "pin": {
+        "bytes": 32386,
+        "sha256": "2eea4401f4f29d0d3647ed6fc8bcf6aa1daf879c8aa407a8ea310edac9dfc317"
+      }
+    },
+    {
+      "module": "textwrap",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/textwrap.py",
+      "pin": {
+        "bytes": 19718,
+        "sha256": "62867e40cdea6669b361f72af4d7daf0359f207c92cbeddfc7c7506397c1f31c"
+      }
+    },
+    {
+      "module": "threading",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/threading.py",
+      "pin": {
+        "bytes": 60200,
+        "sha256": "846f450ae794e4aab823a163f8c71d27751148af33e91dd3de886686a4e8ebfb"
+      }
+    },
+    {
+      "module": "token",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/token.py",
+      "pin": {
+        "bytes": 2511,
+        "sha256": "1a4d994ce9744f4bfe2d964fc24d112a1e76796a08c2e45a2d73c82a8587f922"
+      }
+    },
+    {
+      "module": "tokenize",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tokenize.py",
+      "pin": {
+        "bytes": 21570,
+        "sha256": "026f566ac63e60d69c8185a3880831b657accc5eac984fadf271fc99a5e5825d"
+      }
+    },
+    {
+      "module": "traceback",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/traceback.py",
+      "pin": {
+        "bytes": 46393,
+        "sha256": "2c44af2848836d9af0c7b3547469695cd22586c64274d362eafcf466af284bd6"
+      }
+    },
+    {
+      "module": "types",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/types.py",
+      "pin": {
+        "bytes": 10993,
+        "sha256": "345474ef027a1273f353da9bdc1f7c18f65335e72e681bcc0376774cc51f2405"
+      }
+    },
+    {
+      "module": "urllib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/__init__.py",
+      "pin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "module": "urllib.parse",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/parse.py",
+      "pin": {
+        "bytes": 45676,
+        "sha256": "e6af7f475262f1de335bb2e41e26adb94d6103977cf5fe1ddc430dc6a3b1623f"
+      }
+    },
+    {
+      "module": "warnings",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/warnings.py",
+      "pin": {
+        "bytes": 21909,
+        "sha256": "6405e281882932205eae641b2d31fba7776f94517a206d289465a1caffbf310e"
+      }
+    },
+    {
+      "module": "weakref",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/weakref.py",
+      "pin": {
+        "bytes": 21513,
+        "sha256": "56f8d313fb74019e53eb9287400702fbce788b7fe30e097b0b6e06296f3f080c"
+      }
+    },
+    {
+      "module": "zipimport",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/zipimport.py",
+      "pin": {
+        "bytes": 27840,
+        "sha256": "a96f1d7a7b6aaf421a3cf382b94b1422f4f0ad452fdd0bb61d635b560d7a4e91"
+      }
+    }
+  ],
+  "product_import_loader_calls": 0
+}

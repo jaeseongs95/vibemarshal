@@ -1,0 +1,76 @@
+{
+  "utc": "2026-10-04T23:26:06.027819+00:00",
+  "scope": "Additional static stdlib source observations; no change to raw origin-null/UNKNOWN",
+  "typingPin": {
+    "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/typing.py",
+    "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/typing.py",
+    "bytes": 118836,
+    "sha256": "be92d60fb8382bb29ead21c128825d7c96d0e8c915b44f840791e49f5a8d554c",
+    "state": "FILE_READ",
+    "regular": true,
+    "symlink": false
+  },
+  "typingSourceCopy": "stdlib-typing.source.py",
+  "selectedStaticSource": [
+    {
+      "name": "_DeprecatedType",
+      "start": 3311,
+      "end": 3321,
+      "source": "class _DeprecatedType(type):\n    def __getattribute__(cls, name):\n        if name not in {\"__dict__\", \"__module__\", \"__doc__\"} and name in cls.__dict__:\n            warnings.warn(\n                f\"{cls.__name__} is deprecated, import directly \"\n                f\"from typing instead. {cls.__name__} will be removed \"\n                \"in Python 3.13.\",\n                DeprecationWarning,\n                stacklevel=2,\n            )\n        return super().__getattribute__(name)"
+    },
+    {
+      "name": "io",
+      "start": 3324,
+      "end": 3330,
+      "source": "class io(metaclass=_DeprecatedType):\n    \"\"\"Wrapper namespace for IO generic classes.\"\"\"\n\n    __all__ = ['IO', 'TextIO', 'BinaryIO']\n    IO = IO\n    TextIO = TextIO\n    BinaryIO = BinaryIO"
+    },
+    {
+      "name": "re",
+      "start": 3339,
+      "end": 3344,
+      "source": "class re(metaclass=_DeprecatedType):\n    \"\"\"Wrapper namespace for re type aliases.\"\"\"\n\n    __all__ = ['Pattern', 'Match']\n    Pattern = Pattern\n    Match = Match"
+    }
+  ],
+  "observedAliasRows": [
+    {
+      "name": "typing.io",
+      "present": true,
+      "sameObjectAsTypingAttribute": true,
+      "sysModulesObjectId": 522018384,
+      "typingAttributeObjectId": 522018384,
+      "objectType": "_DeprecatedType",
+      "objectTypeModule": "typing",
+      "declaredClassModule": "typing",
+      "objectName": "typing.io",
+      "isModuleType": false,
+      "rawOrigin": null,
+      "rawFile": null
+    },
+    {
+      "name": "typing.re",
+      "present": true,
+      "sameObjectAsTypingAttribute": true,
+      "sysModulesObjectId": 522019376,
+      "typingAttributeObjectId": 522019376,
+      "objectType": "_DeprecatedType",
+      "objectTypeModule": "typing",
+      "declaredClassModule": "typing",
+      "objectName": "typing.re",
+      "isModuleType": false,
+      "rawOrigin": null,
+      "rawFile": null
+    }
+  ],
+  "observerPin": {
+    "path": "/workspace/vm-d3-source-24cf-r02/evidence/metadata-observer.py",
+    "resolve": "/workspace/vm-d3-source-24cf-r02/evidence/metadata-observer.py",
+    "bytes": 8540,
+    "sha256": "815532b37de45889d8c078357710e4b4599d9d7e84b815384251818f55e90c1e",
+    "state": "FILE_READ",
+    "regular": true,
+    "symlink": false
+  },
+  "rawUnknownClassifierPreserved": false,
+  "metadataRerun": 0,
+  "productImportExecute": 0
+}

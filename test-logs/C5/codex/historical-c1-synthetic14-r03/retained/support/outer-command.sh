@@ -1,0 +1,2 @@
+umask 077
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 -I -S -B -X utf8 /workspace/vm-c5-source-24cf-r03/c1-fixture/fixture.py --run-root /workspace/vm-c5-c1-pre-24cf-r03-01 --fixture-sha256 a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208 --manifest-sha256 15e10b1038f2ced4787e73cca5a19039132cf54b432191e3347aa394e3742b4a --seal-sha256 2345d41939c978a165693f4417db6944fe983fad42706466f6f986bf617d739e

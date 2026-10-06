@@ -1,0 +1,63 @@
+{
+  "scope": "one local stdlib dummy regression process only; not product/whole runner",
+  "argv": [
+    "C:\\Users\\sjs95\\AppData\\Local\\Programs\\Python\\Python312\\python.exe",
+    "-I",
+    "-S",
+    "-B",
+    "-X",
+    "utf8",
+    "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\regression\\check_origin.py",
+    "--runner-sha256",
+    "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+    "--self-sha256",
+    "8321f2343c74a829b4e6509f0a0b2942a7808ffd81f84b45592d5fa6d0616098",
+    "--dummy-sha256",
+    "b42b7cf911d2f08cd5cf023c0b914f7d910411509c5b8d515304bce60ca9133f",
+    "--result",
+    "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\regression-capture\\result.json"
+  ],
+  "cwd": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02",
+  "started_utc": "2026-10-04T17:00:00.338016+00:00",
+  "observed_utc": "2026-10-04T17:00:00.461224+00:00",
+  "pid": 33016,
+  "actual_exit": 0,
+  "terminal_observed": true,
+  "elapsed_seconds": 0.11000000001513399,
+  "wait_budget_seconds": 30,
+  "retry": 0,
+  "kill": 0,
+  "inputs_before": {
+    "runner.py": {
+      "bytes": 20603,
+      "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee"
+    },
+    "regression/check_origin.py": {
+      "bytes": 8497,
+      "sha256": "8321f2343c74a829b4e6509f0a0b2942a7808ffd81f84b45592d5fa6d0616098"
+    },
+    "regression/dummy_helper.py": {
+      "bytes": 300,
+      "sha256": "b42b7cf911d2f08cd5cf023c0b914f7d910411509c5b8d515304bce60ca9133f"
+    }
+  },
+  "inputs_after": {
+    "runner.py": {
+      "bytes": 20603,
+      "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee"
+    },
+    "regression/check_origin.py": {
+      "bytes": 8497,
+      "sha256": "8321f2343c74a829b4e6509f0a0b2942a7808ffd81f84b45592d5fa6d0616098"
+    },
+    "regression/dummy_helper.py": {
+      "bytes": 300,
+      "sha256": "b42b7cf911d2f08cd5cf023c0b914f7d910411509c5b8d515304bce60ca9133f"
+    }
+  },
+  "executable_pin": {
+    "bytes": 104952,
+    "sha256": "4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a"
+  },
+  "author_parent_python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]"
+}

@@ -1,0 +1,77 @@
+{
+  "documentKind": "LOCAL_DERIVED_HISTORICAL_RECOVERY_INDEX",
+  "group": "U2r01",
+  "testUnit": "U2",
+  "testPurpose": "기존 U2 r01 schema migration/writer fence 준비 증거",
+  "historicalArchiveFolder": "historical-source-r01-recovered-evidence-20261006",
+  "recoveryDate": "2026-10-06",
+  "recoveryMeaning": "Historical original bytes now locally recovered; date is not a new run date",
+  "originalRows": [
+    {
+      "sourceRow": 6,
+      "group": "U2r01",
+      "testUnit": "U2",
+      "testPurpose": "기존 U2 r01 schema migration/writer fence 준비 증거",
+      "historicalArchiveFolder": "historical-source-r01-recovered-evidence-20261006",
+      "localOriginalPath": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-cloud-missing11-readback-r01\\raw\\vm-u2-source-24cf-r01\\evidence\\native-page-response.json",
+      "originalCloudPath": "/workspace/vm-u2-source-24cf-r01/evidence/native-page-response.json",
+      "originalHistoricalPin": {
+        "bytes": 328934,
+        "sha256": "c4d063841c66e52313f5ca7b08688bb923984302b5ff1ea713feab6dc1130e73"
+      },
+      "localOriginalPin": {
+        "bytes": 328934,
+        "sha256": "c4d063841c66e52313f5ca7b08688bb923984302b5ff1ea713feab6dc1130e73"
+      },
+      "publicRelativePath": "payload/test-logs/U2/codex/historical-source-r01-recovered-evidence-20261006/retained/evidence/native-page-response.json",
+      "publicPin": {
+        "bytes": 328934,
+        "sha256": "c4d063841c66e52313f5ca7b08688bb923984302b5ff1ea713feab6dc1130e73"
+      },
+      "disposition": "PUBLIC_COPY_UNCHANGED",
+      "originMeaning": "Historical original bytes recovered locally today; no new Cloud test run",
+      "historicalMissingClaim": {
+        "manifest": "C:/Users/sjs95/Documents/Codex/2026-10-04/task-8/vm-cloud-platform-24cfe63e/lead-pre-u2-r01-01/raw/prepare/evidence-manifest.json",
+        "jsonPointer": "/allOwnedFilePins/7",
+        "pinBasis": "Historical manifest value; remote file bytes not read this request",
+        "coverage": "HISTORICAL_PIN_REMOTE_BYTES_NOT_LOCALLY_OBSERVED",
+        "currentRemoteExistence": "UNKNOWN"
+      },
+      "sourceZIPMember": "U2-r01/native-page-response.json",
+      "currentCloudROPinMatchAsReportedByRoot": true,
+      "CloudROClaimSource": "RAW11-READBACK/AVAILABILITY metadata, not this writer observing Cloud",
+      "disclosureReviewSourceRow": 6
+    }
+  ],
+  "sharedTransportZIP": {
+    "pathFromPreparationRoot": "payload/test-logs/C3/codex/historical-source-r03-recovered-evidence-20261006/cloud-return/historical.raw11.zip",
+    "pin": {
+      "bytes": 1809756,
+      "sha256": "9937469f4a0691e7554a1f3101c20e8eb37a9e78fb5a6e9d0781b0413c82fe67"
+    },
+    "sharedUnits": [
+      "C3",
+      "U2",
+      "C5"
+    ],
+    "sharedGroups": [
+      "C3",
+      "U2r01",
+      "U2r02",
+      "C5"
+    ],
+    "storedExactlyOnce": true
+  },
+  "earlierUnrecoveredUNKNOWNMetadata": "Preserved as the fact at the earlier observation time; not rewritten",
+  "currentCloudROObservation": "Root-reported metadata only; direct local source pin readback is separate",
+  "newCloudProductPASS": null,
+  "pastRuntimeEnvironmentEquivalence": "NOT_PROVEN",
+  "CloudFinalManifestReference": "NOT_OBSERVED; carriers obtained from original upload audit instead",
+  "sourceCodeTreatment": "data only; no source import or execution",
+  "effects": {
+    "CloudCalls": 0,
+    "productExecution": 0,
+    "issuance": 0,
+    "publicPublication": 0
+  }
+}

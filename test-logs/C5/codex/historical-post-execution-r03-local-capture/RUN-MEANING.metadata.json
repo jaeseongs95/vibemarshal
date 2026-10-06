@@ -1,0 +1,19 @@
+{
+  "recordKind": "LOCAL_DERIVED_ARCHIVE_MEANING",
+  "testUnit": "C5",
+  "testPurpose": "evidence/history/carry/revalidation 및 별도 synthetic14·이전 NOT_RUN 증거",
+  "historicalArchiveFolder": "historical-post-execution-r03-local-capture",
+  "currentCloudExecution": 0,
+  "actualNativeReturnClaim": "Only rows explicitly marked LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE; captures/PRE requests/local notes are not Cloud product execution returns",
+  "sourceRows": 1,
+  "publicCopyRows": 1,
+  "excludedRows": 0,
+  "historicalMeanings": [
+    "Local App extract/supporting manifest; preserve observed/truncated/null limits"
+  ],
+  "fixtureIsNotProductPASS": true,
+  "priorNOTRUNUNKNOWNRetained": true,
+  "futureExecutionAuthority": null,
+  "sourceOrPreVerdictNotIssued": true,
+  "sameContentPinDoesNotMergeRunLineage": true
+}

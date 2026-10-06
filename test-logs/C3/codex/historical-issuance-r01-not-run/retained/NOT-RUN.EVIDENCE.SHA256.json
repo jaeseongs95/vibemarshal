@@ -1,0 +1,18 @@
+{
+  "APP-COMPLETED-NOT-RUN.actual.json": {
+    "bytes": 18790,
+    "sha256": "b1f81f7f27fbb3311467ae6ad77fc4416c81225464d7a479ea5f77bb34aec26b"
+  },
+  "hold-ro.stdout.actual.json": {
+    "bytes": 2647,
+    "sha256": "5f892ae61eaba5e3ac5beb266cb6186082bc78c0f349afda2b1b8caefdcceb5a"
+  },
+  "READBACK.ko.txt": {
+    "bytes": 2551,
+    "sha256": "386aa93f01173e66ce1dc57e8e1bec8515cf0661cc32ff5d6a3228cbfc4948e1"
+  },
+  "freshness.stdout.actual.json": {
+    "bytes": 1270,
+    "sha256": "4dc5cfcbaf8a48d695446d7c7f310722fe665ed20754314c223c690da21963a2"
+  }
+}

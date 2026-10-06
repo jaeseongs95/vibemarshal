@@ -1,0 +1,46 @@
+{
+  "thread": {
+    "id": "01a0f9a1-b7f5-73a0-b34d-a7cb4e270006",
+    "kind": "codex",
+    "hostId": "durable",
+    "title": "Verify AGS cloud readiness",
+    "preview": "",
+    "status": {
+      "type": "idle"
+    },
+    "cwd": "/workspace",
+    "createdAt": 1790894522,
+    "updatedAt": 1791157018
+  },
+  "page": {
+    "order": "newest_first",
+    "limit": 1,
+    "hasMore": true
+  },
+  "commands": [
+    {
+      "turnId": "01a10934-d8bb-7441-9a3a-b02ebad0bf3b",
+      "type": "commandExecution",
+      "id": "exec-b8a942e1-a864-441a-940c-7397d2e92949",
+      "command": "/bin/bash -c 'umask 077\nset -C\nHOME=/workspace/vm-d3-source-24cf-r02/pre-home TMPDIR=/workspace/vm-d3-source-24cf-r02/pre-tmp TMP=/workspace/vm-d3-source-24cf-r02/pre-tmp TEMP=/workspace/vm-d3-source-24cf-r02/pre-tmp /opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 -I -S -B -X utf8 /workspace/vm-d3-source-24cf-r02/evidence/metadata-observer.py > /workspace/vm-d3-source-24cf-r02/evidence/linux-pre.stdout.json 2> /workspace/vm-d3-source-24cf-r02/evidence/linux-pre.stderr.txt'",
+      "cwd": "/workspace/vm-d3-source-24cf-r02/pre-cwd",
+      "status": "completed",
+      "exitCode": 0,
+      "durationMs": 4
+    },
+    {
+      "turnId": "01a10934-d8bb-7441-9a3a-b02ebad0bf3b",
+      "type": "commandExecution",
+      "id": "exec-f5ae6bd5-af41-443f-a6e1-43426e708cf2",
+      "command": "/bin/bash -c 'umask 077\n/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 -I -S -B -X utf8 /workspace/vm-d3-c1-packet-24cf-r02-01/fixture.py --run-root /workspace/vm-d3-c1-run-24cf-r02-01 --fixture-sha256 6289a2637f2f33ecd493cf6d8a47270e21c91e69c95f0ee5ce4f8b9920c67757 --manifest-sha256 47fcacedda73bb433703232da533004e9bf171ce8cb7bf8d32dec391630087d4 --seal-sha256 c54bf9ce69722a93c0880f5b7099a3a5669999e2b086661b8444e46059e1b1d7'",
+      "cwd": "/workspace/vm-d3-source-24cf-r02/pre-cwd",
+      "status": "completed",
+      "exitCode": 0,
+      "durationMs": 39,
+      "output": {
+        "text": "{\"scope\": \"non_product_delta\", \"fixture_status\": \"MATCH\", \"actual_native_exit\": 0, \"run_root\": \"/workspace/vm-d3-c1-run-24cf-r02-01\"}\n",
+        "truncated": false
+      }
+    }
+  ]
+}

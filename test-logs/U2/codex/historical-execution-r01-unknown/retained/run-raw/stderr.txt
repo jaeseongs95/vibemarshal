@@ -1,0 +1,8 @@
+Traceback (most recent call last):
+  File "/workspace/vm-u2-source-24cf-r01/packet/runner.py", line 319, in main
+    return child(args, Path(args.run_root)) if args.child else supervise(args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/vm-u2-source-24cf-r01/packet/runner.py", line 168, in child
+    raise RuntimeError("helper code origin mismatch")
+RuntimeError: helper code origin mismatch
+

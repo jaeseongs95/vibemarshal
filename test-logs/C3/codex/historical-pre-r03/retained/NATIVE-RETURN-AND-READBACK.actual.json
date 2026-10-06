@@ -1,0 +1,219 @@
+{
+  "scope": "ROOT_OFFICIAL_APP_RECORD_AND_NATIVE_FILE_READBACK",
+  "threadId": "01a0f9a1-b7f5-73a0-b34d-a7cb4e270006",
+  "hostId": "durable",
+  "turnId": "01a10746-9ee8-75db-897c-fff95461cb84",
+  "startedAt": 1791123431,
+  "completedAt": 1791123790,
+  "uploads": [
+    {
+      "filename": "evidence-manifest.json",
+      "messageId": "msg_0fa16676062fa28c016ac2605b95e487d0a2a371d490f8b00a",
+      "byte_size": 4423,
+      "file_access_confirmed": true,
+      "file_name": "evidence-manifest-9be2f3f4a8dc404fafccda0eeaa8d757.json",
+      "inserted": false,
+      "is_image": false,
+      "markdown": "[evidence-manifest.json](library-file:fde1_bGliZmlsZV9uNnhQRjBIXzljZWdLbzJSQUJ1YzNn_FileDrive_db4d605f7b6c8191aedb5f11c15c0007)",
+      "mime_type": "application/json",
+      "next_step": "Read the Page and use edit_page with its fresh guards to insert markdown.",
+      "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+      "reference": "library-file:fde1_bGliZmlsZV9uNnhQRjBIXzljZWdLbzJSQUJ1YzNn_FileDrive_db4d605f7b6c8191aedb5f11c15c0007",
+      "sha256": "fee0c821ac1f86d17c1aeeda7cde47cf35d251b3f323d37a3648ed1ef630dfca"
+    },
+    {
+      "filename": "source-materialization.json",
+      "messageId": "msg_0fa16676062fa28c016ac260c823cc87d0a369cc979adfe886",
+      "byte_size": 3166,
+      "file_access_confirmed": true,
+      "file_name": "source-materialization-658975038b8d4ba78912e4f41535b1d3.json",
+      "inserted": false,
+      "is_image": false,
+      "markdown": "[source-materialization.json](library-file:fde1_bGliZmlsZV9qUWkySHdQcU9yLWZpaFk4TDAtanBB_FileDrive_db4d605f7b6c8191aedb5f11c15c0007)",
+      "mime_type": "application/json",
+      "next_step": "Read the Page and use edit_page with its fresh guards to insert markdown.",
+      "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+      "reference": "library-file:fde1_bGliZmlsZV9qUWkySHdQcU9yLWZpaFk4TDAtanBB_FileDrive_db4d605f7b6c8191aedb5f11c15c0007",
+      "sha256": "b1b38eabdfd1b9595c3b65f8938963104358515024580c8c944fc61907379a59"
+    },
+    {
+      "filename": "linux-pre.stdout.json",
+      "messageId": "msg_0fa16676062fa28c016ac260ef310887d0bc97370a267b1064",
+      "byte_size": 9799,
+      "file_access_confirmed": true,
+      "file_name": "linux-pre.stdout-9548bd3a61fa450fa6764e492152215b.json",
+      "inserted": false,
+      "is_image": false,
+      "markdown": "[linux-pre.stdout.json](library-file:fde1_bGliZmlsZV9kVDFoZVMtTzBGcHBSLWxGMXVHeHNR_FileDrive_db4d605f7b6c8191aedb5f11c15c0007)",
+      "mime_type": "application/json",
+      "next_step": "Read the Page and use edit_page with its fresh guards to insert markdown.",
+      "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+      "reference": "library-file:fde1_bGliZmlsZV9kVDFoZVMtTzBGcHBSLWxGMXVHeHNR_FileDrive_db4d605f7b6c8191aedb5f11c15c0007",
+      "sha256": "2de9b103aaba3a77d3f087b42d816896d9cbf7a233d7d7567e2e381236431e8a"
+    },
+    {
+      "filename": "materialization-initial-audit.json",
+      "messageId": "msg_0fa16676062fa28c016ac2610d29b087d08d2a31f6192925ac",
+      "byte_size": 3454,
+      "file_access_confirmed": true,
+      "file_name": "materialization-initial-audit-492a7d5cccf84e5cb756942ee5c40667.json",
+      "inserted": false,
+      "is_image": false,
+      "markdown": "[materialization-initial-audit.json](library-file:fde1_bGliZmlsZV81LTNqX3JOenF4bXEzb2o5bE1ZMUNR_FileDrive_db4d605f7b6c8191aedb5f11c15c0007)",
+      "mime_type": "application/json",
+      "next_step": "Read the Page and use edit_page with its fresh guards to insert markdown.",
+      "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+      "reference": "library-file:fde1_bGliZmlsZV81LTNqX3JOenF4bXEzb2o5bE1ZMUNR_FileDrive_db4d605f7b6c8191aedb5f11c15c0007",
+      "sha256": "9574e70f9f40b019b809789103e6e2a24020294f49a9bdfa1650d0f945b8a000"
+    },
+    {
+      "filename": "runroot-ro-r01.json",
+      "messageId": "msg_0fa16676062fa28c016ac2611dcd3c87d0afaf6ee340fee51f",
+      "byte_size": 8813,
+      "file_access_confirmed": true,
+      "file_name": "runroot-ro-r01-805f573e007941ffa138b20987d5c4d5.json",
+      "inserted": false,
+      "is_image": false,
+      "markdown": "[runroot-ro-r01.json](library-file:fde1_bGliZmlsZV9kTGxNYVd4Rng3dUl1SzN0V2tvZVF3_FileDrive_db4d605f7b6c8191aedb5f11c15c0007)",
+      "mime_type": "application/json",
+      "next_step": "Read the Page and use edit_page with its fresh guards to insert markdown.",
+      "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+      "reference": "library-file:fde1_bGliZmlsZV9kTGxNYVd4Rng3dUl1SzN0V2tvZVF3_FileDrive_db4d605f7b6c8191aedb5f11c15c0007",
+      "sha256": "6b296a218ca4c1a62b15d8b9be7896714c0d2cc60cb054ccaee0d6076fb5126b"
+    }
+  ],
+  "actualMcpCalls": [
+    {
+      "type": "mcpToolCall",
+      "id": "exec-420bc1ce-4a05-4360-9930-1102849596b8",
+      "server": "codex_apps",
+      "tool": "chatgpt_space.write_page_reference",
+      "arguments": {
+        "file": "/workspace/vm-common3-source-24cf-r03/evidence/evidence-manifest.json",
+        "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+        "title": "evidence-manifest.json"
+      },
+      "status": "completed",
+      "durationMs": 12406
+    },
+    {
+      "type": "mcpToolCall",
+      "id": "exec-8c380876-66ba-4726-8ddb-23c173646200",
+      "server": "codex_apps",
+      "tool": "chatgpt_space.write_page_reference",
+      "arguments": {
+        "file": "/workspace/vm-common3-source-24cf-r03/evidence/source-materialization.json",
+        "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+        "title": "source-materialization.json"
+      },
+      "status": "completed",
+      "durationMs": 13766
+    },
+    {
+      "type": "mcpToolCall",
+      "id": "exec-6ba7ce62-fc9e-4c10-b3b6-a34badc9bf07",
+      "server": "codex_apps",
+      "tool": "chatgpt_space.write_page_reference",
+      "arguments": {
+        "file": "/workspace/vm-common3-source-24cf-r03/evidence/linux-pre.stdout.json",
+        "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+        "title": "linux-pre.stdout.json"
+      },
+      "status": "completed",
+      "durationMs": 11427
+    },
+    {
+      "type": "mcpToolCall",
+      "id": "exec-9aec90e6-b0ba-4287-ad2f-98fc5aa67337",
+      "server": "codex_apps",
+      "tool": "chatgpt_space.write_page_reference",
+      "arguments": {
+        "file": "/workspace/vm-common3-source-24cf-r03/evidence/materialization-initial-audit.json",
+        "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+        "title": "materialization-initial-audit.json"
+      },
+      "status": "completed",
+      "durationMs": 11313
+    },
+    {
+      "type": "mcpToolCall",
+      "id": "exec-81370151-7b63-4047-aa1d-fa040dd4323f",
+      "server": "codex_apps",
+      "tool": "chatgpt_space.write_page_reference",
+      "arguments": {
+        "file": "/workspace/vm-common3-source-24cf-r03/evidence/runroot-ro-r01.json",
+        "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+        "title": "runroot-ro-r01.json"
+      },
+      "status": "completed",
+      "durationMs": 12144
+    }
+  ],
+  "commands": [
+    {
+      "id": "exec-b4074c36-0240-4606-8a9b-a95274866f91",
+      "cwd": "/workspace",
+      "status": "completed",
+      "exitCode": 0,
+      "command": "/bin/bash -c \"/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 -I -S -B - <<'PY'\nimport pathlib,json,hashlib,datetime\nr=pathlib.Path('/workspace/vm-common3-source-24cf-r03');e=r/'evidence';p=e/'evidence-manifest.json';b=p.read_bytes();sha=lambda b:hashlib.sha256(b).hexdigest()\nassert len(b)==4423 and sha(b)=='fee0c821ac1f86d17c1aeeda7cde47cf35d251b3f323d37a3648ed1ef630dfca'\nm=json.loads(b);pinmap={x['path']:x for x in m['evidencePins']};name='evidence/materialization-initial-audit.json';assert name in pinmap\npaths=[p,e/'source-materialization.json',e/'linux-pre.stdout.json',r/name];rows=[]\nfor p in paths:\n assert p.is_file() and not p.is_symlink();b=p.read_bytes();key=p.relative_to(r).as_posix()\n if key in pinmap:assert len(b)==pinmap[key]['bytes'] and sha(b)==pinmap[key]['sha256']\n rows.append({'path':str(p),'bytes':len(b),'sha256':sha(b)})\na=json.loads(paths[3].read_bytes());pf=json.loads(a['preflightResult']['output'])\nprint(json.dumps({'utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'root':str(r),'uploadFiles':rows,'preflightFilenameSelectedFromManifest':name,'existingPreflight':pf,'rootCreateResult':a['rootCreateResult'],'existingFutureRunrootCanonicalDetails':all(k in pf for k in ['runrootResolve','runrootAncestorComponents']),'newRunrootRORequired':not all(k in pf for k in ['runrootResolve','runrootAncestorComponents']),'filesystemWrites':0,'productExecution':0},indent=2))\nPY\""
+    },
+    {
+      "id": "exec-9c186998-b5af-49ea-a769-c0c18baa946f",
+      "cwd": "/workspace/vm-common3-source-24cf-r03",
+      "status": "completed",
+      "exitCode": 0,
+      "command": "/bin/bash -c \"/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 -I -S -B - <<'PY'\nimport pathlib,os,json,stat,datetime,hashlib,sys\nsource=pathlib.Path('/workspace/vm-common3-source-24cf-r03');pre=source/'pre-cwd';run=pathlib.Path('/workspace/vm-common3-run-24cf-r03');workspace=pathlib.Path('/workspace')\ncomponents=[]\nfor p in [pathlib.Path('/'),*reversed(run.parents[:-1]),run]:\n exists=os.path.lexists(p);row={'path':str(p),'lexists':exists,'symlink':p.is_symlink(),'resolveStrictFalse':str(p.resolve(strict=False))}\n if exists:\n  st=p.lstat();row.update(mode=oct(stat.S_IMODE(st.st_mode)),ownerUid=st.st_uid,isDirectory=p.is_dir())\n components.append(row)\nowned=sorted([p for p in workspace.iterdir() if p.name.startswith(('ags-','vm-private-','vm-common3-')) or p.name=='agent-governance-suite'],key=lambda p:p.name)\noverlap=[]\nfor p in owned:\n rp=p.resolve(strict=False);rr=run.resolve(strict=False)\n overlap.append({'path':str(p),'resolved':str(rp),'symlink':p.is_symlink(),'overlap':rr.is_relative_to(rp) or rp.is_relative_to(rr)})\nout={'scope':'FUTURE_RUNROOT_READ_ONLY_CANONICAL_METADATA_NO_GO','utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'actualArgv':[sys.executable,'-I','-S','-B','-'],'cwd':str(pathlib.Path.cwd()),'futureRunroot':{'path':str(run),'resolveStrictFalse':str(run.resolve(strict=False)),'lexists':os.path.lexists(run),'created':False,'uppercaseFMComponents':[x for x in run.parts if x.startswith('FM-')]},'ancestorComponents':components,'source':{'path':str(source),'resolveStrictFalse':str(source.resolve(strict=False)),'symlink':source.is_symlink()},'preCwd':{'path':str(pre),'resolveStrictFalse':str(pre.resolve(strict=False)),'symlink':pre.is_symlink(),'isDirectory':pre.is_dir(),'empty':not any(pre.iterdir())},'existingOwnedRootNonOverlap':overlap,'allNonOverlap':not any(x['overlap'] for x in overlap),'currentEuid':os.geteuid(),'externalJobs':'UNKNOWN; no new process/global reservation inquiry','priorUnreadableProcesses':7,'nativeCommandId':None,'nativeCommandIdNote':'Not provided in command response fields; parent can independently bind official record','freshness':'RO snapshot only; repeat freshness before any future separately authorized execution','runnerImportLoaderTestsInstallNetworkRetryCleanup':0,'sourcePreMainrecordAuthorityCreated':False}\np=source/'evidence/runroot-ro-r01.json'\nwith p.open('x',encoding='utf-8',newline='\\\\n') as f:json.dump(out,f,indent=2);f.write('\\\\n')\nos.chmod(p,0o600);b=p.read_bytes()\nprint(json.dumps(out,indent=2))\nprint('ARTIFACT_PIN='+json.dumps({'path':str(p),'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest()}))\nPY\""
+    },
+    {
+      "id": "exec-0029d00a-090c-4fc6-b718-1ddb243dff74",
+      "cwd": "/workspace/vm-common3-source-24cf-r03",
+      "status": "completed",
+      "exitCode": 0,
+      "command": "/bin/bash -c \"/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 -I -S -B - <<'PY'\nimport pathlib,json,hashlib,os,datetime\np=pathlib.Path('/workspace/vm-common3-source-24cf-r03/evidence/native-return-r01.receipt.json');os.chmod(p,0o600);b=p.read_bytes();a=json.loads(b)\nfor row in a['uploads']:\n f=pathlib.Path(row['request']['file']);d=f.read_bytes();sc=row['result']['structuredContent']\n assert len(d)==row['expected']['bytes']==sc['byte_size'] and hashlib.sha256(d).hexdigest()==row['expected']['sha256']==sc['sha256'] and sc['file_access_confirmed'] is True\nassert len(a['uploads'])==5\nprint(json.dumps({'utc':datetime.datetime.now(datetime.timezone.utc).isoformat(),'receipt':{'path':str(p),'bytes':len(b),'sha256':hashlib.sha256(b).hexdigest()},'uploadsVerified':5,'existingFourPinsUnchanged':True,'runrootExists':os.path.lexists('/workspace/vm-common3-run-24cf-r03'),'preCwdEmpty':not any(pathlib.Path('/workspace/vm-common3-source-24cf-r03/pre-cwd').iterdir()),'retries':0,'productExecution':0},indent=2))\nPY\""
+    }
+  ],
+  "rootNativeReadback": [
+    {
+      "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+      "reference": "library-file:fde1_bGliZmlsZV9uNnhQRjBIXzljZWdLbzJSQUJ1YzNn_FileDrive_db4d605f7b6c8191aedb5f11c15c0007",
+      "kind": "text",
+      "byte_size": 4423,
+      "sha256": "fee0c821ac1f86d17c1aeeda7cde47cf35d251b3f323d37a3648ed1ef630dfca",
+      "exactTextObtained": true
+    },
+    {
+      "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+      "reference": "library-file:fde1_bGliZmlsZV9qUWkySHdQcU9yLWZpaFk4TDAtanBB_FileDrive_db4d605f7b6c8191aedb5f11c15c0007",
+      "kind": "text",
+      "byte_size": 3166,
+      "sha256": "b1b38eabdfd1b9595c3b65f8938963104358515024580c8c944fc61907379a59",
+      "exactTextObtained": true
+    },
+    {
+      "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+      "reference": "library-file:fde1_bGliZmlsZV9kVDFoZVMtTzBGcHBSLWxGMXVHeHNR_FileDrive_db4d605f7b6c8191aedb5f11c15c0007",
+      "kind": "text",
+      "byte_size": 9799,
+      "sha256": "2de9b103aaba3a77d3f087b42d816896d9cbf7a233d7d7567e2e381236431e8a",
+      "exactTextObtained": true
+    },
+    {
+      "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+      "reference": "library-file:fde1_bGliZmlsZV81LTNqX3JOenF4bXEzb2o5bE1ZMUNR_FileDrive_db4d605f7b6c8191aedb5f11c15c0007",
+      "kind": "text",
+      "byte_size": 3454,
+      "sha256": "9574e70f9f40b019b809789103e6e2a24020294f49a9bdfa1650d0f945b8a000",
+      "exactTextObtained": true
+    },
+    {
+      "page_id": "page_1e8d25a4f6848191b5edf529528f1ce6",
+      "reference": "library-file:fde1_bGliZmlsZV9kTGxNYVd4Rng3dUl1SzN0V2tvZVF3_FileDrive_db4d605f7b6c8191aedb5f11c15c0007",
+      "kind": "text",
+      "byte_size": 8813,
+      "sha256": "6b296a218ca4c1a62b15d8b9be7896714c0d2cc60cb054ccaee0d6076fb5126b",
+      "exactTextObtained": true
+    }
+  ],
+  "sourcePreAssistantRawEqualsNative": true,
+  "note": "Native upstream host attestations/IDs remain null in original raw; actual App call IDs are independently observed metadata. First Root app wrapper read returned raw text blocks, then structured native read obtained bytes/SHA for all5; product rerun/retry0."
+}

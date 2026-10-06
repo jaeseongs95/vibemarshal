@@ -1,0 +1,4361 @@
+{
+  "scope": "C1_NON_PRODUCT_FIXTURE_POST_READBACK_ONLY",
+  "peerMessageId": "70bbe262-a65c-43d8-a81b-76bf14eeaeb0",
+  "utc": "2026-10-04T20:15:09.440364+00:00",
+  "checks": {
+    "candidate11Unchanged": true,
+    "fixture7Unchanged": true,
+    "runtime8Unchanged": true,
+    "exeUnchanged": true,
+    "fixtureBeforeAfterSame": true,
+    "fixtureNative0TerminalNoTimeout": true,
+    "exact14Matched": true,
+    "fixtureMATCHRaw": true,
+    "ownedChild1Retry0": true,
+    "caseProductTestsOrLoader0": true,
+    "parentCwdExact": true,
+    "preCwdEmpty": true,
+    "futureProductRunAbsentCanonical": true
+  },
+  "fixtureStatusRaw": "MATCH",
+  "actualOwnedChildPID": 5265,
+  "actualOwnedChildNativeExit": 0,
+  "actualFixtureParentToolExit": 0,
+  "terminalObservedRaw": true,
+  "timedOutRaw": false,
+  "ownedKillErrorRaw": null,
+  "caseAcceptanceCounts": {
+    "PASS": 1,
+    "FAIL": 2,
+    "UNKNOWN": 11
+  },
+  "cases": [
+    {
+      "name": "normal_zero",
+      "expectedAcceptance": "PASS",
+      "dummyAcceptanceRaw": "PASS",
+      "checksMatchRaw": true,
+      "checkErrorsRaw": [],
+      "stageReturnRaw": 0,
+      "stageReturnIsNotNativeExitRaw": true,
+      "frozenParentReturnRaw": 0,
+      "actualOwnedChildNativeExit": 0,
+      "outerErrorCaptureRaw": false,
+      "nativeUncaughtProcessShape": "UNKNOWN_NOT_TESTED; all cases share one fixture child and outer capture is synthetic",
+      "faultObservationsRaw": [],
+      "denialObservationRaw": {
+        "state": "CLEAR",
+        "count": 0,
+        "journal_count": 0,
+        "logging_errors": 0,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "finalCountersRaw": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "rawArtifactPresence": [
+        {
+          "file": "result.json",
+          "exists": true,
+          "bytes": 586,
+          "sha256": "6ce53099b0d6e21e90a66a63a2a1d71cd8d2f833ed12067f86ed47e041218a65"
+        },
+        {
+          "file": "postflight.json",
+          "exists": true,
+          "bytes": 19813,
+          "sha256": "bda0d6fac7c30a206b36c19775e9fa0387e6e89eac69c64a65ceca624df939a3"
+        },
+        {
+          "file": "child-error.json",
+          "exists": false
+        },
+        {
+          "file": "fixture-observation.json",
+          "exists": true,
+          "bytes": 401,
+          "sha256": "d8a13fa4058e3d3567287986d7be8e61bd52903a8a60cee3d443812b39e46ee2"
+        },
+        {
+          "file": "execution.json",
+          "exists": true,
+          "bytes": 3016,
+          "sha256": "4c1a7b557d6330f694bea7be31707ea874c8fa7d576df7a96526756c0392a3b4"
+        },
+        {
+          "file": "effect-denials.jsonl",
+          "exists": true,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "productPASS": false
+    },
+    {
+      "name": "caught_denial",
+      "expectedAcceptance": "FAIL",
+      "dummyAcceptanceRaw": "FAIL",
+      "checksMatchRaw": true,
+      "checkErrorsRaw": [],
+      "stageReturnRaw": 1,
+      "stageReturnIsNotNativeExitRaw": true,
+      "frozenParentReturnRaw": 1,
+      "actualOwnedChildNativeExit": 0,
+      "outerErrorCaptureRaw": false,
+      "nativeUncaughtProcessShape": "UNKNOWN_NOT_TESTED; all cases share one fixture child and outer capture is synthetic",
+      "faultObservationsRaw": [],
+      "denialObservationRaw": {
+        "state": "DENIED",
+        "count": 1,
+        "journal_count": 1,
+        "logging_errors": 0,
+        "bytes": 125,
+        "sha256": "5227db4f1debfc6d916a929e6826f7d1baca2ff6a9162a1e398dae84dc679abb"
+      },
+      "finalCountersRaw": {
+        "count": 1,
+        "logging_errors": 0
+      },
+      "rawArtifactPresence": [
+        {
+          "file": "result.json",
+          "exists": true,
+          "bytes": 586,
+          "sha256": "8ce48fcdaef1877d11f0c4d14a76257d138c2679032f05043bcfbffb301c738c"
+        },
+        {
+          "file": "postflight.json",
+          "exists": true,
+          "bytes": 19816,
+          "sha256": "503ac4b2b0c3b15040b44765ad9b4819d9baea736020813d160ac47d0c610bbf"
+        },
+        {
+          "file": "child-error.json",
+          "exists": false
+        },
+        {
+          "file": "fixture-observation.json",
+          "exists": true,
+          "bytes": 481,
+          "sha256": "81f315bf575734793a399bcf18e9952d3306376123ea5d43d4f429c13664b3d9"
+        },
+        {
+          "file": "execution.json",
+          "exists": true,
+          "bytes": 3021,
+          "sha256": "bbc1cbc786c9233e79c577ad3aa114bdd5741fc34a839c6b9e38e4086b12e415"
+        },
+        {
+          "file": "effect-denials.jsonl",
+          "exists": true,
+          "bytes": 125,
+          "sha256": "5227db4f1debfc6d916a929e6826f7d1baca2ff6a9162a1e398dae84dc679abb"
+        }
+      ],
+      "productPASS": false
+    },
+    {
+      "name": "uncaught_denial",
+      "expectedAcceptance": "FAIL",
+      "dummyAcceptanceRaw": "FAIL",
+      "checksMatchRaw": true,
+      "checkErrorsRaw": [],
+      "stageReturnRaw": 2,
+      "stageReturnIsNotNativeExitRaw": true,
+      "frozenParentReturnRaw": 1,
+      "actualOwnedChildNativeExit": 0,
+      "outerErrorCaptureRaw": true,
+      "nativeUncaughtProcessShape": "UNKNOWN_NOT_TESTED; all cases share one fixture child and outer capture is synthetic",
+      "faultObservationsRaw": [],
+      "denialObservationRaw": {
+        "state": "DENIED",
+        "count": 1,
+        "journal_count": 1,
+        "logging_errors": 0,
+        "bytes": 125,
+        "sha256": "10cd58613c3f87d0b16a699b7a13b13d001cd911818db5c6a0b1b5e21f950530"
+      },
+      "finalCountersRaw": {
+        "count": 1,
+        "logging_errors": 0
+      },
+      "rawArtifactPresence": [
+        {
+          "file": "result.json",
+          "exists": false
+        },
+        {
+          "file": "postflight.json",
+          "exists": false
+        },
+        {
+          "file": "child-error.json",
+          "exists": true,
+          "bytes": 913,
+          "sha256": "636462cb5992d6318d961079d874062492ce6e9d0b14da94a7d2e5a027e32e43"
+        },
+        {
+          "file": "fixture-observation.json",
+          "exists": true,
+          "bytes": 405,
+          "sha256": "b82ee02540c12899f675d78c96925f8390562a50398ba3545b5dfec167efcfb9"
+        },
+        {
+          "file": "execution.json",
+          "exists": true,
+          "bytes": 3010,
+          "sha256": "8000898acef0b3c76755a4290361d14b54f88558ee4a0cad380873530151ec66"
+        },
+        {
+          "file": "effect-denials.jsonl",
+          "exists": true,
+          "bytes": 125,
+          "sha256": "10cd58613c3f87d0b16a699b7a13b13d001cd911818db5c6a0b1b5e21f950530"
+        }
+      ],
+      "productPASS": false
+    },
+    {
+      "name": "init_io",
+      "expectedAcceptance": "UNKNOWN",
+      "dummyAcceptanceRaw": "UNKNOWN",
+      "checksMatchRaw": true,
+      "checkErrorsRaw": [],
+      "stageReturnRaw": 2,
+      "stageReturnIsNotNativeExitRaw": true,
+      "frozenParentReturnRaw": 2,
+      "actualOwnedChildNativeExit": 0,
+      "outerErrorCaptureRaw": true,
+      "nativeUncaughtProcessShape": "UNKNOWN_NOT_TESTED; all cases share one fixture child and outer capture is synthetic",
+      "faultObservationsRaw": [
+        {
+          "operation": "init",
+          "count_before_fault": 0
+        }
+      ],
+      "denialObservationRaw": {
+        "state": "UNKNOWN",
+        "count": null,
+        "journal_count": null,
+        "logging_errors": null,
+        "bytes": null,
+        "sha256": null,
+        "error_type": "ValueError"
+      },
+      "finalCountersRaw": {
+        "count": 0,
+        "logging_errors": 1
+      },
+      "rawArtifactPresence": [
+        {
+          "file": "result.json",
+          "exists": false
+        },
+        {
+          "file": "postflight.json",
+          "exists": false
+        },
+        {
+          "file": "child-error.json",
+          "exists": true,
+          "bytes": 1253,
+          "sha256": "c772ba5c5c75c5fc0b6c742e14f1c7d175e8536140f19988f90c994304deebf8"
+        },
+        {
+          "file": "fixture-observation.json",
+          "exists": true,
+          "bytes": 469,
+          "sha256": "2b247a5369f5f6944ebadc4df43ade81abfd1cc1c6091549d42ec4084f68d349"
+        },
+        {
+          "file": "execution.json",
+          "exists": true,
+          "bytes": 2924,
+          "sha256": "863af6f1571fa6536ebb60a769e1b61ee5c6714e92b8214a262832a8beb7b2d8"
+        },
+        {
+          "file": "effect-denials.jsonl",
+          "exists": false
+        }
+      ],
+      "productPASS": false
+    },
+    {
+      "name": "write_io",
+      "expectedAcceptance": "UNKNOWN",
+      "dummyAcceptanceRaw": "UNKNOWN",
+      "checksMatchRaw": true,
+      "checkErrorsRaw": [],
+      "stageReturnRaw": 2,
+      "stageReturnIsNotNativeExitRaw": true,
+      "frozenParentReturnRaw": 2,
+      "actualOwnedChildNativeExit": 0,
+      "outerErrorCaptureRaw": false,
+      "nativeUncaughtProcessShape": "UNKNOWN_NOT_TESTED; all cases share one fixture child and outer capture is synthetic",
+      "faultObservationsRaw": [
+        {
+          "operation": "write",
+          "count_before_fault": 1
+        }
+      ],
+      "denialObservationRaw": {
+        "state": "UNKNOWN",
+        "count": 1,
+        "journal_count": 0,
+        "logging_errors": 1,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "error_type": "ValueError"
+      },
+      "finalCountersRaw": {
+        "count": 1,
+        "logging_errors": 1
+      },
+      "rawArtifactPresence": [
+        {
+          "file": "result.json",
+          "exists": true,
+          "bytes": 586,
+          "sha256": "04c3036710585baadb3dc1647462a7a0ef12acd1c327e781f8ac7cf9de9cf027"
+        },
+        {
+          "file": "postflight.json",
+          "exists": true,
+          "bytes": 19847,
+          "sha256": "dc340ce645f491766c601102249288c6fde321774d307e49662e43138f58d3de"
+        },
+        {
+          "file": "child-error.json",
+          "exists": false
+        },
+        {
+          "file": "fixture-observation.json",
+          "exists": true,
+          "bytes": 549,
+          "sha256": "07ddb78ca3d44f6ccdf8451dd3e42f1522d5db6792e25d6e2d00126f600198dc"
+        },
+        {
+          "file": "execution.json",
+          "exists": true,
+          "bytes": 3052,
+          "sha256": "eb6836fa77aa010c07af8d31b89924d7efc542a68d70437dbe6b78ba7f5cc830"
+        },
+        {
+          "file": "effect-denials.jsonl",
+          "exists": true,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "productPASS": false
+    },
+    {
+      "name": "flush_io",
+      "expectedAcceptance": "UNKNOWN",
+      "dummyAcceptanceRaw": "UNKNOWN",
+      "checksMatchRaw": true,
+      "checkErrorsRaw": [],
+      "stageReturnRaw": 2,
+      "stageReturnIsNotNativeExitRaw": true,
+      "frozenParentReturnRaw": 2,
+      "actualOwnedChildNativeExit": 0,
+      "outerErrorCaptureRaw": false,
+      "nativeUncaughtProcessShape": "UNKNOWN_NOT_TESTED; all cases share one fixture child and outer capture is synthetic",
+      "faultObservationsRaw": [
+        {
+          "operation": "flush",
+          "count_before_fault": 1
+        }
+      ],
+      "denialObservationRaw": {
+        "state": "UNKNOWN",
+        "count": 1,
+        "journal_count": 1,
+        "logging_errors": 1,
+        "bytes": 125,
+        "sha256": "ff35105f499f76853f010ec8769756e6c95b102456b8839534b73dcc4cd40d9f",
+        "error_type": "ValueError"
+      },
+      "finalCountersRaw": {
+        "count": 1,
+        "logging_errors": 1
+      },
+      "rawArtifactPresence": [
+        {
+          "file": "result.json",
+          "exists": true,
+          "bytes": 586,
+          "sha256": "e4fc4afeda889d00fc137552499b3042346d841f6d89211aecfc76514feb3993"
+        },
+        {
+          "file": "postflight.json",
+          "exists": true,
+          "bytes": 19849,
+          "sha256": "df5f6b69c8904deca97cd7a8bcd13bbf1aabb02751d212f5be3f209c9395c915"
+        },
+        {
+          "file": "child-error.json",
+          "exists": false
+        },
+        {
+          "file": "fixture-observation.json",
+          "exists": true,
+          "bytes": 549,
+          "sha256": "14d964d3c66374629ef90e1575f9dbfc550feb30b9f5935de8ab5d40c84cb33f"
+        },
+        {
+          "file": "execution.json",
+          "exists": true,
+          "bytes": 3056,
+          "sha256": "423dec94c2845fed199e897efcd1dedf34d61724a00a80aa792c4c1d6c67da4b"
+        },
+        {
+          "file": "effect-denials.jsonl",
+          "exists": true,
+          "bytes": 125,
+          "sha256": "ff35105f499f76853f010ec8769756e6c95b102456b8839534b73dcc4cd40d9f"
+        }
+      ],
+      "productPASS": false
+    },
+    {
+      "name": "close_io",
+      "expectedAcceptance": "UNKNOWN",
+      "dummyAcceptanceRaw": "UNKNOWN",
+      "checksMatchRaw": true,
+      "checkErrorsRaw": [],
+      "stageReturnRaw": 2,
+      "stageReturnIsNotNativeExitRaw": true,
+      "frozenParentReturnRaw": 2,
+      "actualOwnedChildNativeExit": 0,
+      "outerErrorCaptureRaw": false,
+      "nativeUncaughtProcessShape": "UNKNOWN_NOT_TESTED; all cases share one fixture child and outer capture is synthetic",
+      "faultObservationsRaw": [
+        {
+          "operation": "close",
+          "count_before_fault": 1
+        }
+      ],
+      "denialObservationRaw": {
+        "state": "UNKNOWN",
+        "count": 1,
+        "journal_count": 1,
+        "logging_errors": 0,
+        "bytes": 125,
+        "sha256": "6e6610f58c1dc99910291a2ceebd91ce289227ba0059a2be7562568a73e8b90b",
+        "protocol_error_type": "ValueError"
+      },
+      "finalCountersRaw": {
+        "count": 1,
+        "logging_errors": 1
+      },
+      "rawArtifactPresence": [
+        {
+          "file": "result.json",
+          "exists": true,
+          "bytes": 586,
+          "sha256": "3b746b310b52f249a9b0081e48723b87236f64284bf95af190b06eacaa7f574d"
+        },
+        {
+          "file": "postflight.json",
+          "exists": true,
+          "bytes": 19849,
+          "sha256": "ec2421f29467e56c2a3e93660c9626ab4a0013da7c7aa87067b50ccee825a041"
+        },
+        {
+          "file": "child-error.json",
+          "exists": false
+        },
+        {
+          "file": "fixture-observation.json",
+          "exists": true,
+          "bytes": 549,
+          "sha256": "5abcd610da81427f787c1306df7d8890dc792703870c7cd56525e27e7ee31a86"
+        },
+        {
+          "file": "execution.json",
+          "exists": true,
+          "bytes": 3065,
+          "sha256": "19b42bc93ae03d0935c5204f3044dc83675f3ce473dbdb628cf9baef5df309cf"
+        },
+        {
+          "file": "effect-denials.jsonl",
+          "exists": true,
+          "bytes": 125,
+          "sha256": "6e6610f58c1dc99910291a2ceebd91ce289227ba0059a2be7562568a73e8b90b"
+        }
+      ],
+      "productPASS": false
+    },
+    {
+      "name": "journal_missing",
+      "expectedAcceptance": "UNKNOWN",
+      "dummyAcceptanceRaw": "UNKNOWN",
+      "checksMatchRaw": true,
+      "checkErrorsRaw": [],
+      "stageReturnRaw": 0,
+      "stageReturnIsNotNativeExitRaw": true,
+      "frozenParentReturnRaw": 2,
+      "actualOwnedChildNativeExit": 0,
+      "outerErrorCaptureRaw": false,
+      "nativeUncaughtProcessShape": "UNKNOWN_NOT_TESTED; all cases share one fixture child and outer capture is synthetic",
+      "faultObservationsRaw": [],
+      "denialObservationRaw": {
+        "state": "UNKNOWN",
+        "count": null,
+        "journal_count": null,
+        "logging_errors": null,
+        "bytes": null,
+        "sha256": null,
+        "error_type": "ValueError"
+      },
+      "finalCountersRaw": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "rawArtifactPresence": [
+        {
+          "file": "result.json",
+          "exists": true,
+          "bytes": 586,
+          "sha256": "361ba2b06a23c07db1cb10f13187faeda2a7ce1c94e6264606166e90bd0b2b95"
+        },
+        {
+          "file": "postflight.json",
+          "exists": true,
+          "bytes": 16145,
+          "sha256": "83a26f2741538388dddf0ba72b3cffe7d27fe0af31de06ab09cc15420b98ae94"
+        },
+        {
+          "file": "child-error.json",
+          "exists": false
+        },
+        {
+          "file": "fixture-observation.json",
+          "exists": true,
+          "bytes": 405,
+          "sha256": "d847f5a18c3c0ff1c277b8e70e87d79650e235cf1cb7d452a967b8f1bbe63c59"
+        },
+        {
+          "file": "execution.json",
+          "exists": true,
+          "bytes": 3095,
+          "sha256": "99dee08cbddec6825c7b3226d4744b80bf480aa1bb6216cc40163c857b50acbb"
+        },
+        {
+          "file": "effect-denials.jsonl",
+          "exists": false
+        }
+      ],
+      "productPASS": false
+    },
+    {
+      "name": "journal_partial",
+      "expectedAcceptance": "UNKNOWN",
+      "dummyAcceptanceRaw": "UNKNOWN",
+      "checksMatchRaw": true,
+      "checkErrorsRaw": [],
+      "stageReturnRaw": 0,
+      "stageReturnIsNotNativeExitRaw": true,
+      "frozenParentReturnRaw": 2,
+      "actualOwnedChildNativeExit": 0,
+      "outerErrorCaptureRaw": false,
+      "nativeUncaughtProcessShape": "UNKNOWN_NOT_TESTED; all cases share one fixture child and outer capture is synthetic",
+      "faultObservationsRaw": [],
+      "denialObservationRaw": {
+        "state": "UNKNOWN",
+        "count": 0,
+        "journal_count": null,
+        "logging_errors": 0,
+        "bytes": 1,
+        "sha256": "021fb596db81e6d02bf3d2586ee3981fe519f275c0ac9ca76bbcf2ebb4097d96",
+        "error_type": "ValueError"
+      },
+      "finalCountersRaw": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "rawArtifactPresence": [
+        {
+          "file": "result.json",
+          "exists": true,
+          "bytes": 586,
+          "sha256": "1611f50cb2e0671f61d6066297225b49e116a2c8fefd36e2be2b6b96c2c4336c"
+        },
+        {
+          "file": "postflight.json",
+          "exists": true,
+          "bytes": 16198,
+          "sha256": "ca8283667fab4159d25a0eab08e59865d6d4c3249bd594156d5a76c04464db0e"
+        },
+        {
+          "file": "child-error.json",
+          "exists": false
+        },
+        {
+          "file": "fixture-observation.json",
+          "exists": true,
+          "bytes": 405,
+          "sha256": "988b465cad7a10161328e03b23b91bff57c0754094f421b0d2f47d84ca7edca1"
+        },
+        {
+          "file": "execution.json",
+          "exists": true,
+          "bytes": 3216,
+          "sha256": "800977b17de1dd3aa7c48b22f19b79c128c3284a030286cf65caac9d3b4b7088"
+        },
+        {
+          "file": "effect-denials.jsonl",
+          "exists": true,
+          "bytes": 1,
+          "sha256": "021fb596db81e6d02bf3d2586ee3981fe519f275c0ac9ca76bbcf2ebb4097d96"
+        }
+      ],
+      "productPASS": false
+    },
+    {
+      "name": "journal_corrupt",
+      "expectedAcceptance": "UNKNOWN",
+      "dummyAcceptanceRaw": "UNKNOWN",
+      "checksMatchRaw": true,
+      "checkErrorsRaw": [],
+      "stageReturnRaw": 0,
+      "stageReturnIsNotNativeExitRaw": true,
+      "frozenParentReturnRaw": 2,
+      "actualOwnedChildNativeExit": 0,
+      "outerErrorCaptureRaw": false,
+      "nativeUncaughtProcessShape": "UNKNOWN_NOT_TESTED; all cases share one fixture child and outer capture is synthetic",
+      "faultObservationsRaw": [],
+      "denialObservationRaw": {
+        "state": "UNKNOWN",
+        "count": 0,
+        "journal_count": null,
+        "logging_errors": 0,
+        "bytes": 9,
+        "sha256": "60498ebafa3f473a2a72c1242e8c3202bf50a6d81dfc721958be1550f46faf33",
+        "error_type": "JSONDecodeError"
+      },
+      "finalCountersRaw": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "rawArtifactPresence": [
+        {
+          "file": "result.json",
+          "exists": true,
+          "bytes": 586,
+          "sha256": "a6a6464325f7cf3ea1e8c7c92af13cdd92000bee0774bd8d1a95a3de1dc7f78a"
+        },
+        {
+          "file": "postflight.json",
+          "exists": true,
+          "bytes": 16203,
+          "sha256": "036f84bfcc117f61efbae09cac96c1d059c02253e49be322fbb0c766167e47b0"
+        },
+        {
+          "file": "child-error.json",
+          "exists": false
+        },
+        {
+          "file": "fixture-observation.json",
+          "exists": true,
+          "bytes": 405,
+          "sha256": "427883dce2853d222a4076f14af7ad715530614ba2a3ff15b6eabab775252296"
+        },
+        {
+          "file": "execution.json",
+          "exists": true,
+          "bytes": 3221,
+          "sha256": "23436379e43f48408a8c71c3fe305ea0c9bad874f22dbd89fd128181793f8266"
+        },
+        {
+          "file": "effect-denials.jsonl",
+          "exists": true,
+          "bytes": 9,
+          "sha256": "60498ebafa3f473a2a72c1242e8c3202bf50a6d81dfc721958be1550f46faf33"
+        }
+      ],
+      "productPASS": false
+    },
+    {
+      "name": "count_mismatch",
+      "expectedAcceptance": "UNKNOWN",
+      "dummyAcceptanceRaw": "UNKNOWN",
+      "checksMatchRaw": true,
+      "checkErrorsRaw": [],
+      "stageReturnRaw": 0,
+      "stageReturnIsNotNativeExitRaw": true,
+      "frozenParentReturnRaw": 2,
+      "actualOwnedChildNativeExit": 0,
+      "outerErrorCaptureRaw": false,
+      "nativeUncaughtProcessShape": "UNKNOWN_NOT_TESTED; all cases share one fixture child and outer capture is synthetic",
+      "faultObservationsRaw": [],
+      "denialObservationRaw": {
+        "state": "UNKNOWN",
+        "count": 1,
+        "journal_count": 0,
+        "logging_errors": 0,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "error_type": "ValueError"
+      },
+      "finalCountersRaw": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "rawArtifactPresence": [
+        {
+          "file": "result.json",
+          "exists": true,
+          "bytes": 522,
+          "sha256": "7a2bd132d2bdb6e465e6164d197228893287638267362101213a88f0cb89bd34"
+        },
+        {
+          "file": "postflight.json",
+          "exists": true,
+          "bytes": 16195,
+          "sha256": "284f5d42f5abee4d8b1c5cc8611b7c9f04cf0cac7839035918676c55ea65ce49"
+        },
+        {
+          "file": "child-error.json",
+          "exists": false
+        },
+        {
+          "file": "fixture-observation.json",
+          "exists": true,
+          "bytes": 404,
+          "sha256": "3655e9347129049fce77c72a37bfbb04544bf11660b5c31e081ab392b99b0af7"
+        },
+        {
+          "file": "execution.json",
+          "exists": true,
+          "bytes": 3206,
+          "sha256": "46ace23a9b7f1cc6df9756cde2801f601bfdd1eb14c75c2a0cba9091d2d52a65"
+        },
+        {
+          "file": "effect-denials.jsonl",
+          "exists": true,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "productPASS": false
+    },
+    {
+      "name": "pid_mismatch",
+      "expectedAcceptance": "UNKNOWN",
+      "dummyAcceptanceRaw": "UNKNOWN",
+      "checksMatchRaw": true,
+      "checkErrorsRaw": [],
+      "stageReturnRaw": 1,
+      "stageReturnIsNotNativeExitRaw": true,
+      "frozenParentReturnRaw": 2,
+      "actualOwnedChildNativeExit": 0,
+      "outerErrorCaptureRaw": false,
+      "nativeUncaughtProcessShape": "UNKNOWN_NOT_TESTED; all cases share one fixture child and outer capture is synthetic",
+      "faultObservationsRaw": [],
+      "denialObservationRaw": {
+        "state": "UNKNOWN",
+        "count": 1,
+        "journal_count": null,
+        "logging_errors": 0,
+        "bytes": 125,
+        "sha256": "7c49b2621fdd6b1de56f4e55994169d019d35d1e4481ea3dc87b905574651425",
+        "error_type": "ValueError"
+      },
+      "finalCountersRaw": {
+        "count": 1,
+        "logging_errors": 0
+      },
+      "rawArtifactPresence": [
+        {
+          "file": "result.json",
+          "exists": true,
+          "bytes": 586,
+          "sha256": "2979e1fb3a5ea372a763328eb5a23dc9f7834e395863d174a94ee2d159fe3565"
+        },
+        {
+          "file": "postflight.json",
+          "exists": true,
+          "bytes": 16200,
+          "sha256": "3fec0a1cb31fb9783fd55e044e5587e3f48725a4d98ec14b4af98282fbf31d44"
+        },
+        {
+          "file": "child-error.json",
+          "exists": false
+        },
+        {
+          "file": "fixture-observation.json",
+          "exists": true,
+          "bytes": 480,
+          "sha256": "5bc6e1125be13a312342db640bd7eb01cf1dc0990a02d4a6e81706903d053d37"
+        },
+        {
+          "file": "execution.json",
+          "exists": true,
+          "bytes": 3222,
+          "sha256": "17f5f2a16cdd542ec5035b11626f1920f048eb29fd60d496b034dad34b49f223"
+        },
+        {
+          "file": "effect-denials.jsonl",
+          "exists": true,
+          "bytes": 125,
+          "sha256": "7c49b2621fdd6b1de56f4e55994169d019d35d1e4481ea3dc87b905574651425"
+        }
+      ],
+      "productPASS": false
+    },
+    {
+      "name": "post_counter_mismatch",
+      "expectedAcceptance": "UNKNOWN",
+      "dummyAcceptanceRaw": "UNKNOWN",
+      "checksMatchRaw": true,
+      "checkErrorsRaw": [],
+      "stageReturnRaw": 0,
+      "stageReturnIsNotNativeExitRaw": true,
+      "frozenParentReturnRaw": 2,
+      "actualOwnedChildNativeExit": 0,
+      "outerErrorCaptureRaw": false,
+      "nativeUncaughtProcessShape": "UNKNOWN_NOT_TESTED; all cases share one fixture child and outer capture is synthetic",
+      "faultObservationsRaw": [],
+      "denialObservationRaw": {
+        "state": "UNKNOWN",
+        "count": 0,
+        "journal_count": 0,
+        "logging_errors": 0,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "protocol_error_type": "ValueError"
+      },
+      "finalCountersRaw": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "rawArtifactPresence": [
+        {
+          "file": "result.json",
+          "exists": true,
+          "bytes": 586,
+          "sha256": "dd1402c8a8dc794612d70b5a5dc1126ca831b8d5f073c2e232e137a7c375aa9a"
+        },
+        {
+          "file": "postflight.json",
+          "exists": true,
+          "bytes": 16165,
+          "sha256": "86f39b9b0d5ebd21e6d73e4992cfa124f511f70aae7768bdb9c5ceb0baa0c624"
+        },
+        {
+          "file": "child-error.json",
+          "exists": false
+        },
+        {
+          "file": "fixture-observation.json",
+          "exists": true,
+          "bytes": 411,
+          "sha256": "36375dfcc342dcf55bc81d4b42bf4df3ed2588777f016e018d4d3fec04878c4f"
+        },
+        {
+          "file": "execution.json",
+          "exists": true,
+          "bytes": 3141,
+          "sha256": "0e15c53707ac4470c22839ed8a0b9c0e63175d01c8b8df06d4ddedb70cf5cf7a"
+        },
+        {
+          "file": "effect-denials.jsonl",
+          "exists": true,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "productPASS": false
+    },
+    {
+      "name": "bool_counter",
+      "expectedAcceptance": "UNKNOWN",
+      "dummyAcceptanceRaw": "UNKNOWN",
+      "checksMatchRaw": true,
+      "checkErrorsRaw": [],
+      "stageReturnRaw": 0,
+      "stageReturnIsNotNativeExitRaw": true,
+      "frozenParentReturnRaw": 2,
+      "actualOwnedChildNativeExit": 0,
+      "outerErrorCaptureRaw": false,
+      "nativeUncaughtProcessShape": "UNKNOWN_NOT_TESTED; all cases share one fixture child and outer capture is synthetic",
+      "faultObservationsRaw": [],
+      "denialObservationRaw": {
+        "state": "UNKNOWN",
+        "count": null,
+        "journal_count": null,
+        "logging_errors": null,
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "error_type": "ValueError"
+      },
+      "finalCountersRaw": {
+        "count": 0,
+        "logging_errors": 0
+      },
+      "rawArtifactPresence": [
+        {
+          "file": "result.json",
+          "exists": true,
+          "bytes": 526,
+          "sha256": "d12a8280190e08bb48857774c358e827444ce2b8a3651eea47443b293406f6d8"
+        },
+        {
+          "file": "postflight.json",
+          "exists": true,
+          "bytes": 16208,
+          "sha256": "cde8f55584c25449302ecdcc6c88237cf2dfed4a2113146c1144aa4bbc3f4ddc"
+        },
+        {
+          "file": "child-error.json",
+          "exists": false
+        },
+        {
+          "file": "fixture-observation.json",
+          "exists": true,
+          "bytes": 402,
+          "sha256": "cafd1c61f86f505f8d913af483eba1ccf86a3217620a571459ff88d0ed46c514"
+        },
+        {
+          "file": "execution.json",
+          "exists": true,
+          "bytes": 3215,
+          "sha256": "25908ac88c5dab2cf8a3ecc90ec3c68754de756fe2afcf42b8659093e9f0db22"
+        },
+        {
+          "file": "effect-denials.jsonl",
+          "exists": true,
+          "bytes": 0,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ],
+      "productPASS": false
+    }
+  ],
+  "rawFileInventory": [
+    {
+      "path": "cases/bool_counter/effect-denials.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/bool_counter/execution.json",
+      "bytes": 3215,
+      "sha256": "25908ac88c5dab2cf8a3ecc90ec3c68754de756fe2afcf42b8659093e9f0db22",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/bool_counter/fixture-observation.json",
+      "bytes": 402,
+      "sha256": "cafd1c61f86f505f8d913af483eba1ccf86a3217620a571459ff88d0ed46c514",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/bool_counter/postflight.json",
+      "bytes": 16208,
+      "sha256": "cde8f55584c25449302ecdcc6c88237cf2dfed4a2113146c1144aa4bbc3f4ddc",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/bool_counter/postflight.json.before-fault",
+      "bytes": 19813,
+      "sha256": "18eba0db06e4cadbaae15a8037795786e6ddbc2f256a7359ba1e64d0f4f5db2d",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/bool_counter/result.json",
+      "bytes": 526,
+      "sha256": "d12a8280190e08bb48857774c358e827444ce2b8a3651eea47443b293406f6d8",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/bool_counter/result.json.before-fault",
+      "bytes": 586,
+      "sha256": "b31477aa9d5c359d64774a1e33bf1bde72d2d635fa17094cf88d9e8b5c3be462",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/caught_denial/effect-denials.jsonl",
+      "bytes": 125,
+      "sha256": "5227db4f1debfc6d916a929e6826f7d1baca2ff6a9162a1e398dae84dc679abb",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/caught_denial/execution.json",
+      "bytes": 3021,
+      "sha256": "bbc1cbc786c9233e79c577ad3aa114bdd5741fc34a839c6b9e38e4086b12e415",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/caught_denial/fixture-observation.json",
+      "bytes": 481,
+      "sha256": "81f315bf575734793a399bcf18e9952d3306376123ea5d43d4f429c13664b3d9",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/caught_denial/postflight.json",
+      "bytes": 19816,
+      "sha256": "503ac4b2b0c3b15040b44765ad9b4819d9baea736020813d160ac47d0c610bbf",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/caught_denial/result.json",
+      "bytes": 586,
+      "sha256": "8ce48fcdaef1877d11f0c4d14a76257d138c2679032f05043bcfbffb301c738c",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/close_io/effect-denials.jsonl",
+      "bytes": 125,
+      "sha256": "6e6610f58c1dc99910291a2ceebd91ce289227ba0059a2be7562568a73e8b90b",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/close_io/execution.json",
+      "bytes": 3065,
+      "sha256": "19b42bc93ae03d0935c5204f3044dc83675f3ce473dbdb628cf9baef5df309cf",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/close_io/fixture-observation.json",
+      "bytes": 549,
+      "sha256": "5abcd610da81427f787c1306df7d8890dc792703870c7cd56525e27e7ee31a86",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/close_io/postflight.json",
+      "bytes": 19849,
+      "sha256": "ec2421f29467e56c2a3e93660c9626ab4a0013da7c7aa87067b50ccee825a041",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/close_io/result.json",
+      "bytes": 586,
+      "sha256": "3b746b310b52f249a9b0081e48723b87236f64284bf95af190b06eacaa7f574d",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/count_mismatch/effect-denials.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/count_mismatch/execution.json",
+      "bytes": 3206,
+      "sha256": "46ace23a9b7f1cc6df9756cde2801f601bfdd1eb14c75c2a0cba9091d2d52a65",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/count_mismatch/fixture-observation.json",
+      "bytes": 404,
+      "sha256": "3655e9347129049fce77c72a37bfbb04544bf11660b5c31e081ab392b99b0af7",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/count_mismatch/postflight.json",
+      "bytes": 16195,
+      "sha256": "284f5d42f5abee4d8b1c5cc8611b7c9f04cf0cac7839035918676c55ea65ce49",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/count_mismatch/postflight.json.before-fault",
+      "bytes": 19813,
+      "sha256": "77438540afbb1a89c9118bf336d41347b89b784fd8227fd3ff5e91a5f74e8785",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/count_mismatch/result.json",
+      "bytes": 522,
+      "sha256": "7a2bd132d2bdb6e465e6164d197228893287638267362101213a88f0cb89bd34",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/count_mismatch/result.json.before-fault",
+      "bytes": 586,
+      "sha256": "dac7a3b19027ddb51ece879d7e5b5cf38ed880b8fe74fcb16d3bf2e434bdec2f",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/flush_io/effect-denials.jsonl",
+      "bytes": 125,
+      "sha256": "ff35105f499f76853f010ec8769756e6c95b102456b8839534b73dcc4cd40d9f",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/flush_io/execution.json",
+      "bytes": 3056,
+      "sha256": "423dec94c2845fed199e897efcd1dedf34d61724a00a80aa792c4c1d6c67da4b",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/flush_io/fixture-observation.json",
+      "bytes": 549,
+      "sha256": "14d964d3c66374629ef90e1575f9dbfc550feb30b9f5935de8ab5d40c84cb33f",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/flush_io/postflight.json",
+      "bytes": 19849,
+      "sha256": "df5f6b69c8904deca97cd7a8bcd13bbf1aabb02751d212f5be3f209c9395c915",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/flush_io/result.json",
+      "bytes": 586,
+      "sha256": "e4fc4afeda889d00fc137552499b3042346d841f6d89211aecfc76514feb3993",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/init_io/child-error.json",
+      "bytes": 1253,
+      "sha256": "c772ba5c5c75c5fc0b6c742e14f1c7d175e8536140f19988f90c994304deebf8",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/init_io/execution.json",
+      "bytes": 2924,
+      "sha256": "863af6f1571fa6536ebb60a769e1b61ee5c6714e92b8214a262832a8beb7b2d8",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/init_io/fixture-observation.json",
+      "bytes": 469,
+      "sha256": "2b247a5369f5f6944ebadc4df43ade81abfd1cc1c6091549d42ec4084f68d349",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_corrupt/effect-denials.jsonl",
+      "bytes": 9,
+      "sha256": "60498ebafa3f473a2a72c1242e8c3202bf50a6d81dfc721958be1550f46faf33",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_corrupt/effect-denials.jsonl.before-fault",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_corrupt/execution.json",
+      "bytes": 3221,
+      "sha256": "23436379e43f48408a8c71c3fe305ea0c9bad874f22dbd89fd128181793f8266",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_corrupt/fixture-observation.json",
+      "bytes": 405,
+      "sha256": "427883dce2853d222a4076f14af7ad715530614ba2a3ff15b6eabab775252296",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_corrupt/postflight.json",
+      "bytes": 16203,
+      "sha256": "036f84bfcc117f61efbae09cac96c1d059c02253e49be322fbb0c766167e47b0",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_corrupt/postflight.json.before-fault",
+      "bytes": 19813,
+      "sha256": "d18af60eaec32e5761528570dae425d947c45d81a8b85dbbff444fec03b1556a",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_corrupt/result.json",
+      "bytes": 586,
+      "sha256": "a6a6464325f7cf3ea1e8c7c92af13cdd92000bee0774bd8d1a95a3de1dc7f78a",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_missing/effect-denials.jsonl.before-fault",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_missing/execution.json",
+      "bytes": 3095,
+      "sha256": "99dee08cbddec6825c7b3226d4744b80bf480aa1bb6216cc40163c857b50acbb",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_missing/fixture-observation.json",
+      "bytes": 405,
+      "sha256": "d847f5a18c3c0ff1c277b8e70e87d79650e235cf1cb7d452a967b8f1bbe63c59",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_missing/postflight.json",
+      "bytes": 16145,
+      "sha256": "83a26f2741538388dddf0ba72b3cffe7d27fe0af31de06ab09cc15420b98ae94",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_missing/postflight.json.before-fault",
+      "bytes": 19813,
+      "sha256": "2861f0da668e65c89635b1c363c25ee2bd226a899605ccb0713e26af9d35a207",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_missing/result.json",
+      "bytes": 586,
+      "sha256": "361ba2b06a23c07db1cb10f13187faeda2a7ce1c94e6264606166e90bd0b2b95",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_partial/effect-denials.jsonl",
+      "bytes": 1,
+      "sha256": "021fb596db81e6d02bf3d2586ee3981fe519f275c0ac9ca76bbcf2ebb4097d96",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_partial/effect-denials.jsonl.before-fault",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_partial/execution.json",
+      "bytes": 3216,
+      "sha256": "800977b17de1dd3aa7c48b22f19b79c128c3284a030286cf65caac9d3b4b7088",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_partial/fixture-observation.json",
+      "bytes": 405,
+      "sha256": "988b465cad7a10161328e03b23b91bff57c0754094f421b0d2f47d84ca7edca1",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_partial/postflight.json",
+      "bytes": 16198,
+      "sha256": "ca8283667fab4159d25a0eab08e59865d6d4c3249bd594156d5a76c04464db0e",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_partial/postflight.json.before-fault",
+      "bytes": 19813,
+      "sha256": "ecb03076c8f67bb4586d189631357b55e630f0b9f28fa4f161c0b68e594aa6df",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_partial/result.json",
+      "bytes": 586,
+      "sha256": "1611f50cb2e0671f61d6066297225b49e116a2c8fefd36e2be2b6b96c2c4336c",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/normal_zero/effect-denials.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/normal_zero/execution.json",
+      "bytes": 3016,
+      "sha256": "4c1a7b557d6330f694bea7be31707ea874c8fa7d576df7a96526756c0392a3b4",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/normal_zero/fixture-observation.json",
+      "bytes": 401,
+      "sha256": "d8a13fa4058e3d3567287986d7be8e61bd52903a8a60cee3d443812b39e46ee2",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/normal_zero/postflight.json",
+      "bytes": 19813,
+      "sha256": "bda0d6fac7c30a206b36c19775e9fa0387e6e89eac69c64a65ceca624df939a3",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/normal_zero/result.json",
+      "bytes": 586,
+      "sha256": "6ce53099b0d6e21e90a66a63a2a1d71cd8d2f833ed12067f86ed47e041218a65",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/pid_mismatch/effect-denials.jsonl",
+      "bytes": 125,
+      "sha256": "7c49b2621fdd6b1de56f4e55994169d019d35d1e4481ea3dc87b905574651425",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/pid_mismatch/effect-denials.jsonl.before-fault",
+      "bytes": 125,
+      "sha256": "101d8c6c2737800f8d3a86feb39fe5e9b896d0ca226219b7d57f2e83fc737cde",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/pid_mismatch/execution.json",
+      "bytes": 3222,
+      "sha256": "17f5f2a16cdd542ec5035b11626f1920f048eb29fd60d496b034dad34b49f223",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/pid_mismatch/fixture-observation.json",
+      "bytes": 480,
+      "sha256": "5bc6e1125be13a312342db640bd7eb01cf1dc0990a02d4a6e81706903d053d37",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/pid_mismatch/postflight.json",
+      "bytes": 16200,
+      "sha256": "3fec0a1cb31fb9783fd55e044e5587e3f48725a4d98ec14b4af98282fbf31d44",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/pid_mismatch/postflight.json.before-fault",
+      "bytes": 19816,
+      "sha256": "0370349165e3d2292896103c6477665365710dbcbcdd4b1834f953a1d31486fa",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/pid_mismatch/result.json",
+      "bytes": 586,
+      "sha256": "2979e1fb3a5ea372a763328eb5a23dc9f7834e395863d174a94ee2d159fe3565",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/post_counter_mismatch/effect-denials.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/post_counter_mismatch/execution.json",
+      "bytes": 3141,
+      "sha256": "0e15c53707ac4470c22839ed8a0b9c0e63175d01c8b8df06d4ddedb70cf5cf7a",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/post_counter_mismatch/fixture-observation.json",
+      "bytes": 411,
+      "sha256": "36375dfcc342dcf55bc81d4b42bf4df3ed2588777f016e018d4d3fec04878c4f",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/post_counter_mismatch/postflight.json",
+      "bytes": 16165,
+      "sha256": "86f39b9b0d5ebd21e6d73e4992cfa124f511f70aae7768bdb9c5ceb0baa0c624",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/post_counter_mismatch/postflight.json.before-fault",
+      "bytes": 19813,
+      "sha256": "35e0c0fc1224f48c893418e41d4be70564f9cda0ca5e0414b6c506642d7c7243",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/post_counter_mismatch/result.json",
+      "bytes": 586,
+      "sha256": "dd1402c8a8dc794612d70b5a5dc1126ca831b8d5f073c2e232e137a7c375aa9a",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/uncaught_denial/child-error.json",
+      "bytes": 913,
+      "sha256": "636462cb5992d6318d961079d874062492ce6e9d0b14da94a7d2e5a027e32e43",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/uncaught_denial/effect-denials.jsonl",
+      "bytes": 125,
+      "sha256": "10cd58613c3f87d0b16a699b7a13b13d001cd911818db5c6a0b1b5e21f950530",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/uncaught_denial/execution.json",
+      "bytes": 3010,
+      "sha256": "8000898acef0b3c76755a4290361d14b54f88558ee4a0cad380873530151ec66",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/uncaught_denial/fixture-observation.json",
+      "bytes": 405,
+      "sha256": "b82ee02540c12899f675d78c96925f8390562a50398ba3545b5dfec167efcfb9",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/write_io/effect-denials.jsonl",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/write_io/execution.json",
+      "bytes": 3052,
+      "sha256": "eb6836fa77aa010c07af8d31b89924d7efc542a68d70437dbe6b78ba7f5cc830",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/write_io/fixture-observation.json",
+      "bytes": 549,
+      "sha256": "07ddb78ca3d44f6ccdf8451dd3e42f1522d5db6792e25d6e2d00126f600198dc",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/write_io/postflight.json",
+      "bytes": 19847,
+      "sha256": "dc340ce645f491766c601102249288c6fde321774d307e49662e43138f58d3de",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/write_io/result.json",
+      "bytes": 586,
+      "sha256": "04c3036710585baadb3dc1647462a7a0ef12acd1c327e781f8ac7cf9de9cf027",
+      "mode": "0o600"
+    },
+    {
+      "path": "fixture-child.json",
+      "bytes": 28686,
+      "sha256": "f97aa0543f2eea551c16f5f82837ec0c6c7f5111fb0d0cbeda102cef13e653e4",
+      "mode": "0o600"
+    },
+    {
+      "path": "fixture-execution.json",
+      "bytes": 27276,
+      "sha256": "0120fb7f7145e1c0b9b51845ef2bc609cefa95963217cfbdbb980ec43490fa85",
+      "mode": "0o600"
+    },
+    {
+      "path": "invocation.json",
+      "bytes": 21243,
+      "sha256": "f7aa69925dd9fdfb63a91375340ccf48b64c08397eff92aa85f8990e791852c3",
+      "mode": "0o600"
+    },
+    {
+      "path": "stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    },
+    {
+      "path": "stdout.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    }
+  ],
+  "rawFileCount": 84,
+  "rawBytes": 489168,
+  "beforeFaultInventory": [
+    {
+      "path": "cases/bool_counter/postflight.json.before-fault",
+      "bytes": 19813,
+      "sha256": "18eba0db06e4cadbaae15a8037795786e6ddbc2f256a7359ba1e64d0f4f5db2d",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/bool_counter/result.json.before-fault",
+      "bytes": 586,
+      "sha256": "b31477aa9d5c359d64774a1e33bf1bde72d2d635fa17094cf88d9e8b5c3be462",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/count_mismatch/postflight.json.before-fault",
+      "bytes": 19813,
+      "sha256": "77438540afbb1a89c9118bf336d41347b89b784fd8227fd3ff5e91a5f74e8785",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/count_mismatch/result.json.before-fault",
+      "bytes": 586,
+      "sha256": "dac7a3b19027ddb51ece879d7e5b5cf38ed880b8fe74fcb16d3bf2e434bdec2f",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_corrupt/effect-denials.jsonl.before-fault",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_corrupt/postflight.json.before-fault",
+      "bytes": 19813,
+      "sha256": "d18af60eaec32e5761528570dae425d947c45d81a8b85dbbff444fec03b1556a",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_missing/effect-denials.jsonl.before-fault",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_missing/postflight.json.before-fault",
+      "bytes": 19813,
+      "sha256": "2861f0da668e65c89635b1c363c25ee2bd226a899605ccb0713e26af9d35a207",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_partial/effect-denials.jsonl.before-fault",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/journal_partial/postflight.json.before-fault",
+      "bytes": 19813,
+      "sha256": "ecb03076c8f67bb4586d189631357b55e630f0b9f28fa4f161c0b68e594aa6df",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/pid_mismatch/effect-denials.jsonl.before-fault",
+      "bytes": 125,
+      "sha256": "101d8c6c2737800f8d3a86feb39fe5e9b896d0ca226219b7d57f2e83fc737cde",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/pid_mismatch/postflight.json.before-fault",
+      "bytes": 19816,
+      "sha256": "0370349165e3d2292896103c6477665365710dbcbcdd4b1834f953a1d31486fa",
+      "mode": "0o600"
+    },
+    {
+      "path": "cases/post_counter_mismatch/postflight.json.before-fault",
+      "bytes": 19813,
+      "sha256": "35e0c0fc1224f48c893418e41d4be70564f9cda0ca5e0414b6c506642d7c7243",
+      "mode": "0o600"
+    }
+  ],
+  "candidate11After": [
+    {
+      "path": "ORIGINAL76-INVENTORY.json",
+      "bytes": 161539,
+      "sha256": "3d9cd9641229dd9ffeaee608737036a6dff68bf4a7039e25e8c06bb315598ecd",
+      "matches": true
+    },
+    {
+      "path": "ORIGINAL76-STATUS.ko.md",
+      "bytes": 24833,
+      "sha256": "f3d088714012f013989b7c82e014bcf872289268df9b3c76d879c755f0b7abf3",
+      "matches": true
+    },
+    {
+      "path": "README.ko.md",
+      "bytes": 3319,
+      "sha256": "7fe160ad0b983227db2502b66cec45ec423062ede9d74033d82f33745fa62503",
+      "matches": true
+    },
+    {
+      "path": "SOURCE.DIFF.patch",
+      "bytes": 33411,
+      "sha256": "64725d1c6b008579132b645f176bdc3271ce3a1eb2e667666a6c4f711ee47004",
+      "matches": true
+    },
+    {
+      "path": "SOURCE.SHA256.json",
+      "bytes": 1425,
+      "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d",
+      "matches": true
+    },
+    {
+      "path": "STATIC-CHECKS.json",
+      "bytes": 2616,
+      "sha256": "651170804bd7537f4c1cced2075b54863e7b785b5baa0b36a575f7706b415d4c",
+      "matches": true
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 12335,
+      "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+      "matches": true
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "matches": true
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "matches": true
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "matches": true
+    },
+    {
+      "path": "runner.py",
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+      "matches": true
+    }
+  ],
+  "fixture7After": [
+    {
+      "path": "EXTRACTIONS.json",
+      "bytes": 2908,
+      "sha256": "1d6ffde24716ddc60bb2c9707754f47dc78d2a4f894252168361d1388dabf35f",
+      "matches": true
+    },
+    {
+      "path": "README.ko.md",
+      "bytes": 3872,
+      "sha256": "f515625c2ed314f4036f47e890c7c0933345364d18934b5b15be70829e34ce8d",
+      "matches": true
+    },
+    {
+      "path": "SOURCE-CHECKS.json",
+      "bytes": 6209,
+      "sha256": "bf824a6d16116b1044ac3f7f8a569c82841c21b94054d6d47e438434ddaf1c55",
+      "matches": true
+    },
+    {
+      "path": "SOURCE.SHA256.json",
+      "bytes": 769,
+      "sha256": "2345d41939c978a165693f4417db6944fe983fad42706466f6f986bf617d739e",
+      "matches": true
+    },
+    {
+      "path": "fixture.py",
+      "bytes": 20601,
+      "sha256": "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208",
+      "matches": true
+    },
+    {
+      "path": "frozen/runner.py",
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+      "matches": true
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 12565,
+      "sha256": "15e10b1038f2ced4787e73cca5a19039132cf54b432191e3347aa394e3742b4a",
+      "matches": true
+    }
+  ],
+  "runtime8After": [
+    {
+      "name": "contextlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "bytes": 27637,
+      "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6",
+      "matches": true
+    },
+    {
+      "name": "inspect",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+      "bytes": 127125,
+      "sha256": "5c54ebf0bfdc25397750e5d0f63800751650ee50e65325ff3ea4069c9bfa5f75",
+      "matches": true
+    },
+    {
+      "name": "sqlite3",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+      "bytes": 2501,
+      "sha256": "f7cc982617b68e147540ef352d38310fe4d25c2c9c2542b67d0590c871df09a8",
+      "matches": true
+    },
+    {
+      "name": "sqlite3.dbapi2",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+      "bytes": 3631,
+      "sha256": "7c5c8d98df1f2c50c4062a3be2c0f0499190c179fa4fc281507a1ef763a98f28",
+      "matches": true
+    },
+    {
+      "name": "ssl",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "bytes": 51655,
+      "sha256": "db62eeaae59c6e7087dcafb28087cd0bb092087381edc556f97c8cb614484380",
+      "matches": true
+    },
+    {
+      "name": "unittest",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+      "bytes": 3487,
+      "sha256": "32ed48385c0377bc2900a76e9a6acc3705aeef402c72de8554b3c637420506f0",
+      "matches": true
+    },
+    {
+      "name": "unittest.mock",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "bytes": 106317,
+      "sha256": "1de18141992c6742bff27e77c0cbe46d53d6a5ab1850574a536910508823fc5c",
+      "matches": true
+    },
+    {
+      "name": "subprocess",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "bytes": 88747,
+      "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375",
+      "matches": true
+    }
+  ],
+  "exeAfter": {
+    "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "bytes": 30894944,
+    "sha256": "fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7",
+    "matches": true
+  },
+  "runtimeMappedFilesReadback": [
+    {
+      "stage": "invocationParent",
+      "module": "__main__",
+      "path": "/workspace/vm-c5-source-24cf-r03/c1-fixture/fixture.py",
+      "bytes": 20601,
+      "sha256": "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208",
+      "rawPin": {
+        "bytes": 20601,
+        "sha256": "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "_collections_abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_collections_abc.py",
+      "bytes": 32089,
+      "sha256": "d4945c8410c4bab351741b04bca3de066f7c27ed7e38df89e206a96617102ffb",
+      "rawPin": {
+        "bytes": 32089,
+        "sha256": "d4945c8410c4bab351741b04bca3de066f7c27ed7e38df89e206a96617102ffb"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "_compression",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_compression.py",
+      "bytes": 5681,
+      "sha256": "3ad5d60627477a60939ee44fc1bb3a05dbe8fb52f0f75039b8f5d8f1a278b981",
+      "rawPin": {
+        "bytes": 5681,
+        "sha256": "3ad5d60627477a60939ee44fc1bb3a05dbe8fb52f0f75039b8f5d8f1a278b981"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "_frozen_importlib_external",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap_external.py",
+      "bytes": 69428,
+      "sha256": "e6ad72f3f0f9b65c99ab52598cd02ab748511dcdce1dd51f18dace9be9a680c6",
+      "rawPin": {
+        "bytes": 69428,
+        "sha256": "e6ad72f3f0f9b65c99ab52598cd02ab748511dcdce1dd51f18dace9be9a680c6"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "_weakrefset",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_weakrefset.py",
+      "bytes": 5893,
+      "sha256": "91895a451d06e9f521a1171b31b9b19bc9740f35af00d4fa106338ab7167c9ac",
+      "rawPin": {
+        "bytes": 5893,
+        "sha256": "91895a451d06e9f521a1171b31b9b19bc9740f35af00d4fa106338ab7167c9ac"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/abc.py",
+      "bytes": 6538,
+      "sha256": "e558702a95cdce3febd289da021715d2b92bc43995b8a1bc58dfa1c3d8010287",
+      "rawPin": {
+        "bytes": 6538,
+        "sha256": "e558702a95cdce3febd289da021715d2b92bc43995b8a1bc58dfa1c3d8010287"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "argparse",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/argparse.py",
+      "bytes": 101155,
+      "sha256": "7cc582dcb3b76e2c957f78a3f74e9809d6c311d6aab7bcaa2c9954d0cbff5f30",
+      "rawPin": {
+        "bytes": 101155,
+        "sha256": "7cc582dcb3b76e2c957f78a3f74e9809d6c311d6aab7bcaa2c9954d0cbff5f30"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "ast",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ast.py",
+      "bytes": 64452,
+      "sha256": "b515c23dbbc459329d3b802a3aac742cc456d7472e66f7ed6e9dc97e40596d7d",
+      "rawPin": {
+        "bytes": 64452,
+        "sha256": "b515c23dbbc459329d3b802a3aac742cc456d7472e66f7ed6e9dc97e40596d7d"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "bisect",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bisect.py",
+      "bytes": 3423,
+      "sha256": "f1cf7b85fc36b5da249813fc5ab97d9464f8cc1bc817f7146206fa2713e35999",
+      "rawPin": {
+        "bytes": 3423,
+        "sha256": "f1cf7b85fc36b5da249813fc5ab97d9464f8cc1bc817f7146206fa2713e35999"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "bz2",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bz2.py",
+      "bytes": 11847,
+      "sha256": "76ab3252924e71e859d7d90e8d3db13b6554975cfcac0fdadced4de7f8779330",
+      "rawPin": {
+        "bytes": 11847,
+        "sha256": "76ab3252924e71e859d7d90e8d3db13b6554975cfcac0fdadced4de7f8779330"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "codecs",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/codecs.py",
+      "bytes": 36870,
+      "sha256": "7b7839e53a77961153240aecfe11edc8054d05b1dedd83894450dae21ec05785",
+      "rawPin": {
+        "bytes": 36870,
+        "sha256": "7b7839e53a77961153240aecfe11edc8054d05b1dedd83894450dae21ec05785"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "collections",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/__init__.py",
+      "bytes": 52378,
+      "sha256": "7fdb04dd248ab37909f46d2085bfee56b32d7e91e49ad3a2fad99c453295659b",
+      "rawPin": {
+        "bytes": 52378,
+        "sha256": "7fdb04dd248ab37909f46d2085bfee56b32d7e91e49ad3a2fad99c453295659b"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "collections.abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/abc.py",
+      "bytes": 119,
+      "sha256": "9cb4208f99128a0489b6c8e6c61637617dd7d4250c59e065491957eda084dd10",
+      "rawPin": {
+        "bytes": 119,
+        "sha256": "9cb4208f99128a0489b6c8e6c61637617dd7d4250c59e065491957eda084dd10"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "contextlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "bytes": 27637,
+      "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6",
+      "rawPin": {
+        "bytes": 27637,
+        "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "copy",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copy.py",
+      "bytes": 8412,
+      "sha256": "cbd25547933176fcf6bb05c2adc9f4796d15ac20b9b82dcf890daea7203daeab",
+      "rawPin": {
+        "bytes": 8412,
+        "sha256": "cbd25547933176fcf6bb05c2adc9f4796d15ac20b9b82dcf890daea7203daeab"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "copyreg",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copyreg.py",
+      "bytes": 7614,
+      "sha256": "c8eda41f05c6bf95a4da4726a530409d2485ae060b8d019b3a8034389a15d3e9",
+      "rawPin": {
+        "bytes": 7614,
+        "sha256": "c8eda41f05c6bf95a4da4726a530409d2485ae060b8d019b3a8034389a15d3e9"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "datetime",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/datetime.py",
+      "bytes": 268,
+      "sha256": "ef20dc6b3554cd585dddffdc573f1f9a7a54c522f2a3fb4576c44edbb1e14238",
+      "rawPin": {
+        "bytes": 268,
+        "sha256": "ef20dc6b3554cd585dddffdc573f1f9a7a54c522f2a3fb4576c44edbb1e14238"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "encodings",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/__init__.py",
+      "bytes": 5884,
+      "sha256": "78c4744d407690f321565488710b5aaf6486b5afa8d185637aa1e7633ab59cd8",
+      "rawPin": {
+        "bytes": 5884,
+        "sha256": "78c4744d407690f321565488710b5aaf6486b5afa8d185637aa1e7633ab59cd8"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "encodings.aliases",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/aliases.py",
+      "bytes": 15677,
+      "sha256": "6fdcc49ba23a0203ae6cf28e608f8e6297d7c4d77d52e651db3cb49b9564c6d2",
+      "rawPin": {
+        "bytes": 15677,
+        "sha256": "6fdcc49ba23a0203ae6cf28e608f8e6297d7c4d77d52e651db3cb49b9564c6d2"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "encodings.utf_8",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/utf_8.py",
+      "bytes": 1005,
+      "sha256": "ba0cac060269583523ca9506473a755203037c57d466a11aa89a30a5f6756f3d",
+      "rawPin": {
+        "bytes": 1005,
+        "sha256": "ba0cac060269583523ca9506473a755203037c57d466a11aa89a30a5f6756f3d"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "enum",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/enum.py",
+      "bytes": 81540,
+      "sha256": "f35e542d8c4c1d2b5e910138d726fa48774925f3c4dc5462793ebcb66aa55501",
+      "rawPin": {
+        "bytes": 81540,
+        "sha256": "f35e542d8c4c1d2b5e910138d726fa48774925f3c4dc5462793ebcb66aa55501"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "fnmatch",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/fnmatch.py",
+      "bytes": 5999,
+      "sha256": "6683da36e47af523f3f41e18ad244d837783e19e98911cc0b7415dea81494ebc",
+      "rawPin": {
+        "bytes": 5999,
+        "sha256": "6683da36e47af523f3f41e18ad244d837783e19e98911cc0b7415dea81494ebc"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "functools",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/functools.py",
+      "bytes": 37940,
+      "sha256": "de4a1d37c795e2a065124b5c49357893433bc6bb111b41277ccc9930ef08d4c9",
+      "rawPin": {
+        "bytes": 37940,
+        "sha256": "de4a1d37c795e2a065124b5c49357893433bc6bb111b41277ccc9930ef08d4c9"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "genericpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/genericpath.py",
+      "bytes": 5572,
+      "sha256": "2b0b35d2206778af4081cf81dd9b513876e72c35a55bec941402e1fa62b1f1aa",
+      "rawPin": {
+        "bytes": 5572,
+        "sha256": "2b0b35d2206778af4081cf81dd9b513876e72c35a55bec941402e1fa62b1f1aa"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "gettext",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/gettext.py",
+      "bytes": 21320,
+      "sha256": "a5c249a522b6b8e3aa6f1b12a8bcc09508b99ad612b58d2fc973db27ea3b7cc3",
+      "rawPin": {
+        "bytes": 21320,
+        "sha256": "a5c249a522b6b8e3aa6f1b12a8bcc09508b99ad612b58d2fc973db27ea3b7cc3"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "hashlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/hashlib.py",
+      "bytes": 9349,
+      "sha256": "6dbdebf270868b391080e21dc9687eddfaf321c965ad979f68d3f5c423c613ab",
+      "rawPin": {
+        "bytes": 9349,
+        "sha256": "6dbdebf270868b391080e21dc9687eddfaf321c965ad979f68d3f5c423c613ab"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "io",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/io.py",
+      "bytes": 3582,
+      "sha256": "7cec3cb8ac004058dd0a5af246e6d950fb59c7ddd0058fda48bcb3fcb98d8822",
+      "rawPin": {
+        "bytes": 3582,
+        "sha256": "7cec3cb8ac004058dd0a5af246e6d950fb59c7ddd0058fda48bcb3fcb98d8822"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "ipaddress",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ipaddress.py",
+      "bytes": 81414,
+      "sha256": "ba8d3389ff084fcb232b48204ec04f2b3ea4bd0eadf7b18c814947d185de2c64",
+      "rawPin": {
+        "bytes": 81414,
+        "sha256": "ba8d3389ff084fcb232b48204ec04f2b3ea4bd0eadf7b18c814947d185de2c64"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "json",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/__init__.py",
+      "bytes": 14020,
+      "sha256": "d5d41e2c29049515d295d81a6d40b4890fbec8d8482cfb401630f8ef2f77e4d5",
+      "rawPin": {
+        "bytes": 14020,
+        "sha256": "d5d41e2c29049515d295d81a6d40b4890fbec8d8482cfb401630f8ef2f77e4d5"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "json.decoder",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py",
+      "bytes": 12525,
+      "sha256": "382cd02af6f7efede5a6d4abbcda1015e5c7a75794b0016022878f9cf32a24f6",
+      "rawPin": {
+        "bytes": 12525,
+        "sha256": "382cd02af6f7efede5a6d4abbcda1015e5c7a75794b0016022878f9cf32a24f6"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "json.encoder",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/encoder.py",
+      "bytes": 16075,
+      "sha256": "52bfb1b66029cc70fa3bd7fe11df9f2e03922d413407a341b387a22c987f24f8",
+      "rawPin": {
+        "bytes": 16075,
+        "sha256": "52bfb1b66029cc70fa3bd7fe11df9f2e03922d413407a341b387a22c987f24f8"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "json.scanner",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/scanner.py",
+      "bytes": 2434,
+      "sha256": "572958017eae8842eeddd0e3d18d3c56cc0a197348224915e1d87ce937841764",
+      "rawPin": {
+        "bytes": 2434,
+        "sha256": "572958017eae8842eeddd0e3d18d3c56cc0a197348224915e1d87ce937841764"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "keyword",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/keyword.py",
+      "bytes": 1073,
+      "sha256": "18c2be738c04ad20ad375f6a71db34b3823c7f40b0340f5294d0e89f3c9b093b",
+      "rawPin": {
+        "bytes": 1073,
+        "sha256": "18c2be738c04ad20ad375f6a71db34b3823c7f40b0340f5294d0e89f3c9b093b"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "linecache",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/linecache.py",
+      "bytes": 5800,
+      "sha256": "9eb9194707991b49f9fea67a5222b0e6a0e49c865cdffc69fbc80a1f829e77fb",
+      "rawPin": {
+        "bytes": 5800,
+        "sha256": "9eb9194707991b49f9fea67a5222b0e6a0e49c865cdffc69fbc80a1f829e77fb"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "locale",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/locale.py",
+      "bytes": 78599,
+      "sha256": "3988c5419552d5b9f0bef3695102376f79357f0f440e9cd1f32c501f966e6ef3",
+      "rawPin": {
+        "bytes": 78599,
+        "sha256": "3988c5419552d5b9f0bef3695102376f79357f0f440e9cd1f32c501f966e6ef3"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "lzma",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/lzma.py",
+      "bytes": 13277,
+      "sha256": "58fb9d2fdc8a8af7b25e218f17ea3b51bdfa53bdf40f440ab33c605974ca5c2e",
+      "rawPin": {
+        "bytes": 13277,
+        "sha256": "58fb9d2fdc8a8af7b25e218f17ea3b51bdfa53bdf40f440ab33c605974ca5c2e"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "ntpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ntpath.py",
+      "bytes": 30404,
+      "sha256": "6c0d55ee892f98ef87b1ed3c50c9dfc7e267a98d2db47e08d3dc67529af56725",
+      "rawPin": {
+        "bytes": 30404,
+        "sha256": "6c0d55ee892f98ef87b1ed3c50c9dfc7e267a98d2db47e08d3dc67529af56725"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "operator",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/operator.py",
+      "bytes": 10965,
+      "sha256": "b2af20f67667203c1730e686cc5d0427becc94db4c97f1d3efe3ed2158473f6a",
+      "rawPin": {
+        "bytes": 10965,
+        "sha256": "b2af20f67667203c1730e686cc5d0427becc94db4c97f1d3efe3ed2158473f6a"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "os",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/os.py",
+      "bytes": 40821,
+      "sha256": "54c43a1fc69c979c70d8f7d097174cee163bfe59937723ee353043dd4a0211e1",
+      "rawPin": {
+        "bytes": 40821,
+        "sha256": "54c43a1fc69c979c70d8f7d097174cee163bfe59937723ee353043dd4a0211e1"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "os.path",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "bytes": 17356,
+      "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9",
+      "rawPin": {
+        "bytes": 17356,
+        "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "pathlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py",
+      "bytes": 51052,
+      "sha256": "10ba48ae8063cfe7589436041d0d4628c05f427c7709cf8e75e486f8930cc32c",
+      "rawPin": {
+        "bytes": 51052,
+        "sha256": "10ba48ae8063cfe7589436041d0d4628c05f427c7709cf8e75e486f8930cc32c"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "posixpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "bytes": 17356,
+      "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9",
+      "rawPin": {
+        "bytes": 17356,
+        "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "random",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/random.py",
+      "bytes": 34689,
+      "sha256": "de48263a837339c7e01cf9f3c4d756696e0e0775f7778eb9cf81ad5b00134569",
+      "rawPin": {
+        "bytes": 34689,
+        "sha256": "de48263a837339c7e01cf9f3c4d756696e0e0775f7778eb9cf81ad5b00134569"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "re",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/__init__.py",
+      "bytes": 16315,
+      "sha256": "8ff3c37c63b917fcf8dc8d50993a502292a3dc159e41de4f4018c72a53d1c07b",
+      "rawPin": {
+        "bytes": 16315,
+        "sha256": "8ff3c37c63b917fcf8dc8d50993a502292a3dc159e41de4f4018c72a53d1c07b"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "re._casefix",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_casefix.py",
+      "bytes": 5444,
+      "sha256": "1b12d9136f23db6c3f6f26053fefc15ca964b886838c7b9c1fabf8d2efc1e5c8",
+      "rawPin": {
+        "bytes": 5444,
+        "sha256": "1b12d9136f23db6c3f6f26053fefc15ca964b886838c7b9c1fabf8d2efc1e5c8"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "re._compiler",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_compiler.py",
+      "bytes": 26399,
+      "sha256": "c75620761098a70ed75b9accef63ef2881d8abb6d4e5cbfd10074bd165eefe4d",
+      "rawPin": {
+        "bytes": 26399,
+        "sha256": "c75620761098a70ed75b9accef63ef2881d8abb6d4e5cbfd10074bd165eefe4d"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "re._constants",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_constants.py",
+      "bytes": 5930,
+      "sha256": "fa4fdb200f238f9e7817b63892b0d69833d8165134801e775e10cc113348a375",
+      "rawPin": {
+        "bytes": 5930,
+        "sha256": "fa4fdb200f238f9e7817b63892b0d69833d8165134801e775e10cc113348a375"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "re._parser",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_parser.py",
+      "bytes": 41201,
+      "sha256": "a51a85b37cf3f44ba7ff25754da5f31306e4ccfa6eb3c017f9d37bdf4e770840",
+      "rawPin": {
+        "bytes": 41201,
+        "sha256": "a51a85b37cf3f44ba7ff25754da5f31306e4ccfa6eb3c017f9d37bdf4e770840"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "reprlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/reprlib.py",
+      "bytes": 7148,
+      "sha256": "e177bc70da83a7fbcde6fd261dc15da34e8a20873b1cccd4f9a1f8f27cca3779",
+      "rawPin": {
+        "bytes": 7148,
+        "sha256": "e177bc70da83a7fbcde6fd261dc15da34e8a20873b1cccd4f9a1f8f27cca3779"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "selectors",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/selectors.py",
+      "bytes": 19671,
+      "sha256": "1eeb102373e18c96311203f30c516e785bd8642275aa0bd66e43a284c9692385",
+      "rawPin": {
+        "bytes": 19671,
+        "sha256": "1eeb102373e18c96311203f30c516e785bd8642275aa0bd66e43a284c9692385"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "shutil",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/shutil.py",
+      "bytes": 56198,
+      "sha256": "53496e06742fe008fee2bccc8caeac77473e69923bec05358bd43eea467db1f8",
+      "rawPin": {
+        "bytes": 56198,
+        "sha256": "53496e06742fe008fee2bccc8caeac77473e69923bec05358bd43eea467db1f8"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "signal",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/signal.py",
+      "bytes": 2495,
+      "sha256": "0363c964c90ac0b3e515de5749205e6e6454051a1211058375d84d91eab6071a",
+      "rawPin": {
+        "bytes": 2495,
+        "sha256": "0363c964c90ac0b3e515de5749205e6e6454051a1211058375d84d91eab6071a"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "stat",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/stat.py",
+      "bytes": 5485,
+      "sha256": "052af0327eae6941b69b05c088b3e748f79995635f80ac4cc7125eb333eb4c77",
+      "rawPin": {
+        "bytes": 5485,
+        "sha256": "052af0327eae6941b69b05c088b3e748f79995635f80ac4cc7125eb333eb4c77"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "subprocess",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "bytes": 88747,
+      "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375",
+      "rawPin": {
+        "bytes": 88747,
+        "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "tempfile",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tempfile.py",
+      "bytes": 32386,
+      "sha256": "2eea4401f4f29d0d3647ed6fc8bcf6aa1daf879c8aa407a8ea310edac9dfc317",
+      "rawPin": {
+        "bytes": 32386,
+        "sha256": "2eea4401f4f29d0d3647ed6fc8bcf6aa1daf879c8aa407a8ea310edac9dfc317"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "textwrap",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/textwrap.py",
+      "bytes": 19718,
+      "sha256": "62867e40cdea6669b361f72af4d7daf0359f207c92cbeddfc7c7506397c1f31c",
+      "rawPin": {
+        "bytes": 19718,
+        "sha256": "62867e40cdea6669b361f72af4d7daf0359f207c92cbeddfc7c7506397c1f31c"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "threading",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/threading.py",
+      "bytes": 60200,
+      "sha256": "846f450ae794e4aab823a163f8c71d27751148af33e91dd3de886686a4e8ebfb",
+      "rawPin": {
+        "bytes": 60200,
+        "sha256": "846f450ae794e4aab823a163f8c71d27751148af33e91dd3de886686a4e8ebfb"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "token",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/token.py",
+      "bytes": 2511,
+      "sha256": "1a4d994ce9744f4bfe2d964fc24d112a1e76796a08c2e45a2d73c82a8587f922",
+      "rawPin": {
+        "bytes": 2511,
+        "sha256": "1a4d994ce9744f4bfe2d964fc24d112a1e76796a08c2e45a2d73c82a8587f922"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "tokenize",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tokenize.py",
+      "bytes": 21570,
+      "sha256": "026f566ac63e60d69c8185a3880831b657accc5eac984fadf271fc99a5e5825d",
+      "rawPin": {
+        "bytes": 21570,
+        "sha256": "026f566ac63e60d69c8185a3880831b657accc5eac984fadf271fc99a5e5825d"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "traceback",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/traceback.py",
+      "bytes": 46393,
+      "sha256": "2c44af2848836d9af0c7b3547469695cd22586c64274d362eafcf466af284bd6",
+      "rawPin": {
+        "bytes": 46393,
+        "sha256": "2c44af2848836d9af0c7b3547469695cd22586c64274d362eafcf466af284bd6"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "types",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/types.py",
+      "bytes": 10993,
+      "sha256": "345474ef027a1273f353da9bdc1f7c18f65335e72e681bcc0376774cc51f2405",
+      "rawPin": {
+        "bytes": 10993,
+        "sha256": "345474ef027a1273f353da9bdc1f7c18f65335e72e681bcc0376774cc51f2405"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "urllib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "urllib.parse",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/parse.py",
+      "bytes": 45676,
+      "sha256": "e6af7f475262f1de335bb2e41e26adb94d6103977cf5fe1ddc430dc6a3b1623f",
+      "rawPin": {
+        "bytes": 45676,
+        "sha256": "e6af7f475262f1de335bb2e41e26adb94d6103977cf5fe1ddc430dc6a3b1623f"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "warnings",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/warnings.py",
+      "bytes": 21909,
+      "sha256": "6405e281882932205eae641b2d31fba7776f94517a206d289465a1caffbf310e",
+      "rawPin": {
+        "bytes": 21909,
+        "sha256": "6405e281882932205eae641b2d31fba7776f94517a206d289465a1caffbf310e"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "weakref",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/weakref.py",
+      "bytes": 21513,
+      "sha256": "56f8d313fb74019e53eb9287400702fbce788b7fe30e097b0b6e06296f3f080c",
+      "rawPin": {
+        "bytes": 21513,
+        "sha256": "56f8d313fb74019e53eb9287400702fbce788b7fe30e097b0b6e06296f3f080c"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "invocationParent",
+      "module": "zipimport",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/zipimport.py",
+      "bytes": 27840,
+      "sha256": "a96f1d7a7b6aaf421a3cf382b94b1422f4f0ad452fdd0bb61d635b560d7a4e91",
+      "rawPin": {
+        "bytes": 27840,
+        "sha256": "a96f1d7a7b6aaf421a3cf382b94b1422f4f0ad452fdd0bb61d635b560d7a4e91"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "__main__",
+      "path": "/workspace/vm-c5-source-24cf-r03/c1-fixture/fixture.py",
+      "bytes": 20601,
+      "sha256": "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208",
+      "rawPin": {
+        "bytes": 20601,
+        "sha256": "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "_collections_abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_collections_abc.py",
+      "bytes": 32089,
+      "sha256": "d4945c8410c4bab351741b04bca3de066f7c27ed7e38df89e206a96617102ffb",
+      "rawPin": {
+        "bytes": 32089,
+        "sha256": "d4945c8410c4bab351741b04bca3de066f7c27ed7e38df89e206a96617102ffb"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "_compression",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_compression.py",
+      "bytes": 5681,
+      "sha256": "3ad5d60627477a60939ee44fc1bb3a05dbe8fb52f0f75039b8f5d8f1a278b981",
+      "rawPin": {
+        "bytes": 5681,
+        "sha256": "3ad5d60627477a60939ee44fc1bb3a05dbe8fb52f0f75039b8f5d8f1a278b981"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "_frozen_importlib_external",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap_external.py",
+      "bytes": 69428,
+      "sha256": "e6ad72f3f0f9b65c99ab52598cd02ab748511dcdce1dd51f18dace9be9a680c6",
+      "rawPin": {
+        "bytes": 69428,
+        "sha256": "e6ad72f3f0f9b65c99ab52598cd02ab748511dcdce1dd51f18dace9be9a680c6"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "_weakrefset",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_weakrefset.py",
+      "bytes": 5893,
+      "sha256": "91895a451d06e9f521a1171b31b9b19bc9740f35af00d4fa106338ab7167c9ac",
+      "rawPin": {
+        "bytes": 5893,
+        "sha256": "91895a451d06e9f521a1171b31b9b19bc9740f35af00d4fa106338ab7167c9ac"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/abc.py",
+      "bytes": 6538,
+      "sha256": "e558702a95cdce3febd289da021715d2b92bc43995b8a1bc58dfa1c3d8010287",
+      "rawPin": {
+        "bytes": 6538,
+        "sha256": "e558702a95cdce3febd289da021715d2b92bc43995b8a1bc58dfa1c3d8010287"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "argparse",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/argparse.py",
+      "bytes": 101155,
+      "sha256": "7cc582dcb3b76e2c957f78a3f74e9809d6c311d6aab7bcaa2c9954d0cbff5f30",
+      "rawPin": {
+        "bytes": 101155,
+        "sha256": "7cc582dcb3b76e2c957f78a3f74e9809d6c311d6aab7bcaa2c9954d0cbff5f30"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "ast",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ast.py",
+      "bytes": 64452,
+      "sha256": "b515c23dbbc459329d3b802a3aac742cc456d7472e66f7ed6e9dc97e40596d7d",
+      "rawPin": {
+        "bytes": 64452,
+        "sha256": "b515c23dbbc459329d3b802a3aac742cc456d7472e66f7ed6e9dc97e40596d7d"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "bisect",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bisect.py",
+      "bytes": 3423,
+      "sha256": "f1cf7b85fc36b5da249813fc5ab97d9464f8cc1bc817f7146206fa2713e35999",
+      "rawPin": {
+        "bytes": 3423,
+        "sha256": "f1cf7b85fc36b5da249813fc5ab97d9464f8cc1bc817f7146206fa2713e35999"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "bz2",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bz2.py",
+      "bytes": 11847,
+      "sha256": "76ab3252924e71e859d7d90e8d3db13b6554975cfcac0fdadced4de7f8779330",
+      "rawPin": {
+        "bytes": 11847,
+        "sha256": "76ab3252924e71e859d7d90e8d3db13b6554975cfcac0fdadced4de7f8779330"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "codecs",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/codecs.py",
+      "bytes": 36870,
+      "sha256": "7b7839e53a77961153240aecfe11edc8054d05b1dedd83894450dae21ec05785",
+      "rawPin": {
+        "bytes": 36870,
+        "sha256": "7b7839e53a77961153240aecfe11edc8054d05b1dedd83894450dae21ec05785"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "collections",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/__init__.py",
+      "bytes": 52378,
+      "sha256": "7fdb04dd248ab37909f46d2085bfee56b32d7e91e49ad3a2fad99c453295659b",
+      "rawPin": {
+        "bytes": 52378,
+        "sha256": "7fdb04dd248ab37909f46d2085bfee56b32d7e91e49ad3a2fad99c453295659b"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "collections.abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/abc.py",
+      "bytes": 119,
+      "sha256": "9cb4208f99128a0489b6c8e6c61637617dd7d4250c59e065491957eda084dd10",
+      "rawPin": {
+        "bytes": 119,
+        "sha256": "9cb4208f99128a0489b6c8e6c61637617dd7d4250c59e065491957eda084dd10"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "contextlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "bytes": 27637,
+      "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6",
+      "rawPin": {
+        "bytes": 27637,
+        "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "copy",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copy.py",
+      "bytes": 8412,
+      "sha256": "cbd25547933176fcf6bb05c2adc9f4796d15ac20b9b82dcf890daea7203daeab",
+      "rawPin": {
+        "bytes": 8412,
+        "sha256": "cbd25547933176fcf6bb05c2adc9f4796d15ac20b9b82dcf890daea7203daeab"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "copyreg",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copyreg.py",
+      "bytes": 7614,
+      "sha256": "c8eda41f05c6bf95a4da4726a530409d2485ae060b8d019b3a8034389a15d3e9",
+      "rawPin": {
+        "bytes": 7614,
+        "sha256": "c8eda41f05c6bf95a4da4726a530409d2485ae060b8d019b3a8034389a15d3e9"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "datetime",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/datetime.py",
+      "bytes": 268,
+      "sha256": "ef20dc6b3554cd585dddffdc573f1f9a7a54c522f2a3fb4576c44edbb1e14238",
+      "rawPin": {
+        "bytes": 268,
+        "sha256": "ef20dc6b3554cd585dddffdc573f1f9a7a54c522f2a3fb4576c44edbb1e14238"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "encodings",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/__init__.py",
+      "bytes": 5884,
+      "sha256": "78c4744d407690f321565488710b5aaf6486b5afa8d185637aa1e7633ab59cd8",
+      "rawPin": {
+        "bytes": 5884,
+        "sha256": "78c4744d407690f321565488710b5aaf6486b5afa8d185637aa1e7633ab59cd8"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "encodings.aliases",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/aliases.py",
+      "bytes": 15677,
+      "sha256": "6fdcc49ba23a0203ae6cf28e608f8e6297d7c4d77d52e651db3cb49b9564c6d2",
+      "rawPin": {
+        "bytes": 15677,
+        "sha256": "6fdcc49ba23a0203ae6cf28e608f8e6297d7c4d77d52e651db3cb49b9564c6d2"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "encodings.utf_8",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/utf_8.py",
+      "bytes": 1005,
+      "sha256": "ba0cac060269583523ca9506473a755203037c57d466a11aa89a30a5f6756f3d",
+      "rawPin": {
+        "bytes": 1005,
+        "sha256": "ba0cac060269583523ca9506473a755203037c57d466a11aa89a30a5f6756f3d"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "enum",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/enum.py",
+      "bytes": 81540,
+      "sha256": "f35e542d8c4c1d2b5e910138d726fa48774925f3c4dc5462793ebcb66aa55501",
+      "rawPin": {
+        "bytes": 81540,
+        "sha256": "f35e542d8c4c1d2b5e910138d726fa48774925f3c4dc5462793ebcb66aa55501"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "fnmatch",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/fnmatch.py",
+      "bytes": 5999,
+      "sha256": "6683da36e47af523f3f41e18ad244d837783e19e98911cc0b7415dea81494ebc",
+      "rawPin": {
+        "bytes": 5999,
+        "sha256": "6683da36e47af523f3f41e18ad244d837783e19e98911cc0b7415dea81494ebc"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "functools",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/functools.py",
+      "bytes": 37940,
+      "sha256": "de4a1d37c795e2a065124b5c49357893433bc6bb111b41277ccc9930ef08d4c9",
+      "rawPin": {
+        "bytes": 37940,
+        "sha256": "de4a1d37c795e2a065124b5c49357893433bc6bb111b41277ccc9930ef08d4c9"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "genericpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/genericpath.py",
+      "bytes": 5572,
+      "sha256": "2b0b35d2206778af4081cf81dd9b513876e72c35a55bec941402e1fa62b1f1aa",
+      "rawPin": {
+        "bytes": 5572,
+        "sha256": "2b0b35d2206778af4081cf81dd9b513876e72c35a55bec941402e1fa62b1f1aa"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "gettext",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/gettext.py",
+      "bytes": 21320,
+      "sha256": "a5c249a522b6b8e3aa6f1b12a8bcc09508b99ad612b58d2fc973db27ea3b7cc3",
+      "rawPin": {
+        "bytes": 21320,
+        "sha256": "a5c249a522b6b8e3aa6f1b12a8bcc09508b99ad612b58d2fc973db27ea3b7cc3"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "hashlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/hashlib.py",
+      "bytes": 9349,
+      "sha256": "6dbdebf270868b391080e21dc9687eddfaf321c965ad979f68d3f5c423c613ab",
+      "rawPin": {
+        "bytes": 9349,
+        "sha256": "6dbdebf270868b391080e21dc9687eddfaf321c965ad979f68d3f5c423c613ab"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "io",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/io.py",
+      "bytes": 3582,
+      "sha256": "7cec3cb8ac004058dd0a5af246e6d950fb59c7ddd0058fda48bcb3fcb98d8822",
+      "rawPin": {
+        "bytes": 3582,
+        "sha256": "7cec3cb8ac004058dd0a5af246e6d950fb59c7ddd0058fda48bcb3fcb98d8822"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "ipaddress",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ipaddress.py",
+      "bytes": 81414,
+      "sha256": "ba8d3389ff084fcb232b48204ec04f2b3ea4bd0eadf7b18c814947d185de2c64",
+      "rawPin": {
+        "bytes": 81414,
+        "sha256": "ba8d3389ff084fcb232b48204ec04f2b3ea4bd0eadf7b18c814947d185de2c64"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "json",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/__init__.py",
+      "bytes": 14020,
+      "sha256": "d5d41e2c29049515d295d81a6d40b4890fbec8d8482cfb401630f8ef2f77e4d5",
+      "rawPin": {
+        "bytes": 14020,
+        "sha256": "d5d41e2c29049515d295d81a6d40b4890fbec8d8482cfb401630f8ef2f77e4d5"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "json.decoder",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py",
+      "bytes": 12525,
+      "sha256": "382cd02af6f7efede5a6d4abbcda1015e5c7a75794b0016022878f9cf32a24f6",
+      "rawPin": {
+        "bytes": 12525,
+        "sha256": "382cd02af6f7efede5a6d4abbcda1015e5c7a75794b0016022878f9cf32a24f6"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "json.encoder",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/encoder.py",
+      "bytes": 16075,
+      "sha256": "52bfb1b66029cc70fa3bd7fe11df9f2e03922d413407a341b387a22c987f24f8",
+      "rawPin": {
+        "bytes": 16075,
+        "sha256": "52bfb1b66029cc70fa3bd7fe11df9f2e03922d413407a341b387a22c987f24f8"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "json.scanner",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/scanner.py",
+      "bytes": 2434,
+      "sha256": "572958017eae8842eeddd0e3d18d3c56cc0a197348224915e1d87ce937841764",
+      "rawPin": {
+        "bytes": 2434,
+        "sha256": "572958017eae8842eeddd0e3d18d3c56cc0a197348224915e1d87ce937841764"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "keyword",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/keyword.py",
+      "bytes": 1073,
+      "sha256": "18c2be738c04ad20ad375f6a71db34b3823c7f40b0340f5294d0e89f3c9b093b",
+      "rawPin": {
+        "bytes": 1073,
+        "sha256": "18c2be738c04ad20ad375f6a71db34b3823c7f40b0340f5294d0e89f3c9b093b"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "linecache",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/linecache.py",
+      "bytes": 5800,
+      "sha256": "9eb9194707991b49f9fea67a5222b0e6a0e49c865cdffc69fbc80a1f829e77fb",
+      "rawPin": {
+        "bytes": 5800,
+        "sha256": "9eb9194707991b49f9fea67a5222b0e6a0e49c865cdffc69fbc80a1f829e77fb"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "locale",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/locale.py",
+      "bytes": 78599,
+      "sha256": "3988c5419552d5b9f0bef3695102376f79357f0f440e9cd1f32c501f966e6ef3",
+      "rawPin": {
+        "bytes": 78599,
+        "sha256": "3988c5419552d5b9f0bef3695102376f79357f0f440e9cd1f32c501f966e6ef3"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "lzma",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/lzma.py",
+      "bytes": 13277,
+      "sha256": "58fb9d2fdc8a8af7b25e218f17ea3b51bdfa53bdf40f440ab33c605974ca5c2e",
+      "rawPin": {
+        "bytes": 13277,
+        "sha256": "58fb9d2fdc8a8af7b25e218f17ea3b51bdfa53bdf40f440ab33c605974ca5c2e"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "ntpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ntpath.py",
+      "bytes": 30404,
+      "sha256": "6c0d55ee892f98ef87b1ed3c50c9dfc7e267a98d2db47e08d3dc67529af56725",
+      "rawPin": {
+        "bytes": 30404,
+        "sha256": "6c0d55ee892f98ef87b1ed3c50c9dfc7e267a98d2db47e08d3dc67529af56725"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "operator",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/operator.py",
+      "bytes": 10965,
+      "sha256": "b2af20f67667203c1730e686cc5d0427becc94db4c97f1d3efe3ed2158473f6a",
+      "rawPin": {
+        "bytes": 10965,
+        "sha256": "b2af20f67667203c1730e686cc5d0427becc94db4c97f1d3efe3ed2158473f6a"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "os",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/os.py",
+      "bytes": 40821,
+      "sha256": "54c43a1fc69c979c70d8f7d097174cee163bfe59937723ee353043dd4a0211e1",
+      "rawPin": {
+        "bytes": 40821,
+        "sha256": "54c43a1fc69c979c70d8f7d097174cee163bfe59937723ee353043dd4a0211e1"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "os.path",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "bytes": 17356,
+      "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9",
+      "rawPin": {
+        "bytes": 17356,
+        "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "pathlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py",
+      "bytes": 51052,
+      "sha256": "10ba48ae8063cfe7589436041d0d4628c05f427c7709cf8e75e486f8930cc32c",
+      "rawPin": {
+        "bytes": 51052,
+        "sha256": "10ba48ae8063cfe7589436041d0d4628c05f427c7709cf8e75e486f8930cc32c"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "posixpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "bytes": 17356,
+      "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9",
+      "rawPin": {
+        "bytes": 17356,
+        "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "random",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/random.py",
+      "bytes": 34689,
+      "sha256": "de48263a837339c7e01cf9f3c4d756696e0e0775f7778eb9cf81ad5b00134569",
+      "rawPin": {
+        "bytes": 34689,
+        "sha256": "de48263a837339c7e01cf9f3c4d756696e0e0775f7778eb9cf81ad5b00134569"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "re",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/__init__.py",
+      "bytes": 16315,
+      "sha256": "8ff3c37c63b917fcf8dc8d50993a502292a3dc159e41de4f4018c72a53d1c07b",
+      "rawPin": {
+        "bytes": 16315,
+        "sha256": "8ff3c37c63b917fcf8dc8d50993a502292a3dc159e41de4f4018c72a53d1c07b"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "re._casefix",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_casefix.py",
+      "bytes": 5444,
+      "sha256": "1b12d9136f23db6c3f6f26053fefc15ca964b886838c7b9c1fabf8d2efc1e5c8",
+      "rawPin": {
+        "bytes": 5444,
+        "sha256": "1b12d9136f23db6c3f6f26053fefc15ca964b886838c7b9c1fabf8d2efc1e5c8"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "re._compiler",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_compiler.py",
+      "bytes": 26399,
+      "sha256": "c75620761098a70ed75b9accef63ef2881d8abb6d4e5cbfd10074bd165eefe4d",
+      "rawPin": {
+        "bytes": 26399,
+        "sha256": "c75620761098a70ed75b9accef63ef2881d8abb6d4e5cbfd10074bd165eefe4d"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "re._constants",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_constants.py",
+      "bytes": 5930,
+      "sha256": "fa4fdb200f238f9e7817b63892b0d69833d8165134801e775e10cc113348a375",
+      "rawPin": {
+        "bytes": 5930,
+        "sha256": "fa4fdb200f238f9e7817b63892b0d69833d8165134801e775e10cc113348a375"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "re._parser",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_parser.py",
+      "bytes": 41201,
+      "sha256": "a51a85b37cf3f44ba7ff25754da5f31306e4ccfa6eb3c017f9d37bdf4e770840",
+      "rawPin": {
+        "bytes": 41201,
+        "sha256": "a51a85b37cf3f44ba7ff25754da5f31306e4ccfa6eb3c017f9d37bdf4e770840"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "reprlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/reprlib.py",
+      "bytes": 7148,
+      "sha256": "e177bc70da83a7fbcde6fd261dc15da34e8a20873b1cccd4f9a1f8f27cca3779",
+      "rawPin": {
+        "bytes": 7148,
+        "sha256": "e177bc70da83a7fbcde6fd261dc15da34e8a20873b1cccd4f9a1f8f27cca3779"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "selectors",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/selectors.py",
+      "bytes": 19671,
+      "sha256": "1eeb102373e18c96311203f30c516e785bd8642275aa0bd66e43a284c9692385",
+      "rawPin": {
+        "bytes": 19671,
+        "sha256": "1eeb102373e18c96311203f30c516e785bd8642275aa0bd66e43a284c9692385"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "shutil",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/shutil.py",
+      "bytes": 56198,
+      "sha256": "53496e06742fe008fee2bccc8caeac77473e69923bec05358bd43eea467db1f8",
+      "rawPin": {
+        "bytes": 56198,
+        "sha256": "53496e06742fe008fee2bccc8caeac77473e69923bec05358bd43eea467db1f8"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "signal",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/signal.py",
+      "bytes": 2495,
+      "sha256": "0363c964c90ac0b3e515de5749205e6e6454051a1211058375d84d91eab6071a",
+      "rawPin": {
+        "bytes": 2495,
+        "sha256": "0363c964c90ac0b3e515de5749205e6e6454051a1211058375d84d91eab6071a"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "stat",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/stat.py",
+      "bytes": 5485,
+      "sha256": "052af0327eae6941b69b05c088b3e748f79995635f80ac4cc7125eb333eb4c77",
+      "rawPin": {
+        "bytes": 5485,
+        "sha256": "052af0327eae6941b69b05c088b3e748f79995635f80ac4cc7125eb333eb4c77"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "subprocess",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "bytes": 88747,
+      "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375",
+      "rawPin": {
+        "bytes": 88747,
+        "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "tempfile",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tempfile.py",
+      "bytes": 32386,
+      "sha256": "2eea4401f4f29d0d3647ed6fc8bcf6aa1daf879c8aa407a8ea310edac9dfc317",
+      "rawPin": {
+        "bytes": 32386,
+        "sha256": "2eea4401f4f29d0d3647ed6fc8bcf6aa1daf879c8aa407a8ea310edac9dfc317"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "textwrap",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/textwrap.py",
+      "bytes": 19718,
+      "sha256": "62867e40cdea6669b361f72af4d7daf0359f207c92cbeddfc7c7506397c1f31c",
+      "rawPin": {
+        "bytes": 19718,
+        "sha256": "62867e40cdea6669b361f72af4d7daf0359f207c92cbeddfc7c7506397c1f31c"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "threading",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/threading.py",
+      "bytes": 60200,
+      "sha256": "846f450ae794e4aab823a163f8c71d27751148af33e91dd3de886686a4e8ebfb",
+      "rawPin": {
+        "bytes": 60200,
+        "sha256": "846f450ae794e4aab823a163f8c71d27751148af33e91dd3de886686a4e8ebfb"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "token",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/token.py",
+      "bytes": 2511,
+      "sha256": "1a4d994ce9744f4bfe2d964fc24d112a1e76796a08c2e45a2d73c82a8587f922",
+      "rawPin": {
+        "bytes": 2511,
+        "sha256": "1a4d994ce9744f4bfe2d964fc24d112a1e76796a08c2e45a2d73c82a8587f922"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "tokenize",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tokenize.py",
+      "bytes": 21570,
+      "sha256": "026f566ac63e60d69c8185a3880831b657accc5eac984fadf271fc99a5e5825d",
+      "rawPin": {
+        "bytes": 21570,
+        "sha256": "026f566ac63e60d69c8185a3880831b657accc5eac984fadf271fc99a5e5825d"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "traceback",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/traceback.py",
+      "bytes": 46393,
+      "sha256": "2c44af2848836d9af0c7b3547469695cd22586c64274d362eafcf466af284bd6",
+      "rawPin": {
+        "bytes": 46393,
+        "sha256": "2c44af2848836d9af0c7b3547469695cd22586c64274d362eafcf466af284bd6"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "types",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/types.py",
+      "bytes": 10993,
+      "sha256": "345474ef027a1273f353da9bdc1f7c18f65335e72e681bcc0376774cc51f2405",
+      "rawPin": {
+        "bytes": 10993,
+        "sha256": "345474ef027a1273f353da9bdc1f7c18f65335e72e681bcc0376774cc51f2405"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "urllib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "urllib.parse",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/parse.py",
+      "bytes": 45676,
+      "sha256": "e6af7f475262f1de335bb2e41e26adb94d6103977cf5fe1ddc430dc6a3b1623f",
+      "rawPin": {
+        "bytes": 45676,
+        "sha256": "e6af7f475262f1de335bb2e41e26adb94d6103977cf5fe1ddc430dc6a3b1623f"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "warnings",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/warnings.py",
+      "bytes": 21909,
+      "sha256": "6405e281882932205eae641b2d31fba7776f94517a206d289465a1caffbf310e",
+      "rawPin": {
+        "bytes": 21909,
+        "sha256": "6405e281882932205eae641b2d31fba7776f94517a206d289465a1caffbf310e"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "weakref",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/weakref.py",
+      "bytes": 21513,
+      "sha256": "56f8d313fb74019e53eb9287400702fbce788b7fe30e097b0b6e06296f3f080c",
+      "rawPin": {
+        "bytes": 21513,
+        "sha256": "56f8d313fb74019e53eb9287400702fbce788b7fe30e097b0b6e06296f3f080c"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "childAfter",
+      "module": "zipimport",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/zipimport.py",
+      "bytes": 27840,
+      "sha256": "a96f1d7a7b6aaf421a3cf382b94b1422f4f0ad452fdd0bb61d635b560d7a4e91",
+      "rawPin": {
+        "bytes": 27840,
+        "sha256": "a96f1d7a7b6aaf421a3cf382b94b1422f4f0ad452fdd0bb61d635b560d7a4e91"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "__main__",
+      "path": "/workspace/vm-c5-source-24cf-r03/c1-fixture/fixture.py",
+      "bytes": 20601,
+      "sha256": "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208",
+      "rawPin": {
+        "bytes": 20601,
+        "sha256": "a3425095abc2dd6fc444cff848053396424202aa019636fc87685889e3ccb208"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "_collections_abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_collections_abc.py",
+      "bytes": 32089,
+      "sha256": "d4945c8410c4bab351741b04bca3de066f7c27ed7e38df89e206a96617102ffb",
+      "rawPin": {
+        "bytes": 32089,
+        "sha256": "d4945c8410c4bab351741b04bca3de066f7c27ed7e38df89e206a96617102ffb"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "_compression",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_compression.py",
+      "bytes": 5681,
+      "sha256": "3ad5d60627477a60939ee44fc1bb3a05dbe8fb52f0f75039b8f5d8f1a278b981",
+      "rawPin": {
+        "bytes": 5681,
+        "sha256": "3ad5d60627477a60939ee44fc1bb3a05dbe8fb52f0f75039b8f5d8f1a278b981"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "_frozen_importlib_external",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/importlib/_bootstrap_external.py",
+      "bytes": 69428,
+      "sha256": "e6ad72f3f0f9b65c99ab52598cd02ab748511dcdce1dd51f18dace9be9a680c6",
+      "rawPin": {
+        "bytes": 69428,
+        "sha256": "e6ad72f3f0f9b65c99ab52598cd02ab748511dcdce1dd51f18dace9be9a680c6"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "_weakrefset",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/_weakrefset.py",
+      "bytes": 5893,
+      "sha256": "91895a451d06e9f521a1171b31b9b19bc9740f35af00d4fa106338ab7167c9ac",
+      "rawPin": {
+        "bytes": 5893,
+        "sha256": "91895a451d06e9f521a1171b31b9b19bc9740f35af00d4fa106338ab7167c9ac"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/abc.py",
+      "bytes": 6538,
+      "sha256": "e558702a95cdce3febd289da021715d2b92bc43995b8a1bc58dfa1c3d8010287",
+      "rawPin": {
+        "bytes": 6538,
+        "sha256": "e558702a95cdce3febd289da021715d2b92bc43995b8a1bc58dfa1c3d8010287"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "argparse",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/argparse.py",
+      "bytes": 101155,
+      "sha256": "7cc582dcb3b76e2c957f78a3f74e9809d6c311d6aab7bcaa2c9954d0cbff5f30",
+      "rawPin": {
+        "bytes": 101155,
+        "sha256": "7cc582dcb3b76e2c957f78a3f74e9809d6c311d6aab7bcaa2c9954d0cbff5f30"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "ast",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ast.py",
+      "bytes": 64452,
+      "sha256": "b515c23dbbc459329d3b802a3aac742cc456d7472e66f7ed6e9dc97e40596d7d",
+      "rawPin": {
+        "bytes": 64452,
+        "sha256": "b515c23dbbc459329d3b802a3aac742cc456d7472e66f7ed6e9dc97e40596d7d"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "bisect",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bisect.py",
+      "bytes": 3423,
+      "sha256": "f1cf7b85fc36b5da249813fc5ab97d9464f8cc1bc817f7146206fa2713e35999",
+      "rawPin": {
+        "bytes": 3423,
+        "sha256": "f1cf7b85fc36b5da249813fc5ab97d9464f8cc1bc817f7146206fa2713e35999"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "bz2",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/bz2.py",
+      "bytes": 11847,
+      "sha256": "76ab3252924e71e859d7d90e8d3db13b6554975cfcac0fdadced4de7f8779330",
+      "rawPin": {
+        "bytes": 11847,
+        "sha256": "76ab3252924e71e859d7d90e8d3db13b6554975cfcac0fdadced4de7f8779330"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "codecs",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/codecs.py",
+      "bytes": 36870,
+      "sha256": "7b7839e53a77961153240aecfe11edc8054d05b1dedd83894450dae21ec05785",
+      "rawPin": {
+        "bytes": 36870,
+        "sha256": "7b7839e53a77961153240aecfe11edc8054d05b1dedd83894450dae21ec05785"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "collections",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/__init__.py",
+      "bytes": 52378,
+      "sha256": "7fdb04dd248ab37909f46d2085bfee56b32d7e91e49ad3a2fad99c453295659b",
+      "rawPin": {
+        "bytes": 52378,
+        "sha256": "7fdb04dd248ab37909f46d2085bfee56b32d7e91e49ad3a2fad99c453295659b"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "collections.abc",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/collections/abc.py",
+      "bytes": 119,
+      "sha256": "9cb4208f99128a0489b6c8e6c61637617dd7d4250c59e065491957eda084dd10",
+      "rawPin": {
+        "bytes": 119,
+        "sha256": "9cb4208f99128a0489b6c8e6c61637617dd7d4250c59e065491957eda084dd10"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "contextlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "bytes": 27637,
+      "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6",
+      "rawPin": {
+        "bytes": 27637,
+        "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "copy",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copy.py",
+      "bytes": 8412,
+      "sha256": "cbd25547933176fcf6bb05c2adc9f4796d15ac20b9b82dcf890daea7203daeab",
+      "rawPin": {
+        "bytes": 8412,
+        "sha256": "cbd25547933176fcf6bb05c2adc9f4796d15ac20b9b82dcf890daea7203daeab"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "copyreg",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/copyreg.py",
+      "bytes": 7614,
+      "sha256": "c8eda41f05c6bf95a4da4726a530409d2485ae060b8d019b3a8034389a15d3e9",
+      "rawPin": {
+        "bytes": 7614,
+        "sha256": "c8eda41f05c6bf95a4da4726a530409d2485ae060b8d019b3a8034389a15d3e9"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "datetime",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/datetime.py",
+      "bytes": 268,
+      "sha256": "ef20dc6b3554cd585dddffdc573f1f9a7a54c522f2a3fb4576c44edbb1e14238",
+      "rawPin": {
+        "bytes": 268,
+        "sha256": "ef20dc6b3554cd585dddffdc573f1f9a7a54c522f2a3fb4576c44edbb1e14238"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "encodings",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/__init__.py",
+      "bytes": 5884,
+      "sha256": "78c4744d407690f321565488710b5aaf6486b5afa8d185637aa1e7633ab59cd8",
+      "rawPin": {
+        "bytes": 5884,
+        "sha256": "78c4744d407690f321565488710b5aaf6486b5afa8d185637aa1e7633ab59cd8"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "encodings.aliases",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/aliases.py",
+      "bytes": 15677,
+      "sha256": "6fdcc49ba23a0203ae6cf28e608f8e6297d7c4d77d52e651db3cb49b9564c6d2",
+      "rawPin": {
+        "bytes": 15677,
+        "sha256": "6fdcc49ba23a0203ae6cf28e608f8e6297d7c4d77d52e651db3cb49b9564c6d2"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "encodings.utf_8",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/encodings/utf_8.py",
+      "bytes": 1005,
+      "sha256": "ba0cac060269583523ca9506473a755203037c57d466a11aa89a30a5f6756f3d",
+      "rawPin": {
+        "bytes": 1005,
+        "sha256": "ba0cac060269583523ca9506473a755203037c57d466a11aa89a30a5f6756f3d"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "enum",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/enum.py",
+      "bytes": 81540,
+      "sha256": "f35e542d8c4c1d2b5e910138d726fa48774925f3c4dc5462793ebcb66aa55501",
+      "rawPin": {
+        "bytes": 81540,
+        "sha256": "f35e542d8c4c1d2b5e910138d726fa48774925f3c4dc5462793ebcb66aa55501"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "fnmatch",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/fnmatch.py",
+      "bytes": 5999,
+      "sha256": "6683da36e47af523f3f41e18ad244d837783e19e98911cc0b7415dea81494ebc",
+      "rawPin": {
+        "bytes": 5999,
+        "sha256": "6683da36e47af523f3f41e18ad244d837783e19e98911cc0b7415dea81494ebc"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "functools",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/functools.py",
+      "bytes": 37940,
+      "sha256": "de4a1d37c795e2a065124b5c49357893433bc6bb111b41277ccc9930ef08d4c9",
+      "rawPin": {
+        "bytes": 37940,
+        "sha256": "de4a1d37c795e2a065124b5c49357893433bc6bb111b41277ccc9930ef08d4c9"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "genericpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/genericpath.py",
+      "bytes": 5572,
+      "sha256": "2b0b35d2206778af4081cf81dd9b513876e72c35a55bec941402e1fa62b1f1aa",
+      "rawPin": {
+        "bytes": 5572,
+        "sha256": "2b0b35d2206778af4081cf81dd9b513876e72c35a55bec941402e1fa62b1f1aa"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "gettext",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/gettext.py",
+      "bytes": 21320,
+      "sha256": "a5c249a522b6b8e3aa6f1b12a8bcc09508b99ad612b58d2fc973db27ea3b7cc3",
+      "rawPin": {
+        "bytes": 21320,
+        "sha256": "a5c249a522b6b8e3aa6f1b12a8bcc09508b99ad612b58d2fc973db27ea3b7cc3"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "hashlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/hashlib.py",
+      "bytes": 9349,
+      "sha256": "6dbdebf270868b391080e21dc9687eddfaf321c965ad979f68d3f5c423c613ab",
+      "rawPin": {
+        "bytes": 9349,
+        "sha256": "6dbdebf270868b391080e21dc9687eddfaf321c965ad979f68d3f5c423c613ab"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "io",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/io.py",
+      "bytes": 3582,
+      "sha256": "7cec3cb8ac004058dd0a5af246e6d950fb59c7ddd0058fda48bcb3fcb98d8822",
+      "rawPin": {
+        "bytes": 3582,
+        "sha256": "7cec3cb8ac004058dd0a5af246e6d950fb59c7ddd0058fda48bcb3fcb98d8822"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "ipaddress",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ipaddress.py",
+      "bytes": 81414,
+      "sha256": "ba8d3389ff084fcb232b48204ec04f2b3ea4bd0eadf7b18c814947d185de2c64",
+      "rawPin": {
+        "bytes": 81414,
+        "sha256": "ba8d3389ff084fcb232b48204ec04f2b3ea4bd0eadf7b18c814947d185de2c64"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "json",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/__init__.py",
+      "bytes": 14020,
+      "sha256": "d5d41e2c29049515d295d81a6d40b4890fbec8d8482cfb401630f8ef2f77e4d5",
+      "rawPin": {
+        "bytes": 14020,
+        "sha256": "d5d41e2c29049515d295d81a6d40b4890fbec8d8482cfb401630f8ef2f77e4d5"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "json.decoder",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/decoder.py",
+      "bytes": 12525,
+      "sha256": "382cd02af6f7efede5a6d4abbcda1015e5c7a75794b0016022878f9cf32a24f6",
+      "rawPin": {
+        "bytes": 12525,
+        "sha256": "382cd02af6f7efede5a6d4abbcda1015e5c7a75794b0016022878f9cf32a24f6"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "json.encoder",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/encoder.py",
+      "bytes": 16075,
+      "sha256": "52bfb1b66029cc70fa3bd7fe11df9f2e03922d413407a341b387a22c987f24f8",
+      "rawPin": {
+        "bytes": 16075,
+        "sha256": "52bfb1b66029cc70fa3bd7fe11df9f2e03922d413407a341b387a22c987f24f8"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "json.scanner",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/json/scanner.py",
+      "bytes": 2434,
+      "sha256": "572958017eae8842eeddd0e3d18d3c56cc0a197348224915e1d87ce937841764",
+      "rawPin": {
+        "bytes": 2434,
+        "sha256": "572958017eae8842eeddd0e3d18d3c56cc0a197348224915e1d87ce937841764"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "keyword",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/keyword.py",
+      "bytes": 1073,
+      "sha256": "18c2be738c04ad20ad375f6a71db34b3823c7f40b0340f5294d0e89f3c9b093b",
+      "rawPin": {
+        "bytes": 1073,
+        "sha256": "18c2be738c04ad20ad375f6a71db34b3823c7f40b0340f5294d0e89f3c9b093b"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "linecache",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/linecache.py",
+      "bytes": 5800,
+      "sha256": "9eb9194707991b49f9fea67a5222b0e6a0e49c865cdffc69fbc80a1f829e77fb",
+      "rawPin": {
+        "bytes": 5800,
+        "sha256": "9eb9194707991b49f9fea67a5222b0e6a0e49c865cdffc69fbc80a1f829e77fb"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "locale",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/locale.py",
+      "bytes": 78599,
+      "sha256": "3988c5419552d5b9f0bef3695102376f79357f0f440e9cd1f32c501f966e6ef3",
+      "rawPin": {
+        "bytes": 78599,
+        "sha256": "3988c5419552d5b9f0bef3695102376f79357f0f440e9cd1f32c501f966e6ef3"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "lzma",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/lzma.py",
+      "bytes": 13277,
+      "sha256": "58fb9d2fdc8a8af7b25e218f17ea3b51bdfa53bdf40f440ab33c605974ca5c2e",
+      "rawPin": {
+        "bytes": 13277,
+        "sha256": "58fb9d2fdc8a8af7b25e218f17ea3b51bdfa53bdf40f440ab33c605974ca5c2e"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "ntpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ntpath.py",
+      "bytes": 30404,
+      "sha256": "6c0d55ee892f98ef87b1ed3c50c9dfc7e267a98d2db47e08d3dc67529af56725",
+      "rawPin": {
+        "bytes": 30404,
+        "sha256": "6c0d55ee892f98ef87b1ed3c50c9dfc7e267a98d2db47e08d3dc67529af56725"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "operator",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/operator.py",
+      "bytes": 10965,
+      "sha256": "b2af20f67667203c1730e686cc5d0427becc94db4c97f1d3efe3ed2158473f6a",
+      "rawPin": {
+        "bytes": 10965,
+        "sha256": "b2af20f67667203c1730e686cc5d0427becc94db4c97f1d3efe3ed2158473f6a"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "os",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/os.py",
+      "bytes": 40821,
+      "sha256": "54c43a1fc69c979c70d8f7d097174cee163bfe59937723ee353043dd4a0211e1",
+      "rawPin": {
+        "bytes": 40821,
+        "sha256": "54c43a1fc69c979c70d8f7d097174cee163bfe59937723ee353043dd4a0211e1"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "os.path",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "bytes": 17356,
+      "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9",
+      "rawPin": {
+        "bytes": 17356,
+        "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "pathlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/pathlib.py",
+      "bytes": 51052,
+      "sha256": "10ba48ae8063cfe7589436041d0d4628c05f427c7709cf8e75e486f8930cc32c",
+      "rawPin": {
+        "bytes": 51052,
+        "sha256": "10ba48ae8063cfe7589436041d0d4628c05f427c7709cf8e75e486f8930cc32c"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "posixpath",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/posixpath.py",
+      "bytes": 17356,
+      "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9",
+      "rawPin": {
+        "bytes": 17356,
+        "sha256": "03825681086638649a43480954f7f6a16b4da3bd41ece956864ae96e4f795cd9"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "random",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/random.py",
+      "bytes": 34689,
+      "sha256": "de48263a837339c7e01cf9f3c4d756696e0e0775f7778eb9cf81ad5b00134569",
+      "rawPin": {
+        "bytes": 34689,
+        "sha256": "de48263a837339c7e01cf9f3c4d756696e0e0775f7778eb9cf81ad5b00134569"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "re",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/__init__.py",
+      "bytes": 16315,
+      "sha256": "8ff3c37c63b917fcf8dc8d50993a502292a3dc159e41de4f4018c72a53d1c07b",
+      "rawPin": {
+        "bytes": 16315,
+        "sha256": "8ff3c37c63b917fcf8dc8d50993a502292a3dc159e41de4f4018c72a53d1c07b"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "re._casefix",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_casefix.py",
+      "bytes": 5444,
+      "sha256": "1b12d9136f23db6c3f6f26053fefc15ca964b886838c7b9c1fabf8d2efc1e5c8",
+      "rawPin": {
+        "bytes": 5444,
+        "sha256": "1b12d9136f23db6c3f6f26053fefc15ca964b886838c7b9c1fabf8d2efc1e5c8"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "re._compiler",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_compiler.py",
+      "bytes": 26399,
+      "sha256": "c75620761098a70ed75b9accef63ef2881d8abb6d4e5cbfd10074bd165eefe4d",
+      "rawPin": {
+        "bytes": 26399,
+        "sha256": "c75620761098a70ed75b9accef63ef2881d8abb6d4e5cbfd10074bd165eefe4d"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "re._constants",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_constants.py",
+      "bytes": 5930,
+      "sha256": "fa4fdb200f238f9e7817b63892b0d69833d8165134801e775e10cc113348a375",
+      "rawPin": {
+        "bytes": 5930,
+        "sha256": "fa4fdb200f238f9e7817b63892b0d69833d8165134801e775e10cc113348a375"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "re._parser",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/re/_parser.py",
+      "bytes": 41201,
+      "sha256": "a51a85b37cf3f44ba7ff25754da5f31306e4ccfa6eb3c017f9d37bdf4e770840",
+      "rawPin": {
+        "bytes": 41201,
+        "sha256": "a51a85b37cf3f44ba7ff25754da5f31306e4ccfa6eb3c017f9d37bdf4e770840"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "reprlib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/reprlib.py",
+      "bytes": 7148,
+      "sha256": "e177bc70da83a7fbcde6fd261dc15da34e8a20873b1cccd4f9a1f8f27cca3779",
+      "rawPin": {
+        "bytes": 7148,
+        "sha256": "e177bc70da83a7fbcde6fd261dc15da34e8a20873b1cccd4f9a1f8f27cca3779"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "selectors",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/selectors.py",
+      "bytes": 19671,
+      "sha256": "1eeb102373e18c96311203f30c516e785bd8642275aa0bd66e43a284c9692385",
+      "rawPin": {
+        "bytes": 19671,
+        "sha256": "1eeb102373e18c96311203f30c516e785bd8642275aa0bd66e43a284c9692385"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "shutil",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/shutil.py",
+      "bytes": 56198,
+      "sha256": "53496e06742fe008fee2bccc8caeac77473e69923bec05358bd43eea467db1f8",
+      "rawPin": {
+        "bytes": 56198,
+        "sha256": "53496e06742fe008fee2bccc8caeac77473e69923bec05358bd43eea467db1f8"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "signal",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/signal.py",
+      "bytes": 2495,
+      "sha256": "0363c964c90ac0b3e515de5749205e6e6454051a1211058375d84d91eab6071a",
+      "rawPin": {
+        "bytes": 2495,
+        "sha256": "0363c964c90ac0b3e515de5749205e6e6454051a1211058375d84d91eab6071a"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "stat",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/stat.py",
+      "bytes": 5485,
+      "sha256": "052af0327eae6941b69b05c088b3e748f79995635f80ac4cc7125eb333eb4c77",
+      "rawPin": {
+        "bytes": 5485,
+        "sha256": "052af0327eae6941b69b05c088b3e748f79995635f80ac4cc7125eb333eb4c77"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "subprocess",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "bytes": 88747,
+      "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375",
+      "rawPin": {
+        "bytes": 88747,
+        "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "tempfile",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tempfile.py",
+      "bytes": 32386,
+      "sha256": "2eea4401f4f29d0d3647ed6fc8bcf6aa1daf879c8aa407a8ea310edac9dfc317",
+      "rawPin": {
+        "bytes": 32386,
+        "sha256": "2eea4401f4f29d0d3647ed6fc8bcf6aa1daf879c8aa407a8ea310edac9dfc317"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "textwrap",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/textwrap.py",
+      "bytes": 19718,
+      "sha256": "62867e40cdea6669b361f72af4d7daf0359f207c92cbeddfc7c7506397c1f31c",
+      "rawPin": {
+        "bytes": 19718,
+        "sha256": "62867e40cdea6669b361f72af4d7daf0359f207c92cbeddfc7c7506397c1f31c"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "threading",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/threading.py",
+      "bytes": 60200,
+      "sha256": "846f450ae794e4aab823a163f8c71d27751148af33e91dd3de886686a4e8ebfb",
+      "rawPin": {
+        "bytes": 60200,
+        "sha256": "846f450ae794e4aab823a163f8c71d27751148af33e91dd3de886686a4e8ebfb"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "token",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/token.py",
+      "bytes": 2511,
+      "sha256": "1a4d994ce9744f4bfe2d964fc24d112a1e76796a08c2e45a2d73c82a8587f922",
+      "rawPin": {
+        "bytes": 2511,
+        "sha256": "1a4d994ce9744f4bfe2d964fc24d112a1e76796a08c2e45a2d73c82a8587f922"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "tokenize",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/tokenize.py",
+      "bytes": 21570,
+      "sha256": "026f566ac63e60d69c8185a3880831b657accc5eac984fadf271fc99a5e5825d",
+      "rawPin": {
+        "bytes": 21570,
+        "sha256": "026f566ac63e60d69c8185a3880831b657accc5eac984fadf271fc99a5e5825d"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "traceback",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/traceback.py",
+      "bytes": 46393,
+      "sha256": "2c44af2848836d9af0c7b3547469695cd22586c64274d362eafcf466af284bd6",
+      "rawPin": {
+        "bytes": 46393,
+        "sha256": "2c44af2848836d9af0c7b3547469695cd22586c64274d362eafcf466af284bd6"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "types",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/types.py",
+      "bytes": 10993,
+      "sha256": "345474ef027a1273f353da9bdc1f7c18f65335e72e681bcc0376774cc51f2405",
+      "rawPin": {
+        "bytes": 10993,
+        "sha256": "345474ef027a1273f353da9bdc1f7c18f65335e72e681bcc0376774cc51f2405"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "urllib",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "rawPin": {
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "urllib.parse",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/urllib/parse.py",
+      "bytes": 45676,
+      "sha256": "e6af7f475262f1de335bb2e41e26adb94d6103977cf5fe1ddc430dc6a3b1623f",
+      "rawPin": {
+        "bytes": 45676,
+        "sha256": "e6af7f475262f1de335bb2e41e26adb94d6103977cf5fe1ddc430dc6a3b1623f"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "warnings",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/warnings.py",
+      "bytes": 21909,
+      "sha256": "6405e281882932205eae641b2d31fba7776f94517a206d289465a1caffbf310e",
+      "rawPin": {
+        "bytes": 21909,
+        "sha256": "6405e281882932205eae641b2d31fba7776f94517a206d289465a1caffbf310e"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "weakref",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/weakref.py",
+      "bytes": 21513,
+      "sha256": "56f8d313fb74019e53eb9287400702fbce788b7fe30e097b0b6e06296f3f080c",
+      "rawPin": {
+        "bytes": 21513,
+        "sha256": "56f8d313fb74019e53eb9287400702fbce788b7fe30e097b0b6e06296f3f080c"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    },
+    {
+      "stage": "parentAfter",
+      "module": "zipimport",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/zipimport.py",
+      "bytes": 27840,
+      "sha256": "a96f1d7a7b6aaf421a3cf382b94b1422f4f0ad452fdd0bb61d635b560d7a4e91",
+      "rawPin": {
+        "bytes": 27840,
+        "sha256": "a96f1d7a7b6aaf421a3cf382b94b1422f4f0ad452fdd0bb61d635b560d7a4e91"
+      },
+      "matchesRaw": true,
+      "status": "FILE_READBACK"
+    }
+  ],
+  "nativeBuiltinsFromPRE": [
+    {
+      "name": "_sqlite3",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "_ssl",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "_socket",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "_posixsubprocess",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "select",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "resource",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    },
+    {
+      "name": "_hashlib",
+      "loaded": true,
+      "origin": "built-in",
+      "file": null,
+      "builtin": true,
+      "bytes": null,
+      "sha256": null
+    }
+  ],
+  "nativeBuiltinFilePinLimit": "Fileless builtins stay null; no extra imports to fill provenance",
+  "futureProductRunAbsent": true,
+  "preCwdEmpty": true,
+  "productRunnerImportsLoadersTests": 0,
+  "productPASS": false,
+  "fixtureInvocations": 1,
+  "ownedChildCount": 1,
+  "retry": 0,
+  "SQLiteProbes": 0,
+  "installationNetworkProviderGitCleanup": 0,
+  "nativeCommandId": null,
+  "providerNativeId": null,
+  "externalJobs": "UNKNOWN",
+  "priorUnreadableProcesses": 7,
+  "OSContainment": "UNKNOWN",
+  "nativeUncaughtProcessExitValidation": "NOT_PERFORMED; per-case stage_return/capture is synthetic, actual single child exit0"
+}

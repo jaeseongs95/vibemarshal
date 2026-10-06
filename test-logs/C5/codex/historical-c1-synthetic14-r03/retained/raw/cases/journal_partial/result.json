@@ -1,0 +1,24 @@
+{
+  "started_utc": "2026-10-04T20:10:58.802155+00:00",
+  "finished_utc": "2026-10-04T20:10:58.802159+00:00",
+  "test_ids": [
+    "c1_non_product.synthetic_shape.0",
+    "c1_non_product.synthetic_shape.1",
+    "c1_non_product.synthetic_shape.2",
+    "c1_non_product.synthetic_shape.3",
+    "c1_non_product.synthetic_shape.4"
+  ],
+  "testsRun": 5,
+  "wasSuccessful": true,
+  "failures": [],
+  "errors": [],
+  "skipped": [],
+  "expectedFailures": [],
+  "unexpectedSuccesses": [],
+  "unittest_exit": 0,
+  "effect_denials": {
+    "count": 0,
+    "logging_errors": 0
+  },
+  "suite_exit": 0
+}

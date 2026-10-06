@@ -1,0 +1,195 @@
+{
+  "scope": "C5_R03_SOURCE_MATERIALIZATION_ONLY",
+  "utc": "2026-10-04T19:44:59.504260+00:00",
+  "packetRoot": "/workspace/vm-c5-source-24cf-r03/packet",
+  "carrier": {
+    "bytes": 203517,
+    "sha256": "0693bac5e36a7adc9794f69219ef25f31c1fdfee3ce377651ae2cea8ff285bda"
+  },
+  "transportZIP": {
+    "bytes": 152636,
+    "sha256": "14a320ac9c1ebb8c6716c591b1d5f3eeed2523d0e4d6b7bcce3f39c810007850",
+    "storedOutsidePacket": true
+  },
+  "sourceFiles": 11,
+  "sourceBytes": 866064,
+  "seal": {
+    "bytes": 1425,
+    "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d"
+  },
+  "all10SealPinsVerified": true,
+  "externalPins": {
+    "runner.py": {
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343"
+    },
+    "manifest.json": {
+      "bytes": 12335,
+      "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1"
+    },
+    "pristine/tests/test_flowmarshal_implementation_workflow.py": {
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+    },
+    "pristine/scripts/flowmarshal_implementation_workflow.py": {
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+    },
+    "pristine/scripts/flowmarshal_orchestrator_ledger.py": {
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    }
+  },
+  "inventory": [
+    {
+      "path": "ORIGINAL76-INVENTORY.json",
+      "bytes": 161539,
+      "sha256": "3d9cd9641229dd9ffeaee608737036a6dff68bf4a7039e25e8c06bb315598ecd",
+      "mode": "0o600"
+    },
+    {
+      "path": "ORIGINAL76-STATUS.ko.md",
+      "bytes": 24833,
+      "sha256": "f3d088714012f013989b7c82e014bcf872289268df9b3c76d879c755f0b7abf3",
+      "mode": "0o600"
+    },
+    {
+      "path": "README.ko.md",
+      "bytes": 3319,
+      "sha256": "7fe160ad0b983227db2502b66cec45ec423062ede9d74033d82f33745fa62503",
+      "mode": "0o600"
+    },
+    {
+      "path": "SOURCE.DIFF.patch",
+      "bytes": 33411,
+      "sha256": "64725d1c6b008579132b645f176bdc3271ce3a1eb2e667666a6c4f711ee47004",
+      "mode": "0o600"
+    },
+    {
+      "path": "SOURCE.SHA256.json",
+      "bytes": 1425,
+      "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d",
+      "mode": "0o600"
+    },
+    {
+      "path": "STATIC-CHECKS.json",
+      "bytes": 2616,
+      "sha256": "651170804bd7537f4c1cced2075b54863e7b785b5baa0b36a575f7706b415d4c",
+      "mode": "0o600"
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 12335,
+      "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+      "mode": "0o600"
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "mode": "0o600"
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "mode": "0o600"
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "mode": "0o600"
+    },
+    {
+      "path": "runner.py",
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+      "mode": "0o600"
+    }
+  ],
+  "safeZIPChecksPassed": true,
+  "zipEntryAttributes": [
+    {
+      "path": "ORIGINAL76-INVENTORY.json",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "ORIGINAL76-STATUS.ko.md",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "README.ko.md",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "SOURCE.DIFF.patch",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "SOURCE.SHA256.json",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "STATIC-CHECKS.json",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "manifest.json",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    },
+    {
+      "path": "runner.py",
+      "createSystem": 0,
+      "externalAttr": 25165824,
+      "flagBits": 0
+    }
+  ],
+  "testIDsFixedByManifest": [
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_carry_rehashes_all_evidence_files_without_freshness_contract",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_migration_backup_history_idempotence_tamper_cycle_and_readonly",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_record_direct_attempt_rejects_task_that_is_not_ready",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revalidate_success_rejects_ordinary_pending_task",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision_manifest_rejects_false_carry_and_incomplete_lineage"
+  ],
+  "productImportsLoadersTestsClaims": 0,
+  "dummyCalls": 0,
+  "futureRunRootCreated": false,
+  "nativeCommandId": null,
+  "providerNativeId": null,
+  "externalJobs": "UNKNOWN",
+  "OSContainment": "UNKNOWN",
+  "scopeLimit": "Source delivery/PRE metadata only; no C1 fixture supplied or run; no launch authority"
+}

@@ -1,0 +1,19 @@
+{
+  "recordKind": "LOCAL_DERIVED_ARCHIVE_MEANING",
+  "testUnit": "C3",
+  "testPurpose": "입력 계약·ASCII/Unicode 출력·경로 판정의 기존 C3 증거",
+  "historicalArchiveFolder": "historical-issuance-r01-not-run",
+  "currentCloudExecution": 0,
+  "actualNativeReturnClaim": "Only rows explicitly marked LOCAL_RETAINED_HISTORICAL_CLOUD_RETURN_FILE; captures/PRE requests/local notes are not Cloud product execution returns",
+  "sourceRows": 5,
+  "publicCopyRows": 5,
+  "excludedRows": 0,
+  "historicalMeanings": [
+    "Prior expired issuance NOT_RUN; no runner/child logs expected"
+  ],
+  "fixtureIsNotProductPASS": true,
+  "priorNOTRUNUNKNOWNRetained": true,
+  "futureExecutionAuthority": null,
+  "sourceOrPreVerdictNotIssued": true,
+  "sameContentPinDoesNotMergeRunLineage": true
+}

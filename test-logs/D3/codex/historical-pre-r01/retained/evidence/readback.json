@@ -1,0 +1,301 @@
+{
+  "utc": "2026-10-04T22:51:24.525685+00:00",
+  "scope": "r01 raw SOURCE/PRE metadata, not PRE PASS or product PASS",
+  "source18After": [
+    {
+      "path": "BASELINE76.after-C5.actual.json",
+      "bytes": 160966,
+      "sha256": "e9704f0efb11ab7e0eab4bb3a9c55f11cc182cfb30679751297b2988c327b5cd",
+      "matches": true
+    },
+    {
+      "path": "BUILD-SOURCE-METADATA.py",
+      "bytes": 32567,
+      "sha256": "99fedfce09fc4d71c85a8d9450f23f7badf30dad683df84cbd6aeb1081e7458d",
+      "matches": true
+    },
+    {
+      "path": "LAUNCH.UNISSUED.SOURCE-DRAFT.template.txt",
+      "bytes": 4164,
+      "sha256": "08c12a090f4e1cb25e385f689301bcd453f6a3af9d6c9d3f19f9c48ed3cc5c29",
+      "matches": true
+    },
+    {
+      "path": "ORIGINAL-BRANCH-EVIDENCE.json",
+      "bytes": 18807,
+      "sha256": "d7904e403615e42384bf48c800871c379f9dce8639b355f695cc5baad7d66c0e",
+      "matches": true
+    },
+    {
+      "path": "ORIGINAL76-INVENTORY.json",
+      "bytes": 184790,
+      "sha256": "eb3e7e3d5f4b15550640d6f3ca883354c9338caae99ea41c0f09023f9245f7ff",
+      "matches": true
+    },
+    {
+      "path": "ORIGINAL76-STATUS.ko.md",
+      "bytes": 25197,
+      "sha256": "eb334ae0cb93981c4a59671cdf5e70b290f83cfd2b20c42ba3b3aa16bc2aa7f7",
+      "matches": true
+    },
+    {
+      "path": "PREPARATION.COMMAND.UNISSUED.txt",
+      "bytes": 505,
+      "sha256": "a4ea5117f8ef3c74940a3fd1785de345780925d6ab654cc4d8f9f49af54cbbaf",
+      "matches": true
+    },
+    {
+      "path": "README.ko.md",
+      "bytes": 4904,
+      "sha256": "c11927a3937fc39e81c256653d6af558ccab84383529b60ea9854ba35acc6488",
+      "matches": true
+    },
+    {
+      "path": "SOURCE.DIFF.patch",
+      "bytes": 24869,
+      "sha256": "6097851fce7b242b462e447148730c1bfcc459bfe20de3888cecaedcc1867e9d",
+      "matches": true
+    },
+    {
+      "path": "SOURCE.SHA256.json",
+      "bytes": 2446,
+      "sha256": "de7fb149f4336b2ca56a82715b88f2bd6ba306713b2789d28be0dd06cb0b10cd",
+      "matches": true
+    },
+    {
+      "path": "STATIC-CHECKS.json",
+      "bytes": 2338,
+      "sha256": "edd1e16b900dd983a6a1ac34c20877bcda37c3f6ea745683271053eb61d65e6c",
+      "matches": true
+    },
+    {
+      "path": "manifest.json",
+      "bytes": 12308,
+      "sha256": "1cc235f35e68e0426f8c020237f96ebb5b3aadbc0db90cfd36f817dda0c9dea5",
+      "matches": true
+    },
+    {
+      "path": "prepare-command.py",
+      "bytes": 3144,
+      "sha256": "6b0eec027d07faaae75389fe11eae3c7b07bc1557b31315beaf22ec2655a7f04",
+      "matches": true
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "matches": true
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "matches": true
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_direct_selection.py",
+      "bytes": 14804,
+      "sha256": "56793b76b16712fffd1d2d732b3c858621fef15d1d85f2874f0545fba3ea6fe2",
+      "matches": true
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "matches": true
+    },
+    {
+      "path": "runner.py",
+      "bytes": 31666,
+      "sha256": "0aba0adde14a93ea88dbef8ad6a0130024f49f1058608c6cf0cf7c45124ae3f0",
+      "matches": true
+    }
+  ],
+  "runtimeAfter": [
+    {
+      "name": "contextlib",
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "bytes": 27637,
+      "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6",
+      "matches": true
+    },
+    {
+      "name": "inspect",
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+      "bytes": 127125,
+      "sha256": "5c54ebf0bfdc25397750e5d0f63800751650ee50e65325ff3ea4069c9bfa5f75",
+      "matches": true
+    },
+    {
+      "name": "sqlite3",
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/__init__.py",
+      "bytes": 2501,
+      "sha256": "f7cc982617b68e147540ef352d38310fe4d25c2c9c2542b67d0590c871df09a8",
+      "matches": true
+    },
+    {
+      "name": "sqlite3.dbapi2",
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sqlite3/dbapi2.py",
+      "bytes": 3631,
+      "sha256": "7c5c8d98df1f2c50c4062a3be2c0f0499190c179fa4fc281507a1ef763a98f28",
+      "matches": true
+    },
+    {
+      "name": "ssl",
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "bytes": 51655,
+      "sha256": "db62eeaae59c6e7087dcafb28087cd0bb092087381edc556f97c8cb614484380",
+      "matches": true
+    },
+    {
+      "name": "unittest",
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/__init__.py",
+      "bytes": 3487,
+      "sha256": "32ed48385c0377bc2900a76e9a6acc3705aeef402c72de8554b3c637420506f0",
+      "matches": true
+    },
+    {
+      "name": "unittest.mock",
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "bytes": 106317,
+      "sha256": "1de18141992c6742bff27e77c0cbe46d53d6a5ab1850574a536910508823fc5c",
+      "matches": true
+    },
+    {
+      "name": "subprocess",
+      "origin": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "bytes": 88747,
+      "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375",
+      "matches": true
+    },
+    {
+      "name": "_hashlib",
+      "origin": "built-in",
+      "bytes": null,
+      "sha256": null,
+      "state": "NO_FILE_RAW"
+    },
+    {
+      "name": "_posixsubprocess",
+      "origin": "built-in",
+      "bytes": null,
+      "sha256": null,
+      "state": "NO_FILE_RAW"
+    },
+    {
+      "name": "_socket",
+      "origin": "built-in",
+      "bytes": null,
+      "sha256": null,
+      "state": "NO_FILE_RAW"
+    },
+    {
+      "name": "_sqlite3",
+      "origin": "built-in",
+      "bytes": null,
+      "sha256": null,
+      "state": "NO_FILE_RAW"
+    },
+    {
+      "name": "_ssl",
+      "origin": "built-in",
+      "bytes": null,
+      "sha256": null,
+      "state": "NO_FILE_RAW"
+    },
+    {
+      "name": "select",
+      "origin": "built-in",
+      "bytes": null,
+      "sha256": null,
+      "state": "NO_FILE_RAW"
+    }
+  ],
+  "exeAfter": {
+    "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "bytes": 30894944,
+    "sha256": "fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7",
+    "state": "FILE_READ"
+  },
+  "sourceCount": 18,
+  "sourceBytes": 1120657,
+  "futureRunAbsent": true,
+  "futureRunCanonical": "/workspace/vm-d3-run-24cf-r01",
+  "preCwdHomeTmpEmpty": true,
+  "metadataPID": 6405,
+  "metadataUTC": "2026-10-04T22:48:07.232156+00:00",
+  "rawMetadataChecks": {
+    "source18BeforeAfterMatch": true,
+    "sourceBytes1120657": true,
+    "actualFixedExePath": true,
+    "actualLinux312": true,
+    "isolated": true,
+    "noSite": true,
+    "dontWriteBytecode": true,
+    "utf8": true,
+    "actualCwd": true,
+    "preCwdEmpty": true,
+    "preHomeEmpty": true,
+    "preTmpEmpty": true,
+    "futureRunAbsent": true,
+    "futureRunCanonical": true,
+    "futureNoAncestorSymlinks": true,
+    "futureNonOverlap": true,
+    "noLoadedNonstdlibObserved": false
+  },
+  "unknownOriginRowsPreserved": [
+    {
+      "name": "__main__",
+      "origin": null,
+      "file": "<stdin>",
+      "classification": "UNKNOWN_OR_NONSTDLIB",
+      "filePin": {
+        "path": "<stdin>",
+        "bytes": null,
+        "sha256": null,
+        "state": "UNOWNED_NOT_READ"
+      }
+    },
+    {
+      "name": "typing.io",
+      "origin": null,
+      "file": null,
+      "classification": "UNKNOWN_OR_NONSTDLIB",
+      "filePin": {
+        "path": null,
+        "bytes": null,
+        "sha256": null,
+        "state": "NO_FILE"
+      }
+    },
+    {
+      "name": "typing.re",
+      "origin": null,
+      "file": null,
+      "classification": "UNKNOWN_OR_NONSTDLIB",
+      "filePin": {
+        "path": null,
+        "bytes": null,
+        "sha256": null,
+        "state": "NO_FILE"
+      }
+    }
+  ],
+  "SQLiteActualCapabilities": "UNKNOWN_NOT_RUN",
+  "productImportsExecute": 0,
+  "fixtureExecute": 0,
+  "retry": 0,
+  "nativeToolCallId": null,
+  "providerExecutionId": null,
+  "externalJobs": "UNKNOWN",
+  "OSContainment": "UNKNOWN"
+}

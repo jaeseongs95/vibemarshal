@@ -1,0 +1,1136 @@
+[
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 0,
+    "bytes": 9000,
+    "mode": "xb",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "099b90",
+      "wall_time_seconds": 0.000019988,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 9000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "30f8e6",
+      "wall_time_seconds": 0.000027531,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 18000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "21ddf9",
+      "wall_time_seconds": 0.000020178,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 27000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "386eea",
+      "wall_time_seconds": 0.000028444,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 36000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "d814d1",
+      "wall_time_seconds": 0.00002136,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 45000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "25e65b",
+      "wall_time_seconds": 0.000033543,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 54000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "785b84",
+      "wall_time_seconds": 0.000023784,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 63000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "de33fe",
+      "wall_time_seconds": 0.000039876,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 72000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "8b2582",
+      "wall_time_seconds": 0.000024255,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 81000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "c89bb7",
+      "wall_time_seconds": 0.000021501,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 90000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "bffc7b",
+      "wall_time_seconds": 0.00002668,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 99000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "9e150b",
+      "wall_time_seconds": 0.000020859,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 108000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "0f3408",
+      "wall_time_seconds": 0.000091112,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 117000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "53efee",
+      "wall_time_seconds": 0.000020699,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 126000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "69a172",
+      "wall_time_seconds": 0.000033463,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 135000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "c50fd9",
+      "wall_time_seconds": 0.000019146,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 144000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "3dd0cf",
+      "wall_time_seconds": 0.000024386,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/carrier.base64.txt",
+    "offset": 153000,
+    "bytes": 2777,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "6ae477",
+      "wall_time_seconds": 0.000019356,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "2777\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 0,
+    "bytes": 9000,
+    "mode": "xb",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "9d59b4",
+      "wall_time_seconds": 0.000024426,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 9000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "ca6c02",
+      "wall_time_seconds": 0.000021541,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 18000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "714d40",
+      "wall_time_seconds": 0.000026018,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 27000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "e1f475",
+      "wall_time_seconds": 0.000023916,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 36000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "6990de",
+      "wall_time_seconds": 0.000021761,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 45000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "31203f",
+      "wall_time_seconds": 0.000025859,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 54000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "aa747d",
+      "wall_time_seconds": 0.00003198,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 63000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "a583bc",
+      "wall_time_seconds": 0.000039314,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 72000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "076bdb",
+      "wall_time_seconds": 0.000036929,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 81000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "c0f44b",
+      "wall_time_seconds": 0.000021601,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 90000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "b5a3c8",
+      "wall_time_seconds": 0.000036809,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 99000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "7b2063",
+      "wall_time_seconds": 0.00002069,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 108000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "d1dcca",
+      "wall_time_seconds": 0.000028454,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 117000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "44592b",
+      "wall_time_seconds": 0.000021752,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 126000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "2cc7a8",
+      "wall_time_seconds": 0.000023364,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 135000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "2bc2f0",
+      "wall_time_seconds": 0.000020268,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 144000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "e28082",
+      "wall_time_seconds": 0.000034194,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 153000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "260b98",
+      "wall_time_seconds": 0.000031609,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 162000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "844f34",
+      "wall_time_seconds": 0.000041799,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 171000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "1339e6",
+      "wall_time_seconds": 0.000029656,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 180000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "3c62bd",
+      "wall_time_seconds": 0.000035307,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 189000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "78a2e6",
+      "wall_time_seconds": 0.000030397,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 198000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "737297",
+      "wall_time_seconds": 0.000020599,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 207000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "60ea23",
+      "wall_time_seconds": 0.000022953,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 216000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "97f8ef",
+      "wall_time_seconds": 0.000022372,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 225000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "a552f2",
+      "wall_time_seconds": 0.000028303,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 234000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "63e693",
+      "wall_time_seconds": 0.000023344,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 243000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "c84086",
+      "wall_time_seconds": 0.000023074,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 252000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "c67450",
+      "wall_time_seconds": 0.000025739,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 261000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "167495",
+      "wall_time_seconds": 0.000020749,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 270000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "7451a3",
+      "wall_time_seconds": 0.000022733,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 279000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "2c7c89",
+      "wall_time_seconds": 0.000025709,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 288000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "2ba888",
+      "wall_time_seconds": 0.000029095,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 297000,
+    "bytes": 9000,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "6d6d85",
+      "wall_time_seconds": 0.000035397,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "9000\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/native-page-response.json",
+    "offset": 306000,
+    "bytes": 6406,
+    "mode": "ab",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "177475",
+      "wall_time_seconds": 0.000027251,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "6406\n"
+    }
+  },
+  {
+    "path": "/workspace/vm-common3-source-24cf-r03/evidence/materialization-initial-audit.json",
+    "offset": 0,
+    "bytes": 3454,
+    "mode": "xb",
+    "argv": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "-I",
+      "-S",
+      "-B",
+      "-"
+    ],
+    "cwd": "/workspace/vm-common3-source-24cf-r03",
+    "result": {
+      "chunk_id": "cceff7",
+      "wall_time_seconds": 0.000028143,
+      "exit_code": 0,
+      "original_token_count": 2,
+      "output": "3454\n"
+    }
+  }
+]

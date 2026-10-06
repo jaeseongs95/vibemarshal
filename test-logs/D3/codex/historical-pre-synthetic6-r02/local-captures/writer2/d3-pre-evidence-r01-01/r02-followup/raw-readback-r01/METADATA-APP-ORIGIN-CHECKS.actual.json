@@ -1,0 +1,463 @@
+{
+  "schema": "VM_DEV2_R02_METADATA_APP_ORIGIN_SELF_CHECK",
+  "observed_utc": "2026-10-05T10:42:19.962826+00:00",
+  "metadata_utc": "2026-10-04T23:22:28.002098+00:00",
+  "metadata_age_seconds_at_readback": 40791.960728,
+  "metadata_PID": 7280,
+  "stdout": {
+    "bytes": 146121,
+    "sha256": "1ae5fc8936ff4604d44cea11a85b2b96f58c0b0095612d9e1e036e32c66a1a77"
+  },
+  "stderr": {
+    "bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "commands": [
+    {
+      "kind": "metadata",
+      "AppID": "exec-b8a942e1-a864-441a-940c-7397d2e92949",
+      "App_command_pin": {
+        "bytes": 506,
+        "sha256": "9113e6841b580ac930d29a27817710ab4124f54fe3007d9a458967760d4fbed0"
+      },
+      "decoded_payload_pin": {
+        "bytes": 491,
+        "sha256": "11bf8207c03289b56dea8d82f365b85135b02e185690de15bfa507edc772f80e"
+      },
+      "exact_return_command_match": true,
+      "cwd": "/workspace/vm-d3-source-24cf-r02/pre-cwd",
+      "App_exit": 0,
+      "App_duration_ms": 4,
+      "native_wall_time_seconds": 0.004374956,
+      "native_tool_ID": null,
+      "provider_ID": null
+    },
+    {
+      "kind": "fixture",
+      "AppID": "exec-f5ae6bd5-af41-443f-a6e1-43426e708cf2",
+      "App_command_pin": {
+        "bytes": 459,
+        "sha256": "c7515db9cbab01279837ea7da9227e74c09dbea114e951a82c9c64fa79f2c0bc"
+      },
+      "decoded_payload_pin": {
+        "bytes": 444,
+        "sha256": "56c7624f257046f36663b45952b31cf26a5938cc75fe271c07203c46ecb90460"
+      },
+      "exact_return_command_match": true,
+      "cwd": "/workspace/vm-d3-source-24cf-r02/pre-cwd",
+      "App_exit": 0,
+      "App_duration_ms": 39,
+      "native_wall_time_seconds": 0.039700929,
+      "native_tool_ID": null,
+      "provider_ID": null
+    }
+  ],
+  "RootApp_record_pin": {
+    "bytes": 2663,
+    "sha256": "6f7e13c83e3e400ceff72e1f4acd66bfb32ecb2c48887cfcc8e2745a74d6b514"
+  },
+  "origin_null": {
+    "raw_false_preserved": true,
+    "raw_unknown_names": [
+      "__main__",
+      "typing.io",
+      "typing.re"
+    ],
+    "observer_pin": {
+      "bytes": 8540,
+      "sha256": "815532b37de45889d8c078357710e4b4599d9d7e84b815384251818f55e90c1e"
+    },
+    "typing_pin": {
+      "bytes": 118836,
+      "sha256": "be92d60fb8382bb29ead21c128825d7c96d0e8c915b44f840791e49f5a8d554c"
+    },
+    "additional_static_extraction_exact": true,
+    "sys_modules_registrations": [
+      {
+        "line": 3334,
+        "source": "sys.modules[io.__name__] = io"
+      },
+      {
+        "line": 3348,
+        "source": "sys.modules[re.__name__] = re"
+      }
+    ],
+    "alias_object_identity": [
+      {
+        "name": "typing.io",
+        "present": true,
+        "sameObjectAsTypingAttribute": true,
+        "sysModulesObjectId": 522018384,
+        "typingAttributeObjectId": 522018384,
+        "objectType": "_DeprecatedType",
+        "objectTypeModule": "typing",
+        "declaredClassModule": "typing",
+        "objectName": "typing.io",
+        "isModuleType": false,
+        "rawOrigin": null,
+        "rawFile": null
+      },
+      {
+        "name": "typing.re",
+        "present": true,
+        "sameObjectAsTypingAttribute": true,
+        "sysModulesObjectId": 522019376,
+        "typingAttributeObjectId": 522019376,
+        "objectType": "_DeprecatedType",
+        "objectTypeModule": "typing",
+        "declaredClassModule": "typing",
+        "objectName": "typing.re",
+        "isModuleType": false,
+        "rawOrigin": null,
+        "rawFile": null
+      }
+    ],
+    "main_identity": {
+      "sameObjectAsCurrentGlobalsModule": true,
+      "rawFile": "/workspace/vm-d3-source-24cf-r02/evidence/metadata-observer.py",
+      "resolvedFileEqualsObserver": true,
+      "objectType": "module",
+      "objectTypeModule": "builtins",
+      "rawOrigin": null,
+      "actualOrigArgv": [
+        "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+        "-I",
+        "-S",
+        "-B",
+        "-X",
+        "utf8",
+        "/workspace/vm-d3-source-24cf-r02/evidence/metadata-observer.py"
+      ],
+      "cwd": "/workspace/vm-d3-source-24cf-r02/pre-cwd"
+    },
+    "assessment": "Pinned r02 observer file/argv/current-globals observations support owned __main__; pinned stdlib typing registrations plus identical class objects support typing.io/re compatibility aliases. Scoped inference does not edit raw false/UNKNOWN, create PRE admission, or reclassify r01."
+  },
+  "runtime8_before_after_match": true,
+  "mapped_module_rows": 198,
+  "extensions_raw": [
+    {
+      "name": "_sqlite3",
+      "file": null,
+      "origin": "built-in",
+      "rawClassification": "builtin",
+      "filePin": {
+        "path": null,
+        "bytes": null,
+        "sha256": null,
+        "state": "NO_FILE"
+      }
+    },
+    {
+      "name": "_ssl",
+      "file": null,
+      "origin": "built-in",
+      "rawClassification": "builtin",
+      "filePin": {
+        "path": null,
+        "bytes": null,
+        "sha256": null,
+        "state": "NO_FILE"
+      }
+    },
+    {
+      "name": "_socket",
+      "file": null,
+      "origin": "built-in",
+      "rawClassification": "builtin",
+      "filePin": {
+        "path": null,
+        "bytes": null,
+        "sha256": null,
+        "state": "NO_FILE"
+      }
+    },
+    {
+      "name": "_posixsubprocess",
+      "file": null,
+      "origin": "built-in",
+      "rawClassification": "builtin",
+      "filePin": {
+        "path": null,
+        "bytes": null,
+        "sha256": null,
+        "state": "NO_FILE"
+      }
+    },
+    {
+      "name": "select",
+      "file": null,
+      "origin": "built-in",
+      "rawClassification": "builtin",
+      "filePin": {
+        "path": null,
+        "bytes": null,
+        "sha256": null,
+        "state": "NO_FILE"
+      }
+    },
+    {
+      "name": "resource",
+      "origin": null,
+      "file": null,
+      "state": "NOT_LOADED",
+      "filePin": {
+        "path": null,
+        "bytes": null,
+        "sha256": null,
+        "state": "NOT_LOADED"
+      }
+    },
+    {
+      "name": "_hashlib",
+      "file": null,
+      "origin": "built-in",
+      "rawClassification": "builtin",
+      "filePin": {
+        "path": null,
+        "bytes": null,
+        "sha256": null,
+        "state": "NO_FILE"
+      }
+    }
+  ],
+  "code_origins_raw": [
+    {
+      "name": "contextlib.contextmanager",
+      "objectType": "function",
+      "co_filename": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+      "co_name": "contextmanager",
+      "filePin": {
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+        "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/contextlib.py",
+        "bytes": 27637,
+        "sha256": "8b7a477f978a8532852fd81e241c78182516bc4975d672d580a5848a76e11eb6",
+        "state": "FILE_READ",
+        "regular": true,
+        "symlink": false
+      }
+    },
+    {
+      "name": "inspect.unwrap",
+      "objectType": "function",
+      "co_filename": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+      "co_name": "unwrap",
+      "filePin": {
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+        "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/inspect.py",
+        "bytes": 127125,
+        "sha256": "5c54ebf0bfdc25397750e5d0f63800751650ee50e65325ff3ea4069c9bfa5f75",
+        "state": "FILE_READ",
+        "regular": true,
+        "symlink": false
+      }
+    },
+    {
+      "name": "sqlite3.connect",
+      "objectType": "builtin_function_or_method",
+      "co_filename": null,
+      "co_name": null,
+      "filePin": {
+        "path": null,
+        "bytes": null,
+        "sha256": null,
+        "state": "BUILTIN_OR_NO_CODE"
+      }
+    },
+    {
+      "name": "sqlite3.dbapi2.connect",
+      "objectType": "builtin_function_or_method",
+      "co_filename": null,
+      "co_name": null,
+      "filePin": {
+        "path": null,
+        "bytes": null,
+        "sha256": null,
+        "state": "BUILTIN_OR_NO_CODE"
+      }
+    },
+    {
+      "name": "ssl.create_default_context",
+      "objectType": "function",
+      "co_filename": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+      "co_name": "create_default_context",
+      "filePin": {
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+        "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/ssl.py",
+        "bytes": 51655,
+        "sha256": "db62eeaae59c6e7087dcafb28087cd0bb092087381edc556f97c8cb614484380",
+        "state": "FILE_READ",
+        "regular": true,
+        "symlink": false
+      }
+    },
+    {
+      "name": "unittest.TestLoader.loadTestsFromNames",
+      "objectType": "function",
+      "co_filename": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/loader.py",
+      "co_name": "loadTestsFromNames",
+      "filePin": {
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/loader.py",
+        "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/loader.py",
+        "bytes": 21116,
+        "sha256": "7f0af414bfa7fe8612a424b14cfcf8a3c34fcac999d976461beb738ef8b211b8",
+        "state": "FILE_READ",
+        "regular": true,
+        "symlink": false
+      }
+    },
+    {
+      "name": "unittest.mock.patch",
+      "objectType": "function",
+      "co_filename": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+      "co_name": "patch",
+      "filePin": {
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+        "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/unittest/mock.py",
+        "bytes": 106317,
+        "sha256": "1de18141992c6742bff27e77c0cbe46d53d6a5ab1850574a536910508823fc5c",
+        "state": "FILE_READ",
+        "regular": true,
+        "symlink": false
+      }
+    },
+    {
+      "name": "subprocess.Popen.__init__",
+      "objectType": "function",
+      "co_filename": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+      "co_name": "__init__",
+      "filePin": {
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+        "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/subprocess.py",
+        "bytes": 88747,
+        "sha256": "85d29b2bf0249f5436838298c9a60ee93508b1102e9ac43b001f8a7e7ae8f375",
+        "state": "FILE_READ",
+        "regular": true,
+        "symlink": false
+      }
+    }
+  ],
+  "python_raw": {
+    "version": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+    "platform": "linux",
+    "executable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "flags": "sys.flags(debug=0, inspect=0, interactive=0, optimize=0, dont_write_bytecode=1, no_user_site=1, no_site=1, ignore_environment=1, verbose=0, bytes_warning=0, quiet=0, hash_randomization=1, isolated=1, dev_mode=False, utf8_mode=1, warn_default_encoding=0, safe_path=True, int_max_str_digits=4300)",
+    "sys_path": [
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python312.zip",
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12",
+      "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/lib-dynload"
+    ],
+    "actualStdlibRoot": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12",
+    "exePin": {
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+      "bytes": 30894944,
+      "sha256": "fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7",
+      "state": "FILE_READ",
+      "regular": true,
+      "symlink": false
+    },
+    "matchesPriorPin": true
+  },
+  "startup_hooks_raw": [
+    {
+      "kind": ".pth",
+      "executed": false,
+      "basis": "actual -S profile; only bounded file metadata read",
+      "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/distutils-precedence.pth",
+      "resolve": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/distutils-precedence.pth",
+      "bytes": 151,
+      "sha256": "2638ce9e2500e572a5e0de7faed6661eb569d1b696fcba07b0dd223da5f5d224",
+      "state": "FILE_READ",
+      "regular": true,
+      "symlink": false
+    },
+    {
+      "kind": "sitecustomize.py",
+      "exists": false,
+      "loaded": false,
+      "pin": {
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/sitecustomize.py",
+        "bytes": null,
+        "sha256": null,
+        "state": "ABSENT"
+      }
+    },
+    {
+      "kind": "usercustomize.py",
+      "exists": false,
+      "loaded": false,
+      "pin": {
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/site-packages/usercustomize.py",
+        "bytes": null,
+        "sha256": null,
+        "state": "ABSENT"
+      }
+    },
+    {
+      "kind": "sitecustomize.py",
+      "exists": false,
+      "loaded": false,
+      "pin": {
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/sitecustomize.py",
+        "bytes": null,
+        "sha256": null,
+        "state": "ABSENT"
+      }
+    },
+    {
+      "kind": "usercustomize.py",
+      "exists": false,
+      "loaded": false,
+      "pin": {
+        "path": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/lib/python3.12/usercustomize.py",
+        "bytes": null,
+        "sha256": null,
+        "state": "ABSENT"
+      }
+    }
+  ],
+  "SQLite_raw": {
+    "version": "3.53.1",
+    "backupDescriptorPresent": true,
+    "createFunctionDescriptorPresent": true,
+    "actualCapabilities": "UNKNOWN_NOT_RUN",
+    "probeCount": 0,
+    "connectCount": 0,
+    "compileOptions": "UNKNOWN_NOT_QUERIED"
+  },
+  "future_product_root_raw": {
+    "path": "/workspace/vm-d3-run-24cf-r02",
+    "lexists": false,
+    "resolve": "/workspace/vm-d3-run-24cf-r02",
+    "ancestors": [
+      {
+        "path": "/",
+        "symlink": false,
+        "resolve": "/"
+      },
+      {
+        "path": "/workspace",
+        "symlink": false,
+        "resolve": "/workspace"
+      },
+      {
+        "path": "/workspace/vm-d3-run-24cf-r02",
+        "symlink": false,
+        "resolve": "/workspace/vm-d3-run-24cf-r02"
+      }
+    ],
+    "nonOverlap": true,
+    "created": false,
+    "canonicalUpperFMZero": true,
+    "canonicalURIUnambiguous": true
+  },
+  "parent_PID_raw": null,
+  "VM2_execution": 0,
+  "limits": [
+    "remote data copies, not direct current remote filesystem observation",
+    "parent PID is null; child PID and report PID field 7284",
+    "original UTC only; no automatic freshness or current root absence promotion",
+    "App duration vs reported child elapsed kept as separate observations",
+    "first AST string selector missed indirect sys.modules[io.__name__] form; narrowed to actual AST assignment targets, not source or oracle relaxation"
+  ]
+}

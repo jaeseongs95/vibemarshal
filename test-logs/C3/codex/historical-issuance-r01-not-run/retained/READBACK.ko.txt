@@ -1,0 +1,13 @@
+[C3 r03 / NOT_RUN / Root actual App 재관측]
+SOURCE R019 STATIC PASS와 PRE R020 자료기준 PASS는 보존된다. 실제 C3 제품 시험은 미실행이다.
+Root 기존 인간 d717/24cf 범위 해석에 따라 03433096을 issued14:41:13Z/launchNotAfter14:43:13Z로 보냈다. 총책 후속28f57301은 sent14:41:47.165Z/Root delivered14:42:40.610Z이며 정확실행범위확인대기를 요구했다. Root는 미착수hold a8dab7ca를14:43:59.656Z 보내고 같은durable본문callback1했다. 이 순서를 소급 변경하지 않는다.
+Cloud 실제 완료 turn01a1075c-b43c-73c5-8d44-fa7d4ff4a0f4의 두 actual command와 stdout을 Root 공식 App read에서 직접 읽었다.
+1 exec-d5724dd1-a8f5-4411-9e0f-7c95ae20c583 / guard 및 준비기록 CreateNew / exit0
+ 14:42:44.356566Z guard 모든18check true/errors[]. 여기서 실제runner 호출0이며 preparedargv일 뿐이다.
+2 exec-98752f77-c9f3-4c18-95d0-5022dffecc7e / scopehold RO / exit0
+ 14:44:50.704823Z runrootLexists=false/pre-cwdEmpty=true/source9/625583B pins unchanged/PREpin unchanged/outerandPost7 artifacts absent/filesystemWrites0/runnerImportsLoadersTests0.
+Cloud 완료 assistant는 dispatch 직전 clock14:43:24Z가 기한을 넘어서 runner native tool을 호출하지 않았다고 보고한다. 실제 완료 turn의 command2개에도 runner호출없다. ownchild/actualstart/actualexit/nativeexecutionID 없으며 자동재발급/재시도0.
+source evidence/launch-freshness-r01.json4635B/d6877881b375f7370d01d46a0d754d8c3b4924092d2499c5e00d01869fdc25bf는 Cloud에서 해시 보고됐지만 Root가 fullfile 원문을 회수한 것은 아니다.
+execution-dispatch-r01.receipt.json1137B/029681c7daf551d2b20ac2ab939adb5f9b22aa25a3ff97fdfb6b5305efc0f153도 Cloud 원 pin이며 준비status NATIVE_DISPATCH_PENDING/requestedRunnerInvocations1은 실제실행을 뜻하지 않는다. 그 body는 actual holdRO stdout 안에 보존됐다.
+이 폴더는 actual App command/출력/메시지 기록과 stdout의 exacttext 및 Root readback만 보존한다. 원raw와 projection·부분출력을 혼동하지 않는다. 제품 POST PASS 요청이 아니며 새 approval source/원장이 아니다. 이후 실행은 총책d0267 범위확인대기(scopehold)이고 자동renew0, 원 SOURCE/PRE후보불변.
+현재 범위의 실제테스트PASS/FAIL 결과 없음. C3helper70f5 후보만/원76·R2·Windows·F6·ledger4·current10a·qualification확대0. unreadable7/externalJobsUNKNOWN 한계유지. 기존파일삭제/Cloud추가작성·ZIP·업로드/제품·원장효과0.
