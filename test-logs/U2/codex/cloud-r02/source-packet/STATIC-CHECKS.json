@@ -1,0 +1,465 @@
+{
+  "schema": "vm-u64-sqlite2-static-checks-r02",
+  "observed_utc": "2026-10-04T16:50:14.910787+00:00",
+  "author_python": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "author_platform": "win32",
+  "source_only": true,
+  "ast_compile_status": "PASS (syntax only; no exec/import/loader)",
+  "compiled": [
+    "runner.py",
+    "regression/check_origin.py",
+    "regression/dummy_helper.py",
+    "pristine/tests/test_flowmarshal_implementation_workflow.py",
+    "pristine/scripts/flowmarshal_implementation_workflow.py",
+    "pristine/scripts/flowmarshal_orchestrator_ledger.py"
+  ],
+  "exact_ids_ast": [
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_migrates_additively_from_v2_and_preserves_history",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_writer_fence_rejects_missing_and_old_contract_versions"
+  ],
+  "selected_test_lines": {
+    "test_schema_v3_migrates_additively_from_v2_and_preserves_history": [
+      3194,
+      3233
+    ],
+    "test_schema_v3_writer_fence_rejects_missing_and_old_contract_versions": [
+      3235,
+      3274
+    ]
+  },
+  "test_method_closure": {
+    "_make_codex_state": [
+      82,
+      104
+    ],
+    "_make_v1": [
+      142,
+      182
+    ],
+    "_manifest": [
+      209,
+      239
+    ],
+    "_task": [
+      184,
+      207
+    ],
+    "_write_manifest": [
+      241,
+      244
+    ],
+    "begin": [
+      329,
+      332
+    ],
+    "migrate": [
+      324,
+      327
+    ],
+    "setUp": [
+      66,
+      80
+    ],
+    "tearDown": [
+      139,
+      140
+    ],
+    "test_schema_v3_migrates_additively_from_v2_and_preserves_history": [
+      3194,
+      3233
+    ],
+    "test_schema_v3_writer_fence_rejects_missing_and_old_contract_versions": [
+      3235,
+      3274
+    ]
+  },
+  "helper_global_reference_upper_bound_not_actual_calls": {
+    "_active_dispatch": [
+      2539,
+      2546
+    ],
+    "_active_migration_blocker": [
+      1410,
+      1432
+    ],
+    "_append_unique_error": [
+      6571,
+      6573
+    ],
+    "_assert_acyclic": [
+      1308,
+      1324
+    ],
+    "_assert_creation_receipt_binding": [
+      3252,
+      3333
+    ],
+    "_assert_launch_claim_binding": [
+      3866,
+      3880
+    ],
+    "_backup_database": [
+      1435,
+      1452
+    ],
+    "_carried_required_check_state": [
+      2387,
+      2437
+    ],
+    "_create_thread_request_sha256": [
+      570,
+      571
+    ],
+    "_decision": [
+      2549,
+      2632
+    ],
+    "_ensure_v1": [
+      1395,
+      1407
+    ],
+    "_evidence_fresh_for_scope": [
+      5142,
+      5180
+    ],
+    "_expect_keys": [
+      840,
+      846
+    ],
+    "_expected_create_thread_request": [
+      3336,
+      3347
+    ],
+    "_historical_interruption_candidate": [
+      3521,
+      3554
+    ],
+    "_insert_reasoning_policy": [
+      894,
+      945
+    ],
+    "_insert_workflow_manifest": [
+      1615,
+      1690
+    ],
+    "_install_writer_fence_triggers": [
+      801,
+      819
+    ],
+    "_interrupt_observation": [
+      3486,
+      3495
+    ],
+    "_latest_reasoning_policy": [
+      881,
+      891
+    ],
+    "_lineage_root_task_id": [
+      5613,
+      5654
+    ],
+    "_load_creation_receipt": [
+      3136,
+      3249
+    ],
+    "_load_evidence": [
+      5183,
+      5299
+    ],
+    "_load_interrupt_receipt": [
+      3430,
+      3483
+    ],
+    "_load_interruption_reopen_decision": [
+      3598,
+      3644
+    ],
+    "_load_policy_retry_decision": [
+      4394,
+      4477
+    ],
+    "_load_receipt_json": [
+      3124,
+      3133
+    ],
+    "_load_thread_resolution_receipt": [
+      3399,
+      3427
+    ],
+    "_materialize_revision_manifest": [
+      1327,
+      1382
+    ],
+    "_nonempty_string": [
+      849,
+      852
+    ],
+    "_ready_tasks": [
+      2512,
+      2536
+    ],
+    "_recovery_budget_state": [
+      5657,
+      5717
+    ],
+    "_require_current_schema": [
+      787,
+      798
+    ],
+    "_require_unicode_integrity": [
+      540,
+      542
+    ],
+    "_required_check_state": [
+      2440,
+      2483
+    ],
+    "_required_checks_passed": [
+      2486,
+      2492
+    ],
+    "_required_evidence_contract": [
+      5086,
+      5093
+    ],
+    "_resolve_evidence_path": [
+      526,
+      530
+    ],
+    "_same_path": [
+      590,
+      597
+    ],
+    "_serial_direct_lineage": [
+      5904,
+      5929
+    ],
+    "_stale_succeeded_tasks": [
+      2495,
+      2509
+    ],
+    "_string_list": [
+      855,
+      860
+    ],
+    "_task_with_checks": [
+      5302,
+      5316
+    ],
+    "_transitive_dependencies": [
+      1296,
+      1305
+    ],
+    "_unconsumed_direct_claims": [
+      5932,
+      5993
+    ],
+    "_validate_create_thread_request": [
+      545,
+      567
+    ],
+    "_validate_effort_ladder": [
+      863,
+      878
+    ],
+    "_validate_execution_policy_observation": [
+      600,
+      648
+    ],
+    "_validate_freshness_contract": [
+      5096,
+      5139
+    ],
+    "_validate_historical_interruption": [
+      3557,
+      3595
+    ],
+    "_verify_interrupt_event": [
+      3498,
+      3518
+    ],
+    "_verify_interruption_reopen_event": [
+      3659,
+      3711
+    ],
+    "_verify_policy_mismatch_reopen_event": [
+      4510,
+      4583
+    ],
+    "_verify_recovery_bindings": [
+      6634,
+      6739
+    ],
+    "_verify_static_task_and_lineage_bindings": [
+      6576,
+      6631
+    ],
+    "_verify_stored_creation_receipt": [
+      3350,
+      3368
+    ],
+    "_verify_stored_receipt": [
+      3371,
+      3396
+    ],
+    "_verify_thread_resolution_event": [
+      3824,
+      3846
+    ],
+    "_without_windows_extended_path_prefix": [
+      574,
+      587
+    ],
+    "_workflow": [
+      1858,
+      1878
+    ],
+    "_workflow_by_revision": [
+      1848,
+      1855
+    ],
+    "canonical_json": [
+      510,
+      511
+    ],
+    "command_begin": [
+      2843,
+      2921
+    ],
+    "command_migrate": [
+      1693,
+      1845
+    ],
+    "command_verify": [
+      6742,
+      7008
+    ],
+    "insert_event": [
+      822,
+      837
+    ],
+    "isoformat": [
+      502,
+      503
+    ],
+    "load_manifest": [
+      1385,
+      1392
+    ],
+    "open_readonly": [
+      742,
+      751
+    ],
+    "open_write": [
+      754,
+      778
+    ],
+    "parse_time": [
+      506,
+      507
+    ],
+    "require_existing_db": [
+      734,
+      738
+    ],
+    "sha256_bytes": [
+      514,
+      515
+    ],
+    "sha256_file": [
+      518,
+      523
+    ],
+    "table_exists": [
+      781,
+      784
+    ],
+    "utc_now": [
+      498,
+      499
+    ],
+    "validate_manifest": [
+      984,
+      1293
+    ]
+  },
+  "original_byte_identity": [
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    }
+  ],
+  "runner_changed_top_level_functions": [
+    "inputs",
+    "child"
+  ],
+  "module_bound_loader_preserved": true,
+  "strict_module_hook_preserved": true,
+  "sqlite_uri_change_runtime_state": "NOT_RUN; new SOURCE/PRE required",
+  "actual_candidate_runner_starts": 0,
+  "actual_original_imports": 0,
+  "actual_loader_calls": 0,
+  "actual_test_runs": 0,
+  "actual_fixtures": 0,
+  "actual_probes": 0,
+  "no_product_git_ledger_install_changes": true,
+  "runner_added_top_level_functions": [
+    "checked_helper_origin",
+    "helper_origin_observation",
+    "record_helper_origin"
+  ],
+  "helper_origin_guard_runtime_state": "Product NOT_RUN; local Windows Python3.12.10 stdlib dummy11 PASS/exit0 once; not Cloud r01 object observation",
+  "r01_cloud_actual_failure": {
+    "status": "UNKNOWN",
+    "exit": 2,
+    "stage": "helper origin check before TextTestRunner.run",
+    "offending_name": "UNKNOWN",
+    "actual_co_filename": "UNKNOWN"
+  },
+  "first_static_expected_mismatch": {
+    "ordinal": 4,
+    "name": "open_readonly",
+    "decorator": "contextmanager",
+    "expected_original": "pinned helper path",
+    "normal_exposed": "runtime contextlib.py"
+  },
+  "raw_r01_pins_checked": 22,
+  "helper_origin_journal_state": "Dummy before/after22 rows observed; future real helper-origin.jsonl NOT_RUN",
+  "actual_stdlib_dummy_processes": 1,
+  "stdlib_dummy_case_count": 11,
+  "dummy_body_calls": 0,
+  "dummy_terminal_exit": 0,
+  "dummy_retry": 0,
+  "dummy_kill": 0,
+  "supervise_main_sqlite_uri_audit_unchanged_ast": true,
+  "regression_evidence": {
+    "regression-capture/execution.json": {
+      "bytes": 2441,
+      "sha256": "857378118c39c8dd58716717a6e0d794d5d0b6b365027bfb0ac2aa2c61585ed6"
+    },
+    "regression-capture/result.json": {
+      "bytes": 33704,
+      "sha256": "1ce8f75eae84b5f0de00a539943c2cac577721ee27d912cf0038866b2293286f"
+    },
+    "regression-capture/stdout.txt": {
+      "bytes": 30485,
+      "sha256": "aeddf4a96cc87c2b67677ab27fa23e2b600f747d594ca94db341de92354da56e"
+    },
+    "regression-capture/stderr.txt": {
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "r01_unknown_preserved": true
+}

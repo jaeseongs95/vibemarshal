@@ -1,0 +1,88 @@
+--- r01/runner.py
++++ r02/runner.py
+@@ -92,7 +92,7 @@
+ def closure():
+     files = {}
+     for name, module in list(sys.modules.items()):
+-        if name not in ("__main__", MODULE) and name.split(".")[0] not in sys.stdlib_module_names:
++        if name not in ("__main__", MODULE, FIXTURE_MODULE) and name.split(".")[0] not in sys.stdlib_module_names:
+             raise RuntimeError("non-stdlib module: " + name)
+         path = getattr(module, "__file__", None)
+         if path:
+--- r01/manifest.json
++++ r02/manifest.json
+@@ -29,8 +29,8 @@
+   },
+   "runner": {
+     "path": "runner.py",
+-    "bytes": 31666,
+-    "sha256": "0aba0adde14a93ea88dbef8ad6a0130024f49f1058608c6cf0cf7c45124ae3f0"
++    "bytes": 31682,
++    "sha256": "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb"
+   },
+   "runtime": {
+     "platform": "linux",
+@@ -271,7 +271,8 @@
+     "C5_baseline_runner": {
+       "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03\\runner.py",
+       "bytes": 29404,
+-      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343"
++      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
++      "scope": "historical reference; current SOURCE.DIFF is r01 to r02"
+     },
+     "C5_POST": {
+       "path": "D:\\claude\\독립감사관\\R-034-VM-C5-R03-POST-VERDICT.ko.md",
+@@ -284,7 +285,26 @@
+     "original76_inventory": "ORIGINAL76-INVENTORY.json",
+     "unselected_concrete_reasons": "ORIGINAL76-INVENTORY.json",
+     "actual_global_import_closure": "NOT_RUN; source4 and original globals pinned; runtime observation required in new PRE/actual selected run",
+-    "prior_C1_dummy14": "not rerun; common C1 AST evidence reused only for preserved functions, not new D3 observation"
++    "prior_C1_dummy14": "not rerun; common C1 AST evidence reused only for preserved functions, not new D3 observation",
++    "prior_D3_r01": {
++      "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r01",
++      "bytes": 31666,
++      "sha256": "0aba0adde14a93ea88dbef8ad6a0130024f49f1058608c6cf0cf7c45124ae3f0",
++      "scope": "historical R035 SOURCE only; natural M closure rejection statically found afterwards; not executable acceptance"
++    },
++    "closure_fix": {
++      "old_line": 95,
++      "new_line": 95,
++      "old_AST_sha256": "8ecdf924abe18d5f17803fdf996fcd0a084df96b0ae100b5493445b247183706",
++      "new_AST_sha256": "0317fa35190a701ef75ef801bdb7376a559f5f17ab429d91867e5c7d517553ae",
++      "exact_AST_equal": false,
++      "change": "add only declared FIXTURE_MODULE to existing exact closure allow tuple",
++      "full_runner_inverse_declared_tuple_AST_equal": true,
++      "reason": "D imports natural M; checked binding requires M in sys.modules; preflight/postflight closure must admit that same declared M",
++      "actual_import_loader_product_run": "NOT_RUN",
++      "prior_R035": "historical/static unchanged source only; do not reuse for r02",
++      "new_SOURCE_PRE_fixture_required": true
++    }
+   },
+   "issuance": {
+     "issuer": "Root only under current human scope; this candidate issues none",
+@@ -301,6 +321,7 @@
+     "preparation_invocation": "PREPARATION.COMMAND.UNISSUED.txt",
+     "native_template": "LAUNCH.UNISSUED.SOURCE-DRAFT.template.txt",
+     "template_state": "SOURCE_DRAFT_PRE_UNBOUND_NOT_RUN",
+-    "future_rule": "Root must bind new PRE evidence/paths/runtime/source seal into separate final template, include preparation command in PRE review. Only after actual final template audited may issuer substitute the designated4 values, preserving all other bytes including .__name__."
+-  }
++    "future_rule": "Root must bind new r02 SOURCE and PRE/denial/closure fixture/runtime/paths into separate final template; actual preparation argv reviewed; only designated4 issued values substituted. SOURCE draft and issuance remain NOT_RUN."
++  },
++  "candidate_revision": "after-c5-next-source-r02"
+ }
+--- r01/LAUNCH.UNISSUED.SOURCE-DRAFT.template.txt
++++ r02/LAUNCH.UNISSUED.SOURCE-DRAFT.template.txt
+@@ -4,10 +4,10 @@
+ deadline=datetime.datetime.fromisoformat('__LAUNCH_NOT_AFTER_ISO__')
+ context={'peerId':'__DISPATCH_PEER_ID__','launchNotAfterUtc':'__LAUNCH_NOT_AFTER_UTC__'}
+ window_seconds=900
+-root=pathlib.Path('/workspace/vm-d3-source-24cf-r01')
+-packet=root/'packet';cwd=root/'pre-cwd';run=pathlib.Path('/workspace/vm-d3-run-24cf-r01')
++root=pathlib.Path('/workspace/vm-d3-source-24cf-r02')
++packet=root/'packet';cwd=root/'pre-cwd';run=pathlib.Path('/workspace/vm-d3-run-24cf-r02')
+ exe=pathlib.Path('/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12')
+-SOURCE_CORE_PINS={"manifest.json": {"bytes": 12308, "sha256": "1cc235f35e68e0426f8c020237f96ebb5b3aadbc0db90cfd36f817dda0c9dea5"}, "pristine/scripts/flowmarshal_implementation_workflow.py": {"bytes": 384699, "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"}, "pristine/scripts/flowmarshal_orchestrator_ledger.py": {"bytes": 39264, "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"}, "pristine/tests/test_flowmarshal_direct_selection.py": {"bytes": 14804, "sha256": "56793b76b16712fffd1d2d732b3c858621fef15d1d85f2874f0545fba3ea6fe2"}, "pristine/tests/test_flowmarshal_implementation_workflow.py": {"bytes": 173219, "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"}, "runner.py": {"bytes": 31666, "sha256": "0aba0adde14a93ea88dbef8ad6a0130024f49f1058608c6cf0cf7c45124ae3f0"}}
++SOURCE_CORE_PINS={"manifest.json": {"bytes": 13558, "sha256": "ff64e328bfc51fae2c96ebb605008d7ef2fb8fde15e4b36fd6de4d205bb6a3d0"}, "pristine/scripts/flowmarshal_implementation_workflow.py": {"bytes": 384699, "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"}, "pristine/scripts/flowmarshal_orchestrator_ledger.py": {"bytes": 39264, "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"}, "pristine/tests/test_flowmarshal_direct_selection.py": {"bytes": 14804, "sha256": "56793b76b16712fffd1d2d732b3c858621fef15d1d85f2874f0545fba3ea6fe2"}, "pristine/tests/test_flowmarshal_implementation_workflow.py": {"bytes": 173219, "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"}, "runner.py": {"bytes": 31682, "sha256": "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb"}}
+ # SOURCE draft only. Root must bind a new PRE before freezing the final native template.
+ pre_evidence_pin=None
+ try:

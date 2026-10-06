@@ -1,0 +1,2 @@
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 -I -S -B -X utf8 <absolute SOURCE packet>/prepare-command.py --template <Root new-PRE final UNISSUED template> --template-sha256 <new-PRE final template external sha256> --tokens-json <Root system-issued exact-four-key JSON> --output <fresh absolute owned issued command file>
+SOURCE preparation only: this argv is unissued and was not run. Final template/PRE binding is unresolved; no product/fixture launch assignment exists.

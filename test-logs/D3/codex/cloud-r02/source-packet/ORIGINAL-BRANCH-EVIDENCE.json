@@ -1,0 +1,753 @@
+{
+  "schema": "d3_static_branch_evidence",
+  "actual_execution": "NOT_RUN",
+  "selected_exact_ids": [
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged",
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject"
+  ],
+  "selected_source_methods": {
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows": {
+      "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+      "start": 157,
+      "end": 168,
+      "method_AST_sha256": "c9cc7b61be75c54f699ba9093ecda751359aa956b243cd692fe89d78c07a41fb"
+    },
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged": {
+      "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+      "start": 204,
+      "end": 217,
+      "method_AST_sha256": "d4f6e81fb68c83225b97da355258b7d5863d2e4f4fdac57e4bc546b9b3d0fb44"
+    },
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject": {
+      "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+      "start": 183,
+      "end": 189,
+      "method_AST_sha256": "f0738d4d234e65ef27f318785c1fa52b3d7fe0659cc0cb8c382842e11d80484d"
+    }
+  },
+  "variants": [
+    {
+      "test": "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+      "variant": "workflow_revision=77",
+      "cut": "_load_direct_selection:6018-6019",
+      "oracle": "(RuntimeError,ValueError)",
+      "basis": "原evidence still actual task binding; selected workflow_revision differs expected1"
+    },
+    {
+      "test": "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+      "variant": "generation=77",
+      "cut": "_load_direct_selection:6018-6019",
+      "oracle": "(RuntimeError,ValueError)",
+      "basis": "selected generation differs actual migrated head generation"
+    },
+    {
+      "test": "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+      "variant": "task_spec_sha256='f'*64",
+      "cut": "_load_direct_selection:6018-6019",
+      "oracle": "(RuntimeError,ValueError)",
+      "basis": "evidence actual spec remains original; selection expected spec differs"
+    },
+    {
+      "test": "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+      "variant": "dependencies=[]",
+      "cut": "_load_direct_selection:6030-6031",
+      "oracle": "(RuntimeError,ValueError)",
+      "basis": "FM02 depends FM00; source D selection carries actual nonempty dependency descriptors"
+    },
+    {
+      "test": "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+      "variant": "approved=True extra field",
+      "cut": "_load_direct_selection:6011 _expect_keys",
+      "oracle": "(RuntimeError,ValueError)",
+      "basis": "approved is absent from exact keys6006-6008"
+    },
+    {
+      "test": "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject",
+      "variant": "prior proof tamper",
+      "cut": "_ready_tasks:2529-2533 -> _load_direct_selection:6024-6025",
+      "oracle": "RuntimeError stale|dependency-ready",
+      "basis": "FM00 stored check digest stale, current FM02 evidence generated after tamper has current digest; prerequisite FM00 no longer ready-valid"
+    },
+    {
+      "test": "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged",
+      "variant": "assignment.sha256='e'*64",
+      "cut": "_load_evidence:5231-5233",
+      "oracle": "ValueError hash",
+      "basis": "D record74-78 copies this false hash into evidence.files; assignment source file unchanged"
+    },
+    {
+      "test": "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged",
+      "variant": "required check status NOT_RUN, finding None",
+      "cut": "_load_evidence:5292-5296",
+      "oracle": "ValueError PASS",
+      "basis": "D211-216 original required-check evidence only changes status; _load_evidence rejects outcome PASS with nonPASS required check"
+    }
+  ],
+  "before_effect_target": "command_record_direct_attempt:6240; successful prepare snapshot6159 not called by selected3",
+  "shared_fixture": {
+    "D_setUp": [
+      17,
+      34
+    ],
+    "M_setUp": [
+      66,
+      80
+    ],
+    "migrate": [
+      324,
+      327
+    ],
+    "begin": [
+      329,
+      332
+    ],
+    "pass_fm00": [
+      424,
+      430
+    ],
+    "D_helpers": {
+      "selection": [
+        39,
+        55
+      ],
+      "record": [
+        67,
+        81
+      ],
+      "counts": [
+        83,
+        87
+      ]
+    },
+    "M_record_direct": [
+      2386,
+      2392
+    ]
+  },
+  "named_helper_graph": {
+    "command_record_direct_attempt": {
+      "start": 6175,
+      "end": 6320,
+      "named_helper_calls": [
+        "_active_dispatch",
+        "_assert_no_unscoped_direct_claims",
+        "_capture_execution_source_snapshot",
+        "_decision",
+        "_invalidate_carry_forward_for_attempt",
+        "_latest_direct_preparation",
+        "_lease_row",
+        "_load_direct_selection",
+        "_load_evidence",
+        "_nonempty_string",
+        "_task_model_binding",
+        "_task_with_checks",
+        "_workflow",
+        "canonical_json",
+        "insert_event",
+        "isoformat",
+        "open_write"
+      ]
+    },
+    "open_write": {
+      "start": 754,
+      "end": 778,
+      "named_helper_calls": [
+        "require_existing_db",
+        "table_exists"
+      ]
+    },
+    "table_exists": {
+      "start": 781,
+      "end": 784,
+      "named_helper_calls": []
+    },
+    "require_existing_db": {
+      "start": 734,
+      "end": 738,
+      "named_helper_calls": []
+    },
+    "isoformat": {
+      "start": 502,
+      "end": 503,
+      "named_helper_calls": [
+        "utc_now"
+      ]
+    },
+    "utc_now": {
+      "start": 498,
+      "end": 499,
+      "named_helper_calls": []
+    },
+    "insert_event": {
+      "start": 822,
+      "end": 837,
+      "named_helper_calls": [
+        "canonical_json",
+        "isoformat"
+      ]
+    },
+    "canonical_json": {
+      "start": 510,
+      "end": 511,
+      "named_helper_calls": []
+    },
+    "_workflow": {
+      "start": 1858,
+      "end": 1878,
+      "named_helper_calls": [
+        "_workflow_by_revision",
+        "table_exists"
+      ]
+    },
+    "_workflow_by_revision": {
+      "start": 1848,
+      "end": 1855,
+      "named_helper_calls": []
+    },
+    "_task_with_checks": {
+      "start": 5302,
+      "end": 5316,
+      "named_helper_calls": []
+    },
+    "_task_model_binding": {
+      "start": 948,
+      "end": 981,
+      "named_helper_calls": [
+        "_latest_reasoning_policy"
+      ]
+    },
+    "_latest_reasoning_policy": {
+      "start": 881,
+      "end": 891,
+      "named_helper_calls": [
+        "table_exists"
+      ]
+    },
+    "_nonempty_string": {
+      "start": 849,
+      "end": 852,
+      "named_helper_calls": []
+    },
+    "_load_evidence": {
+      "start": 5183,
+      "end": 5299,
+      "named_helper_calls": [
+        "_expect_keys",
+        "_nonempty_string",
+        "_required_evidence_contract",
+        "_resolve_evidence_path",
+        "_string_list",
+        "_validate_freshness_contract",
+        "canonical_json",
+        "parse_time",
+        "sha256_bytes",
+        "sha256_file"
+      ]
+    },
+    "sha256_file": {
+      "start": 518,
+      "end": 523,
+      "named_helper_calls": []
+    },
+    "sha256_bytes": {
+      "start": 514,
+      "end": 515,
+      "named_helper_calls": []
+    },
+    "parse_time": {
+      "start": 506,
+      "end": 507,
+      "named_helper_calls": []
+    },
+    "_validate_freshness_contract": {
+      "start": 5096,
+      "end": 5139,
+      "named_helper_calls": [
+        "_expect_keys",
+        "_nonempty_string",
+        "_resolve_evidence_path",
+        "_string_list",
+        "sha256_file"
+      ]
+    },
+    "_string_list": {
+      "start": 855,
+      "end": 860,
+      "named_helper_calls": [
+        "_nonempty_string"
+      ]
+    },
+    "_resolve_evidence_path": {
+      "start": 526,
+      "end": 530,
+      "named_helper_calls": []
+    },
+    "_expect_keys": {
+      "start": 840,
+      "end": 846,
+      "named_helper_calls": []
+    },
+    "_required_evidence_contract": {
+      "start": 5086,
+      "end": 5093,
+      "named_helper_calls": []
+    },
+    "_load_direct_selection": {
+      "start": 6001,
+      "end": 6127,
+      "named_helper_calls": [
+        "_direct_dependencies",
+        "_direct_failures",
+        "_expect_keys",
+        "_nonempty_string",
+        "_ready_tasks",
+        "_required_checks_passed",
+        "_resolve_evidence_path",
+        "_serial_direct_lineage",
+        "_stale_succeeded_tasks",
+        "_unconsumed_direct_claims",
+        "_validate_parallel_assignment",
+        "_validate_parallel_claims",
+        "canonical_json",
+        "sha256_bytes",
+        "sha256_file"
+      ]
+    },
+    "_validate_parallel_claims": {
+      "start": 5884,
+      "end": 5901,
+      "named_helper_calls": [
+        "canonical_json"
+      ]
+    },
+    "_validate_parallel_assignment": {
+      "start": 5813,
+      "end": 5881,
+      "named_helper_calls": []
+    },
+    "_unconsumed_direct_claims": {
+      "start": 5932,
+      "end": 5993,
+      "named_helper_calls": [
+        "_resolve_evidence_path",
+        "_serial_direct_lineage",
+        "sha256_file"
+      ]
+    },
+    "_serial_direct_lineage": {
+      "start": 5904,
+      "end": 5929,
+      "named_helper_calls": [
+        "canonical_json"
+      ]
+    },
+    "_stale_succeeded_tasks": {
+      "start": 2495,
+      "end": 2509,
+      "named_helper_calls": [
+        "_required_check_state"
+      ]
+    },
+    "_required_check_state": {
+      "start": 2440,
+      "end": 2483,
+      "named_helper_calls": [
+        "_carried_required_check_state",
+        "_evidence_fresh_for_scope",
+        "_required_evidence_contract"
+      ]
+    },
+    "_evidence_fresh_for_scope": {
+      "start": 5142,
+      "end": 5180,
+      "named_helper_calls": [
+        "_resolve_evidence_path",
+        "_validate_freshness_contract",
+        "sha256_file"
+      ]
+    },
+    "_carried_required_check_state": {
+      "start": 2387,
+      "end": 2437,
+      "named_helper_calls": [
+        "_evidence_fresh_for_scope",
+        "_required_evidence_contract",
+        "table_exists"
+      ]
+    },
+    "_required_checks_passed": {
+      "start": 2486,
+      "end": 2492,
+      "named_helper_calls": [
+        "_required_check_state"
+      ]
+    },
+    "_ready_tasks": {
+      "start": 2512,
+      "end": 2536,
+      "named_helper_calls": [
+        "_required_checks_passed"
+      ]
+    },
+    "_direct_failures": {
+      "start": 5753,
+      "end": 5770,
+      "named_helper_calls": []
+    },
+    "_direct_dependencies": {
+      "start": 5720,
+      "end": 5750,
+      "named_helper_calls": []
+    },
+    "_lease_row": {
+      "start": 2832,
+      "end": 2840,
+      "named_helper_calls": [
+        "isoformat"
+      ]
+    },
+    "_latest_direct_preparation": {
+      "start": 6130,
+      "end": 6140,
+      "named_helper_calls": []
+    },
+    "_invalidate_carry_forward_for_attempt": {
+      "start": 2971,
+      "end": 2984,
+      "named_helper_calls": [
+        "table_exists"
+      ]
+    },
+    "_decision": {
+      "start": 2549,
+      "end": 2632,
+      "named_helper_calls": [
+        "_active_dispatch",
+        "_interrupt_observation",
+        "_ready_tasks",
+        "_recovery_budget_state",
+        "_required_checks_passed",
+        "_stale_succeeded_tasks"
+      ]
+    },
+    "_recovery_budget_state": {
+      "start": 5657,
+      "end": 5717,
+      "named_helper_calls": [
+        "_latest_reasoning_policy",
+        "_lineage_root_task_id"
+      ]
+    },
+    "_lineage_root_task_id": {
+      "start": 5613,
+      "end": 5654,
+      "named_helper_calls": [
+        "table_exists"
+      ]
+    },
+    "_interrupt_observation": {
+      "start": 3486,
+      "end": 3495,
+      "named_helper_calls": []
+    },
+    "_active_dispatch": {
+      "start": 2539,
+      "end": 2546,
+      "named_helper_calls": []
+    },
+    "_capture_execution_source_snapshot": {
+      "start": 2129,
+      "end": 2190,
+      "named_helper_calls": [
+        "_capture_source_snapshot"
+      ]
+    },
+    "_capture_source_snapshot": {
+      "start": 2089,
+      "end": 2126,
+      "named_helper_calls": [
+        "sha256_bytes",
+        "sha256_file"
+      ]
+    },
+    "_assert_no_unscoped_direct_claims": {
+      "start": 5996,
+      "end": 5998,
+      "named_helper_calls": [
+        "_unconsumed_direct_claims"
+      ]
+    },
+    "command_ready_tasks": {
+      "start": 5773,
+      "end": 5809,
+      "named_helper_calls": [
+        "_decision",
+        "_direct_dependencies",
+        "_direct_failures",
+        "_ready_tasks",
+        "_recovery_budget_state",
+        "_required_check_state",
+        "_stale_succeeded_tasks",
+        "_task_with_checks",
+        "_workflow",
+        "open_readonly"
+      ]
+    },
+    "open_readonly": {
+      "start": 742,
+      "end": 751,
+      "named_helper_calls": [
+        "require_existing_db"
+      ]
+    },
+    "command_review": {
+      "start": 5319,
+      "end": 5455,
+      "named_helper_calls": [
+        "_active_dispatch",
+        "_invalidate_carry_forward_for_attempt",
+        "_lease_row",
+        "_load_evidence",
+        "_task_with_checks",
+        "_workflow",
+        "_workflow_by_revision",
+        "canonical_json",
+        "insert_event",
+        "isoformat",
+        "open_write"
+      ]
+    },
+    "command_begin": {
+      "start": 2843,
+      "end": 2921,
+      "named_helper_calls": [
+        "_active_dispatch",
+        "_decision",
+        "_workflow",
+        "canonical_json",
+        "insert_event",
+        "isoformat",
+        "open_write",
+        "utc_now"
+      ]
+    },
+    "command_migrate": {
+      "start": 1693,
+      "end": 1845,
+      "named_helper_calls": [
+        "_active_migration_blocker",
+        "_backup_database",
+        "_ensure_v1",
+        "_insert_workflow_manifest",
+        "_install_writer_fence_triggers",
+        "canonical_json",
+        "insert_event",
+        "isoformat",
+        "load_manifest",
+        "open_readonly",
+        "open_write",
+        "require_existing_db",
+        "sha256_bytes",
+        "table_exists"
+      ]
+    },
+    "load_manifest": {
+      "start": 1385,
+      "end": 1392,
+      "named_helper_calls": [
+        "_materialize_revision_manifest",
+        "canonical_json",
+        "sha256_bytes",
+        "validate_manifest"
+      ]
+    },
+    "validate_manifest": {
+      "start": 984,
+      "end": 1293,
+      "named_helper_calls": [
+        "_assert_acyclic",
+        "_expect_keys",
+        "_nonempty_string",
+        "_string_list",
+        "_transitive_dependencies",
+        "_validate_effort_ladder",
+        "sha256_file"
+      ]
+    },
+    "_validate_effort_ladder": {
+      "start": 863,
+      "end": 878,
+      "named_helper_calls": [
+        "_string_list"
+      ]
+    },
+    "_transitive_dependencies": {
+      "start": 1296,
+      "end": 1305,
+      "named_helper_calls": []
+    },
+    "_assert_acyclic": {
+      "start": 1308,
+      "end": 1324,
+      "named_helper_calls": []
+    },
+    "_materialize_revision_manifest": {
+      "start": 1327,
+      "end": 1382,
+      "named_helper_calls": [
+        "sha256_file",
+        "validate_manifest"
+      ]
+    },
+    "_install_writer_fence_triggers": {
+      "start": 801,
+      "end": 819,
+      "named_helper_calls": [
+        "table_exists"
+      ]
+    },
+    "_insert_workflow_manifest": {
+      "start": 1615,
+      "end": 1690,
+      "named_helper_calls": [
+        "_insert_reasoning_policy",
+        "canonical_json",
+        "sha256_bytes"
+      ]
+    },
+    "_insert_reasoning_policy": {
+      "start": 894,
+      "end": 945,
+      "named_helper_calls": [
+        "_nonempty_string",
+        "_validate_effort_ladder",
+        "canonical_json"
+      ]
+    },
+    "_ensure_v1": {
+      "start": 1395,
+      "end": 1407,
+      "named_helper_calls": []
+    },
+    "_backup_database": {
+      "start": 1435,
+      "end": 1452,
+      "named_helper_calls": [
+        "open_readonly",
+        "sha256_file",
+        "utc_now"
+      ]
+    },
+    "_active_migration_blocker": {
+      "start": 1410,
+      "end": 1432,
+      "named_helper_calls": [
+        "_unconsumed_direct_claims",
+        "isoformat"
+      ]
+    }
+  },
+  "potential_effect_nodes_in_overapprox": [
+    "_capture_execution_source_snapshot",
+    "_capture_source_snapshot"
+  ],
+  "graph_limit": "named-call overapprox contains unavailable success branches and misses dynamic calls; branch cuts rely on source inputs above. No runtime discovery or no-effect proof yet.",
+  "source_branch_read_ranges": {
+    "helper": [
+      [
+        2089,
+        2190
+      ],
+      [
+        2512,
+        2536
+      ],
+      [
+        5183,
+        5299
+      ],
+      [
+        5773,
+        5809
+      ],
+      [
+        6001,
+        6127
+      ],
+      [
+        6143,
+        6320
+      ]
+    ],
+    "D": [
+      [
+        1,
+        283
+      ]
+    ],
+    "M": [
+      [
+        1,
+        80
+      ],
+      [
+        82,
+        105
+      ],
+      [
+        141,
+        244
+      ],
+      [
+        324,
+        332
+      ],
+      [
+        365,
+        430
+      ],
+      [
+        2386,
+        2392
+      ]
+    ],
+    "H": [
+      [
+        1,
+        86
+      ]
+    ],
+    "I": [
+      [
+        1,
+        136
+      ]
+    ]
+  },
+  "natural_identity": {
+    "D_import": [
+      11,
+      11
+    ],
+    "D_aliases": [
+      13,
+      13
+    ],
+    "M_load_helper": [
+      21,
+      35
+    ],
+    "no_alias_injection": true,
+    "no_invented_tests_init": true,
+    "only_unqualified_D_and_M_modules": true,
+    "guard": "sys.modules natural names, __name__/__spec__/__package__/__file__, D aliases object-identical to M, test and fixture code/globals origin; M connect writer-contract lambda belongs original M globals"
+  },
+  "effects_allowed_in_future": "runner owned child1, original private TMP SQLite/migration/backups/read-only URI and evidence-file mutations/teardown only; selected commands rejection means record snapshot must not run",
+  "still_unmeasured": [
+    "selected branch runtime",
+    "D natural import and globals actual observations",
+    "helper-origin17",
+    "full public product/Goal"
+  ]
+}

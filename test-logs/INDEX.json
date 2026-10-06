@@ -1,6 +1,6 @@
 {
   "repository": "https://github.com/jaeseongs95/vibemarshal",
-  "branch": "codex/vm-test-logs-20261006",
+  "branch": "evidence",
   "originalTestCount": 76,
   "historicalScopedSuccessCount": 13,
   "remainingCount": 63,
@@ -892,6 +892,439 @@
       "bytes": 7567,
       "sha256": "3f574de18a54251faaced0688a6456d304edd5947669c0d41106dc2d4cd9bdda",
       "kind": "original-post-verdict"
+    },
+    {
+      "path": "C3/codex/cloud-r03/source-packet/manifest.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\final-r03\\manifest.json",
+      "bytes": 3381,
+      "sha256": "ae0260a8fd9803cc716a8eab504e34b9bdfd919f39695e8bced5a896c116c3ad",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C3/codex/cloud-r03/source-packet/pristine/scripts/flowmarshal_implementation_workflow.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\final-r03\\pristine\\scripts\\flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C3/codex/cloud-r03/source-packet/pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\final-r03\\pristine\\scripts\\flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C3/codex/cloud-r03/source-packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\final-r03\\pristine\\tests\\test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C3/codex/cloud-r03/source-packet/README.ko.md",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\final-r03\\README.ko.md",
+      "bytes": 3904,
+      "sha256": "4d68300671e9b6728ee4877642d7673caefbe1225faca05c9985ca2f6143ac6f",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C3/codex/cloud-r03/source-packet/runner.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\final-r03\\runner.py",
+      "bytes": 15249,
+      "sha256": "457fd65598bc5cb5a87dd46abb7036bac9768db20a932053fb9670b201862136",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C3/codex/cloud-r03/source-packet/SOURCE.DIFF.patch",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\final-r03\\SOURCE.DIFF.patch",
+      "bytes": 1729,
+      "sha256": "0628ef2c7fdefea950e93f9304d9a29f34a0879823a31266d737145c326b4160",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C3/codex/cloud-r03/source-packet/SOURCE.SHA256.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\final-r03\\SOURCE.SHA256.json",
+      "bytes": 1146,
+      "sha256": "321ee6055812cdd7b2648bdc27f67eaac6d7fd2bcde309c8ad1d503bf988bc86",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C3/codex/cloud-r03/source-packet/STATIC-CHECKS.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\final-r03\\STATIC-CHECKS.json",
+      "bytes": 2992,
+      "sha256": "b54634a9a471c9c8ecfa2de276a100d854fff9bdb1f818d9e7072ec87a94c9bb",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C3/codex/cloud-r03/source-packet/transport.zip",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\final-r03\\transport.zip",
+      "bytes": 116830,
+      "sha256": "0763a488d0d780bfc243acc0d104c77f5128e78a8d9f04b422c496fcdfb63a7d",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C3/codex/cloud-r03/cloud-return/return.zip",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c3-r03-r02-01\\post-return-r02.zip",
+      "bytes": 54454,
+      "sha256": "a0622a7d64513ce2d1e7be0323a3392a59620a2e0b004479791d6659bc10fe6f",
+      "kind": "original-cloud-return-zip"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/manifest.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\manifest.json",
+      "bytes": 5916,
+      "sha256": "90a8ac8ee16171b735a105ba27e34b3d60e6ed0e520133e15cf16513ab2a11af",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/pristine/scripts/flowmarshal_implementation_workflow.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\pristine\\scripts\\flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\pristine\\scripts\\flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\pristine\\tests\\test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/README.ko.md",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\README.ko.md",
+      "bytes": 7129,
+      "sha256": "42a72ef4b84fd3b285ae1aecd2cb48baede4fbd95f67f53f3c5be6c976fba855",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/regression/check_origin.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\regression\\check_origin.py",
+      "bytes": 8497,
+      "sha256": "8321f2343c74a829b4e6509f0a0b2942a7808ffd81f84b45592d5fa6d0616098",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/regression/dummy_helper.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\regression\\dummy_helper.py",
+      "bytes": 300,
+      "sha256": "b42b7cf911d2f08cd5cf023c0b914f7d910411509c5b8d515304bce60ca9133f",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/regression-capture/execution.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\regression-capture\\execution.json",
+      "bytes": 2441,
+      "sha256": "857378118c39c8dd58716717a6e0d794d5d0b6b365027bfb0ac2aa2c61585ed6",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/regression-capture/result.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\regression-capture\\result.json",
+      "bytes": 33704,
+      "sha256": "1ce8f75eae84b5f0de00a539943c2cac577721ee27d912cf0038866b2293286f",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/regression-capture/stderr.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\regression-capture\\stderr.txt",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/regression-capture/stdout.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\regression-capture\\stdout.txt",
+      "bytes": 30485,
+      "sha256": "aeddf4a96cc87c2b67677ab27fa23e2b600f747d594ca94db341de92354da56e",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/runner.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\runner.py",
+      "bytes": 20603,
+      "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/SOURCE.DIFF.patch",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\SOURCE.DIFF.patch",
+      "bytes": 7305,
+      "sha256": "01d38f4ac1b6755c41d99e5940952ac1e0e1b95029fb66706f3489657783b591",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/SOURCE.SHA256.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\SOURCE.SHA256.json",
+      "bytes": 1995,
+      "sha256": "0c1c54b6643cfb514df94cf1160a41eca46c086dce0e042254658801afcc22d2",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/STATIC-CHECKS.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\STATIC-CHECKS.json",
+      "bytes": 9390,
+      "sha256": "e00bf43810e19196eb6e2081955ce8f6768f2784c7ec72ac78ba4d0e2ef37c81",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/source-packet/transport.zip",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\common3-source-candidate-r01\\next-u64-r02\\transport.zip",
+      "bytes": 133260,
+      "sha256": "15e9898c20210576204681b2365b0cf488c2c19cd2e45205f13e5ffb98810e68",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "U2/codex/cloud-r02/cloud-return/return.zip",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\transport.zip",
+      "bytes": 96279,
+      "sha256": "870dcf98cdbb785cf234211e6629f833bdbc7a64bba10d4fab0fd32faccc3b21",
+      "kind": "original-cloud-return-zip"
+    },
+    {
+      "path": "C5/codex/cloud-r03/source-packet/manifest.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03\\manifest.json",
+      "bytes": 12335,
+      "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C5/codex/cloud-r03/source-packet/ORIGINAL76-INVENTORY.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03\\ORIGINAL76-INVENTORY.json",
+      "bytes": 161539,
+      "sha256": "3d9cd9641229dd9ffeaee608737036a6dff68bf4a7039e25e8c06bb315598ecd",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C5/codex/cloud-r03/source-packet/ORIGINAL76-STATUS.ko.md",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03\\ORIGINAL76-STATUS.ko.md",
+      "bytes": 24833,
+      "sha256": "f3d088714012f013989b7c82e014bcf872289268df9b3c76d879c755f0b7abf3",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C5/codex/cloud-r03/source-packet/pristine/scripts/flowmarshal_implementation_workflow.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03\\pristine\\scripts\\flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C5/codex/cloud-r03/source-packet/pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03\\pristine\\scripts\\flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C5/codex/cloud-r03/source-packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03\\pristine\\tests\\test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C5/codex/cloud-r03/source-packet/README.ko.md",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03\\README.ko.md",
+      "bytes": 3319,
+      "sha256": "7fe160ad0b983227db2502b66cec45ec423062ede9d74033d82f33745fa62503",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C5/codex/cloud-r03/source-packet/runner.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03\\runner.py",
+      "bytes": 29404,
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C5/codex/cloud-r03/source-packet/SOURCE.DIFF.patch",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03\\SOURCE.DIFF.patch",
+      "bytes": 33411,
+      "sha256": "64725d1c6b008579132b645f176bdc3271ce3a1eb2e667666a6c4f711ee47004",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C5/codex/cloud-r03/source-packet/SOURCE.SHA256.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03\\SOURCE.SHA256.json",
+      "bytes": 1425,
+      "sha256": "1e12d8ab6f3a4f9fee880355edf4fd0f1ca6c47d795c07ed800fc073aa40344d",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C5/codex/cloud-r03/source-packet/STATIC-CHECKS.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03\\STATIC-CHECKS.json",
+      "bytes": 2616,
+      "sha256": "651170804bd7537f4c1cced2075b54863e7b785b5baa0b36a575f7706b415d4c",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C5/codex/cloud-r03/source-packet/transport.zip",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03\\transport.zip",
+      "bytes": 152636,
+      "sha256": "14a320ac9c1ebb8c6716c591b1d5f3eeed2523d0e4d6b7bcce3f39c810007850",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "C5/codex/cloud-r03/cloud-return/return.zip",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\POST-return.zip",
+      "bytes": 104575,
+      "sha256": "5d2108ba3bd774661574083a79ac85e77769c95899be68484f0d195a1ad4a0bb",
+      "kind": "original-cloud-return-zip"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/BASELINE76.after-C5.actual.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\BASELINE76.after-C5.actual.json",
+      "bytes": 160966,
+      "sha256": "e9704f0efb11ab7e0eab4bb3a9c55f11cc182cfb30679751297b2988c327b5cd",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/BUILD-R02-SOURCE-METADATA.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\BUILD-R02-SOURCE-METADATA.py",
+      "bytes": 8206,
+      "sha256": "8419dff0cd96bebeb1c5887715d5ae5be1b2ab0dfd69935b15fc409ea1781511",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/LAUNCH.UNISSUED.SOURCE-DRAFT.template.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\LAUNCH.UNISSUED.SOURCE-DRAFT.template.txt",
+      "bytes": 4164,
+      "sha256": "eb00c1b8a7a7f9779aca4c9a361234c4b28859e390f9e451a41fed608ecfd9e6",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/manifest.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\manifest.json",
+      "bytes": 13558,
+      "sha256": "ff64e328bfc51fae2c96ebb605008d7ef2fb8fde15e4b36fd6de4d205bb6a3d0",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/ORIGINAL-BRANCH-EVIDENCE.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\ORIGINAL-BRANCH-EVIDENCE.json",
+      "bytes": 18807,
+      "sha256": "d7904e403615e42384bf48c800871c379f9dce8639b355f695cc5baad7d66c0e",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/ORIGINAL76-INVENTORY.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\ORIGINAL76-INVENTORY.json",
+      "bytes": 184790,
+      "sha256": "eb3e7e3d5f4b15550640d6f3ca883354c9338caae99ea41c0f09023f9245f7ff",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/ORIGINAL76-STATUS.ko.md",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\ORIGINAL76-STATUS.ko.md",
+      "bytes": 25197,
+      "sha256": "eb334ae0cb93981c4a59671cdf5e70b290f83cfd2b20c42ba3b3aa16bc2aa7f7",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/PREPARATION.COMMAND.UNISSUED.txt",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\PREPARATION.COMMAND.UNISSUED.txt",
+      "bytes": 505,
+      "sha256": "a4ea5117f8ef3c74940a3fd1785de345780925d6ab654cc4d8f9f49af54cbbaf",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/prepare-command.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\prepare-command.py",
+      "bytes": 3144,
+      "sha256": "6b0eec027d07faaae75389fe11eae3c7b07bc1557b31315beaf22ec2655a7f04",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/pristine/scripts/flowmarshal_implementation_workflow.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\pristine\\scripts\\flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\pristine\\scripts\\flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/pristine/tests/test_flowmarshal_direct_selection.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\pristine\\tests\\test_flowmarshal_direct_selection.py",
+      "bytes": 14804,
+      "sha256": "56793b76b16712fffd1d2d732b3c858621fef15d1d85f2874f0545fba3ea6fe2",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\pristine\\tests\\test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/README.ko.md",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\README.ko.md",
+      "bytes": 6080,
+      "sha256": "b5f6a9c61edc0a1a294868843b87e2556d72271a22c5fa913636d8258c6424ff",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/runner.py",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\runner.py",
+      "bytes": 31682,
+      "sha256": "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/SOURCE.DIFF.patch",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\SOURCE.DIFF.patch",
+      "bytes": 6585,
+      "sha256": "a97103eca8696923c240c8a53a94198797580b339f941c40a054cfa7dca3aeb9",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/SOURCE.SHA256.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\SOURCE.SHA256.json",
+      "bytes": 2448,
+      "sha256": "3cb53a85a030f614d265d0e2ce392f26628ac5a5e0f0ff7280f5cd3b06300a3e",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/STATIC-CHECKS.json",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\STATIC-CHECKS.json",
+      "bytes": 3270,
+      "sha256": "7c5e49c158f00d2b92231822563858736d76a0892ce53b4af19636026d98c0ef",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/source-packet/transport.zip",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\after-c5-next-source-r02\\transport.zip",
+      "bytes": 177651,
+      "sha256": "9b5a08fef3a9b05e78086cb208a330479ab0d5f60cbe8fec1344c111cb1f49aa",
+      "kind": "source-input-archive"
+    },
+    {
+      "path": "D3/codex/cloud-r02/cloud-return/return.zip",
+      "source": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer2\\d3-post-execution-r02-01\\raw-readback-r01\\native\\return.zip",
+      "bytes": 245576,
+      "sha256": "96bca3be143255776e51b33bb1e469c5fe25ab4bb4b237b93d5dec9f355937af",
+      "kind": "original-cloud-return-zip"
     }
-  ]
+  ],
+  "priorLocalArchive": {
+    "branch": "codex/vm-test-logs-20261006",
+    "commit": "1abd15779bb5b4e70222b9020793507fa2cca1eb",
+    "copiedOriginalFiles": 121
+  },
+  "publicationScope": "사용자가 승인한 기존 C3/U2/C5/D3 Cloud 반환물 전체와 동일 input pin의 증명 소스. source-packet은 원본 로컬 보존본을 Cloud invocation hash와 대조한 사본이다."
 }

@@ -1,0 +1,139 @@
+--- next-u64-r01/runner.py
++++ next-u64-r02/runner.py
+@@ -1,6 +1,7 @@
+ """U2 source candidate. Execute only after this packet's SOURCE/PRE."""
+ import argparse
+ import hashlib
++import inspect
+ import json
+ import os
+ import sqlite3
+@@ -10,7 +11,9 @@
+ import time
+ import traceback
+ import unittest
++from contextlib import contextmanager
+ from datetime import datetime, timezone
++from types import FunctionType
+ from pathlib import Path
+ 
+ PACKET = Path(__file__).resolve().parent
+@@ -47,7 +50,7 @@
+     if sha(manifest_path) != args.manifest_sha256:
+         raise RuntimeError("manifest pin mismatch")
+     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+-    if (manifest["schema"] != "vm-u64-sqlite2-source-r01"
++    if (manifest["schema"] != "vm-u64-sqlite2-source-r02"
+             or manifest["test_ids"] != args.expected_ids):
+         raise RuntimeError("manifest contract mismatch")
+     if (manifest["runner"]["sha256"] != args.runner_sha256
+@@ -95,6 +98,72 @@
+                 raise RuntimeError("package origin: " + path)
+             files[name] = str(Path(path).resolve())
+     return files
++
++
++
++def helper_origin_observation(helper, name, expected_path, function):
++    wrapped = getattr(function, "__wrapped__", None)
++    exposed_code = getattr(function, "__code__", None)
++    wrapped_code = getattr(wrapped, "__code__", None)
++    return {"name": name, "expected_source": str(expected_path),
++            "exposed_type": type(function).__name__, "exposed_object_id": id(function),
++            "exposed_co_filename": getattr(exposed_code, "co_filename", None),
++            "exposed_co_name": getattr(exposed_code, "co_name", None),
++            "wrapped_type": type(wrapped).__name__ if wrapped is not None else None,
++            "wrapped_object_id": id(wrapped) if wrapped is not None else None,
++            "wrapped_co_filename": getattr(wrapped_code, "co_filename", None),
++            "wrapped_co_name": getattr(wrapped_code, "co_name", None),
++            "exposed_globals_bound": getattr(function, "__globals__", None) is helper.__dict__,
++            "wrapped_globals_bound": getattr(wrapped, "__globals__", None) is helper.__dict__,
++            "imported_contextmanager_is_stdlib": getattr(helper, "contextmanager", None) is contextmanager}
++
++
++def record_helper_origin(stream, phase, observation):
++    stream.write(json.dumps({"utc": utc(), "phase": phase, **observation}, ensure_ascii=False) + "\n")
++    stream.flush()
++
++
++def checked_helper_origin(helper, name, expected_path, function):
++    target = function
++    decorator = None
++    if not isinstance(function, FunctionType):
++        raise RuntimeError("helper origin requires function: " + name)
++    if name == "open_readonly":
++        wrapped = getattr(function, "__wrapped__", None)
++        if (helper.contextmanager is not contextmanager
++                or not isinstance(wrapped, FunctionType)
++                or hasattr(wrapped, "__wrapped__")
++                or not inspect.isgeneratorfunction(wrapped)):
++            raise RuntimeError("helper contextmanager binding mismatch: " + name)
++        reference = contextmanager(wrapped)  # Creates a wrapper; never calls the generator.
++        actual_cells, expected_cells = function.__closure__ or (), reference.__closure__ or ()
++        if (function.__code__ is not reference.__code__
++                or function.__globals__ is not reference.__globals__
++                or function.__defaults__ != reference.__defaults__
++                or function.__kwdefaults__ != reference.__kwdefaults__
++                or len(actual_cells) != len(expected_cells)
++                or any(actual.cell_contents is not expected.cell_contents
++                       for actual, expected in zip(actual_cells, expected_cells))):
++            raise RuntimeError(
++                f"helper contextmanager wrapper mismatch: {name}; "
++                f"exposed={function.__code__.co_filename!r}; wrapped={wrapped.__code__.co_filename!r}"
++            )
++        target = inspect.unwrap(function)
++        if target is not wrapped:
++            raise RuntimeError("helper contextmanager unwrap mismatch: " + name)
++        decorator = "contextlib.contextmanager"
++    if (target.__globals__ is not helper.__dict__ or target.__name__ != name
++            or target.__code__.co_name != name
++            or Path(target.__code__.co_filename).resolve() != Path(expected_path)):
++        raise RuntimeError(
++            f"helper code origin mismatch: {name}; "
++            f"exposed={function.__code__.co_filename!r}; original={target.__code__.co_filename!r}; "
++            f"expected={str(expected_path)!r}"
++        )
++    return {"name": name, "decorator": decorator,
++            "exposed_co_filename": function.__code__.co_filename,
++            "original_co_filename": target.__code__.co_filename,
++            "original_globals_bound": True}
+ 
+ 
+ def child(args, root):
+@@ -162,15 +231,31 @@
+         method = getattr(case, case._testMethodName)
+         if Path(method.__func__.__code__.co_filename).resolve() != Path(origins["test"]):
+             raise RuntimeError("test code origin mismatch")
+-    for name in ("command_migrate", "command_begin", "command_verify", "open_readonly",
+-                 "open_write", "_backup_database", "_install_writer_fence_triggers"):
+-        if Path(getattr(module.impl, name).__code__.co_filename).resolve() != Path(origins["helper"]):
+-            raise RuntimeError("helper code origin mismatch")
++    helper_code_origins = []
++    with (root / "helper-origin.jsonl").open("x", encoding="utf-8", newline="\n") as origin_stream:
++        for name in ("command_migrate", "command_begin", "command_verify", "open_readonly",
++                     "open_write", "_backup_database", "_install_writer_fence_triggers"):
++            function = getattr(module.impl, name)
++            observation = helper_origin_observation(module.impl, name, origins["helper"], function)
++            record_helper_origin(origin_stream, "before", observation)
++            try:
++                verified = checked_helper_origin(module.impl, name, origins["helper"], function)
++            except Exception as error:
++                try:
++                    record_helper_origin(origin_stream, "rejected", {
++                        **observation, "error_type": type(error).__name__, "error": str(error),
++                    })
++                except Exception:
++                    print(traceback.format_exc(), file=sys.stderr)
++                raise
++            record_helper_origin(origin_stream, "accepted", {**observation, **verified})
++            helper_code_origins.append(verified)
+     save(root / "preflight.json", {
+         "utc": utc(), "argv": sys.argv, "cwd": str(Path.cwd()), "pid": os.getpid(),
+         "python": sys.version, "executable": sys.executable, "sqlite": sqlite3.sqlite_version,
+         "loader_ids": ids, "loader_count": len(cases), "loader_errors": loader.errors,
+-        "origins": origins, "module_files": closure(), "inputs_before": before,
++        "origins": origins, "helper_code_origins": helper_code_origins,
++        "module_files": closure(), "inputs_before": before,
+     })
+     if time.monotonic() >= args.deadline:
+         raise RuntimeError("deadline before tests")

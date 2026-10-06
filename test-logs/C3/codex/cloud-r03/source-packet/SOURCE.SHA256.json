@@ -1,0 +1,34 @@
+{
+  "runner.py": {
+    "bytes": 15249,
+    "sha256": "457fd65598bc5cb5a87dd46abb7036bac9768db20a932053fb9670b201862136"
+  },
+  "pristine/tests/test_flowmarshal_implementation_workflow.py": {
+    "bytes": 173219,
+    "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+  },
+  "pristine/scripts/flowmarshal_implementation_workflow.py": {
+    "bytes": 384699,
+    "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+  },
+  "pristine/scripts/flowmarshal_orchestrator_ledger.py": {
+    "bytes": 39264,
+    "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+  },
+  "SOURCE.DIFF.patch": {
+    "bytes": 1729,
+    "sha256": "0628ef2c7fdefea950e93f9304d9a29f34a0879823a31266d737145c326b4160"
+  },
+  "manifest.json": {
+    "bytes": 3381,
+    "sha256": "ae0260a8fd9803cc716a8eab504e34b9bdfd919f39695e8bced5a896c116c3ad"
+  },
+  "README.ko.md": {
+    "bytes": 3904,
+    "sha256": "4d68300671e9b6728ee4877642d7673caefbe1225faca05c9985ca2f6143ac6f"
+  },
+  "STATIC-CHECKS.json": {
+    "bytes": 2992,
+    "sha256": "b54634a9a471c9c8ecfa2de276a100d854fff9bdb1f818d9e7072ec87a94c9bb"
+  }
+}

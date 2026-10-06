@@ -1,0 +1,33 @@
+{
+  "testUnit": "C5",
+  "observedInputEvidence": "raw/invocation.json",
+  "sourcePacketOrigin": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r03",
+  "inputPinsMatched": [
+    {
+      "path": "runner.py",
+      "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343",
+      "bytes": 29404
+    },
+    {
+      "path": "manifest.json",
+      "sha256": "e7fe12b65611cd1dd72c7d670234962d20da6b1ea19baf952d52d3016d14d5c1",
+      "bytes": 12335
+    },
+    {
+      "path": "pristine/tests/test_flowmarshal_implementation_workflow.py",
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5",
+      "bytes": 173219
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_implementation_workflow.py",
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea",
+      "bytes": 384699
+    },
+    {
+      "path": "pristine/scripts/flowmarshal_orchestrator_ledger.py",
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72",
+      "bytes": 39264
+    }
+  ],
+  "meaning": "로컬 보존 소스의 bytes/SHA가 해당 Cloud invocation inputs_before와 일치함. 새 실행·원격 소스 재회수·배치 재수행 아님."
+}

@@ -1,0 +1,608 @@
+--- next-common-source-candidate-r01/runner.py
++++ next-common-source-candidate-r03/runner.py
+@@ -50,7 +50,7 @@
+     if sha(manifest_path) != args.manifest_sha256:
+         raise RuntimeError("manifest pin mismatch")
+     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+-    if (manifest["schema"] != "vm-next-common5-source-r01"
++    if (manifest["schema"] != "vm-next-common5-source-r03"
+             or manifest["test_ids"] != args.expected_ids):
+         raise RuntimeError("manifest contract mismatch")
+     if (manifest["runner"]["sha256"] != args.runner_sha256
+@@ -166,6 +166,55 @@
+             "original_globals_bound": True}
+ 
+ 
++
++def effect_denial_counts(state):
++    if state is None:
++        return None
++    return {"count": state["count"], "logging_errors": state["logging_errors"]}
++
++
++def observe_effect_denials(root, expected_pid, claimed):
++    """Missing or inconsistent evidence cannot establish zero denials."""
++    observed = {"state": "UNKNOWN", "count": None, "journal_count": None,
++                "logging_errors": None, "bytes": None, "sha256": None}
++    try:
++        path = root / "effect-denials.jsonl"
++        if path.is_symlink() or not path.is_file():
++            raise ValueError("required denial journal missing or nonregular")
++        data = path.read_bytes()
++        observed.update(bytes=len(data), sha256=hashlib.sha256(data).hexdigest())
++        if (not isinstance(claimed, dict) or set(claimed) != {"count", "logging_errors"}
++                or any(type(claimed[name]) is not int or claimed[name] < 0
++                       for name in ("count", "logging_errors"))):
++            raise ValueError("invalid child denial counters")
++        observed.update(count=claimed["count"], logging_errors=claimed["logging_errors"])
++        if data and not data.endswith(b"\n"):
++            raise ValueError("partial denial journal row")
++        rows = [json.loads(line) for line in data.decode("utf-8").splitlines()]
++        for sequence, row in enumerate(rows, 1):
++            if (not isinstance(row, dict)
++                    or set(row) != {"sequence", "pid", "utc", "event", "reason"}
++                    or type(row["sequence"]) is not int or row["sequence"] != sequence
++                    or type(row["pid"]) is not int or row["pid"] != expected_pid
++                    or not isinstance(row["event"], str) or not row["event"]
++                    or row["reason"] not in (
++                        "prohibited_effect", "nonstdlib_import", "unsupported_sqlite_uri",
++                        "noncanonical_sqlite_uri", "sqlite_outside_private_tmp")
++                    or not isinstance(row["utc"], str)
++                    or datetime.fromisoformat(row["utc"]).utcoffset() is None):
++                raise ValueError("invalid denial journal row")
++        observed["journal_count"] = len(rows)
++        if len(rows) != claimed["count"]:
++            raise ValueError("denial journal counter mismatch")
++        if claimed["logging_errors"]:
++            raise ValueError("child denial journal I/O error")
++        observed["state"] = "DENIED" if rows else "CLEAR"
++    except Exception as error:
++        # Preserve uncertainty; no target arguments or error-string fallback.
++        observed["error_type"] = type(error).__name__
++    return observed
++
++
+ def child(args, root):
+     manifest, before = inputs(args)
+     if time.monotonic() >= args.deadline:
+@@ -180,15 +229,43 @@
+     if Path(tempfile.gettempdir()).resolve() != tmp:
+         raise RuntimeError("stdlib tempfile fell outside private tmp")
+ 
++    denial_state = {"count": 0, "logging_errors": 0, "logging_active": False}
++    args.effect_denial_state = denial_state
++    try:
++        denial_stream = (root / "effect-denials.jsonl").open("x", encoding="utf-8", newline="\n")
++        args.effect_denial_stream = denial_stream
++        denial_stream.flush()  # The required empty file represents normal zero denials.
++    except Exception as error:
++        denial_state["logging_errors"] += 1
++        raise RuntimeError("C5 denial journal initialization failed") from error
++
++    def deny(event, reason, message):
++        # A test catching the exception cannot erase this independent observation.
++        denial_state["count"] += 1
++        if denial_state["logging_active"]:
++            denial_state["logging_errors"] += 1
++            raise RuntimeError(message)  # Prevent recursive logging; evidence is UNKNOWN.
++        denial_state["logging_active"] = True
++        try:
++            row = {"sequence": denial_state["count"], "pid": os.getpid(), "utc": utc(),
++                   "event": event, "reason": reason}
++            denial_stream.write(json.dumps(row, ensure_ascii=False) + "\n")
++            denial_stream.flush()
++        except Exception:
++            denial_state["logging_errors"] += 1
++        finally:
++            denial_state["logging_active"] = False
++        raise RuntimeError(message)  # Reject before the operation even when logging failed.
++
+     def audit(event, values):
+         # This checks the selected Python seams; it is not an OS sandbox.
+         if (event.startswith(("socket.", "subprocess.", "os.exec", "os.spawn"))
+                 or event in ("os.system", "os.posix_spawn", "ctypes.dlopen", "os.chdir")):
+-            raise RuntimeError("C5 prohibited effect: " + event)
++            deny(event, "prohibited_effect", "C5 prohibited effect: " + event)
+         if event == "import":
+             name = values[0]
+             if name != MODULE and name.split(".")[0] not in sys.stdlib_module_names:
+-                raise RuntimeError("C5 non-stdlib import: " + name)
++                deny(event, "nonstdlib_import", "C5 non-stdlib import: " + name)
+         if event == "sqlite3.connect":
+             target = os.fspath(values[0])
+             if isinstance(target, str) and target.startswith("file:"):
+@@ -196,13 +273,13 @@
+                 if (not target.startswith("file:/") or target.startswith("file://")
+                         or not target.endswith("?mode=ro") or target.count("?") != 1
+                         or any(char in target for char in ("%", "#", "\x00"))):
+-                    raise RuntimeError("C5 unsupported SQLite URI")
++                    deny(event, "unsupported_sqlite_uri", "C5 unsupported SQLite URI")
+                 target = target[5:-8]
+                 if Path(target).resolve().as_posix() != target:
+-                    raise RuntimeError("C5 noncanonical SQLite URI path")
++                    deny(event, "noncanonical_sqlite_uri", "C5 noncanonical SQLite URI path")
+             path = Path(target)
+             if not path.is_absolute() or not path.resolve().is_relative_to(tmp):
+-                raise RuntimeError("C5 SQLite outside private tmp")
++                deny(event, "sqlite_outside_private_tmp", "C5 SQLite outside private tmp")
+ 
+     sys.addaudithook(audit)
+     sys.path.insert(0, str(PACKET / "pristine" / "tests"))
+@@ -275,15 +352,30 @@
+     ok = (data["testsRun"] == 5 and data["wasSuccessful"]
+           and not any(data[name] for name in
+                       ("failures", "errors", "skipped", "expectedFailures", "unexpectedSuccesses")))
+-    data["suite_exit"] = 0 if ok else 1
+-    # Preserve the original result before any additional source/closure observation.
++    data["unittest_exit"] = 0 if ok else 1
++    data["effect_denials"] = effect_denial_counts(denial_state)
++    data["suite_exit"] = (2 if denial_state["logging_errors"] else
++                          (1 if denial_state["count"] else data["unittest_exit"]))
++    # Preserve original unittest fields and counters before additional observations.
+     save(root / "result.json", data)
++    try:
++        denial_stream.flush()
++        denial_stream.close()
++    except Exception:
++        denial_state["logging_errors"] += 1
++    denial_observation = observe_effect_denials(
++        root, os.getpid(), effect_denial_counts(denial_state))
+     _, after = inputs(args)
+     save(root / "postflight.json", {
+         "utc": utc(), "inputs_after": after, "matches_before": before == after,
+         "module_files_after": closure(),
++        "effect_denials": effect_denial_counts(denial_state),
++        "effect_denial_observation": denial_observation,
+     })
+-    return data["suite_exit"] if before == after else 2
++    if before != after or denial_observation["state"] == "UNKNOWN":
++        return 2
++    return 1 if denial_observation["state"] == "DENIED" else data["unittest_exit"]
++
+ 
+ 
+ def residual_files(root):
+@@ -358,25 +450,69 @@
+             raw = json.loads(raw_path.read_text(encoding="utf-8"))
+         except (OSError, ValueError) as error:
+             raw_error = repr(error)  # Keep missing/partial raw bytes; never repair them.
++    denial_observation = {"state": "UNKNOWN", "count": None, "journal_count": None,
++                          "logging_errors": None, "bytes": None, "sha256": None}
++    denial_claim_source = None
++    if terminal:
++        try:
++            if isinstance(raw, dict):
++                denial_claim_source = "result.json"
++                claimed = raw["effect_denials"]
++                denial_observation = observe_effect_denials(root, process.pid, claimed)
++                post = json.loads((root / "postflight.json").read_text(encoding="utf-8"))
++                if (post["effect_denials"] != claimed
++                        or post["effect_denial_observation"] != denial_observation):
++                    raise ValueError("child and parent denial observations mismatch")
++                original_ok = (raw.get("test_ids") == manifest["test_ids"]
++                               and raw.get("testsRun") == 5 and raw.get("wasSuccessful") is True
++                               and all(raw.get(name) == [] for name in
++                                       ("failures", "errors", "skipped", "expectedFailures",
++                                        "unexpectedSuccesses")))
++                if type(raw.get("unittest_exit")) is not int or raw["unittest_exit"] != (0 if original_ok else 1):
++                    raise ValueError("original unittest result mismatch")
++                expected_exit = (2 if claimed["logging_errors"] else
++                                 (1 if claimed["count"] else raw["unittest_exit"]))
++                if type(raw.get("suite_exit")) is not int or raw["suite_exit"] != expected_exit:
++                    raise ValueError("child denial outcome mismatch")
++            elif not raw_path.exists():
++                # Pre-unittest uncaught refusal has no fabricated unittest result.
++                error = json.loads((root / "child-error.json").read_text(encoding="utf-8"))
++                if error["pid"] != process.pid or error["status"] != "ERROR":
++                    raise ValueError("child error binding mismatch")
++                denial_claim_source = "child-error.json"
++                denial_observation = observe_effect_denials(
++                    root, process.pid, error["effect_denials"])
++        except Exception as error:
++            denial_observation.update(state="UNKNOWN", protocol_error_type=type(error).__name__)
+     residual = residual_files(root)
+-    observation_unknown = (not terminal or raw_error is not None or before != after
+-                           or any("error" in row for row in residual))
++    unittest_observation_unknown = raw_error is not None or not isinstance(raw, dict)
++    uncaught_denial = (denial_claim_source == "child-error.json"
++                      and denial_observation["state"] == "DENIED")
++    observation_unknown = (
++        not terminal or before != after or any("error" in row for row in residual)
++        or denial_observation["state"] == "UNKNOWN"
++        or (unittest_observation_unknown and not uncaught_denial))
+     raw_ok = (isinstance(raw, dict) and raw.get("suite_exit") == 0
+               and raw.get("test_ids") == manifest["test_ids"] and raw.get("testsRun") == 5
+               and raw.get("wasSuccessful") is True
+               and all(raw.get(name) == [] for name in
+                       ("failures", "errors", "skipped", "expectedFailures", "unexpectedSuccesses")))
+-    if timed_out:
+-        status = "TIMEOUT" if terminal else "UNKNOWN"
+-    elif observation_unknown:
++    if observation_unknown:
+         status = "UNKNOWN"
++    elif timed_out:
++        status = "TIMEOUT"
++    elif denial_observation["state"] == "DENIED":
++        status = "FAIL"
+     else:
+-        status = "PASS" if code == 0 and raw_ok else "FAIL"
++        status = "PASS" if code == 0 and raw_ok and denial_observation["state"] == "CLEAR" else "FAIL"
+     save(root / "execution.json", {
+         "started_utc": started, "observed_utc": utc(), "pid": process.pid,
+         "actual_exit": code, "terminal_observed": terminal, "status": status,
+         "timed_out": timed_out, "own_child_kill_error": kill_error,
+         "raw_observation_error": raw_error, "observation_unknown": observation_unknown,
++        "unittest_observation_unknown": unittest_observation_unknown,
++        "effect_denial_claim_source": denial_claim_source,
++        "effect_denial_observation": denial_observation,
+         "inputs_before": before, "inputs_after_observation": after,
+         "files_observed": residual, "residual_observation_mutable": not terminal,
+         "timeout_note": "Own child only kill/reap in same budget; no retry/global kill/cleanup",
+@@ -412,8 +548,18 @@
+         print(text, file=sys.stderr)
+         if args.child:
+             try:
++                state = getattr(args, "effect_denial_state", None)
++                stream = getattr(args, "effect_denial_stream", None)
++                if stream is not None and not stream.closed:
++                    try:
++                        stream.flush()
++                        stream.close()
++                    except Exception:
++                        if state is not None:
++                            state["logging_errors"] += 1
+                 save(Path(args.run_root) / "child-error.json",
+-                     {"utc": utc(), "status": "ERROR", "traceback": text})
++                     {"utc": utc(), "status": "ERROR", "traceback": text, "pid": os.getpid(),
++                      "effect_denials": effect_denial_counts(state)})
+             except Exception:
+                 print(traceback.format_exc(), file=sys.stderr)
+         return 2
+--- next-common-source-candidate-r01/manifest.json
++++ next-common-source-candidate-r03/manifest.json
+@@ -1,5 +1,5 @@
+ {
+-  "schema": "vm-next-common5-source-r01",
++  "schema": "vm-next-common5-source-r03",
+   "test_ids": [
+     "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_carry_rehashes_all_evidence_files_without_freshness_contract",
+     "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_migration_backup_history_idempotence_tamper_cycle_and_readonly",
+@@ -26,8 +26,8 @@
+   },
+   "runner": {
+     "path": "runner.py",
+-    "bytes": 21129,
+-    "sha256": "f16748b2f3d7e9a99a80442df61afc6cf478381785b51ac2b3b1940c21ec765d"
++    "bytes": 29404,
++    "sha256": "f7b4206ac2b96dcfc0d0f59560bcf83c5f0757684e1b8d17355518516d906343"
+   },
+   "runtime": {
+     "platform": "linux",
+@@ -66,10 +66,10 @@
+     "cwd": "new run-root/cwd, initially empty",
+     "HOME": "new run-root/home",
+     "TMPDIR_TMP_TEMP": "new run-root/tmp",
+-    "writes": "owned run-root raw capture and original per-test private TMP plan/proof/manifest/revision-manifest/evidence/SQLite/backups/atomic rename/journal/WAL/SHM; original teardown only",
++    "writes": "owned run-root raw capture and original per-test private TMP plan/proof/manifest/revision-manifest/evidence/SQLite/backups/atomic rename/journal/WAL/SHM; original teardown only; additional owned raw effect-denials.jsonl only, plus counter fields in existing result/postflight/child-error/execution JSON",
+     "audit_seams": "nonstdlib import/socket/process launch/ctypes/chdir/SQLite target including exact canonical private file:/...?mode=ro; no open/dir_fd hook",
+     "audit_not_os_sandbox": true,
+-    "timeout_residual": "TIMEOUT if owned child reaped; otherwise UNKNOWN; no retry/global kill/cleanup",
++    "timeout_residual": "Denial/source/residual evidence gaps remain UNKNOWN even if owned child reaped; otherwise timed_out is TIMEOUT. Native timeout/exit and <=300s owned-child wait/kill/reap remain recorded; no retry/global kill/cleanup.",
+     "result_before_extra_observation": true,
+     "pristine_before_after": "three source files, runner, manifest",
+     "no_expanded_pass": [
+@@ -86,7 +86,16 @@
+     ],
+     "sqlite_uri": "Only literal file:{canonical absolute private TMP path}?mode=ro; no authority, percent escape, fragment, extra query or other mode; original uri=True caller pinned",
+     "helper_origin_checks": "Original7 first, extra7 commands appended. Same decorator, path/code/globals binding; no new permitted effect.",
+-    "helper_origin_journal": "CreateNew helper-origin.jsonl exact14 names; same before-guard actual observations/flush/accepted/rejected/error preservation."
++    "helper_origin_journal": "CreateNew helper-origin.jsonl exact14 names; same before-guard actual observations/flush/accepted/rejected/error preservation.",
++    "effect_denials": {
++      "journal": "owned run-root/effect-denials.jsonl CreateNew, required even empty",
++      "record": "count before refusal; sequence/pid/utc/event/reason only, no args/import-name/target path; write+flush; original RuntimeError always; recursive logging/I/O sets unknown evidence",
++      "child": "Original unittest fields/unittest_exit retained, effect counters copied, suite_exit1 for refusal or2 for logging error; result saved before journal-close/read/post-source observations",
++      "parent": "Required regular JSONL, sequence/PID/counters/logging-error/child post observations match. CLEAR0 only PASS; valid DENIED FAIL; missing/corrupt/IO/mismatch UNKNOWN",
++      "uncaught_before_suite": "Existing child-error.json gains PID/counters; matching DENIED proves FAIL while unittest result remains unobserved, never fabricated",
++      "timeout": "Same owned-child wait/kill/reap budget and native timeout/exit retained; missing denial evidence is UNKNOWN even if owned child termination observed",
++      "fresh_runtime_validation": "NOT_RUN; future bounded C1 caught-RuntimeError/normal-zero/I/O-unknown dummy required by new PRE"
++    }
+   },
+   "source_evidence": {
+     "selected_test_lines": {
+@@ -243,6 +252,36 @@
+     "branch_sensitive_proof": "test2443–2454 and helper6230–6233 READY error before snapshot6240. Audit error is not original regex; actual branch NOT_RUN.",
+     "r01_unknown": "R025 UNKNOWN preserved; old successful dummy11 and U2 PASS are not new candidate execution.",
+     "new_runtime_requirements": "New SOURCE/PRE fixes exact5 IDs, origin14 observations, Linux3.12/contextlib/inspect/SQLite, absolute private roots and runner/manifest pins.",
+-    "exclusions_artifact": "ORIGINAL76-INVENTORY.json"
++    "exclusions_artifact": "ORIGINAL76-INVENTORY.json",
++    "r01_SOURCE": {
++      "path": "D:\\claude\\독립감사관\\R-030-VM-NEXT-COMMON5-R01-SOURCE-VERDICT.ko.md",
++      "bytes": 7387,
++      "sha256": "c943f4af0d3dafabac571c16f2b21b31447356432a8daf8d92b064486e7b17e8",
++      "state": "SOURCE STATIC PASS for r01 only; not PRE/POST or r02 approval",
++      "limits": "R030 inventory/status/Root proof content unread, partial independence preserved"
++    },
++    "inventory_reuse": "Original76 inventory/status reused byte-for-byte as r01 preparation snapshot; no expansion of old PASS or new runtime claim",
++    "C1_correction": "Every explicit audit RuntimeError refusal records independent counter/journal; stdout/stderr string absence is not acceptance evidence",
++    "r02_source_candidate": {
++      "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r02",
++      "state": "Frozen source preparation only, SOURCE/PRE/POST NOT_RUN; all12 files preserved",
++      "runner": {
++        "bytes": 29404,
++        "sha256": "35b478ef92ceedaaa70a1639ee3979e68ff1ae9ea3f2aea2d51ca711067c9cea"
++      },
++      "manifest": {
++        "bytes": 11186,
++        "sha256": "7c0648076adc84e5e8dc8b202c9049fa64e8b8acf585089241aee6344d397e13"
++      },
++      "seal": {
++        "bytes": 1425,
++        "sha256": "c851627426f2ee719852d5f8bc36299f45ba8005cc6e3a1d1dc839d89a48bfc7"
++      },
++      "zip": {
++        "bytes": 148441,
++        "sha256": "6a4b415cf6f173a3b3357e51163877deac66d2aff2b8c9db6fb76a5cd538f72a"
++      }
++    },
++    "r03_delta": "Metadata-only timeout description consistency fix; runner schema literal and manifest identity updated, full AST same after schema normalization. C1 code unchanged from r02."
+   }
+ }
+--- next-common-source-candidate-r01/README.ko.md
++++ next-common-source-candidate-r03/README.ko.md
+@@ -1,17 +1,17 @@
+-# 다음 공통 5건 — 실행하지 않은 고정 SOURCE 후보
++# C5 r03 — 감사 거절 관측 보정 SOURCE 후보
+ 
+-Root의 원본 소스 검토 후 기존 Claude970에게 직접 SOURCE를 제출한다. 새 runtime/PRE/실행 권한은 아직 바인딩되지 않았다.
++원 M/helper70f5/legacy3 bytes, ID5/순서/원 assertion/oracle, 원76 inventory/status를 r01에서 그대로 재사용했다. R030은 r01 SOURCE STATIC PASS만이며 새 r03 SOURCE/PRE/실측은 NOT_RUN이다. R030의 현황표·Root proof 미독과 부분 독립성 한계를 유지한다.
+ 
+-- 원76=완료5+잔여71; 이번 새5는 NOT_RUN이며 나머지66의 미결/현재 조건 차이를 구분했다.
+-- 원 assertions/helper/oracle 변경0. 기존 r02 origin journal과 감사 경계 그대로, 새 정확 IDs/count·command origin만 반영했다.
+-- 허용 fixture는 새 run-root/tmp 안 원 SQLite/plan/proof/manifest/evidence/backups와 원 teardown. 새 HOME/cwd도 private root다.
+-- product/candidate runner/test import/dummy/Cloud 실행0. 원장/운영 DB/Git/권한/설치/network/provider 변경0.
+-- 자기 Python child1/retry0/전체≤300초 wait-reap 예산을 유지한다. OS hardwall/full native coverage 보장은 없다. 불명확하면 UNKNOWN 유지, 자동 재실행 없음.
++audit 허용조건은 그대로다. 각 명시적 거절은 작업 전 count를 증가시키고 새 run-root의 CreateNew effect-denials.jsonl에 sequence/PID/UTC/event/고정 이유만 write+flush한다. 원 인자·target path·import name은 journal에 적지 않는다. 로깅 오류/재진입은 logging_errors로 남기며 RuntimeError 거절을 유지한다. 정상0건도 빈 journal이 필수다.
+ 
+-준비 argv 형식(실행 안 함):
++child result에는 원 unittest 필드와 unittest_exit, 독립 거절 count/logging_errors, 수용용 suite_exit를 함께 넣는다. 거절은 예외를 원 테스트가 잡아도 suite_exit1이며 I/O 오류는2다. result를 먼저 CreateNew 저장한 뒤 journal close/read와 postflight를 수행한다. 뒤늦은 I/O 오류/불일치는 postflight/부모 재독에서 UNKNOWN이며 raw result를 덮어쓰지 않는다.
+ 
+-<새 PRE의 Linux Python3.12> -I -S -B -X utf8 <packet>/runner.py --run-root <새 절대root> --runner-sha256 <manifest.runner.sha256> --manifest-sha256 <manifest 실제SHA256> --timeout 300
++부모는 journal의 존재/regular-file/UTF-8 완결행/정확필드/순번/PID·카운터를 다시 확인하고 child의 postflight 상태 및 native 결과를 대조한다. 일치한 CLEAR0만 PASS, 확인된 DENIED는 FAIL, 누락/손상/I/O/불일치는 UNKNOWN이다. 원 unittest 결과가 없는 사전 uncaught refusal은 기존 child-error.json의 PID/counters를 journal과 결속해 FAIL로 보고하되 unittest_observation_unknown과 원 missing-result 오류는 보존한다. 손상된 result가 있으면 child-error로 우회하지 않는다.
+ 
+-새 SOURCE/PRE는 exact5 loader, origin14 actual journal, Linux runtime/contextlib/inspect/SQLite, exact source/runner/manifest 핀, fixture·효과 scope를 확인해야 한다. 이전 R021/R029는 helper70f5와 각각 원3/원2, Linux no-site에 한정한다. r01/R025 UNKNOWN을 보존한다.
++기존 origin14 journal/provenance, private SQLite URI/path, module/import/socket/process/ctypes/chdir 조건, source before/after, owned child1/retry0/동일≤300초 wait-kill-reap 예산은 유지한다. native timed_out/exit는 그대로 기록하며 denial evidence가 없으면 UNKNOWN이다. stderr의 C5 문자열 유무를 gate로 쓰지 않는다. OS sandbox/full native coverage 보장은 없다.
+ 
+-ORIGINAL76-STATUS.ko.md / ORIGINAL76-INVENTORY.json / SOURCE.DIFF.patch / STATIC-CHECKS.json을 함께 읽는다. 기존 common3-source-candidate-r01 트리를 그대로 두고 이 새 형제 디렉터리만 CreateNew로 작성했다.
++이번 실제 수행은 AST/compile 메모리·hash·정적 diff·봉인/ZIP 검사뿐이다. product/import/loader/candidate runner/dummy/Cloud 실행0이다. 새 SOURCE 검토 후 기존 Cloud actor의 PRE 자료에 정상0거절, RuntimeError를 잡아도 count가 남는 C1, journal I/O 오류 UNKNOWN 실측을 연결해야 한다. 이 문서는 그 dummy를 실행하거나 결과를 합성하지 않았다.
++
++ORIGINAL76-INVENTORY.json과 ORIGINAL76-STATUS.ko.md는 r01 당시의 정적 선택/완료 근거 snapshot bytes다. 새 journal/판정 변경은 SOURCE.DIFF.patch·manifest.json·STATIC-CHECKS.json을 기준으로 읽는다. 원76/currenthelper10a/Windows/F6/qualification/Goal PASS로 확대하지 않는다. 기존 r01/이전후보/r01 UNKNOWN 및 운영물은 보존한다.
++
++r03은 r02의 timeout_residual 설명 한 곳이 새 UNKNOWN 우선 판정과 충돌하던 부분을 맞췄다. 후보 schema 식별자만 함께 바꾸었으며 schema literal을 정규화한 runner 전체 AST는 r02와 같다. r02의 원12 파일과 봉인·ZIP을 보존했다. r02도 실행·SOURCE 승인 근거가 아니며 최종 검토 대상은 새 r03이다.
+--- next-common-source-candidate-r01/STATIC-CHECKS.json
++++ next-common-source-candidate-r03/STATIC-CHECKS.json
+@@ -1,185 +1,53 @@
+ {
+-  "observed_utc": "2026-10-04T18:47:56.193472+00:00",
+-  "method": "stdlib metadata/AST/hash/compile only, no product/candidate/dummy import or execution",
+-  "actual_product_runs": 0,
+-  "candidate_runner_runs": 0,
+-  "dummy_runs": 0,
+-  "cloud_assignment_calls": 0,
+-  "original_unique_ast_ids": 76,
+-  "canonical_set_matches": true,
+-  "completed_unique_subset": 5,
+-  "next_exact_disjoint_ids": 5,
+-  "original6_source_pins": [
+-    {
+-      "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_direct_selection.py",
+-      "bytes": 14804,
+-      "sha256": "56793b76b16712fffd1d2d732b3c858621fef15d1d85f2874f0545fba3ea6fe2"
+-    },
+-    {
+-      "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_implementation_workflow.py",
+-      "bytes": 173219,
+-      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+-    },
+-    {
+-      "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_same_tick_handoff.py",
+-      "bytes": 3283,
+-      "sha256": "7ce7041367087523b8e944061fcc97a2cb4e7faaba04442f259c65cd280cc57b"
+-    },
+-    {
+-      "path": "D:\\codex\\자동화템플릿\\tests\\test_flowmarshal_workflow_integration.py",
+-      "bytes": 7401,
+-      "sha256": "44ff1bf4a3407ce64d1dae842b2f6a9123d6a10f045fc040da3efa08fa9f2498"
+-    },
+-    {
+-      "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-03\\task-8\\direct-selection-candidate-dev3-01\\guard-fixture-r02\\candidate\\scripts\\flowmarshal_implementation_workflow.py",
+-      "bytes": 384699,
+-      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+-    },
+-    {
+-      "path": "D:\\codex\\자동화템플릿\\scripts\\flowmarshal_orchestrator_ledger.py",
+-      "bytes": 39264,
+-      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+-    }
+-  ],
+-  "compiled_in_memory": [
++  "observed_utc": "2026-10-04T19:25:25.858231+00:00",
++  "method": "metadata AST/compile/hash only; candidate functions never imported/executed",
++  "actual_product_candidate_import_loader_dummy_cloud_runs": 0,
++  "compiled_in_memory_files": [
+     "runner.py",
+     "pristine/tests/test_flowmarshal_implementation_workflow.py",
+     "pristine/scripts/flowmarshal_implementation_workflow.py",
+     "pristine/scripts/flowmarshal_orchestrator_ledger.py"
+   ],
+-  "unchanged_r02_function_asts": [
+-    "utc",
+-    "sha",
+-    "save",
+-    "flattened",
+-    "closure",
+-    "helper_origin_observation",
+-    "record_helper_origin",
+-    "checked_helper_origin",
+-    "residual_files"
+-  ],
+-  "sqlite_import_process_audit_ast_unchanged_except_scope_label": true,
+-  "origin14_decorator_inventory": {
+-    "command_migrate": {
+-      "lines": [
+-        1693,
+-        1845
+-      ],
+-      "decorators": []
++  "r02_runner_full_AST_same_after_schema_literal_normalization": true,
++  "original3_and_ID5_unchanged": true,
++  "original76_inventory_status_r01_bytes_unchanged": true,
++  "r02_cold_recheck": "Tool f9a677 exit0, seal10/ZIP11/every-payload-byte equality/audit-predicate same/unchanged9 function AST/compile4",
++  "r03_delta": "Metadata-only timeout description consistency fix; runner schema literal and manifest identity updated, full AST same after schema normalization. C1 code unchanged from r02.",
++  "r02_pins": {
++    "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\writer4\\next-common-source-candidate-r02",
++    "state": "Frozen source preparation only, SOURCE/PRE/POST NOT_RUN; all12 files preserved",
++    "runner": {
++      "bytes": 29404,
++      "sha256": "35b478ef92ceedaaa70a1639ee3979e68ff1ae9ea3f2aea2d51ca711067c9cea"
+     },
+-    "command_begin": {
+-      "lines": [
+-        2843,
+-        2921
+-      ],
+-      "decorators": []
++    "manifest": {
++      "bytes": 11186,
++      "sha256": "7c0648076adc84e5e8dc8b202c9049fa64e8b8acf585089241aee6344d397e13"
+     },
+-    "command_verify": {
+-      "lines": [
+-        6742,
+-        7008
+-      ],
+-      "decorators": []
++    "seal": {
++      "bytes": 1425,
++      "sha256": "c851627426f2ee719852d5f8bc36299f45ba8005cc6e3a1d1dc839d89a48bfc7"
+     },
+-    "open_readonly": {
+-      "lines": [
+-        742,
+-        751
+-      ],
+-      "decorators": [
+-        "contextmanager"
+-      ]
+-    },
+-    "open_write": {
+-      "lines": [
+-        754,
+-        778
+-      ],
+-      "decorators": []
+-    },
+-    "_backup_database": {
+-      "lines": [
+-        1435,
+-        1452
+-      ],
+-      "decorators": []
+-    },
+-    "_install_writer_fence_triggers": {
+-      "lines": [
+-        801,
+-        819
+-      ],
+-      "decorators": []
+-    },
+-    "command_status": {
+-      "lines": [
+-        2650,
+-        2652
+-      ],
+-      "decorators": []
+-    },
+-    "command_task": {
+-      "lines": [
+-        2714,
+-        2753
+-      ],
+-      "decorators": []
+-    },
+-    "command_register_revision": {
+-      "lines": [
+-        1913,
+-        2070
+-      ],
+-      "decorators": []
+-    },
+-    "command_review": {
+-      "lines": [
+-        5319,
+-        5455
+-      ],
+-      "decorators": []
+-    },
+-    "command_finish": {
+-      "lines": [
+-        6524,
+-        6568
+-      ],
+-      "decorators": []
+-    },
+-    "command_revalidate_success": {
+-      "lines": [
+-        5458,
+-        5610
+-      ],
+-      "decorators": []
+-    },
+-    "command_record_direct_attempt": {
+-      "lines": [
+-        6175,
+-        6320
+-      ],
+-      "decorators": []
++    "zip": {
++      "bytes": 148441,
++      "sha256": "6a4b415cf6f173a3b3357e51163877deac66d2aff2b8c9db6fb76a5cd538f72a"
+     }
+   },
+-  "previous_tree_files_preserved": 68,
+-  "previous_tree_fingerprint": "02b13361e0fbc839c78e24c48eeb32985ca0e1496cf701963a1249c4b9879d2f",
+-  "branch_sensitive_candidate": {
+-    "id": "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_record_direct_attempt_rejects_task_that_is_not_ready",
+-    "expected_READY_error_before_snapshot": true,
+-    "actual_branch": "NOT_RUN"
++  "previous_files_preserved": 81,
++  "previous_fingerprint": "3d94ff4f0d82d19a09597a8a747a401e997833a4189aa7f1886411c633cbd28c",
++  "required_future_dummy_NOT_RUN": [
++    "normal zero required empty journal/PASS",
++    "caught RuntimeError retains denial and FAIL",
++    "uncaught guard denial/FAIL with native unittest unobserved",
++    "journal initialization/write/flush/close/read/missing/corrupt/mismatch => UNKNOWN"
++  ],
++  "r01_R030_pin": {
++    "path": "D:\\claude\\독립감사관\\R-030-VM-NEXT-COMMON5-R01-SOURCE-VERDICT.ko.md",
++    "bytes": 7387,
++    "sha256": "c943f4af0d3dafabac571c16f2b21b31447356432a8daf8d92b064486e7b17e8",
++    "state": "SOURCE STATIC PASS for r01 only; not PRE/POST or r02 approval",
++    "limits": "R030 inventory/status/Root proof content unread, partial independence preserved"
+   },
+-  "category_counts": {
+-    "MODULE_IDENTITY_REVIEW_16": 16,
+-    "EFFECT_BRANCH_REVIEW_41": 41,
+-    "WINDOWS_PROFILE_REQUIRED_9": 9,
+-    "NEXT_COMMON_5": 5,
+-    "COMPLETED_5": 5
+-  },
+-  "NOT_RUN": [
+-    "new loader5",
+-    "new origin14 actual journal",
+-    "new Linux assertions/runtime",
+-    "fresh SOURCE/PRE",
+-    "native full coverage/OS sandbox"
+-  ]
++  "new_SOURCE_PRE_POST": "NOT_RUN",
++  "no_current_76_or_Windows_or_Goal_PASS": true
+ }

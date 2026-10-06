@@ -1,0 +1,68 @@
+{
+  "observed_utc": "2026-10-04T22:52:21.444964+00:00",
+  "method": "source metadata AST/compile/hash only",
+  "actual_product_fixture_import_loader_discovery_cloud_runs": 0,
+  "selected_original_IDs": [
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_changed_identity_or_schema_rejects_without_rows",
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_selection_refs_and_required_check_cannot_be_forged",
+    "test_flowmarshal_direct_selection.DirectSelectionTest.test_stale_success_and_evidence_tamper_reject"
+  ],
+  "selected_variant_count": 8,
+  "compiled_in_memory_files": [
+    "runner.py",
+    "prepare-command.py",
+    "pristine4 unchanged",
+    "r02 draft embedded Python"
+  ],
+  "C1_top11_and_deny_AST_identical_to_r03": false,
+  "audit_predicate_identical_except_exact_declared_D_M_import_data": true,
+  "native_Popen_wait_kill_call_AST_identical": true,
+  "source4_byte_identical_to_original": true,
+  "original_module_identity_runtime": "NOT_RUN",
+  "helper_origin17_runtime": "NOT_RUN",
+  "baseline_original76_ROOT_pin": {
+    "path": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-c5-r03-01\\ROOT-ORIGINAL76-AFTER-C5.actual.json",
+    "bytes": 160966,
+    "sha256": "e9704f0efb11ab7e0eab4bb3a9c55f11cc182cfb30679751297b2988c327b5cd"
+  },
+  "canonical_count": 76,
+  "completed_unique_scoped_raw_count": 10,
+  "remaining_not_run": 66,
+  "source_selected_not_run": 3,
+  "not_selected_not_run": 63,
+  "category_counts": {
+    "MODULE_IDENTITY_REVIEW_16": 13,
+    "NEXT_DIRECT_NEGATIVE_3": 3,
+    "EFFECT_BRANCH_REVIEW_41": 41,
+    "WINDOWS_PROFILE_REQUIRED_9": 9,
+    "COMPLETED_10": 10
+  },
+  "C5_R034_did_not_audit_cumulative76": true,
+  "prior_r03_fixture_files_preserved": 20,
+  "prior_fingerprint": "610dbff85f03894fa7489a9d516e6cfb71d13a744887ab3a69d6e5717c3bcfda",
+  "issuance_tokens_each_once": true,
+  "issuance_window_seconds": 900,
+  "normal___name___preserved": true,
+  "new_PRE_binding": "UNISSUED_SOURCE_DRAFT_FAILS_CLOSED",
+  "prepared_or_executed_native_commands": 0,
+  "new_SOURCE_PRE_ACTUAL_POST": "NOT_RUN",
+  "candidate_revision": "after-c5-next-source-r02",
+  "C1_top11_change_explanation": "closure exact allow tuple adds only natural declared M. Other10 common functions and deny unchanged.",
+  "full_runner_AST_equal_to_r01_after_only_declared_closure_tuple_inverse": true,
+  "closure_AST_equal_to_r01": false,
+  "closure_fix": {
+    "old_line": 95,
+    "new_line": 95,
+    "old_AST_sha256": "8ecdf924abe18d5f17803fdf996fcd0a084df96b0ae100b5493445b247183706",
+    "new_AST_sha256": "0317fa35190a701ef75ef801bdb7376a559f5f17ab429d91867e5c7d517553ae",
+    "exact_AST_equal": false,
+    "change": "add only declared FIXTURE_MODULE to existing exact closure allow tuple",
+    "full_runner_inverse_declared_tuple_AST_equal": true,
+    "reason": "D imports natural M; checked binding requires M in sys.modules; preflight/postflight closure must admit that same declared M",
+    "actual_import_loader_product_run": "NOT_RUN",
+    "prior_R035": "historical/static unchanged source only; do not reuse for r02",
+    "new_SOURCE_PRE_fixture_required": true
+  },
+  "prior_D3_19_files_preserved": true,
+  "current_product_fixture_import_loader_discovery_cloud_runs": 0
+}

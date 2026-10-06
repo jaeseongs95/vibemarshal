@@ -13,5 +13,8 @@
   "futureExecutionAuthority": null,
   "originRoot": "C:\\Users\\sjs95\\Documents\\Codex\\2026-10-04\\task-8\\vm-cloud-platform-24cfe63e\\lead-post-u2-r02-01\\raw",
   "captureMeaning": "기존 원자료의 바이트 동일 복사; 새 실행 없음",
-  "limits": "원래 절대경로/manifest는 역사적 provenance이며, 재배치된 source/runner의 실행 가능성을 뜻하지 않음"
+  "limits": "원래 절대경로/manifest는 역사적 provenance이며, 재배치된 source/runner의 실행 가능성을 뜻하지 않음",
+  "sourcePacket": "source-packet/",
+  "originalCloudReturn": "cloud-return/return.zip",
+  "inputPinEvidence": "CLOUD-INPUT-PINS.json"
 }

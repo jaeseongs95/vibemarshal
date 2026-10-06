@@ -1,0 +1,92 @@
+{
+  "mode": "AST/compile only; no exec, product import, loader or test",
+  "writer_metadata_runtime": "3.12.10 (tags/v3.12.10:0cc8128, Apr  8 2025, 12:21:36) [MSC v.1943 64 bit (AMD64)]",
+  "files": {
+    "pristine/tests/test_flowmarshal_implementation_workflow.py": {
+      "AST": "PASS",
+      "compile": "PASS",
+      "direct_imports": [
+        "__future__",
+        "argparse",
+        "copy",
+        "hashlib",
+        "importlib.util",
+        "io",
+        "json",
+        "os",
+        "sqlite3",
+        "subprocess",
+        "tempfile",
+        "threading",
+        "unittest",
+        "contextlib",
+        "datetime",
+        "pathlib",
+        "unittest"
+      ],
+      "nonstdlib_direct_imports": []
+    },
+    "pristine/scripts/flowmarshal_implementation_workflow.py": {
+      "AST": "PASS",
+      "compile": "PASS",
+      "direct_imports": [
+        "__future__",
+        "argparse",
+        "hashlib",
+        "json",
+        "os",
+        "re",
+        "sqlite3",
+        "subprocess",
+        "sys",
+        "time",
+        "uuid",
+        "contextlib",
+        "datetime",
+        "pathlib",
+        "typing"
+      ],
+      "nonstdlib_direct_imports": []
+    },
+    "pristine/scripts/flowmarshal_orchestrator_ledger.py": {
+      "AST": "PASS",
+      "compile": "PASS",
+      "direct_imports": [
+        "__future__",
+        "argparse",
+        "hashlib",
+        "json",
+        "sqlite3",
+        "sys",
+        "uuid",
+        "datetime",
+        "pathlib",
+        "typing"
+      ],
+      "nonstdlib_direct_imports": []
+    }
+  },
+  "selected_ast_ids": [
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_json_output_is_ascii_safe_and_round_trips_unicode",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision5_requires_typed_ancestor_inputs_and_evidence_contract",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_same_path_accepts_only_drive_and_unc_extended_namespaces"
+  ],
+  "actual_loader_ids_count_errors": "NOT_RUN",
+  "actual_runtime_closure": "NOT_RUN",
+  "actual_tests": "NOT_RUN",
+  "actual_source_pre": "NOT_RUN",
+  "runner_ast": "PASS",
+  "runner_compile": "PASS",
+  "selected_original_lines": {
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_json_output_is_ascii_safe_and_round_trips_unicode": 560,
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_revision5_requires_typed_ancestor_inputs_and_evidence_contract": 809,
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_same_path_accepts_only_drive_and_unc_extended_namespaces": 978
+  },
+  "supervisor_popen_call_sites": 1,
+  "child_popen_call_sites": 0,
+  "owned_child_kill_call_sites": 1,
+  "actual_owned_child_kill": 0,
+  "source_bytes_changed": 0,
+  "R015_C1": "fixed exact MODULE __import__; exact full IDs then relative names with module=module; hook unchanged",
+  "product_candidate_import_loader_tests": "NOT_RUN"
+}

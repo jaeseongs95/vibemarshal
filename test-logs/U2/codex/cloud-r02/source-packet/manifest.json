@@ -1,0 +1,112 @@
+{
+  "schema": "vm-u64-sqlite2-source-r02",
+  "test_ids": [
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_migrates_additively_from_v2_and_preserves_history",
+    "test_flowmarshal_implementation_workflow.ImplementationWorkflowTest.test_schema_v3_writer_fence_rejects_missing_and_old_contract_versions"
+  ],
+  "sources": {
+    "pristine/tests/test_flowmarshal_implementation_workflow.py": {
+      "original_path": "D:/codex/자동화템플릿/tests/test_flowmarshal_implementation_workflow.py",
+      "bytes": 173219,
+      "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"
+    },
+    "pristine/scripts/flowmarshal_implementation_workflow.py": {
+      "original_path": "C:/Users/sjs95/Documents/Codex/2026-10-03/task-8/direct-selection-candidate-dev3-01/guard-fixture-r02/candidate/scripts/flowmarshal_implementation_workflow.py",
+      "bytes": 384699,
+      "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"
+    },
+    "pristine/scripts/flowmarshal_orchestrator_ledger.py": {
+      "original_path": "D:/codex/자동화템플릿/scripts/flowmarshal_orchestrator_ledger.py",
+      "bytes": 39264,
+      "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"
+    }
+  },
+  "runner": {
+    "path": "runner.py",
+    "bytes": 20603,
+    "sha256": "cfc6e0f438f42ba453d503475c54a3dd8959c06ae5bdef83b48fa760166f2cee"
+  },
+  "runtime": {
+    "platform": "linux",
+    "python_major_minor": [
+      3,
+      12
+    ],
+    "argv_flags": [
+      "-I",
+      "-S",
+      "-B",
+      "-X",
+      "utf8"
+    ],
+    "stdlib_only_python_dependencies": true,
+    "install": false,
+    "native_stdlib_extensions": "Linux SQLite backup/URI/UDF/trigger support and original module native imports require new PRE; no install/fallback",
+    "site_startup": "isolated no-site profile, no .pth/sitecustomize consumption; not original Q startup",
+    "origin_stdlib_binding": "New PRE pins contextlib.py and inspect.py actual runtime bytes/closure; wrapper validation references same runtime contextlib.contextmanager, no literal filename whitelist"
+  },
+  "contract": {
+    "source_only_candidate": true,
+    "test_scope": "exact U2 only: schema-v3 additive upgrade and writer-fence rejection",
+    "self_child_count": 1,
+    "test_child_subprocess_count": 0,
+    "retry": 0,
+    "network_provider_git_install_calls": 0,
+    "windows_native_observer_calls": 0,
+    "legacy_mode": "original test module import seam only; no CLI",
+    "controller_wait_reap_budget_max_seconds": 300,
+    "own_child_timeout_kill_reap": true,
+    "global_process_kill": false,
+    "cleanup_existing": false,
+    "reap_reserve_seconds": "min(5,timeout/10), within same deadline",
+    "wall_clock_limit": "OS creation/kill calls and capture not hardwall guaranteed; failed reap UNKNOWN",
+    "cwd": "new run-root/cwd, initially empty",
+    "HOME": "new run-root/home",
+    "TMPDIR_TMP_TEMP": "new run-root/tmp",
+    "writes": "owned run-root raw capture; original private tempfile plan/proof/manifest, two SQLite DBs, backups/atomic rename and transient SQLite journal/WAL/SHM; original tearDown only",
+    "audit_seams": "nonstdlib import/socket/process launch/ctypes/chdir/SQLite target including exact canonical private file:/...?mode=ro; no open/dir_fd hook",
+    "audit_not_os_sandbox": true,
+    "timeout_residual": "TIMEOUT if owned child reaped; otherwise UNKNOWN; no retry/global kill/cleanup",
+    "result_before_extra_observation": true,
+    "pristine_before_after": "three source files, runner, manifest",
+    "no_expanded_pass": [
+      "original76",
+      "Windows",
+      "F6",
+      "qualification",
+      "R2",
+      "ledger4",
+      "C3 rerun",
+      "current-helper10a",
+      "Goal acceptance"
+    ],
+    "sqlite_uri": "Only literal file:{canonical absolute private TMP path}?mode=ro; no authority, percent escape, fragment, extra query or other mode; original uri=True caller pinned",
+    "helper_origin_checks": "All7 kept; open_readonly decorator-specific binding only; wrong wrapped origin/closure/globals/decorator rejected; accepted rows saved in preflight.helper_code_origins",
+    "helper_origin_journal": "CreateNew helper-origin.jsonl, original7 order; actual exposed/wrapped code/name/type/globals and expected_source before guard, flush; accepted/rejected row after guard; validation exception preserved if rejected logging fails"
+  },
+  "source_evidence": {
+    "selected_test_lines": {
+      "test_schema_v3_migrates_additively_from_v2_and_preserves_history": [
+        3194,
+        3233
+      ],
+      "test_schema_v3_writer_fence_rejects_missing_and_old_contract_versions": [
+        3235,
+        3274
+      ]
+    },
+    "test_shared_closure": "Original setUp/tearDown, connect/ClosingConnection, fixture methods and command helpers; no substitutions",
+    "fixture_creation": "Original test code only, inside freshly bound private TMP; no prepared DB/fixture bytes",
+    "helper_call_roots": [
+      "command_migrate",
+      "command_begin",
+      "command_verify"
+    ],
+    "source_review_only": true,
+    "actual_run_state": "NOT_RUN",
+    "new_SOURCE_PRE_required": true,
+    "origin_validator": "Only open_readonly @contextlib.contextmanager: runtime decorator identity, reference wrapper code/globals/defaults, closure cells bound to one __wrapped__ generator, inspect.unwrap identity, original helper globals/name/code-name/path; other functions direct provenance",
+    "r01_unknown": "Terminal exit2/UNKNOWN before TextTestRunner.run; actual offending name/co_filename absent. Static first expected mismatch is ordinal4 open_readonly wrapper.",
+    "regression_scope": "Local stdlib dummy exact11; normal single binding accepted; general unwrap cycle rejected, normal nested chain unwrap observed but extra undeclared wrapper rejected; wrong metadata/origin/globals/code-less rejected; product0"
+  }
+}

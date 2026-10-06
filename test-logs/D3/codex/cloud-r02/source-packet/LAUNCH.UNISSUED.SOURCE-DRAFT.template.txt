@@ -1,0 +1,55 @@
+/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12 -I -S -B -X utf8 - <<'PY'
+import datetime,hashlib,json,os,pathlib,sys
+issued=datetime.datetime.fromisoformat('__ISSUED_UTC__')
+deadline=datetime.datetime.fromisoformat('__LAUNCH_NOT_AFTER_ISO__')
+context={'peerId':'__DISPATCH_PEER_ID__','launchNotAfterUtc':'__LAUNCH_NOT_AFTER_UTC__'}
+window_seconds=900
+root=pathlib.Path('/workspace/vm-d3-source-24cf-r02')
+packet=root/'packet';cwd=root/'pre-cwd';run=pathlib.Path('/workspace/vm-d3-run-24cf-r02')
+exe=pathlib.Path('/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12')
+SOURCE_CORE_PINS={"manifest.json": {"bytes": 13558, "sha256": "ff64e328bfc51fae2c96ebb605008d7ef2fb8fde15e4b36fd6de4d205bb6a3d0"}, "pristine/scripts/flowmarshal_implementation_workflow.py": {"bytes": 384699, "sha256": "70f5c5f0da8885eda96becc07e5fcdb9b23a1d3a0ce02aad86fa6c684e432dea"}, "pristine/scripts/flowmarshal_orchestrator_ledger.py": {"bytes": 39264, "sha256": "8f32c23dd5c8bd8105be4d8338243fb67b59825397545a6681abc6c921a4bd72"}, "pristine/tests/test_flowmarshal_direct_selection.py": {"bytes": 14804, "sha256": "56793b76b16712fffd1d2d732b3c858621fef15d1d85f2874f0545fba3ea6fe2"}, "pristine/tests/test_flowmarshal_implementation_workflow.py": {"bytes": 173219, "sha256": "0053b2f64047d819fcb8da1fc40233ffe4bc635e2a64e4d4ceb9a28842f0f3c5"}, "runner.py": {"bytes": 31682, "sha256": "97958345d3ef7982ceb620854b56ea5ad2c91029b15b51b2076f26bf870f1cdb"}}
+# SOURCE draft only. Root must bind a new PRE before freezing the final native template.
+pre_evidence_pin=None
+try:
+ if (issued.utcoffset()!=datetime.timedelta(0) or deadline.utcoffset()!=datetime.timedelta(0)
+     or deadline-issued!=datetime.timedelta(seconds=window_seconds)
+     or datetime.datetime.fromisoformat(context['launchNotAfterUtc'])!=deadline):
+  raise ValueError('exact900-second UTC issuance window required')
+ if pre_evidence_pin is None:
+  print(json.dumps({'scope':'D3_SOURCE_DRAFT','status':'NOT_RUN_NEW_PRE_BINDING_REQUIRED',
+                    'runnerInvocations':0,'childInvocations':0,'windowSeconds':900}),flush=True)
+  raise SystemExit(2)
+ # New PRE must provide the exact metadata path/pin/runtime below before final-template audit.
+ pb=(root/'evidence/linux-pre.stdout.json').read_bytes()
+ if hashlib.sha256(pb).hexdigest()!=pre_evidence_pin:
+  raise ValueError('new PRE metadata external pin mismatch')
+ pre=json.loads(pb)
+ if not pre['checks'] or not all(v is True for v in pre['checks'].values()):
+  raise ValueError('new PRE metadata checks are incomplete')
+ if sys.platform!='linux' or sys.version!=pre['python']['version']:
+  raise ValueError('PRE runtime identity mismatch')
+ if not (sys.flags.isolated and sys.flags.no_site and sys.dont_write_bytecode and sys.flags.utf8_mode):
+  raise ValueError('isolated no-site flags required')
+ if pathlib.Path.cwd()!=cwd or not cwd.is_dir() or any(cwd.iterdir()):
+  raise ValueError('fresh exact parent cwd required')
+ if (run.resolve()!=run or os.path.lexists(run)
+     or any(p.is_symlink() for p in (root,packet,run,*run.parents))
+     or run.is_relative_to(packet) or packet.is_relative_to(run)):
+  raise ValueError('new owned run-root binding mismatch')
+ for name,pin in SOURCE_CORE_PINS.items():
+  p=packet/name;b=p.read_bytes()
+  if p.is_symlink() or len(b)!=pin['bytes'] or hashlib.sha256(b).hexdigest()!=pin['sha256']:
+   raise ValueError('SOURCE core pin mismatch')
+ argv=[str(exe),'-I','-S','-B','-X','utf8',str(packet/'runner.py'),'--run-root',str(run),
+       '--runner-sha256',SOURCE_CORE_PINS['runner.py']['sha256'],
+       '--manifest-sha256',SOURCE_CORE_PINS['manifest.json']['sha256'],'--timeout','300']
+ if datetime.datetime.now(datetime.timezone.utc)>deadline:
+  raise SystemExit(124)
+ print(json.dumps({'scope':'D3_PRE_FINAL_TEMPLATE_REQUIRED','context':context,'argv':argv,
+                   'cwd':str(cwd),'method':'os.execv same process','retry':0}),flush=True)
+ os.execv(str(exe),argv)
+except Exception as error:
+ print(json.dumps({'scope':'D3_SOURCE_DRAFT_ERROR','status':'NOT_RUN','errorType':type(error).__name__,
+                   'runnerInvocations':0}),flush=True)
+ raise
+PY

@@ -1,0 +1,34 @@
+--- r02/runner.py
++++ final-r03/runner.py
+@@ -47,7 +47,7 @@
+     if sha(manifest_path) != args.manifest_sha256:
+         raise RuntimeError("manifest pin mismatch")
+     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+-    if (manifest["schema"] != "vm-common3-source-r02"
++    if (manifest["schema"] != "vm-common3-source-r03"
+             or manifest["test_ids"] != args.expected_ids):
+         raise RuntimeError("manifest contract mismatch")
+     if (manifest["runner"]["sha256"] != args.runner_sha256
+@@ -127,15 +127,20 @@
+ 
+     sys.addaudithook(audit)
+     sys.path.insert(0, str(PACKET / "pristine" / "tests"))
++    module = __import__(MODULE)
++    full_ids = manifest["test_ids"]
++    if (full_ids != args.expected_ids or len(full_ids) != 3 or len(set(full_ids)) != 3
++            or any(not identity.startswith(MODULE + ".") for identity in full_ids)):
++        raise RuntimeError("exact original IDs/module prefix mismatch")
++    names = [identity[len(MODULE) + 1:] for identity in full_ids]
+     loader = unittest.TestLoader()
+-    suite = loader.loadTestsFromNames(manifest["test_ids"])
++    suite = loader.loadTestsFromNames(names, module=module)
+     cases = list(flattened(suite))
+     ids = [case.id() for case in cases]
+     save(root / "loader.json", {"utc": utc(), "ids": ids, "count": len(cases),
+                                 "errors": loader.errors})
+     if loader.errors or len(cases) != 3 or ids != manifest["test_ids"]:
+         raise RuntimeError("exact loader IDs/count/errors mismatch: " + repr(loader.errors))
+-    module = sys.modules[MODULE]
+     origins = {
+         "test": str(Path(module.__file__).resolve()),
+         "helper": str(Path(module.impl.__file__).resolve()),
