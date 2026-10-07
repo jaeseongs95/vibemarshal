@@ -1,0 +1,6 @@
+test_string_enums_preserve_public_contract_without_stdlib_strenum (test_engine_python_compat.EnginePythonCompatibilityTests.test_string_enums_preserve_public_contract_without_stdlib_strenum) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 0.427s
+
+OK

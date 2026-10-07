@@ -1,0 +1,189 @@
+{
+  "schemaVersion": "vm-cloud-result.r02.v1",
+  "jobId": "session_011y4D5XEQU9WmwioDkgxSA2",
+  "requesterLabel": "Claude VM 테스터 세션 df9448bb",
+  "vendor": "claude-cloud",
+  "model": {
+    "configured": "claude-opus-5-5",
+    "session_context.model": "claude-opus-5-5",
+    "last_served_model": "claude-opus-5-5",
+    "source": "get_session"
+  },
+  "effort": {
+    "value": "high",
+    "source": "get_session session_context.effort_level"
+  },
+  "environment": {
+    "id": "env_01NaUG8DzDCAkxhmxR7CK4MV",
+    "kind": "anthropic_cloud",
+    "expectedNode": "24",
+    "observedNode": "v22.22.0",
+    "nodeNote": "기대값 node24와 다름(v22). 이 시험은 node를 사용하지 않으며 header의 중단 조건(model·effort)이 아니므로 기록만 한다."
+  },
+  "repository": {
+    "originUrl": "https://github.com/jaeseongs95/vibemarshal",
+    "sessionBranch": "claude/strenum-python-compat-xbnqif",
+    "baselineCommit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+    "candidateHead": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+    "checkout": "git worktree add --detach <candidate> 32bb0f9dd9f024045d24487312b50f5b703573a3 (clean, 0 changes before patch)",
+    "candidateStatusAfterRuns": [
+      "M README.md",
+      " M src/flowmarshal/engine/domain.py",
+      " M src/flowmarshal/engine/qualification_manifest.py",
+      "?? tests/test_engine_python_compat.py"
+    ]
+  },
+  "host": {
+    "hostname": "vm",
+    "kernel": "6.18.44-fc-v77",
+    "machine": "x86_64",
+    "os": "Ubuntu 24.04.5 LTS"
+  },
+  "inputs": {
+    "patch": {
+      "bytes": 11246,
+      "sha256": "4c85a90fe38ef0007cc2bea5aa4bf1eaff63efdf521810672db8c9aff8c9348e",
+      "expectedSha256": "4c85a90fe38ef0007cc2bea5aa4bf1eaff63efdf521810672db8c9aff8c9348e"
+    },
+    "manifest": {
+      "bytes": 4669,
+      "sha256": "35638c726c62460898ef9763b9f96680977c6ab0040488c1b2b6c950a8f3ef35",
+      "expectedSha256": "35638c726c62460898ef9763b9f96680977c6ab0040488c1b2b6c950a8f3ef35"
+    },
+    "applyCommand": "git -c core.autocrlf=false apply <patch>"
+  },
+  "source4": {
+    "README.md": {
+      "bytes": 18675,
+      "sha256": "9fdf30b6dbec2adcf31e0a557f5626c18ebd9ca1f7f0f58ba62bc5086d320112",
+      "matchesManifest": true
+    },
+    "src/flowmarshal/engine/domain.py": {
+      "bytes": 123131,
+      "sha256": "29311ea13fcdd80215fdd7a348aca9496148459ae59b682df8061d9070d7c71e",
+      "matchesManifest": true
+    },
+    "src/flowmarshal/engine/qualification_manifest.py": {
+      "bytes": 43857,
+      "sha256": "f6950213d484df2b05ede8cbd3c22bfcc0a630f3b3f0931c0de2ca875418b759",
+      "matchesManifest": true
+    },
+    "tests/test_engine_python_compat.py": {
+      "bytes": 4542,
+      "sha256": "b5bda8f77254dee5a0411cd0f4f6aafad2b8173ad87218dac911b1f31c3e1f2f",
+      "matchesManifest": true
+    }
+  },
+  "runtimes": {
+    "primary": {
+      "installer": "uv 0.11.32: UV_PYTHON_INSTALL_DIR=<scratch>/uv-python uv python install 3.10",
+      "installedFrom": "cpython-3.10.20-linux-x86_64-gnu (uv python-build-standalone download)",
+      "baseInterpreter": "/tmp/claude-0/-home-user-vibemarshal/c0c3fe5f-b08b-587c-af4d-3abbcfba534e/scratchpad/uv-python/cpython-3.10-linux-x86_64-gnu/bin/python3.10",
+      "sideEffect": "uv가 /root/.local/bin/python3.10 symlink를 sandbox 안에 생성",
+      "venv": "/tmp/claude-0/-home-user-vibemarshal/c0c3fe5f-b08b-587c-af4d-3abbcfba534e/scratchpad/uv-python/cpython-3.10-linux-x86_64-gnu/bin/python3.10 -m venv <scratch>/venv310; pip install pydantic==2.13.5",
+      "version": "3.10.20 (main, Jul 18 2026, 17:02:35) [Clang 22.1.3 ]",
+      "implementation": "CPython",
+      "executable": "/tmp/claude-0/-home-user-vibemarshal/c0c3fe5f-b08b-587c-af4d-3abbcfba534e/scratchpad/venv310/bin/python",
+      "base_prefix": "/tmp/claude-0/-home-user-vibemarshal/c0c3fe5f-b08b-587c-af4d-3abbcfba534e/scratchpad/uv-python/cpython-3.10-linux-x86_64-gnu",
+      "pydantic": "2.13.5",
+      "pydantic_core": "2.46.5"
+    },
+    "supplement": {
+      "installer": "없음(기존 /usr/bin/python3 -> /usr/bin/python3.13, 3.11 이상이라 그대로 사용)",
+      "baseInterpreter": "/usr/bin/python3",
+      "venv": "/usr/bin/python3 -m venv <scratch>/venv313; pip install pydantic==2.13.5",
+      "version": "3.13.16 (main, Oct  1 2026, 15:40:24) [GCC 13.3.0]",
+      "implementation": "CPython",
+      "executable": "/tmp/claude-0/-home-user-vibemarshal/c0c3fe5f-b08b-587c-af4d-3abbcfba534e/scratchpad/venv313/bin/python",
+      "base_prefix": "/usr",
+      "pydantic": "2.13.5",
+      "pydantic_core": "2.46.5"
+    }
+  },
+  "cells": {
+    "primary": {
+      "manifestKey": "primaryExactArgv",
+      "argvTemplate": [
+        "<확인된 Python3.10 interpreter>",
+        "-I",
+        "-B",
+        "-c",
+        "import sys; assert sys.version_info[:2] == (3, 10); import sys, unittest; from pathlib import Path; root = Path(sys.argv.pop(1)).resolve(); sys.path[:0] = [str(root / \"src\"), str(root / \"tests\")]; import pydantic; assert pydantic.__version__ == \"2.13.5\"; unittest.main(module=\"test_engine_python_compat\", argv=[\"unittest\", \"EnginePythonCompatibilityTests.test_string_enums_preserve_public_contract_without_stdlib_strenum\"], verbosity=2)",
+        "<같은 동결 candidate source root>"
+      ],
+      "argv": [
+        "/tmp/claude-0/-home-user-vibemarshal/c0c3fe5f-b08b-587c-af4d-3abbcfba534e/scratchpad/venv310/bin/python",
+        "-I",
+        "-B",
+        "-c",
+        "import sys; assert sys.version_info[:2] == (3, 10); import sys, unittest; from pathlib import Path; root = Path(sys.argv.pop(1)).resolve(); sys.path[:0] = [str(root / \"src\"), str(root / \"tests\")]; import pydantic; assert pydantic.__version__ == \"2.13.5\"; unittest.main(module=\"test_engine_python_compat\", argv=[\"unittest\", \"EnginePythonCompatibilityTests.test_string_enums_preserve_public_contract_without_stdlib_strenum\"], verbosity=2)",
+        "/tmp/claude-0/-home-user-vibemarshal/c0c3fe5f-b08b-587c-af4d-3abbcfba534e/scratchpad/candidate"
+      ],
+      "cwd": "/tmp/claude-0/-home-user-vibemarshal/c0c3fe5f-b08b-587c-af4d-3abbcfba534e/scratchpad/candidate",
+      "startUtc": "2026-10-07T23:01:55.391+00:00",
+      "endUtc": "2026-10-07T23:01:56.120+00:00",
+      "exit": 0
+    },
+    "supplement": {
+      "manifestKey": "nativeSupplementExactArgv",
+      "argvTemplate": [
+        "<확인된 Python3.11+ interpreter>",
+        "-I",
+        "-B",
+        "-c",
+        "import sys; assert sys.version_info[:2] >= (3, 11); import sys, unittest; from pathlib import Path; root = Path(sys.argv.pop(1)).resolve(); sys.path[:0] = [str(root / \"src\"), str(root / \"tests\")]; import pydantic; assert pydantic.__version__ == \"2.13.5\"; unittest.main(module=\"test_engine_python_compat\", argv=[\"unittest\", \"EnginePythonCompatibilityTests.test_string_enums_preserve_public_contract_without_stdlib_strenum\"], verbosity=2)",
+        "<같은 동결 candidate source root>"
+      ],
+      "argv": [
+        "/tmp/claude-0/-home-user-vibemarshal/c0c3fe5f-b08b-587c-af4d-3abbcfba534e/scratchpad/venv313/bin/python",
+        "-I",
+        "-B",
+        "-c",
+        "import sys; assert sys.version_info[:2] >= (3, 11); import sys, unittest; from pathlib import Path; root = Path(sys.argv.pop(1)).resolve(); sys.path[:0] = [str(root / \"src\"), str(root / \"tests\")]; import pydantic; assert pydantic.__version__ == \"2.13.5\"; unittest.main(module=\"test_engine_python_compat\", argv=[\"unittest\", \"EnginePythonCompatibilityTests.test_string_enums_preserve_public_contract_without_stdlib_strenum\"], verbosity=2)",
+        "/tmp/claude-0/-home-user-vibemarshal/c0c3fe5f-b08b-587c-af4d-3abbcfba534e/scratchpad/candidate"
+      ],
+      "cwd": "/tmp/claude-0/-home-user-vibemarshal/c0c3fe5f-b08b-587c-af4d-3abbcfba534e/scratchpad/candidate",
+      "startUtc": "2026-10-07T23:01:56.120+00:00",
+      "endUtc": "2026-10-07T23:01:56.779+00:00",
+      "exit": 0
+    }
+  },
+  "auxiliaryObservations": {
+    "provenance": "local_derived; manifest oracle 밖의 보조 관측이며 PASS 판정 근거를 대체하지 않는다",
+    "py3.10.20": {
+      "domainStrEnumSubclasses": 32,
+      "qualificationStrEnumSubclasses": 3,
+      "enum.StrEnum is domain.StrEnum": false,
+      "qualification.StrEnum is domain.StrEnum": true
+    },
+    "py3.13.16": {
+      "domainStrEnumSubclasses": 32,
+      "qualificationStrEnumSubclasses": 3,
+      "enum.StrEnum is domain.StrEnum": true,
+      "qualification.StrEnum is domain.StrEnum": true
+    },
+    "packaging": "patch 변경 파일은 source4뿐이며 pyproject.toml 미변경(requires-python \">=3.10\", pydantic==2.13.5 기존 값)"
+  },
+  "acceptance": {
+    "A2-AC1": {
+      "status": "PASS",
+      "basis": "primary(CPython 3.10.20 + pydantic 2.13.5)에서 domain·qualification_manifest import 후 테스트 OK, exit 0"
+    },
+    "A2-AC2": {
+      "status": "PASS",
+      "basis": "primary·supplement 테스트의 runtime/fallback enum 값·이름 비교와 대표 8 enum의 str/format/JSON/constructor 검사 OK; 보조 관측 32+3"
+    },
+    "A2-AC3": {
+      "status": "PASS",
+      "basis": "supplement(CPython 3.13.16 + pydantic 2.13.5) 테스트 OK, exit 0; 보조 관측 enum.StrEnum is domain.StrEnum == True"
+    },
+    "A2-AC4": {
+      "status": "PASS",
+      "basis": "정적 source 확인: 변경은 source4뿐, dependency·Python floor·packaging 변경 0. 제품 실행 검사는 수행하지 않음(manifest STATIC_SOURCE_CONFIRMED_PRODUCT_NOT_RUN 범위)"
+    }
+  },
+  "effects": "candidate는 scratch worktree(.git에 worktree 메타데이터)이며 실행은 -B로 bytecode를 쓰지 않았다. 원격 효과는 결과 branch push뿐이다.",
+  "runStartUtc": "2026-10-07T22:57:45Z",
+  "runEndUtc": "2026-10-07T23:02:56+00:00",
+  "exit": 0
+}
