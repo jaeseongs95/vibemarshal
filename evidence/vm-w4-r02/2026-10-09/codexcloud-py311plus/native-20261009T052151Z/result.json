@@ -1,0 +1,94 @@
+{
+  "schema": "vm-w4-r02-runtime-evidence.v1",
+  "cell": "codexcloud-py311plus",
+  "result": "PASS",
+  "independent_method_invocations": 1,
+  "input_commit": "8fb519e85844c74f60be176e0242667e8673d32a",
+  "base_commit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "base_tree": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d",
+  "candidate_commit": null,
+  "candidate_identity": "exact baseline + verified patch SHA + all four original source bytes/SHA",
+  "input_receipt": "input-receipt.json",
+  "source_pin": "source4.verified.json",
+  "post_test_source_verification": "source4.after.json",
+  "runtime": {
+    "implementation": "CPython",
+    "version": "3.12.14 (main, Aug 25 2026, 14:00:49) [Clang 22.1.3 ]",
+    "version_info": [
+      3,
+      12,
+      14,
+      "final",
+      0
+    ],
+    "executable": "/workspace/w4-py311plus/venv-native/bin/python",
+    "resolved_executable": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python/bin/python3.12",
+    "executable_bytes": 30894944,
+    "executable_sha256": "fa67443527ed9647f760d807e2a38f26340757123e643c4639cf273ed15d5ea7",
+    "prefix": "/workspace/w4-py311plus/venv-native",
+    "base_prefix": "/opt/codex/runtimes/codex-primary-runtime/dependencies/python",
+    "pydantic_version": "2.13.5",
+    "pydantic_origin": "/workspace/w4-py311plus/venv-native/lib/python3.12/site-packages/pydantic/__init__.py",
+    "packages": {
+      "pydantic": "2.13.5",
+      "pydantic-core": "2.46.5",
+      "annotated-types": "0.8.0",
+      "typing-extensions": "4.16.0",
+      "typing-inspection": "0.4.4"
+    },
+    "platform": "Linux-6.18.44-x86_64-with-glibc2.41",
+    "machine": "x86_64"
+  },
+  "command_key": "nativeSupplementExactArgv",
+  "command_receipt": "nativeSupplementExactArgv.command.json",
+  "argv_substitutions_only": [
+    "confirmed CPython3.11+ interpreter",
+    "candidate source root"
+  ],
+  "test_result": {
+    "exit": 0,
+    "tests_reported": 1,
+    "stdout_file": "nativeSupplementExactArgv.stdout",
+    "stderr_file": "nativeSupplementExactArgv.stderr"
+  },
+  "criteria": [
+    {
+      "id": "A2-AC1",
+      "status": "NOT_RUN_IN_THIS_CELL",
+      "reason": "Actual CPython3.10 import criterion belongs to the other cell."
+    },
+    {
+      "id": "A2-AC2",
+      "status": "PASS_NATIVE_SUPPLEMENT",
+      "scope": "Original method checks all public enum member/name/value maps and eight representatives in runtime/fallback modes."
+    },
+    {
+      "id": "A2-AC3",
+      "status": "PASS_NATIVE_SUPPLEMENT",
+      "scope": "Exact method passed under actual CPython3.12.14 with original native/runtime and fallback contracts."
+    },
+    {
+      "id": "A2-AC4",
+      "status": "ORIGINAL_STATIC_STATUS_PRESERVED",
+      "original_status": "STATIC_SOURCE_CONFIRMED_PRODUCT_NOT_RUN",
+      "scope": "No product changes beyond authorized exact patch; no new product dependency or packaging/Python-floor change performed."
+    }
+  ],
+  "effects": {
+    "observed": [
+      "Exact patch applied solely to detached candidate worktree.",
+      "Three raw inputs received and verified.",
+      "Isolated venv/cache and local evidence created.",
+      "Four original source files unchanged after exact method; matches ZIP originals."
+    ],
+    "unobserved": "Test network/syscall effects were not independently traced; UNKNOWN.",
+    "inference_api_calls_by_agent": 0,
+    "claude_calls_by_agent": 0
+  },
+  "limitations": [
+    "Does not substitute for the separate actual CPython3.10 cell.",
+    "Does not imply full release qualification/freeze/F07 PASS.",
+    "Individual subTest success rows are derived from the intact method-level OK, not separately instrumented outputs."
+  ],
+  "historical_NOT_RUN_preserved": true
+}

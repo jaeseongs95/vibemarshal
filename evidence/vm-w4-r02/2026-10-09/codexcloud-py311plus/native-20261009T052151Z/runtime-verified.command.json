@@ -1,0 +1,20 @@
+{
+  "argv": [
+    "/workspace/w4-py311plus/venv-native/bin/python",
+    "-I",
+    "-B",
+    "-c",
+    "import sys,platform,json,pydantic,importlib.metadata,pathlib,hashlib; p=pathlib.Path(sys.executable).resolve(); print(json.dumps({'implementation':platform.python_implementation(),'version':sys.version,'version_info':list(sys.version_info),'executable':sys.executable,'resolved_executable':str(p),'executable_bytes':p.stat().st_size,'executable_sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'prefix':sys.prefix,'base_prefix':sys.base_prefix,'pydantic_version':pydantic.__version__,'pydantic_origin':pydantic.__file__,'packages':{x:importlib.metadata.version(x) for x in ['pydantic','pydantic-core','annotated-types','typing-extensions','typing-inspection']},'platform':platform.platform(),'machine':platform.machine()},indent=2))"
+  ],
+  "cwd": "/workspace/w4-py311plus/candidate",
+  "start": "2026-10-09T05:21:51.414906+00:00",
+  "end": "2026-10-09T05:21:51.613123+00:00",
+  "exit_code": 0,
+  "stdout_file": "runtime-verified.stdout",
+  "stderr_file": "runtime-verified.stderr",
+  "environment_overrides": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONPYCACHEPREFIX": "/workspace/w4-py311plus/cache/pycache-native",
+    "TMPDIR": "/workspace/w4-py311plus/cache/tmp-native"
+  }
+}

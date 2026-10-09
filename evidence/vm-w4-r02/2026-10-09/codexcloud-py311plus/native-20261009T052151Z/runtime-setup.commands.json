@@ -1,0 +1,43 @@
+[
+  {
+    "argv": [
+      "uv",
+      "venv",
+      "--python",
+      "/workspace/cloud-setup/venv/bin/python",
+      "/workspace/w4-py311plus/venv-native"
+    ],
+    "cwd": "/workspace/w4-py311plus",
+    "start": "2026-10-09T05:21:29.984876+00:00",
+    "end": "2026-10-09T05:21:30.036147+00:00",
+    "exit_code": 0,
+    "stdout_file": "runtime-setup-0.stdout",
+    "stderr_file": "runtime-setup-0.stderr",
+    "environment_overrides": {
+      "UV_CACHE_DIR": "/workspace/w4-py311plus/cache/uv",
+      "PIP_CACHE_DIR": "/workspace/w4-py311plus/cache/pip",
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  },
+  {
+    "argv": [
+      "uv",
+      "pip",
+      "install",
+      "--python",
+      "/workspace/w4-py311plus/venv-native/bin/python",
+      "pydantic==2.13.5"
+    ],
+    "cwd": "/workspace/w4-py311plus",
+    "start": "2026-10-09T05:21:30.036386+00:00",
+    "end": "2026-10-09T05:21:31.038288+00:00",
+    "exit_code": 0,
+    "stdout_file": "runtime-setup-1.stdout",
+    "stderr_file": "runtime-setup-1.stderr",
+    "environment_overrides": {
+      "UV_CACHE_DIR": "/workspace/w4-py311plus/cache/uv",
+      "PIP_CACHE_DIR": "/workspace/w4-py311plus/cache/pip",
+      "PYTHONDONTWRITEBYTECODE": "1"
+    }
+  }
+]

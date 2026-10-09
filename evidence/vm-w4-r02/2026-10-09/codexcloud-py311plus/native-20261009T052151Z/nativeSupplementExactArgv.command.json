@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "/workspace/w4-py311plus/venv-native/bin/python",
+    "-I",
+    "-B",
+    "-c",
+    "import sys; assert sys.version_info[:2] >= (3, 11); import sys, unittest; from pathlib import Path; root = Path(sys.argv.pop(1)).resolve(); sys.path[:0] = [str(root / \"src\"), str(root / \"tests\")]; import pydantic; assert pydantic.__version__ == \"2.13.5\"; unittest.main(module=\"test_engine_python_compat\", argv=[\"unittest\", \"EnginePythonCompatibilityTests.test_string_enums_preserve_public_contract_without_stdlib_strenum\"], verbosity=2)",
+    "/workspace/w4-py311plus/candidate"
+  ],
+  "cwd": "/workspace/w4-py311plus/candidate",
+  "start": "2026-10-09T05:21:51.613748+00:00",
+  "end": "2026-10-09T05:21:52.058315+00:00",
+  "exit_code": 0,
+  "stdout_file": "nativeSupplementExactArgv.stdout",
+  "stderr_file": "nativeSupplementExactArgv.stderr",
+  "environment_overrides": {
+    "PYTHONDONTWRITEBYTECODE": "1",
+    "PYTHONPYCACHEPREFIX": "/workspace/w4-py311plus/cache/pycache-native",
+    "TMPDIR": "/workspace/w4-py311plus/cache/tmp-native"
+  }
+}

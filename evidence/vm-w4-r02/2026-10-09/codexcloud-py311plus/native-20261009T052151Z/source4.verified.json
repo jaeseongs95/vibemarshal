@@ -1,0 +1,40 @@
+{
+  "base": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "tree": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d",
+  "patch_sha256": "4c85a90fe38ef0007cc2bea5aa4bf1eaff63efdf521810672db8c9aff8c9348e",
+  "source_root": "/workspace/w4-py311plus/candidate",
+  "source4": [
+    {
+      "path": "README.md",
+      "bytes": 18675,
+      "sha256": "9fdf30b6dbec2adcf31e0a557f5626c18ebd9ca1f7f0f58ba62bc5086d320112",
+      "observed_bytes": 18675,
+      "observed_sha256": "9fdf30b6dbec2adcf31e0a557f5626c18ebd9ca1f7f0f58ba62bc5086d320112",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/engine/domain.py",
+      "bytes": 123131,
+      "sha256": "29311ea13fcdd80215fdd7a348aca9496148459ae59b682df8061d9070d7c71e",
+      "observed_bytes": 123131,
+      "observed_sha256": "29311ea13fcdd80215fdd7a348aca9496148459ae59b682df8061d9070d7c71e",
+      "match": true
+    },
+    {
+      "path": "src/flowmarshal/engine/qualification_manifest.py",
+      "bytes": 43857,
+      "sha256": "f6950213d484df2b05ede8cbd3c22bfcc0a630f3b3f0931c0de2ca875418b759",
+      "observed_bytes": 43857,
+      "observed_sha256": "f6950213d484df2b05ede8cbd3c22bfcc0a630f3b3f0931c0de2ca875418b759",
+      "match": true
+    },
+    {
+      "path": "tests/test_engine_python_compat.py",
+      "bytes": 4542,
+      "sha256": "b5bda8f77254dee5a0411cd0f4f6aafad2b8173ad87218dac911b1f31c3e1f2f",
+      "observed_bytes": 4542,
+      "observed_sha256": "b5bda8f77254dee5a0411cd0f4f6aafad2b8173ad87218dac911b1f31c3e1f2f",
+      "match": true
+    }
+  ]
+}

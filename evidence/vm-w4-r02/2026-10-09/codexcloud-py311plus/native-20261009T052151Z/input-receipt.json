@@ -1,0 +1,60 @@
+{
+  "fixed_input_commit": "8fb519e85844c74f60be176e0242667e8673d32a",
+  "status": "VERIFIED",
+  "files": [
+    {
+      "file": "VM-CANDIDATE-r02-CLOUD-INPUT.zip",
+      "bytes": 49386,
+      "sha256": "619e1b80dd7cd000b52469082f906701cf12061771e646c97febd23d2b5360cf",
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/vibemarshal",
+        "show",
+        "8fb519e85844c74f60be176e0242667e8673d32a:evidence/vm-w4-r02/2026-10-09/inputs/fixed-619e1b80/VM-CANDIDATE-r02-CLOUD-INPUT.zip"
+      ],
+      "cwd": "/workspace/vibemarshal",
+      "start": "2026-10-09T05:20:40.545826+00:00",
+      "end": "2026-10-09T05:20:40.547961+00:00",
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_saved_to": "/workspace/w4-py311plus/inputs/VM-CANDIDATE-r02-CLOUD-INPUT.zip"
+    },
+    {
+      "file": "VM-CANDIDATE-r02.patch",
+      "bytes": 11246,
+      "sha256": "4c85a90fe38ef0007cc2bea5aa4bf1eaff63efdf521810672db8c9aff8c9348e",
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/vibemarshal",
+        "show",
+        "8fb519e85844c74f60be176e0242667e8673d32a:evidence/vm-w4-r02/2026-10-09/inputs/fixed-619e1b80/VM-CANDIDATE-r02.patch"
+      ],
+      "cwd": "/workspace/vibemarshal",
+      "start": "2026-10-09T05:20:40.548122+00:00",
+      "end": "2026-10-09T05:20:40.549912+00:00",
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_saved_to": "/workspace/w4-py311plus/inputs/VM-CANDIDATE-r02.patch"
+    },
+    {
+      "file": "VM-CLOUD-INPUT-r02.actual.json",
+      "bytes": 4669,
+      "sha256": "35638c726c62460898ef9763b9f96680977c6ab0040488c1b2b6c950a8f3ef35",
+      "argv": [
+        "git",
+        "-C",
+        "/workspace/vibemarshal",
+        "show",
+        "8fb519e85844c74f60be176e0242667e8673d32a:evidence/vm-w4-r02/2026-10-09/inputs/fixed-619e1b80/VM-CLOUD-INPUT-r02.actual.json"
+      ],
+      "cwd": "/workspace/vibemarshal",
+      "start": "2026-10-09T05:20:40.550062+00:00",
+      "end": "2026-10-09T05:20:40.551715+00:00",
+      "exit_code": 0,
+      "stderr": "",
+      "stdout_saved_to": "/workspace/w4-py311plus/inputs/VM-CLOUD-INPUT-r02.actual.json"
+    }
+  ]
+}

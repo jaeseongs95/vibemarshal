@@ -1,0 +1,137 @@
+{
+  "method": "EnginePythonCompatibilityTests.test_string_enums_preserve_public_contract_without_stdlib_strenum",
+  "independent_unit": "one complete unittest method",
+  "raw_reported_tests": 1,
+  "subtests_modified_or_split": false,
+  "subtest_rows": [
+    {
+      "mode": "runtime",
+      "enum": "LifecycleStage",
+      "member_name": "PRODUCTION",
+      "expected_value": "production",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "runtime",
+      "enum": "CandidateStatus",
+      "member_name": "NEEDS_REVISION",
+      "expected_value": "needs_revision",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "runtime",
+      "enum": "EvidenceKind",
+      "member_name": "MODEL_REVIEW",
+      "expected_value": "model_review",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "runtime",
+      "enum": "TaskRuntimeStatus",
+      "member_name": "COMPLETED",
+      "expected_value": "completed",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "runtime",
+      "enum": "RuntimeIntentStatus",
+      "member_name": "UNKNOWN",
+      "expected_value": "unknown",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "runtime",
+      "enum": "EvidenceProvenance",
+      "member_name": "FAULT_INJECTED",
+      "expected_value": "fault_injected",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "runtime",
+      "enum": "QualificationCellStatus",
+      "member_name": "NOT_RUN",
+      "expected_value": "NOT_RUN",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "runtime",
+      "enum": "QualificationFailureClass",
+      "member_name": "ENVIRONMENT",
+      "expected_value": "environment",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "fallback",
+      "enum": "LifecycleStage",
+      "member_name": "PRODUCTION",
+      "expected_value": "production",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "fallback",
+      "enum": "CandidateStatus",
+      "member_name": "NEEDS_REVISION",
+      "expected_value": "needs_revision",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "fallback",
+      "enum": "EvidenceKind",
+      "member_name": "MODEL_REVIEW",
+      "expected_value": "model_review",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "fallback",
+      "enum": "TaskRuntimeStatus",
+      "member_name": "COMPLETED",
+      "expected_value": "completed",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "fallback",
+      "enum": "RuntimeIntentStatus",
+      "member_name": "UNKNOWN",
+      "expected_value": "unknown",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "fallback",
+      "enum": "EvidenceProvenance",
+      "member_name": "FAULT_INJECTED",
+      "expected_value": "fault_injected",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "fallback",
+      "enum": "QualificationCellStatus",
+      "member_name": "NOT_RUN",
+      "expected_value": "NOT_RUN",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    },
+    {
+      "mode": "fallback",
+      "enum": "QualificationFailureClass",
+      "member_name": "ENVIRONMENT",
+      "expected_value": "environment",
+      "status": "PASS",
+      "provenance": "local_derived: original intact method returned OK; no per-subTest instrumentation or isolated execution"
+    }
+  ],
+  "raw_success_granularity": "unittest reports method-level OK; individual rows derived from original loop and method success"
+}
