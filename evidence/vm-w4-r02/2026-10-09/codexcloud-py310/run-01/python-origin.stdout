@@ -1,0 +1,1 @@
+[{"key":"cpython-3.10.21-linux-x86_64-gnu","version":"3.10.21","version_parts":{"major":3,"minor":10,"patch":21},"path":"uv-python/cpython-3.10.21-linux-x86_64-gnu/bin/python3.10","symlink":null,"url":null,"os":"linux","variant":"default","implementation":"cpython","arch":"x86_64","libc":"gnu"}]

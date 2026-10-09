@@ -1,0 +1,83 @@
+[
+  {
+    "argv": [
+      "git",
+      "rev-parse",
+      "HEAD"
+    ],
+    "cwd": "/workspace/vibemarshal",
+    "start": "2026-10-09T05:03:34.543082+00:00",
+    "end": "2026-10-09T05:03:34.545181+00:00",
+    "exit": 0,
+    "stdout": "32bb0f9dd9f024045d24487312b50f5b703573a3\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "git",
+      "rev-parse",
+      "HEAD^{tree}"
+    ],
+    "cwd": "/workspace/vibemarshal",
+    "start": "2026-10-09T05:03:34.545192+00:00",
+    "end": "2026-10-09T05:03:34.547321+00:00",
+    "exit": 0,
+    "stdout": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "git",
+      "status",
+      "--porcelain"
+    ],
+    "cwd": "/workspace/vibemarshal",
+    "start": "2026-10-09T05:03:34.547327+00:00",
+    "end": "2026-10-09T05:03:34.580727+00:00",
+    "exit": 0,
+    "stdout": "",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "git",
+      "ls-remote",
+      "--heads",
+      "origin",
+      "evidence"
+    ],
+    "cwd": "/workspace/vibemarshal",
+    "start": "2026-10-09T05:03:34.580739+00:00",
+    "end": "2026-10-09T05:03:35.124500+00:00",
+    "exit": 0,
+    "stdout": "003e6ed95b56b485ce8bca3f457659891ea80ec6\trefs/heads/evidence\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "uv",
+      "--version"
+    ],
+    "cwd": "/workspace/vibemarshal",
+    "start": "2026-10-09T05:03:35.124513+00:00",
+    "end": "2026-10-09T05:03:35.132563+00:00",
+    "exit": 0,
+    "stdout": "uv 0.12.19 (x86_64-unknown-linux-gnu)\n",
+    "stderr": ""
+  },
+  {
+    "argv": [
+      "gh",
+      "api",
+      "repos/jaeseongs95/vibemarshal",
+      "--jq",
+      "{private,visibility,full_name}"
+    ],
+    "cwd": "/workspace/vibemarshal",
+    "start": "2026-10-09T05:03:35.132569+00:00",
+    "end": "2026-10-09T05:03:35.191885+00:00",
+    "exit": 1,
+    "stdout": "",
+    "stderr": "Get \"https://api.github.com/repos/jaeseongs95/vibemarshal\": Forbidden\n"
+  }
+]

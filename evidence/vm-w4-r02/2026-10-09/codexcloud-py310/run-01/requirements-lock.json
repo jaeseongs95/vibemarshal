@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "uv",
+    "pip",
+    "compile",
+    "--python",
+    "/workspace/w4-r02-codexcloud-py310/venv/bin/python",
+    "--generate-hashes",
+    "--no-header",
+    "--output-file",
+    "/workspace/w4-r02-codexcloud-py310/requirements.lock",
+    "/workspace/w4-r02-codexcloud-py310/requirements.in"
+  ],
+  "cwd": "/workspace/w4-r02-codexcloud-py310",
+  "start": "2026-10-09T05:21:41.256111+00:00",
+  "end": "2026-10-09T05:21:41.954104+00:00",
+  "exit": 0,
+  "environment_overrides": {
+    "UV_CACHE_DIR": "/workspace/w4-r02-codexcloud-py310/uv-cache",
+    "UV_PYTHON_INSTALL_DIR": "/workspace/w4-r02-codexcloud-py310/uv-python",
+    "UV_PYTHON_BIN_DIR": "/workspace/w4-r02-codexcloud-py310/uv-bin",
+    "XDG_CACHE_HOME": "/workspace/w4-r02-codexcloud-py310/xdg-cache",
+    "TMPDIR": "/workspace/w4-r02-codexcloud-py310/tmp"
+  },
+  "streams": {
+    "stdout": {
+      "path": "requirements-lock.stdout",
+      "bytes": 11154,
+      "sha256": "96fe6bd1fa600badb3c393af35b83544e4b5e2eea275409f6eda8b364bd7de54"
+    },
+    "stderr": {
+      "path": "requirements-lock.stderr",
+      "bytes": 29,
+      "sha256": "38a3459c053f0232f1058a5315642aa53ba52e45eff59446ebbadd79561cdb4a"
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "argv": [
+    "/workspace/w4-r02-codexcloud-py310/venv/bin/python",
+    "-I",
+    "-B",
+    "-c",
+    "import sys, platform, json, enum, pydantic, importlib.metadata as m; print(json.dumps({\"implementation\":platform.python_implementation(),\"version\":sys.version,\"version_info\":list(sys.version_info),\"executable\":sys.executable,\"base_executable\":sys._base_executable,\"prefix\":sys.prefix,\"base_prefix\":sys.base_prefix,\"stdlib_StrEnum_present\":hasattr(enum,\"StrEnum\"),\"pydantic_version\":pydantic.__version__,\"pydantic_file\":pydantic.__file__,\"packages\":{x:m.version(x) for x in [\"pydantic\",\"pydantic-core\",\"annotated-types\",\"typing-extensions\",\"typing-inspection\"]},\"platform\":platform.platform()},indent=2))"
+  ],
+  "cwd": "/workspace/w4-r02-codexcloud-py310/source",
+  "start": "2026-10-09T05:21:57.147460+00:00",
+  "end": "2026-10-09T05:21:57.434921+00:00",
+  "exit": 0,
+  "environment_overrides": {
+    "UV_CACHE_DIR": "/workspace/w4-r02-codexcloud-py310/uv-cache",
+    "UV_PYTHON_INSTALL_DIR": "/workspace/w4-r02-codexcloud-py310/uv-python",
+    "UV_PYTHON_BIN_DIR": "/workspace/w4-r02-codexcloud-py310/uv-bin",
+    "XDG_CACHE_HOME": "/workspace/w4-r02-codexcloud-py310/xdg-cache",
+    "TMPDIR": "/workspace/w4-r02-codexcloud-py310/tmp"
+  },
+  "streams": {
+    "stdout": {
+      "path": "runtime-info.stdout",
+      "bytes": 876,
+      "sha256": "dbed366bab66c16bfef37141d98ba281e16794111dc55cc86c43df10b674b065"
+    },
+    "stderr": {
+      "path": "runtime-info.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

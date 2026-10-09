@@ -1,0 +1,17 @@
+[
+  {
+    "path": "README.md",
+    "bytes": 1439,
+    "sha256": "3ef92c6c577f5e4f5eedb90cc4f55c810089fa2f5f50d8df4261a10713980fb0"
+  },
+  {
+    "path": "read-only-observations.json",
+    "bytes": 1915,
+    "sha256": "9b6d4db47ca5dcbd3c91479f5d88b3703522f4bab7f5caf89e1ada66f437e985"
+  },
+  {
+    "path": "result.json",
+    "bytes": 4475,
+    "sha256": "2a9521d4351449d5871efadd81567b99eb0b1e95c8bc7332495ebb6beb555dff"
+  }
+]

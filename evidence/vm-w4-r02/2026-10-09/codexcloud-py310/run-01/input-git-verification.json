@@ -1,0 +1,47 @@
+[
+  {
+    "argv": [
+      "git",
+      "show",
+      "8fb519e85844c74f60be176e0242667e8673d32a:evidence/vm-w4-r02/2026-10-09/inputs/fixed-619e1b80/VM-CANDIDATE-r02-CLOUD-INPUT.zip"
+    ],
+    "cwd": "/workspace/vibemarshal",
+    "start": "2026-10-09T05:20:58.818213+00:00",
+    "end": "2026-10-09T05:20:58.823200+00:00",
+    "exit": 0,
+    "stdout_file": "VM-CANDIDATE-r02-CLOUD-INPUT.zip",
+    "stderr": "",
+    "bytes": 49386,
+    "sha256": "619e1b80dd7cd000b52469082f906701cf12061771e646c97febd23d2b5360cf"
+  },
+  {
+    "argv": [
+      "git",
+      "show",
+      "8fb519e85844c74f60be176e0242667e8673d32a:evidence/vm-w4-r02/2026-10-09/inputs/fixed-619e1b80/VM-CANDIDATE-r02.patch"
+    ],
+    "cwd": "/workspace/vibemarshal",
+    "start": "2026-10-09T05:20:58.823512+00:00",
+    "end": "2026-10-09T05:20:58.825807+00:00",
+    "exit": 0,
+    "stdout_file": "VM-CANDIDATE-r02.patch",
+    "stderr": "",
+    "bytes": 11246,
+    "sha256": "4c85a90fe38ef0007cc2bea5aa4bf1eaff63efdf521810672db8c9aff8c9348e"
+  },
+  {
+    "argv": [
+      "git",
+      "show",
+      "8fb519e85844c74f60be176e0242667e8673d32a:evidence/vm-w4-r02/2026-10-09/inputs/fixed-619e1b80/VM-CLOUD-INPUT-r02.actual.json"
+    ],
+    "cwd": "/workspace/vibemarshal",
+    "start": "2026-10-09T05:20:58.825959+00:00",
+    "end": "2026-10-09T05:20:58.828178+00:00",
+    "exit": 0,
+    "stdout_file": "VM-CLOUD-INPUT-r02.actual.json",
+    "stderr": "",
+    "bytes": 4669,
+    "sha256": "35638c726c62460898ef9763b9f96680977c6ab0040488c1b2b6c950a8f3ef35"
+  }
+]

@@ -1,0 +1,30 @@
+{
+  "argv": [
+    "git",
+    "status",
+    "--porcelain"
+  ],
+  "cwd": "/workspace/w4-r02-codexcloud-py310/source",
+  "start": "2026-10-09T05:21:25.196135+00:00",
+  "end": "2026-10-09T05:21:25.335666+00:00",
+  "exit": 0,
+  "environment_overrides": {
+    "UV_CACHE_DIR": "/workspace/w4-r02-codexcloud-py310/uv-cache",
+    "UV_PYTHON_INSTALL_DIR": "/workspace/w4-r02-codexcloud-py310/uv-python",
+    "UV_PYTHON_BIN_DIR": "/workspace/w4-r02-codexcloud-py310/uv-bin",
+    "XDG_CACHE_HOME": "/workspace/w4-r02-codexcloud-py310/xdg-cache",
+    "TMPDIR": "/workspace/w4-r02-codexcloud-py310/tmp"
+  },
+  "streams": {
+    "stdout": {
+      "path": "source-status.stdout",
+      "bytes": 139,
+      "sha256": "8e99141d7523783f49ead0a8460466c0c6de7a9f0f00cabc5ea5c891e1f6eb60"
+    },
+    "stderr": {
+      "path": "source-status.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "argv": [
+    "uv",
+    "-v",
+    "python",
+    "install",
+    "3.10",
+    "--no-bin"
+  ],
+  "cwd": "/workspace/w4-r02-codexcloud-py310",
+  "start": "2026-10-09T05:21:25.367940+00:00",
+  "end": "2026-10-09T05:21:26.611996+00:00",
+  "exit": 0,
+  "environment_overrides": {
+    "UV_CACHE_DIR": "/workspace/w4-r02-codexcloud-py310/uv-cache",
+    "UV_PYTHON_INSTALL_DIR": "/workspace/w4-r02-codexcloud-py310/uv-python",
+    "UV_PYTHON_BIN_DIR": "/workspace/w4-r02-codexcloud-py310/uv-bin",
+    "XDG_CACHE_HOME": "/workspace/w4-r02-codexcloud-py310/xdg-cache",
+    "TMPDIR": "/workspace/w4-r02-codexcloud-py310/tmp"
+  },
+  "streams": {
+    "stdout": {
+      "path": "python-install.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stderr": {
+      "path": "python-install.stderr",
+      "bytes": 192,
+      "sha256": "b7fb9a4f7b3a97829b975dd1ff7d5ea10aea83160350b026a69b24d25c05e8de"
+    }
+  }
+}

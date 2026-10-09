@@ -1,0 +1,34 @@
+{
+  "argv": [
+    "uv",
+    "python",
+    "list",
+    "3.10.21",
+    "--show-urls",
+    "--output-format",
+    "json"
+  ],
+  "cwd": "/workspace/w4-r02-codexcloud-py310",
+  "start": "2026-10-09T05:21:57.435305+00:00",
+  "end": "2026-10-09T05:21:57.580176+00:00",
+  "exit": 0,
+  "environment_overrides": {
+    "UV_CACHE_DIR": "/workspace/w4-r02-codexcloud-py310/uv-cache",
+    "UV_PYTHON_INSTALL_DIR": "/workspace/w4-r02-codexcloud-py310/uv-python",
+    "UV_PYTHON_BIN_DIR": "/workspace/w4-r02-codexcloud-py310/uv-bin",
+    "XDG_CACHE_HOME": "/workspace/w4-r02-codexcloud-py310/xdg-cache",
+    "TMPDIR": "/workspace/w4-r02-codexcloud-py310/tmp"
+  },
+  "streams": {
+    "stdout": {
+      "path": "python-origin.stdout",
+      "bytes": 297,
+      "sha256": "aa479b9e80565fa4a5b38f70ddc12b870175a40cca2bae6b7bcb19313d32efd5"
+    },
+    "stderr": {
+      "path": "python-origin.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

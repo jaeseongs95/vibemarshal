@@ -1,0 +1,35 @@
+{
+  "argv": [
+    "uv",
+    "python",
+    "list",
+    "3.10.21",
+    "--only-downloads",
+    "--show-urls",
+    "--output-format",
+    "json"
+  ],
+  "cwd": "/workspace/w4-r02-codexcloud-py310",
+  "start": "2026-10-09T05:22:04.133528+00:00",
+  "end": "2026-10-09T05:22:04.173982+00:00",
+  "exit": 0,
+  "environment_overrides": {
+    "UV_CACHE_DIR": "/workspace/w4-r02-codexcloud-py310/uv-cache",
+    "UV_PYTHON_INSTALL_DIR": "/workspace/w4-r02-codexcloud-py310/uv-python",
+    "UV_PYTHON_BIN_DIR": "/workspace/w4-r02-codexcloud-py310/uv-bin",
+    "XDG_CACHE_HOME": "/workspace/w4-r02-codexcloud-py310/xdg-cache",
+    "TMPDIR": "/workspace/w4-r02-codexcloud-py310/tmp"
+  },
+  "streams": {
+    "stdout": {
+      "path": "python-download-catalog.stdout",
+      "bytes": 405,
+      "sha256": "0bc93179e22ff45a3a3c68af25e08d91f572aec4df5bca2629f149fbdfa919d3"
+    },
+    "stderr": {
+      "path": "python-download-catalog.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  }
+}

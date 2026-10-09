@@ -1,0 +1,33 @@
+{
+  "argv": [
+    "/workspace/w4-r02-codexcloud-py310/venv/bin/python",
+    "-I",
+    "-B",
+    "-c",
+    "import sys; assert sys.version_info[:2] == (3, 10); import sys, unittest; from pathlib import Path; root = Path(sys.argv.pop(1)).resolve(); sys.path[:0] = [str(root / \"src\"), str(root / \"tests\")]; import pydantic; assert pydantic.__version__ == \"2.13.5\"; unittest.main(module=\"test_engine_python_compat\", argv=[\"unittest\", \"EnginePythonCompatibilityTests.test_string_enums_preserve_public_contract_without_stdlib_strenum\"], verbosity=2)",
+    "/workspace/w4-r02-codexcloud-py310/source"
+  ],
+  "cwd": "/workspace/w4-r02-codexcloud-py310/source",
+  "start": "2026-10-09T05:21:57.580623+00:00",
+  "end": "2026-10-09T05:21:58.300818+00:00",
+  "exit": 0,
+  "environment_overrides": {
+    "UV_CACHE_DIR": "/workspace/w4-r02-codexcloud-py310/uv-cache",
+    "UV_PYTHON_INSTALL_DIR": "/workspace/w4-r02-codexcloud-py310/uv-python",
+    "UV_PYTHON_BIN_DIR": "/workspace/w4-r02-codexcloud-py310/uv-bin",
+    "XDG_CACHE_HOME": "/workspace/w4-r02-codexcloud-py310/xdg-cache",
+    "TMPDIR": "/workspace/w4-r02-codexcloud-py310/tmp"
+  },
+  "streams": {
+    "stdout": {
+      "path": "primary-exact.stdout",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stderr": {
+      "path": "primary-exact.stderr",
+      "bytes": 229,
+      "sha256": "8708ffdc0de13a82ee0f1929cf8f40bc045043adcb1ed6d0ac353bb7f8702f2f"
+    }
+  }
+}

@@ -1,0 +1,270 @@
+{
+  "schema": "vm-w4-r02-runtime-evidence.v1",
+  "cell": "codexcloud-py310",
+  "vendor": "Codex Cloud",
+  "job_id": "UNKNOWN_NOT_EXPOSED",
+  "runtime": {
+    "implementation": "CPython",
+    "version": "3.10.21 (main, Sep 24 2026, 17:54:40) [Clang 22.1.3 ]",
+    "version_info": [
+      3,
+      10,
+      21,
+      "final",
+      0
+    ],
+    "executable": "/workspace/w4-r02-codexcloud-py310/venv/bin/python",
+    "base_executable": "/workspace/w4-r02-codexcloud-py310/venv/bin/python",
+    "prefix": "/workspace/w4-r02-codexcloud-py310/venv",
+    "base_prefix": "/workspace/w4-r02-codexcloud-py310/uv-python/cpython-3.10-linux-x86_64-gnu",
+    "stdlib_StrEnum_present": false,
+    "pydantic_version": "2.13.5",
+    "pydantic_file": "/workspace/w4-r02-codexcloud-py310/venv/lib/python3.10/site-packages/pydantic/__init__.py",
+    "packages": {
+      "pydantic": "2.13.5",
+      "pydantic-core": "2.46.5",
+      "annotated-types": "0.8.0",
+      "typing-extensions": "4.16.0",
+      "typing-inspection": "0.4.4"
+    },
+    "platform": "Linux-6.18.44-x86_64-with-glibc2.41"
+  },
+  "interpreter_bytes": 18843424,
+  "interpreter_sha256": "9f978e8b6ed68141b521bfd4f5d623c3d69eff2215925263f3b53e93a5a69663",
+  "interpreter_realpath": "/workspace/w4-r02-codexcloud-py310/uv-python/cpython-3.10.21-linux-x86_64-gnu/bin/python3.10",
+  "runtime_origin": {
+    "installer": "existing uv 0.12.19",
+    "installation": "cell-only python-install.json",
+    "release_catalog": {
+      "key": "cpython-3.10.21-linux-x86_64-gnu",
+      "version": "3.10.21",
+      "version_parts": {
+        "major": 3,
+        "minor": 10,
+        "patch": 21
+      },
+      "path": null,
+      "symlink": null,
+      "url": "https://releases.astral.sh/github/python-build-standalone/releases/download/20260924/cpython-3.10.21%2B20260924-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+      "os": "linux",
+      "variant": "default",
+      "implementation": "cpython",
+      "arch": "x86_64",
+      "libc": "gnu"
+    },
+    "provenance": "uv built-in Python download catalog; install log confirms matching key; archive digest not independently captured"
+  },
+  "input_commit": "8fb519e85844c74f60be176e0242667e8673d32a",
+  "input_path": "evidence/vm-w4-r02/2026-10-09/inputs/fixed-619e1b80/",
+  "base": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "base_tree": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d",
+  "candidate": "exact approved r02 patch on fixed base; source4 hashes verified before/after; no release freeze claim",
+  "command_field": "cloudInput.primaryExactArgv",
+  "placeholder_substitution_only": true,
+  "test": {
+    "argv": [
+      "/workspace/w4-r02-codexcloud-py310/venv/bin/python",
+      "-I",
+      "-B",
+      "-c",
+      "import sys; assert sys.version_info[:2] == (3, 10); import sys, unittest; from pathlib import Path; root = Path(sys.argv.pop(1)).resolve(); sys.path[:0] = [str(root / \"src\"), str(root / \"tests\")]; import pydantic; assert pydantic.__version__ == \"2.13.5\"; unittest.main(module=\"test_engine_python_compat\", argv=[\"unittest\", \"EnginePythonCompatibilityTests.test_string_enums_preserve_public_contract_without_stdlib_strenum\"], verbosity=2)",
+      "/workspace/w4-r02-codexcloud-py310/source"
+    ],
+    "cwd": "/workspace/w4-r02-codexcloud-py310/source",
+    "start": "2026-10-09T05:21:57.580623+00:00",
+    "end": "2026-10-09T05:21:58.300818+00:00",
+    "exit": 0,
+    "environment_overrides": {
+      "UV_CACHE_DIR": "/workspace/w4-r02-codexcloud-py310/uv-cache",
+      "UV_PYTHON_INSTALL_DIR": "/workspace/w4-r02-codexcloud-py310/uv-python",
+      "UV_PYTHON_BIN_DIR": "/workspace/w4-r02-codexcloud-py310/uv-bin",
+      "XDG_CACHE_HOME": "/workspace/w4-r02-codexcloud-py310/xdg-cache",
+      "TMPDIR": "/workspace/w4-r02-codexcloud-py310/tmp"
+    },
+    "streams": {
+      "stdout": {
+        "path": "primary-exact.stdout",
+        "bytes": 0,
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      },
+      "stderr": {
+        "path": "primary-exact.stderr",
+        "bytes": 229,
+        "sha256": "8708ffdc0de13a82ee0f1929cf8f40bc045043adcb1ed6d0ac353bb7f8702f2f"
+      }
+    }
+  },
+  "result": "PASS",
+  "unittest_methods_run": 1,
+  "oracle_test_sha256": "b5bda8f77254dee5a0411cd0f4f6aafad2b8173ad87218dac911b1f31c3e1f2f",
+  "subtests_modified_or_split": false,
+  "case_results": [
+    {
+      "mode": "runtime",
+      "enum": "LifecycleStage",
+      "member": "PRODUCTION",
+      "expected": "production",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "runtime",
+      "enum": "CandidateStatus",
+      "member": "NEEDS_REVISION",
+      "expected": "needs_revision",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "runtime",
+      "enum": "EvidenceKind",
+      "member": "MODEL_REVIEW",
+      "expected": "model_review",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "runtime",
+      "enum": "TaskRuntimeStatus",
+      "member": "COMPLETED",
+      "expected": "completed",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "runtime",
+      "enum": "RuntimeIntentStatus",
+      "member": "UNKNOWN",
+      "expected": "unknown",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "runtime",
+      "enum": "EvidenceProvenance",
+      "member": "FAULT_INJECTED",
+      "expected": "fault_injected",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "runtime",
+      "enum": "QualificationCellStatus",
+      "member": "NOT_RUN",
+      "expected": "NOT_RUN",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "runtime",
+      "enum": "QualificationFailureClass",
+      "member": "ENVIRONMENT",
+      "expected": "environment",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "fallback",
+      "enum": "LifecycleStage",
+      "member": "PRODUCTION",
+      "expected": "production",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "fallback",
+      "enum": "CandidateStatus",
+      "member": "NEEDS_REVISION",
+      "expected": "needs_revision",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "fallback",
+      "enum": "EvidenceKind",
+      "member": "MODEL_REVIEW",
+      "expected": "model_review",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "fallback",
+      "enum": "TaskRuntimeStatus",
+      "member": "COMPLETED",
+      "expected": "completed",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "fallback",
+      "enum": "RuntimeIntentStatus",
+      "member": "UNKNOWN",
+      "expected": "unknown",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "fallback",
+      "enum": "EvidenceProvenance",
+      "member": "FAULT_INJECTED",
+      "expected": "fault_injected",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "fallback",
+      "enum": "QualificationCellStatus",
+      "member": "NOT_RUN",
+      "expected": "NOT_RUN",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    },
+    {
+      "mode": "fallback",
+      "enum": "QualificationFailureClass",
+      "member": "ENVIRONMENT",
+      "expected": "environment",
+      "result": "PASS_INFERRED_FROM_UNMODIFIED_METHOD_OK",
+      "individual_stream_output": "NOT_EMITTED_BY_UNITTEST_ON_SUCCESS"
+    }
+  ],
+  "criteria": [
+    {
+      "id": "A2-AC1",
+      "status": "PASS",
+      "evidence": "primary-exact.stderr; same unit imports domain and qualification_manifest"
+    },
+    {
+      "id": "A2-AC2",
+      "status": "PASS_WITH_ORIGINAL_ORACLE",
+      "evidence": "one unmodified unittest method with all original loop/subTests"
+    },
+    {
+      "id": "A2-AC3",
+      "status": "NOT_RUN_IN_PY310_CELL",
+      "reason": "native Python 3.11+ belongs to another cell"
+    },
+    {
+      "id": "A2-AC4",
+      "status": "SOURCE_PIN_CONFIRMED",
+      "evidence": "exact patch only; pinned base/tree; source4 before/after; packaging is unchanged by approved patch"
+    }
+  ],
+  "effects": {
+    "source4_mutation_during_runtime": "NONE_OBSERVED_HASH_EQUAL",
+    "original_checkout_mutation": "NONE_OBSERVED_CLEAN",
+    "authorized_source_preparation": "exact approved patch only in detached source worktree",
+    "main_F07_permissions_or_shared_product_changes": false,
+    "Claude_or_model_API_calls": 0,
+    "venv_cache_tmp": "cell-only paths recorded per command",
+    "other_runtime_effects": "UNKNOWN_NO_FULL_FILESYSTEM_AUDIT"
+  },
+  "limitations": [
+    "source-based compatibility unit, not wheel install/release qualification",
+    "Python 3.11 native supplement not run in this cell",
+    "archive digest not independently captured; uv release catalog and actual interpreter identity retained",
+    "per-subTest success logs not emitted; reported case pass is inferred from original complete method OK"
+  ],
+  "publish_base": "8fb519e85844c74f60be176e0242667e8673d32a",
+  "preserved_previous_NOT_RUN": "../result.json; ../README.md; unchanged historical bytes from preceding blocked phase"
+}

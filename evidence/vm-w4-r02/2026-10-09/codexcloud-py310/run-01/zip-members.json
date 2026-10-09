@@ -1,0 +1,26 @@
+[
+  {
+    "path": "README.md",
+    "bytes": 18675
+  },
+  {
+    "path": "src/flowmarshal/engine/domain.py",
+    "bytes": 123131
+  },
+  {
+    "path": "src/flowmarshal/engine/qualification_manifest.py",
+    "bytes": 43857
+  },
+  {
+    "path": "tests/test_engine_python_compat.py",
+    "bytes": 4542
+  },
+  {
+    "path": "VM-CANDIDATE-r02.patch",
+    "bytes": 11246
+  },
+  {
+    "path": "VM-CLOUD-INPUT-r02.actual.json",
+    "bytes": 4669
+  }
+]
