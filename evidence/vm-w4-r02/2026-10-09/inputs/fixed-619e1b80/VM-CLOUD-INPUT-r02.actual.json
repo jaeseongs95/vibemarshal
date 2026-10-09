@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "vm-cloud-input.v1",
+  "candidateRevision": "r02",
+  "baselineRepository": "https://github.com/jaeseongs95/vibemarshal.git",
+  "baselineCommit": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+  "candidateCommit": null,
+  "candidateCommitState": "Git author name/email missing; no fabricated identity",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 18675,
+      "sha256": "9fdf30b6dbec2adcf31e0a557f5626c18ebd9ca1f7f0f58ba62bc5086d320112"
+    },
+    {
+      "path": "src/flowmarshal/engine/domain.py",
+      "bytes": 123131,
+      "sha256": "29311ea13fcdd80215fdd7a348aca9496148459ae59b682df8061d9070d7c71e"
+    },
+    {
+      "path": "src/flowmarshal/engine/qualification_manifest.py",
+      "bytes": 43857,
+      "sha256": "f6950213d484df2b05ede8cbd3c22bfcc0a630f3b3f0931c0de2ca875418b759"
+    },
+    {
+      "path": "tests/test_engine_python_compat.py",
+      "bytes": 4542,
+      "sha256": "b5bda8f77254dee5a0411cd0f4f6aafad2b8173ad87218dac911b1f31c3e1f2f"
+    }
+  ],
+  "patch": {
+    "path": "VM-CANDIDATE-r02.patch",
+    "bytes": 11246,
+    "sha256": "4c85a90fe38ef0007cc2bea5aa4bf1eaff63efdf521810672db8c9aff8c9348e"
+  },
+  "cloudInput": {
+    "providers": [
+      "실제 ClaudeCloud",
+      "실제 CodexCloud"
+    ],
+    "sameCandidateRequired": true,
+    "candidateDigest": "NOT_FROZEN_PARENT_INTEGRATES",
+    "sameTestSourceAndOracleRequired": true,
+    "primaryRuntime": "실제 CPython3.10 + pydantic2.13.5; interpreter 실제 version/origin 기록 필수",
+    "primaryExactArgv": [
+      "<확인된 Python3.10 interpreter>",
+      "-I",
+      "-B",
+      "-c",
+      "import sys; assert sys.version_info[:2] == (3, 10); import sys, unittest; from pathlib import Path; root = Path(sys.argv.pop(1)).resolve(); sys.path[:0] = [str(root / \"src\"), str(root / \"tests\")]; import pydantic; assert pydantic.__version__ == \"2.13.5\"; unittest.main(module=\"test_engine_python_compat\", argv=[\"unittest\", \"EnginePythonCompatibilityTests.test_string_enums_preserve_public_contract_without_stdlib_strenum\"], verbosity=2)",
+      "<같은 동결 candidate source root>"
+    ],
+    "nativeSupplementRuntime": "실제 CPython3.11 이상 + pydantic2.13.5; v2 native 동작 검사도 새 후보에 결속",
+    "nativeSupplementExactArgv": [
+      "<확인된 Python3.11+ interpreter>",
+      "-I",
+      "-B",
+      "-c",
+      "import sys; assert sys.version_info[:2] >= (3, 11); import sys, unittest; from pathlib import Path; root = Path(sys.argv.pop(1)).resolve(); sys.path[:0] = [str(root / \"src\"), str(root / \"tests\")]; import pydantic; assert pydantic.__version__ == \"2.13.5\"; unittest.main(module=\"test_engine_python_compat\", argv=[\"unittest\", \"EnginePythonCompatibilityTests.test_string_enums_preserve_public_contract_without_stdlib_strenum\"], verbosity=2)",
+      "<같은 동결 candidate source root>"
+    ],
+    "cwd": "<candidate source root>",
+    "evidenceRequired": [
+      "candidate source/test digests",
+      "interpreter path/version",
+      "pydantic version",
+      "actual argv/cwd/start/end/exit/stdout/stderr",
+      "same AC IDs/oracle",
+      "effect observations/UNKNOWN"
+    ],
+    "newCloudJobAuthority": "NOT_GRANTED_BY_THIS_CANDIDATE",
+    "execution": "NOT_RUN_BOTH_PROVIDERS"
+  },
+  "criteria": [
+    {
+      "id": "A2-AC1",
+      "requirement": "실제 Python3.10+pydantic2.13.5에서 domain 및 qualification_manifest 정상 import",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "A2-AC2",
+      "requirement": "기존32+qualification3 public enum 값·member name과 대표8의 str/format/JSON/constructor 계약 보존",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "A2-AC3",
+      "requirement": "3.11 이상 native StrEnum 재사용 동작 보존",
+      "status": "NOT_RUN"
+    },
+    {
+      "id": "A2-AC4",
+      "requirement": "domain fallback 복제/새 dependency/Python floor 또는 packaging 정책 변경0",
+      "status": "STATIC_SOURCE_CONFIRMED_PRODUCT_NOT_RUN"
+    }
+  ],
+  "sameCandidateSameInputsSameCommandsBothVendors": true,
+  "existingEquivalentJobStatus": "Not assigned/observed by this lead; existing owner must check original IDs before any create",
+  "actualCloudRuns": 0,
+  "newJobAuthorization": false,
+  "localFurtherProductChecks": "STOPPED",
+  "priorR01ResultsAreNotR02Pass": true,
+  "rawResultsRequired": [
+    "jobID/vendor/actualhost/runtime",
+    "exact argv/cwd/stdout/stderr/exit",
+    "source/test/candidate digest",
+    "approved resultbranch + fixed resultcommit/path original bytes, length/SHA"
+  ],
+  "excluded": [
+    "keys/credentials/profile/operational DB",
+    "raw chat/internal reasoning",
+    ".git contents"
+  ]
+}
