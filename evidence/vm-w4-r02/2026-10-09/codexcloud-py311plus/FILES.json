@@ -1,0 +1,46 @@
+{
+  "algorithm": "SHA-256",
+  "self_excluded": true,
+  "files": [
+    {
+      "path": "REPORT.md",
+      "bytes": 3483,
+      "sha256": "bb2d613f65525ba7f9aa1942129a28cb4536992786ac2b84f36d74a6d5a92892"
+    },
+    {
+      "path": "delivery-observations.json",
+      "bytes": 4454,
+      "sha256": "28d9f9c5d219fb6c8f9025582b0db63097fae51d9a0403d1b6c10910489df427"
+    },
+    {
+      "path": "followup.json",
+      "bytes": 715,
+      "sha256": "611a317e6413e8f01b90aa30928f13792c68fbb7e2735e73f0f189a10f13fa78"
+    },
+    {
+      "path": "result.json",
+      "bytes": 2389,
+      "sha256": "de307959864000fbd03d07319a704698c76aead6bd36b0d4d13e28315b92e2fb"
+    },
+    {
+      "path": "runtime-probe.command.json",
+      "bytes": 1105,
+      "sha256": "eec0bfa9c7ade6e6720e42f179da2f8198fb8942886fc86d161c230f964e6811"
+    },
+    {
+      "path": "runtime-probe.stderr",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "runtime-probe.stdout",
+      "bytes": 667,
+      "sha256": "5bf6e273cd0f5b73f5f1cbd4b6a13f0b151d0ad540205e889fea0625f858c5aa"
+    },
+    {
+      "path": "source4.expected.json",
+      "bytes": 984,
+      "sha256": "828376bd885d1a3d60da3252fe7c7701db7bbc907efcc8da872059d53a0846f0"
+    }
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "schema": "vm-w4-r02-runtime-evidence.v1",
+  "cell": "codexcloud-py311plus",
+  "result": "NOT_RUN",
+  "classification": "SUPPORTED_TRANSFER_TOOL_UNAVAILABLE",
+  "requested_command_key": "nativeSupplementExactArgv",
+  "method": "EnginePythonCompatibilityTests.test_string_enums_preserve_public_contract_without_stdlib_strenum",
+  "runtime": {
+    "implementation": "CPython",
+    "version": "3.12.14",
+    "pydantic": "2.13.5",
+    "probe": "runtime-probe.command.json"
+  },
+  "source_pin": {
+    "expected_base": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+    "observed_checkout_head": "32bb0f9dd9f024045d24487312b50f5b703573a3",
+    "expected_tree": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d",
+    "observed_checkout_tree": "27e18c0c7853c1d35a98d5437cebf0ba703ed42d",
+    "main_checkout_clean": true,
+    "patch_apply": "NOT_RUN",
+    "source4_verification": "NOT_RUN",
+    "candidate_source_root": null
+  },
+  "test": {
+    "argv": null,
+    "cwd": null,
+    "start": null,
+    "end": null,
+    "exit_code": null,
+    "stdout": null,
+    "stderr": null,
+    "subtests": "NOT_RUN; original manifest and test bytes unavailable; no splitting or substitution attempted",
+    "effects": "UNKNOWN",
+    "reason": "Raw ZIP, patch and manifest were not delivered to this consuming environment; no input hash or candidate source4 verification was possible."
+  },
+  "publication": {
+    "status": "AUTHORIZED_PUBLIC_EVIDENCE",
+    "reason": "User confirmed intentional public visibility and approved publishing sanitized evidence; prior private hold superseded. Fixed publication commit and remote readback are recorded after non-force push.",
+    "repository": "jaeseongs95/vibemarshal",
+    "branch": "evidence",
+    "observed_head": "003e6ed95b56b485ce8bca3f457659891ea80ec6",
+    "path": "evidence/vm-w4-r02/2026-10-09/codexcloud-py311plus/",
+    "remote_result_commit": "SEE_POST_PUSH_RECEIPT",
+    "remote_bytes_sha_verification": "SEE_POST_PUSH_RECEIPT"
+  },
+  "constraints": {
+    "product_test_sources_modified": false,
+    "main_modified": false,
+    "F07_modified": false,
+    "release_freeze_used_as_precondition": false,
+    "claude_calls": 0,
+    "inference_api_calls": 0,
+    "python310_replaced": false
+  },
+  "remaining_blockers": [
+    "The supported download_file tool is absent from this consuming environment; exact raw inputs cannot be materialized and verified."
+  ]
+}

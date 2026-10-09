@@ -1,0 +1,135 @@
+{
+  "recorded_at": "2026-10-09 05:01:58 UTC",
+  "inputs": [
+    {
+      "name": "VM-CANDIDATE-r02-CLOUD-INPUT.zip",
+      "mime_type": "application/zip",
+      "expected_bytes": 49386,
+      "expected_sha256": "619e1b80dd7cd000b52469082f906701cf12061771e646c97febd23d2b5360cf",
+      "metadata_size": 49386,
+      "fetch_file_size_bytes": 49386,
+      "fetch_success": true,
+      "materialized_bytes": null,
+      "materialized_sha256": null,
+      "hash_verification": "NOT_RUN",
+      "failure": {
+        "exit_code": 22,
+        "stderr": "curl: (22) The requested URL returned error: 403\n",
+        "start": null,
+        "end": null,
+        "time_limitation": "Initial exec cells did not capture absolute process start/end; these are not reconstructed.",
+        "argv_redacted": [
+          "curl",
+          "--fail",
+          "--silent",
+          "--show-error",
+          "--location",
+          "<authenticated file_uri.download_url omitted: signed credential>",
+          "--output",
+          "/workspace/w4-py311plus/inputs/VM-CANDIDATE-r02-CLOUD-INPUT.zip"
+        ],
+        "cwd": "/workspace",
+        "stdout": ""
+      }
+    },
+    {
+      "name": "VM-CANDIDATE-r02.patch",
+      "mime_type": "text/x-diff",
+      "expected_bytes": 11246,
+      "expected_sha256": "4c85a90fe38ef0007cc2bea5aa4bf1eaff63efdf521810672db8c9aff8c9348e",
+      "metadata_size": 11246,
+      "fetch_file_size_bytes": 11246,
+      "fetch_success": true,
+      "materialized_bytes": null,
+      "materialized_sha256": null,
+      "hash_verification": "NOT_RUN",
+      "failure": {
+        "exit_code": 22,
+        "stderr": "curl: (22) The requested URL returned error: 403\n",
+        "start": null,
+        "end": null,
+        "time_limitation": "Initial exec cells did not capture absolute process start/end; these are not reconstructed.",
+        "argv_redacted": [
+          "curl",
+          "--fail",
+          "--silent",
+          "--show-error",
+          "--location",
+          "<authenticated file_uri.download_url omitted: signed credential>",
+          "--output",
+          "/workspace/w4-py311plus/inputs/VM-CANDIDATE-r02.patch"
+        ],
+        "cwd": "/workspace",
+        "stdout": ""
+      }
+    },
+    {
+      "name": "VM-CLOUD-INPUT-r02.actual.json",
+      "mime_type": "application/json",
+      "expected_bytes": 4669,
+      "expected_sha256": "35638c726c62460898ef9763b9f96680977c6ab0040488c1b2b6c950a8f3ef35",
+      "metadata_size": 4669,
+      "fetch_file_size_bytes": 4669,
+      "fetch_success": true,
+      "materialized_bytes": null,
+      "materialized_sha256": null,
+      "hash_verification": "NOT_RUN",
+      "failure": {
+        "exit_code": 22,
+        "stderr": "curl: (22) The requested URL returned error: 403\n",
+        "start": null,
+        "end": null,
+        "time_limitation": "Initial exec cells did not capture absolute process start/end; these are not reconstructed.",
+        "argv_redacted": [
+          "curl",
+          "--fail",
+          "--silent",
+          "--show-error",
+          "--location",
+          "<authenticated file_uri.download_url omitted: signed credential>",
+          "--output",
+          "/workspace/w4-py311plus/inputs/VM-CLOUD-INPUT-r02.actual.json"
+        ],
+        "cwd": "/workspace",
+        "stdout": ""
+      }
+    }
+  ],
+  "additional_attempts": [
+    {
+      "kind": "response_capture_manifest",
+      "exit_code": 56,
+      "stdout": "000\n",
+      "stderr": "curl: (56) CONNECT tunnel failed, response 403\n"
+    },
+    {
+      "kind": "escalated_manifest_download",
+      "exit_code": 22,
+      "stderr": "curl: (22) The requested URL returned error: 403\n",
+      "auto_review_rejected": false
+    },
+    {
+      "kind": "no_proxy_manifest_download",
+      "exit_code": 6,
+      "stderr": "curl: (6) Could not resolve host: sdmntprcentralus.oaiusercontent.com\n"
+    }
+  ],
+  "signed_urls_redacted": true,
+  "repo_observation": {
+    "tool": "github_get_repo",
+    "repository_full_name": "jaeseongs95/vibemarshal",
+    "visibility": "public",
+    "permissions": {
+      "push": true,
+      "pull": true
+    },
+    "private_verified": false,
+    "historical_publication_hold": true,
+    "current_public_evidence_authorization": true
+  },
+  "remote_evidence_head": "003e6ed95b56b485ce8bca3f457659891ea80ec6",
+  "github_cli_metadata_probe": {
+    "exit_code": 1,
+    "stderr": "Get \"https://api.github.com/repos/jaeseongs95/vibemarshal\": Forbidden\n"
+  }
+}

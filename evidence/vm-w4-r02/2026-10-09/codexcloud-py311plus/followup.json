@@ -1,0 +1,19 @@
+{
+  "observed_at": "2026-10-09T05:08:45.278380+00:00",
+  "public_evidence_posting_authorized": true,
+  "private_publication_hold_superseded": true,
+  "supported_transfer": "download_file(file_id=<actual returned sediment file ID without scheme>)",
+  "download_file_tool_available": false,
+  "tool_search_available": false,
+  "available_download_or_materialization_tools": [
+    "github_download_user_content",
+    "github_download_workflow_artifact",
+    "library_prepare_materialize",
+    "pets_get_pet_download_link"
+  ],
+  "no_supported_drive_file_materialization_tool": true,
+  "shell_downloads_repeated": false,
+  "actual_test_result": "NOT_RUN",
+  "test_invocations": 0,
+  "source4_verification": "NOT_RUN"
+}
