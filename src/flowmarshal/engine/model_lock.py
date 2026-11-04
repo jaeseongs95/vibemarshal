@@ -95,8 +95,8 @@ class ModelInventory(LockModel):
 
     @property
     def inventory_provenance(self) -> str:
-        """inventory 원문의 출처 label. Claude provider는 호출자가 주입한 카탈로그다."""
-        if self.source.startswith("claude-code:configured-catalog@"):
+        """inventory 원문의 출처 label. Claude·Gemini provider는 호출자가 주입한 카탈로그다."""
+        if self.source.startswith(("claude-code:configured-catalog@", "gemini-cli:configured-catalog@")):
             return "configured_catalog"
         return "model/list"
 

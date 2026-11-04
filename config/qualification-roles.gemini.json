@@ -1,0 +1,30 @@
+{
+  "normalizer": {
+    "model": "gemini-3-flash",
+    "effort": "high"
+  },
+  "skeleton_generator": {
+    "model": "gemini-3-flash",
+    "effort": "high"
+  },
+  "plan_expander": {
+    "model": "gemini-3-flash",
+    "effort": "high"
+  },
+  "general_reviewer": {
+    "model": "gemini-3-flash",
+    "effort": "high"
+  },
+  "critical_reviewer": {
+    "model": "gemini-3.1-pro",
+    "effort": "xhigh"
+  },
+  "executor": {
+    "model": "gemini-3-flash",
+    "effort": "high"
+  },
+  "validator": {
+    "model": "gemini-3.1-pro",
+    "effort": "xhigh"
+  }
+}

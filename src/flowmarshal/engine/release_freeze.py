@@ -50,12 +50,14 @@ FORMAT = "flowmarshal.release-freeze.v1"
 
 CONFIG_FILES: tuple[str, ...] = (
     "config/claude-model-catalog.json",
+    "config/gemini-model-catalog.json",
     "config/legacy-freeze-manifest.json",
     "config/pre-1.0-performance-thresholds.json",
     "config/pre-1.0-role-timeouts.json",
     "config/pre-1.0-validation-budget.json",
     "config/qualification-finding-taxonomy.json",
     "config/qualification-roles.claude.json",
+    "config/qualification-roles.gemini.json",
     "config/qualification-roles.json",
     "config/qualification-suite.json",
 )

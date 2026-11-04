@@ -560,7 +560,12 @@ class ReleaseFreezeBuildTests(unittest.TestCase):
             manifest.governance_plugin.e2e_identity_digest,
         )
         self.assertTrue((destination / "governance-conformance.json").is_file())
-        for name in ("config/claude-model-catalog.json", "config/qualification-roles.claude.json"):
+        for name in (
+            "config/claude-model-catalog.json",
+            "config/gemini-model-catalog.json",
+            "config/qualification-roles.claude.json",
+            "config/qualification-roles.gemini.json",
+        ):
             self.assertEqual(
                 sha256_bytes((ROOT / name).read_bytes()), manifest.inputs.config_file_digests[name], name,
             )
@@ -585,7 +590,12 @@ class ReleaseFreezeBuildTests(unittest.TestCase):
         self._build(destination=destination, wheel=self.wheel_copy, clean=True)
         original_read_bytes = Path.read_bytes
 
-        for name in ("config/claude-model-catalog.json", "config/qualification-roles.claude.json"):
+        for name in (
+            "config/claude-model-catalog.json",
+            "config/gemini-model-catalog.json",
+            "config/qualification-roles.claude.json",
+            "config/qualification-roles.gemini.json",
+        ):
             target = (ROOT / name).resolve()
 
             def drifted(path: Path, target=target) -> bytes:

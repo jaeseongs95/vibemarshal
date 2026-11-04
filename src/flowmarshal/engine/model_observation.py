@@ -4,11 +4,16 @@ from typing import Any, Mapping
 
 
 PROVIDER_RAW_MODEL_OBSERVATION_SOURCE = "provider_raw_response"
-# Claude CLI는 stream 응답에 effort를 싣지 않고 자기 session 기록 파일에만 남긴다.
+# Claude·Gemini CLI는 stream 응답에 effort를 싣지 않고 자기 session 기록 파일에만 남긴다.
 # stream 원문과 출처를 구분해 그 turn의 assistant 줄이 명시한 한 쌍만 관측값으로 쓴다.
 CLAUDE_SESSION_TRANSCRIPT_MODEL_OBSERVATION_SOURCE = "claude_session_transcript"
+GEMINI_SESSION_TRANSCRIPT_MODEL_OBSERVATION_SOURCE = "gemini_session_transcript"
 MODEL_OBSERVATION_SOURCES = frozenset(
-    {PROVIDER_RAW_MODEL_OBSERVATION_SOURCE, CLAUDE_SESSION_TRANSCRIPT_MODEL_OBSERVATION_SOURCE}
+    {
+        PROVIDER_RAW_MODEL_OBSERVATION_SOURCE,
+        CLAUDE_SESSION_TRANSCRIPT_MODEL_OBSERVATION_SOURCE,
+        GEMINI_SESSION_TRANSCRIPT_MODEL_OBSERVATION_SOURCE,
+    }
 )
 
 

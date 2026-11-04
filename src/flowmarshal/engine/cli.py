@@ -865,8 +865,10 @@ def _cmd_task_materialize(arguments: argparse.Namespace) -> None:
 
 
 def _runtime(arguments: argparse.Namespace) -> CodexRuntimePort:
+    provider = getattr(arguments, "provider", "codex") or "codex"
+    default_dir_name = "gemini-threads" if provider == "gemini" else "claude-threads"
     selection = selection_from_arguments(
-        arguments, default_state_root=Path(arguments.artifacts) / "claude-threads",
+        arguments, default_state_root=Path(arguments.artifacts) / default_dir_name,
     )
     binding_path = getattr(arguments, "codex_project_binding", None)
     project_binding = (
