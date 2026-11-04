@@ -762,6 +762,52 @@ def _finding(
     )
 
 
+def _reachable_pairs(
+    nodes: tuple[str, ...],
+    edges: tuple[tuple[str, str], ...],
+) -> set[tuple[str, str]]:
+    """DAG의 유향 경로 도달 가능 쌍(u ->* v)을 계산한다."""
+    adjacency: dict[str, set[str]] = {node: set() for node in nodes}
+    for producer, consumer in edges:
+        if producer in adjacency and consumer in adjacency:
+            adjacency[producer].add(consumer)
+    reachable: set[tuple[str, str]] = set()
+    for start in nodes:
+        stack = list(adjacency[start])
+        visited: set[str] = set()
+        while stack:
+            current = stack.pop()
+            if current in visited:
+                continue
+            visited.add(current)
+            reachable.add((start, current))
+            stack.extend(adjacency[current] - visited)
+    return reachable
+
+
+def parallel_task_product_collisions(
+    *,
+    task_refs: tuple[str, ...],
+    produces_by_ref: dict[str, tuple[str, ...]],
+    dependency_edges: tuple[tuple[str, str], ...],
+) -> tuple[tuple[str, str, tuple[str, ...]], ...]:
+    """선후 의존성 경로가 없는 병렬(concurrent) Task 쌍의 동일 산출물(produces) 충돌을 검출한다."""
+    reachable = _reachable_pairs(task_refs, dependency_edges)
+    collisions: list[tuple[str, str, tuple[str, ...]]] = []
+    ordered_refs = tuple(sorted(task_refs))
+    for index, first in enumerate(ordered_refs):
+        first_products = set(produces_by_ref.get(first, ()))
+        if not first_products:
+            continue
+        for second in ordered_refs[index + 1 :]:
+            if (first, second) in reachable or (second, first) in reachable:
+                continue
+            shared = tuple(sorted(first_products & set(produces_by_ref.get(second, ()))))
+            if shared:
+                collisions.append((first, second, shared))
+    return tuple(collisions)
+
+
 def skeleton_gate(
     candidate: PlanSkeletonCandidate,
     *,
@@ -887,6 +933,32 @@ def skeleton_gate(
                 "Task consumes 일부가 dependency producer와 연결되지 않았습니다.",
                 digest,
                 task_refs=tuple(disconnected),
+                remediable=True,
+            )
+        )
+    parallel_collisions = parallel_task_product_collisions(
+        task_refs=tuple(item.task_ref for item in candidate.tasks),
+        produces_by_ref={item.task_ref: item.produces for item in candidate.tasks},
+        dependency_edges=tuple(
+            (edge.producer_task_ref, edge.consumer_task_ref)
+            for edge in candidate.dependencies
+        ),
+    )
+    if parallel_collisions:
+        colliding_refs = tuple(
+            sorted({ref for first, second, _ in parallel_collisions for ref in (first, second)})
+        )
+        collision_details = ", ".join(
+            f"{first}<->{second}:{list(shared)}"
+            for first, second, shared in parallel_collisions
+        )
+        findings.append(
+            _finding(
+                "PARALLEL_TASK_PRODUCT_COLLISION",
+                GateName.PLAN,
+                f"병렬 실행 가능한 비의존 Task들이 동일한 산출물(produces)을 중복 생성하여 충돌합니다: {collision_details}",
+                digest,
+                task_refs=colliding_refs,
                 remediable=True,
             )
         )
@@ -1101,6 +1173,34 @@ def plan_gate(
                 "내부/file 효과와 외부 효과는 독립 확인 가능한 별도 Task로 분리해야 합니다: "
                 + ", ".join(sorted(mixed_effect_tasks)),
                 digest,
+                remediable=True,
+            )
+        )
+    plan_ref_by_id = {item.task_id: item.task_ref for item in definition.tasks}
+    plan_parallel_collisions = parallel_task_product_collisions(
+        task_refs=tuple(item.task_ref for item in definition.tasks),
+        produces_by_ref={item.task_ref: item.produces for item in definition.tasks},
+        dependency_edges=tuple(
+            (plan_ref_by_id[edge.producer_task_id], plan_ref_by_id[edge.consumer_task_id])
+            for edge in definition.dependencies
+            if edge.producer_task_id in plan_ref_by_id and edge.consumer_task_id in plan_ref_by_id
+        ),
+    )
+    if plan_parallel_collisions:
+        colliding_refs = tuple(
+            sorted({ref for first, second, _ in plan_parallel_collisions for ref in (first, second)})
+        )
+        collision_details = ", ".join(
+            f"{first}<->{second}:{list(shared)}"
+            for first, second, shared in plan_parallel_collisions
+        )
+        findings.append(
+            _finding(
+                "PARALLEL_TASK_PRODUCT_COLLISION",
+                GateName.PLAN,
+                f"PlanContract 내 병렬 실행 가능한 비의존 Task들이 동일한 산출물(produces)을 중복 생성하여 충돌합니다: {collision_details}",
+                digest,
+                task_refs=colliding_refs,
                 remediable=True,
             )
         )

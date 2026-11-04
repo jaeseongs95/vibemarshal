@@ -4312,6 +4312,43 @@ class EngineService:
                 item.kind in {"command", "edit"} for item in spec.definition.actions
             ):
                 raise EngineServiceError("MIXED_EFFECT_EXECUTION_SPEC_REQUIRES_TASK_SPLIT")
+            from .planning import _reachable_pairs
+            task_ids = tuple(item.task_id for item in plan.definition.tasks)
+            plan_edges = tuple(
+                (edge.producer_task_id, edge.consumer_task_id)
+                for edge in plan.definition.dependencies
+            )
+            reachable = _reachable_pairs(task_ids, plan_edges)
+            my_mutable_paths = {
+                target.path
+                for target in spec.definition.resolved_targets
+                if target.access in {"write", "create", "delete"}
+            }
+            if my_mutable_paths:
+                peer_specs = tx.all(
+                    "SELECT t.id AS task_id, t.task_ref AS task_ref, t.status AS status, "
+                    "s.payload_json AS payload_json "
+                    "FROM task_contracts t "
+                    "JOIN execution_spec_revisions s ON s.task_id = t.id AND s.is_current = 1 "
+                    "WHERE t.plan_revision_id = ? AND t.id != ?",
+                    (task["plan_revision_id"], task["id"]),
+                )
+                for peer in peer_specs:
+                    peer_id = peer["task_id"]
+                    if (task["id"], peer_id) in reachable or (peer_id, task["id"]) in reachable:
+                        continue
+                    peer_spec = TaskExecutionSpecRevision.model_validate_json(peer["payload_json"])
+                    peer_mutable_paths = {
+                        target.path
+                        for target in peer_spec.definition.resolved_targets
+                        if target.access in {"write", "create", "delete"}
+                    }
+                    colliding_paths = sorted(my_mutable_paths & peer_mutable_paths)
+                    if colliding_paths:
+                        raise EngineServiceError(
+                            f"PARALLEL_EXECUTION_TARGET_COLLISION: 병렬 Task({peer['task_ref']})와 "
+                            f"동일한 쓰기 대상이 충돌합니다: {colliding_paths}"
+                        )
             current = tx.maybe_one(
                 "SELECT id, revision_no FROM execution_spec_revisions WHERE task_id = ? AND is_current = 1",
                 (task["id"],),

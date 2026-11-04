@@ -178,6 +178,14 @@ SKELETON_CONTRIBUTION_AUTHORING_INSTRUCTIONS = (
 )
 
 
+PARALLEL_TASK_DECOMPOSITION_INSTRUCTIONS = (
+    "전체 작업(Goal)을 여러 Task로 분해할 때, 선후 dependency 경로가 없는 병렬(concurrent) "
+    "Task들은 산출물(produces)과 쓰기 대상(write scope)이 서로 겹치지 않도록(disjoint write targets, "
+    "single-writer ownership) 쪼갠다. 동일한 산출물이나 파일을 함께 생성·수정해야 하는 Task 쌍은 "
+    "병렬로 두지 말고 명시적 dependency로 순서를 직렬화하거나 책임 경계를 분리한다."
+)
+
+
 SKELETON_CONTRIBUTION_REVIEW_INSTRUCTIONS = (
     "Skeleton의 기여는 구조와 의미를 별도로 검사한다. AC별 Task.contributes_to 역산 집합과 "
     "goal_coverage.task_refs의 일치를 확인한 뒤, 일치 여부와 별개로 AC 원문이 직접 요구하는 "
@@ -962,7 +970,7 @@ class SkeletonGeneratorAdapter:
                 "현재 출력은 실행 전 계획 후보다. 사용자가 이후 정확한 Plan digest를 활성화하며, "
                 "아직 없는 활성화 증적을 consumes로 요구하거나 별도 승인 Task를 발명하지 않는다. "
                 "read_only는 프로젝트 산출물 변경 금지이며 읽기 관측·계획 제안 자체를 금지하지 않는다."
-            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + SKELETON_CONTRIBUTION_AUTHORING_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + SKELETON_CONTRIBUTION_AUTHORING_INSTRUCTIONS + PARALLEL_TASK_DECOMPOSITION_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(goal.definition_digest),
                 "candidate_count": candidate_count,
@@ -1032,7 +1040,7 @@ class SkeletonGeneratorAdapter:
                 "Core의 검사를 기다리는 일반 Task를 추가하지 않는다. 실제 Task 검증 결함은 수정한다. "
                 "consumes는 external_input_catalog의 key 또는 data dependency의 산출물과 일치해야 한다. "
                 "unknown_refs는 StateSnapshot.unknowns의 실제 ID만 쓴다. 새 정보는 발명하지 않는다."
-            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + PARALLEL_TASK_DECOMPOSITION_INSTRUCTIONS + READ_ONLY_REPORTING_INSTRUCTIONS,
             payload={
                 "case_ref": _case_ref(sha256_digest(candidate)),
                 "goal": goal.definition.model_dump(mode="json"),
@@ -1161,7 +1169,7 @@ class SkeletonReviewerAdapter:
                 "다음 Plan/ExecutionSpec 단계의 책임이다. 그 필드 부재만으로 Skeleton을 차단하지 않는다. "
                 "Plan 후보는 아직 승인되지 않은 것이 정상이며 미래 activation 증적의 부재는 dead-end가 아니다. "
                 "read_only는 파일 mutation 계약이지 모든 명령·검사를 금지하는 sandbox가 아니다."
-            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + SKELETON_CONTRIBUTION_REVIEW_INSTRUCTIONS + REVIEW_OUTPUT_INSTRUCTIONS,
+            ) + PLANNING_PROJECT_PATH_INSTRUCTIONS + PLANNING_VALIDATION_BOUNDARY_INSTRUCTIONS + SKELETON_CONTRIBUTION_REVIEW_INSTRUCTIONS + PARALLEL_TASK_DECOMPOSITION_INSTRUCTIONS + REVIEW_OUTPUT_INSTRUCTIONS,
             payload={"case_ref": _case_ref(digest), "evidence_catalog": evidence_catalog},
             output_schema=ReviewDraft.model_json_schema(),
             model=self.model,
