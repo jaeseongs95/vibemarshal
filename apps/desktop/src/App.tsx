@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertCircle, X } from "lucide-react";
 
-import { AuditPanel, Header, ProjectRail, SectionTabs } from "./components";
+import { AuditPanel, Header, ProjectRail, SectionTabs, type RuntimeMode } from "./components";
 import { createCommandContextFactory } from "./command-context";
 import type {
   ActivatePlanCommand,
   AppView,
   CommandResult,
+  EngineClient,
   PossibleActionKind,
   ScenarioKey,
   WorkspaceSnapshot,
 } from "./contracts";
+import { HttpEngineClient } from "./http-engine-client";
 import { MockEngineClient } from "./mock-engine-client";
 import { BrowserPlatformAdapter } from "./platform";
 import { GoalScreen, OverviewScreen, PlansScreen, RecoveryScreen, RunScreen } from "./screens";
@@ -24,10 +26,31 @@ function viewFromHash(): AppView {
   return validViews.includes(candidate) ? candidate : "overview";
 }
 
-export function App() {
-  const engineRef = useRef<MockEngineClient | null>(null);
-  if (!engineRef.current) engineRef.current = new MockEngineClient();
-  const engine = engineRef.current;
+function initialRuntimeMode(explicitMode?: RuntimeMode): RuntimeMode {
+  if (explicitMode) return explicitMode;
+  if (typeof window !== "undefined") {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("runtime") === "http") return "http";
+  }
+  const envMode =
+    typeof import.meta !== "undefined"
+      ? (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ENGINE_RUNTIME
+      : undefined;
+  return envMode === "http" ? "http" : "mock";
+}
+
+export interface AppProps {
+  client?: EngineClient;
+  defaultRuntimeMode?: RuntimeMode;
+  apiBaseUrl?: string;
+}
+
+export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
+  const [runtimeMode, setRuntimeMode] = useState<RuntimeMode>(() => initialRuntimeMode(defaultRuntimeMode));
+  const mockClientRef = useRef<MockEngineClient | null>(null);
+  if (!mockClientRef.current) mockClientRef.current = new MockEngineClient();
+  const httpClient = useMemo(() => new HttpEngineClient({ baseUrl: apiBaseUrl }), [apiBaseUrl]);
+  const engine: EngineClient = client ?? (runtimeMode === "http" ? httpClient : mockClientRef.current);
   const contextFactoryRef = useRef(createCommandContextFactory());
   const platformRef = useRef(new BrowserPlatformAdapter());
   const [snapshot, setSnapshot] = useState<WorkspaceSnapshot | null>(null);
@@ -50,9 +73,18 @@ export function App() {
     const unsubscribe = engine.subscribe((nextSnapshot) => {
       if (active) setSnapshot(nextSnapshot);
     });
-    void engine.getSnapshot().then((nextSnapshot) => {
-      if (active) setSnapshot(nextSnapshot);
-    });
+    void engine
+      .getSnapshot()
+      .then((nextSnapshot) => {
+        if (active) setSnapshot(nextSnapshot);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setCommandError({
+          code: "ENGINE_CONNECTION_FAILED",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      });
     const handleNavigation = () => setView(viewFromHash());
     window.addEventListener("hashchange", handleNavigation);
     window.addEventListener("popstate", handleNavigation);
@@ -168,7 +200,15 @@ export function App() {
 
   return (
     <div className="app-frame">
-      <Header scenario={snapshot.scenario} productStatus={snapshot.productStatus} onScenarioChange={(scenario) => void handleScenario(scenario)} onOpenProjects={() => setProjectsOpen(true)} onOpenInspector={() => setInspectorOpen(true)} />
+      <Header
+        scenario={snapshot.scenario}
+        productStatus={snapshot.productStatus}
+        runtimeMode={runtimeMode}
+        onRuntimeModeChange={client ? undefined : setRuntimeMode}
+        onScenarioChange={(scenario) => void handleScenario(scenario)}
+        onOpenProjects={() => setProjectsOpen(true)}
+        onOpenInspector={() => setInspectorOpen(true)}
+      />
       {busy ? <div className="command-progress" role="progressbar" aria-label="명령 처리 중" /> : null}
       <div className="workspace">
         <ProjectRail snapshot={snapshot} open={projectsOpen} onClose={() => setProjectsOpen(false)} />

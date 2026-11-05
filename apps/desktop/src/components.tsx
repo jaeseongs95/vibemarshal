@@ -79,15 +79,29 @@ export function shortDigest(value: string | null | undefined): string {
   return `${value.slice(0, 14)}…${value.slice(-7)}`;
 }
 
+export type RuntimeMode = "mock" | "http";
+
 interface HeaderProps {
   scenario: ScenarioKey;
   productStatus: WorkspaceSnapshot["productStatus"];
+  runtimeMode?: RuntimeMode;
+  onRuntimeModeChange?: (mode: RuntimeMode) => void;
   onScenarioChange: (scenario: ScenarioKey) => void;
   onOpenProjects: () => void;
   onOpenInspector: () => void;
 }
 
-export function Header({ scenario, productStatus, onScenarioChange, onOpenProjects, onOpenInspector }: HeaderProps) {
+export function Header({
+  scenario,
+  productStatus,
+  runtimeMode = "mock",
+  onRuntimeModeChange,
+  onScenarioChange,
+  onOpenProjects,
+  onOpenInspector,
+}: HeaderProps) {
+  const nextMode: RuntimeMode = runtimeMode === "mock" ? "http" : "mock";
+  const runtimeLabel = runtimeMode === "http" ? "Local HTTP Engine" : t("app.runtimeMock");
   return (
     <header className="topbar">
       <div className="topbar-start">
@@ -110,7 +124,18 @@ export function Header({ scenario, productStatus, onScenarioChange, onOpenProjec
           </select>
         </label>
         <span className="status-chip status-chip--warning">Engine {productStatus}</span>
-        <span className="status-chip runtime-chip"><CircleDot size={14} /> {t("app.runtimeMock")}</span>
+        {onRuntimeModeChange ? (
+          <button
+            className="status-chip runtime-chip"
+            type="button"
+            onClick={() => onRuntimeModeChange(nextMode)}
+            title="클릭하여 Mock / Local HTTP Engine 전환"
+          >
+            <CircleDot size={14} /> {runtimeLabel}
+          </button>
+        ) : (
+          <span className="status-chip runtime-chip"><CircleDot size={14} /> {runtimeLabel}</span>
+        )}
         <button className="icon-button inspector-trigger" type="button" onClick={onOpenInspector} aria-label={t("nav.openInspector")}>
           <PanelRightOpen size={18} />
         </button>

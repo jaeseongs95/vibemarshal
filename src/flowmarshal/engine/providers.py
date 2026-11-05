@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from pathlib import Path
 from typing import Any, Callable, Literal
 
@@ -154,9 +155,12 @@ def open_runtime(
         )
     from .gemini_runtime import GeminiModelCatalog, GeminiRuntime
 
+    gemini_bin_path = Path(selection.gemini_bin).resolve() if selection.gemini_bin else None
+    interpreter = sys.executable if (gemini_bin_path is not None and gemini_bin_path.suffix.lower() == ".py") else None
     return GeminiRuntime(
         model_catalog=GeminiModelCatalog.load(selection.gemini_model_catalog or ""),
         gemini_bin=selection.gemini_bin,
+        interpreter=interpreter,
         state_root=selection.gemini_state_root,
         setting_sources=selection.gemini_setting_sources,
     )

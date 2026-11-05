@@ -922,6 +922,7 @@ class GeminiRuntime:
                 "turn_id": turn.turn_id,
                 "turn_status": status,
                 "prompt_digest": turn.prompt_digest,
+                "duration_ms": None if result is None else result.get("duration_ms"),
                 "usage": usage,
                 "usage_scope": usage_scope,
                 "usage_scope_basis": usage_scope_basis,

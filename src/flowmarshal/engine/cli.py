@@ -95,7 +95,7 @@ from .roles import CodexStructuredRoleRunner, RoleCallReceipt, StructuredRoleErr
 from .reporting import render_final
 from .service import EngineService, EngineServiceError
 from .budget import BudgetManager, BudgetedRoleRunner, GoalBudgetPolicy, receipt_usage
-from .application import EngineApplication, EngineApplicationError
+from .application import ApplicationAuthority, EngineApplication, EngineApplicationError
 from .governance_gate import GovernanceSettings
 from .model_rebinding import ModelRebindRequest, ModelRebindingError
 from .role_execution import RoleTimeoutPolicy, use_role_timeout_policy
@@ -109,7 +109,11 @@ def _json(path: str | Path) -> Any:
 def _emit(value: Any) -> None:
     if hasattr(value, "model_dump"):
         value = value.model_dump(mode="json")
-    print(json.dumps(value, ensure_ascii=False, indent=2, default=str))
+    text = json.dumps(value, ensure_ascii=False, indent=2, default=str) + "\n"
+    try:
+        sys.stdout.write(text)
+    except UnicodeEncodeError:
+        sys.stdout.write(text.encode(sys.stdout.encoding or "utf-8", errors="replace").decode(sys.stdout.encoding or "utf-8"))
 
 
 def _service(arguments: argparse.Namespace) -> EngineService:
@@ -188,6 +192,20 @@ def _application(
     *,
     runtime: CodexRuntimePort | None = None,
 ) -> EngineApplication:
+    governance_settings: Any = (
+        None if runtime is None
+        else GovernanceSettings.from_environment(Path(arguments.artifacts) / "governance")
+    )
+    if (
+        governance_settings is None
+        and runtime is not None
+        and getattr(arguments, "provider", "codex") == "gemini"
+        and getattr(runtime, "gemini_executable", None) is not None
+        and Path(runtime.gemini_executable).name == "agy_gemini_bridge.py"
+    ):
+        from .agy_gemini_bridge import AgyLocalGovernance
+
+        governance_settings = AgyLocalGovernance()
     return EngineApplication(
         _service(arguments),
         runtime=runtime,
@@ -196,10 +214,7 @@ def _application(
             arguments, "inspection_contract", PLAN_INSPECTION_PROVIDER_V1
         ),
         # 실행 Task는 필수 governance gate를 지난다. 플러그인 위치와 model class 대응표는 환경 변수로만 받는다.
-        governance=(
-            None if runtime is None
-            else GovernanceSettings.from_environment(Path(arguments.artifacts) / "governance")
-        ),
+        governance=governance_settings,
     )
 
 
@@ -790,9 +805,16 @@ def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
 
 def _cmd_goal_authorize(arguments: argparse.Namespace) -> None:
     policy = _goal_authorization_policy(arguments)
+    app = _application(arguments)
+    authority = ApplicationAuthority(app)
+    target = authority.authorization_target(
+        arguments.project_id,
+        operating_policy=policy,
+    )
     _emit(
-        _application(arguments).authorize(
+        authority.authorize(
             arguments.project_id,
+            target=target,
             source=arguments.source,
             operating_policy=policy,
         )
@@ -1206,11 +1228,20 @@ def _cmd_report_progress(arguments: argparse.Namespace) -> None:
 def _cmd_report_final(arguments: argparse.Namespace) -> None:
     report = EngineApplication(_service(arguments)).final_report(arguments.project_id, goal_verdict_id=arguments.goal_verdict_id)
     if arguments.format == "markdown":
-        print(render_final(goal=report.goal, plan=report.plan, verdict=report.verdict,
-                           usage=report.usage.usage_records, usage_summary=report.usage,
-                           execution_summary=report.execution_summary,
-                           governance_plugin_tasks=report.governance_plugin_tasks,
-                           read_only_verification=report.read_only_verification), end="")
+        text = render_final(
+            goal=report.goal,
+            plan=report.plan,
+            verdict=report.verdict,
+            usage=report.usage.usage_records,
+            usage_summary=report.usage,
+            execution_summary=report.execution_summary,
+            governance_plugin_tasks=report.governance_plugin_tasks,
+            read_only_verification=report.read_only_verification,
+        )
+        try:
+            sys.stdout.write(text)
+        except UnicodeEncodeError:
+            sys.stdout.write(text.encode(sys.stdout.encoding or "utf-8", errors="replace").decode(sys.stdout.encoding or "utf-8"))
         return
     _emit(report)
 
@@ -1340,7 +1371,7 @@ def _add_goal_arguments(parser: argparse.ArgumentParser, *, revise: bool = False
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="flowmarshal-engine", description="FlowMarshal 새 authority engine")
+    parser = argparse.ArgumentParser(prog="flowmarshal-engine", description="VibeMarshal 새 authority engine")
     parser.add_argument("--role-timeout-policy", help="역할별 timeout 운영 설정 JSON")
     parser.add_argument("--codex-project-binding", help="새 역할·Worker thread의 App Server 프로젝트 결속 JSON")
     parser.add_argument("--db", default=str(Path.cwd() / ".flowmarshal-engine" / DEFAULT_DB_NAME))
