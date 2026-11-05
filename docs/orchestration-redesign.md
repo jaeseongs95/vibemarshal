@@ -1,4 +1,4 @@
-# FlowMarshal 전면 재설계 권위 문서
+# VibeMarshal 전면 재설계 권위 문서
 
 - 상태: **현재 제품 설계 기준선 / 1.0 변경 계약 planned**
 - 승인된 12항목·필수 검증·구현 연결: [1.0 승인 계약](redesign-1.0-contract.md). 새 계약의 구현·검증 완료를 주장하지 않는다.
@@ -10,7 +10,7 @@
 
 ## 1. 제품 정의
 
-FlowMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하고, Task마다 적절한 Codex 실행·검사 모델과 추론 수준을 배정한 뒤, Task 생성·재개·진행·결과·실패·재시도를 끝까지 추적하는 로컬 Workflow Orchestrator다.
+VibeMarshal은 사용자의 큰 요청을 검증 가능한 Task DAG로 분해하고, Task마다 적절한 Codex 실행·검사 모델과 추론 수준을 배정한 뒤, Task 생성·재개·진행·결과·실패·재시도를 끝까지 추적하는 로컬 Workflow Orchestrator다.
 
 제품의 중심은 다음 다섯 가지다.
 

@@ -158,7 +158,7 @@ class CodexAppServerRuntime:
             config_overrides=overrides,
             env=None if home is None else {"CODEX_HOME": str(home)},
             client_name="flowmarshal_gate0b",
-            client_title="FlowMarshal Gate 0B",
+            client_title="VibeMarshal Gate 0B",
             client_version="0.2.0a0",
             experimental_api=True,
         )
@@ -187,7 +187,7 @@ class CodexAppServerRuntime:
             approval_mode=ApprovalMode.deny_all,
             cwd=str(workspace),
             developer_instructions=(
-                "이 task는 FlowMarshal Gate 0B 합성 실행이다. 지정된 workspace와 "
+                "이 task는 VibeMarshal Gate 0B 합성 실행이다. 지정된 workspace와 "
                 "승인 자료만 사용하고 외부 서비스나 사용자 실제 자료에 접근하지 않는다."
             ),
             ephemeral=False,

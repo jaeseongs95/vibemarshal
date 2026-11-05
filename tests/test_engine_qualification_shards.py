@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import tempfile
 import unittest
@@ -157,8 +158,13 @@ class ShardAggregateTests(unittest.TestCase):
     def _copies(self) -> tuple[Path, list[Path]]:
         scratch = Path(tempfile.mkdtemp(dir=self.work))
         copies = []
+        def _fast_copy(src: str, dst: str) -> None:
+            if "reproduction-bundle" in Path(src).parts:
+                os.link(src, dst)
+            else:
+                shutil.copy2(src, dst)
         for index, shard in enumerate(self.planning_shards):
-            copies.append(Path(shutil.copytree(shard, scratch / f"s{index}")))
+            copies.append(Path(shutil.copytree(shard, scratch / f"s{index}", copy_function=_fast_copy)))
         return scratch, copies
 
     def _snapshot(self, root: Path) -> dict[str, bytes]:
@@ -289,7 +295,9 @@ class ShardAggregateTests(unittest.TestCase):
         # 같은 계약의 bytes만 다른 경우: metadata 결속은 통과하고 shard 사이 bytes 대조가 거부한다.
         scratch, copies = self._copies()
         contract = copies[2] / "evaluation-contract.json"
-        contract.write_bytes(contract.read_bytes() + b"\n")
+        raw_contract = contract.read_bytes()
+        contract.unlink()
+        contract.write_bytes(raw_contract + b"\n")
         with self.assertRaisesRegex(
             QualificationRunError,
             "AGGREGATE_SHARD_BINDING_MISMATCH: evaluation-contract.json roots=.*s0,.*s2",
@@ -301,6 +309,7 @@ class ShardAggregateTests(unittest.TestCase):
         contract = copies[2] / "evaluation-contract.json"
         document = json.loads(contract.read_text(encoding="utf-8"))
         document["prompt_digest"] = "sha256:" + "c" * 64
+        contract.unlink()
         contract.write_text(json.dumps(document), encoding="utf-8")
         with self.assertRaisesRegex(QualificationRunError, "evaluation contract digest가 다릅니다"):
             aggregate_shard_runs(root=ROOT, shard_run_roots=tuple(copies), destination=scratch / "b")
@@ -386,7 +395,9 @@ class ShardAggregateTests(unittest.TestCase):
     def test_aggregate_revalidates_each_bundle_and_requires_equal_digests(self) -> None:
         scratch, copies = self._copies()
         payload = next((copies[1] / "reproduction-bundle" / "payload").rglob("*.py"))
-        payload.write_bytes(payload.read_bytes() + b"\n")
+        raw_payload = payload.read_bytes()
+        payload.unlink()
+        payload.write_bytes(raw_payload + b"\n")
         with self.assertRaisesRegex(
             QualificationRunError, "AGGREGATE_SHARD_REPRODUCTION_BUNDLE_INVALID"
         ):
@@ -402,6 +413,7 @@ class ShardAggregateTests(unittest.TestCase):
         manifest["bundle_digest"] = sha256_digest(
             {key: value for key, value in manifest.items() if key != "bundle_digest"}
         )
+        manifest_path.unlink()
         manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
         with self.assertRaisesRegex(
             QualificationRunError, "AGGREGATE_SHARD_REPRODUCTION_BUNDLE_MISMATCH"

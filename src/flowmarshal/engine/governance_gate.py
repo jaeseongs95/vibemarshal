@@ -95,7 +95,7 @@ DECISION_SCHEMA = {
     "properties": {"accept": {"type": "boolean"}, "rationale": {"type": "string"}},
 }
 STEWARD_INSTRUCTIONS = (
-    "당신은 FlowMarshal governance steward다. payload.question에 payload에 담긴 근거만으로 답한다. "
+    "당신은 VibeMarshal governance steward다. payload.question에 payload에 담긴 근거만으로 답한다. "
     "파일을 만들거나 고치지 않고 명령도 실행하지 않는다. 근거가 질문을 충족할 때만 accept를 true로 하고 "
     "rationale에 한국어 한두 문장으로 판단 근거를 쓴다."
 )
@@ -1137,7 +1137,7 @@ class GovernanceTaskGate:
             "riskLevel": contract.risk_level.value,
             "workUnits": [{"id": "WU-1", "objective": contract.objective, "dependencies": [], "writeTargets": writes}],
             "requiredCapabilities": sorted(SUPPORTED_CAPABILITIES),
-            "constraints": ["FlowMarshal Execution Spec의 쓰기 target만 바꾼다", *plan.definition.prohibited_effects],
+            "constraints": ["VibeMarshal Execution Spec의 쓰기 target만 바꾼다", *plan.definition.prohibited_effects],
             "authorization": {"allowedActions": ["Execution Spec의 쓰기 target 편집과 Task validation 실행"],
                               "prohibitedActions": prohibited, "approvalRequired": []},
             "decision": {"complexity": "simple", "hasConflicts": False},
@@ -1249,7 +1249,7 @@ class GovernanceTaskGate:
             excluded=excluded), "writes": writes}, replay=replay)
         run = _Run(key=key, root=root, folder=folder, envelope=envelope, c0=c0)
         observation = self._review(task, run, "bootstrap", None, {
-            "question": "이 TaskEnvelope가 FlowMarshal Task 계약의 목표·쓰기 범위·수용 기준을 빠짐없이 옮겼는가?",
+            "question": "이 TaskEnvelope가 VibeMarshal Task 계약의 목표·쓰기 범위·수용 기준을 빠짐없이 옮겼는가?",
             "taskEnvelope": envelope, "task": contract.model_dump(mode="json"),
             "resolvedTargets": [item.model_dump(mode="json") for item in spec.definition.resolved_targets]},
             replay=replay)
@@ -1310,7 +1310,7 @@ class GovernanceTaskGate:
         if worker is None:
             raise GovernanceRejected(f"WORKER_OBSERVATION_UNAVAILABLE: {attempt['id']}")
         implementation = self._write(run.folder / "implementation.json", {
-            "summary": "FlowMarshal Worker Attempt가 Task를 구현했다.", "attemptId": attempt["id"],
+            "summary": "VibeMarshal Worker Attempt가 Task를 구현했다.", "attemptId": attempt["id"],
             "threadId": json.loads(attempt["binding_json"]).get("thread_id"), "observation": worker})
         self._record(task, run, "implementation", "passed", worker, output_file=implementation,
                      note=f"Worker attempt {attempt['id']} observed via {worker['source']}", replay=False)
@@ -1339,7 +1339,7 @@ class GovernanceTaskGate:
                                                    verdicts=ACCEPTANCE_STATES)
         acceptance_state = ACCEPTANCE_STATES[acceptance["verdict"]]
         observation = self._review(task, run, "acceptance", run.stages["acceptance"].get("executionRequirement"), {
-            "question": "각 수용 기준의 판정이 연결된 FlowMarshal 검증 근거와 맞는가?",
+            "question": "각 수용 기준의 판정이 연결된 VibeMarshal 검증 근거와 맞는가?",
             "verdict": acceptance["verdict"], "criteria": acceptance.get("criteria"),
             "evidence": request["evidence"]}, replay=False)
         run.target_digest = request["target"]["digest"]
@@ -1378,9 +1378,9 @@ class GovernanceTaskGate:
                              "digest": f"sha256:{_sha256_file(path)}", "targetDigest": target, "verified": True,
                              "criterionIds": criteria,
                              "direction": "supports" if row["status"] == "pass" else "refutes",
-                             "observedResult": f"FlowMarshal {row['validation_id']} {row['status']}: {payload.get('rationale')}"})
+                             "observedResult": f"VibeMarshal {row['validation_id']} {row['status']}: {payload.get('rationale')}"})
         return {"schemaVersion": "1.0.0", "taskEnvelope": run.envelope,
                 "target": {"kind": "commit", "identifier": c1, "digest": target},
                 "evidence": evidence, "verificationCommands": [],
-                "knownLimitations": ["Task 수용 기준(자유 문장)은 FlowMarshal Task validation 전체 PASS에 대응시켰다."],
+                "knownLimitations": ["Task 수용 기준(자유 문장)은 VibeMarshal Task validation 전체 PASS에 대응시켰다."],
                 "criterionOverrides": []}

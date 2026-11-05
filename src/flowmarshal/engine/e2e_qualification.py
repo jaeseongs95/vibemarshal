@@ -1396,7 +1396,7 @@ def _initialize_workspace_git(workspace: Path) -> dict[str, str]:
 
     options = (
         "-c", "init.defaultBranch=main",
-        "-c", "user.name=FlowMarshal E2E",
+        "-c", "user.name=VibeMarshal E2E",
         "-c", "user.email=e2e@flowmarshal.invalid",
         "-c", "commit.gpgsign=false",
     )
@@ -1411,6 +1411,8 @@ def _initialize_workspace_git(workspace: Path) -> dict[str, str]:
             cwd=workspace,
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=120,
             check=False,
         )
@@ -5125,7 +5127,7 @@ class _RuntimeObservationLayer:
 
     journal에는 provider 원문이 그대로 남는다. 하위 class는 `_observe`에서 Engine에 넘길
     관측만 바꾸거나, 관측을 넘기기 직전에 통제된 로컬 효과를 낸다. Worker 실행 thread는
-    Engine이 붙이는 제목("FlowMarshal <task_ref> execution")으로 구분한다.
+    Engine이 붙이는 제목("VibeMarshal <task_ref> execution")으로 구분한다.
     """
 
     def __init__(self, runtime: RecordedRuntime) -> None:
@@ -5181,7 +5183,7 @@ class _RuntimeObservationLayer:
 
     def create_thread(self, **arguments: Any) -> Any:
         receipt = self.runtime.create_thread(**arguments)
-        # Worker 실행 thread 제목은 "FlowMarshal <task_ref> execution"이다. 역할·검사 thread는 가리지 않는다.
+        # Worker 실행 thread 제목은 "VibeMarshal <task_ref> execution"이다. 역할·검사 thread는 가리지 않는다.
         if str(arguments.get("title", "")).endswith(" execution"):
             self.worker_thread_ids.add(
                 receipt.binding.thread_id if receipt.binding is not None else receipt.operation_id

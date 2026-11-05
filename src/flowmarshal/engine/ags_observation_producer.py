@@ -79,7 +79,7 @@ def _windows_protected(path: Path, *, secret: bool, is_file: bool) -> bool:
     try:
         result = subprocess.run(
             [_WINDOWS_POWERSHELL, "-NoProfile", "-NonInteractive", "-Command", script],
-            input=str(path), text=True, capture_output=True, timeout=5, check=True,
+            input=str(path), text=True, encoding="utf-8", errors="replace", capture_output=True, timeout=5, check=True,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         acl = json.loads(result.stdout)

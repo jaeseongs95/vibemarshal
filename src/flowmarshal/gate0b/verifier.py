@@ -561,7 +561,7 @@ def write_report(
         encoding="utf-8",
     )
     lines = [
-        "# FlowMarshal Gate 0B 검증 보고서",
+        "# VibeMarshal Gate 0B 검증 보고서",
         "",
         f"- 판정: **{report.overall}**",
         f"- 내부 schema revision: `{report.schema_revision}`",

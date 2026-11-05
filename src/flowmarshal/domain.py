@@ -273,7 +273,7 @@ def new_id(prefix: str) -> str:
 
 def validate_id(value: str) -> str:
     if not _IDENTIFIER_RE.fullmatch(value):
-        raise DomainError(f"유효하지 않은 FlowMarshal ID입니다: {value}")
+        raise DomainError(f"유효하지 않은 VibeMarshal ID입니다: {value}")
     return value
 
 

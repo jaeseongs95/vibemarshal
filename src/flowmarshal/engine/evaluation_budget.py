@@ -136,7 +136,7 @@ def initialize_cell_budget(
     manager = BudgetManager(service)
     if not existed:
         service.create_project(
-            name="FlowMarshal qualification role cell",
+            name="VibeMarshal qualification role cell",
             root=workspace,
             project_id=project_id,
         )

@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "flowmarshal-engine"
-version = "0.2.0a1"
-description = "검증 가능한 계획·분배·추적을 위한 FlowMarshal 개발 엔진"
+version = "1.0.0"
+description = "검증 가능한 계획·분배·추적을 위한 VibeMarshal 개발 엔진"
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]

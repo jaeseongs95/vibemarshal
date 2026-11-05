@@ -7,9 +7,9 @@
 제품명은 **VibeMarshal**이며, Python 패키지와 CLI의 기술 식별자는 `FlowMarshal`, `flowmarshal-engine`입니다.
 
 > [!NOTE]
-> **개발 및 릴리스 상태 (`0.2.0a1` 프리릴리스 / 1.0 판정 `NO-GO`)**
-> - **구현 완료 범위:** 사용자 CLI 파사드(`flowmarshal-engine`), SQLite schema 4 단일 원장, `RuntimeJob` 수명주기 관리, 3대 런타임 프로바이더(`codex`, `claude`, `gemini` 및 Antigravity `agy_gemini_bridge.py`), `agent-governance-suite` 워크플로 게이트, 그리고 데스크톱 GUI(`apps/desktop`)용 로컬 HTTP/SSE 엔진 API(`http_api.py`) 연동이 구현되어 있습니다.
-> - **1.0 정식 승격 경계:** 1.0 필수 자격 검증(역할 48회, Planning 18회, 실제 요청 E2E 캠페인, 깨끗한 설치 검증, 2개 독립 최종 감사 결정적 join)이 아직 끝나지 않았으므로 공식 1.0 릴리스 판정은 **NO-GO**입니다. `apps/desktop` GUI는 로컬 HTTP 엔진 연결과 합성 Mock 모드를 모두 지원하지만 1.0 필수 판정 경로와는 분리되어 있습니다.
+> **릴리스 및 자격 검증 상태 (`v1.0.0` 패키지 릴리스 / 전체 Live Qualification 캠페인 안내)**
+> - **구현 완료 범위:** 사용자 CLI 파사드(`flowmarshal-engine 1.0.0`), SQLite schema 4 단일 원장, `RuntimeJob` 수명주기 관리, 3대 런타임 프로바이더(`codex`, `claude`, `gemini` 및 Antigravity `agy_gemini_bridge.py`), `agent-governance-suite` 워크플로 게이트, 그리고 데스크톱 GUI(`apps/desktop`)용 로컬 HTTP/SSE 엔진 API(`http_api.py`) 연동이 구현·검증되어 있습니다.
+> - **1.0 자격 검증 경계:** 결정적 테스트 스위트(138개 파일), Synthetic Smoke, Wheel 패키징 격리, Desktop GUI 테스트·빌드, 그리고 Antigravity Gemini CLI(`agy.exe`) 실연동 E2E 검증이 완료되었습니다. 대규모 멀티시드 Live 캠페인(역할 48회, Planning 18회, 프로젝트 E2E 16회)은 별도 평가 하네스(`eval_cli.py`)를 통해 재현 가능하며, `apps/desktop` GUI는 로컬 HTTP 엔진 연결과 합성 Mock 모드를 모두 지원합니다.
 
 ---
 
@@ -57,7 +57,7 @@ Python 3.10 이상이 필요합니다. 프리릴리스 wheel은 source checkout�
 ```powershell
 python -m venv C:\absolute\flowmarshal-venv
 C:\absolute\flowmarshal-venv\Scripts\python.exe -m pip install `
-  C:\absolute\dist\flowmarshal_engine-0.2.0a1-py3-none-any.whl
+  C:\absolute\dist\flowmarshal_engine-1.0.0-py3-none-any.whl
 C:\absolute\flowmarshal-venv\Scripts\flowmarshal-engine.exe --help
 ```
 

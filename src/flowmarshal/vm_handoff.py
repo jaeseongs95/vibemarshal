@@ -501,7 +501,7 @@ def _print(value: dict[str, Any]) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="FlowMarshal 별도 Windows VM 전달 도구")
+    parser = argparse.ArgumentParser(description="VibeMarshal 별도 Windows VM 전달 도구")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     build = subparsers.add_parser("build-bundle", help="별도 VM 전달용 ZIP을 만든다")

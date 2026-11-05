@@ -34,7 +34,7 @@ FIXTURE = "sha256:" + "f" * 64
 WHEEL = "sha256:" + "e" * 64
 WHEEL_BINDING = "sha256:" + "d" * 64
 DISTRIBUTION_NAME = "flowmarshal-engine"
-DISTRIBUTION_VERSION = "0.2.0a1"
+DISTRIBUTION_VERSION = "1.0.0"
 GOVERNANCE_PLUGIN_IDENTITY = "sha256:" + "9" * 64
 
 
@@ -115,17 +115,17 @@ class QualificationManifestTests(unittest.TestCase):
         )
 
     def candidate_wheel_fixture(self):
-        wheel = self.run_root / "flowmarshal_engine-0.2.0a1-py3-none-any.whl"
+        wheel = self.run_root / "flowmarshal_engine-1.0.0-py3-none-any.whl"
         package_files = {
-            "flowmarshal/__init__.py": b"__version__ = '0.2.0a1'\n",
+            "flowmarshal/__init__.py": b"__version__ = '1.0.0'\n",
             "flowmarshal/module.py": b"VALUE = 1\n",
         }
         with zipfile.ZipFile(wheel, "w") as archive:
             for relative, payload in package_files.items():
                 archive.writestr(relative, payload)
             archive.writestr(
-                "flowmarshal_engine-0.2.0a1.dist-info/METADATA",
-                "Metadata-Version: 2.1\nName: flowmarshal-engine\nVersion: 0.2.0a1\n",
+                "flowmarshal_engine-1.0.0.dist-info/METADATA",
+                "Metadata-Version: 2.1\nName: flowmarshal-engine\nVersion: 1.0.0\n",
             )
         installed_root = self.run_root / "site-packages"
         for relative, payload in package_files.items():
@@ -135,7 +135,7 @@ class QualificationManifestTests(unittest.TestCase):
 
         class FakeDistribution:
             metadata = {"Name": "flowmarshal-engine"}
-            version = "0.2.0a1"
+            version = "1.0.0"
             files = tuple(package_files)
 
             def __init__(self, *, editable: bool = False):
@@ -537,7 +537,7 @@ class QualificationManifestTests(unittest.TestCase):
         self.assertIsInstance(binding, CandidateWheelBinding)
         self.assertFalse(binding.editable)
         self.assertEqual("flowmarshal-engine", binding.distribution_name)
-        self.assertEqual("0.2.0a1", binding.distribution_version)
+        self.assertEqual("1.0.0", binding.distribution_version)
         self.assertEqual(binding.wheel_package_digest, binding.installed_package_digest)
         self.assertEqual(2, len(binding.package_file_digests))
 

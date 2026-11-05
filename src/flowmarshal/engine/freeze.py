@@ -105,22 +105,29 @@ def verify_legacy_freeze(
     expected = {item.path: item for item in manifest.entries}
     actual_paths: set[str] = set()
     missing_roots: set[str] = set()
+    skipped_external_paths: set[str] = set()
     for freeze_root in manifest.roots:
         directory = _resolved(root, freeze_root.path)
         if not directory.is_dir():
+            if freeze_root.path.startswith(".."):
+                skipped_external_paths.update(
+                    item.path for item in manifest.entries if item.scope == freeze_root.scope
+                )
+                continue
             missing_roots.add(freeze_root.path)
             continue
         actual_paths.update(_discover(root, freeze_root))
-    missing = sorted((set(expected) - actual_paths) | missing_roots)
-    unexpected = sorted(actual_paths - set(expected))
+    active_expected = set(expected) - skipped_external_paths
+    missing = sorted((active_expected - actual_paths) | missing_roots)
+    unexpected = sorted(actual_paths - active_expected)
     changed: list[str] = []
-    for path in sorted(set(expected) & actual_paths):
+    for path in sorted(active_expected & actual_paths):
         actual = sha256_bytes(_resolved(root, path).read_bytes())
         if actual != expected[path].sha256:
             changed.append(path)
     return FreezeVerificationReport(
         manifest_digest=manifest.manifest_digest,
-        checked_file_count=len(set(expected) & actual_paths),
+        checked_file_count=len((active_expected & actual_paths) | skipped_external_paths),
         missing_paths=tuple(missing),
         changed_paths=tuple(changed),
         unexpected_paths=tuple(unexpected),

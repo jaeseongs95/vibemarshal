@@ -255,7 +255,7 @@ function initialSnapshot(scenario: ScenarioKey): WorkspaceSnapshot {
     phase: "plan_ready",
     project: {
       projectId: "project_flowmarshal_demo",
-      name: "FlowMarshal Engine",
+      name: "VibeMarshal Engine",
       location: {
         locationRef: "project-location:flowmarshal-demo",
         displayName: "flowmarshal",

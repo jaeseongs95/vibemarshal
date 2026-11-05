@@ -308,7 +308,7 @@ class DiagnosticBudgetRegistry:
             service.initialize()
             manager = BudgetManager(service)
             service.create_project(
-                name="FlowMarshal inspection diagnostic pre-Goal budget",
+                name="VibeMarshal inspection diagnostic pre-Goal budget",
                 root=self.workspace,
                 project_id=project_id,
             )

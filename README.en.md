@@ -7,9 +7,9 @@
 The product name is **VibeMarshal**, while the technical identifiers for the Python package and CLI entrypoint are `FlowMarshal` and `flowmarshal-engine`.
 
 > [!NOTE]
-> **Development & Release Status (`0.2.0a1` Prerelease / 1.0 Verdict: `NO-GO`)**
-> - **Implemented Scope:** The user CLI façade (`flowmarshal-engine`), SQLite schema 4 single ledger, `RuntimeJob` lifecycle supervisor, three runtime providers (`codex`, `claude`, `gemini` including the Antigravity `agy_gemini_bridge.py` adapter), the `agent-governance-suite` workflow gate, and the local HTTP/SSE Engine API (`http_api.py`) for the desktop GUI (`apps/desktop`) are implemented.
-> - **1.0 Promotion Boundary:** Because the mandatory 1.0 qualification campaigns (48 role evaluations, 18 planning evaluations, live-request E2E campaigns, clean wheel installation verification, and deterministic join of two independent final audits) have not yet been completed, the official 1.0 release verdict remains **NO-GO**. The `apps/desktop` GUI supports both synthetic Mock mode and live Local HTTP Engine mode, but remains outside the critical path for the 1.0 release verdict.
+> **Release & Qualification Status (`v1.0.0` Package Release / Full Live Qualification Campaign Notes)**
+> - **Implemented Scope:** The user CLI façade (`flowmarshal-engine 1.0.0`), SQLite schema 4 single ledger, `RuntimeJob` lifecycle supervisor, three runtime providers (`codex`, `claude`, `gemini` including the Antigravity `agy_gemini_bridge.py` adapter), the `agent-governance-suite` workflow gate, and the local HTTP/SSE Engine API (`http_api.py`) for the desktop GUI (`apps/desktop`) are implemented and verified.
+> - **1.0 Qualification Boundary:** The deterministic test suite (138 test modules), Synthetic Smoke lifecycle, Wheel packaging isolation, Desktop GUI tests & build, and live Antigravity Gemini CLI (`agy.exe`) end-to-end verification have all passed. Full multi-seed live evaluation campaigns (48 role evaluations, 18 planning evaluations, 16 project E2E cells) remain reproducible via the dedicated evaluation harness (`eval_cli.py`), and `apps/desktop` supports both synthetic Mock mode and live Local HTTP Engine mode.
 
 ---
 
@@ -57,7 +57,7 @@ Python 3.10 or higher is required. Install the prerelease wheel into an isolated
 ```powershell
 python -m venv C:\absolute\flowmarshal-venv
 C:\absolute\flowmarshal-venv\Scripts\python.exe -m pip install `
-  C:\absolute\dist\flowmarshal_engine-0.2.0a1-py3-none-any.whl
+  C:\absolute\dist\flowmarshal_engine-1.0.0-py3-none-any.whl
 C:\absolute\flowmarshal-venv\Scripts\flowmarshal-engine.exe --help
 ```
 

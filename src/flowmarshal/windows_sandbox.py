@@ -233,7 +233,7 @@ def query_windows_sandbox_status(
                 cwd=str(working_directory),
                 env={"CODEX_HOME": str(context.authoritative_home)},
                 client_name="flowmarshal_sandbox_status",
-                client_title="FlowMarshal Sandbox Status",
+                client_title="VibeMarshal Sandbox Status",
                 client_version="0.2.0a0",
                 experimental_api=True,
             ),

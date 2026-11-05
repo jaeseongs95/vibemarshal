@@ -118,7 +118,7 @@ def _latest_task_states(connection: sqlite3.Connection) -> dict[str, str | None]
 
 
 class Gate0CVerifier:
-    """FlowMarshal Core의 상태 투영·완료 판정을 재사용하지 않는 원시 증거 검사기."""
+    """VibeMarshal Core의 상태 투영·완료 판정을 재사용하지 않는 원시 증거 검사기."""
 
     def __init__(
         self,
@@ -697,7 +697,7 @@ def write_report(
         encoding="utf-8",
     )
     lines = [
-        "# FlowMarshal Gate 0C 검증 보고서",
+        "# VibeMarshal Gate 0C 검증 보고서",
         "",
         f"- 최종 판정: **{report.overall}**",
         f"- 생성 시각(UTC): `{report.generated_at}`",

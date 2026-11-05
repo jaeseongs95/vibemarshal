@@ -79,7 +79,7 @@ from tests.fixtures.engine.governance.allow import ALLOW_ALL
 #: worker 종료·정지 지점·hook 도달을 기다리는 상한. 넘으면 멈추지 않고 테스트 실패로 드러낸다.
 _WAIT_SECONDS = 10.0
 _TICK_LIMIT = 40
-_ROLE_TITLE_PREFIX = "FlowMarshal role: "
+_ROLE_TITLE_PREFIX = "VibeMarshal role: "
 _REVIEW_ROLES = frozenset({
     "compact_plan_reviewer", "critical_effect_reviewer", "high_risk_reviewer",
     "external_effect_reviewer", RECOVERY_PLAN_REVIEWER_ROLE,

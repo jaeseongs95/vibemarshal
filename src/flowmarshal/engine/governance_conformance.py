@@ -59,7 +59,7 @@ def _envelope() -> dict[str, Any]:
         "acceptanceCriteria": ["target.txt가 바뀐다"], "riskLevel": "medium",
         "workUnits": [{"id": "WU-1", "objective": objective, "dependencies": [], "writeTargets": [TARGET]}],
         "requiredCapabilities": sorted(SUPPORTED_CAPABILITIES),
-        "constraints": ["FlowMarshal Execution Spec의 쓰기 target만 바꾼다"],
+        "constraints": ["VibeMarshal Execution Spec의 쓰기 target만 바꾼다"],
         "authorization": {"allowedActions": ["Execution Spec의 쓰기 target 편집과 Task validation 실행"],
                           "prohibitedActions": ["쓰기 target 밖 변경"], "approvalRequired": []},
         "decision": {"complexity": "simple", "hasConflicts": False},

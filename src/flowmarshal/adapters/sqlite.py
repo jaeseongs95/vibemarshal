@@ -1439,7 +1439,7 @@ class SQLiteTransaction:
         )
         request = {
             "workspace": project["canonical_root"],
-            "title": f"FlowMarshal: {chosen['goal'][:80]}",
+            "title": f"VibeMarshal: {chosen['goal'][:80]}",
             "goal": chosen["goal"],
         }
         intent_id = self.create_intent(

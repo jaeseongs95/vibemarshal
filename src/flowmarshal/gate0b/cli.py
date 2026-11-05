@@ -17,7 +17,7 @@ from ..adapters.authority import FileHumanControlAuthority, default_control_path
 from ..adapters.evidence import FileEvidenceStore
 from ..adapters.runtime import CodexAppServerRuntime, FakeAgentRuntime
 from ..adapters.sqlite import SQLiteLedger
-from ..application import FlowMarshalService, RunOutcome
+from ..application import VibeMarshalService, RunOutcome
 from ..domain import AccessMode, DomainError, PlanDraft, ResourceKind
 from ..time import SystemClock
 from ..windows_sandbox import (
@@ -40,7 +40,7 @@ def build_parser() -> argparse.ArgumentParser:
     data_root = default_data_root()
     parser = argparse.ArgumentParser(
         prog="flowmarshal-gate0b",
-        description="FlowMarshal Gate 0B 내부 기술 CLI (공개 호환성 계약 아님)",
+        description="VibeMarshal Gate 0B 내부 기술 CLI (공개 호환성 계약 아님)",
     )
     parser.add_argument("--db", type=Path, default=data_root / "data" / "flowmarshal.db")
     parser.add_argument("--evidence", type=Path, default=data_root / "evidence")
@@ -136,7 +136,7 @@ def _components(
     *,
     validation_checks: dict[str, Any] | None = None,
 ) -> tuple[
-    FlowMarshalService,
+    VibeMarshalService,
     SQLiteLedger,
     FileHumanControlAuthority,
 ]:
@@ -146,7 +146,7 @@ def _components(
     authority = FileHumanControlAuthority(
         clock=clock, capability_path=args.control
     )
-    service = FlowMarshalService(
+    service = VibeMarshalService(
         ledger=ledger,
         evidence_store=FileEvidenceStore(args.evidence),
         authority=authority,
@@ -434,7 +434,7 @@ def _smoke(args: argparse.Namespace, *, real: bool) -> int:
         )
         authority.initialize()
         registered = service.register_project(
-            name="FlowMarshal Gate 0B 실제 합성 검사" if real else "FlowMarshal Gate 0B 합성 검사",
+            name="VibeMarshal Gate 0B 실제 합성 검사" if real else "VibeMarshal Gate 0B 합성 검사",
             workspace=workspace,
         )
         marker = workspace / "gate0b-smoke.txt"

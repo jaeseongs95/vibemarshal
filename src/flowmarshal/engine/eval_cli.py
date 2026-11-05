@@ -603,7 +603,7 @@ def _cutover(arguments: argparse.Namespace) -> int:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="flowmarshal-engine-eval",
-        description="FlowMarshal Engine 개발 전용 qualification runner",
+        description="VibeMarshal Engine 개발 전용 qualification runner",
     )
     commands = parser.add_subparsers(dest="command", required=True)
     run = commands.add_parser("run")

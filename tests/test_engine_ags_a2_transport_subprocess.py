@@ -39,21 +39,31 @@ from flowmarshal.engine.governance_gate import (
 )
 from test_engine_ags_observation_producer import FIXTURE, _service
 
+def _default_ags_repo() -> Path:
+    configured = os.environ.get("FLOWMARSHAL_AGS_REPO")
+    if configured:
+        return Path(configured)
+    for candidate in (Path(r"D:\gemini\AGS"), Path(r"D:\codex\거버전스 3.0\agent-governance-suite")):
+        if candidate.is_dir():
+            return candidate
+    return Path(r"D:\codex\거버전스 3.0\agent-governance-suite")
+
+
 AGS_PIN = "0e88cb6039e143e79dd8c68c7aecc3e45da41d43"
-AGS_REPO = Path(os.environ.get("FLOWMARSHAL_AGS_REPO", r"D:\codex\거버전스 3.0\agent-governance-suite"))
+AGS_REPO = _default_ags_repo()
 SERVER = Path("mcp-server") / "dist" / "server.mjs"
 MODEL_CLASS = "deep"
 
 
 def _unavailable() -> str | None:
     try:
-        node = subprocess.run(["node", "--version"], capture_output=True, text=True, timeout=30)
+        node = subprocess.run(["node", "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=30)
         major = int(node.stdout.strip().lstrip("v").split(".")[0])
     except (OSError, ValueError, subprocess.SubprocessError):
         return "node를 실행할 수 없다"
     if major < 24:
         return f"node 24 이상이 필요하다({node.stdout.strip()})"
-    probe = subprocess.run(["git", "-C", str(AGS_REPO), "cat-file", "-t", AGS_PIN], capture_output=True, text=True)
+    probe = subprocess.run(["git", "-C", str(AGS_REPO), "cat-file", "-t", AGS_PIN], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if probe.returncode != 0 or probe.stdout.strip() != "commit":
         return f"AGS 고정 SHA {AGS_PIN}를 {AGS_REPO}에서 찾을 수 없다"
     return None
@@ -111,7 +121,7 @@ class A2SubprocessRoundTripTests(unittest.TestCase):
         cls.evidence = {
             "ags_pin": AGS_PIN, "ags_repo": str(AGS_REPO), **source,
             "server_bundle_sha256": hashlib.sha256(server.read_bytes()).hexdigest(),
-            "node": subprocess.run(["node", "--version"], capture_output=True, text=True).stdout.strip(),
+            "node": subprocess.run(["node", "--version"], capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip(),
             "checks": {},
         }
 
@@ -123,7 +133,7 @@ class A2SubprocessRoundTripTests(unittest.TestCase):
             self_sid = subprocess.run(
                 ["powershell", "-NoProfile", "-NonInteractive", "-Command",
                  "[Security.Principal.WindowsIdentity]::GetCurrent().User.Value"],
-                capture_output=True, text=True, check=True, timeout=30).stdout.strip()
+                capture_output=True, text=True, encoding="utf-8", errors="replace", check=True, timeout=30).stdout.strip()
             subprocess.run(["icacls", str(profile_dir), "/inheritance:r", "/grant:r",
                             f"*{self_sid}:(OI)(CI)F", "*S-1-5-18:(OI)(CI)F", "*S-1-5-32-544:(OI)(CI)F"],
                            capture_output=True, check=True, timeout=30)

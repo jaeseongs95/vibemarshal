@@ -1089,7 +1089,13 @@ class LocalGuiEngineBackend:
                 )
             plan_revision_id = payload.get("planRevisionId")
             activation_digest = payload.get("activationDigest")
+            target_digest = payload.get("targetDigest")
             expected_goal_digest = payload.get("expectedGoalDigest")
+            if not plan_revision_id or not (activation_digest or target_digest):
+                return self._error(
+                    "DIGEST_REQUIRED",
+                    "Plan 승인을 위해서는 planRevisionId와 activationDigest(또는 targetDigest)를 명시해야 합니다.",
+                )
             goal = self.service.load_latest_goal(self.project_id)
             if expected_goal_digest and expected_goal_digest != goal.definition_digest:
                 return self._error("REVISION_CONFLICT", "Goal digest가 현재 revision과 다릅니다.")
@@ -1101,10 +1107,12 @@ class LocalGuiEngineBackend:
                 )
                 authority = ApplicationAuthority(app_for_auth)
                 target = authority.authorization_target(self.project_id)
-                if plan_revision_id and target.plan_revision_id != plan_revision_id:
+                if target.plan_revision_id != plan_revision_id:
                     return self._error("DIGEST_MISMATCH", "선택한 Plan 후보가 승인 대상과 다릅니다.")
                 if activation_digest and target.plan_activation_digest != activation_digest:
                     return self._error("DIGEST_MISMATCH", "현재 후보와 activation digest가 일치하지 않습니다.")
+                if target_digest and target.target_digest != target_digest:
+                    return self._error("DIGEST_MISMATCH", "현재 후보와 target digest가 일치하지 않습니다.")
                 authority.authorize(
                     self.project_id,
                     target=target,
@@ -1474,6 +1482,18 @@ class LocalGuiEngineBackend:
         }
 
 
+def _is_loopback_origin(origin: str) -> bool:
+    try:
+        parsed = urlparse(origin)
+    except ValueError:
+        return False
+    return parsed.scheme in {"http", "https"} and parsed.hostname in {
+        "127.0.0.1",
+        "localhost",
+        "::1",
+    }
+
+
 def create_http_handler(backend: LocalGuiEngineBackend) -> type[BaseHTTPRequestHandler]:
     class GuiApiHandler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -1481,9 +1501,32 @@ def create_http_handler(backend: LocalGuiEngineBackend) -> type[BaseHTTPRequestH
         def log_message(self, format: str, *args: Any) -> None:
             return
 
+        def _check_origin(self) -> bool:
+            origin = self.headers.get("Origin")
+            if origin is None or _is_loopback_origin(origin):
+                return True
+            body = json.dumps(
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "CROSS_ORIGIN_FORBIDDEN",
+                        "message": "외부 Origin에서의 로컬 GUI API 호출은 허용되지 않습니다.",
+                    },
+                },
+                ensure_ascii=False,
+            ).encode("utf-8")
+            self.send_response(HTTPStatus.FORBIDDEN)
+            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+            return False
+
         def _send_cors_headers(self) -> None:
-            origin = self.headers.get("Origin", "*")
-            self.send_header("Access-Control-Allow-Origin", origin)
+            origin = self.headers.get("Origin")
+            allowed_origin = origin if (origin and _is_loopback_origin(origin)) else "http://127.0.0.1"
+            self.send_header("Access-Control-Allow-Origin", allowed_origin)
+            self.send_header("Vary", "Origin")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             self.send_header(
                 "Access-Control-Allow-Headers",
@@ -1507,12 +1550,16 @@ def create_http_handler(backend: LocalGuiEngineBackend) -> type[BaseHTTPRequestH
             return json.loads(raw) if raw.strip() else {}
 
         def do_OPTIONS(self) -> None:
+            if not self._check_origin():
+                return
             self.send_response(HTTPStatus.NO_CONTENT)
             self._send_cors_headers()
             self.send_header("Content-Length", "0")
             self.end_headers()
 
         def do_GET(self) -> None:
+            if not self._check_origin():
+                return
             parsed = urlparse(self.path)
             if parsed.path == "/api/v1/health":
                 snap = backend.snapshot()
@@ -1521,7 +1568,7 @@ def create_http_handler(backend: LocalGuiEngineBackend) -> type[BaseHTTPRequestH
                     {
                         "api_version": "1",
                         "engine_package": "flowmarshal-engine",
-                        "engine_version": "0.2.0a1",
+                        "engine_version": "1.0.0",
                         "engine_schema_version": 4,
                         "sqlite_application_id": "FME1",
                         "minimum_ui_api_version": "1",
@@ -1557,6 +1604,8 @@ def create_http_handler(backend: LocalGuiEngineBackend) -> type[BaseHTTPRequestH
             self._send_json(HTTPStatus.NOT_FOUND, {"error": "NOT_FOUND", "path": parsed.path})
 
         def do_POST(self) -> None:
+            if not self._check_origin():
+                return
             parsed = urlparse(self.path)
             body = self._read_json()
             if parsed.path == "/api/v1/scenario":
@@ -1606,6 +1655,10 @@ class LocalGuiServer:
         host: str = "127.0.0.1",
         port: int = 0,
     ) -> None:
+        if host not in {"127.0.0.1", "localhost", "::1"}:
+            raise ValueError(
+                "LOCAL_LOOPBACK_ONLY: GUI HTTP 서버는 로컬 루프백 주소(127.0.0.1, localhost, ::1)에만 바인딩할 수 있습니다."
+            )
         self.backend = backend
         self.httpd = ThreadingHTTPServer((host, port), create_http_handler(backend))
         self.host = str(self.httpd.server_address[0])

@@ -1,4 +1,4 @@
-# FlowMarshal 작업 지침
+# VibeMarshal 작업 지침
 
 이 파일에는 반복 적용할 장기 제품 목적·권위 경계·검증 불변조건만 둔다. 세션별 작업, thread·run ID, 진행률, Gate 판정, 실제 모델과 token·시점별 수치는 해당 원장·artifact·보고서에 기록하며 여기에는 복제하지 않는다.
 
@@ -45,7 +45,7 @@
 
 ## 제품 목적과 경계
 
-FlowMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정규화하고, Skeleton-first planning, 역할별 모델 배정, 계획 활성화, Task 생성·재개·관찰, 검증, 실패 분류, 제한 재시도와 최종 Goal 판정을 추적하는 로컬 Workflow Orchestrator다. revision 원장, 상태 전이, thread·turn binding, evidence와 recovery로 중복·유실·오완료를 막는다.
+VibeMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정규화하고, Skeleton-first planning, 역할별 모델 배정, 계획 활성화, Task 생성·재개·관찰, 검증, 실패 분류, 제한 재시도와 최종 Goal 판정을 추적하는 로컬 Workflow Orchestrator다. revision 원장, 상태 전이, thread·turn binding, evidence와 recovery로 중복·유실·오완료를 막는다.
 
 - Threadkeeper와 R1~R3.1은 `legacy/prototype` 기준선이다. 새 Engine의 권위 도메인으로 확장하지 않는다. `codex-context-continuity`도 독립 제품이자 향후 연동 사례로 유지한다.
 - 새 코드는 `flowmarshal.engine`에 두고 기존 `flowmarshal.core`·`flowmarshal.planning` 도메인을 import하지 않는다. 검증된 transport만 `CodexRuntimePort` 뒤에서 재사용할 수 있다.

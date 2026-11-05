@@ -406,7 +406,7 @@ class OwnerLeaseUnitTests(_ChildProcessMixin, unittest.TestCase):
     def test_harness_child_imports_this_worktree(self) -> None:
         completed = subprocess.run(
             [sys.executable, "-X", "utf8", str(Path(__file__).resolve()), "origin"],
-            env=_child_env(), cwd=str(ROOT), capture_output=True, text=True, timeout=60,
+            env=_child_env(), cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=60,
         )
         self.assertEqual(0, completed.returncode, completed.stdout + completed.stderr)
         origin = Path(completed.stdout.strip())

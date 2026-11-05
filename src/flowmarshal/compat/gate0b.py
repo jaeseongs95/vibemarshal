@@ -7,10 +7,10 @@ AccessGrant를 실행 전제조건으로 두지 않는다.
 
 from ..adapters.authority import FileHumanControlAuthority
 from ..adapters.sqlite import SQLiteLedger
-from ..application import FlowMarshalService
+from ..application import VibeMarshalService
 from ..domain import AccessMode, ResourceDefinition, ResourceKind
 
-LegacyGate0BService = FlowMarshalService
+LegacyGate0BService = VibeMarshalService
 LegacyGate0BLedger = SQLiteLedger
 
 __all__ = [

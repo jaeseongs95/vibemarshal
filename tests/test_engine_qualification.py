@@ -3,6 +3,7 @@ from __future__ import annotations
 from flowmarshal.engine.model_lock import OperationalBinding, RUNTIME_CAPABILITIES
 
 import json
+import os
 import tempfile
 import unittest
 import sqlite3
@@ -329,6 +330,11 @@ class EngineQualificationTests(unittest.TestCase):
                         )
 
     def setUp(self) -> None:
+        self._env_patch = patch.dict(
+            os.environ, {"FLOWMARSHAL_ENGINE_SOURCE_ROOT": str(ROOT)}
+        )
+        self._env_patch.start()
+        self.addCleanup(self._env_patch.stop)
         self.roles = default_role_configuration(ROOT)
         self.inventory = qualification_inventory()
 

@@ -1,7 +1,7 @@
-# ADR: FlowMarshal Engine 분리와 1.0 cutover
+# ADR: VibeMarshal Engine 분리와 1.0 cutover
 
 - 상태: **Accepted（설계）/ 재설계 구현·검증 planned**
-- 대상: 기존 FlowMarshal Domain Core를 유지하는 1.0 Engine
+- 대상: 기존 VibeMarshal Domain Core를 유지하는 1.0 Engine
 - 권위: [승인 12항목과 필수 검증](redesign-1.0-contract.md), [제품 설계](orchestration-redesign.md)
 
 ## Context

@@ -6,6 +6,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -15,7 +16,7 @@ from pathlib import Path
 from typing import Any
 
 AGY_CLI_VERSION = "0.66.0-agy"
-DEFAULT_AGY_EXE = Path(r"C:\Users\Lenovo\.gemini\bin\agy.exe")
+DEFAULT_AGY_EXE = Path.home() / ".gemini" / "bin" / ("agy.exe" if os.name == "nt" else "agy")
 
 AGY_MODEL_MAP: dict[tuple[str, str], str] = {
     ("gemini-3-flash", "low"): "Gemini 3.8 Flash (Low)",
@@ -33,6 +34,11 @@ def resolve_agy_exe(override: str | Path | None = None) -> Path:
     env_override = os.environ.get("FLOWMARSHAL_AGY_EXE")
     if env_override:
         return Path(env_override).expanduser().resolve()
+    if DEFAULT_AGY_EXE.exists():
+        return DEFAULT_AGY_EXE
+    which_agy = shutil.which("agy.exe" if os.name == "nt" else "agy") or shutil.which("agy")
+    if which_agy:
+        return Path(which_agy).resolve()
     return DEFAULT_AGY_EXE
 
 

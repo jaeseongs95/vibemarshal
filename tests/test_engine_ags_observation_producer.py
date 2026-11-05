@@ -213,7 +213,7 @@ def _node(receipt: dict, example: dict, producer: AGSObservationProducer, *,
         "claimDir": claim_dir,
     }
     result = subprocess.run(["node", str(VERIFY_SCRIPT)], input=json.dumps(payload), text=True,
-                            capture_output=True, check=True, timeout=10)
+                            encoding="utf-8", errors="replace", capture_output=True, check=True, timeout=10)
     return json.loads(result.stdout)
 
 

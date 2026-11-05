@@ -1,4 +1,4 @@
-# FlowMarshal 1.0 승인 계약과 검증 책임
+# VibeMarshal 1.0 승인 계약과 검증 책임
 
 상태: **승인된 설계 / planned**. 이 문서는 FM-01의 문서 계약이며 제품 구현·qualification·1.0 전환 완료 증거가 아니다. 기존 Domain Core·revision·DAG·binding·evidence·validation을 유지하며 전면 재작성하지 않는다. 세부 기존 계약은 [제품 설계](orchestration-redesign.md), 릴리스 결정은 [ADR](engine-cutover-adr.md)을 함께 따른다.
 

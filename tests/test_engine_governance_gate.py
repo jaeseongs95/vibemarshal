@@ -41,7 +41,7 @@ PLUGIN_ROOT = Path(os.environ["FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT"]) if os.envir
 
 
 def git(root: Path, *args: str) -> str:
-    return subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True, text=True).stdout.strip()
+    return subprocess.run(["git", "-C", str(root), *args], check=True, capture_output=True, text=True, encoding="utf-8", errors="replace").stdout.strip()
 
 
 def init_repository(workspace: Path) -> None:

@@ -311,6 +311,20 @@ def _manifest(root: Path) -> LegacyFreezeManifest:
     return LegacyFreezeManifest.load(root / "config" / "legacy-freeze-manifest.json")
 
 
+_SOURCE_HASH_CACHE: dict[tuple[str, int, int], str] = {}
+
+
+def _cached_sha256_file(path: Path) -> str:
+    stat = path.stat()
+    raw = path.read_bytes()
+    key = (str(path), stat.st_mtime_ns, stat.st_size, raw[:16], raw[-16:])
+    cached = _SOURCE_HASH_CACHE.get(key)
+    if cached is None:
+        cached = sha256_bytes(raw)
+        _SOURCE_HASH_CACHE[key] = cached
+    return cached
+
+
 def source_manifest_files(root: Path) -> dict[str, str]:
     """결정적 Gate가 실행하는 source·test·fixture 입력의 실제 결속을 반환한다."""
 
@@ -393,7 +407,7 @@ def source_manifest_files(root: Path) -> dict[str, str]:
         ),
         key=lambda item: item.relative_to(root).as_posix(),
     )
-    return {path.relative_to(root).as_posix(): sha256_bytes(path.read_bytes()) for path in files}
+    return {path.relative_to(root).as_posix(): _cached_sha256_file(path) for path in files}
 
 
 def source_manifest_digest(root: Path) -> str:
@@ -1429,7 +1443,7 @@ def _planning_contract(
 
 def _profile(project_id: str) -> ProjectProfileRevision:
     definition = ProjectProfileDefinition(
-        product_goal="FlowMarshal qualification fixture를 안전하고 검증 가능하게 처리한다.",
+        product_goal="VibeMarshal qualification fixture를 안전하고 검증 가능하게 처리한다.",
         lifecycle_stage=LifecycleStage.DEVELOPMENT,
         criticality=Criticality.HIGH,
         compatibility_policy=(
@@ -2425,7 +2439,12 @@ def aggregate_shard_runs(
     for name in bound[1:]:
         if not (target / name).exists():
             shutil.copyfile(first / name, target / name)
-    shutil.copytree(first / "reproduction-bundle", target_bundle, dirs_exist_ok=True)
+    shutil.copytree(
+        first / "reproduction-bundle",
+        target_bundle,
+        dirs_exist_ok=True,
+        copy_function=lambda src, dst: os.link(src, dst) if not Path(dst).exists() else shutil.copy2(src, dst),
+    )
     try:
         copied_bundle_digest = verify_qualification_reproduction_bundle(
             target_bundle

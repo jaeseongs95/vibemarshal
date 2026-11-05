@@ -638,7 +638,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
             digests = {"flowmarshal/__init__.py": sha256_bytes(b"package")}
             binding = CandidateWheelBinding(
                 wheel_path=str(wheel), wheel_digest=sha256_bytes(b"candidate"),
-                distribution_name="flowmarshal-engine", distribution_version="0.2.0a1",
+                distribution_name="flowmarshal-engine", distribution_version="1.0.0",
                 distribution_root=str(import_root.parent), import_root=str(import_root),
                 package_file_digests=digests, wheel_package_digest=sha256_digest(digests),
                 installed_package_digest=sha256_digest(digests),

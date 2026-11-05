@@ -402,7 +402,7 @@ class CodexStructuredRoleRunner:
                 str(error), receipts=tuple(self.receipts), effects_started=False,
             ) from error
         create_request = {
-            "cwd": str(cwd), "title": f"FlowMarshal role: {request.role}",
+            "cwd": str(cwd), "title": f"VibeMarshal role: {request.role}",
             "model": request.model, "developer_instructions_digest": sha256_digest(request.instructions),
             "ephemeral": self.ephemeral_threads,
         }
@@ -410,7 +410,7 @@ class CodexStructuredRoleRunner:
             trace, "create", create_request,
             lambda: self.runtime.create_thread(
                 cwd=cwd,
-                title=f"FlowMarshal role: {request.role}",
+                title=f"VibeMarshal role: {request.role}",
                 model=request.model,
                 developer_instructions=request.instructions,
                 ephemeral=self.ephemeral_threads,

@@ -1,4 +1,4 @@
-# FlowMarshal 문서 지도
+# VibeMarshal 문서 지도
 
 - [1.0 승인 계약과 책임 연결표](redesign-1.0-contract.md): 승인된 12개 설계 항목, 필수 검증·E2E 책임과 FM 태스크 연결. 새 계약은 planned이며 구현·검증 완료가 아니다.
 - [비차단 비교 성능](performance-release-floor.md): 현재 릴리스 필수 Gate와 이전 비교 계약의 구분

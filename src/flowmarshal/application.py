@@ -76,7 +76,7 @@ class RecoveryObservation:
     terminal_status: str | None
 
 
-class FlowMarshalService:
+class VibeMarshalService:
     """Planner나 Worker가 직접 바꿀 수 없는 Gate 0B 권위 Core."""
 
     def __init__(
@@ -122,16 +122,16 @@ class FlowMarshalService:
         if ledger_path is not None:
             protected_values.extend(
                 (
-                    (ledger_path, "FlowMarshal 권위 원장"),
-                    (Path(f"{ledger_path}-wal"), "FlowMarshal 원장 WAL"),
-                    (Path(f"{ledger_path}-shm"), "FlowMarshal 원장 shared memory"),
-                    (Path(f"{ledger_path}-journal"), "FlowMarshal 원장 journal"),
+                    (ledger_path, "VibeMarshal 권위 원장"),
+                    (Path(f"{ledger_path}-wal"), "VibeMarshal 원장 WAL"),
+                    (Path(f"{ledger_path}-shm"), "VibeMarshal 원장 shared memory"),
+                    (Path(f"{ledger_path}-journal"), "VibeMarshal 원장 journal"),
                 )
             )
         evidence_root = getattr(self.evidence_store, "root", None)
         if evidence_root is not None:
             protected_values.append(
-                (evidence_root, "FlowMarshal content-addressed evidence 저장소")
+                (evidence_root, "VibeMarshal content-addressed evidence 저장소")
             )
         capability_path = getattr(self.authority, "capability_path", None)
         if capability_path is not None:
@@ -153,7 +153,7 @@ class FlowMarshalService:
             _paths_overlap(Path(workspace_path), Path(protected_path))
             for protected_path, _ in protected
         ):
-            raise DomainError("workspace는 FlowMarshal 보호 경로와 겹칠 수 없습니다.")
+            raise DomainError("workspace는 VibeMarshal 보호 경로와 겹칠 수 없습니다.")
         reference_values = tuple(references)
         runtime_dependency_values = tuple(runtime_dependencies)
         input_paths = reference_values + runtime_dependency_values
@@ -1774,7 +1774,7 @@ def _worker_prompt(
     if not protected:
         protected = "- 없음"
     return (
-        "당신은 FlowMarshal이 배정한 하나의 작업만 수행합니다.\n"
+        "당신은 VibeMarshal이 배정한 하나의 작업만 수행합니다.\n"
         f"목표: {goal}\n"
         f"수정 가능 작업 폴더: {workspace}\n"
         "승인된 읽기 자료:\n"
@@ -1874,3 +1874,6 @@ def _evaluate_path_predicate(
             "expected_digest": sha256_digest(expected),
         }
     return False, {"error": "UNSUPPORTED_PREDICATE", "predicate": predicate}
+
+
+FlowMarshalService = VibeMarshalService

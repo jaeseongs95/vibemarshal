@@ -15,7 +15,7 @@ def _default_project_root() -> Path:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="flowmarshal-gate0c",
-        description="FlowMarshal Gate 0C 내부 독립 검증 CLI",
+        description="VibeMarshal Gate 0C 내부 독립 검증 CLI",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
     verify = subparsers.add_parser("verify", help="원시 원장과 artifact를 독립 검증합니다.")

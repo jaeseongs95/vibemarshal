@@ -69,7 +69,7 @@ PERMISSION_RECHECK_SCHEMA_VERSION = "1.0"
 PERMISSION_RECHECK_KIND = "fm_0a_p_permission_recheck"
 SYSTEM_RUNTIME_NAME = "desktop-system"
 GATE_NAME = "0A"
-PROJECT_NAME = "FlowMarshal"
+PROJECT_NAME = "VibeMarshal"
 DEFAULT_TURN_TIMEOUT_SECONDS = 180
 PERMISSION_PROFILE_ID = "flowmarshal_gate0a"
 UNDECLARED_READ_EXCEPTION_ID = "native-windows-read-boundary-20260901"
@@ -603,7 +603,7 @@ def make_client(
         cwd=str(cwd),
         env=env,
         client_name="flowmarshal_gate0a",
-        client_title="FlowMarshal Gate 0A",
+        client_title="VibeMarshal Gate 0A",
         client_version="0.1.0",
         experimental_api=True,
     )
@@ -2606,7 +2606,7 @@ def render_report(document: dict[str, Any]) -> str:
         == "strict_read_isolation"
     ]
     lines = [
-        "# FlowMarshal Gate 0A 기술 스파이크 보고서",
+        "# VibeMarshal Gate 0A 기술 스파이크 보고서",
         "",
         f"- 실행 ID: `{document.get('run_id', '-')}`",
         f"- 실행 시각: `{document.get('started_at', '-')}`",
@@ -3061,7 +3061,7 @@ def setup_permission_sandbox(args: argparse.Namespace) -> int:
         payload: dict[str, Any] = {
             "status": "EXTERNAL_SETUP_REQUIRED",
             "reason_code": HOST_PROVISIONING_FORBIDDEN,
-            "message": "실제 PC에서 FlowMarshal의 자동 Windows sandbox provisioning은 금지됩니다.",
+            "message": "실제 PC에서 VibeMarshal의 자동 Windows sandbox provisioning은 금지됩니다.",
         }
         try:
             context = resolve_host_context(
@@ -4339,7 +4339,7 @@ def regenerate_report(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="FlowMarshal Gate 0A 기술 스파이크")
+    parser = argparse.ArgumentParser(description="VibeMarshal Gate 0A 기술 스파이크")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     status = subparsers.add_parser(

@@ -447,8 +447,8 @@ class CodexAppServerRuntime:
             CodexConfig(
                 codex_bin=None if codex_bin is None else str(resolved),
                 client_name="flowmarshal_engine",
-                client_title="FlowMarshal Engine",
-                client_version="0.2.0a1",
+                client_title="VibeMarshal Engine",
+                client_version="1.0.0",
                 experimental_api=True,
             )
         )
@@ -5862,11 +5862,11 @@ class EngineDispatcher:
             trace, "create", request,
             lambda: self.runtime.create_thread(
                 cwd=cwd,
-                title=f"FlowMarshal {row['task_ref']} {row['kind']}",
+                title=f"VibeMarshal {row['task_ref']} {row['kind']}",
                 model=role.model,
                 developer_instructions=(
                     "활성 PlanContract가 지정한 역할 하나만 수행한다. 다음 Task를 선택하거나 "
-                    "FlowMarshal 원장의 권위 상태를 직접 바꾸지 않는다."
+                    "VibeMarshal 원장의 권위 상태를 직접 바꾸지 않는다."
                 ),
             ),
             attempt_id=attempt_id, intent_id=create_intent.intent_id,

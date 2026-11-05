@@ -80,6 +80,8 @@ class EnginePackagingContractTests(unittest.TestCase):
                     cwd=temp,
                     capture_output=True,
                     text=True,
+                    encoding="utf-8",
+                    errors="replace",
                     timeout=300,
                 )
             except (OSError, subprocess.TimeoutExpired) as error:

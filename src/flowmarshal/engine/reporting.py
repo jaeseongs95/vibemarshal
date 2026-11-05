@@ -27,7 +27,7 @@ def render_plan_review(
     decision: CandidateDecision,
 ) -> str:
     lines = [
-        "# FlowMarshal 계획 검토",
+        "# VibeMarshal 계획 검토",
         "",
         f"- 목표: {goal.definition.observable_outcome}",
         f"- 활성화 digest: `{plan.activation_digest}`",
@@ -60,7 +60,7 @@ def render_failure(
     recovery: RecoveryAssessment,
 ) -> str:
     return (
-        "# FlowMarshal 실패 보고\n\n"
+        "# VibeMarshal 실패 보고\n\n"
         f"- Attempt: `{attempt.attempt_id}`\n"
         f"- Task: `{attempt.task_id}`\n"
         f"- 실패 분류: `{recovery.failure_class.value}`\n"
@@ -99,7 +99,7 @@ def render_final(
     cache_ratio = None if total_input in (None, 0) or total_cached is None else total_cached / total_input
     display = lambda value: "미확인" if value is None else f"{value:,}"
     lines = [
-        "# FlowMarshal 최종 보고",
+        "# VibeMarshal 최종 보고",
         "",
         f"- Goal: {goal.definition.observable_outcome}",
         f"- Plan: `{plan.activation_digest}`",

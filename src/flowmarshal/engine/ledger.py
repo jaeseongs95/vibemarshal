@@ -823,7 +823,7 @@ class SQLiteEngineLedger:
                 )
             }
             if "schema_meta" not in tables:
-                raise EngineLedgerError("기존 DB가 FlowMarshal Engine 원장으로 식별되지 않습니다.")
+                raise EngineLedgerError("기존 DB가 VibeMarshal Engine 원장으로 식별되지 않습니다.")
             metadata = {
                 row["key"]: row["value"]
                 for row in connection.execute("SELECT key, value FROM schema_meta")
@@ -847,7 +847,7 @@ class SQLiteEngineLedger:
                     "기존 개발 DB를 제자리 변환하지 말고 새 DB를 만드세요."
                 )
             if connection.execute("PRAGMA application_id").fetchone()[0] != SQLITE_APPLICATION_ID:
-                raise EngineLedgerError("SQLite application_id가 FlowMarshal Engine과 다릅니다.")
+                raise EngineLedgerError("SQLite application_id가 VibeMarshal Engine과 다릅니다.")
             if connection.execute("PRAGMA user_version").fetchone()[0] != ENGINE_SCHEMA_REVISION:
                 raise EngineLedgerError("SQLite user_version과 Engine schema revision이 다릅니다.")
         finally:
@@ -965,7 +965,7 @@ class SQLiteEngineHistoryReader:
                 )
             }
             if "schema_meta" not in tables:
-                raise EngineLedgerError("기존 DB가 FlowMarshal Engine 원장으로 식별되지 않습니다.")
+                raise EngineLedgerError("기존 DB가 VibeMarshal Engine 원장으로 식별되지 않습니다.")
             metadata = {
                 row["key"]: row["value"]
                 for row in connection.execute("SELECT key,value FROM schema_meta")
@@ -976,7 +976,7 @@ class SQLiteEngineHistoryReader:
             if revision not in HISTORICAL_ENGINE_SCHEMA_REVISIONS | {ENGINE_SCHEMA_REVISION}:
                 raise EngineLedgerError("지원하지 않는 Engine history schema revision입니다.")
             if connection.execute("PRAGMA application_id").fetchone()[0] != SQLITE_APPLICATION_ID:
-                raise EngineLedgerError("SQLite application_id가 FlowMarshal Engine과 다릅니다.")
+                raise EngineLedgerError("SQLite application_id가 VibeMarshal Engine과 다릅니다.")
             if connection.execute("PRAGMA user_version").fetchone()[0] != revision:
                 raise EngineLedgerError("SQLite user_version과 Engine history schema revision이 다릅니다.")
             return {"schema_id": ENGINE_SCHEMA_ID, "schema_revision": revision}

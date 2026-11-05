@@ -203,6 +203,56 @@ class EngineHttpApiTests(unittest.TestCase):
         self.assertEqual(snap["budget"]["latencyMs"], 850)
         self.assertIn("Gemini CLI (agy.exe)", snap["budget"]["availabilityReason"])
 
+    def test_activate_plan_rejects_empty_or_mismatched_digest(self) -> None:
+        snapshot = self._get("/api/v1/snapshot")
+        plan = snapshot["plans"][0]
+
+        empty_res = self._post("/api/v1/plans/activate", {})
+        self.assertFalse(empty_res["ok"])
+        self.assertEqual(empty_res["error"]["code"], "DIGEST_REQUIRED")
+
+        missing_digest_res = self._post(
+            "/api/v1/plans/activate",
+            {"planRevisionId": plan["planRevisionId"]},
+        )
+        self.assertFalse(missing_digest_res["ok"])
+        self.assertEqual(missing_digest_res["error"]["code"], "DIGEST_REQUIRED")
+
+        wrong_digest_res = self._post(
+            "/api/v1/plans/activate",
+            {
+                "planRevisionId": plan["planRevisionId"],
+                "activationDigest": "sha256:" + "0" * 64,
+            },
+        )
+        self.assertFalse(wrong_digest_res["ok"])
+        self.assertEqual(wrong_digest_res["error"]["code"], "DIGEST_MISMATCH")
+
+    def test_cors_origin_restriction_and_loopback_host_enforcement(self) -> None:
+        import urllib.error
+
+        req = urllib.request.Request(
+            f"{self.base_url}/api/v1/snapshot",
+            headers={"Origin": "https://evil.example.com"},
+            method="GET",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as ctx:
+            urllib.request.urlopen(req, timeout=5)
+        self.assertEqual(ctx.exception.code, 403)
+        err_payload = json.loads(ctx.exception.read().decode("utf-8"))
+        self.assertEqual(err_payload["error"]["code"], "CROSS_ORIGIN_FORBIDDEN")
+
+        local_req = urllib.request.Request(
+            f"{self.base_url}/api/v1/health",
+            headers={"Origin": "http://localhost:5173"},
+            method="GET",
+        )
+        with urllib.request.urlopen(local_req, timeout=5) as resp:
+            self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), "http://localhost:5173")
+
+        with self.assertRaises(ValueError):
+            LocalGuiServer(self.backend, host="0.0.0.0", port=0)
+
 
 if __name__ == "__main__":
     unittest.main()

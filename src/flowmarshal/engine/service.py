@@ -205,7 +205,7 @@ def latest_write_observation(connection: Any, attempt_id: str, path: str) -> tup
 
 
 class EngineService:
-    """FlowMarshal Engine에서 권위 상태를 전이할 수 있는 유일한 서비스."""
+    """VibeMarshal Engine에서 권위 상태를 전이할 수 있는 유일한 서비스."""
 
     def __init__(
         self,

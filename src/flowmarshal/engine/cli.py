@@ -805,16 +805,9 @@ def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
 
 def _cmd_goal_authorize(arguments: argparse.Namespace) -> None:
     policy = _goal_authorization_policy(arguments)
-    app = _application(arguments)
-    authority = ApplicationAuthority(app)
-    target = authority.authorization_target(
-        arguments.project_id,
-        operating_policy=policy,
-    )
     _emit(
-        authority.authorize(
+        _application(arguments).authorize(
             arguments.project_id,
-            target=target,
             source=arguments.source,
             operating_policy=policy,
         )

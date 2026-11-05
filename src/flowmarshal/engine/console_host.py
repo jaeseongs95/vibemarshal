@@ -90,7 +90,7 @@ class TrustedConsoleHost:
         value["budget_policies"] = [json.loads(item) for item in target.budget_policies]
         value["target_digest"] = target.target_digest
         value["audit_source"] = audit_source
-        self.approval_stream.write("FlowMarshal Goal 승인 대상:\n")
+        self.approval_stream.write("VibeMarshal Goal 승인 대상:\n")
         self.approval_stream.write(json.dumps(value, ensure_ascii=False, indent=2))
         self.approval_stream.write(
             "\n승인하려면 위 target_digest 전체를 그대로 입력하세요. "

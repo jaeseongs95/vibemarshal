@@ -86,7 +86,7 @@ def run_synthetic_lifecycle(
     authority = CoreActionAuthority()
     service = EngineService(ledger, action_authority=authority)
     service.initialize()
-    project_id = service.create_project(name="FlowMarshal Engine synthetic E2E", root=root)
+    project_id = service.create_project(name="VibeMarshal Engine synthetic E2E", root=root)
 
     profile_definition = ProjectProfileDefinition(
         product_goal="검증 가능한 로컬 workflow orchestration",
@@ -359,10 +359,11 @@ def run_synthetic_lifecycle(
         ContextNeed(
             need_id="project_source",
             description="최소 프로젝트 텍스트",
+            path_hints=(project_map.entries[0].path,),
             tag_hints=(project_map.entries[0].tags[0],),
         ),
     )
-    selection = ContextSelector().select(
+    selection = ContextSelector(default_token_budget=32_000).select(
         project_map=project_map,
         task=task,
         prompt_binding=prompt.binding,
@@ -452,7 +453,7 @@ def main() -> int:
     import argparse
     import tempfile
 
-    parser = argparse.ArgumentParser(description="FlowMarshal Engine synthetic E2E smoke")
+    parser = argparse.ArgumentParser(description="VibeMarshal Engine synthetic E2E smoke")
     parser.add_argument("--project-root", default=str(Path.cwd()))
     parser.add_argument("--output-root")
     arguments = parser.parse_args()
