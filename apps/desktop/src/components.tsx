@@ -1,8 +1,9 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   Activity,
   Check,
   CircleDot,
+  Copy,
   FolderKanban,
   GitBranch,
   History,
@@ -31,6 +32,16 @@ const viewLabels: Record<AppView, string> = {
   plans: t("nav.plans"),
   run: t("nav.run"),
   recovery: t("nav.recovery"),
+};
+
+const phaseLabels: Record<WorkspaceSnapshot["phase"], string> = {
+  goal_draft: "목표 작성 중",
+  goal_ready: "목표 준비됨",
+  plan_ready: "계획 비교 대기",
+  plan_active: "계획 활성화됨",
+  running: "실행 중",
+  recovery: "복구 필요",
+  completed: "검증 완료",
 };
 
 const taskLabels: Record<TaskRuntimeStatus, string> = {
@@ -79,6 +90,41 @@ export function shortDigest(value: string | null | undefined): string {
   return `${value.slice(0, 14)}…${value.slice(-7)}`;
 }
 
+export function CopyableCode({
+  value,
+  short = true,
+}: {
+  value: string | null | undefined;
+  short?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  if (!value) return <code>—</code>;
+  const display = short ? shortDigest(value) : value;
+
+  const handleCopy = () => {
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      void navigator.clipboard.writeText(value);
+    }
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  };
+
+  return (
+    <span className="copyable-code-wrap">
+      <code title={value}>{display}</code>
+      <button
+        type="button"
+        className={`copy-digest-btn ${copied ? "is-copied" : ""}`}
+        onClick={handleCopy}
+        title={copied ? "복사됨" : "전체 값 복사"}
+        aria-label={copied ? "복사됨" : `${value} 복사`}
+      >
+        {copied ? <Check size={12} /> : <Copy size={12} />}
+      </button>
+    </span>
+  );
+}
+
 export type RuntimeMode = "mock" | "http";
 
 interface HeaderProps {
@@ -111,7 +157,7 @@ export function Header({
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">V</span>
           <span>{t("app.brand")}</span>
-          <span className="prototype-label">{t("app.prototype")}</span>
+          <span className="prototype-label">{runtimeMode === "http" ? "v1.0.0 Engine" : t("app.prototype")}</span>
         </div>
       </div>
       <div className="system-strip" aria-label="제품 및 런타임 상태">
@@ -126,7 +172,7 @@ export function Header({
         <span className="status-chip status-chip--warning">Engine {productStatus}</span>
         {onRuntimeModeChange ? (
           <button
-            className="status-chip runtime-chip"
+            className={`status-chip runtime-chip ${runtimeMode === "http" ? "runtime-chip--live" : ""}`}
             type="button"
             onClick={() => onRuntimeModeChange(nextMode)}
             title="클릭하여 Mock / Local HTTP Engine 전환"
@@ -134,7 +180,9 @@ export function Header({
             <CircleDot size={14} /> {runtimeLabel}
           </button>
         ) : (
-          <span className="status-chip runtime-chip"><CircleDot size={14} /> {runtimeLabel}</span>
+          <span className={`status-chip runtime-chip ${runtimeMode === "http" ? "runtime-chip--live" : ""}`}>
+            <CircleDot size={14} /> {runtimeLabel}
+          </span>
         )}
         <button className="icon-button inspector-trigger" type="button" onClick={onOpenInspector} aria-label={t("nav.openInspector")}>
           <PanelRightOpen size={18} />
@@ -151,8 +199,9 @@ interface ProjectRailProps {
 }
 
 export function ProjectRail({ snapshot, open, onClose }: ProjectRailProps) {
+  const completedCount = snapshot.tasks.filter((task) => task.status === "completed").length;
   const progress = snapshot.tasks.length
-    ? `${snapshot.tasks.filter((task) => task.status === "completed").length}/${snapshot.tasks.length} 완료`
+    ? `${completedCount}/${snapshot.tasks.length} 완료`
     : "활성 Plan 없음";
   return (
     <aside className={`project-rail ${open ? "is-drawer-open" : ""}`} aria-label="프로젝트">
@@ -162,12 +211,31 @@ export function ProjectRail({ snapshot, open, onClose }: ProjectRailProps) {
       </div>
       <button className="project-item project-item--active" type="button" onClick={onClose} aria-current="true">
         <span className="project-glyph"><FolderKanban size={18} /></span>
-        <span><strong>{snapshot.project.name}</strong><small>{snapshot.project.runState === "recovery_required" ? "복구 필요" : progress}</small></span>
+        <span>
+          <strong>{snapshot.project.name}</strong>
+          <small>{snapshot.project.runState === "recovery_required" ? "복구 필요" : progress}</small>
+        </span>
       </button>
-      <button className="project-item" type="button" disabled>
-        <span className="project-glyph"><FolderKanban size={18} /></span>
-        <span><strong>Context Continuity</strong><small>이 데모에서는 읽기 전용</small></span>
-      </button>
+
+      <div className="rail-meta-card" aria-label="워크스페이스 상태 요약">
+        <div className="rail-meta-row">
+          <span>현재 단계</span>
+          <strong>{phaseLabels[snapshot.phase] ?? snapshot.phase}</strong>
+        </div>
+        <div className="rail-meta-row">
+          <span>경로</span>
+          <strong title={snapshot.project.location.displayPath}>{snapshot.project.location.displayPath}</strong>
+        </div>
+        <div className="rail-meta-row">
+          <span>Goal Revision</span>
+          <strong>#{snapshot.goal.revisionNo} ({statusLabels[snapshot.goal.status] ?? snapshot.goal.status})</strong>
+        </div>
+        <div className="rail-meta-row">
+          <span>원장 이벤트</span>
+          <strong>#{snapshot.historyCursor.sequence}</strong>
+        </div>
+      </div>
+
       <div className="rail-footnote">
         <LockKeyhole size={15} />
         <span>{t("app.localWriter")}</span>
@@ -178,10 +246,32 @@ export function ProjectRail({ snapshot, open, onClose }: ProjectRailProps) {
 
 interface SectionTabsProps {
   view: AppView;
+  snapshot?: WorkspaceSnapshot;
   onNavigate: (view: AppView) => void;
 }
 
-export function SectionTabs({ view, onNavigate }: SectionTabsProps) {
+export function SectionTabs({ view, snapshot, onNavigate }: SectionTabsProps) {
+  const completedTasks = snapshot ? snapshot.tasks.filter((task) => task.status === "completed").length : 0;
+  const totalTasks = snapshot ? snapshot.tasks.length : 0;
+
+  const renderBadge = (item: AppView) => {
+    if (!snapshot) return null;
+    if (item === "plans" && snapshot.plans.length > 0) {
+      return <span className="tab-pill">{snapshot.plans.length}</span>;
+    }
+    if (item === "run" && totalTasks > 0) {
+      return (
+        <span className={`tab-pill ${completedTasks === totalTasks ? "tab-pill--done" : ""}`}>
+          {completedTasks}/{totalTasks}
+        </span>
+      );
+    }
+    if (item === "recovery" && snapshot.recovery) {
+      return <span className="tab-pill tab-pill--alert" aria-label="복구 필요">!</span>;
+    }
+    return null;
+  };
+
   return (
     <nav className="section-tabs" aria-label="프로젝트 화면">
       {(Object.keys(viewLabels) as AppView[]).map((item) => (
@@ -192,7 +282,8 @@ export function SectionTabs({ view, onNavigate }: SectionTabsProps) {
           onClick={() => onNavigate(item)}
           aria-current={view === item ? "page" : undefined}
         >
-          {viewLabels[item]}
+          <span>{viewLabels[item]}</span>
+          {renderBadge(item)}
         </button>
       ))}
     </nav>
@@ -240,7 +331,14 @@ export function TaskRunway({ tasks, emptyTitle, emptyDescription }: { tasks: Tas
             <div className="task-index" aria-hidden="true">{task.status === "completed" ? <Check size={15} /> : index + 1}</div>
             <div className="task-copy">
               <strong>{task.taskRef} · {task.title}</strong>
-              <span>{task.executionSpecRevisionId ?? (task.dependencies.length ? `선행 ${task.dependencies.join(", ")}` : "dependency 없음")}</span>
+              <span>
+                {task.executionSpecRevisionId
+                  ? `Spec: ${shortDigest(task.executionSpecRevisionId)}`
+                  : task.dependencies.length
+                    ? `선행 ${task.dependencies.join(", ")}`
+                    : "dependency 없음"}
+                {task.contributesTo.length ? ` · AC: ${task.contributesTo.join(", ")}` : ""}
+              </span>
             </div>
             <StatusBadge status={task.status} />
           </div>
@@ -285,15 +383,17 @@ export function ValidationTrace({ validation }: { validation: ValidationLaneView
 }
 
 export function TaskDag({ plan }: { plan: PlanCandidateView }) {
-  const width = 680;
-  const top = 28;
-  const nodeWidth = 128;
-  const nodeHeight = 64;
-  const gap = (width - nodeWidth * plan.tasks.length) / Math.max(plan.tasks.length + 1, 2);
+  const count = Math.max(plan.tasks.length, 1);
+  const nodeWidth = 156;
+  const nodeHeight = 72;
+  const minGap = 28;
+  const width = Math.max(680, count * nodeWidth + (count + 1) * minGap);
+  const top = 24;
+  const gap = (width - nodeWidth * count) / Math.max(count + 1, 2);
   const positions = new Map(plan.tasks.map((task, index) => [task.taskRef, { x: gap + index * (nodeWidth + gap), y: top }]));
   return (
     <div className="dag-wrap">
-      <svg viewBox={`0 0 ${width} 120`} role="img" aria-labelledby={`dag-title-${plan.planRevisionId} dag-desc-${plan.planRevisionId}`}>
+      <svg viewBox={`0 0 ${width} 124`} role="img" aria-labelledby={`dag-title-${plan.planRevisionId} dag-desc-${plan.planRevisionId}`}>
         <title id={`dag-title-${plan.planRevisionId}`}>{plan.name} Task DAG</title>
         <desc id={`dag-desc-${plan.planRevisionId}`}>{plan.tasks.map((task) => `${task.taskRef} ${task.title}, dependency ${task.dependencies.join(", ") || "없음"}`).join(". ")}</desc>
         <defs>
@@ -309,11 +409,14 @@ export function TaskDag({ plan }: { plan: PlanCandidateView }) {
         }))}
         {plan.tasks.map((task) => {
           const position = positions.get(task.taskRef)!;
+          const acText = task.contributesTo.length ? task.contributesTo.join(" · ") : "AC 연결";
           return (
             <g key={task.taskRef}>
+              <title>{`${task.taskRef}: ${task.title} (${acText})`}</title>
               <rect x={position.x} y={position.y} width={nodeWidth} height={nodeHeight} rx="10" className="dag-node" />
-              <text x={position.x + 12} y={position.y + 24} className="dag-ref">{task.taskRef}</text>
-              <text x={position.x + 12} y={position.y + 46} className="dag-title">{task.title.length > 10 ? `${task.title.slice(0, 10)}…` : task.title}</text>
+              <text x={position.x + 12} y={position.y + 22} className="dag-ref">{task.taskRef}</text>
+              <text x={position.x + 12} y={position.y + 42} className="dag-title">{task.title.length > 14 ? `${task.title.slice(0, 14)}…` : task.title}</text>
+              <text x={position.x + 12} y={position.y + 60} className="dag-ac">{acText.length > 18 ? `${acText.slice(0, 18)}…` : acText}</text>
             </g>
           );
         })}
@@ -328,13 +431,15 @@ export function TaskDag({ plan }: { plan: PlanCandidateView }) {
 interface AuditPanelProps {
   snapshot: WorkspaceSnapshot;
   platform: PlatformCapabilities;
+  runtimeMode?: RuntimeMode;
   open: boolean;
   onClose: () => void;
 }
 
-export function AuditPanel({ snapshot, platform, open, onClose }: AuditPanelProps) {
+export function AuditPanel({ snapshot, platform, runtimeMode = "mock", open, onClose }: AuditPanelProps) {
   const activePlan = snapshot.plans.find((plan) => plan.planRevisionId === snapshot.activePlanRevisionId);
   const recent = snapshot.history.at(-1);
+  const isLiveHttp = runtimeMode === "http";
   return (
     <aside className={`audit-panel ${open ? "is-drawer-open" : ""}`} aria-label="상태 및 감사 정보">
       <div className="inspector-title">
@@ -343,20 +448,20 @@ export function AuditPanel({ snapshot, platform, open, onClose }: AuditPanelProp
       </div>
       <dl className="audit-list">
         <div><dt>{t("audit.api")}</dt><dd>호환됨 · v{snapshot.apiVersion}</dd></div>
-        <div><dt>{t("audit.permission")}</dt><dd className="ok-text">{t("audit.permissionValue")}</dd></div>
-        <div><dt>{t("audit.model")}</dt><dd>{t("audit.modelValue")}</dd></div>
-        <div><dt>{t("audit.history")}</dt><dd className="ok-text">{t("audit.historyValue")}</dd></div>
+        <div><dt>{t("audit.permission")}</dt><dd className="ok-text">{isLiveHttp ? "danger-full-access / never" : t("audit.permissionValue")}</dd></div>
+        <div><dt>{t("audit.model")}</dt><dd>{isLiveHttp ? "Runtime inventory 결속" : t("audit.modelValue")}</dd></div>
+        <div><dt>{t("audit.history")}</dt><dd className="ok-text">{t("audit.historyValue")} (#{snapshot.historyCursor.sequence})</dd></div>
       </dl>
       <hr />
       <div className="inspector-block">
         <span className="inspector-label"><GitBranch size={14} /> {t("audit.activeContract")}</span>
         <strong>{activePlan?.planRevisionId ?? t("audit.noActiveContract")}</strong>
-        <code title={activePlan?.activationDigest}>{shortDigest(activePlan?.activationDigest)}</code>
+        <CopyableCode value={activePlan?.activationDigest} />
       </div>
       <div className="inspector-block">
         <span className="inspector-label">Goal revision</span>
         <strong>{snapshot.goal.revisionId}</strong>
-        <code title={snapshot.goal.definitionDigest}>{shortDigest(snapshot.goal.definitionDigest)}</code>
+        <CopyableCode value={snapshot.goal.definitionDigest} />
       </div>
       <div className="inspector-block">
         <span className="inspector-label">{t("audit.actor")}</span>
@@ -366,20 +471,26 @@ export function AuditPanel({ snapshot, platform, open, onClose }: AuditPanelProp
       <div className="inspector-block">
         <span className="inspector-label">{t("audit.platform")}</span>
         <strong>{platform.shell} · {platform.os}</strong>
-        <small>runtime {platform.runtimeAvailable ? "available" : "mock only"}</small>
+        <small>runtime {isLiveHttp ? "local HTTP connected" : platform.runtimeAvailable ? "available" : "mock only"}</small>
       </div>
       <div className="inspector-block history-chain">
-        <span className="inspector-label">최근 원장 event</span>
-        {snapshot.history.slice(-3).reverse().map((event) => (
-          <div className="mini-event" key={event.sequence}>
-            <span>#{event.sequence} · {event.eventType}</span>
-            <small>{event.summary}</small>
-          </div>
-        ))}
+        <span className="inspector-label">최근 원장 event ({snapshot.history.length}건)</span>
+        <div className="history-scroll">
+          {snapshot.history.slice(-6).reverse().map((event) => (
+            <div className="mini-event" key={event.sequence}>
+              <span>#{event.sequence} · {event.eventType}</span>
+              <small>{event.summary}</small>
+            </div>
+          ))}
+        </div>
       </div>
-      <div className="prototype-notice">
-        <strong>{t("app.nonAuthority")}</strong>
-        <p>{t("app.nonAuthorityDescription")}</p>
+      <div className={`prototype-notice ${isLiveHttp ? "prototype-notice--live" : ""}`}>
+        <strong>{isLiveHttp ? "SQLite 권위 원장 연결됨" : t("app.nonAuthority")}</strong>
+        <p>
+          {isLiveHttp
+            ? "로컬 HTTP/SSE 어댑터를 통해 실제 EngineService 및 schema 4 SQLite 원장과 동기화됩니다."
+            : t("app.nonAuthorityDescription")}
+        </p>
       </div>
     </aside>
   );

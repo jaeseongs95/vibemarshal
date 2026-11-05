@@ -43,4 +43,19 @@ describe("VibeMarshal GUI prototype", () => {
     fireEvent.click(screen.getByRole("button", { name: /먼저 관측/ }));
     expect(await screen.findByRole("button", { name: /마지막 checkpoint에서 재개/ })).toBeEnabled();
   });
+
+  it("Goal 화면에서 효과 정책을 표시하고 Run 화면에서 완료까지 연속 실행을 지원한다", async () => {
+    render(<App />);
+    fireEvent.click(await screen.findByRole("button", { name: /^목표/ }));
+    expect(await screen.findByText(/변경 정책: minimal_change/)).toBeVisible();
+    expect(screen.getByText(/금지: 배포/)).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: /^계획/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "선택 Plan 활성화" }));
+    fireEvent.click(screen.getByRole("button", { name: "이 계약 활성화" }));
+
+    const runAllBtn = await screen.findByRole("button", { name: /완료까지 연속 실행/ });
+    fireEvent.click(runAllBtn);
+    await waitFor(() => expect(screen.getAllByText("충족").length).toBeGreaterThanOrEqual(1));
+  });
 });

@@ -4,6 +4,7 @@ import {
   ArrowRight,
   CheckCircle2,
   CircleDollarSign,
+  FastForward,
   FileCheck2,
   GitCompareArrows,
   Play,
@@ -13,9 +14,11 @@ import {
   Search,
   ShieldAlert,
   ShieldCheck,
+  Target,
 } from "lucide-react";
 
 import {
+  CopyableCode,
   EmptyState,
   Modal,
   PageIntro,
@@ -23,7 +26,6 @@ import {
   TaskDag,
   TaskRunway,
   ValidationTrace,
-  shortDigest,
 } from "./components";
 import type { ActivatePlanCommand, AppView, PlanCandidateView, PossibleActionKind, WorkspaceSnapshot } from "./contracts";
 import { t } from "./messages";
@@ -105,7 +107,11 @@ export function OverviewScreen({ snapshot, onNavigate, onAction }: OverviewProps
         </section>
       </div>
 
-      <div className="overview-summary-grid">
+      <div className="overview-summary-grid overview-summary-grid--four">
+        <button className="surface summary-card" type="button" onClick={() => onNavigate("goal")}>
+          <span className="summary-icon"><Target size={18} /></span>
+          <span><small>Goal 계약</small><strong>{snapshot.goal.revisionId} · AC {snapshot.goal.criteria.length}개</strong></span>
+        </button>
         <button className="surface summary-card" type="button" onClick={() => onNavigate("run")}>
           <span className="summary-icon"><FileCheck2 size={18} /></span>
           <span><small>{t("run.progress")}</small><strong>{snapshot.tasks.length ? `${completed} / ${snapshot.tasks.length}` : "Plan 미활성"}</strong></span>
@@ -116,7 +122,14 @@ export function OverviewScreen({ snapshot, onNavigate, onAction }: OverviewProps
         </button>
         <div className="surface summary-card">
           <span className="summary-icon"><CircleDollarSign size={18} /></span>
-          <span><small>{t("overview.budget")}</small><strong>{snapshot.budget.inputTokens?.toLocaleString() ?? "알 수 없음"} input</strong></span>
+          <span>
+            <small>{t("overview.budget")}</small>
+            <strong>
+              {snapshot.budget.inputTokens !== null
+                ? `${snapshot.budget.inputTokens.toLocaleString()} in / ${(snapshot.budget.outputTokens ?? 0).toLocaleString()} out`
+                : "알 수 없음"}
+            </strong>
+          </span>
         </div>
       </div>
     </>
@@ -148,6 +161,9 @@ export function GoalScreen({ snapshot, onNewRevision, onPrepare, onSearchPlans }
         <div className="contract-editor-body">
           <label className="field-label" htmlFor="goal-source">{t("goal.sourceLabel")}</label>
           <textarea id="goal-source" value={source} onChange={(event) => setSource(event.target.value)} readOnly={!isDraft} rows={5} />
+          {!isDraft ? (
+            <p className="readonly-hint">현재 활성 Goal 계약입니다. 수정하려면 &apos;새 요청으로 다시 시작&apos;을 눌러 새 초안 revision을 여세요.</p>
+          ) : null}
           <div className="button-row">
             {hasAction(snapshot, "edit_goal") ? <button className="secondary-action" type="button" onClick={onNewRevision}><RotateCcw size={16} /> {t("goal.newRevision")}</button> : null}
             {hasAction(snapshot, "prepare_goal") ? <button className="primary-action" type="button" onClick={() => onPrepare(source)} disabled={!source.trim()}>{t("goal.normalize")} <ArrowRight size={16} /></button> : null}
@@ -160,7 +176,7 @@ export function GoalScreen({ snapshot, onNewRevision, onPrepare, onSearchPlans }
         <section className="surface contract-card contract-card--wide">
           <p className="eyebrow">{t("goal.outcome")}</p>
           <h2>{snapshot.goal.observableOutcome}</h2>
-          <code title={snapshot.goal.definitionDigest}>{shortDigest(snapshot.goal.definitionDigest)}</code>
+          <CopyableCode value={snapshot.goal.definitionDigest} />
         </section>
         <section className="surface contract-card">
           <p className="eyebrow">{t("goal.review")}</p>
@@ -183,6 +199,14 @@ export function GoalScreen({ snapshot, onNewRevision, onPrepare, onSearchPlans }
           <ul className="plain-list">{snapshot.goal.constraints.map((item) => <li key={item}>{item}</li>)}</ul>
           <p className="eyebrow subsection-label">{t("goal.nonGoals")}</p>
           <ul className="plain-list">{snapshot.goal.nonGoals.map((item) => <li key={item}>{item}</li>)}</ul>
+          <p className="eyebrow subsection-label">{t("goal.effects")}</p>
+          <div className="effect-tags">
+            <span className="effect-tag">변경 정책: {snapshot.goal.effectPolicy.mutation}</span>
+            <span className="effect-tag">동작 기대: {snapshot.goal.effectPolicy.behavior}</span>
+            {snapshot.goal.effectPolicy.prohibitedEffects.map((effect) => (
+              <span key={effect} className="effect-tag effect-tag--danger">금지: {effect}</span>
+            ))}
+          </div>
         </section>
       </div>
     </>
@@ -280,7 +304,7 @@ function PlanCard({ plan, recommended, selected, active, onSelect }: { plan: Pla
         <div><dt>{t("plans.validation")}</dt><dd>{plan.validationSummary}</dd></div>
         <div><dt>{t("plans.model")}</dt><dd>{plan.modelEnvelope}</dd></div>
         <div><dt>Revision</dt><dd>{plan.planRevisionId}</dd></div>
-        <div><dt>Digest</dt><dd title={plan.activationDigest}>{shortDigest(plan.activationDigest)}</dd></div>
+        <div><dt>Digest</dt><dd><CopyableCode value={plan.activationDigest} /></dd></div>
       </dl>
       <button className={selected ? "selected-plan-button" : "secondary-action"} type="button" onClick={onSelect} aria-pressed={selected}>
         {selected ? <><CheckCircle2 size={16} /> 선택됨</> : t("plans.select")}
@@ -292,13 +316,15 @@ function PlanCard({ plan, recommended, selected, active, onSelect }: { plan: Pla
 interface RunProps {
   snapshot: WorkspaceSnapshot;
   onRunOnce: () => void;
+  onRunAll?: () => void;
   onNavigate: (view: AppView) => void;
 }
 
-export function RunScreen({ snapshot, onRunOnce, onNavigate }: RunProps) {
+export function RunScreen({ snapshot, onRunOnce, onRunAll, onNavigate }: RunProps) {
   const activePlan = snapshot.plans.find((plan) => plan.planRevisionId === snapshot.activePlanRevisionId);
   const completed = snapshot.tasks.filter((task) => task.status === "completed").length;
   const current = snapshot.tasks.find((task) => task.status !== "completed");
+  const canRunOnce = hasAction(snapshot, "run_once");
   return (
     <>
       <PageIntro eyebrow={t("run.eyebrow")} title={t("run.title")} description={t("run.description")} cursor={snapshot.historyCursor.sequence} />
@@ -314,7 +340,16 @@ export function RunScreen({ snapshot, onRunOnce, onNavigate }: RunProps) {
               <h2>{current?.title ?? (snapshot.validation.goalTest === "pending" ? "독립 Goal Test 시작" : "최종 GoalVerdict 기록")}</h2>
               <p>{activePlan.planRevisionId} · {completed}/{snapshot.tasks.length} Task 완료</p>
             </div>
-            {hasAction(snapshot, "run_once") ? <button className="primary-action" type="button" onClick={onRunOnce}>{t("run.nextStep")} <Play size={16} /></button> : <StatusBadge status={snapshot.validation.verdict} />}
+            {canRunOnce ? (
+              <div className="run-actions-group">
+                {onRunAll ? (
+                  <button className="secondary-action" type="button" onClick={onRunAll}>
+                    완료까지 연속 실행 <FastForward size={16} />
+                  </button>
+                ) : null}
+                <button className="primary-action" type="button" onClick={onRunOnce}>{t("run.nextStep")} <Play size={16} /></button>
+              </div>
+            ) : <StatusBadge status={snapshot.validation.verdict} />}
           </section>
           <div className="run-grid">
             <section className="surface">
@@ -337,6 +372,16 @@ export function RunScreen({ snapshot, onRunOnce, onNavigate }: RunProps) {
                   <div><dt>Receipt</dt><dd>{snapshot.activeAttempt.receiptId ?? "없음"}</dd></div>
                 </dl>
               ) : <p className="muted-copy">활성 Attempt가 없습니다. materialize와 dispatch는 서로 다른 run once 단계입니다.</p>}
+              <p className="eyebrow subsection-label">{t("overview.budget")}</p>
+              <div className="budget-metrics-grid">
+                <div><small>Input</small><strong>{snapshot.budget.inputTokens?.toLocaleString() ?? "null"}</strong></div>
+                <div><small>Cached</small><strong>{snapshot.budget.cachedInputTokens?.toLocaleString() ?? "null"}</strong></div>
+                <div><small>Output</small><strong>{snapshot.budget.outputTokens?.toLocaleString() ?? "null"}</strong></div>
+                <div><small>Latency</small><strong>{snapshot.budget.latencyMs !== null ? `${snapshot.budget.latencyMs}ms` : "null"}</strong></div>
+              </div>
+              {snapshot.budget.availabilityReason ? (
+                <small className="muted-copy">{snapshot.budget.availabilityReason}</small>
+              ) : null}
             </section>
             <section className="surface detail-card">
               <p className="eyebrow">{t("run.timeline")}</p>
@@ -386,8 +431,8 @@ export function RecoveryScreen({ snapshot, onRefresh, onObserve, onResume, onAba
             <h2>{recovery.title}</h2>
             <p className="recovery-explanation">{recovery.explanation}</p>
             <dl className="recovery-details">
-              <div><dt>{t("recovery.expected")}</dt><dd><code>{recovery.expectedDigest ?? "—"}</code></dd></div>
-              <div><dt>{t("recovery.current")}</dt><dd><code>{recovery.currentDigest ?? "—"}</code></dd></div>
+              <div><dt>{t("recovery.expected")}</dt><dd>{recovery.expectedDigest ? <CopyableCode value={recovery.expectedDigest} short={false} /> : <code>—</code>}</dd></div>
+              <div><dt>{t("recovery.current")}</dt><dd>{recovery.currentDigest ? <CopyableCode value={recovery.currentDigest} short={false} /> : <code>—</code>}</dd></div>
               <div><dt>{t("recovery.intent")}</dt><dd>{recovery.intentId ?? "provider 호출 전"}</dd></div>
               <div><dt>{t("recovery.receipt")}</dt><dd>{receiptLabel}</dd></div>
               <div><dt>{t("recovery.checkpoint")}</dt><dd>{recovery.lastCheckpoint}</dd></div>

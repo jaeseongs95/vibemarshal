@@ -97,6 +97,19 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
   }, [engine]);
 
   useEffect(() => {
+    const handleShortcut = (event: KeyboardEvent) => {
+      if (!event.altKey || event.ctrlKey || event.metaKey) return;
+      const index = Number(event.key) - 1;
+      if (index >= 0 && index < validViews.length) {
+        event.preventDefault();
+        navigate(validViews[index]);
+      }
+    };
+    window.addEventListener("keydown", handleShortcut);
+    return () => window.removeEventListener("keydown", handleShortcut);
+  }, [navigate]);
+
+  useEffect(() => {
     if (!snapshot?.plans.length) {
       setSelectedPlanId(null);
       return;
@@ -124,6 +137,25 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
       setBusy(false);
     }
   }, [busy, handleResult]);
+
+  const runUntilSettled = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      for (let step = 0; step < 24; step += 1) {
+        const result = await engine.runOnce(contextFactoryRef.current());
+        if (!handleResult(result)) break;
+        const canContinue = result.data.possibleActions.some(
+          (action) => action.kind === "run_once" && action.enabled,
+        );
+        if (!canContinue || result.data.phase === "completed" || result.data.recovery) {
+          break;
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, engine, handleResult]);
 
   useEffect(() => {
     let unregister: () => void = () => undefined;
@@ -213,7 +245,7 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
       <div className="workspace">
         <ProjectRail snapshot={snapshot} open={projectsOpen} onClose={() => setProjectsOpen(false)} />
         <main className="main-workspace" aria-busy={busy}>
-          <SectionTabs view={view} onNavigate={navigate} />
+          <SectionTabs view={view} snapshot={snapshot} onNavigate={navigate} />
           {commandError ? (
             <div className="command-error" role="alert">
               <AlertCircle size={18} />
@@ -231,7 +263,14 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
             />
           ) : null}
           {view === "plans" ? <PlansScreen snapshot={snapshot} selectedPlanId={selectedPlanId} onSelect={setSelectedPlanId} onActivate={activatePlan} onNavigate={navigate} /> : null}
-          {view === "run" ? <RunScreen snapshot={snapshot} onRunOnce={() => void perform(() => engine.runOnce(contextFactoryRef.current()))} onNavigate={navigate} /> : null}
+          {view === "run" ? (
+            <RunScreen
+              snapshot={snapshot}
+              onRunOnce={() => void perform(() => engine.runOnce(contextFactoryRef.current()))}
+              onRunAll={() => void runUntilSettled()}
+              onNavigate={navigate}
+            />
+          ) : null}
           {view === "recovery" ? (
             <RecoveryScreen
               snapshot={snapshot}
@@ -243,7 +282,13 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
             />
           ) : null}
         </main>
-        <AuditPanel snapshot={snapshot} platform={platformRef.current.getCapabilities()} open={inspectorOpen} onClose={() => setInspectorOpen(false)} />
+        <AuditPanel
+          snapshot={snapshot}
+          platform={platformRef.current.getCapabilities()}
+          runtimeMode={runtimeMode}
+          open={inspectorOpen}
+          onClose={() => setInspectorOpen(false)}
+        />
       </div>
       {(projectsOpen || inspectorOpen) ? <button className="drawer-scrim" type="button" aria-label="열린 패널 닫기" onClick={() => { setProjectsOpen(false); setInspectorOpen(false); }} /> : null}
     </div>
