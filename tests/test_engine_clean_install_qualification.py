@@ -57,7 +57,7 @@ from flowmarshal.engine.qualification_manifest import (
 ROOT = Path(__file__).resolve().parents[1]
 BINDING_DIGEST = "sha256:" + "b" * 64
 DISTRIBUTION_NAME = "flowmarshal-engine"
-DISTRIBUTION_VERSION = "1.0.0"
+DISTRIBUTION_VERSION = "1.0.1"
 
 
 def _write_bundle(destination: Path) -> str:

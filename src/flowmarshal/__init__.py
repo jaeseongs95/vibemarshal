@@ -7,4 +7,4 @@ import가 그 경계를 자동으로 섞지 않는다.
 
 __all__: list[str] = []
 
-__version__ = "1.0.0"
+__version__ = "1.0.1"

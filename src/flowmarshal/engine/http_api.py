@@ -1568,7 +1568,7 @@ def create_http_handler(backend: LocalGuiEngineBackend) -> type[BaseHTTPRequestH
                     {
                         "api_version": "1",
                         "engine_package": "flowmarshal-engine",
-                        "engine_version": "1.0.0",
+                        "engine_version": "1.0.1",
                         "engine_schema_version": 4,
                         "sqlite_application_id": "FME1",
                         "minimum_ui_api_version": "1",
