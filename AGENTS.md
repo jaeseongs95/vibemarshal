@@ -216,3 +216,4 @@ VibeMarshal은 큰 요청을 검증 가능한 Goal Contract와 Task DAG로 정�
 - commit 전 관련 테스트·결정적 Gate·`git diff --check`를 실행하고 실제로 통과하지 않은 qualification을 PASS 또는 1.0 완료로 기록하지 않는다.
 - 비밀·인증정보, 로컬 Engine DB, cache, 임시 디렉터리와 미완료 evaluation cell을 commit하지 않는다.
 - R1~R3.1 동결 source·artifact와 prototype Planner 스킬은 수정하지 않으며 freeze manifest를 확인한다.
+- 패키지·런타임·Desktop·릴리스 태그의 버전 관리는 SemVer 2.0.0(`MAJOR.MINOR.PATCH`)을 따른다: 하위 호환성이 깨지는 공개 계약·schema·CLI·API 변경은 `MAJOR`, 하위 호환성을 유지하는 기능 추가(`feat`)는 `MINOR`, 하위 호환성을 유지하는 결함·버그 수정(`fix`)은 `PATCH`를 올린다.
