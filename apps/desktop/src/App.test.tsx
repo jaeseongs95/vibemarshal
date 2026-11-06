@@ -1,7 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
+import { HttpEngineClient } from "./http-engine-client";
+import { MockEngineClient } from "./mock-engine-client";
 
 describe("VibeMarshal GUI prototype", () => {
   it("비권위 상태와 Core가 제안한 다음 행동을 표시한다", async () => {
@@ -57,5 +59,48 @@ describe("VibeMarshal GUI prototype", () => {
     const runAllBtn = await screen.findByRole("button", { name: /완료까지 연속 실행/ });
     fireEvent.click(runAllBtn);
     await waitFor(() => expect(screen.getAllByText("충족").length).toBeGreaterThanOrEqual(1));
+  });
+
+  it("HttpEngineClient가 /api/v1/health의 session_token을 조회해 POST X-FlowMarshal-Token 헤더로 전송한다", async () => {
+    const mock = new MockEngineClient("golden-path");
+    const snapshot = await mock.getSnapshot();
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/health")) {
+        return new Response(JSON.stringify({ session_token: "tok_test_session_123" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url.endsWith("/api/v1/run-once")) {
+        const headers = (init?.headers ?? {}) as Record<string, string>;
+        expect(headers["X-FlowMarshal-Token"]).toBe("tok_test_session_123");
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            status: "applied",
+            commandId: "cmd_1",
+            message: "ok",
+            historyCursor: snapshot.historyCursor,
+            data: snapshot,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+
+    const client = new HttpEngineClient({
+      baseUrl: "http://127.0.0.1:8765",
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+    const res = await client.runOnce({
+      actorRef: "local:test-user",
+      clientInstanceId: "vitest:http-client",
+      requestId: "req_1",
+      idempotencyKey: "idem_1",
+    });
+    expect(res.ok).toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });

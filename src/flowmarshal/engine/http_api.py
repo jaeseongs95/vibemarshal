@@ -5,7 +5,9 @@ EngineApplication의 권위 상태와 명령을 호출한다.
 """
 from __future__ import annotations
 
+import hmac
 import json
+import secrets
 import sys
 import threading
 from datetime import datetime, timezone
@@ -1494,7 +1496,13 @@ def _is_loopback_origin(origin: str) -> bool:
     }
 
 
-def create_http_handler(backend: LocalGuiEngineBackend) -> type[BaseHTTPRequestHandler]:
+def create_http_handler(
+    backend: LocalGuiEngineBackend,
+    *,
+    session_token: str | None = None,
+) -> type[BaseHTTPRequestHandler]:
+    active_token = session_token or secrets.token_urlsafe(32)
+
     class GuiApiHandler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
 
@@ -1522,6 +1530,22 @@ def create_http_handler(backend: LocalGuiEngineBackend) -> type[BaseHTTPRequestH
             self.wfile.write(body)
             return False
 
+        def _check_session_token(self) -> bool:
+            provided = (self.headers.get("X-FlowMarshal-Token") or "").strip()
+            if provided and hmac.compare_digest(provided, active_token):
+                return True
+            self._send_json(
+                HTTPStatus.FORBIDDEN,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "SESSION_TOKEN_REQUIRED",
+                        "message": "로컬 GUI POST 변이 요청에는 유효한 X-FlowMarshal-Token 세션 토큰 헤더가 필요합니다.",
+                    },
+                },
+            )
+            return False
+
         def _send_cors_headers(self) -> None:
             origin = self.headers.get("Origin")
             allowed_origin = origin if (origin and _is_loopback_origin(origin)) else "http://127.0.0.1"
@@ -1530,7 +1554,7 @@ def create_http_handler(backend: LocalGuiEngineBackend) -> type[BaseHTTPRequestH
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             self.send_header(
                 "Access-Control-Allow-Headers",
-                "Content-Type, Authorization, Idempotency-Key, X-Request-Id",
+                "Content-Type, Authorization, Idempotency-Key, X-Request-Id, X-FlowMarshal-Token",
             )
 
         def _send_json(self, status: int, payload: Any) -> None:
@@ -1575,6 +1599,7 @@ def create_http_handler(backend: LocalGuiEngineBackend) -> type[BaseHTTPRequestH
                         "product_status": "NO-GO",
                         "project_id": backend.project_id,
                         "history_cursor": snap["historyCursor"],
+                        "session_token": active_token,
                     },
                 )
                 return
@@ -1605,6 +1630,8 @@ def create_http_handler(backend: LocalGuiEngineBackend) -> type[BaseHTTPRequestH
 
         def do_POST(self) -> None:
             if not self._check_origin():
+                return
+            if not self._check_session_token():
                 return
             parsed = urlparse(self.path)
             body = self._read_json()
@@ -1654,13 +1681,18 @@ class LocalGuiServer:
         *,
         host: str = "127.0.0.1",
         port: int = 0,
+        session_token: str | None = None,
     ) -> None:
         if host not in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError(
                 "LOCAL_LOOPBACK_ONLY: GUI HTTP 서버는 로컬 루프백 주소(127.0.0.1, localhost, ::1)에만 바인딩할 수 있습니다."
             )
         self.backend = backend
-        self.httpd = ThreadingHTTPServer((host, port), create_http_handler(backend))
+        self.session_token = session_token or secrets.token_urlsafe(32)
+        self.httpd = ThreadingHTTPServer(
+            (host, port),
+            create_http_handler(backend, session_token=self.session_token),
+        )
         self.host = str(self.httpd.server_address[0])
         self.port = int(self.httpd.server_address[1])
         self._thread: threading.Thread | None = None

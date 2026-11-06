@@ -9,6 +9,7 @@ import type {
 
 export interface HttpEngineClientOptions {
   baseUrl?: string;
+  sessionToken?: string;
   fetchImpl?: typeof fetch;
   eventSourceFactory?: (url: string) => EventSource;
 }
@@ -17,6 +18,8 @@ export class HttpEngineClient implements EngineClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
   private readonly eventSourceFactory?: (url: string) => EventSource;
+  private sessionToken: string | null;
+  private tokenPromise: Promise<string | null> | null = null;
   private readonly listeners = new Set<(snapshot: WorkspaceSnapshot) => void>();
   private latestSnapshot: WorkspaceSnapshot | null = null;
   private eventSource: EventSource | null = null;
@@ -28,6 +31,7 @@ export class HttpEngineClient implements EngineClient {
         ? (import.meta as { env: Record<string, string> }).env.VITE_ENGINE_API_URL
         : "";
     this.baseUrl = (options.baseUrl ?? envBase).replace(/\/+$/, "");
+    this.sessionToken = options.sessionToken ?? null;
     this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
     this.eventSourceFactory =
       options.eventSourceFactory ??
@@ -46,11 +50,51 @@ export class HttpEngineClient implements EngineClient {
     return snapshot;
   }
 
+  private async ensureSessionToken(): Promise<string | null> {
+    if (this.sessionToken) {
+      return this.sessionToken;
+    }
+    if (!this.tokenPromise) {
+      this.tokenPromise = (async () => {
+        try {
+          const response = await this.fetchImpl(this.url("/api/v1/health"), {
+            method: "GET",
+            headers: { "Content-Type": "application/json" },
+          });
+          if (response.ok) {
+            const payload = (await response.json()) as { session_token?: string };
+            if (typeof payload.session_token === "string" && payload.session_token.length > 0) {
+              this.sessionToken = payload.session_token;
+              return this.sessionToken;
+            }
+          }
+        } catch {
+          // Ignore and let subsequent POST surface the HTTP error if unreachable
+        }
+        return null;
+      })();
+    }
+    const token = await this.tokenPromise;
+    if (!token) {
+      this.tokenPromise = null;
+    }
+    return token;
+  }
+
   private async requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+    const method = (init?.method ?? "GET").toUpperCase();
+    const tokenHeaders: Record<string, string> = {};
+    if (method === "POST") {
+      const token = await this.ensureSessionToken();
+      if (token) {
+        tokenHeaders["X-FlowMarshal-Token"] = token;
+      }
+    }
     const response = await this.fetchImpl(this.url(path), {
       ...init,
       headers: {
         "Content-Type": "application/json",
+        ...tokenHeaders,
         ...(init?.headers ?? {}),
       },
     });

@@ -158,6 +158,48 @@ class EnginePackagingContractTests(unittest.TestCase):
                 entry_points.replace("\r\n", "\n"),
             )
 
+            import sysconfig
+
+            venv_root = out_dir / "clean-smoke-venv"
+            venv_res = subprocess.run(
+                [sys.executable, "-m", "venv", "--clear", str(venv_root)],
+                cwd=temp,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=120,
+            )
+            self.assertEqual(0, venv_res.returncode, venv_res.stdout + venv_res.stderr)
+            scripts_dir = venv_root / ("Scripts" if os.name == "nt" else "bin")
+            venv_python = scripts_dir / ("python.exe" if os.name == "nt" else "python")
+            install_res = subprocess.run(
+                [str(venv_python), "-m", "pip", "install", "--no-deps", "--force-reinstall", str(wheels[0])],
+                cwd=temp,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=120,
+            )
+            self.assertEqual(0, install_res.returncode, install_res.stdout + install_res.stderr)
+            cli_exe = scripts_dir / ("flowmarshal-engine.exe" if os.name == "nt" else "flowmarshal-engine")
+            self.assertTrue(cli_exe.is_file(), f"Missing console entrypoint: {cli_exe}")
+            smoke_env = dict(os.environ)
+            smoke_env["PYTHONPATH"] = sysconfig.get_paths()["purelib"]
+            help_res = subprocess.run(
+                [str(cli_exe), "--help"],
+                cwd=temp,
+                env=smoke_env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=60,
+            )
+            self.assertEqual(0, help_res.returncode, help_res.stdout + help_res.stderr)
+            self.assertIn("flowmarshal", help_res.stdout.casefold())
+
     def test_shipped_engine_modules_do_not_import_developer_only_code(self) -> None:
         """import graph 범위 검사(FM-10-C1)를 source AST로 직접 재현한다.
 

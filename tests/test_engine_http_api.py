@@ -34,12 +34,17 @@ class EngineHttpApiTests(unittest.TestCase):
         with urllib.request.urlopen(f"{self.base_url}{path}", timeout=5) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
-    def _post(self, path: str, payload: dict | None = None) -> dict:
+    def _post(self, path: str, payload: dict | None = None, *, token: str | None = "default") -> dict:
         data = json.dumps(payload or {}, ensure_ascii=False).encode("utf-8")
+        headers = {"Content-Type": "application/json"}
+        if token == "default":
+            headers["X-FlowMarshal-Token"] = self.server.session_token
+        elif token is not None:
+            headers["X-FlowMarshal-Token"] = token
         req = urllib.request.Request(
             f"{self.base_url}{path}",
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers=headers,
             method="POST",
         )
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -252,6 +257,24 @@ class EngineHttpApiTests(unittest.TestCase):
 
         with self.assertRaises(ValueError):
             LocalGuiServer(self.backend, host="0.0.0.0", port=0)
+
+    def test_post_mutation_requires_valid_session_token(self) -> None:
+        import urllib.error
+
+        health = self._get("/api/v1/health")
+        self.assertEqual(health["session_token"], self.server.session_token)
+
+        with self.assertRaises(urllib.error.HTTPError) as missing_ctx:
+            self._post("/api/v1/run-once", {}, token=None)
+        self.assertEqual(missing_ctx.exception.code, 403)
+        missing_err = json.loads(missing_ctx.exception.read().decode("utf-8"))
+        self.assertEqual(missing_err["error"]["code"], "SESSION_TOKEN_REQUIRED")
+
+        with self.assertRaises(urllib.error.HTTPError) as invalid_ctx:
+            self._post("/api/v1/run-once", {}, token="invalid-token")
+        self.assertEqual(invalid_ctx.exception.code, 403)
+        invalid_err = json.loads(invalid_ctx.exception.read().decode("utf-8"))
+        self.assertEqual(invalid_err["error"]["code"], "SESSION_TOKEN_REQUIRED")
 
 
 if __name__ == "__main__":
