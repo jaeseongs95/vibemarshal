@@ -171,7 +171,7 @@ def _deterministic_freeze_dependencies(plan: rf.ShardIsolationPlan, roles):
     parser_surface = {"options": [], "subcommands": {}}
     package_identity = rf.PackageIdentityFreeze(
         distribution_name="flowmarshal-engine",
-        distribution_version="1.0.1",
+        distribution_version="1.1.0",
         console_entrypoint="flowmarshal-engine = flowmarshal.engine.console_host:main",
         parser_surface=parser_surface,
         parser_surface_digest=sha256_digest(parser_surface),
@@ -199,7 +199,7 @@ def _deterministic_freeze_dependencies(plan: rf.ShardIsolationPlan, roles):
                     b"wheel",
                     {"flowmarshal/__init__.py": sha256_digest({"wheel": True})},
                     "flowmarshal-engine",
-                    "1.0.1",
+                    "1.1.0",
                     "[console_scripts]\nflowmarshal-engine = flowmarshal.engine.console_host:main\n",
                     "py3-none-any",
                 ),

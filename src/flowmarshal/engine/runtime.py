@@ -448,7 +448,7 @@ class CodexAppServerRuntime:
                 codex_bin=None if codex_bin is None else str(resolved),
                 client_name="flowmarshal_engine",
                 client_title="VibeMarshal Engine",
-                client_version="1.0.1",
+                client_version="1.1.0",
                 experimental_api=True,
             )
         )

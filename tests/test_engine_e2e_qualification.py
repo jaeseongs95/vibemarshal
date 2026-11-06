@@ -444,7 +444,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
                 candidate_wheel_digest=digest,
                 candidate_wheel_binding_digest=digest,
                 candidate_distribution_name="flowmarshal-engine",
-                candidate_distribution_version="1.0.1",
+                candidate_distribution_version="1.1.0",
             )
 
             self.assertEqual(
@@ -638,7 +638,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
             digests = {"flowmarshal/__init__.py": sha256_bytes(b"package")}
             binding = CandidateWheelBinding(
                 wheel_path=str(wheel), wheel_digest=sha256_bytes(b"candidate"),
-                distribution_name="flowmarshal-engine", distribution_version="1.0.1",
+                distribution_name="flowmarshal-engine", distribution_version="1.1.0",
                 distribution_root=str(import_root.parent), import_root=str(import_root),
                 package_file_digests=digests, wheel_package_digest=sha256_digest(digests),
                 installed_package_digest=sha256_digest(digests),
@@ -1337,7 +1337,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
                 candidate_wheel_digest=digest,
                 candidate_wheel_binding_digest=digest,
                 candidate_distribution_name="flowmarshal-engine",
-                candidate_distribution_version="1.0.1",
+                candidate_distribution_version="1.1.0",
             )
             self.assertEqual(("E2E-16",), outcome.responsibility_ids)
             self.assertEqual((EvidenceProvenance.LIVE,), outcome.provenance)
@@ -1426,7 +1426,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
                 candidate_wheel_digest=digest,
                 candidate_wheel_binding_digest=digest,
                 candidate_distribution_name="flowmarshal-engine",
-                candidate_distribution_version="1.0.1",
+                candidate_distribution_version="1.1.0",
             )
             self.assertEqual(("E2E-09",), outcome.responsibility_ids)
             self.assertEqual(
@@ -1515,7 +1515,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
                 candidate_wheel_digest=digest,
                 candidate_wheel_binding_digest=digest,
                 candidate_distribution_name="flowmarshal-engine",
-                candidate_distribution_version="1.0.1",
+                candidate_distribution_version="1.1.0",
             )
             self.assertEqual(("E2E-10",), outcome.responsibility_ids)
             self.assertEqual(
@@ -1586,7 +1586,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
                 candidate_wheel_digest=digest,
                 candidate_wheel_binding_digest=digest,
                 candidate_distribution_name="flowmarshal-engine",
-                candidate_distribution_version="1.0.1",
+                candidate_distribution_version="1.1.0",
             )
             self.assertEqual(("E2E-13",), outcome.responsibility_ids)
             self.assertEqual(
@@ -2173,7 +2173,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
                         candidate_wheel_digest=digest,
                         candidate_wheel_binding_digest=digest,
                         candidate_distribution_name="flowmarshal-engine",
-                        candidate_distribution_version="1.0.1",
+                        candidate_distribution_version="1.1.0",
                     )
                     self.assertEqual((requirement.responsibility_id,), outcome.responsibility_ids)
                     self.assertEqual(expected, _ordered_contains(outcome.pipeline_stages, required))
@@ -2255,7 +2255,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
             candidate_wheel_digest=digest,
             candidate_wheel_binding_digest=digest,
             candidate_distribution_name="flowmarshal-engine",
-            candidate_distribution_version="1.0.1",
+            candidate_distribution_version="1.1.0",
         )
 
     def test_prohibited_effect_fault_candidate_is_blocked_before_execution(self) -> None:
@@ -2394,7 +2394,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
                 expected_candidate_wheel_digest=digest,
                 expected_candidate_wheel_binding_digest=digest,
                 expected_candidate_distribution_name="flowmarshal-engine",
-                expected_candidate_distribution_version="1.0.1",
+                expected_candidate_distribution_version="1.1.0",
             )
 
         self.assertEqual((), report.failures)
@@ -2701,7 +2701,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
                 candidate_wheel_digest=digest,
                 candidate_wheel_binding_digest=digest,
                 candidate_distribution_name="flowmarshal-engine",
-                candidate_distribution_version="1.0.1",
+                candidate_distribution_version="1.1.0",
             )
             # 결정적 PASS cell은 live 출처를 주장하지 않아 E2E-15 책임 PASS가 될 수 없다.
             self.assertEqual((EvidenceProvenance.FAKE,), outcome.provenance)
@@ -2833,7 +2833,7 @@ class EngineE2EQualificationTests(unittest.TestCase):
                     candidate_wheel_digest=digest,
                     candidate_wheel_binding_digest=digest,
                     candidate_distribution_name="flowmarshal-engine",
-                    candidate_distribution_version="1.0.1",
+                    candidate_distribution_version="1.1.0",
                 )
                 requirement = requirements[responsibility_id]
                 # 동결 suite가 허용·요구하는 출처 안에서만 주장한다.

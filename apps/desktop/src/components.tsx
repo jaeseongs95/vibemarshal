@@ -157,7 +157,7 @@ export function Header({
         <div className="brand">
           <span className="brand-mark" aria-hidden="true">V</span>
           <span>{t("app.brand")}</span>
-          <span className="prototype-label">{runtimeMode === "http" ? "v1.0.1 Engine" : t("app.prototype")}</span>
+          <span className="prototype-label">{runtimeMode === "http" ? "v1.1.0 Engine" : t("app.prototype")}</span>
         </div>
       </div>
       <div className="system-strip" aria-label="제품 및 런타임 상태">

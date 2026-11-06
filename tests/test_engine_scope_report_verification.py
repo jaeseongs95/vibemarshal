@@ -158,7 +158,7 @@ class ScopeReportVerificationTests(unittest.TestCase):
                 wheel_path=str(wheel_path.resolve()),
                 wheel_digest=sha256_bytes(wheel_path.read_bytes()),
                 distribution_name="flowmarshal-engine",
-                distribution_version="1.0.1",
+                distribution_version="1.1.0",
                 distribution_root=str(distribution_root.resolve()),
                 import_root=str(import_root.resolve()),
                 package_file_digests=package_digests,
