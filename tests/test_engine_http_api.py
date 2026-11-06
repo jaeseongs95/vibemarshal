@@ -276,6 +276,65 @@ class EngineHttpApiTests(unittest.TestCase):
         invalid_err = json.loads(invalid_ctx.exception.read().decode("utf-8"))
         self.assertEqual(invalid_err["error"]["code"], "SESSION_TOKEN_REQUIRED")
 
+    def test_json_body_validation_and_recovery_ledger_persistence(self) -> None:
+        import urllib.error
+
+        # 1. Invalid JSON body returns HTTP 400
+        bad_req = urllib.request.Request(
+            f"{self.base_url}/api/v1/run-once",
+            data=b"{invalid json",
+            headers={
+                "Content-Type": "application/json",
+                "X-FlowMarshal-Token": self.server.session_token,
+            },
+            method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as bad_ctx:
+            urllib.request.urlopen(bad_req, timeout=5)
+        self.assertEqual(bad_ctx.exception.code, 400)
+        bad_err = json.loads(bad_ctx.exception.read().decode("utf-8"))
+        self.assertEqual(bad_err["error"]["code"], "INVALID_JSON_BODY")
+
+        # 2. Oversized Content-Length returns HTTP 413
+        huge_req = urllib.request.Request(
+            f"{self.base_url}/api/v1/run-once",
+            data=b"{}",
+            headers={
+                "Content-Type": "application/json",
+                "Content-Length": str(1_048_576 + 10),
+                "X-FlowMarshal-Token": self.server.session_token,
+            },
+            method="POST",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as huge_ctx:
+            urllib.request.urlopen(huge_req, timeout=5)
+        self.assertEqual(huge_ctx.exception.code, 413)
+        huge_err = json.loads(huge_ctx.exception.read().decode("utf-8"))
+        self.assertEqual(huge_err["error"]["code"], "PAYLOAD_TOO_LARGE")
+
+        # 3. SSE emits event: snapshot and engineSchemaVersion == 4
+        with urllib.request.urlopen(f"{self.base_url}/api/v1/events", timeout=5) as resp:
+            sse_text = resp.read().decode("utf-8")
+        self.assertIn("event: snapshot", sse_text)
+
+        snap = self._get("/api/v1/snapshot")
+        self.assertEqual(snap["engineSchemaVersion"], 4)
+
+        # 4. External-unknown recovery actions persist to SQLite history_events
+        ext_snap = self._post("/api/v1/scenario", {"scenario": "external-unknown"})
+        self.assertEqual(ext_snap["phase"], "recovery")
+        abandoned = self._post("/api/v1/intents/abandon", {"rationale": "외부에서 이미 처리됨 확인"})
+        self.assertTrue(abandoned["ok"])
+        self.assertEqual(abandoned["data"]["phase"], "goal_draft")
+        with self.backend.service.ledger.read() as conn:
+            rows = conn.execute(
+                "SELECT event_type FROM history_events WHERE project_id = ?",
+                (self.backend.project_id,),
+            ).fetchall()
+        history_kinds = [row["event_type"] for row in rows]
+        self.assertIn("recovery.external_unknown_detected", history_kinds)
+        self.assertIn("recovery.intent_abandoned", history_kinds)
+
 
 if __name__ == "__main__":
     unittest.main()

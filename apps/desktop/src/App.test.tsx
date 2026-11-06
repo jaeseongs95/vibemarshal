@@ -103,4 +103,65 @@ describe("VibeMarshal GUI prototype", () => {
     expect(res.ok).toBe(true);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it("HttpEngineClient가 403 SESSION_TOKEN_REQUIRED 응답 시 토큰을 재발급받아 1회 재시도한다", async () => {
+    const mock = new MockEngineClient("golden-path");
+    const snapshot = await mock.getSnapshot();
+    let healthCount = 0;
+    let runOnceCount = 0;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/api/v1/health")) {
+        healthCount += 1;
+        return new Response(
+          JSON.stringify({ session_token: healthCount === 1 ? "tok_stale" : "tok_fresh" }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      if (url.endsWith("/api/v1/run-once")) {
+        runOnceCount += 1;
+        const headers = (init?.headers ?? {}) as Record<string, string>;
+        if (runOnceCount === 1) {
+          expect(headers["X-FlowMarshal-Token"]).toBe("tok_stale");
+          return new Response(
+            JSON.stringify({
+              ok: false,
+              status: "rejected",
+              commandId: "cmd_stale",
+              message: "expired",
+              error: { code: "SESSION_TOKEN_REQUIRED", message: "expired", recoverable: true },
+            }),
+            { status: 403, headers: { "Content-Type": "application/json" } },
+          );
+        }
+        expect(headers["X-FlowMarshal-Token"]).toBe("tok_fresh");
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            status: "applied",
+            commandId: "cmd_fresh",
+            message: "ok",
+            historyCursor: snapshot.historyCursor,
+            data: snapshot,
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      throw new Error(`Unexpected URL: ${url}`);
+    });
+
+    const client = new HttpEngineClient({
+      baseUrl: "http://127.0.0.1:8765",
+      fetchImpl: fetchMock as unknown as typeof fetch,
+    });
+    const res = await client.runOnce({
+      actorRef: "local:test-user",
+      clientInstanceId: "vitest:http-client",
+      requestId: "req_retry",
+      idempotencyKey: "idem_retry",
+    });
+    expect(res.ok).toBe(true);
+    expect(healthCount).toBe(2);
+    expect(runOnceCount).toBe(2);
+  });
 });

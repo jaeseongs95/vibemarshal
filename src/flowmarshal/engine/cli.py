@@ -788,7 +788,19 @@ def _cmd_plan_compare(arguments: argparse.Namespace) -> None:
             "WHERE p.project_id = ? ORDER BY p.created_at, p.rowid",
             (arguments.project_id,),
         ).fetchall()
-    _emit([dict(row) | {"decision": json.loads(row["decision_json"])} for row in rows])
+    _emit(
+        [
+            dict(row)
+            | {
+                "decision": (
+                    json.loads(row["decision_json"])
+                    if row["decision_json"] is not None
+                    else None
+                )
+            }
+            for row in rows
+        ]
+    )
 
 
 def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
@@ -805,8 +817,30 @@ def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
 
 def _cmd_goal_authorize(arguments: argparse.Namespace) -> None:
     policy = _goal_authorization_policy(arguments)
+    confirm_digest = getattr(arguments, "confirm_digest", None)
+    app = _application(arguments)
+    if confirm_digest is not None:
+        from .application import ApplicationAuthority
+
+        authority = ApplicationAuthority(app)
+        target = authority.authorization_target(
+            arguments.project_id,
+            operating_policy=policy,
+        )
+        if confirm_digest.strip() != target.target_digest:
+            raise EngineServiceError(
+                "AUTHORIZATION_DECLINED: target_digest가 일치하지 않아 승인하지 않았습니다."
+            )
+        _emit(
+            authority.authorize(
+                arguments.project_id,
+                target=target,
+                source=arguments.source,
+            )
+        )
+        return
     _emit(
-        _application(arguments).authorize(
+        app.authorize(
             arguments.project_id,
             source=arguments.source,
             operating_policy=policy,
@@ -959,6 +993,19 @@ def _spawn_run_once_owner(argv: tuple[str, ...]) -> RunOnceResult:
         if process.poll() is not None:
             break
         time.sleep(0.01)
+    if result_path.exists():
+        payload = json.loads(result_path.read_text(encoding="utf-8"))
+        result_path.unlink(missing_ok=True)
+        if "owner_error" in payload:
+            raise EngineServiceError(payload["owner_error"])
+        return RunOnceResult.model_validate(payload)
+    if process.poll() is None:
+        try:
+            process.kill()
+            process.wait(timeout=2.0)
+        except Exception:
+            pass
+    result_path.unlink(missing_ok=True)
     raise EngineServiceError(
         "RUNTIME_OWNER_START_FAILED: background owner가 초기 tick 결과를 게시하지 못했습니다. "
         f"result_path={result_path}"
@@ -973,14 +1020,16 @@ def _publish_owner_result(path: Path, payload: dict[str, Any]) -> None:
 
 def _run_once_owned(arguments: argparse.Namespace, result_path: Path) -> None:
     published = False
-    proposal = (
-        None
-        if arguments.proposal_file is None
-        else ExecutionSpecProposal.model_validate(_json(arguments.proposal_file))
-    )
-    runtime = _runtime(arguments)
-    application = _application(arguments, runtime=runtime)
+    runtime: CodexRuntimePort | None = None
+    application: EngineApplication | None = None
     try:
+        proposal = (
+            None
+            if arguments.proposal_file is None
+            else ExecutionSpecProposal.model_validate(_json(arguments.proposal_file))
+        )
+        runtime = _runtime(arguments)
+        application = _application(arguments, runtime=runtime)
         outcome = application.run_once(
             arguments.project_id,
             proposal=proposal,
@@ -1037,10 +1086,13 @@ def _run_once_owned(arguments: argparse.Namespace, result_path: Path) -> None:
             )
         raise
     finally:
-        application.close_task_gate()
-        if application.supervisor is not None:
-            application.supervisor.close()
-        else:
+        if application is not None:
+            application.close_task_gate()
+            if application.supervisor is not None:
+                application.supervisor.close()
+            elif runtime is not None:
+                runtime.close()
+        elif runtime is not None:
             runtime.close()
 
 
@@ -1434,6 +1486,10 @@ def build_parser() -> argparse.ArgumentParser:
     authorize_facade.add_argument("--project-id", required=True)
     authorize_facade.add_argument("--source", default="cli-user")
     authorize_facade.add_argument("--policy-file")
+    authorize_facade.add_argument(
+        "--confirm-digest",
+        help="승인할 GoalAuthorizationTarget의 전체 target_digest (직접 CLI 호출 시 검증)",
+    )
     authorize_facade.set_defaults(
         handler=_cmd_goal_authorize,
         trusted_action="goal.authorize",
@@ -1574,6 +1630,10 @@ def build_parser() -> argparse.ArgumentParser:
     authorize.add_argument("--project-id", required=True)
     authorize.add_argument("--source", default="cli-user")
     authorize.add_argument("--policy-file")
+    authorize.add_argument(
+        "--confirm-digest",
+        help="승인할 GoalAuthorizationTarget의 전체 target_digest (직접 CLI 호출 시 검증)",
+    )
     authorize.set_defaults(
         handler=_cmd_goal_authorize,
         trusted_action="goal.authorize",

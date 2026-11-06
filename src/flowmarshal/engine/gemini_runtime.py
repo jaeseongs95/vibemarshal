@@ -300,6 +300,7 @@ class _GeminiThread:
     control_responses: dict[str, dict[str, Any]] = field(default_factory=dict)
     control_waiters: dict[str, threading.Event] = field(default_factory=dict)
     reader: threading.Thread | None = None
+    stderr_reader: threading.Thread | None = None
     exit_code: int | None = None
 
 
@@ -576,10 +577,12 @@ class GeminiRuntime:
         )
         thread.reader = reader
         reader.start()
-        threading.Thread(
+        stderr_reader = threading.Thread(
             target=self._read_stderr, args=(thread, process),
             name=f"flowmarshal-gemini-stderr-{thread.thread_id}", daemon=True,
-        ).start()
+        )
+        thread.stderr_reader = stderr_reader
+        stderr_reader.start()
 
     @staticmethod
     def _read_stderr(thread: _GeminiThread, process: subprocess.Popen) -> None:
@@ -631,9 +634,11 @@ class GeminiRuntime:
         finished: _GeminiTurn | None = None
         transcript = None
         if kind == "result":
-            current = thread.current
+            with self._lock:
+                current = thread.current
+                current_turn_id = None if current is None else current.turn_id
             transcript = self._live_transcript_model_observation(
-                thread.thread_id, None if current is None else current.turn_id,
+                thread.thread_id, current_turn_id,
             )
         with self._lock:
             if kind == "control_response":
@@ -748,6 +753,8 @@ class GeminiRuntime:
                 pass
         if thread.reader is not None:
             thread.reader.join(timeout=5)
+        if thread.stderr_reader is not None:
+            thread.stderr_reader.join(timeout=5)
 
     # ------------------------------------------------------------ turn
     def _start_timeout(self) -> float:
@@ -819,30 +826,36 @@ class GeminiRuntime:
             sent_at=utc_now().isoformat(),
             first_empty_thread=first_empty_thread,
         )
-        with self._lock:
-            thread.current = turn
-            thread.turns.append(turn)
-            thread.started_turns += 1
-            if not process_alive:
-                self._spawn(thread, argv)
-                thread.process_key = process_key
-            self._write(
-                thread,
-                {"type": "user", "message": {"role": "user", "content": prompt}},
-            )
-        if not turn.replayed.wait(timeout=self._start_timeout()):
-            raise TimeoutError(
-                "GEMINI_TURN_START_UNCONFIRMED: provider가 turn 수신을 확인하지 않았습니다."
-            )
-        if turn.policy_violation is not None:
-            raise RuntimePolicyError(turn.policy_violation)
-        if turn.turn_id is None:
-            raise RuntimePolicyError(
-                "GEMINI_TURN_START_UNCONFIRMED: "
-                + (turn.collector_error or "provider replay가 없습니다.")
-            )
-        if turn.init_event is None:
-            raise RuntimePolicyError("PERMISSION_POLICY_MISMATCH: turn init 관측이 없습니다.")
+        try:
+            with self._lock:
+                thread.current = turn
+                thread.turns.append(turn)
+                thread.started_turns += 1
+                if not process_alive:
+                    self._spawn(thread, argv)
+                    thread.process_key = process_key
+                self._write(
+                    thread,
+                    {"type": "user", "message": {"role": "user", "content": prompt}},
+                )
+            if not turn.replayed.wait(timeout=self._start_timeout()):
+                raise TimeoutError(
+                    "GEMINI_TURN_START_UNCONFIRMED: provider가 turn 수신을 확인하지 않았습니다."
+                )
+            if turn.policy_violation is not None:
+                raise RuntimePolicyError(turn.policy_violation)
+            if turn.turn_id is None:
+                raise RuntimePolicyError(
+                    "GEMINI_TURN_START_UNCONFIRMED: "
+                    + (turn.collector_error or "provider replay가 없습니다.")
+                )
+            if turn.init_event is None:
+                raise RuntimePolicyError("PERMISSION_POLICY_MISMATCH: turn init 관측이 없습니다.")
+        except BaseException:
+            turn.done.set()
+            turn.replayed.set()
+            self._stop_process(thread, timeout_seconds=1.0)
+            raise
         return RuntimeOperationReceipt(
             operation_id=turn.turn_id,
             payload={

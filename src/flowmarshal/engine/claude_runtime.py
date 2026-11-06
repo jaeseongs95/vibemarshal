@@ -303,6 +303,7 @@ class _ClaudeThread:
     control_responses: dict[str, dict[str, Any]] = field(default_factory=dict)
     control_waiters: dict[str, threading.Event] = field(default_factory=dict)
     reader: threading.Thread | None = None
+    stderr_reader: threading.Thread | None = None
     exit_code: int | None = None
 
 
@@ -580,10 +581,12 @@ class ClaudeCodeRuntime:
         )
         thread.reader = reader
         reader.start()
-        threading.Thread(
+        stderr_reader = threading.Thread(
             target=self._read_stderr, args=(thread, process),
             name=f"flowmarshal-claude-stderr-{thread.thread_id}", daemon=True,
-        ).start()
+        )
+        thread.stderr_reader = stderr_reader
+        stderr_reader.start()
 
     @staticmethod
     def _read_stderr(thread: _ClaudeThread, process: subprocess.Popen) -> None:
@@ -636,9 +639,11 @@ class ClaudeCodeRuntime:
         transcript = None
         if kind == "result":
             # done 전에 읽어 둔다. 완료 대기·관측자 전달이 파일 읽기를 기다리지 않게 한다.
-            current = thread.current
+            with self._lock:
+                current = thread.current
+                current_turn_id = None if current is None else current.turn_id
             transcript = self._live_transcript_model_observation(
-                thread.thread_id, None if current is None else current.turn_id,
+                thread.thread_id, current_turn_id,
             )
         with self._lock:
             if kind == "control_response":
@@ -753,6 +758,8 @@ class ClaudeCodeRuntime:
                 pass
         if thread.reader is not None:
             thread.reader.join(timeout=5)
+        if thread.stderr_reader is not None:
+            thread.stderr_reader.join(timeout=5)
 
     # ------------------------------------------------------------ turn
     def _start_timeout(self) -> float:
@@ -824,32 +831,38 @@ class ClaudeCodeRuntime:
             sent_at=utc_now().isoformat(),
             first_empty_thread=first_empty_thread,
         )
-        with self._lock:
-            thread.current = turn
-            thread.turns.append(turn)
-            thread.started_turns += 1
-            if not process_alive:
-                self._spawn(thread, argv)
-                thread.process_key = process_key
-            self._write(
-                thread,
-                {"type": "user", "message": {"role": "user", "content": prompt}},
-            )
-        if not turn.replayed.wait(timeout=self._start_timeout()):
-            raise TimeoutError(
-                "CLAUDE_TURN_START_UNCONFIRMED: provider가 turn 수신을 확인하지 않았습니다."
-            )
-        if turn.policy_violation is not None:
-            raise RuntimePolicyError(turn.policy_violation)
-        # 실측(2.1.277): 매 turn `system/init` → replay user 순서다(첫 turn 포함). replay uuid가
-        # 없으면 client uuid 등으로 대체하지 않는다. provider 확인 없는 turn ID는 결속 근거가 아니다.
-        if turn.turn_id is None:
-            raise RuntimePolicyError(
-                "CLAUDE_TURN_START_UNCONFIRMED: "
-                + (turn.collector_error or "provider replay가 없습니다.")
-            )
-        if turn.init_event is None:
-            raise RuntimePolicyError("PERMISSION_POLICY_MISMATCH: turn init 관측이 없습니다.")
+        try:
+            with self._lock:
+                thread.current = turn
+                thread.turns.append(turn)
+                thread.started_turns += 1
+                if not process_alive:
+                    self._spawn(thread, argv)
+                    thread.process_key = process_key
+                self._write(
+                    thread,
+                    {"type": "user", "message": {"role": "user", "content": prompt}},
+                )
+            if not turn.replayed.wait(timeout=self._start_timeout()):
+                raise TimeoutError(
+                    "CLAUDE_TURN_START_UNCONFIRMED: provider가 turn 수신을 확인하지 않았습니다."
+                )
+            if turn.policy_violation is not None:
+                raise RuntimePolicyError(turn.policy_violation)
+            # 실측(2.1.277): 매 turn `system/init` → replay user 순서다(첫 turn 포함). replay uuid가
+            # 없으면 client uuid 등으로 대체하지 않는다. provider 확인 없는 turn ID는 결속 근거가 아니다.
+            if turn.turn_id is None:
+                raise RuntimePolicyError(
+                    "CLAUDE_TURN_START_UNCONFIRMED: "
+                    + (turn.collector_error or "provider replay가 없습니다.")
+                )
+            if turn.init_event is None:
+                raise RuntimePolicyError("PERMISSION_POLICY_MISMATCH: turn init 관측이 없습니다.")
+        except BaseException:
+            turn.done.set()
+            turn.replayed.set()
+            self._stop_process(thread, timeout_seconds=1.0)
+            raise
         return RuntimeOperationReceipt(
             operation_id=turn.turn_id,
             payload={

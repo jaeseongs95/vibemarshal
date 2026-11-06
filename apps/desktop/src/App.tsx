@@ -99,6 +99,16 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
       if (!event.altKey || event.ctrlKey || event.metaKey) return;
+      const target = event.target as HTMLElement | null;
+      if (
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.tagName === "SELECT" ||
+          target.isContentEditable)
+      ) {
+        return;
+      }
       const index = Number(event.key) - 1;
       if (index >= 0 && index < validViews.length) {
         event.preventDefault();
@@ -128,11 +138,17 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
     return true;
   }, [navigate]);
 
-  const perform = useCallback(async (operation: () => Promise<CommandResult>, successView?: AppView) => {
-    if (busy) return;
+  const perform = useCallback(async (operation: () => Promise<CommandResult>, successView?: AppView): Promise<boolean> => {
+    if (busy) return false;
     setBusy(true);
     try {
-      handleResult(await operation(), successView);
+      return handleResult(await operation(), successView);
+    } catch (error: unknown) {
+      setCommandError({
+        code: "ENGINE_COMMAND_FAILED",
+        message: error instanceof Error ? error.message : String(error),
+      });
+      return false;
     } finally {
       setBusy(false);
     }
@@ -152,6 +168,11 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
           break;
         }
       }
+    } catch (error: unknown) {
+      setCommandError({
+        code: "ENGINE_COMMAND_FAILED",
+        message: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setBusy(false);
     }
@@ -180,6 +201,11 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
       const nextSnapshot = await engine.resetScenario(scenario);
       setSelectedPlanId(nextSnapshot.plans[0]?.planRevisionId ?? null);
       navigate(scenario === "external-unknown" ? "recovery" : "plans");
+    } catch (error: unknown) {
+      setCommandError({
+        code: "ENGINE_COMMAND_FAILED",
+        message: error instanceof Error ? error.message : String(error),
+      });
     } finally {
       setBusy(false);
     }
@@ -189,10 +215,21 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
     switch (kind) {
       case "edit_goal":
         setBusy(true);
-        void engine.startGoalRevision(contextFactoryRef.current()).finally(() => {
-          setBusy(false);
-          navigate("goal");
-        });
+        void engine
+          .startGoalRevision(contextFactoryRef.current())
+          .then(() => {
+            setCommandError(null);
+            navigate("goal");
+          })
+          .catch((error: unknown) => {
+            setCommandError({
+              code: "ENGINE_COMMAND_FAILED",
+              message: error instanceof Error ? error.message : String(error),
+            });
+          })
+          .finally(() => {
+            setBusy(false);
+          });
         break;
       case "prepare_goal":
         navigate("goal");
@@ -219,15 +256,51 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
     if (busy) return;
     setBusy(true);
     setCommandError(null);
-    void engine.startGoalRevision(contextFactoryRef.current()).finally(() => setBusy(false));
+    void engine
+      .startGoalRevision(contextFactoryRef.current())
+      .catch((error: unknown) => {
+        setCommandError({
+          code: "ENGINE_COMMAND_FAILED",
+          message: error instanceof Error ? error.message : String(error),
+        });
+      })
+      .finally(() => setBusy(false));
   };
 
-  const activatePlan = (command: ActivatePlanCommand) => {
-    void perform(() => engine.activatePlan(command, contextFactoryRef.current()), "run");
+  const activatePlan = (command: ActivatePlanCommand): Promise<boolean> => {
+    return perform(() => engine.activatePlan(command, contextFactoryRef.current()), "run");
   };
+
+  const handleRuntimeModeSwitch = useCallback((nextMode: RuntimeMode) => {
+    setCommandError(null);
+    setRuntimeMode(nextMode);
+  }, []);
 
   if (!snapshot) {
-    return <div className="boot-screen"><span className="brand-mark" aria-hidden="true">V</span><p>권위 snapshot 경계를 준비하는 중…</p></div>;
+    return (
+      <div className="boot-screen">
+        <span className="brand-mark" aria-hidden="true">V</span>
+        <p>권위 snapshot 경계를 준비하는 중…</p>
+        {commandError ? (
+          <div className="command-error" role="alert">
+            <AlertCircle size={18} />
+            <div>
+              <strong>{commandError.code}</strong>
+              <span>{commandError.message}</span>
+            </div>
+            {!client && runtimeMode === "http" ? (
+              <button
+                className="secondary-action"
+                type="button"
+                onClick={() => handleRuntimeModeSwitch("mock")}
+              >
+                로컬 Mock 모드로 전환
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+    );
   }
 
   return (
@@ -236,7 +309,7 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
         scenario={snapshot.scenario}
         productStatus={snapshot.productStatus}
         runtimeMode={runtimeMode}
-        onRuntimeModeChange={client ? undefined : setRuntimeMode}
+        onRuntimeModeChange={client ? undefined : handleRuntimeModeSwitch}
         onScenarioChange={(scenario) => void handleScenario(scenario)}
         onOpenProjects={() => setProjectsOpen(true)}
         onOpenInspector={() => setInspectorOpen(true)}

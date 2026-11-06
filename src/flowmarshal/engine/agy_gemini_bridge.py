@@ -116,10 +116,18 @@ class AgyLocalTaskGate:
     closed: bool = False
 
     def before_execution(self, *args: Any, **kwargs: Any) -> str | None:
+        if not self.project_id or not str(self.project_id).strip():
+            raise RuntimeError("AGY_LOCAL_GATE_INVALID_PROJECT: project_id가 비어 있습니다.")
+        if self.closed:
+            raise RuntimeError("AGY_LOCAL_GATE_CLOSED: 이미 닫힌 gate에서는 실행할 수 없습니다.")
         self.before_execution_calls += 1
         return None
 
     def before_completion(self, *args: Any, **kwargs: Any) -> str | None:
+        if not self.project_id or not str(self.project_id).strip():
+            raise RuntimeError("AGY_LOCAL_GATE_INVALID_PROJECT: project_id가 비어 있습니다.")
+        if self.closed:
+            raise RuntimeError("AGY_LOCAL_GATE_CLOSED: 이미 닫힌 gate에서는 완료 판정을 진행할 수 없습니다.")
         self.before_completion_calls += 1
         return None
 
@@ -259,15 +267,24 @@ def _invoke_agy_cli(
         "default-cli-project",
     ]
     agy_cwd = tempfile.gettempdir()
-    completed = subprocess.run(
-        cmd,
-        cwd=agy_cwd,
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=120,
-    )
+    try:
+        completed = subprocess.run(
+            cmd,
+            cwd=agy_cwd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
+        )
+    except subprocess.TimeoutExpired as exc:
+        raise RuntimeError(
+            f"Antigravity CLI (agy.exe) timed out after {exc.timeout}s"
+        ) from exc
+    except OSError as exc:
+        raise RuntimeError(
+            f"Antigravity CLI (agy.exe) invocation failed: {exc}"
+        ) from exc
     stdout_text = completed.stdout or ""
     stderr_text = completed.stderr or ""
     result_event: dict[str, Any] | None = None
@@ -1426,12 +1443,31 @@ def main(argv: list[str] | None = None) -> int:
         )
 
         prompt_for_agy = _summarize_prompt_for_agy(user_prompt, schema)
-        agy_result = _invoke_agy_cli(
-            prompt_for_agy=prompt_for_agy,
-            model=model,
-            effort=effort,
-            cwd=cwd,
-        )
+        try:
+            agy_result = _invoke_agy_cli(
+                prompt_for_agy=prompt_for_agy,
+                model=model,
+                effort=effort,
+                cwd=cwd,
+            )
+        except Exception as exc:
+            error_msg = str(exc)
+            _emit_stdout(
+                {
+                    "type": "result",
+                    "subtype": "error_during_execution",
+                    "is_error": True,
+                    "session_id": session_id,
+                    "uuid": f"result-{uuid.uuid4().hex[:12]}",
+                    "duration_ms": 1,
+                    "duration_api_ms": 1,
+                    "num_turns": 1,
+                    "result": error_msg,
+                    "error": error_msg,
+                    "stop_reason": "error",
+                }
+            )
+            return 1
 
         usage = agy_result["usage"]
         assistant_uuid = f"assistant-{uuid.uuid4().hex[:12]}"

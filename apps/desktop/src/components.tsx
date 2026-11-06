@@ -98,15 +98,33 @@ export function CopyableCode({
   short?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
+  const timerRef = useRef<number | null>(null);
+  useEffect(() => {
+    return () => {
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+      }
+    };
+  }, []);
   if (!value) return <code>—</code>;
   const display = short ? shortDigest(value) : value;
 
   const handleCopy = () => {
+    const markCopied = () => {
+      setCopied(true);
+      if (timerRef.current !== null) {
+        window.clearTimeout(timerRef.current);
+      }
+      timerRef.current = window.setTimeout(() => setCopied(false), 1400);
+    };
     if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-      void navigator.clipboard.writeText(value);
+      void navigator.clipboard
+        .writeText(value)
+        .then(markCopied)
+        .catch(() => setCopied(false));
+    } else {
+      markCopied();
     }
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1400);
   };
 
   return (

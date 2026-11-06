@@ -887,41 +887,44 @@ class SQLiteEngineLedger:
         with self.read() as connection:
             # 상태와 이력을 짧은 한 snapshot에서 읽고 hash 계산 전에 연결을 닫는다.
             connection.execute("BEGIN")
-            project = connection.execute(
-                "SELECT * FROM projects WHERE id = ?", (project_id,)
-            ).fetchone()
-            if project is None:
-                raise EngineLedgerError("프로젝트를 찾을 수 없습니다.")
-            plans = connection.execute(
-                "SELECT id, plan_id, revision_no, activation_digest, status, activated_at, completed_at "
-                "FROM plan_revisions WHERE project_id = ? ORDER BY plan_id, revision_no",
-                (project_id,),
-            ).fetchall()
-            tasks = connection.execute(
-                "SELECT id, plan_revision_id, task_ref, position, contract_digest, status "
-                "FROM task_contracts WHERE project_id = ? ORDER BY plan_revision_id, position",
-                (project_id,),
-            ).fetchall()
-            attempts = connection.execute(
-                "SELECT id, task_id, attempt_no, kind, status, failure_class, failure_detail "
-                "FROM attempts WHERE project_id = ? ORDER BY created_at, rowid",
-                (project_id,),
-            ).fetchall()
-            runtime_jobs = connection.execute(
-                "SELECT id,kind,status,checkpoint_key,attempt_id,task_id,thread_id,turn_id,"
-                "absolute_deadline_at,provider_terminal_status,result_digest,created_at,started_at,ended_at "
-                "FROM runtime_jobs WHERE project_id=? ORDER BY created_at,rowid",
-                (project_id,),
-            ).fetchall()
-            context_sources = connection.execute(
-                "SELECT id, kind, path, content_digest, registered_at "
-                "FROM context_source_registrations WHERE project_id = ? ORDER BY registered_at, rowid",
-                (project_id,),
-            ).fetchall()
-            history_rows = connection.execute(
-                "SELECT * FROM history_events WHERE project_id = ? ORDER BY sequence",
-                (project_id,),
-            ).fetchall()
+            try:
+                project = connection.execute(
+                    "SELECT * FROM projects WHERE id = ?", (project_id,)
+                ).fetchone()
+                if project is None:
+                    raise EngineLedgerError("프로젝트를 찾을 수 없습니다.")
+                plans = connection.execute(
+                    "SELECT id, plan_id, revision_no, activation_digest, status, activated_at, completed_at "
+                    "FROM plan_revisions WHERE project_id = ? ORDER BY plan_id, revision_no",
+                    (project_id,),
+                ).fetchall()
+                tasks = connection.execute(
+                    "SELECT id, plan_revision_id, task_ref, position, contract_digest, status "
+                    "FROM task_contracts WHERE project_id = ? ORDER BY plan_revision_id, position",
+                    (project_id,),
+                ).fetchall()
+                attempts = connection.execute(
+                    "SELECT id, task_id, attempt_no, kind, status, failure_class, failure_detail "
+                    "FROM attempts WHERE project_id = ? ORDER BY created_at, rowid",
+                    (project_id,),
+                ).fetchall()
+                runtime_jobs = connection.execute(
+                    "SELECT id,kind,status,checkpoint_key,attempt_id,task_id,thread_id,turn_id,"
+                    "absolute_deadline_at,provider_terminal_status,result_digest,created_at,started_at,ended_at "
+                    "FROM runtime_jobs WHERE project_id=? ORDER BY created_at,rowid",
+                    (project_id,),
+                ).fetchall()
+                context_sources = connection.execute(
+                    "SELECT id, kind, path, content_digest, registered_at "
+                    "FROM context_source_registrations WHERE project_id = ? ORDER BY registered_at, rowid",
+                    (project_id,),
+                ).fetchall()
+                history_rows = connection.execute(
+                    "SELECT * FROM history_events WHERE project_id = ? ORDER BY sequence",
+                    (project_id,),
+                ).fetchall()
+            finally:
+                connection.execute("ROLLBACK")
         return {
             "project": dict(project),
             "plans": [dict(row) for row in plans],

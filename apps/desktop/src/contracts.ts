@@ -48,6 +48,7 @@ export type RunOnceAction =
   | "observed"
   | "validated"
   | "completed"
+  | "recovered"
   | "blocked"
   | "idle";
 
@@ -228,7 +229,7 @@ export interface RunLogEntry {
 
 export interface WorkspaceSnapshot {
   apiVersion: "1";
-  engineSchemaVersion: 2;
+  engineSchemaVersion: 2 | 4;
   productStatus: "NO-GO";
   generatedAt: string;
   scenario: ScenarioKey;

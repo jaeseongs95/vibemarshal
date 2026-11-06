@@ -37,18 +37,27 @@ export function registerRunOnceWebMcpTool({ engine, createContext, onResult, doc
       if (typeof input !== "object" || input === null || Array.isArray(input) || Object.keys(input as object).length > 0) {
         throw new TypeError("입력은 빈 객체여야 합니다.");
       }
-      const result = await engine.runOnce(createContext());
-      onResult(result);
-      if (!result.ok) {
-        return { ok: false, code: result.error.code, message: result.error.message, historySequence: result.error.historyCursor.sequence };
+      try {
+        const result = await engine.runOnce(createContext());
+        onResult(result);
+        if (!result.ok) {
+          return { ok: false, code: result.error.code, message: result.error.message, historySequence: result.error.historyCursor.sequence };
+        }
+        return {
+          ok: true,
+          phase: result.data.phase,
+          historySequence: result.data.historyCursor.sequence,
+          activeTask: result.data.tasks.find((task) => task.status !== "completed")?.taskRef ?? null,
+          verdict: result.data.validation.verdict,
+        };
+      } catch (error: unknown) {
+        reportError(error);
+        return {
+          ok: false,
+          code: "ENGINE_COMMAND_FAILED",
+          message: error instanceof Error ? error.message : String(error),
+        };
       }
-      return {
-        ok: true,
-        phase: result.data.phase,
-        historySequence: result.data.historyCursor.sequence,
-        activeTask: result.data.tasks.find((task) => task.status !== "completed")?.taskRef ?? null,
-        verdict: result.data.validation.verdict,
-      };
     },
   };
 

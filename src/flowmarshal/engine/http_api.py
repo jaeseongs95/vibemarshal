@@ -162,7 +162,38 @@ class LocalGuiEngineBackend:
         self._stale_pending: bool = False
         self._recovery_state: dict[str, Any] | None = None
         self._active_attempt_state: dict[str, Any] | None = None
+        self._ephemeral_workspaces: list[Path] = []
         self.project_id = project_id or self._ensure_default_project()
+
+    def _cleanup_ephemeral_workspaces(self) -> None:
+        import shutil
+
+        while self._ephemeral_workspaces:
+            ws = self._ephemeral_workspaces.pop()
+            if ws.exists() and ws != self.project_root:
+                shutil.rmtree(ws, ignore_errors=True)
+
+    def _record_recovery_ledger_event(
+        self,
+        event_type: str,
+        entity_id: str,
+        payload: dict[str, Any],
+        *,
+        run_state: str,
+        recovery_reason: str | None = None,
+    ) -> None:
+        with self.service.ledger.transaction() as tx:
+            tx.connection.execute(
+                "UPDATE projects SET run_state = ?, recovery_reason = ?, updated_at = ? WHERE id = ?",
+                (run_state, recovery_reason, tx.now, self.project_id),
+            )
+            tx.history(
+                self.project_id,
+                event_type,
+                "recovery",
+                entity_id,
+                payload,
+            )
 
     def _ensure_default_project(self) -> str:
         with self.service.ledger.read() as conn:
@@ -187,6 +218,7 @@ class LocalGuiEngineBackend:
             ).fetchone()
         if existing_root is not None:
             scenario_root = self.project_root / new_id("workspace")
+            self._ephemeral_workspaces.append(scenario_root)
         scenario_root.mkdir(parents=True, exist_ok=True)
         readme = scenario_root / "README.md"
         if not readme.exists():
@@ -654,19 +686,41 @@ class LocalGuiEngineBackend:
                     dec = json.loads(row["decision_json"])
                     if dec.get("fitness_score") is not None:
                         score = int(dec["fitness_score"])
+                task_objs = plan_obj.definition.tasks
+                task_titles = [t.objective for t in task_objs if t.objective]
+                dynamic_name = (
+                    "경계 수정 + 양방향 회귀"
+                    if any("usage 합산 경계 수정" in t for t in task_titles)
+                    else (" + ".join(task_titles[:2]) if task_titles else f"Plan r{plan_obj.revision_no}")
+                )
+                dynamic_summary = (
+                    "합산기를 한곳에서 결측 안전하게 만들고 Markdown·JSON 출력 계약을 함께 검증합니다."
+                    if any("usage 합산 경계 수정" in t for t in task_titles)
+                    else (" · ".join(task_titles) if task_titles else goal.definition.observable_outcome)
+                )
+                highest_risk = "low"
+                for t in task_objs:
+                    if t.risk_level.value in {"high", "critical"}:
+                        highest_risk = "high"
+                        break
+                    if t.risk_level.value == "medium":
+                        highest_risk = "medium"
+                has_external = any(
+                    eff.external for t in task_objs for eff in t.expected_effects
+                )
                 plans_view.append(
                     {
                         "planRevisionId": plan_obj.plan_revision_id,
                         "revisionNo": plan_obj.revision_no,
-                        "name": "경계 수정 + 양방향 회귀",
-                        "summary": "합산기를 한곳에서 결측 안전하게 만들고 Markdown·JSON 출력 계약을 함께 검증합니다.",
+                        "name": dynamic_name,
+                        "summary": dynamic_summary,
                         "decision": "selected" if is_selected else "admissible",
                         "score": score,
                         "activationDigest": plan_obj.activation_digest,
                         "definitionDigest": plan_obj.definition_digest,
                         "goalDigest": plan_obj.definition.goal_contract_digest,
-                        "risk": "low",
-                        "checkpoint": "외부 효과 없음",
+                        "risk": highest_risk,
+                        "checkpoint": "외부 효과 승인 필요" if has_external else "외부 효과 없음",
                         "modelEnvelope": "executor · validator 분리",
                         "validationSummary": (
                             f"Task validation {len(plan_obj.definition.tasks)}개 · "
@@ -906,31 +960,46 @@ class LocalGuiEngineBackend:
                 cached_tokens = 0
                 out_tokens = 0
                 latency_total = 0
-                has_tokens = False
+                has_in = False
+                has_cached = False
+                has_out = False
+                has_latency = False
+                observed_models: list[str] = []
                 for u_row in usage_rows:
                     u_payload = json.loads(u_row["payload_json"])
+                    model_val = str(u_payload.get("model") or "")
+                    if model_val and model_val not in observed_models:
+                        observed_models.append(model_val)
                     if u_payload.get("input_tokens") is not None:
                         in_tokens += int(u_payload["input_tokens"])
-                        has_tokens = True
+                        has_in = True
                     if u_payload.get("cached_input_tokens") is not None:
                         cached_tokens += int(u_payload["cached_input_tokens"])
+                        has_cached = True
                     if u_payload.get("output_tokens") is not None:
                         out_tokens += int(u_payload["output_tokens"])
-                        has_tokens = True
+                        has_out = True
                     if u_payload.get("latency_ms") is not None:
                         latency_total += int(u_payload["latency_ms"])
-                if has_tokens:
+                        has_latency = True
+                if has_in or has_out or has_latency:
+                    if self.live_gemini or any("gemini" in m.lower() for m in observed_models):
+                        reason_label = "Gemini CLI (agy.exe) 실측 사용량"
+                    elif observed_models:
+                        reason_label = f"원장 기록 실측 사용량 ({', '.join(observed_models)})"
+                    else:
+                        reason_label = "원장 기록 실측 사용량"
                     budget_view = {
-                        "inputTokens": in_tokens,
-                        "cachedInputTokens": cached_tokens,
-                        "outputTokens": out_tokens,
-                        "latencyMs": latency_total,
-                        "availabilityReason": "Gemini CLI (agy.exe) 실측 사용량",
+                        "inputTokens": in_tokens if has_in else None,
+                        "cachedInputTokens": cached_tokens if has_cached else None,
+                        "outputTokens": out_tokens if has_out else None,
+                        "latencyMs": latency_total if has_latency else None,
+                        "availabilityReason": reason_label,
                     }
 
             return {
                 "apiVersion": "1",
-                "engineSchemaVersion": 2,
+                "engineSchemaVersion": 4,
                 "productStatus": "NO-GO",
                 "generatedAt": _iso_now(),
                 "scenario": self.scenario,
@@ -1012,7 +1081,9 @@ class LocalGuiEngineBackend:
             if self.live_gemini:
                 active_plan = self.service.status(self.project_id)["project"].get("active_plan_revision_id")
                 if active_plan is not None:
+                    self._cleanup_ephemeral_workspaces()
                     scenario_root = self.project_root / new_id("workspace")
+                    self._ephemeral_workspaces.append(scenario_root)
                     scenario_root.mkdir(parents=True, exist_ok=True)
                     (scenario_root / "README.md").write_text("# VibeMarshal Live Gemini Workspace\n", encoding="utf-8")
                     self.project_id = self.service.create_project(name="VibeMarshal Live Gemini", root=str(scenario_root))
@@ -1045,6 +1116,7 @@ class LocalGuiEngineBackend:
             latest = self.service.load_latest_goal(self.project_id)
             active_plan = self.service.status(self.project_id)["project"].get("active_plan_revision_id")
             if active_plan is not None:
+                self._cleanup_ephemeral_workspaces()
                 self.project_id = self._bootstrap_project_with_goal_and_plans(
                     source_request=source_request.strip()
                 )
@@ -1110,16 +1182,40 @@ class LocalGuiEngineBackend:
                 authority = ApplicationAuthority(app_for_auth)
                 target = authority.authorization_target(self.project_id)
                 if target.plan_revision_id != plan_revision_id:
-                    return self._error("DIGEST_MISMATCH", "선택한 Plan 후보가 승인 대상과 다릅니다.")
-                if activation_digest and target.plan_activation_digest != activation_digest:
-                    return self._error("DIGEST_MISMATCH", "현재 후보와 activation digest가 일치하지 않습니다.")
-                if target_digest and target.target_digest != target_digest:
-                    return self._error("DIGEST_MISMATCH", "현재 후보와 target digest가 일치하지 않습니다.")
-                authority.authorize(
-                    self.project_id,
-                    target=target,
-                    source="desktop-gui:user-confirmation",
-                )
+                    with self.service.ledger.read() as conn:
+                        alt_row = conn.execute(
+                            "SELECT id, activation_digest, status FROM plan_revisions "
+                            "WHERE id = ? AND project_id = ?",
+                            (plan_revision_id, self.project_id),
+                        ).fetchone()
+                    if alt_row is None or alt_row["status"] != "ready":
+                        return self._error("DIGEST_MISMATCH", "선택한 Plan 후보가 승인 대상과 다릅니다.")
+                    if activation_digest and alt_row["activation_digest"] != activation_digest:
+                        return self._error("DIGEST_MISMATCH", "현재 후보와 activation digest가 일치하지 않습니다.")
+                    self.service.authorize_goal(
+                        project_id=self.project_id,
+                        source="desktop-gui:user-confirmation",
+                        capability=app_for_auth._core_action_authority.issue_goal_authorization(
+                            ledger_path=self.service.ledger.path,
+                            target=target,
+                        ),
+                        authorization_target=target,
+                    )
+                    self.service.activate_plan(
+                        plan_revision_id=str(plan_revision_id),
+                        activation_digest=str(alt_row["activation_digest"]),
+                        source="desktop-gui:user-confirmation",
+                    )
+                else:
+                    if activation_digest and target.plan_activation_digest != activation_digest:
+                        return self._error("DIGEST_MISMATCH", "현재 후보와 activation digest가 일치하지 않습니다.")
+                    if target_digest and target.target_digest != target_digest:
+                        return self._error("DIGEST_MISMATCH", "현재 후보와 target digest가 일치하지 않습니다.")
+                    authority.authorize(
+                        self.project_id,
+                        target=target,
+                        source="desktop-gui:user-confirmation",
+                    )
             except (EngineServiceError, EngineApplicationError, EngineLedgerError, CoreCapabilityError) as error:
                 return self._error("ACTIVATION_FAILED", str(error))
             return {"ok": True, "data": self.snapshot()}
@@ -1139,7 +1235,11 @@ class LocalGuiEngineBackend:
                     if self.service.active_runtime_job(self.project_id) is None:
                         break
                     self.application.observe(self.project_id)
-                    time.sleep(0.1)
+                    self._lock.release()
+                    try:
+                        time.sleep(0.1)
+                    finally:
+                        self._lock.acquire()
                 if self.service.active_runtime_job(self.project_id) is None and tick.action.value in {
                     "started",
                     "reserved",
@@ -1173,6 +1273,15 @@ class LocalGuiEngineBackend:
             ]
             if not incomplete:
                 project_map, _ = self.service.reobserve_project(self.project_id)
+                if not project_map.entries:
+                    readme_fallback = Path(status_data["project"]["root"]) / "README.md"
+                    readme_fallback.parent.mkdir(parents=True, exist_ok=True)
+                    if not readme_fallback.exists():
+                        readme_fallback.write_text("# VibeMarshal Workspace\n", encoding="utf-8")
+                    project_map, _ = self.service.reobserve_project(
+                        self.project_id,
+                        observed_paths=("README.md",),
+                    )
                 entry = project_map.entries[0]
                 goal_evidence = EvidenceRecord(
                     evidence_id=new_id("evidence"),
@@ -1246,6 +1355,15 @@ class LocalGuiEngineBackend:
                 ).fetchone()
             from .domain import ProjectMapRevision
             project_map = ProjectMapRevision.model_validate_json(map_row["payload_json"])
+            if not project_map.entries:
+                readme_fallback = Path(status_data["project"]["root"]) / "README.md"
+                readme_fallback.parent.mkdir(parents=True, exist_ok=True)
+                if not readme_fallback.exists():
+                    readme_fallback.write_text("# VibeMarshal Workspace\n", encoding="utf-8")
+                project_map, _ = self.service.reobserve_project(
+                    self.project_id,
+                    observed_paths=("README.md",),
+                )
             entry = project_map.entries[0]
 
             if t_status == "ready":
@@ -1369,6 +1487,7 @@ class LocalGuiEngineBackend:
             self._recovery_state = None
             self._active_attempt_state = None
             self.run_log.clear()
+            self._cleanup_ephemeral_workspaces()
             self.project_id = self._bootstrap_project_with_goal_and_plans()
             if scenario == "external-unknown":
                 snap = self.snapshot()
@@ -1406,6 +1525,17 @@ class LocalGuiEngineBackend:
                         "auto retry blocked by idempotency boundary",
                     ],
                 }
+                self._record_recovery_ledger_event(
+                    "recovery.external_unknown_detected",
+                    "intent_gui_ext_01",
+                    {
+                        "attempt_id": "attempt_gui_ext_01",
+                        "intent_id": "intent_gui_ext_01",
+                        "receipt_state": "missing",
+                    },
+                    run_state="recovery_required",
+                    recovery_reason="external_unknown",
+                )
             return self.snapshot()
 
     def refresh_stale(self) -> dict[str, Any]:
@@ -1420,12 +1550,20 @@ class LocalGuiEngineBackend:
                 goal_id=latest.goal_id,
                 supersedes_goal_revision_id=latest.goal_revision_id,
             )
+            self._record_recovery_ledger_event(
+                "recovery.stale_input_refreshed",
+                self.project_id,
+                {"goal_id": latest.goal_id, "revision_no": latest.revision_no + 1},
+                run_state="idle",
+                recovery_reason=None,
+            )
             return {"ok": True, "data": self.snapshot()}
 
     def observe_attempt(self) -> dict[str, Any]:
         with self._lock:
             if self._recovery_state is None or self._recovery_state.get("kind") != "external_unknown":
                 return self._error("RECOVERY_NOT_OBSERVABLE", "관측할 external_unknown 복구 건이 없습니다.")
+            intent_id = str(self._recovery_state.get("intentId") or "intent_gui_ext_01")
             self._recovery_state = {
                 **self._recovery_state,
                 "stage": "observed",
@@ -1441,6 +1579,17 @@ class LocalGuiEngineBackend:
                     **self._active_attempt_state,
                     "status": "interrupted",
                 }
+            self._record_recovery_ledger_event(
+                "recovery.attempt_observed",
+                intent_id,
+                {
+                    "intent_id": intent_id,
+                    "stage": "observed",
+                    "receipt_state": "confirmed_missing",
+                },
+                run_state="recovery_required",
+                recovery_reason="external_unknown:observed",
+            )
             return {"ok": True, "data": self.snapshot()}
 
     def resume_attempt(self) -> dict[str, Any]:
@@ -1451,17 +1600,37 @@ class LocalGuiEngineBackend:
                 or self._recovery_state.get("stage") != "observed"
             ):
                 return self._error("OBSERVATION_REQUIRED", "재개 전에 먼저 기존 시도를 관측해야 합니다.")
+            intent_id = str(self._recovery_state.get("intentId") or "intent_gui_ext_01")
             self._recovery_state = None
             self._active_attempt_state = None
+            self._record_recovery_ledger_event(
+                "recovery.attempt_resumed",
+                intent_id,
+                {"intent_id": intent_id, "resumed": True},
+                run_state="active",
+                recovery_reason=None,
+            )
             return {"ok": True, "data": self.snapshot()}
 
     def abandon_intent(self, rationale: str) -> dict[str, Any]:
         with self._lock:
             if not rationale or not rationale.strip():
                 return self._error("RATIONALE_REQUIRED", "포기 사유를 입력해야 원장에 기록할 수 있습니다.")
+            intent_id = (
+                str(self._recovery_state.get("intentId"))
+                if self._recovery_state and self._recovery_state.get("intentId")
+                else "intent_gui_ext_01"
+            )
             self._recovery_state = None
             self._active_attempt_state = None
             self._draft_goal_mode = True
+            self._record_recovery_ledger_event(
+                "recovery.intent_abandoned",
+                intent_id,
+                {"intent_id": intent_id, "rationale": rationale.strip()},
+                run_state="idle",
+                recovery_reason=None,
+            )
             return {"ok": True, "data": self.snapshot()}
 
     def _error(
@@ -1566,12 +1735,35 @@ def create_http_handler(
             self.end_headers()
             self.wfile.write(body)
 
+        MAX_JSON_BODY_BYTES = 1_048_576
+
         def _read_json(self) -> dict[str, Any]:
-            length = int(self.headers.get("Content-Length", "0") or "0")
-            if length <= 0:
+            raw_len = self.headers.get("Content-Length", "0") or "0"
+            try:
+                length = int(raw_len)
+            except ValueError as exc:
+                raise ValueError("INVALID_CONTENT_LENGTH: Content-Length 헤더가 정수가 아닙니다.") from exc
+            if length < 0:
+                raise ValueError("INVALID_CONTENT_LENGTH: Content-Length는 음수일 수 없습니다.")
+            if length > self.MAX_JSON_BODY_BYTES:
+                raise ValueError(
+                    f"PAYLOAD_TOO_LARGE: 요청 본문 크기가 허용 상한({self.MAX_JSON_BODY_BYTES} bytes)을 초과했습니다."
+                )
+            if length == 0:
                 return {}
-            raw = self.rfile.read(length).decode("utf-8")
-            return json.loads(raw) if raw.strip() else {}
+            try:
+                raw = self.rfile.read(length).decode("utf-8")
+            except UnicodeDecodeError as exc:
+                raise ValueError("INVALID_UTF8_BODY: 요청 본문이 유효한 UTF-8이 아닙니다.") from exc
+            if not raw.strip():
+                return {}
+            try:
+                parsed = json.loads(raw)
+            except json.JSONDecodeError as exc:
+                raise ValueError(f"INVALID_JSON_BODY: 유효한 JSON 형식이 아닙니다 ({exc.msg}).") from exc
+            if not isinstance(parsed, dict):
+                raise ValueError("INVALID_JSON_OBJECT: JSON 요청 본문은 객체(dict)여야 합니다.")
+            return parsed
 
         def do_OPTIONS(self) -> None:
             if not self._check_origin():
@@ -1608,7 +1800,7 @@ def create_http_handler(
                 return
             if parsed.path == "/api/v1/events":
                 snap = backend.snapshot()
-                payload = json.dumps(
+                ready_payload = json.dumps(
                     {
                         "sequence": snap["historyCursor"]["sequence"],
                         "event_hash": snap["historyCursor"]["eventHash"],
@@ -1617,7 +1809,11 @@ def create_http_handler(
                     },
                     ensure_ascii=False,
                 )
-                body = f"data: {payload}\n\n".encode("utf-8")
+                snap_payload = json.dumps(snap, ensure_ascii=False)
+                body = (
+                    f"data: {ready_payload}\n\n"
+                    f"event: snapshot\ndata: {snap_payload}\n\n"
+                ).encode("utf-8")
                 self.send_response(HTTPStatus.OK)
                 self._send_cors_headers()
                 self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -1634,7 +1830,29 @@ def create_http_handler(
             if not self._check_session_token():
                 return
             parsed = urlparse(self.path)
-            body = self._read_json()
+            try:
+                body = self._read_json()
+            except ValueError as exc:
+                msg = str(exc)
+                code = msg.split(":", 1)[0] if ":" in msg else "INVALID_JSON_BODY"
+                status = (
+                    HTTPStatus.REQUEST_ENTITY_TOO_LARGE
+                    if code == "PAYLOAD_TOO_LARGE"
+                    else HTTPStatus.BAD_REQUEST
+                )
+                self._send_json(
+                    status,
+                    {
+                        "ok": False,
+                        "error": {
+                            "code": code,
+                            "message": msg,
+                        },
+                    },
+                )
+                if code == "PAYLOAD_TOO_LARGE":
+                    self.close_connection = True
+                return
             if parsed.path == "/api/v1/scenario":
                 scenario = str(body.get("scenario") or "golden-path")
                 self._send_json(HTTPStatus.OK, backend.reset_scenario(scenario))

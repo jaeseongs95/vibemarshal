@@ -18,6 +18,7 @@ dependencies = [
 
 [project.scripts]
 flowmarshal-engine = "flowmarshal.engine.console_host:main"
+flowmarshal-gui = "flowmarshal.engine.http_api:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

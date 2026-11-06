@@ -125,8 +125,8 @@ export function OverviewScreen({ snapshot, onNavigate, onAction }: OverviewProps
           <span>
             <small>{t("overview.budget")}</small>
             <strong>
-              {snapshot.budget.inputTokens !== null
-                ? `${snapshot.budget.inputTokens.toLocaleString()} in / ${(snapshot.budget.outputTokens ?? 0).toLocaleString()} out`
+              {snapshot.budget.inputTokens !== null || snapshot.budget.outputTokens !== null
+                ? `${snapshot.budget.inputTokens !== null ? snapshot.budget.inputTokens.toLocaleString() : "미제공"} in / ${snapshot.budget.outputTokens !== null ? snapshot.budget.outputTokens.toLocaleString() : "미제공"} out`
                 : "알 수 없음"}
             </strong>
           </span>
@@ -217,7 +217,7 @@ interface PlansProps {
   snapshot: WorkspaceSnapshot;
   selectedPlanId: string | null;
   onSelect: (planId: string) => void;
-  onActivate: (command: ActivatePlanCommand) => void;
+  onActivate: (command: ActivatePlanCommand) => void | Promise<boolean>;
   onNavigate: (view: AppView) => void;
 }
 
@@ -235,10 +235,12 @@ export function PlansScreen({ snapshot, selectedPlanId, onSelect, onActivate, on
     },
   } satisfies ActivatePlanCommand : null;
 
-  const confirm = () => {
+  const confirm = async () => {
     if (!command) return;
-    setModalOpen(false);
-    onActivate(command);
+    const outcome = await onActivate(command);
+    if (outcome !== false) {
+      setModalOpen(false);
+    }
   };
   return (
     <>

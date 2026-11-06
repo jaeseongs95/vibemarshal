@@ -29,6 +29,8 @@ ENGINE_DEVELOPER_MODULES = {
     "performance",
     "performance_assessment",
     "performance_lifecycle_safety",
+    "plan_inspection_eval",
+    "plan_inspection_eval_v2",
     "qualification",
     "release_freeze",
     "scope_report_verification",

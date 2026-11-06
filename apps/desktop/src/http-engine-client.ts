@@ -81,7 +81,7 @@ export class HttpEngineClient implements EngineClient {
     return token;
   }
 
-  private async requestJson<T>(path: string, init?: RequestInit): Promise<T> {
+  private async requestJson<T>(path: string, init?: RequestInit, retriedToken = false): Promise<T> {
     const method = (init?.method ?? "GET").toUpperCase();
     const tokenHeaders: Record<string, string> = {};
     if (method === "POST") {
@@ -98,8 +98,34 @@ export class HttpEngineClient implements EngineClient {
         ...(init?.headers ?? {}),
       },
     });
+    if (response.status === 403 && method === "POST" && !retriedToken) {
+      this.sessionToken = null;
+      this.tokenPromise = null;
+      return this.requestJson<T>(path, init, true);
+    }
     if (!response.ok) {
-      throw new Error(`Engine HTTP error (${response.status}): ${path}`);
+      let detail = "";
+      try {
+        const errBody = (await response.json()) as {
+          error?: { code?: string; message?: string } | string;
+          message?: string;
+        };
+        if (errBody && typeof errBody.error === "object" && errBody.error !== null) {
+          const code = errBody.error.code ? `[${errBody.error.code}] ` : "";
+          detail = `${code}${errBody.error.message ?? ""}`.trim();
+        } else if (typeof errBody?.error === "string") {
+          detail = errBody.error;
+        } else if (typeof errBody?.message === "string") {
+          detail = errBody.message;
+        }
+      } catch {
+        // Ignore body parse errors and fallback to status code
+      }
+      throw new Error(
+        detail
+          ? `Engine HTTP error (${response.status}): ${detail}`
+          : `Engine HTTP error (${response.status}): ${path}`,
+      );
     }
     return (await response.json()) as T;
   }
@@ -125,11 +151,34 @@ export class HttpEngineClient implements EngineClient {
         es.addEventListener("snapshot", (event: MessageEvent) => {
           try {
             const parsed = JSON.parse(String(event.data)) as WorkspaceSnapshot;
-            this.notify(parsed);
+            if (parsed && typeof parsed === "object" && "phase" in parsed) {
+              this.notify(parsed);
+            }
           } catch {
             // Ignore malformed SSE payload
           }
         });
+        if (typeof es.addEventListener === "function") {
+          es.addEventListener("message", (event: MessageEvent) => {
+            try {
+              const parsed = JSON.parse(String(event.data)) as {
+                event_type?: string;
+                sequence?: number;
+                phase?: string;
+              };
+              if (parsed && "phase" in parsed) {
+                this.notify(parsed as unknown as WorkspaceSnapshot);
+              } else if (
+                parsed?.event_type === "snapshot.ready" &&
+                (!this.latestSnapshot || parsed.sequence !== this.latestSnapshot.historyCursor.sequence)
+              ) {
+                void this.getSnapshot().catch(() => undefined);
+              }
+            } catch {
+              // Ignore malformed default message
+            }
+          });
+        }
         this.eventSource = es;
       } catch {
         this.eventSource = null;

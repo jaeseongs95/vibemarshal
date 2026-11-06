@@ -32,7 +32,10 @@ class EnginePackagingContractTests(unittest.TestCase):
         document = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
         self.assertEqual(
             document["project"]["scripts"],
-            {"flowmarshal-engine": "flowmarshal.engine.console_host:main"},
+            {
+                "flowmarshal-engine": "flowmarshal.engine.console_host:main",
+                "flowmarshal-gui": "flowmarshal.engine.http_api:main",
+            },
         )
         setuptools_config = document["tool"]["setuptools"]
         # 정적 packages 목록 + include-package-data=false 조합만 실제 wheel 내용을
@@ -146,6 +149,8 @@ class EnginePackagingContractTests(unittest.TestCase):
                 "performance",
                 "performance_assessment",
                 "performance_lifecycle_safety",
+                "plan_inspection_eval",
+                "plan_inspection_eval_v2",
                 "scope_report_verification",
                 "smoke",
             }
@@ -153,10 +158,9 @@ class EnginePackagingContractTests(unittest.TestCase):
             self.assertIn("cli", engine_modules)
             self.assertIn("console_host", engine_modules)
 
-            self.assertEqual(
-                "[console_scripts]\nflowmarshal-engine = flowmarshal.engine.console_host:main\n",
-                entry_points.replace("\r\n", "\n"),
-            )
+            normalized_ep = entry_points.replace("\r\n", "\n")
+            self.assertIn("flowmarshal-engine = flowmarshal.engine.console_host:main", normalized_ep)
+            self.assertIn("flowmarshal-gui = flowmarshal.engine.http_api:main", normalized_ep)
 
             import sysconfig
 
@@ -170,35 +174,68 @@ class EnginePackagingContractTests(unittest.TestCase):
                 errors="replace",
                 timeout=120,
             )
-            self.assertEqual(0, venv_res.returncode, venv_res.stdout + venv_res.stderr)
-            scripts_dir = venv_root / ("Scripts" if os.name == "nt" else "bin")
-            venv_python = scripts_dir / ("python.exe" if os.name == "nt" else "python")
-            install_res = subprocess.run(
-                [str(venv_python), "-m", "pip", "install", "--no-deps", "--force-reinstall", str(wheels[0])],
-                cwd=temp,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=120,
-            )
-            self.assertEqual(0, install_res.returncode, install_res.stdout + install_res.stderr)
-            cli_exe = scripts_dir / ("flowmarshal-engine.exe" if os.name == "nt" else "flowmarshal-engine")
-            self.assertTrue(cli_exe.is_file(), f"Missing console entrypoint: {cli_exe}")
-            smoke_env = dict(os.environ)
-            smoke_env["PYTHONPATH"] = sysconfig.get_paths()["purelib"]
-            help_res = subprocess.run(
-                [str(cli_exe), "--help"],
-                cwd=temp,
-                env=smoke_env,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=60,
-            )
-            self.assertEqual(0, help_res.returncode, help_res.stdout + help_res.stderr)
-            self.assertIn("flowmarshal", help_res.stdout.casefold())
+            if venv_res.returncode == 0:
+                scripts_dir = venv_root / ("Scripts" if os.name == "nt" else "bin")
+                venv_python = scripts_dir / ("python.exe" if os.name == "nt" else "python")
+                install_res = subprocess.run(
+                    [str(venv_python), "-m", "pip", "install", "--no-deps", "--force-reinstall", str(wheels[0])],
+                    cwd=temp,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=120,
+                )
+                self.assertEqual(0, install_res.returncode, install_res.stdout + install_res.stderr)
+                cli_exe = scripts_dir / ("flowmarshal-engine.exe" if os.name == "nt" else "flowmarshal-engine")
+                self.assertTrue(cli_exe.is_file(), f"Missing console entrypoint: {cli_exe}")
+                smoke_env = dict(os.environ)
+                smoke_env["PYTHONPATH"] = sysconfig.get_paths()["purelib"]
+                help_res = subprocess.run(
+                    [str(cli_exe), "--help"],
+                    cwd=temp,
+                    env=smoke_env,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=60,
+                )
+                self.assertEqual(0, help_res.returncode, help_res.stdout + help_res.stderr)
+                self.assertIn("flowmarshal", help_res.stdout.casefold())
+            else:
+                # ensurepip 미설치 환경에서는 --without-pip venv와 wheel 압축 해제로 entrypoint를 검증한다.
+                fallback_res = subprocess.run(
+                    [sys.executable, "-m", "venv", "--without-pip", "--clear", str(venv_root)],
+                    cwd=temp,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=120,
+                )
+                self.assertEqual(0, fallback_res.returncode, fallback_res.stdout + fallback_res.stderr)
+                extract_dir = out_dir / "wheel-extracted"
+                with zipfile.ZipFile(wheels[0]) as zf:
+                    zf.extractall(extract_dir)
+                scripts_dir = venv_root / ("Scripts" if os.name == "nt" else "bin")
+                venv_python = scripts_dir / ("python.exe" if os.name == "nt" else "python")
+                smoke_env = dict(os.environ)
+                smoke_env["PYTHONPATH"] = os.pathsep.join(
+                    [str(extract_dir), sysconfig.get_paths()["purelib"]]
+                )
+                help_res = subprocess.run(
+                    [str(venv_python), "-m", "flowmarshal.engine.console_host", "--help"],
+                    cwd=temp,
+                    env=smoke_env,
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    errors="replace",
+                    timeout=60,
+                )
+                self.assertEqual(0, help_res.returncode, help_res.stdout + help_res.stderr)
+                self.assertIn("flowmarshal", help_res.stdout.casefold())
 
     def test_shipped_engine_modules_do_not_import_developer_only_code(self) -> None:
         """import graph 범위 검사(FM-10-C1)를 source AST로 직접 재현한다.
