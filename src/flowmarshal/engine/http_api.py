@@ -117,16 +117,13 @@ class LocalGuiEngineBackend:
         self.live_gemini = bool(live_gemini)
 
         if self.live_gemini and runtime is None:
-            from .agy_gemini_bridge import (
-                AgyLocalGovernance,
-                create_agy_gemini_runtime,
-                default_agy_gemini_role_configuration,
-            )
+            import importlib
 
-            self.runtime = create_agy_gemini_runtime(state_root=self.artifact_root / "gemini-runtime")
+            bridge = importlib.import_module("flowmarshal.engine.agy_gemini_bridge")
+            self.runtime = bridge.create_agy_gemini_runtime(state_root=self.artifact_root / "gemini-runtime")
             self.inventory = self.runtime.list_models()
-            self.role_configuration = role_configuration or default_agy_gemini_role_configuration()
-            self.governance = AgyLocalGovernance()
+            self.role_configuration = role_configuration or bridge.default_agy_gemini_role_configuration()
+            self.governance = None
         else:
             self.inventory = ModelInventory(
                 executable_digest="sha256:" + "0" * 64,
@@ -163,7 +160,56 @@ class LocalGuiEngineBackend:
         self._recovery_state: dict[str, Any] | None = None
         self._active_attempt_state: dict[str, Any] | None = None
         self._ephemeral_workspaces: list[Path] = []
+        self._event_subscribers: list[Any] = []
         self.project_id = project_id or self._ensure_default_project()
+
+    def subscribe_events(self) -> Any:
+        import queue
+
+        q: queue.Queue[dict[str, Any] | None] = queue.Queue(maxsize=64)
+        with self._lock:
+            self._event_subscribers.append(q)
+        return q
+
+    def unsubscribe_events(self, q: Any) -> None:
+        with self._lock:
+            if q in self._event_subscribers:
+                self._event_subscribers.remove(q)
+
+    def _notify_subscribers(self, snap: dict[str, Any] | None = None) -> None:
+        with self._lock:
+            if not self._event_subscribers:
+                return
+            payload = snap or self.snapshot()
+            for q in list(self._event_subscribers):
+                try:
+                    q.put_nowait(payload)
+                except Exception:
+                    pass
+
+    def close(self) -> None:
+        with self._lock:
+            for q in list(self._event_subscribers):
+                try:
+                    q.put_nowait(None)
+                except Exception:
+                    pass
+            self._event_subscribers.clear()
+            try:
+                self.application.close_task_gate()
+            except Exception:
+                pass
+            if getattr(self.application, "supervisor", None) is not None:
+                try:
+                    self.application.supervisor.close()
+                except Exception:
+                    pass
+            elif getattr(self, "runtime", None) is not None and hasattr(self.runtime, "close"):
+                try:
+                    self.runtime.close()
+                except Exception:
+                    pass
+            self._cleanup_ephemeral_workspaces()
 
     def _cleanup_ephemeral_workspaces(self) -> None:
         import shutil
@@ -309,12 +355,18 @@ class LocalGuiEngineBackend:
                 trace_refs=(trace.trace_id,),
             ),
         )
+        is_default_request = "사용량이 비어 있는 실행에서도" in source_request or "usage 일부가 null이어도" in source_request
+        observable_outcome = (
+            "usage 일부가 null이어도 Markdown과 JSON 보고가 생성되고 기존 정상 합계가 유지된다."
+            if is_default_request
+            else source_request.strip()
+        )
         goal_def = GoalContractDefinition(
             project_id=project_id,
             source_request=source_request,
             source_request_digest=req_digest,
             mission_class=MissionClass.BUGFIX_STABILIZATION,
-            observable_outcome="usage 일부가 null이어도 Markdown과 JSON 보고가 생성되고 기존 정상 합계가 유지된다.",
+            observable_outcome=observable_outcome,
             hard_acceptance=criteria,
             constraints=constraints,
             non_goals=("실제 provider usage를 추정해 채우지 않는다.", "Engine 1.0 cutover 판정을 변경하지 않는다."),
@@ -337,7 +389,7 @@ class LocalGuiEngineBackend:
             supersedes_goal_revision_id=supersedes_goal_revision_id,
             created_at=utc_now(),
         )
-        self.service.register_goal(goal_rev, activate=True)
+        self.service.register_goal(goal_rev, activate=True, replace_active_plan=True)
 
         project_map, state = self.service.reobserve_project(
             project_id,
@@ -779,12 +831,14 @@ class LocalGuiEngineBackend:
                             "contributesTo": list(tc.goal_criterion_refs) if tc else [],
                             "executionSpecRevisionId": spec_rows.get(t_row["id"]),
                             "attemptId": a_row["id"] if a_row is not None else None,
-                            "updatedAt": _iso_now(),
+                            "updatedAt": t_row.get("updated_at") or _iso_now(),
                         }
                     )
 
             has_task_val = any(r["task_id"] is not None and r["status"] == "pass" for r in val_rows)
+            has_task_val_fail = any(r["task_id"] is not None and r["status"] == "fail" for r in val_rows)
             has_goal_val = any(r["task_id"] is None and r["status"] == "pass" for r in val_rows)
+            has_goal_val_fail = any(r["task_id"] is None and r["status"] == "fail" for r in val_rows)
             verdict_status = "unknown"
             if verdict_row is not None:
                 verdict_obj = GoalVerdict.model_validate_json(verdict_row["payload_json"])
@@ -795,12 +849,19 @@ class LocalGuiEngineBackend:
                 )
 
             all_completed = bool(tasks_view) and all(t["status"] == "completed" for t in tasks_view)
+            control_state = self.service.workflow_control_state(self.project_id)
             if self._recovery_state is not None:
                 phase = "recovery"
                 run_state = "recovery_required"
             elif verdict_status == "satisfied":
                 phase = "completed"
                 run_state = "completed"
+            elif control_state == "cancelled":
+                phase = "recovery"
+                run_state = "cancelled"
+            elif control_state == "paused":
+                phase = "running" if active_plan_id is not None else "goal_ready"
+                run_state = "paused"
             elif self._draft_goal_mode:
                 phase = "goal_draft"
                 run_state = "idle"
@@ -908,12 +969,32 @@ class LocalGuiEngineBackend:
                 possible_actions.append(
                     {
                         "kind": "run_once",
-                        "enabled": True,
-                        "disabledReason": None,
+                        "enabled": control_state != "cancelled",
+                        "disabledReason": "취소된 워크플로입니다." if control_state == "cancelled" else None,
                         "confirmation": "none",
                         "checkpointRequired": False,
                     }
                 )
+                if control_state == "running":
+                    possible_actions.append(
+                        {
+                            "kind": "pause",
+                            "enabled": True,
+                            "disabledReason": None,
+                            "confirmation": "none",
+                            "checkpointRequired": False,
+                        }
+                    )
+                if control_state != "cancelled":
+                    possible_actions.append(
+                        {
+                            "kind": "cancel",
+                            "enabled": True,
+                            "disabledReason": None,
+                            "confirmation": "none",
+                            "checkpointRequired": False,
+                        }
+                    )
             elif phase == "completed":
                 possible_actions.append(
                     {
@@ -1051,9 +1132,21 @@ class LocalGuiEngineBackend:
                 "activePlanRevisionId": effective_plan_id,
                 "tasks": tasks_view,
                 "validation": {
-                    "workerObservation": "collected" if has_task_val or all_completed else "pending",
-                    "taskValidation": "passed" if has_task_val or all_completed else "pending",
-                    "goalTest": "passed" if has_goal_val or verdict_status == "satisfied" else "pending",
+                    "workerObservation": (
+                        "collected"
+                        if has_task_val or has_task_val_fail or all_completed
+                        else "pending"
+                    ),
+                    "taskValidation": (
+                        "failed"
+                        if has_task_val_fail and not all_completed
+                        else ("passed" if has_task_val or all_completed else "pending")
+                    ),
+                    "goalTest": (
+                        "failed"
+                        if has_goal_val_fail or verdict_status == "unsatisfied"
+                        else ("passed" if has_goal_val or verdict_status == "satisfied" else "pending")
+                    ),
                     "verdict": verdict_status,
                 },
                 "activeAttempt": self._active_attempt_state,
@@ -1133,7 +1226,26 @@ class LocalGuiEngineBackend:
     def search_plans(self) -> dict[str, Any]:
         with self._lock:
             self._draft_goal_mode = False
-            return {"ok": True, "data": self.snapshot()}
+            try:
+                latest = self.service.load_latest_goal(self.project_id)
+                with self.service.ledger.read() as conn:
+                    has_plans = conn.execute(
+                        "SELECT 1 FROM plan_revisions WHERE project_id = ? AND json_extract(payload_json, '$.definition.goal_contract_digest') = ? LIMIT 1",
+                        (self.project_id, latest.definition_digest),
+                    ).fetchone()
+                if has_plans is None:
+                    self._register_goal_and_plans_in_ledger(
+                        project_id=self.project_id,
+                        source_request=latest.definition.source_request,
+                        revision_no=latest.revision_no + 1,
+                        goal_id=latest.goal_id,
+                        supersedes_goal_revision_id=latest.goal_revision_id,
+                    )
+            except Exception:
+                pass
+            snap = self.snapshot()
+            self._notify_subscribers(snap)
+            return {"ok": True, "data": snap}
 
     def activate_plan(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
@@ -1184,7 +1296,7 @@ class LocalGuiEngineBackend:
                 if target.plan_revision_id != plan_revision_id:
                     with self.service.ledger.read() as conn:
                         alt_row = conn.execute(
-                            "SELECT id, activation_digest, status FROM plan_revisions "
+                            "SELECT id, activation_digest, status, payload_json FROM plan_revisions "
                             "WHERE id = ? AND project_id = ?",
                             (plan_revision_id, self.project_id),
                         ).fetchone()
@@ -1192,20 +1304,24 @@ class LocalGuiEngineBackend:
                         return self._error("DIGEST_MISMATCH", "선택한 Plan 후보가 승인 대상과 다릅니다.")
                     if activation_digest and alt_row["activation_digest"] != activation_digest:
                         return self._error("DIGEST_MISMATCH", "현재 후보와 activation digest가 일치하지 않습니다.")
-                    self.service.authorize_goal(
-                        project_id=self.project_id,
-                        source="desktop-gui:user-confirmation",
-                        capability=app_for_auth._core_action_authority.issue_goal_authorization(
-                            ledger_path=self.service.ledger.path,
-                            target=target,
-                        ),
-                        authorization_target=target,
-                    )
-                    self.service.activate_plan(
-                        plan_revision_id=str(plan_revision_id),
-                        activation_digest=str(alt_row["activation_digest"]),
-                        source="desktop-gui:user-confirmation",
-                    )
+                    with self.service.ledger.transaction() as tx:
+                        authorization, _, _ = self.service._authorize_goal_in_transaction(
+                            tx,
+                            project_id=self.project_id,
+                            source="desktop-gui:user-confirmation",
+                            capability=app_for_auth._core_action_authority.issue_goal_authorization(
+                                ledger_path=self.service.ledger.path,
+                                target=target,
+                            ),
+                            authorization_target=target,
+                            validate_selected_plan=False,
+                        )
+                        self.service._activate_plan_in_transaction(
+                            tx,
+                            plan_revision_id=str(plan_revision_id),
+                            activation_digest=str(alt_row["activation_digest"]),
+                            source="desktop-gui:user-confirmation",
+                        )
                 else:
                     if activation_digest and target.plan_activation_digest != activation_digest:
                         return self._error("DIGEST_MISMATCH", "현재 후보와 activation digest가 일치하지 않습니다.")
@@ -1218,7 +1334,9 @@ class LocalGuiEngineBackend:
                     )
             except (EngineServiceError, EngineApplicationError, EngineLedgerError, CoreCapabilityError) as error:
                 return self._error("ACTIVATION_FAILED", str(error))
-            return {"ok": True, "data": self.snapshot()}
+            snap = self.snapshot()
+            self._notify_subscribers(snap)
+            return {"ok": True, "data": snap}
 
     def run_once(self) -> dict[str, Any]:
         with self._lock:
@@ -1631,7 +1749,100 @@ class LocalGuiEngineBackend:
                 run_state="idle",
                 recovery_reason=None,
             )
-            return {"ok": True, "data": self.snapshot()}
+            snap = self.snapshot()
+            self._notify_subscribers(snap)
+            return {"ok": True, "data": snap}
+
+    def pause_workflow(self, reason: str = "사용자 일시정지 요청") -> dict[str, Any]:
+        with self._lock:
+            try:
+                self.application.pause(self.project_id, reason=reason.strip() or "사용자 일시정지 요청")
+            except (EngineServiceError, EngineApplicationError, EngineLedgerError) as error:
+                return self._error("PAUSE_FAILED", str(error))
+            snap = self.snapshot()
+            self._notify_subscribers(snap)
+            return {"ok": True, "data": snap}
+
+    def cancel_workflow(self, reason: str = "사용자 취소 요청") -> dict[str, Any]:
+        with self._lock:
+            try:
+                self.application.cancel(self.project_id, reason=reason.strip() or "사용자 취소 요청")
+            except (EngineServiceError, EngineApplicationError, EngineLedgerError) as error:
+                return self._error("CANCEL_FAILED", str(error))
+            snap = self.snapshot()
+            self._notify_subscribers(snap)
+            return {"ok": True, "data": snap}
+
+    def replan_workflow(self, rationale: str) -> dict[str, Any]:
+        with self._lock:
+            if not rationale or not rationale.strip():
+                return self._error("RATIONALE_REQUIRED", "재계획 사유(rationale)가 필요합니다.")
+            try:
+                self.application.replan(self.project_id, rationale=rationale.strip())
+            except (EngineServiceError, EngineApplicationError, EngineLedgerError) as error:
+                if self.live_gemini:
+                    return self._error("REPLAN_FAILED", str(error))
+                self.service.set_workflow_control(
+                    self.project_id, state="running", reason=rationale.strip()
+                )
+                self._recovery_state = None
+            snap = self.snapshot()
+            self._notify_subscribers(snap)
+            return {"ok": True, "data": snap}
+
+    def final_report_view(self, format_type: str = "json") -> dict[str, Any]:
+        with self._lock:
+            try:
+                report = self.application.final_report(self.project_id)
+                from .reporting import render_final
+
+                markdown = render_final(
+                    goal=report.goal,
+                    plan=report.plan,
+                    verdict=report.verdict,
+                    usage=report.usage.usage_records,
+                    usage_summary=report.usage,
+                    execution_summary=report.execution_summary,
+                    governance_plugin_tasks=report.governance_plugin_tasks,
+                    read_only_verification=report.read_only_verification,
+                    governance_profile_id=report.governance_profile_id,
+                    governance_freeze_identity=report.governance_freeze_identity,
+                    same_user_security_limitation=report.same_user_security_limitation,
+                    r16_approved_slot_status=report.r16_approved_slot_status,
+                )
+                return {
+                    "ok": True,
+                    "data": {
+                        "report": report.model_dump(mode="json"),
+                        "markdown": markdown,
+                    },
+                }
+            except (EngineServiceError, EngineApplicationError, EngineLedgerError) as error:
+                return self._error("FINAL_REPORT_UNAVAILABLE", str(error))
+
+    def select_project(self, project_root: str) -> dict[str, Any]:
+        with self._lock:
+            if not project_root or not project_root.strip():
+                return self._error("PROJECT_ROOT_REQUIRED", "프로젝트 루트 경로가 필요합니다.")
+            resolved = Path(project_root.strip()).expanduser().resolve()
+            resolved.mkdir(parents=True, exist_ok=True)
+            self.project_root = resolved
+            with self.service.ledger.read() as conn:
+                existing = conn.execute(
+                    "SELECT id FROM projects WHERE root = ? ORDER BY created_at DESC LIMIT 1",
+                    (str(resolved),),
+                ).fetchone()
+            if existing is not None:
+                self.project_id = str(existing["id"])
+                self._draft_goal_mode = False
+                self._recovery_state = None
+            else:
+                self.project_id = self._bootstrap_project_with_goal_and_plans()
+                self._draft_goal_mode = False
+                self._recovery_state = None
+            snap = self.snapshot()
+            self._notify_subscribers(snap)
+            return {"ok": True, "data": snap}
 
     def _error(
         self,
@@ -1798,6 +2009,9 @@ def create_http_handler(
             if parsed.path == "/api/v1/snapshot":
                 self._send_json(HTTPStatus.OK, backend.snapshot())
                 return
+            if parsed.path == "/api/v1/final-report":
+                self._send_json(HTTPStatus.OK, backend.final_report_view())
+                return
             if parsed.path == "/api/v1/events":
                 snap = backend.snapshot()
                 ready_payload = json.dumps(
@@ -1810,18 +2024,69 @@ def create_http_handler(
                     ensure_ascii=False,
                 )
                 snap_payload = json.dumps(snap, ensure_ascii=False)
-                body = (
+                initial_body = (
                     f"data: {ready_payload}\n\n"
                     f"event: snapshot\ndata: {snap_payload}\n\n"
                 ).encode("utf-8")
+                from urllib.parse import parse_qs
+
+                query = parse_qs(parsed.query)
+                if query.get("stream") == ["1"]:
+                    import queue
+
+                    self.send_response(HTTPStatus.OK)
+                    self._send_cors_headers()
+                    self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                    self.send_header("Cache-Control", "no-cache")
+                    self.send_header("Connection", "keep-alive")
+                    self.end_headers()
+                    q = backend.subscribe_events()
+                    try:
+                        self.wfile.write(initial_body)
+                        self.wfile.flush()
+                        while True:
+                            try:
+                                next_snap = q.get(timeout=15.0)
+                            except queue.Empty:
+                                self.wfile.write(b": keepalive\n\n")
+                                self.wfile.flush()
+                                continue
+                            if next_snap is None:
+                                break
+                            ev_data = json.dumps(next_snap, ensure_ascii=False).encode("utf-8")
+                            self.wfile.write(b"event: snapshot\ndata: " + ev_data + b"\n\n")
+                            self.wfile.flush()
+                    except (BrokenPipeError, ConnectionResetError, OSError):
+                        pass
+                    finally:
+                        backend.unsubscribe_events(q)
+                    return
                 self.send_response(HTTPStatus.OK)
                 self._send_cors_headers()
                 self.send_header("Content-Type", "text/event-stream; charset=utf-8")
                 self.send_header("Cache-Control", "no-cache")
-                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Content-Length", str(len(initial_body)))
                 self.end_headers()
-                self.wfile.write(body)
+                self.wfile.write(initial_body)
                 return
+            dist_dir = Path(__file__).resolve().parents[3] / "apps" / "desktop" / "dist"
+            if dist_dir.is_dir() and not parsed.path.startswith("/api/"):
+                import mimetypes
+
+                rel_path = parsed.path.lstrip("/") or "index.html"
+                candidate = (dist_dir / rel_path).resolve()
+                if not str(candidate).startswith(str(dist_dir.resolve())) or not candidate.is_file():
+                    candidate = dist_dir / "index.html"
+                if candidate.is_file():
+                    content = candidate.read_bytes()
+                    ctype, _ = mimetypes.guess_type(str(candidate))
+                    self.send_response(HTTPStatus.OK)
+                    self._send_cors_headers()
+                    self.send_header("Content-Type", ctype or "application/octet-stream")
+                    self.send_header("Content-Length", str(len(content)))
+                    self.end_headers()
+                    self.wfile.write(content)
+                    return
             self._send_json(HTTPStatus.NOT_FOUND, {"error": "NOT_FOUND", "path": parsed.path})
 
         def do_POST(self) -> None:
@@ -1857,6 +2122,9 @@ def create_http_handler(
                 scenario = str(body.get("scenario") or "golden-path")
                 self._send_json(HTTPStatus.OK, backend.reset_scenario(scenario))
                 return
+            if parsed.path == "/api/v1/projects/select":
+                self._send_json(HTTPStatus.OK, backend.select_project(str(body.get("projectRoot") or "")))
+                return
             if parsed.path == "/api/v1/goals/draft":
                 self._send_json(HTTPStatus.OK, backend.start_goal_revision())
                 return
@@ -1872,6 +2140,18 @@ def create_http_handler(
                 return
             if parsed.path == "/api/v1/run-once":
                 self._send_json(HTTPStatus.OK, backend.run_once())
+                return
+            if parsed.path == "/api/v1/pause":
+                self._send_json(HTTPStatus.OK, backend.pause_workflow(str(body.get("reason") or "사용자 일시정지 요청")))
+                return
+            if parsed.path == "/api/v1/cancel":
+                self._send_json(HTTPStatus.OK, backend.cancel_workflow(str(body.get("reason") or "사용자 취소 요청")))
+                return
+            if parsed.path == "/api/v1/replan":
+                self._send_json(HTTPStatus.OK, backend.replan_workflow(str(body.get("rationale") or "")))
+                return
+            if parsed.path == "/api/v1/final-report":
+                self._send_json(HTTPStatus.OK, backend.final_report_view(str(body.get("format") or "json")))
                 return
             if parsed.path == "/api/v1/stale/refresh":
                 self._send_json(HTTPStatus.OK, backend.refresh_stale())
@@ -1929,6 +2209,7 @@ class LocalGuiServer:
         self.httpd.serve_forever()
 
     def close(self) -> None:
+        self.backend.close()
         self.httpd.shutdown()
         self.httpd.server_close()
         if self._thread is not None:

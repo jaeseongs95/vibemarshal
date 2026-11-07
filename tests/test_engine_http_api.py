@@ -335,6 +335,104 @@ class EngineHttpApiTests(unittest.TestCase):
         self.assertIn("recovery.external_unknown_detected", history_kinds)
         self.assertIn("recovery.intent_abandoned", history_kinds)
 
+    def test_pause_cancel_replan_select_project_and_final_report_endpoints(self) -> None:
+        # 1. /api/v1/plans/search
+        searched = self._post("/api/v1/plans/search", {})
+        self.assertTrue(searched["ok"])
+        self.assertGreaterEqual(len(searched["data"]["plans"]), 1)
+
+        # 2. Activate plan atomically (VM-D-0033)
+        alt_plan = searched["data"]["plans"][-1]
+        activated = self._post(
+            "/api/v1/plans/activate",
+            {
+                "planRevisionId": alt_plan["planRevisionId"],
+                "activationDigest": alt_plan["activationDigest"],
+                "expectedGoalDigest": searched["data"]["goal"]["definitionDigest"],
+            },
+        )
+        self.assertTrue(activated["ok"])
+        self.assertEqual(activated["data"]["activePlanRevisionId"], alt_plan["planRevisionId"])
+        # Task updatedAt comes from ledger row (VM-D-0043)
+        self.assertTrue(all(bool(t["updatedAt"]) for t in activated["data"]["tasks"]))
+
+        # 3. /api/v1/pause & /api/v1/replan & /api/v1/cancel (VM-T-0009, VM-D-0032)
+        paused = self._post("/api/v1/pause", {"reason": "점검 일시정지"})
+        self.assertTrue(paused["ok"])
+        self.assertEqual(paused["data"]["project"]["runState"], "paused")
+
+        replanned = self._post("/api/v1/replan", {"rationale": "대안 경로 재탐색"})
+        self.assertTrue(replanned["ok"])
+        self.assertEqual(replanned["data"]["phase"], "plan_active")
+
+        # Run to completion and fetch /api/v1/final-report (VM-T-0009, VM-T-0011)
+        for _ in range(9):
+            step = self._post("/api/v1/run-once", {})
+            if step["data"]["phase"] == "completed":
+                break
+        report_res = self._get("/api/v1/final-report")
+        self.assertTrue(report_res["ok"])
+        self.assertIn("Governance A2 서명 프로파일 및 보안 한계", report_res["data"]["markdown"])
+        self.assertEqual(report_res["data"]["report"]["governance_profile_id"], "flowmarshal-same-user-v1")
+
+        # 4. /api/v1/projects/select switches workspace root (VM-T-0009, VM-D-0032)
+        new_ws = self.root / "second-workspace"
+        selected = self._post("/api/v1/projects/select", {"projectRoot": str(new_ws)})
+        self.assertTrue(selected["ok"])
+        self.assertEqual(selected["data"]["project"]["location"]["displayName"], "second-workspace")
+
+    def test_defect_and_task_invariants_across_engine_layers(self) -> None:
+        from flowmarshal.engine.capabilities import CoreCapabilityError, role_execution_scope
+        from flowmarshal.engine.eval_cli import _emit
+        from flowmarshal.engine.ledger import SQLiteEngineHistoryReader
+
+        # VM-D-0035: SQLiteEngineHistoryReader blocks access inside role_execution_scope
+        with role_execution_scope("worker"):
+            with self.assertRaises(CoreCapabilityError):
+                SQLiteEngineHistoryReader(self.db_path)
+
+        # VM-D-0039 / VM-T-0015: RoleSteward error message and pre-1.0 governance model classes config
+        config_path = Path(__file__).resolve().parents[1] / "config" / "pre-1.0-governance-model-classes.json"
+        self.assertTrue(config_path.is_file())
+        config_data = json.loads(config_path.read_text(encoding="utf-8"))
+        self.assertIn("claude-sonnet-4-6", config_data["classes"])
+        self.assertIn("gemini-3-flash", config_data["classes"])
+
+        # VM-D-0044: eval_cli._emit survives non-UTF8 stream encoding without UnicodeEncodeError
+        raw_bytes = io.BytesIO()
+        cp949_stream = io.TextIOWrapper(raw_bytes, encoding="ascii", errors="strict")
+        with redirect_stdout(cp949_stream):
+            _emit({"message": "한글 및 이모지 🚀 출력 안전성 검증"})
+        cp949_stream.flush()
+        self.assertIn("message", raw_bytes.getvalue().decode("ascii", errors="ignore"))
+
+        # VM-T-0012: register_goal(replace_active_plan=True) supersedes active plan cleanly
+        from flowmarshal.canonical import sha256_bytes
+        from flowmarshal.engine.domain import new_id
+
+        latest_goal = self.backend.service.load_latest_goal(self.backend.project_id)
+        new_req = "수정된 목표 요청 원문으로 활성 Plan을 안전하게 교체한다."
+        new_def = latest_goal.definition.model_copy(
+            update={
+                "source_request": new_req,
+                "source_request_digest": sha256_bytes(new_req.encode("utf-8")),
+            }
+        )
+        new_goal = latest_goal.model_copy(
+            update={
+                "goal_revision_id": new_id("goal_revision"),
+                "revision_no": latest_goal.revision_no + 1,
+                "definition": new_def,
+                "definition_digest": new_def.definition_digest,
+                "supersedes_goal_revision_id": latest_goal.goal_revision_id,
+            }
+        )
+        self.backend.service.register_goal(new_goal, replace_active_plan=True)
+        loaded_after = self.backend.service.load_latest_goal(self.backend.project_id)
+        self.assertEqual(loaded_after.goal_revision_id, new_goal.goal_revision_id)
+        status_after = self.backend.service.status(self.backend.project_id)
+        self.assertIsNone(status_after["project"]["active_plan_revision_id"])
+
 
 if __name__ == "__main__":
     unittest.main()

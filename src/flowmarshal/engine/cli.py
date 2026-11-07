@@ -196,16 +196,6 @@ def _application(
         None if runtime is None
         else GovernanceSettings.from_environment(Path(arguments.artifacts) / "governance")
     )
-    if (
-        governance_settings is None
-        and runtime is not None
-        and getattr(arguments, "provider", "codex") == "gemini"
-        and getattr(runtime, "gemini_executable", None) is not None
-        and Path(runtime.gemini_executable).name == "agy_gemini_bridge.py"
-    ):
-        from .agy_gemini_bridge import AgyLocalGovernance
-
-        governance_settings = AgyLocalGovernance()
     return EngineApplication(
         _service(arguments),
         runtime=runtime,
@@ -557,6 +547,7 @@ def _cmd_goal_revise(arguments: argparse.Namespace) -> None:
         service.register_goal(
             outcome.goal_contract,
             activate=outcome.goal_contract.status is RevisionStatus.READY,
+            replace_active_plan=getattr(arguments, "replace_active_plan", False),
         )
         BudgetManager(service).attach_goal(arguments.project_id, latest.goal_id, outcome.goal_contract.definition_digest)
         _emit(outcome)
@@ -572,7 +563,10 @@ def _cmd_goal_revise(arguments: argparse.Namespace) -> None:
         supersedes_goal_revision_id=latest.goal_revision_id,
         created_at=utc_now(),
     )
-    service.register_goal(revision)
+    service.register_goal(
+        revision,
+        replace_active_plan=getattr(arguments, "replace_active_plan", False),
+    )
     _emit(
         {
             "goal_id": revision.goal_id,
@@ -804,6 +798,34 @@ def _cmd_plan_compare(arguments: argparse.Namespace) -> None:
 
 
 def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
+    confirm_digest = getattr(arguments, "confirm_digest", None)
+    if confirm_digest is not None:
+        from .application import ApplicationAuthority
+
+        app = _application(arguments)
+        authority = ApplicationAuthority(app)
+        project_id = arguments.project_id
+        if not project_id and arguments.plan_revision_id:
+            with app.service.ledger.read() as connection:
+                row = connection.execute(
+                    "SELECT project_id FROM plan_revisions WHERE id = ?",
+                    (arguments.plan_revision_id,),
+                ).fetchone()
+            if row is None:
+                raise EngineServiceError("PlanContract를 찾을 수 없습니다.")
+            project_id = row["project_id"]
+        target = authority.authorization_target(project_id)
+        if confirm_digest.strip() != target.target_digest:
+            raise EngineServiceError(
+                "AUTHORIZATION_DECLINED: target_digest가 일치하지 않아 승인하지 않았습니다."
+            )
+        result = authority.authorize(
+            project_id,
+            target=target,
+            source=arguments.source,
+        )
+        _emit({"activation_id": result.activation_id})
+        return
     service = _service(arguments)
     if arguments.project_id:
         activation_id = service.activate_selected_plan(project_id=arguments.project_id)
@@ -839,13 +861,23 @@ def _cmd_goal_authorize(arguments: argparse.Namespace) -> None:
             )
         )
         return
-    _emit(
-        app.authorize(
-            arguments.project_id,
-            source=arguments.source,
-            operating_policy=policy,
+    try:
+        _emit(
+            app.authorize(
+                arguments.project_id,
+                source=arguments.source,
+                operating_policy=policy,
+            )
         )
-    )
+    except Exception as error:
+        if "CORE_CAPABILITY_REQUIRED" in str(error):
+            from .capabilities import CoreCapabilityError
+
+            raise CoreCapabilityError(
+                "CORE_CAPABILITY_REQUIRED: ApplicationAuthority가 필요합니다. "
+                "TrustedConsoleHost(flowmarshal-engine)에서 실행하거나 --confirm-digest <target_digest>를 지정하십시오."
+            ) from error
+        raise
 
 
 def _goal_authorization_policy(arguments: argparse.Namespace) -> GoalOperatingPolicy | None:
@@ -1282,6 +1314,10 @@ def _cmd_report_final(arguments: argparse.Namespace) -> None:
             execution_summary=report.execution_summary,
             governance_plugin_tasks=report.governance_plugin_tasks,
             read_only_verification=report.read_only_verification,
+            governance_profile_id=report.governance_profile_id,
+            governance_freeze_identity=report.governance_freeze_identity,
+            same_user_security_limitation=report.same_user_security_limitation,
+            r16_approved_slot_status=report.r16_approved_slot_status,
         )
         try:
             sys.stdout.write(text)
@@ -1353,11 +1389,15 @@ def _cmd_prepare(arguments: argparse.Namespace) -> None:
 def _cmd_revise(arguments: argparse.Namespace) -> None:
     if arguments.role_config is None:
         raise EngineApplicationError("ROLE_CONFIGURATION_REQUIRED")
+    extra_kwargs: dict[str, Any] = {}
+    if getattr(arguments, "replace_active_plan", False):
+        extra_kwargs["allow_active_plan_replacement"] = True
     with _runtime(arguments) as runtime:
         result = _application(arguments, runtime=runtime).revise(
             arguments.project_id,
             source_request=arguments.request,
             candidate_count=arguments.candidate_count,
+            **extra_kwargs,
         )
     _emit(result)
 
@@ -1396,6 +1436,11 @@ def _add_goal_arguments(parser: argparse.ArgumentParser, *, revise: bool = False
     parser.add_argument("--project-id", required=True)
     if revise:
         parser.add_argument("--goal-id")
+        parser.add_argument(
+            "--replace-active-plan",
+            action="store_true",
+            help="quiescent 상태에서 기존 active Plan을 supersede하고 새 Goal revision을 활성화",
+        )
     parser.add_argument("--file")
     parser.add_argument("--request")
     parser.add_argument("--outcome")
@@ -1473,6 +1518,11 @@ def build_parser() -> argparse.ArgumentParser:
     revise_facade.add_argument("--role-config", required=True)
     revise_facade.add_argument("--codex-bin")
     revise_facade.add_argument("--candidate-count", type=int, choices=(1, 2, 3))
+    revise_facade.add_argument(
+        "--replace-active-plan",
+        action="store_true",
+        help="quiescent 상태에서 기존 active Plan을 supersede하고 새 Goal revision을 준비",
+    )
     revise_facade.add_argument(
         "--inspection-contract",
         choices=(PLAN_INSPECTION_PROVIDER_V1, PLAN_INSPECTION_PROVIDER_V2),
@@ -1671,6 +1721,10 @@ def build_parser() -> argparse.ArgumentParser:
     activation_target.add_argument("--project-id", help="Core가 선택한 후보를 활성화")
     activation_target.add_argument("--plan-revision-id", help="내부 진단용 후보 식별자")
     activate.add_argument("--digest", help="선택적 내부 digest 검증")
+    activate.add_argument(
+        "--confirm-digest",
+        help="승인할 GoalAuthorizationTarget의 전체 target_digest (직접 CLI 호출 시 승인 및 활성화)",
+    )
     activate.add_argument("--source", default="cli")
     activate.set_defaults(handler=_cmd_plan_activate)
     plan_status = plan_commands.add_parser("status")

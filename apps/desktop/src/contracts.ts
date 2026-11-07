@@ -58,6 +58,9 @@ export type PossibleActionKind =
   | "search_plans"
   | "activate_plan"
   | "run_once"
+  | "pause"
+  | "cancel"
+  | "replan"
   | "refresh_snapshot"
   | "observe_attempt"
   | "resume_attempt"
@@ -97,7 +100,7 @@ export interface ProjectSummary {
     displayName: string;
     displayPath: string;
   };
-  runState: "idle" | "active" | "recovery_required" | "completed";
+  runState: "idle" | "active" | "paused" | "cancelled" | "recovery_required" | "completed";
   activeBlocker: string | null;
 }
 
@@ -269,6 +272,12 @@ export interface ActivatePlanCommand {
   expectedState: ExpectedState;
 }
 
+export interface FinalReportPayload {
+  report: unknown;
+  markdown: string;
+  snapshot?: WorkspaceSnapshot;
+}
+
 export interface EngineClient {
   getSnapshot(): Promise<WorkspaceSnapshot>;
   subscribe(listener: (snapshot: WorkspaceSnapshot) => void): () => void;
@@ -278,6 +287,11 @@ export interface EngineClient {
   searchPlans(context: CommandContext): Promise<CommandResult>;
   activatePlan(command: ActivatePlanCommand, context: CommandContext): Promise<CommandResult>;
   runOnce(context: CommandContext): Promise<CommandResult>;
+  pauseWorkflow?(reason: string, context: CommandContext): Promise<CommandResult>;
+  cancelWorkflow?(reason: string, context: CommandContext): Promise<CommandResult>;
+  replanWorkflow?(rationale: string, context: CommandContext): Promise<CommandResult>;
+  selectProject?(projectRoot: string, context: CommandContext): Promise<CommandResult>;
+  getFinalReport?(context?: CommandContext): Promise<CommandResult<FinalReportPayload>>;
   refreshStale(context: CommandContext): Promise<CommandResult>;
   observeAttempt(context: CommandContext): Promise<CommandResult>;
   resumeAttempt(context: CommandContext): Promise<CommandResult>;

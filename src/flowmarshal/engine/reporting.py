@@ -79,6 +79,12 @@ def render_final(
     execution_summary: ExecutionObservationSummary | None = None,
     read_only_verification: ReadOnlyReportVerification | None = None,
     governance_plugin_tasks: tuple[GovernancePluginTaskObservation, ...] = (),
+    governance_profile_id: str = "flowmarshal-same-user-v1",
+    governance_freeze_identity: str | None = None,
+    same_user_security_limitation: str = (
+        "같은 OS 사용자가 원장·transcript·key를 조작할 수 있어 관측 진실성·격리를 보증하지 않음"
+    ),
+    r16_approved_slot_status: str = "unverified",
 ) -> str:
     if usage_summary is None:
         usage_summary = summarize_usage_records(
@@ -137,8 +143,22 @@ def render_final(
                 f"- 프로젝트 source 무변경: {'PASS' if read_only_verification.source_unchanged else 'FAIL'}",
                 f"- 기준/현재 source digest: `{read_only_verification.baseline_project_map_semantic_digest}` / "
                 f"`{read_only_verification.observed_project_map_semantic_digest}`",
+                f"- 기준/현재 workspace inventory digest: `"
+                f"{read_only_verification.baseline_workspace_inventory_digest or '미기록'}` / "
+                f"`{read_only_verification.observed_workspace_inventory_digest or '미관측'}`",
             )
         )
+    lines.extend(
+        (
+            "",
+            "## Governance A2 서명 프로파일 및 보안 한계",
+            "",
+            f"- profileId: `{governance_profile_id}`",
+            f"- freezeIdentity: `{governance_freeze_identity or '미관측'}`",
+            f"- 동일 OS 사용자 한계: {same_user_security_limitation}",
+            f"- R16 승인 슬롯 상태: `{r16_approved_slot_status}` (승인 슬롯 미검증)",
+        )
+    )
     lines.extend(("", "## Task별 governance plugin identity", ""))
     if governance_plugin_tasks:
         for item in governance_plugin_tasks:

@@ -726,14 +726,14 @@ class RoleSteward:
         self.service, self.runtime, self.roles, self.runner, self.cwd = service, runtime, roles, runner, cwd
 
     def ensure_supported(self) -> None:
-        # Claude provider(설정 카탈로그 inventory)만 session 기록에서 turn별 model·effort를 관측한다. Codex App
+        # Claude·Gemini provider(설정 카탈로그 inventory)만 session 기록에서 turn별 model·effort를 관측한다. Codex App
         # Server는 그 근거가 확인되지 않았으므로 관측 없는 stage 기록을 만들지 않도록 steward 호출 전에 멈추고
         # 다른 provider로 넘어가지 않는다. 평가용 wrapper를 거쳐도 inventory 출처는 그대로다.
         provenance = self.runtime.list_models().inventory_provenance
         if provenance != "configured_catalog":
             raise GovernanceRejected(
-                "GOVERNANCE_PROVIDER_UNSUPPORTED: 필수 governance 연동은 관측 근거가 확인된 Claude provider에서만 "
-                f"실행합니다(현재 inventory 출처 {provenance}).")
+                "GOVERNANCE_PROVIDER_UNSUPPORTED: 필수 governance 연동은 관측 근거가 확인된 Claude/Gemini provider"
+                f"(configured_catalog)에서만 실행합니다(현재 inventory 출처 {provenance}).")
 
     def review(self, task: Any, stage: str, requirement: dict[str, Any] | None, brief: dict[str, Any]) -> dict[str, Any]:
         from .budget import BudgetedRoleRunner
@@ -1192,6 +1192,8 @@ class GovernanceTaskGate:
         phase = "before_completion" if replay else "before_execution"
         stored = self._op(task, key, "plugin_identity", {}, lambda: {
             "summary": identity["summary"], "labels": identity["labels"],
+            "freeze_identity": getattr(self.producer, "freeze_identity", None),
+            "profile_id": getattr(self.producer, "profile_id", None),
             "files": str(self._write(folder / "plugin-identity.json", identity["files"]))}, replay=replay)
         if stored["summary"] != identity["summary"]:
             self._op(task, key, f"plugin_identity_changed:{phase}",
@@ -1368,7 +1370,11 @@ class GovernanceTaskGate:
         evidence = []
         for row in results:
             payload = json.loads(row["payload_json"])
-            index = next(i for i, item in enumerate(contract.validations) if item.validation_id == row["validation_id"])
+            index = next((i for i, item in enumerate(contract.validations) if item.validation_id == row["validation_id"]), None)
+            if index is None:
+                raise GovernanceRejected(
+                    f"GOVERNANCE_VALIDATION_CONTRACT_MISMATCH: TaskContract에 없는 validation_id {row['validation_id']}"
+                )
             # ponytail: Task 수용 기준(자유 문장)은 Task validation 전체 PASS에 대응시킨다(Task 완료 의미).
             criteria = [*task_criteria, f"AC-{own + index + 1:03d}"]
             path = self._write(run.folder / f"evidence-{row['validation_id']}.json", {

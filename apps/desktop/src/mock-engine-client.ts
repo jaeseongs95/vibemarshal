@@ -3,6 +3,7 @@ import type {
   CommandContext,
   CommandResult,
   EngineClient,
+  FinalReportPayload,
   HistoryEventView,
   PlanCandidateView,
   PossibleAction,
@@ -236,7 +237,7 @@ function possibleActionsFor(snapshot: WorkspaceSnapshot): PossibleAction[] {
       return [action("activate_plan", "plan_activation"), action("edit_goal")];
     case "plan_active":
     case "running":
-      return [action("run_once")];
+      return [action("run_once"), action("pause"), action("cancel")];
     case "completed":
       return [action("edit_goal")];
   }
@@ -248,7 +249,7 @@ function initialSnapshot(scenario: ScenarioKey): WorkspaceSnapshot {
   const history = initialHistory();
   const snapshot: WorkspaceSnapshot = {
     apiVersion: "1",
-    engineSchemaVersion: 2,
+    engineSchemaVersion: 4,
     productStatus: "NO-GO",
     generatedAt: now(),
     scenario,
@@ -590,6 +591,84 @@ export class MockEngineClient implements EngineClient {
     this.snapshot.project.activeBlocker = null;
     this.commit("runtime_intent.abandoned", `사용자 사유: ${rationale.trim()}`, "runtime_intent", "intent_demo_resume_02", context);
     return { ok: true, data: await this.getSnapshot() };
+  }
+
+  async pauseWorkflow(reason: string, context: CommandContext): Promise<CommandResult> {
+    this.snapshot.project.runState = "paused";
+    this.snapshot.project.activeBlocker = reason.trim() || "user_paused";
+    this.commit("workflow.paused", `사용자 일시정지: ${reason.trim() || "user_paused"}`, "project", this.snapshot.project.projectId, context);
+    return { ok: true, data: await this.getSnapshot() };
+  }
+
+  async cancelWorkflow(reason: string, context: CommandContext): Promise<CommandResult> {
+    this.snapshot.project.runState = "cancelled";
+    this.snapshot.project.activeBlocker = reason.trim() || "user_cancelled";
+    this.snapshot.activePlanRevisionId = null;
+    this.snapshot.phase = "goal_ready";
+    this.commit("workflow.cancelled", `사용자 취소: ${reason.trim() || "user_cancelled"}`, "project", this.snapshot.project.projectId, context);
+    return { ok: true, data: await this.getSnapshot() };
+  }
+
+  async replanWorkflow(rationale: string, context: CommandContext): Promise<CommandResult> {
+    this.snapshot.plans = planCandidates(true).map((plan) => ({ ...plan, goalDigest: this.snapshot.goal.definitionDigest }));
+    this.snapshot.recommendedPlanRevisionId = this.snapshot.plans[0].planRevisionId;
+    this.snapshot.activePlanRevisionId = this.snapshot.plans[0].planRevisionId;
+    this.snapshot.plans[0].decision = "selected";
+    this.snapshot.recovery = null;
+    this.snapshot.phase = "plan_active";
+    this.snapshot.project.runState = "active";
+    this.snapshot.project.activeBlocker = null;
+    this.commit("plan.replanned", `재계획 완료: ${rationale.trim() || "user_requested_replan"}`, "project", this.snapshot.project.projectId, context);
+    return { ok: true, data: await this.getSnapshot() };
+  }
+
+  async selectProject(projectRoot: string, context: CommandContext): Promise<CommandResult> {
+    const trimmed = projectRoot.trim();
+    if (!trimmed) {
+      return this.error("PROJECT_ROOT_REQUIRED", "전환할 프로젝트 루트 경로가 필요합니다.");
+    }
+    const parts = trimmed.split(/[\\/]/).filter(Boolean);
+    const displayName = parts.at(-1) ?? "workspace";
+    this.snapshot.project = {
+      ...this.snapshot.project,
+      name: displayName,
+      location: {
+        locationRef: `project-location:${displayName}`,
+        displayName,
+        displayPath: trimmed,
+      },
+    };
+    this.commit("project.selected", `프로젝트 경로 전환: ${trimmed}`, "project", this.snapshot.project.projectId, context);
+    return { ok: true, data: await this.getSnapshot() };
+  }
+
+  async getFinalReport(): Promise<CommandResult<FinalReportPayload>> {
+    const snap = await this.getSnapshot();
+    const markdown = [
+      `# 최종 보고서 (${snap.project.name})`,
+      "",
+      `- **Goal**: ${snap.goal.revisionId} (\`${snap.goal.definitionDigest}\`)`,
+      `- **Verdict**: ${snap.validation.verdict}`,
+      `- **History Sequence**: #${snap.historyCursor.sequence}`,
+      "",
+      "## Governance A2 서명 프로파일 및 보안 한계",
+      "- 프로파일: `flowmarshal-same-user-v1`",
+      "- R16 승인 슬롯 상태: `unverified`",
+    ].join("\n");
+    return {
+      ok: true,
+      data: {
+        report: {
+          projectId: snap.project.projectId,
+          goalRevisionId: snap.goal.revisionId,
+          verdict: snap.validation.verdict,
+          governanceProfileId: "flowmarshal-same-user-v1",
+          r16ApprovedSlotStatus: "unverified",
+        },
+        markdown,
+        snapshot: snap,
+      },
+    };
   }
 
   private async advanceGoalTest(context: CommandContext): Promise<CommandResult> {

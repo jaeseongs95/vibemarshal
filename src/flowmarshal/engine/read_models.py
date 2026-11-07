@@ -248,6 +248,9 @@ class ReadOnlyReportVerification(EngineModel):
     source_unchanged: bool
     baseline_project_map_semantic_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     observed_project_map_semantic_digest: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+    workspace_inventory_unchanged: bool = True
+    baseline_workspace_inventory_digest: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
+    observed_workspace_inventory_digest: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
 
 
 class GovernancePluginTaskObservation(EngineModel):
@@ -257,6 +260,7 @@ class GovernancePluginTaskObservation(EngineModel):
     task_ref: str = Field(min_length=1, max_length=300)
     closure_tree_digest: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
     plugin_version_label: str | None = Field(default=None, max_length=200)
+    freeze_identity: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
     changed: bool = False
     changed_phases: tuple[str, ...] = ()
 
@@ -271,6 +275,14 @@ class FinalReport(ReadPresentation):
     ledger_history_valid: bool
     governance_plugin_tasks: tuple[GovernancePluginTaskObservation, ...] = ()
     read_only_verification: ReadOnlyReportVerification | None = None
+    governance_profile_id: str = Field(default="flowmarshal-same-user-v1", min_length=1, max_length=200)
+    governance_freeze_identity: str | None = Field(default=None, pattern=r"^sha256:[0-9a-f]{64}$")
+    same_user_security_limitation: str = Field(
+        default="같은 OS 사용자가 원장·transcript·key를 조작할 수 있어 관측 진실성·격리를 보증하지 않음",
+        min_length=1,
+        max_length=1000,
+    )
+    r16_approved_slot_status: str = Field(default="unverified", min_length=1, max_length=200)
 
 
 class IntentDetail(EngineModel):

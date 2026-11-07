@@ -408,6 +408,7 @@ class EngineService:
         revision: GoalContractRevision,
         *,
         activate: bool = True,
+        replace_active_plan: bool = False,
     ) -> None:
         project_id = revision.definition.project_id
         with self.ledger.transaction() as tx:
@@ -451,8 +452,11 @@ class EngineService:
                 raise EngineServiceError("active Goal이 있으면 새 Goal create 대신 같은 Goal을 revise해야 합니다.")
             if activate and revision.status is not RevisionStatus.READY:
                 raise EngineServiceError("ready GoalContract만 활성화할 수 있습니다.")
-            if activate and project["active_plan_revision_id"] is not None:
-                raise EngineServiceError("active Plan이 있는 동안 GoalContract를 교체할 수 없습니다.")
+            active_plan_id = project["active_plan_revision_id"]
+            if activate and active_plan_id is not None:
+                if not replace_active_plan:
+                    raise EngineServiceError("active Plan이 있는 동안 GoalContract를 교체할 수 없습니다.")
+                self._assert_plan_replacement_quiescent(tx, project_id)
             status = "active" if activate else revision.status.value
             now = tx.now
             tx.connection.execute(
@@ -472,15 +476,30 @@ class EngineService:
                     now if activate else None,
                 ),
             )
+            history_payload: dict[str, Any] = {
+                "definition_digest": revision.definition_digest,
+                "revision_no": revision.revision_no,
+            }
             if activate:
+                if active_plan_id is not None:
+                    tx.connection.execute(
+                        "UPDATE plan_revisions SET status = 'superseded' WHERE id = ?",
+                        (active_plan_id,),
+                    )
+                    tx.connection.execute(
+                        "UPDATE task_contracts SET status = 'superseded', updated_at = ? "
+                        "WHERE plan_revision_id = ? AND status <> 'completed'",
+                        (now, active_plan_id),
+                    )
+                    history_payload["replaced_active_plan_revision_id"] = active_plan_id
                 if active is not None:
                     tx.connection.execute(
                         "UPDATE goal_revisions SET status = 'superseded' WHERE id = ?",
                         (active["id"],),
                     )
                 tx.connection.execute(
-                    "UPDATE projects SET active_goal_revision_id = ?, run_state = 'idle', "
-                    "updated_at = ? WHERE id = ?",
+                    "UPDATE projects SET active_goal_revision_id = ?, active_plan_revision_id = NULL, "
+                    "run_state = 'idle', recovery_reason = NULL, updated_at = ? WHERE id = ?",
                     (revision.goal_revision_id, now, project_id),
                 )
             tx.history(
@@ -488,87 +507,93 @@ class EngineService:
                 "goal.registered" if not activate else "goal.activated",
                 "goal_revision",
                 revision.goal_revision_id,
-                {"definition_digest": revision.definition_digest, "revision_no": revision.revision_no},
+                history_payload,
             )
 
     def record_state_snapshot(self, snapshot: StateSnapshot) -> None:
         with self.ledger.transaction() as tx:
-            project = tx.one("SELECT * FROM projects WHERE id = ?", (snapshot.project_id,))
-            if project["active_goal_revision_id"] is None:
-                raise EngineServiceError("StateSnapshot보다 먼저 GoalContract를 활성화해야 합니다.")
-            goal = tx.one(
-                "SELECT definition_digest FROM goal_revisions WHERE id = ?",
-                (project["active_goal_revision_id"],),
-            )
-            if snapshot.goal_contract_digest != goal["definition_digest"]:
-                raise EngineServiceError("StateSnapshot이 active GoalContract용 projection이 아닙니다.")
-            tx.connection.execute(
-                "UPDATE state_snapshots SET is_current = 0 WHERE project_id = ? "
-                "AND goal_contract_digest = ? AND is_current = 1",
-                (snapshot.project_id, snapshot.goal_contract_digest),
-            )
-            tx.connection.execute(
-                "INSERT INTO state_snapshots "
-                "(id, project_id, goal_contract_digest, version, snapshot_digest, semantic_digest, "
-                "scope_fingerprint, payload_json, observed_at, is_current) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
-                (
-                    snapshot.snapshot_id,
-                    snapshot.project_id,
-                    snapshot.goal_contract_digest,
-                    snapshot.version,
-                    snapshot.snapshot_digest,
-                    snapshot.semantic_digest,
-                    snapshot.scope_fingerprint,
-                    canonical_json(snapshot),
-                    snapshot.observed_at.isoformat(),
-                ),
-            )
-            tx.history(
-                snapshot.project_id,
-                "state.observed",
-                "state_snapshot",
+            self._record_state_snapshot_in_transaction(tx, snapshot)
+
+    def _record_state_snapshot_in_transaction(self, tx: EngineTransaction, snapshot: StateSnapshot) -> None:
+        project = tx.one("SELECT * FROM projects WHERE id = ?", (snapshot.project_id,))
+        if project["active_goal_revision_id"] is None:
+            raise EngineServiceError("StateSnapshot보다 먼저 GoalContract를 활성화해야 합니다.")
+        goal = tx.one(
+            "SELECT definition_digest FROM goal_revisions WHERE id = ?",
+            (project["active_goal_revision_id"],),
+        )
+        if snapshot.goal_contract_digest != goal["definition_digest"]:
+            raise EngineServiceError("StateSnapshot이 active GoalContract용 projection이 아닙니다.")
+        tx.connection.execute(
+            "UPDATE state_snapshots SET is_current = 0 WHERE project_id = ? "
+            "AND goal_contract_digest = ? AND is_current = 1",
+            (snapshot.project_id, snapshot.goal_contract_digest),
+        )
+        tx.connection.execute(
+            "INSERT INTO state_snapshots "
+            "(id, project_id, goal_contract_digest, version, snapshot_digest, semantic_digest, "
+            "scope_fingerprint, payload_json, observed_at, is_current) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)",
+            (
                 snapshot.snapshot_id,
-                {"snapshot_digest": snapshot.snapshot_digest, "scope_fingerprint": snapshot.scope_fingerprint},
-            )
+                snapshot.project_id,
+                snapshot.goal_contract_digest,
+                snapshot.version,
+                snapshot.snapshot_digest,
+                snapshot.semantic_digest,
+                snapshot.scope_fingerprint,
+                canonical_json(snapshot),
+                snapshot.observed_at.isoformat(),
+            ),
+        )
+        tx.history(
+            snapshot.project_id,
+            "state.observed",
+            "state_snapshot",
+            snapshot.snapshot_id,
+            {"snapshot_digest": snapshot.snapshot_digest, "scope_fingerprint": snapshot.scope_fingerprint},
+        )
 
     def record_project_map(self, project_map: ProjectMapRevision) -> None:
         with self.ledger.transaction() as tx:
-            tx.one("SELECT id FROM projects WHERE id = ?", (project_map.project_id,))
-            expected_no = int(
-                tx.connection.execute(
-                    "SELECT COALESCE(MAX(revision_no), 0) + 1 FROM project_map_revisions "
-                    "WHERE project_id = ?",
-                    (project_map.project_id,),
-                ).fetchone()[0]
-            )
-            if project_map.revision_no != expected_no:
-                raise EngineServiceError(f"ProjectMap revision_no는 {expected_no}여야 합니다.")
+            self._record_project_map_in_transaction(tx, project_map)
+
+    def _record_project_map_in_transaction(self, tx: EngineTransaction, project_map: ProjectMapRevision) -> None:
+        tx.one("SELECT id FROM projects WHERE id = ?", (project_map.project_id,))
+        expected_no = int(
             tx.connection.execute(
-                "UPDATE project_map_revisions SET is_current = 0 WHERE project_id = ? AND is_current = 1",
+                "SELECT COALESCE(MAX(revision_no), 0) + 1 FROM project_map_revisions "
+                "WHERE project_id = ?",
                 (project_map.project_id,),
-            )
-            tx.connection.execute(
-                "INSERT INTO project_map_revisions "
-                "(id, project_id, revision_no, revision_digest, semantic_digest, payload_json, created_at, is_current) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
-                (
-                    project_map.project_map_revision_id,
-                    project_map.project_id,
-                    project_map.revision_no,
-                    project_map.revision_digest,
-                    project_map.semantic_digest,
-                    canonical_json(project_map),
-                    project_map.created_at.isoformat(),
-                ),
-            )
-            tx.history(
-                project_map.project_id,
-                "project_map.recorded",
-                "project_map_revision",
+            ).fetchone()[0]
+        )
+        if project_map.revision_no != expected_no:
+            raise EngineServiceError(f"ProjectMap revision_no는 {expected_no}여야 합니다.")
+        tx.connection.execute(
+            "UPDATE project_map_revisions SET is_current = 0 WHERE project_id = ? AND is_current = 1",
+            (project_map.project_id,),
+        )
+        tx.connection.execute(
+            "INSERT INTO project_map_revisions "
+            "(id, project_id, revision_no, revision_digest, semantic_digest, payload_json, created_at, is_current) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, 1)",
+            (
                 project_map.project_map_revision_id,
-                {"revision_digest": project_map.revision_digest, "entry_count": len(project_map.entries)},
-            )
+                project_map.project_id,
+                project_map.revision_no,
+                project_map.revision_digest,
+                project_map.semantic_digest,
+                canonical_json(project_map),
+                project_map.created_at.isoformat(),
+            ),
+        )
+        tx.history(
+            project_map.project_id,
+            "project_map.recorded",
+            "project_map_revision",
+            project_map.project_map_revision_id,
+            {"revision_digest": project_map.revision_digest, "entry_count": len(project_map.entries)},
+        )
 
     def observe_goal_inputs(self, project_id: str, source_request: str) -> tuple[dict[str, Any], ...]:
         """Goal 활성화 전에도 등록 source를 확인하고 실제 입력만 읽어 반환한다."""
@@ -666,11 +691,8 @@ class EngineService:
             requested_symbols=symbols,
             observed_links=scope["observed_links"],
         )
-        if current_map is None or observed_map.semantic_digest != current_map.semantic_digest:
-            project_map = observed_map
-            self.record_project_map(project_map)
-        else:
-            project_map = current_map
+        map_changed = current_map is None or observed_map.semantic_digest != current_map.semantic_digest
+        project_map = observed_map if map_changed else current_map
 
         try:
             current_state = self.load_current_state(project_id, goal.definition_digest)
@@ -697,6 +719,7 @@ class EngineService:
             )
         if (
             current_state is not None
+            and not map_changed
             and not force_state_revision
             and map_bound == project_map.revision_digest
             and workspace_inventory_bound == workspace_inventory
@@ -763,7 +786,10 @@ class EngineService:
             facts=tuple(facts),
             observed_at=utc_now(),
         )
-        self.record_state_snapshot(state)
+        with self.ledger.transaction() as tx:
+            if map_changed:
+                self._record_project_map_in_transaction(tx, project_map)
+            self._record_state_snapshot_in_transaction(tx, state)
         return project_map, state
 
     def record_skeleton_evaluation(self, evaluation: CandidateEvaluation) -> None:
@@ -3139,7 +3165,25 @@ class EngineService:
                 raise EngineServiceError(_LINEAGE_REQUIRED)
         self._assert_plan_inputs_current(tx, project, payload)
         now = tx.now
-        reused = self._reuse_completed_tasks(tx, payload, active_plan_id) if active_plan_id else ()
+        reuse_source_plan_id = active_plan_id
+        if reuse_source_plan_id is None:
+            goal_event = tx.maybe_one(
+                "SELECT payload_json FROM history_events WHERE project_id = ? "
+                "AND event_type = 'goal.activated' AND entity_id = ? "
+                "ORDER BY sequence DESC LIMIT 1",
+                (project["id"], project["active_goal_revision_id"]),
+            )
+            if goal_event is not None:
+                replaced_id = json.loads(goal_event["payload_json"]).get(
+                    "replaced_active_plan_revision_id"
+                )
+                if isinstance(replaced_id, str):
+                    reuse_source_plan_id = replaced_id
+        reused = (
+            self._reuse_completed_tasks(tx, payload, reuse_source_plan_id)
+            if reuse_source_plan_id
+            else ()
+        )
         if active_plan_id is not None:
             tx.connection.execute(
                 "UPDATE plan_revisions SET status = 'superseded' WHERE id = ?",
@@ -5830,7 +5874,16 @@ class EngineService:
         ):
             raise EngineServiceError("INDEPENDENT_VALIDATION_PROVIDER_CALL_BINDING_MISMATCH")
         review = model_review_rows[0]
-        if review["source_ref"] != f"codex-validator:{job['thread_id']}":
+        expected_suffix = f"-validator:{job['thread_id']}"
+        allowed_prefixes = ("codex", "claude", "gemini", "semantic", "engine")
+        source_ref = str(review["source_ref"] or "")
+        if not (
+            source_ref == f"codex-validator:{job['thread_id']}"
+            or (
+                source_ref.endswith(expected_suffix)
+                and source_ref[: -len(expected_suffix)] in allowed_prefixes
+            )
+        ):
             raise EngineServiceError("INDEPENDENT_VALIDATION_EVIDENCE_SOURCE_MISMATCH")
         try:
             semantic = SemanticValidationObservation.model_validate_json(
@@ -5928,8 +5981,11 @@ class EngineService:
                 item for item in plan.definition.tasks if item.task_id == result.task_id
             )
             if (
-                task_contract.assignment.independence_required
-                and validation_contract.method == "semantic"
+                validation_contract.method == "semantic"
+                and (
+                    task_contract.assignment.independence_required
+                    or validation_contract.evidence_mode == "independent"
+                )
                 and result.status in {ValidationStatus.PASS, ValidationStatus.FAIL}
             ):
                 self._verify_semantic_validation_independence(

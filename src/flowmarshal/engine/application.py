@@ -831,19 +831,21 @@ class EngineApplication:
         *,
         source_request: str,
         candidate_count: int | None = None,
+        allow_active_plan_replacement: bool = False,
     ) -> EnginePreparationResult:
         """최신 Goal의 다음 revision을 prepare와 같은 역할로 준비한다. Plan은 활성화하지 않는다."""
 
         if not source_request.strip():
             raise EngineApplicationError("SOURCE_REQUEST_REQUIRED")
-        # active Plan 중 Goal revision은 아직 지원하지 않는다(미해결 gap).
-        # register_goal이 교체를 막으므로 역할·runtime 호출과 원장 쓰기 전에 먼저 거절한다.
         active_plan_revision_id = self._project_row(project_id)["active_plan_revision_id"]
         if active_plan_revision_id is not None:
-            raise EngineApplicationError(
-                "GOAL_REVISION_ACTIVE_PLAN: active Plan "
-                f"{active_plan_revision_id}이 있는 동안의 Goal revision은 아직 지원하지 않습니다."
-            )
+            if not allow_active_plan_replacement:
+                raise EngineApplicationError(
+                    "GOAL_REVISION_ACTIVE_PLAN: active Plan "
+                    f"{active_plan_revision_id}이 있는 동안의 Goal revision은 아직 지원하지 않습니다."
+                )
+            with self.service.ledger.transaction() as tx:
+                self.service._assert_plan_replacement_quiescent(tx, project_id)
         latest = self.service.load_latest_goal(project_id)
         return self._prepare_goal_revision(
             project_id,
@@ -852,6 +854,7 @@ class EngineApplication:
             goal_id=latest.goal_id,
             revision_no=latest.revision_no + 1,
             supersedes_goal_revision_id=latest.goal_revision_id,
+            replace_active_plan=allow_active_plan_replacement,
         )
 
     def _prepare_goal_revision(
@@ -863,6 +866,7 @@ class EngineApplication:
         goal_id: str,
         revision_no: int = 1,
         supersedes_goal_revision_id: str | None = None,
+        replace_active_plan: bool = False,
     ) -> EnginePreparationResult:
         """prepare·revise가 공유하는 Goal 준비·등록·Planning. 활성화는 authorize만 한다."""
 
@@ -910,7 +914,11 @@ class EngineApplication:
             observed_facts=self.service.observe_goal_inputs(project_id, source_request),
         )
         goal = goal_preparation.goal_contract
-        self.service.register_goal(goal, activate=goal.status is RevisionStatus.READY)
+        self.service.register_goal(
+            goal,
+            activate=goal.status is RevisionStatus.READY,
+            replace_active_plan=replace_active_plan,
+        )
         BudgetManager(self.service).attach_goal(project_id, goal_id, goal.definition_digest)
         if goal.status is not RevisionStatus.READY:
             return EnginePreparationResult(
@@ -2370,6 +2378,14 @@ class EngineApplication:
             else None
         )
         governance_plugin_tasks = self._governance_plugin_task_observations(project_id, plan)
+        producer = getattr(self.governance, "observation_producer", None) if self.governance is not None else None
+        freeze_identity = getattr(producer, "freeze_identity", None)
+        if freeze_identity is None:
+            freeze_identity = next(
+                (item.freeze_identity for item in governance_plugin_tasks if item.freeze_identity is not None),
+                None,
+            )
+        profile_id = getattr(producer, "profile_id", None) or "flowmarshal-same-user-v1"
         return FinalReport(
             project_id=project_id, goal=goal, plan=plan, verdict=verdict, usage=usage,
             execution_summary=execution_summary,
@@ -2377,6 +2393,8 @@ class EngineApplication:
             governance_plugin_tasks=governance_plugin_tasks,
             entity_refs=presentation.entity_refs, history_cursor=presentation.history_cursor,
             read_only_verification=read_only_verification,
+            governance_profile_id=profile_id,
+            governance_freeze_identity=freeze_identity,
             error_code=(
                 "READ_ONLY_REPORT_VERIFICATION_FAILED"
                 if read_only_verification is not None and not (
@@ -2427,6 +2445,7 @@ class EngineApplication:
                 {
                     "closure_tree_digest": None,
                     "plugin_version_label": None,
+                    "freeze_identity": None,
                     "changed": False,
                     "changed_phases": [],
                 },
@@ -2442,6 +2461,8 @@ class EngineApplication:
             result = completed.get("result", {}).get("data", {})
             summary = result.get("summary", {})
             item["closure_tree_digest"] = summary.get("closure_tree_digest")
+            if isinstance(result.get("freeze_identity"), str):
+                item["freeze_identity"] = result["freeze_identity"]
             labels = result.get("labels", ())
             manifest = next((label.get("plugin") for label in labels
                              if label.get("source") == "plugin_manifest_file"), None)
@@ -2470,7 +2491,11 @@ class EngineApplication:
         plan: PlanContractRevision,
         verdict: GoalVerdict,
     ) -> ReadOnlyReportVerification:
-        from .context import ProjectMapper, project_map_reobservation_scope
+        from .context import (
+            ProjectMapper,
+            project_map_reobservation_scope,
+            workspace_path_inventory_digest,
+        )
 
         with self.service.ledger.read() as connection:
             baseline_row = connection.execute(
@@ -2478,14 +2503,35 @@ class EngineApplication:
                 "WHERE project_id=? AND revision_digest=?",
                 (project_id, plan.definition.project_map_digest),
             ).fetchone()
+            state_row = connection.execute(
+                "SELECT payload_json FROM state_snapshots "
+                "WHERE project_id=? AND snapshot_digest=?",
+                (project_id, plan.definition.base_state_snapshot_digest),
+            ).fetchone()
             project = connection.execute(
                 "SELECT root FROM projects WHERE id=?", (project_id,)
             ).fetchone()
         if baseline_row is None or project is None:
             raise EngineApplicationError("READ_ONLY_BASELINE_NOT_FOUND")
-        from .domain import ProjectMapRevision
+        from .domain import ProjectMapRevision, StateSnapshot
 
         baseline = ProjectMapRevision.model_validate_json(baseline_row["payload_json"])
+        baseline_inventory: str | None = None
+        if state_row is not None:
+            base_state = StateSnapshot.model_validate_json(state_row["payload_json"])
+            baseline_inventory = next(
+                (
+                    item.value
+                    for item in base_state.facts
+                    if item.fact_id == "fact_workspace_path_inventory"
+                    and isinstance(item.value, str)
+                ),
+                None,
+            )
+        excluded_paths = (self.service.ledger.artifact_root.resolve(),)
+        observed_inventory = workspace_path_inventory_digest(
+            project["root"], excluded_paths=excluded_paths,
+        )
         sources = self.service.list_context_sources(project_id)
         observed = ProjectMapper().build(
             project_id=project_id,
@@ -2501,7 +2547,7 @@ class EngineApplication:
                 for item in sources
                 if item.kind is ContextSourceRegistrationKind.INSTRUCTION
             ),
-            excluded_paths=(self.service.ledger.artifact_root.resolve(),),
+            excluded_paths=excluded_paths,
             **project_map_reobservation_scope(baseline),
         )
         required = tuple(item.criterion_id for item in goal.definition.hard_acceptance)
@@ -2527,6 +2573,11 @@ class EngineApplication:
             criterion.status.value in {"pass", "fail"} and not criterion.evidence_ids
             for criterion in verdict.criteria
         )
+        inventory_unchanged = (
+            True
+            if baseline_inventory is None
+            else observed_inventory == baseline_inventory
+        )
         return ReadOnlyReportVerification(
             required_criterion_ids=required,
             reported_criterion_ids=reported,
@@ -2540,6 +2591,9 @@ class EngineApplication:
             source_unchanged=observed.semantic_digest == baseline.semantic_digest,
             baseline_project_map_semantic_digest=baseline.semantic_digest,
             observed_project_map_semantic_digest=observed.semantic_digest,
+            workspace_inventory_unchanged=inventory_unchanged,
+            baseline_workspace_inventory_digest=baseline_inventory,
+            observed_workspace_inventory_digest=observed_inventory,
         )
 
     def attempt_detail(self, attempt_id: str) -> AttemptDetail:

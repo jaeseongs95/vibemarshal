@@ -1,0 +1,13 @@
+{
+  "format": "flowmarshal-governance-model-classes-v1",
+  "classes": {
+    "claude-haiku-4-5-20251001": "lightweight",
+    "claude-sonnet-4-6": "general",
+    "claude-opus-4-6": "frontier",
+    "gemini-3-flash": "general",
+    "gemini-3.1-pro": "frontier",
+    "gpt-5.3-codex": "deep",
+    "gpt-5.4": "frontier",
+    "gpt-5.4-mini": "general"
+  }
+}

@@ -14,6 +14,7 @@ from setuptools.command.build_py import build_py as _BuildPy
 
 
 ENGINE_DEVELOPER_MODULES = {
+    "agy_gemini_bridge",
     "benchmark",
     "benchmark_candidate_costs",
     "benchmark_lifecycle",

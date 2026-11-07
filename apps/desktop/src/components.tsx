@@ -214,9 +214,11 @@ interface ProjectRailProps {
   snapshot: WorkspaceSnapshot;
   open: boolean;
   onClose: () => void;
+  onSelectProject?: (projectRoot: string) => void;
 }
 
-export function ProjectRail({ snapshot, open, onClose }: ProjectRailProps) {
+export function ProjectRail({ snapshot, open, onClose, onSelectProject }: ProjectRailProps) {
+  const [newPath, setNewPath] = useState("");
   const completedCount = snapshot.tasks.filter((task) => task.status === "completed").length;
   const progress = snapshot.tasks.length
     ? `${completedCount}/${snapshot.tasks.length} 완료`
@@ -234,6 +236,30 @@ export function ProjectRail({ snapshot, open, onClose }: ProjectRailProps) {
           <small>{snapshot.project.runState === "recovery_required" ? "복구 필요" : progress}</small>
         </span>
       </button>
+
+      {onSelectProject ? (
+        <form
+          className="project-switch-form"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (newPath.trim()) {
+              onSelectProject(newPath.trim());
+              setNewPath("");
+            }
+          }}
+        >
+          <input
+            type="text"
+            value={newPath}
+            onChange={(event) => setNewPath(event.target.value)}
+            placeholder="워크스페이스 경로 전환…"
+            aria-label="워크스페이스 경로 전환"
+          />
+          <button className="secondary-action" type="submit" disabled={!newPath.trim()}>
+            전환
+          </button>
+        </form>
+      ) : null}
 
       <div className="rail-meta-card" aria-label="워크스페이스 상태 요약">
         <div className="rail-meta-row">
@@ -401,17 +427,69 @@ export function ValidationTrace({ validation }: { validation: ValidationLaneView
 }
 
 export function TaskDag({ plan }: { plan: PlanCandidateView }) {
-  const count = Math.max(plan.tasks.length, 1);
   const nodeWidth = 156;
   const nodeHeight = 72;
-  const minGap = 28;
-  const width = Math.max(680, count * nodeWidth + (count + 1) * minGap);
-  const top = 24;
-  const gap = (width - nodeWidth * count) / Math.max(count + 1, 2);
-  const positions = new Map(plan.tasks.map((task, index) => [task.taskRef, { x: gap + index * (nodeWidth + gap), y: top }]));
+  const minGapX = 36;
+  const minGapY = 24;
+  const topPadding = 28;
+
+  const taskByRef = new Map(plan.tasks.map((task) => [task.taskRef, task]));
+  const depthMap = new Map<string, number>();
+  const computeDepth = (ref: string, visited = new Set<string>()): number => {
+    if (depthMap.has(ref)) return depthMap.get(ref)!;
+    if (visited.has(ref)) return 0;
+    visited.add(ref);
+    const task = taskByRef.get(ref);
+    if (!task || !task.dependencies.length) {
+      depthMap.set(ref, 0);
+      return 0;
+    }
+    let maxParent = 0;
+    for (const dep of task.dependencies) {
+      if (taskByRef.has(dep)) {
+        maxParent = Math.max(maxParent, computeDepth(dep, new Set(visited)) + 1);
+      }
+    }
+    depthMap.set(ref, maxParent);
+    return maxParent;
+  };
+  for (const task of plan.tasks) {
+    computeDepth(task.taskRef);
+  }
+
+  const columns = new Map<number, PlanCandidateView["tasks"]>();
+  for (const task of plan.tasks) {
+    const col = depthMap.get(task.taskRef) ?? 0;
+    const list = columns.get(col) ?? [];
+    list.push(task);
+    columns.set(col, list);
+  }
+
+  const colCount = Math.max(columns.size, 1);
+  const maxRows = Math.max(1, ...Array.from(columns.values(), (list) => list.length));
+  const width = Math.max(680, colCount * nodeWidth + (colCount + 1) * minGapX);
+  const height = Math.max(132, topPadding * 2 + maxRows * nodeHeight + Math.max(0, maxRows - 1) * minGapY);
+  const gapX = (width - nodeWidth * colCount) / Math.max(colCount + 1, 2);
+
+  const positions = new Map<string, { x: number; y: number; col: number; row: number }>();
+  const sortedCols = Array.from(columns.keys()).sort((a, b) => a - b);
+  sortedCols.forEach((colKey, colIdx) => {
+    const tasksInCol = columns.get(colKey) ?? [];
+    const totalColHeight = tasksInCol.length * nodeHeight + Math.max(0, tasksInCol.length - 1) * minGapY;
+    const startY = Math.max(topPadding, (height - totalColHeight) / 2);
+    tasksInCol.forEach((task, rowIdx) => {
+      positions.set(task.taskRef, {
+        x: gapX + colIdx * (nodeWidth + gapX),
+        y: startY + rowIdx * (nodeHeight + minGapY),
+        col: colIdx,
+        row: rowIdx,
+      });
+    });
+  });
+
   return (
     <div className="dag-wrap">
-      <svg viewBox={`0 0 ${width} 124`} role="img" aria-labelledby={`dag-title-${plan.planRevisionId} dag-desc-${plan.planRevisionId}`}>
+      <svg viewBox={`0 0 ${width} ${height}`} role="img" aria-labelledby={`dag-title-${plan.planRevisionId} dag-desc-${plan.planRevisionId}`}>
         <title id={`dag-title-${plan.planRevisionId}`}>{plan.name} Task DAG</title>
         <desc id={`dag-desc-${plan.planRevisionId}`}>{plan.tasks.map((task) => `${task.taskRef} ${task.title}, dependency ${task.dependencies.join(", ") || "없음"}`).join(". ")}</desc>
         <defs>
@@ -423,7 +501,29 @@ export function TaskDag({ plan }: { plan: PlanCandidateView }) {
           const from = positions.get(dependency);
           const to = positions.get(task.taskRef);
           if (!from || !to) return null;
-          return <line key={`${dependency}-${task.taskRef}`} x1={from.x + nodeWidth} y1={from.y + nodeHeight / 2} x2={to.x - 7} y2={to.y + nodeHeight / 2} className="dag-line" markerEnd={`url(#arrow-${plan.planRevisionId})`} />;
+          const x1 = from.x + nodeWidth;
+          const y1 = from.y + nodeHeight / 2;
+          const x2 = to.x - 7;
+          const y2 = to.y + nodeHeight / 2;
+          const colSpan = Math.abs(to.col - from.col);
+          let pathD: string;
+          if (colSpan > 1 && Math.abs(y1 - y2) < 8) {
+            const archY = Math.max(6, Math.min(y1, y2) - (nodeHeight * 0.65));
+            const midX = (x1 + x2) / 2;
+            pathD = `M ${x1} ${y1} Q ${midX} ${archY} ${x2} ${y2}`;
+          } else {
+            const dx = Math.max(24, Math.abs(x2 - x1) * 0.45);
+            pathD = `M ${x1} ${y1} C ${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+          }
+          return (
+            <path
+              key={`${dependency}-${task.taskRef}`}
+              d={pathD}
+              fill="none"
+              className="dag-line"
+              markerEnd={`url(#arrow-${plan.planRevisionId})`}
+            />
+          );
         }))}
         {plan.tasks.map((task) => {
           const position = positions.get(task.taskRef)!;

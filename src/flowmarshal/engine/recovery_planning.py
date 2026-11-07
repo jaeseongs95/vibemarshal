@@ -168,17 +168,17 @@ def replace_failed_subgraph(
 
     previous_by_ref = {item.task_ref: item for item in previous.definition.tasks}
     expanded_by_ref = {item.task_ref: item for item in expanded.definition.tasks}
-    if set(previous_by_ref) != set(expanded_by_ref):
-        raise RecoveryPlanError(
-            "RECOVERY_REPLAN_TASK_SET_DRIFT: 재계획이 Task 집합을 바꿨습니다."
-        )
     preserved_refs = set(previous_by_ref) - set(replaced_task_refs)
+    if not set(previous_by_ref).issubset(expanded_by_ref):
+        raise RecoveryPlanError(
+            "RECOVERY_REPLAN_TASK_SET_DRIFT: 재계획이 보존 대상 Task 집합을 바꿨습니다."
+        )
     if not preserved_refs:
         return expanded
 
     tasks = tuple(
         item
-        if item.task_ref in replaced_task_refs
+        if item.task_ref not in preserved_refs
         else previous_by_ref[item.task_ref].model_copy(
             update={"task_id": item.task_id}
         )
@@ -198,7 +198,8 @@ def replace_failed_subgraph(
             if owner is None or owner in preserved_refs:
                 merged.append(validation_id)
         for validation_id in item.validation_ids:
-            if expanded_owner.get(validation_id) in replaced_task_refs:
+            owner = expanded_owner.get(validation_id)
+            if owner is not None and owner not in preserved_refs:
                 merged.append(validation_id)
         coverage.append(
             item.model_copy(

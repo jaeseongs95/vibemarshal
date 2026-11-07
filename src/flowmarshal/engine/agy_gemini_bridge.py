@@ -253,10 +253,11 @@ def _invoke_agy_cli(
 ) -> dict[str, Any]:
     agy_exe = resolve_agy_exe()
     mapped_model = map_to_agy_model(model, effort)
+    safe_prompt = prompt_for_agy if len(prompt_for_agy) <= 6000 else prompt_for_agy[:6000]
     cmd = [
         str(agy_exe),
         "-p",
-        prompt_for_agy,
+        safe_prompt,
         "--model",
         mapped_model,
         "--output-format",
@@ -287,6 +288,10 @@ def _invoke_agy_cli(
         ) from exc
     stdout_text = completed.stdout or ""
     stderr_text = completed.stderr or ""
+    if completed.returncode != 0:
+        raise RuntimeError(
+            f"Antigravity CLI (agy.exe) exited with non-zero code {completed.returncode}: {stderr_text or stdout_text}"
+        )
     result_event: dict[str, Any] | None = None
     init_event: dict[str, Any] | None = None
     for raw_line in stdout_text.splitlines():
@@ -308,13 +313,18 @@ def _invoke_agy_cli(
             f"Antigravity CLI (agy.exe) did not emit a result event (rc={completed.returncode}): {stderr_text or stdout_text}"
         )
     result_body = result_event.get("result") if isinstance(result_event.get("result"), dict) else {}
+    status_str = str(result_body.get("status") or "SUCCESS")
+    if status_str.upper() in {"ERROR", "FAILED", "CANCELLED"} or result_event.get("is_error") is True:
+        raise RuntimeError(
+            f"Antigravity CLI (agy.exe) reported failure status={status_str}: {result_body.get('error') or stderr_text}"
+        )
     usage_body = result_body.get("usage") if isinstance(result_body.get("usage"), dict) else {}
     duration_seconds = float(result_body.get("duration_seconds") or 0.1)
     return {
         "returncode": completed.returncode,
         "mapped_model": mapped_model,
         "conversation_id": str(result_body.get("conversation_id") or (init_event or {}).get("conversation_id") or ""),
-        "status": str(result_body.get("status") or "SUCCESS"),
+        "status": status_str,
         "response_text": str(result_body.get("response") or ""),
         "structured_output": result_body.get("structured_output"),
         "duration_ms": max(1, int(round(duration_seconds * 1000))),
@@ -1204,11 +1214,28 @@ def _build_structured_output_for_schema(
 ) -> dict[str, Any]:
     title = str(schema.get("title") or "")
     properties = schema.get("properties") if isinstance(schema.get("properties"), dict) else {}
+    required_keys = set(schema.get("required") or ())
     payload = _parse_json_loose(user_prompt) or {}
     response_text = str(agy_result.get("response_text") or "")
+    raw_structured = agy_result.get("structured_output")
+    parsed_agy = (
+        raw_structured
+        if isinstance(raw_structured, dict)
+        else _parse_json_loose(response_text)
+    )
+    if (
+        isinstance(parsed_agy, dict)
+        and required_keys
+        and required_keys.issubset(parsed_agy.keys())
+        and os.environ.get("FLOWMARSHAL_AGY_FORCE_CANONICAL") != "1"
+    ):
+        return parsed_agy
 
     if title == "GoalNormalizationProposal" or "hard_acceptance" in properties:
-        return _canonical_goal_normalization(payload)
+        base = _canonical_goal_normalization(payload)
+        if isinstance(parsed_agy, dict) and isinstance(parsed_agy.get("observable_outcome"), str):
+            base["observable_outcome"] = parsed_agy["observable_outcome"]
+        return base
     if title == "ReviewDraft" or ("findings" in properties and "ratings" in properties and "inspection" not in properties):
         return _canonical_review_draft()
     if title == "SkeletonBatchDraft" or "candidates" in properties:
@@ -1279,8 +1306,9 @@ def _apply_worker_effects(user_prompt: str, agy_result: dict[str, Any], cwd: str
     mod_path = cwd_path / primary_module
     test_path = cwd_path / primary_test
 
-    need_fallback = not mod_path.exists() or not test_path.exists()
-    if not need_fallback:
+    allow_synthetic_fallback = os.environ.get("FLOWMARSHAL_AGY_SYNTHETIC_FALLBACK", "1") != "0"
+    need_fallback = allow_synthetic_fallback and (not mod_path.exists() or not test_path.exists())
+    if not need_fallback and allow_synthetic_fallback:
         check = subprocess.run(
             [sys.executable, "-m", "unittest", "discover", "-v"],
             cwd=str(cwd_path),
@@ -1290,6 +1318,10 @@ def _apply_worker_effects(user_prompt: str, agy_result: dict[str, Any], cwd: str
         )
         if check.returncode != 0:
             need_fallback = True
+    if not allow_synthetic_fallback and not written_files:
+        raise RuntimeError(
+            "AGY_WORKER_NO_CODE_BLOCKS: Worker response did not contain valid Python code blocks."
+        )
 
     if need_fallback:
         mod_code = (

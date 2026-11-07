@@ -3,6 +3,7 @@ import type {
   CommandContext,
   CommandResult,
   EngineClient,
+  FinalReportPayload,
   ScenarioKey,
   WorkspaceSnapshot,
 } from "./contracts";
@@ -147,7 +148,7 @@ export class HttpEngineClient implements EngineClient {
     }
     if (this.listeners.size === 1 && this.eventSourceFactory && !this.eventSource) {
       try {
-        const es = this.eventSourceFactory(this.url("/api/v1/events"));
+        const es = this.eventSourceFactory(this.url("/api/v1/events?stream=1"));
         es.addEventListener("snapshot", (event: MessageEvent) => {
           try {
             const parsed = JSON.parse(String(event.data)) as WorkspaceSnapshot;
@@ -271,5 +272,45 @@ export class HttpEngineClient implements EngineClient {
       body: JSON.stringify({ rationale, context }),
     });
     return this.handleCommandResult(result);
+  }
+
+  async pauseWorkflow(reason: string, context: CommandContext): Promise<CommandResult> {
+    const result = await this.requestJson<CommandResult>("/api/v1/pause", {
+      method: "POST",
+      body: JSON.stringify({ reason, context }),
+    });
+    return this.handleCommandResult(result);
+  }
+
+  async cancelWorkflow(reason: string, context: CommandContext): Promise<CommandResult> {
+    const result = await this.requestJson<CommandResult>("/api/v1/cancel", {
+      method: "POST",
+      body: JSON.stringify({ reason, context }),
+    });
+    return this.handleCommandResult(result);
+  }
+
+  async replanWorkflow(rationale: string, context: CommandContext): Promise<CommandResult> {
+    const result = await this.requestJson<CommandResult>("/api/v1/replan", {
+      method: "POST",
+      body: JSON.stringify({ rationale, context }),
+    });
+    return this.handleCommandResult(result);
+  }
+
+  async selectProject(projectRoot: string, context: CommandContext): Promise<CommandResult> {
+    const result = await this.requestJson<CommandResult>("/api/v1/projects/select", {
+      method: "POST",
+      body: JSON.stringify({ projectRoot, context }),
+    });
+    return this.handleCommandResult(result);
+  }
+
+  async getFinalReport(): Promise<CommandResult<FinalReportPayload>> {
+    const result = await this.requestJson<CommandResult<FinalReportPayload>>("/api/v1/final-report");
+    if (result.ok && result.data.snapshot) {
+      this.notify(result.data.snapshot);
+    }
+    return result;
   }
 }

@@ -73,7 +73,15 @@ def _json(path: Path | str) -> Any:
 
 def _emit(value: Any) -> None:
     document = value.model_dump(mode="json") if hasattr(value, "model_dump") else value
-    print(json.dumps(document, ensure_ascii=False, indent=2))
+    text = json.dumps(document, ensure_ascii=False, indent=2) + "\n"
+    try:
+        sys.stdout.write(text)
+    except UnicodeEncodeError:
+        sys.stdout.write(
+            text.encode(sys.stdout.encoding or "utf-8", errors="replace").decode(
+                sys.stdout.encoding or "utf-8"
+            )
+        )
 
 
 def _roles(path: str | None, root: Path) -> EngineRoleConfiguration:

@@ -164,4 +164,40 @@ describe("VibeMarshal GUI prototype", () => {
     expect(healthCount).toBe(2);
     expect(runOnceCount).toBe(2);
   });
+
+  it("MockEngineClient는 engineSchemaVersion 4를 반환하고 TaskDag는 곡선 path와 다중 행/열로 간선을 렌더링한다", async () => {
+    const mock = new MockEngineClient("golden-path");
+    const snap = await mock.getSnapshot();
+    expect(snap.engineSchemaVersion).toBe(4);
+
+    const { container } = render(<App client={mock} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Plan 비교하기" }));
+    const paths = container.querySelectorAll("svg path.dag-line");
+    expect(paths.length).toBeGreaterThan(0);
+  });
+
+  it("Run 화면에서 일시정지·최종 보고서 조회 및 프로젝트 경로 전환이 동작한다", async () => {
+    const mock = new MockEngineClient("golden-path");
+    render(<App client={mock} />);
+
+    const pathInput = await screen.findByLabelText("워크스페이스 경로 전환");
+    fireEvent.change(pathInput, { target: { value: "D:\\gemini\\new-workspace" } });
+    fireEvent.submit(pathInput.closest("form")!);
+    await waitFor(() => expect(screen.getByText("new-workspace")).toBeVisible());
+
+    fireEvent.click(screen.getByRole("button", { name: /^계획/ }));
+    fireEvent.click(await screen.findByRole("button", { name: "선택 Plan 활성화" }));
+    fireEvent.click(screen.getByRole("button", { name: "이 계약 활성화" }));
+
+    const pauseBtn = await screen.findByRole("button", { name: "일시정지" });
+    fireEvent.click(pauseBtn);
+
+    const runAllBtn = await screen.findByRole("button", { name: /완료까지 연속 실행/ });
+    fireEvent.click(runAllBtn);
+    await waitFor(() => expect(screen.getAllByText("충족").length).toBeGreaterThanOrEqual(1));
+
+    const reportBtn = await screen.findByRole("button", { name: "최종 보고서 조회" });
+    fireEvent.click(reportBtn);
+    expect(await screen.findByText(/Governance A2 서명 프로파일 및 보안 한계/)).toBeVisible();
+  });
 });

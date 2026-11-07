@@ -177,7 +177,16 @@ def reuse_completed_tasks(service: Any, tx: Any, plan: PlanContractRevision, pre
     previous = PlanContractRevision.model_validate_json(tx.one("SELECT payload_json FROM plan_revisions WHERE id = ?",
                                                               (previous_id,))["payload_json"])
     if previous.definition.goal_contract_digest != plan.definition.goal_contract_digest:
-        return ()
+        prev_goal = tx.maybe_one(
+            "SELECT goal_id FROM goal_revisions WHERE project_id = ? AND definition_digest = ?",
+            (plan.definition.project_id, previous.definition.goal_contract_digest),
+        )
+        curr_goal = tx.maybe_one(
+            "SELECT goal_id FROM goal_revisions WHERE project_id = ? AND definition_digest = ?",
+            (plan.definition.project_id, plan.definition.goal_contract_digest),
+        )
+        if prev_goal is None or curr_goal is None or prev_goal["goal_id"] != curr_goal["goal_id"]:
+            return ()
     previous_tasks = {task.task_ref: task for task in previous.definition.tasks}
     reused: dict[str, str] = {}
     remaining = list(plan.definition.tasks)

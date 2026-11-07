@@ -293,6 +293,15 @@ class RecordedRuntime:
         # create_thread의 payload만 adapter가 보존한 thread/start 원시 응답이다.
         # start_turn의 model/effort는 SDK 요청 인자를 receipt에 다시 쓴 값이므로
         # provider 관측으로 승격하지 않는다.
+        # 단, read / read_stored / completion_observation의 payload에 담긴
+        # authoritative_model_observation(claude/gemini session transcript 포함)은
+        # 해당 turn의 권위 관측으로 보존한다.
+        from .model_observation import (
+            MODEL_OBSERVATION_SOURCES,
+            authoritative_model_observation,
+            model_observation_source,
+        )
+
         provider_raw = operation == "create_thread" and isinstance(payload, dict)
         raw_model = payload.get("model") if provider_raw else None
         raw_effort = payload.get("effort") if provider_raw else None
@@ -302,9 +311,29 @@ class RecordedRuntime:
             and isinstance(raw_effort, str)
             and bool(raw_effort)
         )
-        observed_model = raw_model if complete_provider_pair else None
-        observed_effort = raw_effort if complete_provider_pair else None
-        observation_source = "provider_raw_response" if complete_provider_pair else None
+        auth_model, auth_effort = (
+            authoritative_model_observation(payload)
+            if operation in {"read", "read_stored", "completion_observation"}
+            and isinstance(payload, dict)
+            else (None, None)
+        )
+        auth_source = (
+            model_observation_source(payload)
+            if auth_model is not None and auth_effort is not None
+            else None
+        )
+        if complete_provider_pair:
+            observed_model = raw_model
+            observed_effort = raw_effort
+            observation_source = "provider_raw_response"
+        elif auth_model is not None and auth_effort is not None:
+            observed_model = auth_model
+            observed_effort = auth_effort
+            observation_source = auth_source
+        else:
+            observed_model = None
+            observed_effort = None
+            observation_source = None
         if operation == "start_turn":
             observation_reason = "START_TURN_RECEIPT_MODEL_EFFORT_ARE_REQUEST_ECHO"
         elif observed_model is None or observed_effort is None:
@@ -419,15 +448,42 @@ class RecordedRuntime:
 
 
 def _checkpoint_model_observation(events: list[dict[str, Any]]) -> dict[str, Any]:
+    from .model_observation import MODEL_OBSERVATION_SOURCES
+
     turns = [item for item in events if item.get("operation") == "start_turn"]
-    observed = [
-        (item.get("observed_model"), item.get("observed_effort")) for item in turns
-        if item.get("model_observation_source") == "provider_raw_response"
-        and isinstance(item.get("observed_model"), str)
-        and bool(item.get("observed_model"))
-        and isinstance(item.get("observed_effort"), str)
-        and bool(item.get("observed_effort"))
-    ]
+    turn_observations: dict[tuple[str, str], tuple[str, str]] = {}
+    for item in events:
+        if (
+            item.get("model_observation_source") not in MODEL_OBSERVATION_SOURCES
+            or not isinstance(item.get("observed_model"), str)
+            or not item.get("observed_model")
+            or not isinstance(item.get("observed_effort"), str)
+            or not item.get("observed_effort")
+        ):
+            continue
+        rb = item.get("request_binding") if isinstance(item.get("request_binding"), dict) else {}
+        rc = item.get("receipt") if isinstance(item.get("receipt"), dict) else {}
+        t_id = rb.get("thread_id") or rc.get("thread_id")
+        u_id = rb.get("turn_id") or rc.get("turn_id")
+        if isinstance(t_id, str) and isinstance(u_id, str):
+            turn_observations[(t_id, u_id)] = (item["observed_model"], item["observed_effort"])
+    observed: list[tuple[str, str]] = []
+    for item in turns:
+        if (
+            item.get("model_observation_source") in MODEL_OBSERVATION_SOURCES
+            and isinstance(item.get("observed_model"), str)
+            and bool(item.get("observed_model"))
+            and isinstance(item.get("observed_effort"), str)
+            and bool(item.get("observed_effort"))
+        ):
+            observed.append((item["observed_model"], item["observed_effort"]))
+            continue
+        rc = item.get("receipt") if isinstance(item.get("receipt"), dict) else {}
+        rb = item.get("request_binding") if isinstance(item.get("request_binding"), dict) else {}
+        t_id = rc.get("thread_id") or rb.get("thread_id")
+        u_id = rc.get("turn_id") or rb.get("turn_id")
+        if isinstance(t_id, str) and isinstance(u_id, str) and (t_id, u_id) in turn_observations:
+            observed.append(turn_observations[(t_id, u_id)])
     pairs = tuple(sorted(set(observed)))
     missing = len(turns) - len(observed)
     if not turns:

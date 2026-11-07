@@ -899,7 +899,7 @@ class SQLiteEngineLedger:
                     (project_id,),
                 ).fetchall()
                 tasks = connection.execute(
-                    "SELECT id, plan_revision_id, task_ref, position, contract_digest, status "
+                    "SELECT id, plan_revision_id, task_ref, position, contract_digest, status, created_at, updated_at "
                     "FROM task_contracts WHERE project_id = ? ORDER BY plan_revision_id, position",
                     (project_id,),
                 ).fetchall()
@@ -950,6 +950,7 @@ class SQLiteEngineHistoryReader:
         self._identity = self._read_identity()
 
     def _connect(self) -> sqlite3.Connection:
+        require_host_execution()
         connection = sqlite3.connect(
             self.path.resolve().as_uri() + "?mode=ro", uri=True, timeout=10.0,
         )

@@ -40,6 +40,9 @@ const primaryLabels: Partial<Record<PossibleActionKind, string>> = {
   search_plans: t("goal.searchPlans"),
   activate_plan: t("overview.openPlans"),
   run_once: t("overview.runOnce"),
+  pause: "일시정지",
+  cancel: "취소",
+  replan: "재계획",
   refresh_snapshot: t("recovery.refresh"),
   observe_attempt: t("recovery.observe"),
   resume_attempt: t("recovery.resume"),
@@ -319,14 +322,32 @@ interface RunProps {
   snapshot: WorkspaceSnapshot;
   onRunOnce: () => void;
   onRunAll?: () => void;
+  onPause?: () => void;
+  onCancel?: () => void;
+  onReplan?: () => void;
+  onViewFinalReport?: () => void;
+  finalReportMarkdown?: string | null;
   onNavigate: (view: AppView) => void;
 }
 
-export function RunScreen({ snapshot, onRunOnce, onRunAll, onNavigate }: RunProps) {
+export function RunScreen({
+  snapshot,
+  onRunOnce,
+  onRunAll,
+  onPause,
+  onCancel,
+  onReplan,
+  onViewFinalReport,
+  finalReportMarkdown,
+  onNavigate,
+}: RunProps) {
   const activePlan = snapshot.plans.find((plan) => plan.planRevisionId === snapshot.activePlanRevisionId);
   const completed = snapshot.tasks.filter((task) => task.status === "completed").length;
   const current = snapshot.tasks.find((task) => task.status !== "completed");
   const canRunOnce = hasAction(snapshot, "run_once");
+  const canPause = hasAction(snapshot, "pause");
+  const canCancel = hasAction(snapshot, "cancel");
+  const canReplan = hasAction(snapshot, "replan");
   return (
     <>
       <PageIntro eyebrow={t("run.eyebrow")} title={t("run.title")} description={t("run.description")} cursor={snapshot.historyCursor.sequence} />
@@ -342,17 +363,49 @@ export function RunScreen({ snapshot, onRunOnce, onRunAll, onNavigate }: RunProp
               <h2>{current?.title ?? (snapshot.validation.goalTest === "pending" ? "독립 Goal Test 시작" : "최종 GoalVerdict 기록")}</h2>
               <p>{activePlan.planRevisionId} · {completed}/{snapshot.tasks.length} Task 완료</p>
             </div>
-            {canRunOnce ? (
-              <div className="run-actions-group">
-                {onRunAll ? (
-                  <button className="secondary-action" type="button" onClick={onRunAll}>
-                    완료까지 연속 실행 <FastForward size={16} />
-                  </button>
-                ) : null}
-                <button className="primary-action" type="button" onClick={onRunOnce}>{t("run.nextStep")} <Play size={16} /></button>
-              </div>
-            ) : <StatusBadge status={snapshot.validation.verdict} />}
+            <div className="run-actions-group">
+              {canPause && onPause ? (
+                <button className="secondary-action" type="button" onClick={onPause}>
+                  일시정지
+                </button>
+              ) : null}
+              {canCancel && onCancel ? (
+                <button className="secondary-action" type="button" onClick={onCancel}>
+                  실행 취소
+                </button>
+              ) : null}
+              {canReplan && onReplan ? (
+                <button className="secondary-action" type="button" onClick={onReplan}>
+                  재계획
+                </button>
+              ) : null}
+              {canRunOnce ? (
+                <>
+                  {onRunAll ? (
+                    <button className="secondary-action" type="button" onClick={onRunAll}>
+                      완료까지 연속 실행 <FastForward size={16} />
+                    </button>
+                  ) : null}
+                  <button className="primary-action" type="button" onClick={onRunOnce}>{t("run.nextStep")} <Play size={16} /></button>
+                </>
+              ) : (
+                <>
+                  <StatusBadge status={snapshot.validation.verdict} />
+                  {onViewFinalReport ? (
+                    <button className="secondary-action" type="button" onClick={onViewFinalReport}>
+                      최종 보고서 조회
+                    </button>
+                  ) : null}
+                </>
+              )}
+            </div>
           </section>
+          {finalReportMarkdown ? (
+            <section className="surface detail-card" aria-label="최종 보고서">
+              <p className="eyebrow">FINAL REPORT</p>
+              <pre className="final-report-pre">{finalReportMarkdown}</pre>
+            </section>
+          ) : null}
           <div className="run-grid">
             <section className="surface">
               <div className="surface-heading"><div><p className="eyebrow">TASK LEDGER</p><h2>{t("run.progress")}</h2></div><span className="revision-label">{completed}/{snapshot.tasks.length}</span></div>

@@ -60,6 +60,7 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
   const [busy, setBusy] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [finalReportMarkdown, setFinalReportMarkdown] = useState<string | null>(null);
 
   const navigate = useCallback((nextView: AppView) => {
     setView(nextView);
@@ -243,6 +244,21 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
       case "run_once":
         void perform(() => engine.runOnce(contextFactoryRef.current()), "run");
         break;
+      case "pause":
+        if (engine.pauseWorkflow) {
+          void perform(() => engine.pauseWorkflow!("user_paused", contextFactoryRef.current()), "run");
+        }
+        break;
+      case "cancel":
+        if (engine.cancelWorkflow) {
+          void perform(() => engine.cancelWorkflow!("user_cancelled", contextFactoryRef.current()), "overview");
+        }
+        break;
+      case "replan":
+        if (engine.replanWorkflow) {
+          void perform(() => engine.replanWorkflow!("user_requested_replan", contextFactoryRef.current()), "plans");
+        }
+        break;
       case "refresh_snapshot":
       case "observe_attempt":
       case "resume_attempt":
@@ -269,6 +285,33 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
 
   const activatePlan = (command: ActivatePlanCommand): Promise<boolean> => {
     return perform(() => engine.activatePlan(command, contextFactoryRef.current()), "run");
+  };
+
+  const handleSelectProject = (projectRoot: string) => {
+    if (!engine.selectProject) return;
+    setFinalReportMarkdown(null);
+    void perform(() => engine.selectProject!(projectRoot, contextFactoryRef.current()), "overview");
+  };
+
+  const handleViewFinalReport = async () => {
+    if (!engine.getFinalReport || busy) return;
+    setBusy(true);
+    try {
+      const result = await engine.getFinalReport(contextFactoryRef.current());
+      if (result.ok) {
+        setFinalReportMarkdown(result.data.markdown);
+        setCommandError(null);
+      } else {
+        setCommandError({ code: result.error.code, message: result.error.message });
+      }
+    } catch (error: unknown) {
+      setCommandError({
+        code: "ENGINE_COMMAND_FAILED",
+        message: error instanceof Error ? error.message : String(error),
+      });
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleRuntimeModeSwitch = useCallback((nextMode: RuntimeMode) => {
@@ -316,7 +359,12 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
       />
       {busy ? <div className="command-progress" role="progressbar" aria-label="명령 처리 중" /> : null}
       <div className="workspace">
-        <ProjectRail snapshot={snapshot} open={projectsOpen} onClose={() => setProjectsOpen(false)} />
+        <ProjectRail
+          snapshot={snapshot}
+          open={projectsOpen}
+          onClose={() => setProjectsOpen(false)}
+          onSelectProject={engine.selectProject ? handleSelectProject : undefined}
+        />
         <main className="main-workspace" aria-busy={busy}>
           <SectionTabs view={view} snapshot={snapshot} onNavigate={navigate} />
           {commandError ? (
@@ -341,6 +389,11 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
               snapshot={snapshot}
               onRunOnce={() => void perform(() => engine.runOnce(contextFactoryRef.current()))}
               onRunAll={() => void runUntilSettled()}
+              onPause={engine.pauseWorkflow ? () => void perform(() => engine.pauseWorkflow!("user_paused", contextFactoryRef.current())) : undefined}
+              onCancel={engine.cancelWorkflow ? () => void perform(() => engine.cancelWorkflow!("user_cancelled", contextFactoryRef.current()), "overview") : undefined}
+              onReplan={engine.replanWorkflow ? () => void perform(() => engine.replanWorkflow!("user_requested_replan", contextFactoryRef.current()), "plans") : undefined}
+              onViewFinalReport={engine.getFinalReport ? () => void handleViewFinalReport() : undefined}
+              finalReportMarkdown={finalReportMarkdown}
               onNavigate={navigate}
             />
           ) : null}
