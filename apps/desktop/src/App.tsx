@@ -28,15 +28,22 @@ function viewFromHash(): AppView {
 
 function initialRuntimeMode(explicitMode?: RuntimeMode): RuntimeMode {
   if (explicitMode) return explicitMode;
+  const envObj =
+    typeof import.meta !== "undefined"
+      ? (import.meta as { env?: Record<string, string | boolean | undefined> }).env
+      : undefined;
+  const envMode = envObj?.VITE_ENGINE_RUNTIME;
+  if (envMode === "mock" || envMode === "http") return envMode;
   if (typeof window !== "undefined") {
     const params = new URLSearchParams(window.location.search);
     if (params.get("runtime") === "http") return "http";
+    if (params.get("runtime") === "mock") return "mock";
+    const isTestEnv = Boolean(envObj?.VITEST || envObj?.MODE === "test");
+    if (!isTestEnv && window.location.port && window.location.port !== "5173") {
+      return "http";
+    }
   }
-  const envMode =
-    typeof import.meta !== "undefined"
-      ? (import.meta as { env?: Record<string, string | undefined> }).env?.VITE_ENGINE_RUNTIME
-      : undefined;
-  return envMode === "http" ? "http" : "mock";
+  return "mock";
 }
 
 export interface AppProps {
@@ -293,6 +300,14 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
     void perform(() => engine.selectProject!(projectRoot, contextFactoryRef.current()), "overview");
   };
 
+  const handleBrowseProject = async () => {
+    if (!engine.selectProject || busy) return;
+    const selected = await platformRef.current.selectProjectDirectory();
+    if (selected?.displayPath) {
+      handleSelectProject(selected.displayPath);
+    }
+  };
+
   const handleViewFinalReport = async () => {
     if (!engine.getFinalReport || busy) return;
     setBusy(true);
@@ -364,6 +379,7 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
           open={projectsOpen}
           onClose={() => setProjectsOpen(false)}
           onSelectProject={engine.selectProject ? handleSelectProject : undefined}
+          onBrowseProject={engine.selectProject ? () => void handleBrowseProject() : undefined}
         />
         <main className="main-workspace" aria-busy={busy}>
           <SectionTabs view={view} snapshot={snapshot} onNavigate={navigate} />

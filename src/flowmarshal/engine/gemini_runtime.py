@@ -387,7 +387,11 @@ class GeminiRuntime:
         """`gemini --version` 첫 토큰을 잠금 값으로 쓴다. 모델 호출은 없다."""
         try:
             completed = subprocess.run(
-                [*self._launcher, "--version"], capture_output=True, timeout=60, env=self._env,
+                [*self._launcher, "--version"],
+                capture_output=True,
+                timeout=60,
+                env=self._env,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
         except (OSError, subprocess.TimeoutExpired) as error:
             raise RuntimePolicyError(f"GEMINI_CLI_VERSION_UNAVAILABLE: {error}") from error
@@ -568,6 +572,7 @@ class GeminiRuntime:
             stderr=subprocess.PIPE,
             cwd=str(thread.cwd),
             env=self._env,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         thread.process = process
         thread.exit_code = None

@@ -447,27 +447,30 @@ class AGSObservationProducerTests(unittest.TestCase):
             connection.close()
             for attempt in range(2):
                 reopened = sqlite3.connect(database)
-                reopened.row_factory = sqlite3.Row
-                service = SimpleNamespace(ledger=_Ledger(reopened))
-                restarted = producer if attempt == 0 else AGSObservationProducer(
-                    private_key=key, installation_id=example["producer"]["installationId"],
-                    key_id=example["producer"]["keyId"], instance_id=example["producer"]["instanceId"],
-                    session_id=example["binding"]["sessionId"],
-                    clock=lambda: datetime.fromisoformat(example["issuedAt"].replace("Z", "+00:00")),
-                    nonce=lambda: "new-nonce", invocation_id=lambda: "new-invocation",
-                )
-                receipt = _issue(example, restarted, service, ref)
-                self.assertEqual(1, reopened.execute(
-                    "SELECT COUNT(*) FROM history_events WHERE event_type='vm_observation.issued'"
-                ).fetchone()[0])
-                stored = json.loads(reopened.execute(
-                    "SELECT payload_json FROM history_events WHERE event_type='vm_observation.issued'"
-                ).fetchone()[0])
-                self.assertEqual(receipt, stored["receipt"])
-                if attempt == 0:
-                    original = receipt
-                else:
-                    self.assertEqual(original, receipt)
+                try:
+                    reopened.row_factory = sqlite3.Row
+                    service = SimpleNamespace(ledger=_Ledger(reopened))
+                    restarted = producer if attempt == 0 else AGSObservationProducer(
+                        private_key=key, installation_id=example["producer"]["installationId"],
+                        key_id=example["producer"]["keyId"], instance_id=example["producer"]["instanceId"],
+                        session_id=example["binding"]["sessionId"],
+                        clock=lambda: datetime.fromisoformat(example["issuedAt"].replace("Z", "+00:00")),
+                        nonce=lambda: "new-nonce", invocation_id=lambda: "new-invocation",
+                    )
+                    receipt = _issue(example, restarted, service, ref)
+                    self.assertEqual(1, reopened.execute(
+                        "SELECT COUNT(*) FROM history_events WHERE event_type='vm_observation.issued'"
+                    ).fetchone()[0])
+                    stored = json.loads(reopened.execute(
+                        "SELECT payload_json FROM history_events WHERE event_type='vm_observation.issued'"
+                    ).fetchone()[0])
+                    self.assertEqual(receipt, stored["receipt"])
+                    if attempt == 0:
+                        original = receipt
+                    else:
+                        self.assertEqual(original, receipt)
+                finally:
+                    reopened.close()
                 reopened.close()
 
     def test_only_explicit_no_effect_retry_gets_new_single_use_invocation(self) -> None:

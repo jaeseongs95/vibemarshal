@@ -681,11 +681,13 @@ class ApplicationAuthority:
         project_id: str,
         *,
         operating_policy: GoalOperatingPolicy | None = None,
+        selected_plan_revision_id: str | None = None,
     ) -> GoalAuthorizationTarget:
         require_host_execution()
         return self._application.authorization_target(
             project_id,
             operating_policy=operating_policy,
+            selected_plan_revision_id=selected_plan_revision_id,
         )
 
     def authorize(
@@ -695,6 +697,7 @@ class ApplicationAuthority:
         target: GoalAuthorizationTarget,
         source: str,
         operating_policy: GoalOperatingPolicy | None = None,
+        selected_plan_revision_id: str | None = None,
     ) -> EngineAuthorizationResult:
         require_host_execution()
         if self._authorization_attempted:
@@ -707,6 +710,7 @@ class ApplicationAuthority:
             target=target,
             source=source,
             operating_policy=operating_policy,
+            selected_plan_revision_id=selected_plan_revision_id,
         )
 
 
@@ -760,6 +764,7 @@ class EngineApplication:
         target: GoalAuthorizationTarget,
         source: str,
         operating_policy: GoalOperatingPolicy | None = None,
+        selected_plan_revision_id: str | None = None,
     ) -> EngineAuthorizationResult:
         require_host_execution()
         authority = self._core_action_authority
@@ -777,7 +782,7 @@ class EngineApplication:
             operating_policy=operating_policy,
             capability=capability,
             authorization_target=target,
-            selected_plan_revision_id=target.plan_revision_id,
+            selected_plan_revision_id=selected_plan_revision_id,
         )
 
     def _execution_components(self) -> tuple[Any, EngineRoleConfiguration, StructuredRolePort]:
@@ -1041,7 +1046,12 @@ class EngineApplication:
             operating_policy=operating_policy,
             capability=capability,
             authorization_target=authorization_target,
-            expected_plan_revision_id=selected_plan_revision_id,
+            expected_plan_revision_id=(
+                selected_plan_revision_id
+                if selected_plan_revision_id is not None
+                else (None if authorization_target is None else authorization_target.plan_revision_id)
+            ),
+            selected_plan_revision_id=selected_plan_revision_id,
         )
         return EngineAuthorizationResult(
             project_id=project_id,
@@ -1054,12 +1064,14 @@ class EngineApplication:
         project_id: str,
         *,
         operating_policy: GoalOperatingPolicy | None = None,
+        selected_plan_revision_id: str | None = None,
     ) -> GoalAuthorizationTarget:
         """현재 사용자 승인 대상 전체를 상태 변경 없이 반환한다."""
 
         return self.service.goal_authorization_target(
             project_id=project_id,
             operating_policy=operating_policy,
+            selected_plan_revision_id=selected_plan_revision_id,
         )
 
     def read_current_approved_role_slot_source(

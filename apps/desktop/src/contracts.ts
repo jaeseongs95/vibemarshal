@@ -238,6 +238,7 @@ export interface WorkspaceSnapshot {
   scenario: ScenarioKey;
   phase: WorkspacePhase;
   project: ProjectSummary;
+  projects?: ProjectSummary[];
   goal: GoalRevisionView;
   plans: PlanCandidateView[];
   recommendedPlanRevisionId: string | null;

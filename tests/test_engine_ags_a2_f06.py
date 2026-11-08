@@ -28,7 +28,10 @@ from flowmarshal.engine.governance_gate import (
     GovernanceTaskGate, MissingGovernanceGate, _Run,
 )
 from flowmarshal.engine import governance_gate
-from test_engine_ags_observation_producer import FIXTURE, _service
+try:
+    from tests.test_engine_ags_observation_producer import FIXTURE, _service
+except ModuleNotFoundError:
+    from test_engine_ags_observation_producer import FIXTURE, _service
 
 ROOT = Path(__file__).resolve().parents[1]
 VM_PROFILE = {
@@ -360,7 +363,10 @@ class A2ConformanceTransitionTests(unittest.TestCase):
     def test_signed_probe_checks_fail_closed_until_the_a2_probe_exists(self) -> None:
         from flowmarshal.engine.governance_conformance import run_conformance
         from flowmarshal.engine.governance_gate import GovernancePlugin
-        from test_engine_governance_conformance import ConformanceFake
+        try:
+            from tests.test_engine_governance_conformance import ConformanceFake
+        except ImportError:
+            from test_engine_governance_conformance import ConformanceFake
 
         class RealSigningPath(ConformanceFake):
             def call(self, tool, arguments, observation):

@@ -18,7 +18,10 @@ from flowmarshal.engine.ags_observation_producer import (
     ProducerUnavailable, _load_installed_producer, _read_protected_json, _windows_protected,
 )
 from flowmarshal.engine.governance_gate import GovernanceSettings
-from test_engine_ags_observation_producer import FIXTURE, _service
+try:
+    from tests.test_engine_ags_observation_producer import FIXTURE, _service
+except ModuleNotFoundError:
+    from test_engine_ags_observation_producer import FIXTURE, _service
 
 
 class InstalledProducerBootstrapTests(unittest.TestCase):

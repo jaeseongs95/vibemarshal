@@ -33,6 +33,8 @@ class EnginePackagingContractTests(unittest.TestCase):
         self.assertEqual(
             document["project"]["scripts"],
             {
+                "vibemarshal": "flowmarshal.engine.console_host:main",
+                "vibemarshal-gui": "flowmarshal.engine.http_api:main",
                 "flowmarshal-engine": "flowmarshal.engine.console_host:main",
                 "flowmarshal-gui": "flowmarshal.engine.http_api:main",
             },
@@ -94,7 +96,9 @@ class EnginePackagingContractTests(unittest.TestCase):
                     "wheel build failed in this environment "
                     f"(likely no network for build isolation): {result.stderr[-2000:]}"
                 )
-            wheels = list(out_dir.glob("flowmarshal_engine-*.whl"))
+            wheels = list(out_dir.glob("vibemarshal-*.whl")) or list(
+                out_dir.glob("flowmarshal_engine-*.whl")
+            )
             self.assertEqual(1, len(wheels), result.stdout + result.stderr)
             with zipfile.ZipFile(wheels[0]) as archive:
                 names = archive.namelist()
@@ -133,6 +137,7 @@ class EnginePackagingContractTests(unittest.TestCase):
             # shared canonical 자산이다. 그래서 의도적으로 wheel에 남긴다.
             self.assertIn("qualification_manifest", engine_modules)
             leaked_dev_modules = engine_modules & {
+                "agy_gemini_bridge",
                 "qualification",
                 "eval_cli",
                 "benchmark",
@@ -159,6 +164,8 @@ class EnginePackagingContractTests(unittest.TestCase):
             self.assertIn("console_host", engine_modules)
 
             normalized_ep = entry_points.replace("\r\n", "\n")
+            self.assertIn("vibemarshal = flowmarshal.engine.console_host:main", normalized_ep)
+            self.assertIn("vibemarshal-gui = flowmarshal.engine.http_api:main", normalized_ep)
             self.assertIn("flowmarshal-engine = flowmarshal.engine.console_host:main", normalized_ep)
             self.assertIn("flowmarshal-gui = flowmarshal.engine.http_api:main", normalized_ep)
 

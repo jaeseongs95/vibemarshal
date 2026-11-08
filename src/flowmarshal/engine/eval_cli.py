@@ -7,7 +7,12 @@ from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
-from openai_codex.errors import CodexError
+
+try:
+    from openai_codex.errors import CodexError
+except ModuleNotFoundError:  # pragma: no cover - optional legacy runtime dependency
+    class CodexError(Exception):  # type: ignore[no-redef]
+        pass
 
 from ..canonical import sha256_digest
 from .benchmark_observation import (
@@ -104,8 +109,14 @@ def _evaluation_policies(arguments: argparse.Namespace) -> EvaluationPolicies:
     )
 
 
+def _resolve_project_root(argument: str | None) -> Path:
+    if argument:
+        return Path(argument).resolve(strict=True)
+    return project_root()
+
+
 def _run(arguments: argparse.Namespace) -> int:
-    root = Path(arguments.project_root).resolve(strict=True)
+    root = _resolve_project_root(arguments.project_root)
     destination = None if arguments.run_root is None else Path(arguments.run_root).resolve()
     if arguments.scope == "project-e2e":
         if not arguments.candidate_wheel:
@@ -200,7 +211,7 @@ def _run(arguments: argparse.Namespace) -> int:
 
 
 def _release_freeze(arguments: argparse.Namespace) -> int:
-    root = Path(arguments.project_root).resolve(strict=True)
+    root = _resolve_project_root(arguments.project_root)
     plan = ShardIsolationPlan.model_validate(_json(arguments.shard_plan))
     role_configuration = (
         None if arguments.role_config is None else _roles(arguments.role_config, root)
@@ -228,7 +239,7 @@ def _release_freeze(arguments: argparse.Namespace) -> int:
 
 
 def _verify_release_freeze(arguments: argparse.Namespace) -> int:
-    root = Path(arguments.project_root).resolve(strict=True)
+    root = _resolve_project_root(arguments.project_root)
     role_configuration = (
         None if arguments.role_config is None else _roles(arguments.role_config, root)
     )
@@ -254,7 +265,7 @@ def _verify_release_freeze(arguments: argparse.Namespace) -> int:
 def _clean_install(arguments: argparse.Namespace) -> int:
     """E2E-18 clean 설치 cell을 실행하고 같은 산출물로 즉시 재검증한다."""
 
-    root = Path(arguments.project_root).resolve(strict=True)
+    root = _resolve_project_root(arguments.project_root)
     run_root, report = run_clean_install(
         root=root,
         run_root=None if arguments.run_root is None else Path(arguments.run_root).resolve(),
@@ -373,9 +384,9 @@ def _bound_scope_reports(
 
 
 def _benchmark(arguments: argparse.Namespace) -> int:
+    root = _resolve_project_root(arguments.project_root)
     if arguments.cells_file is None:
         from .benchmark import run_benchmark
-        root = Path(arguments.project_root).resolve(strict=True)
         policies = _evaluation_policies(arguments)
         run_root, report = run_benchmark(
             root=root, run_root=None if arguments.run_root is None else Path(arguments.run_root),
@@ -392,11 +403,11 @@ def _benchmark(arguments: argparse.Namespace) -> int:
         return 0 if report.passed else 1
     cells = _load_cells(arguments.cells_file)
     catalog = PlanningScenarioCatalog.load(
-        Path(arguments.project_root) / "tests" / "fixtures" / "engine" / "planning-scenarios.json"
+        root / "tests" / "fixtures" / "engine" / "planning-scenarios.json"
     )
     validate_benchmark_matrix(cells, catalog)
     reports = _bound_scope_reports(
-        arguments.scope_report, Path(arguments.project_root).resolve(strict=True),
+        arguments.scope_report, root,
         inspection_provider_contract=arguments.inspection_contract,
     )
     functional = (
@@ -458,7 +469,7 @@ def _write_immutable_assessment(path: Path, value: Any) -> None:
 
 def _observe_benchmark_lifecycle_v3(arguments: argparse.Namespace) -> int:
     """모델 호출 없이 원래 cell 원장을 읽고 별도 불변 평가를 추가한다."""
-    root = Path(arguments.project_root).resolve(strict=True)
+    root = _resolve_project_root(arguments.project_root)
     run_root = Path(arguments.run_root).resolve(strict=True)
     contract = EvaluationContract.model_validate(_json(run_root / "evaluation-contract.json"))
     metadata = _json(run_root / "run-metadata.json")
@@ -554,7 +565,7 @@ def _observe_benchmark_lifecycle_v3(arguments: argparse.Namespace) -> int:
 def _observe_benchmark_lifecycle(arguments: argparse.Namespace) -> int:
     """v4 run은 최종 최소선을 판정하고 v3는 역사 관측 형식으로만 읽는다."""
     from .performance_assessment import build_performance_assessment, write_performance_assessment
-    root = Path(arguments.project_root).resolve(strict=True)
+    root = _resolve_project_root(arguments.project_root)
     run_root = Path(arguments.run_root).resolve(strict=True)
     metadata = _json(run_root / "run-metadata.json")
     if "performance_threshold_policy" not in metadata:
@@ -576,7 +587,7 @@ def _cutover(arguments: argparse.Namespace) -> int:
     """원본 근거에서 재계산한 final v4 보고서만 새 cutover에 사용한다."""
     from .performance import PerformanceQualificationReport, evaluate_release_cutover_gate
     from .performance_assessment import build_performance_assessment
-    root = Path(arguments.project_root).resolve(strict=True)
+    root = _resolve_project_root(arguments.project_root)
     path = Path(arguments.benchmark_report).resolve(strict=True)
     document = _json(path)
     if document.get("schema_version") != "4.0":
@@ -625,7 +636,7 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         required=True,
     )
-    run.add_argument("--project-root", default=str(project_root()))
+    run.add_argument("--project-root")
     run.add_argument("--run-root")
     run.add_argument("--role-config")
     run.add_argument("--codex-bin")
@@ -659,7 +670,7 @@ def build_parser() -> argparse.ArgumentParser:
     run.set_defaults(handler=_run)
 
     clean_install = commands.add_parser("clean-install")
-    clean_install.add_argument("--project-root", default=str(project_root()))
+    clean_install.add_argument("--project-root")
     clean_install.add_argument("--run-root")
     clean_install.add_argument(
         "--candidate-wheel", required=True, help="설치할 candidate wheel의 절대경로"
@@ -684,7 +695,7 @@ def build_parser() -> argparse.ArgumentParser:
     resume.set_defaults(handler=_resume)
 
     benchmark = commands.add_parser("benchmark")
-    benchmark.add_argument("--project-root", default=str(project_root()))
+    benchmark.add_argument("--project-root")
     benchmark.add_argument("--cells-file", help="기존 36-cell 결과를 수입한다. 생략하면 실제 비교를 수집한다.")
     benchmark.add_argument("--run-root")
     benchmark.add_argument("--role-config")
@@ -707,20 +718,20 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.set_defaults(handler=_benchmark)
 
     observe = commands.add_parser("observe-benchmark-lifecycle")
-    observe.add_argument("--project-root", default=str(project_root()))
+    observe.add_argument("--project-root")
     observe.add_argument("--run-root", required=True)
     observe.add_argument("--scope-report", action="append")
     observe.set_defaults(handler=_observe_benchmark_lifecycle)
 
     cutover = commands.add_parser("cutover")
-    cutover.add_argument("--project-root", default=str(project_root()))
+    cutover.add_argument("--project-root")
     cutover.add_argument("--scope-report", action="append", required=True)
     cutover.add_argument("--benchmark-report", required=True)
     cutover.add_argument("--output")
     cutover.set_defaults(handler=_cutover)
 
     release_freeze = commands.add_parser("release-freeze")
-    release_freeze.add_argument("--project-root", default=str(project_root()))
+    release_freeze.add_argument("--project-root")
     release_freeze.add_argument("--destination", required=True)
     release_freeze.add_argument("--candidate-wheel", required=True, help="freeze할 candidate wheel의 절대경로")
     release_freeze.add_argument("--built-from-commit", required=True)
@@ -738,7 +749,7 @@ def build_parser() -> argparse.ArgumentParser:
     release_freeze.set_defaults(handler=_release_freeze)
 
     verify_release_freeze_parser = commands.add_parser("verify-release-freeze")
-    verify_release_freeze_parser.add_argument("--project-root", default=str(project_root()))
+    verify_release_freeze_parser.add_argument("--project-root")
     verify_release_freeze_parser.add_argument("--destination", required=True)
     verify_release_freeze_parser.add_argument("--candidate-wheel")
     verify_release_freeze_parser.add_argument("--role-config")

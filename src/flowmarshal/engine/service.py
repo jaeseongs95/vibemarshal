@@ -691,8 +691,11 @@ class EngineService:
             requested_symbols=symbols,
             observed_links=scope["observed_links"],
         )
-        map_changed = current_map is None or observed_map.semantic_digest != current_map.semantic_digest
-        project_map = observed_map if map_changed else current_map
+        if current_map is None or observed_map.semantic_digest != current_map.semantic_digest:
+            project_map = observed_map
+            self.record_project_map(project_map)
+        else:
+            project_map = current_map
 
         try:
             current_state = self.load_current_state(project_id, goal.definition_digest)
@@ -719,7 +722,6 @@ class EngineService:
             )
         if (
             current_state is not None
-            and not map_changed
             and not force_state_revision
             and map_bound == project_map.revision_digest
             and workspace_inventory_bound == workspace_inventory
@@ -786,10 +788,7 @@ class EngineService:
             facts=tuple(facts),
             observed_at=utc_now(),
         )
-        with self.ledger.transaction() as tx:
-            if map_changed:
-                self._record_project_map_in_transaction(tx, project_map)
-            self._record_state_snapshot_in_transaction(tx, state)
+        self.record_state_snapshot(state)
         return project_map, state
 
     def record_skeleton_evaluation(self, evaluation: CandidateEvaluation) -> None:
@@ -2614,10 +2613,16 @@ class EngineService:
         *,
         project_id: str,
         operating_policy: GoalOperatingPolicy | None = None,
+        selected_plan_revision_id: str | None = None,
     ) -> GoalAuthorizationTarget:
         """사용자에게 표시한 실제 승인 요청을 host capability에 결속한다."""
         with self.ledger.read() as connection:
-            return self._goal_authorization_target(connection, project_id, operating_policy)[0]
+            return self._goal_authorization_target(
+                connection,
+                project_id,
+                operating_policy,
+                selected_plan_revision_id=selected_plan_revision_id,
+            )[0]
 
     def _replan_candidate_for_activation(
         self, connection: Any, project_id: str,
@@ -2664,34 +2669,71 @@ class EngineService:
             return None
         return plan if self._supersedes_reaches(connection, plan, active_id) else None
 
-    def _authorization_plan(self, connection: Any, project_id: str) -> tuple[PlanContractRevision, bool]:
+    def _authorization_plan(
+        self,
+        connection: Any,
+        project_id: str,
+    ) -> tuple[PlanContractRevision, bool]:
         """승인 target·authorize 재계산·활성화가 함께 쓰는 선택과 재계획 후보 여부."""
         candidate = self._replan_candidate_for_activation(connection, project_id)
         if candidate is not None:
             return candidate, True
         return self._selected_plan_for_activation(connection, project_id), False
 
-    @staticmethod
-    def _selected_plan_for_activation(connection: Any, project_id: str) -> PlanContractRevision:
-        """activate_selected_plan과, 재계획 후보가 없을 때의 승인 선택이 공유하는 eligible 선택 판정."""
-        selection = connection.execute(
-            "SELECT payload_json FROM history_events WHERE project_id = ? "
-            "AND event_type = 'planning.search_recorded' ORDER BY sequence DESC LIMIT 1",
-            (project_id,),
-        ).fetchone()
-        selected_digest = (
-            None
-            if selection is None
-            else json.loads(selection["payload_json"])["outcome"].get(
-                "selected_activation_digest"
-            )
+    def _authorization_plan_for_selection(
+        self,
+        connection: Any,
+        project_id: str,
+        selected_plan_revision_id: str | None,
+    ) -> tuple[PlanContractRevision, bool]:
+        if selected_plan_revision_id is None:
+            return self._authorization_plan(connection, project_id)
+        candidate = self._replan_candidate_for_activation(connection, project_id)
+        if candidate is not None and candidate.plan_revision_id == selected_plan_revision_id:
+            return candidate, True
+        return (
+            self._selected_plan_for_activation(
+                connection,
+                project_id,
+                selected_plan_revision_id=selected_plan_revision_id,
+            ),
+            False,
         )
+
+    @staticmethod
+    def _selected_plan_for_activation(
+        connection: Any,
+        project_id: str,
+        *,
+        selected_plan_revision_id: str | None = None,
+    ) -> PlanContractRevision:
+        """activate_selected_plan과, 재계획 후보가 없을 때의 승인 선택이 공유하는 eligible 선택 판정."""
         selected = None
-        if selected_digest is not None:
+        if selected_plan_revision_id is not None:
             selected = connection.execute(
-                "SELECT * FROM plan_revisions WHERE project_id = ? AND activation_digest = ?",
-                (project_id, selected_digest),
+                "SELECT * FROM plan_revisions WHERE project_id = ? AND id = ?",
+                (project_id, selected_plan_revision_id),
             ).fetchone()
+            if selected is None:
+                raise EngineServiceError("PlanContract를 찾을 수 없습니다.")
+        if selected is None:
+            selection = connection.execute(
+                "SELECT payload_json FROM history_events WHERE project_id = ? "
+                "AND event_type = 'planning.search_recorded' ORDER BY sequence DESC LIMIT 1",
+                (project_id,),
+            ).fetchone()
+            selected_digest = (
+                None
+                if selection is None
+                else json.loads(selection["payload_json"])["outcome"].get(
+                    "selected_activation_digest"
+                )
+            )
+            if selected_digest is not None:
+                selected = connection.execute(
+                    "SELECT * FROM plan_revisions WHERE project_id = ? AND activation_digest = ?",
+                    (project_id, selected_digest),
+                ).fetchone()
         if selected is None:
             candidates = connection.execute(
                 "SELECT * FROM plan_revisions WHERE project_id = ? AND status = 'ready'",
@@ -2747,7 +2789,12 @@ class EngineService:
         return plan
 
     def _goal_authorization_target(
-        self, connection, project_id, operating_policy,
+        self,
+        connection,
+        project_id,
+        operating_policy,
+        *,
+        selected_plan_revision_id: str | None = None,
     ) -> tuple[GoalAuthorizationTarget, PlanContractRevision, bool]:
         """승인 target과 그 target이 결속한 Plan 선택·재계획 후보 여부를 함께 돌려준다."""
         from .authorization import current_budget_policies, _operating_budget
@@ -2767,7 +2814,11 @@ class EngineService:
         if profile is None:
             raise EngineServiceError("active ProjectProfile revision을 찾을 수 없습니다.")
         policy = (operating_policy or GoalOperatingPolicy()).model_copy(update={"execution_guard_version": "2.0"})
-        plan, replan_candidate = self._authorization_plan(connection, project_id)
+        plan, replan_candidate = self._authorization_plan_for_selection(
+            connection,
+            project_id,
+            selected_plan_revision_id,
+        )
         budget_policies = tuple(
             canonical_json({
                 "scope_key": item["scope_key"],
@@ -2809,6 +2860,7 @@ class EngineService:
         capability: GoalAuthorizationCapability | None = None,
         authorization_target: GoalAuthorizationTarget | None = None,
         validate_selected_plan: bool = False,
+        selected_plan_revision_id: str | None = None,
     ) -> tuple[GoalAuthorization, PlanContractRevision, bool]:
         """승인을 기록하고 target이 결속한 Plan 선택·재계획 후보 여부를 함께 돌려준다."""
         require_host_execution()
@@ -2827,7 +2879,10 @@ class EngineService:
                 target=authorization_target,
             )
             target, selected, replan_candidate = self._goal_authorization_target(
-                tx.connection, project_id, operating_policy,
+                tx.connection,
+                project_id,
+                operating_policy,
+                selected_plan_revision_id=selected_plan_revision_id,
             )
             if target != authorization_target:
                 raise CoreCapabilityError(
@@ -2835,7 +2890,10 @@ class EngineService:
                 )
         else:
             target, selected, replan_candidate = self._goal_authorization_target(
-                tx.connection, project_id, operating_policy,
+                tx.connection,
+                project_id,
+                operating_policy,
+                selected_plan_revision_id=selected_plan_revision_id,
             )
             consume_goal_authorization(
                 self._action_authority,
@@ -2901,6 +2959,7 @@ class EngineService:
         capability: GoalAuthorizationCapability | None = None,
         authorization_target: GoalAuthorizationTarget | None = None,
         expected_plan_revision_id: str | None = None,
+        selected_plan_revision_id: str | None = None,
     ) -> tuple[GoalAuthorization, str]:
         """승인과 선택 Plan 활성화를 함께 commit하거나 함께 rollback한다."""
         with self.ledger.transaction() as tx:
@@ -2908,6 +2967,7 @@ class EngineService:
                 tx, project_id=project_id, source=source, operating_policy=operating_policy,
                 capability=capability, authorization_target=authorization_target,
                 validate_selected_plan=True,
+                selected_plan_revision_id=selected_plan_revision_id,
             )
             # 승인 insert 뒤에 다시 선택하지 않는다. target·재계산과 같은 insert 전 선택을 활성화한다.
             if expected_plan_revision_id is not None and selected.plan_revision_id != expected_plan_revision_id:
@@ -5977,15 +6037,8 @@ class EngineService:
             raise EngineServiceError("validation의 Task binding이 계약과 다릅니다.")
         validation_contract = validation_contracts[result.validation_id]
         if result.task_id is not None:
-            task_contract = next(
-                item for item in plan.definition.tasks if item.task_id == result.task_id
-            )
             if (
                 validation_contract.method == "semantic"
-                and (
-                    task_contract.assignment.independence_required
-                    or validation_contract.evidence_mode == "independent"
-                )
                 and result.status in {ValidationStatus.PASS, ValidationStatus.FAIL}
             ):
                 self._verify_semantic_validation_independence(
@@ -5997,7 +6050,6 @@ class EngineService:
                 )
         elif (
             validation_contract.method == "semantic"
-            and validation_contract.evidence_mode == "independent"
             and result.status in {ValidationStatus.PASS, ValidationStatus.FAIL}
         ):
             self._verify_semantic_validation_independence(

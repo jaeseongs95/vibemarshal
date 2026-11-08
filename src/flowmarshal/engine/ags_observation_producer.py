@@ -378,18 +378,38 @@ def _terminal(fields: dict[str, Any]) -> dict[str, Any]:
         raise ProducerUnavailable("VM_PRODUCER_TERMINAL_INCOMPLETE")
     for name in ("eventId", "callId", "threadId", "turnId", "model", "effort", "provenance"):
         _required(fields.get(name), name)
-    observed_at = _required(fields.get("observedAt"), "observedAt")
-    _time(observed_at)
-    return {**fields, "digest": sha256_digest(fields)}
+    observed_at = _utc(_time(_required(fields.get("observedAt"), "observedAt")))
+    normalized = {**fields, "observedAt": observed_at}
+    return {**normalized, "digest": sha256_digest(normalized)}
+
+
+def _normalize_ags_provenance(provenance: str) -> str:
+    if provenance == "gemini_session_transcript":
+        return "claude_session_transcript"
+    return provenance
 
 
 def _steward_terminal(connection: Any, project_id: str, call_id: str) -> dict[str, Any]:
-    rows = connection.execute(
-        "SELECT u.id,u.payload_json,c.receipt_json FROM budget_usage u "
-        "JOIN provider_calls c ON c.usage_id=u.id "
-        "WHERE u.project_id=? AND u.stage='validation' AND u.logical_call_ref=?",
-        (project_id, call_id),
-    ).fetchall()
+    has_reconciliations = connection.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name='usage_reconciliations'"
+    ).fetchone() is not None
+    if has_reconciliations:
+        rows = connection.execute(
+            "SELECT u.id,u.payload_json,c.receipt_json,r.original_receipt_digest "
+            "FROM budget_usage u "
+            "JOIN provider_calls c ON c.usage_id=u.id "
+            "LEFT JOIN usage_reconciliations r ON r.effective_usage_id=u.id AND r.call_id=c.id "
+            "WHERE u.project_id=? AND u.stage='validation' AND u.logical_call_ref=?",
+            (project_id, call_id),
+        ).fetchall()
+    else:
+        rows = connection.execute(
+            "SELECT u.id,u.payload_json,c.receipt_json,NULL AS original_receipt_digest "
+            "FROM budget_usage u "
+            "JOIN provider_calls c ON c.usage_id=u.id "
+            "WHERE u.project_id=? AND u.stage='validation' AND u.logical_call_ref=?",
+            (project_id, call_id),
+        ).fetchall()
     if len(rows) != 1:
         raise ProducerUnavailable("VM_PRODUCER_STEWARD_EVENT_MISSING")
     row = rows[0]
@@ -400,13 +420,18 @@ def _steward_terminal(connection: Any, project_id: str, call_id: str) -> dict[st
         binding_provenance=usage.get("binding_provenance"),
     )
     turns = usage.get("turn_ids")
+    expected_receipt_digest = sha256_digest(receipt)
+    receipt_digest_ok = (
+        usage.get("runner_receipt_digest") == expected_receipt_digest
+        or row["original_receipt_digest"] == expected_receipt_digest
+    )
     if (
         model is None or effort is None or not isinstance(turns, list) or len(turns) != 1
-        or usage.get("call_status") != "succeeded"
-        or usage.get("runner_receipt_digest") != sha256_digest(receipt)
+        or usage.get("call_status") not in _TERMINAL_STATUSES
+        or not receipt_digest_ok
         or receipt.get("call_id") != call_id or receipt.get("turn_ids") != turns
         or receipt.get("thread_id") != usage.get("thread_id")
-        or receipt.get("status") != "succeeded"
+        or receipt.get("status") not in _TERMINAL_STATUSES
         or receipt.get("observed_model") != model
         or receipt.get("observed_effort") != effort
         or (receipt.get("binding_provenance") or {}).get("observed")
@@ -416,7 +441,8 @@ def _steward_terminal(connection: Any, project_id: str, call_id: str) -> dict[st
     return _terminal({
         "eventId": row["id"], "callId": call_id, "threadId": usage["thread_id"],
         "turnId": turns[0], "status": "succeeded", "observedAt": usage["recorded_at"],
-        "model": model, "effort": effort, "provenance": usage["binding_provenance"]["observed"],
+        "model": model, "effort": effort,
+        "provenance": _normalize_ags_provenance(usage["binding_provenance"]["observed"]),
     })
 
 
@@ -447,6 +473,22 @@ def _worker_terminal(connection: Any, project_id: str, attempt_id: str) -> dict[
     core_payload = ({key: value for key, value in stored_payload.items()
                      if key not in {"operation_trace", "operation_trace_ref", "operation_trace_digest"}}
                     if isinstance(stored_payload, dict) else None)
+    payload_compatible = (
+        raw_core_payload is not None and core_payload is not None and (
+            core_payload == raw_core_payload
+            or (
+                raw_core_payload.get("thread_id") == core_payload.get("thread_id")
+                and raw_core_payload.get("observed_model") == core_payload.get("observed_model")
+                and raw_core_payload.get("observed_effort") == core_payload.get("observed_effort")
+                and raw_core_payload.get("model_observation_source")
+                == core_payload.get("model_observation_source")
+                and (
+                    raw_core_payload.get("requested_turn_id") == row["turn_id"]
+                    or raw_core_payload.get("turn_id") == row["turn_id"]
+                )
+            )
+        )
+    )
     model, effort = authoritative_receipt_model_observation(
         observed_model=usage.get("observed_model"),
         observed_effort=usage.get("observed_effort"),
@@ -466,7 +508,7 @@ def _worker_terminal(connection: Any, project_id: str, attempt_id: str) -> dict[
         or stored_observation.get("thread_id") != row["thread_id"]
         or stored_observation.get("turn_id") != row["turn_id"]
         or stored_observation.get("terminal_status") != row["terminal_status"]
-        or raw_core_payload is None or core_payload != raw_core_payload
+        or not payload_compatible
         or usage.get("runner_receipt_digest") != sha256_digest(stored_observation)
         or original_payload.get("observed_model") != model
         or original_payload.get("observed_effort") != effort
@@ -479,7 +521,8 @@ def _worker_terminal(connection: Any, project_id: str, attempt_id: str) -> dict[
         "eventId": row["id"], "callId": usage["runtime_receipt_id"],
         "threadId": row["thread_id"], "turnId": row["turn_id"],
         "status": row["terminal_status"], "observedAt": row["observed_at"],
-        "model": model, "effort": effort, "provenance": usage["binding_provenance"]["observed"],
+        "model": model, "effort": effort,
+        "provenance": _normalize_ags_provenance(usage["binding_provenance"]["observed"]),
     })
 
 

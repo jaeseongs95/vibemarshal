@@ -256,6 +256,7 @@ def _sha256_file(path: Path) -> str:
 
 
 def _run(command: list[str], *, timeout: float, code: str, effects_started: bool, **kwargs: Any) -> subprocess.CompletedProcess:
+    kwargs.setdefault("creationflags", getattr(subprocess, "CREATE_NO_WINDOW", 0))
     try:
         result = subprocess.run(command, capture_output=True, timeout=timeout, **kwargs)
     except subprocess.TimeoutExpired as error:
@@ -382,8 +383,15 @@ class McpStdioClient:
             raise GovernanceUnavailable("GOVERNANCE_TIMEOUT: MCP start: absolute deadline")
         self._stderr = stderr_path.open("ab")
         try:
-            self.process = subprocess.Popen(command, cwd=str(cwd), env=env, stdin=subprocess.PIPE,
-                                            stdout=subprocess.PIPE, stderr=self._stderr)
+            self.process = subprocess.Popen(
+                command,
+                cwd=str(cwd),
+                env=env,
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=self._stderr,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
         except OSError as error:
             self._stderr.close()
             raise GovernanceUnavailable(f"MCP_SERVER_START_FAILED: {error}") from error
@@ -874,7 +882,6 @@ class GovernanceSettings:
                 f"{A2_PROFILE_ENV}를 지정하십시오. 보호 VM·CLI 서명으로 대체하지 않습니다.")
         from .governance_conformance import CHECK_SET_DIGEST
 
-        # 제품 경로의 gate에는 항상 런타임 적합성 분기를 결속한다.
         return GovernanceTaskGate(
             service, plugin=GovernancePlugin(self.plugin_root, self.state_dir / "plugin", self.model_classes,
                                              dispatch_binding=_dispatch_binding(self.observation_producer)),

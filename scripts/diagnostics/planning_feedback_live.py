@@ -53,8 +53,15 @@ from flowmarshal.engine.role_execution import (
     RoleTimeoutPolicy, use_role_timeout_policy, verify_role_timeout_binding,
 )
 from flowmarshal.engine.qualification import (
-    PlanningScenarioCatalog, _profile, project_root, source_manifest_files,
+    PlanningScenarioCatalog, _profile, project_root as _qualification_project_root, source_manifest_files,
 )
+
+
+def project_root() -> Path:
+    try:
+        return _qualification_project_root()
+    except Exception:
+        return Path(__file__).resolve().parents[2]
 from flowmarshal.engine.roles import (
     CodexStructuredRoleRunner, RoleCallReceipt, RoleCallRequest, RoleCallResult, StructuredRoleError,
     strict_json_output_schema,

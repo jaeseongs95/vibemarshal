@@ -169,7 +169,12 @@ def replace_failed_subgraph(
     previous_by_ref = {item.task_ref: item for item in previous.definition.tasks}
     expanded_by_ref = {item.task_ref: item for item in expanded.definition.tasks}
     preserved_refs = set(previous_by_ref) - set(replaced_task_refs)
-    if not set(previous_by_ref).issubset(expanded_by_ref):
+    replacement_refs = set(expanded_by_ref) - preserved_refs
+    if (
+        not preserved_refs.issubset(expanded_by_ref)
+        or len(expanded_by_ref) < len(previous_by_ref)
+        or (replaced_task_refs and not replacement_refs)
+    ):
         raise RecoveryPlanError(
             "RECOVERY_REPLAN_TASK_SET_DRIFT: 재계획이 보존 대상 Task 집합을 바꿨습니다."
         )

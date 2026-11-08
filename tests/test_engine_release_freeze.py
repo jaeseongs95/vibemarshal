@@ -19,7 +19,10 @@ from flowmarshal.engine.models import EngineRoleConfiguration
 from flowmarshal.engine.qualification import default_role_configuration, project_root
 
 
-ROOT = project_root()
+try:
+    ROOT = project_root()
+except Exception:
+    ROOT = Path(__file__).resolve().parents[1]
 FM12_WHEEL = Path(
     "D:/codex/fm-inspection-runtime/performance-release-floor-20260907/redesign-1.0/"
     "FM-12-direct-20260917T2346Z/wheel/flowmarshal_engine-0.2.0a1-py3-none-any.whl"

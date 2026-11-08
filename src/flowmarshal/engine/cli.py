@@ -798,86 +798,32 @@ def _cmd_plan_compare(arguments: argparse.Namespace) -> None:
 
 
 def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
-    confirm_digest = getattr(arguments, "confirm_digest", None)
-    if confirm_digest is not None:
-        from .application import ApplicationAuthority
-
-        app = _application(arguments)
-        authority = ApplicationAuthority(app)
-        project_id = arguments.project_id
-        if not project_id and arguments.plan_revision_id:
-            with app.service.ledger.read() as connection:
-                row = connection.execute(
-                    "SELECT project_id FROM plan_revisions WHERE id = ?",
-                    (arguments.plan_revision_id,),
-                ).fetchone()
-            if row is None:
-                raise EngineServiceError("PlanContract를 찾을 수 없습니다.")
-            project_id = row["project_id"]
-        target = authority.authorization_target(project_id)
-        if confirm_digest.strip() != target.target_digest:
-            raise EngineServiceError(
-                "AUTHORIZATION_DECLINED: target_digest가 일치하지 않아 승인하지 않았습니다."
-            )
-        result = authority.authorize(
-            project_id,
-            target=target,
-            source=arguments.source,
-        )
-        _emit({"activation_id": result.activation_id})
-        return
     service = _service(arguments)
     if arguments.project_id:
         activation_id = service.activate_selected_plan(project_id=arguments.project_id)
     elif arguments.digest:
-        activation_id = service.activate_plan(plan_revision_id=arguments.plan_revision_id,
-                                               activation_digest=arguments.digest, source=arguments.source)
+        activation_id = service.activate_plan(
+            plan_revision_id=arguments.plan_revision_id,
+            activation_digest=arguments.digest,
+            source=arguments.source,
+        )
     else:
-        activation_id = service.activate_authorized_plan(plan_revision_id=arguments.plan_revision_id)
+        activation_id = service.activate_authorized_plan(
+            plan_revision_id=arguments.plan_revision_id
+        )
     _emit({"activation_id": activation_id})
 
 
 def _cmd_goal_authorize(arguments: argparse.Namespace) -> None:
     policy = _goal_authorization_policy(arguments)
-    confirm_digest = getattr(arguments, "confirm_digest", None)
     app = _application(arguments)
-    if confirm_digest is not None:
-        from .application import ApplicationAuthority
-
-        authority = ApplicationAuthority(app)
-        target = authority.authorization_target(
+    _emit(
+        app.authorize(
             arguments.project_id,
+            source=arguments.source,
             operating_policy=policy,
         )
-        if confirm_digest.strip() != target.target_digest:
-            raise EngineServiceError(
-                "AUTHORIZATION_DECLINED: target_digest가 일치하지 않아 승인하지 않았습니다."
-            )
-        _emit(
-            authority.authorize(
-                arguments.project_id,
-                target=target,
-                source=arguments.source,
-            )
-        )
-        return
-    try:
-        _emit(
-            app.authorize(
-                arguments.project_id,
-                source=arguments.source,
-                operating_policy=policy,
-            )
-        )
-    except Exception as error:
-        if "CORE_CAPABILITY_REQUIRED" in str(error):
-            from .capabilities import CoreCapabilityError
-
-            raise CoreCapabilityError(
-                "CORE_CAPABILITY_REQUIRED: ApplicationAuthority가 필요합니다. "
-                "TrustedConsoleHost(flowmarshal-engine)에서 실행하거나 --confirm-digest <target_digest>를 지정하십시오."
-            ) from error
-        raise
+    )
 
 
 def _goal_authorization_policy(arguments: argparse.Namespace) -> GoalOperatingPolicy | None:
@@ -1014,7 +960,8 @@ def _spawn_run_once_owner(argv: tuple[str, ...]) -> RunOnceResult:
     else:
         popen_kwargs["start_new_session"] = True
     process = subprocess.Popen(command, **popen_kwargs)
-    deadline = time.monotonic() + 5.0
+    wait_seconds = float(os.environ.get("FLOWMARSHAL_RUNTIME_OWNER_WAIT_SECONDS") or 180.0)
+    deadline = time.monotonic() + wait_seconds
     while time.monotonic() < deadline:
         if result_path.exists():
             payload = json.loads(result_path.read_text(encoding="utf-8"))

@@ -121,8 +121,15 @@ def run_command_validation(service: EngineService, task: Any, step: ValidationEx
         service.assert_project_authorized(project_id)
         stdout, stderr, code, timed_out = b"", b"", None, False
         try:
-            result = subprocess.run(step.argv, cwd=step.working_directory, capture_output=True,
-                                    check=False, timeout=step.timeout_seconds, shell=False)
+            result = subprocess.run(
+                step.argv,
+                cwd=step.working_directory,
+                capture_output=True,
+                check=False,
+                timeout=step.timeout_seconds,
+                shell=False,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
             stdout, stderr, code = result.stdout, result.stderr, result.returncode
         except subprocess.TimeoutExpired as error:
             stdout, stderr, timed_out = error.stdout or b"", error.stderr or b"", True

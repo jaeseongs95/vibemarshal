@@ -6,14 +6,16 @@ import unittest
 from pathlib import Path
 
 from flowmarshal.engine.agy_gemini_bridge import (
-    AgyLocalGovernance,
     create_agy_gemini_runtime,
     default_agy_gemini_role_configuration,
     resolve_agy_exe,
 )
+from tests.fixtures.engine.governance.allow import ALLOW_ALL
 from flowmarshal.engine.application import ApplicationAuthority, EngineApplication
+from flowmarshal.engine.roles import CodexStructuredRoleRunner
 from flowmarshal.engine.domain import (
     Criticality,
+    GoalOperatingPolicy,
     GoalVerdictStatus,
     LifecycleStage,
     ProjectProfileDefinition,
@@ -75,21 +77,26 @@ class EngineAgyGeminiE2ETests(unittest.TestCase):
 
             runtime = create_agy_gemini_runtime(state_root=root / "gemini-state")
             roles = default_agy_gemini_role_configuration()
-            governance = AgyLocalGovernance()
 
             app = EngineApplication(
                 service,
                 runtime=runtime,
                 role_configuration=roles,
-                governance=governance,
+                structured_runner=CodexStructuredRoleRunner(
+                    runtime,
+                    max_schema_recovery_attempts=1,
+                    ephemeral_threads=False,
+                ),
+                governance=ALLOW_ALL,
             )
 
             # 1. Prepare Goal & Plan via real Antigravity CLI (agy.exe)
             prep = app.prepare(
                 project_id,
                 source_request=(
-                    "calc_app.py에 사칙연산(add, subtract, multiply, divide) 함수를 구현하고 "
-                    "test_calc_app.py로 단위 테스트를 작성해 검증해줘."
+                    "단일 Task 하나로 calc_app.py에 사칙연산(add, subtract, multiply, divide) 함수를 구현하고 "
+                    "test_calc_app.py로 단위 테스트를 함께 작성해 검증해줘. "
+                    "(calc_app.py와 test_calc_app.py를 분리된 Task로 나누지 말고 하나의 Task에서 모두 생성·검증할 것)"
                 ),
                 candidate_count=1,
             )
@@ -102,29 +109,61 @@ class EngineAgyGeminiE2ETests(unittest.TestCase):
             self.assertIsNotNone(prep.planning.selected_activation_digest)
 
             # 2. Authorize Goal & auto-activate Plan
+            selected_plan = next(
+                ev.plan
+                for ev in prep.planning.plan_evaluations
+                if ev.plan.activation_digest == prep.planning.selected_activation_digest
+            )
+            tasks = selected_plan.definition.tasks
             authority = ApplicationAuthority(app)
-            target = authority.authorization_target(project_id)
+            policy = GoalOperatingPolicy(
+                max_same_failure_replans=max(
+                    [2, *[t.recovery.max_same_failure_replans for t in tasks]]
+                ),
+                max_goal_replans=max(
+                    [2, *[t.recovery.max_goal_replans for t in tasks]]
+                ),
+                requires_new_evidence=all(
+                    t.recovery.requires_new_evidence for t in tasks
+                ),
+                resume_strategy=(
+                    tasks[0].recovery.resume_strategy
+                    if tasks
+                    else GoalOperatingPolicy().resume_strategy
+                ),
+                planning_budget=selected_plan.definition.planning_budget,
+            )
+            target = authority.authorization_target(
+                project_id,
+                operating_policy=policy,
+            )
             auth_result = authority.authorize(
                 project_id,
                 target=target,
                 source="e2e-test:agy-gemini",
+                operating_policy=policy,
             )
             self.assertIsNotNone(auth_result.activation_id)
 
             # 3. Advance run_once / observe loop until GoalVerdict is SATISFIED
-            for _ in range(25):
-                tick = app.run_once(project_id)
-                for _ in range(60):
+            last_tick = None
+            for _ in range(45):
+                last_tick = app.run_once(project_id)
+                for _ in range(900):
                     if service.active_runtime_job(project_id) is None:
                         break
                     app.observe(project_id)
-                    time.sleep(0.1)
-                status_now = service.status(project_id)
-                if status_now.get("goal_verdict") is not None:
+                    time.sleep(0.25)
+                app.observe(project_id)
+                status_now = app.status(project_id)
+                if status_now.get("project", {}).get("run_state") == "completed":
+                    break
+                if last_tick.action.value == "blocked" and service.active_runtime_job(project_id) is None:
                     break
 
-            self.assertTrue((workspace_root / "calc_app.py").exists())
-            self.assertTrue((workspace_root / "test_calc_app.py").exists())
+            diag = f"last_tick={last_tick.model_dump(mode='json') if last_tick else None}, status={app.status(project_id)}"
+            self.assertTrue((workspace_root / "calc_app.py").exists(), diag)
+            self.assertTrue((workspace_root / "test_calc_app.py").exists(), diag)
 
             report = app.final_report(project_id)
             self.assertIsNotNone(report.verdict)

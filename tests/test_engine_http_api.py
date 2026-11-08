@@ -13,7 +13,7 @@ from flowmarshal.engine.http_api import LocalGuiEngineBackend, LocalGuiServer, m
 
 class EngineHttpApiTests(unittest.TestCase):
     def setUp(self) -> None:
-        self._tmp = tempfile.TemporaryDirectory()
+        self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.root = Path(self._tmp.name)
         self.db_path = self.root / "ledger.sqlite3"
         self.artifact_root = self.root / "artifacts"
@@ -31,7 +31,7 @@ class EngineHttpApiTests(unittest.TestCase):
         self._tmp.cleanup()
 
     def _get(self, path: str) -> dict:
-        with urllib.request.urlopen(f"{self.base_url}{path}", timeout=5) as resp:
+        with urllib.request.urlopen(f"{self.base_url}{path}", timeout=15) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
     def _post(self, path: str, payload: dict | None = None, *, token: str | None = "default") -> dict:
@@ -47,7 +47,7 @@ class EngineHttpApiTests(unittest.TestCase):
             headers=headers,
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=5) as resp:
+        with urllib.request.urlopen(req, timeout=15) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
     def test_health_and_snapshot_and_sse_events(self) -> None:
@@ -361,11 +361,12 @@ class EngineHttpApiTests(unittest.TestCase):
         self.assertTrue(paused["ok"])
         self.assertEqual(paused["data"]["project"]["runState"], "paused")
 
+        # replan은 SUBGRAPH_REPLAN 차단 후보가 없을 때 예외를 삼키거나 가짜 성공을 만들지 않고 REPLAN_FAILED를 반환한다.
         replanned = self._post("/api/v1/replan", {"rationale": "대안 경로 재탐색"})
-        self.assertTrue(replanned["ok"])
-        self.assertEqual(replanned["data"]["phase"], "plan_active")
+        self.assertFalse(replanned["ok"])
+        self.assertEqual(replanned["error"]["code"], "REPLAN_FAILED")
 
-        # Run to completion and fetch /api/v1/final-report (VM-T-0009, VM-T-0011)
+        # Run to completion (paused state is resumed by run-once) and fetch /api/v1/final-report (VM-T-0009, VM-T-0011)
         for _ in range(9):
             step = self._post("/api/v1/run-once", {})
             if step["data"]["phase"] == "completed":

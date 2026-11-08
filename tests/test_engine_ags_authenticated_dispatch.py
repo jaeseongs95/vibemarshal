@@ -21,7 +21,10 @@ from flowmarshal.engine.ags_invocation_transport import (
 )
 from flowmarshal.engine.ags_observation_producer import AGSObservationProducer, ProducerUnavailable, _canonical
 from flowmarshal.engine.governance_gate import GovernanceContractMismatch, GovernancePlugin, McpStdioClient
-from test_engine_ags_observation_producer import FIXTURE, _Ledger, _service
+try:
+    from tests.test_engine_ags_observation_producer import FIXTURE, _Ledger, _service
+except ModuleNotFoundError:
+    from test_engine_ags_observation_producer import FIXTURE, _Ledger, _service
 
 
 SERVER = r'''

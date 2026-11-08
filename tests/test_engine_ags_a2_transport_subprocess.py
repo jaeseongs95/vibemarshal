@@ -37,7 +37,10 @@ from flowmarshal.engine.governance_conformance import _envelope
 from flowmarshal.engine.governance_gate import (
     HOST_ID, GovernanceContractMismatch, GovernanceTimeout, GovernanceUnavailable, McpStdioClient, mcp_envelope,
 )
-from test_engine_ags_observation_producer import FIXTURE, _service
+try:
+    from tests.test_engine_ags_observation_producer import FIXTURE, _service
+except ModuleNotFoundError:
+    from test_engine_ags_observation_producer import FIXTURE, _service
 
 def _default_ags_repo() -> Path:
     configured = os.environ.get("FLOWMARSHAL_AGS_REPO")

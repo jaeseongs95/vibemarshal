@@ -215,27 +215,51 @@ interface ProjectRailProps {
   open: boolean;
   onClose: () => void;
   onSelectProject?: (projectRoot: string) => void;
+  onBrowseProject?: () => void;
 }
 
-export function ProjectRail({ snapshot, open, onClose, onSelectProject }: ProjectRailProps) {
+export function ProjectRail({ snapshot, open, onClose, onSelectProject, onBrowseProject }: ProjectRailProps) {
   const [newPath, setNewPath] = useState("");
   const completedCount = snapshot.tasks.filter((task) => task.status === "completed").length;
   const progress = snapshot.tasks.length
     ? `${completedCount}/${snapshot.tasks.length} 완료`
     : "활성 Plan 없음";
+  const projectsList = snapshot.projects?.length ? snapshot.projects : [snapshot.project];
   return (
     <aside className={`project-rail ${open ? "is-drawer-open" : ""}`} aria-label="프로젝트">
       <div className="rail-heading">
         <span>{t("app.projects")}</span>
         <button className="icon-button drawer-close" type="button" onClick={onClose} aria-label={t("nav.close")}><X size={18} /></button>
       </div>
-      <button className="project-item project-item--active" type="button" onClick={onClose} aria-current="true">
-        <span className="project-glyph"><FolderKanban size={18} /></span>
-        <span>
-          <strong>{snapshot.project.name}</strong>
-          <small>{snapshot.project.runState === "recovery_required" ? "복구 필요" : progress}</small>
-        </span>
-      </button>
+      {projectsList.map((proj) => {
+        const isCurrent = proj.projectId === snapshot.project.projectId;
+        return (
+          <button
+            key={proj.projectId}
+            className={`project-item ${isCurrent ? "project-item--active" : ""}`}
+            type="button"
+            onClick={() => {
+              if (!isCurrent && onSelectProject) {
+                onSelectProject(proj.location.displayPath);
+              }
+              onClose();
+            }}
+            aria-current={isCurrent ? "true" : undefined}
+          >
+            <span className="project-glyph"><FolderKanban size={18} /></span>
+            <span>
+              <strong>{proj.name}</strong>
+              <small>
+                {proj.runState === "recovery_required"
+                  ? "복구 필요"
+                  : isCurrent
+                    ? progress
+                    : proj.location.displayName}
+              </small>
+            </span>
+          </button>
+        );
+      })}
 
       {onSelectProject ? (
         <form
@@ -258,6 +282,11 @@ export function ProjectRail({ snapshot, open, onClose, onSelectProject }: Projec
           <button className="secondary-action" type="submit" disabled={!newPath.trim()}>
             전환
           </button>
+          {onBrowseProject ? (
+            <button className="secondary-action" type="button" onClick={onBrowseProject}>
+              폴더 선택
+            </button>
+          ) : null}
         </form>
       ) : null}
 

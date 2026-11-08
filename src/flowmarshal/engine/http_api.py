@@ -5,87 +5,60 @@ EngineApplication의 권위 상태와 명령을 호출한다.
 """
 from __future__ import annotations
 
+from copy import deepcopy
 import hmac
+import importlib
+import importlib.util
 import json
 import secrets
 import sys
 import threading
+import time
 from datetime import datetime, timezone
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 from urllib.parse import urlparse
 
 from ..canonical import sha256_bytes, sha256_digest
 from .application import ApplicationAuthority, EngineApplication, EngineApplicationError
 from .capabilities import CoreCapabilityError
 from .domain import (
-    ApproachSignature,
     ApprovalClass,
     BehaviorPolicy,
-    CandidateDecision,
-    CandidateStatus,
-    CriterionVerdict,
     Criticality,
     DependencyType,
-    EffectPolicy,
-    EvidenceKind,
-    EvidenceRecord,
-    ExecutionAction,
-    ExecutionContextNeed,
-    ExecutionSpecProposal,
-    GoalConstraint,
-    GoalContractDefinition,
     GoalContractRevision,
-    GoalCoverage,
-    GoalCriterion,
     GoalVerdict,
     GoalVerdictStatus,
-    IntegrationValidationContract,
     LifecycleStage,
     MissionClass,
-    ModelAssignmentContract,
     MutationPolicy,
-    PlanContractDefinition,
     PlanContractRevision,
-    PlanDependency,
-    PlanGoalCoverage,
-    PlanSkeletonCandidate,
     ProjectProfileDefinition,
     ProjectProfileRevision,
-    RecoveryEnvelope,
-    ResolvedTarget,
-    ReviewRatings,
-    ReviewerSubmission,
     RevisionStatus,
     RiskLevel,
-    RoleAssignmentPolicy,
     RuntimeIntentKind,
-    SkeletonDependency,
-    SourceTrace,
-    TaskContract,
     TaskKind,
-    TaskSkeleton,
     ThreadBinding,
-    ValidationContract,
-    ValidationExecutionStep,
-    ValidationResult,
-    ValidationStatus,
     new_id,
     utc_now,
 )
+from .governance_gate import GovernanceSettings
 from .ledger import EngineLedgerError, SQLiteEngineLedger
 from .model_lock import RUNTIME_CAPABILITIES
 from .models import EngineRoleConfiguration, ModelCapability, ModelInventory, RoleModelBinding
-from .planning import (
-    CandidateEvaluation,
-    ExpandedPlanEvaluation,
-    PlanningSearchOutcome,
-    plan_review_evidence_catalog,
-    skeleton_review_evidence_catalog,
+from .roles import (
+    REQUIRED_APPROVAL_POLICY,
+    REQUIRED_PERMISSION_PROFILE,
+    RoleCallReceipt,
+    RoleCallRequest,
+    RoleCallResult,
+    strict_json_output_schema,
 )
-from .runtime import FakeCodexRuntime
+from .runtime import FakeCodexRuntime, RuntimeOperationReceipt
 from .service import EngineService, EngineServiceError
 
 
@@ -93,8 +66,593 @@ def _iso_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
+class _LocalImmediateRuntime(FakeCodexRuntime):
+    """로컬 결정적 실행 모드에서 turn 시작 직후 provider terminal을 완료로 전환하는 runtime."""
+
+    def start_turn(
+        self,
+        *,
+        thread_id: str,
+        cwd: Path,
+        prompt: str,
+        model: str,
+        effort: str,
+        output_schema: dict[str, Any] | None = None,
+    ) -> RuntimeOperationReceipt:
+        receipt = super().start_turn(
+            thread_id=thread_id,
+            cwd=cwd,
+            prompt=prompt,
+            model=model,
+            effort=effort,
+            output_schema=output_schema,
+        )
+        self.complete(thread_id, response="worker turn completed")
+        return receipt
+
+
+class _LocalTaskGate:
+    """로컬 결정적 모드에서 EngineDispatcher가 실행 Task를 통과시키는 task gate."""
+
+    def before_execution(self, task: Any) -> None:
+        return None
+
+    def before_completion(self, task: Any) -> None:
+        return None
+
+    def close(self) -> None:
+        return None
+
+
+class _LocalGovernance:
+    """로컬 결정적 모드용 governance provider."""
+
+    def check_conformance(self) -> dict[str, Any]:
+        return {"verdict": "PASS", "checks": [], "provenance": "local_derived"}
+
+    def open_gate(self, service: Any, *, runtime: Any, roles: Any, runner: Any) -> _LocalTaskGate:
+        return _LocalTaskGate()
+
+
+def _build_plan_inspection_dict(
+    plan: dict[str, Any],
+    goal: dict[str, Any],
+    *,
+    revision: bool = False,
+) -> dict[str, Any]:
+    """실제 plan draft/revision과 goal 원문에서 대조표(PlanInspection)를 동적으로 구성한다."""
+    definition = plan["definition"] if revision else plan
+    prefix = "/definition" if revision else ""
+    plan_ref = "artifact:plan_contract" if revision else "artifact:plan_draft"
+    citations: list[dict[str, Any]] = []
+
+    def cite(source: str, selector: str, text: str) -> str:
+        for existing in citations:
+            if (existing["source_ref"], existing["selector"], existing["quote"]) == (source, selector, text):
+                return str(existing["citation_id"])
+        ref = f"c{len(citations)}"
+        citations.append(
+            {
+                "citation_id": ref,
+                "source_ref": source,
+                "selector": selector,
+                "quote": text,
+            }
+        )
+        return ref
+
+    ac_refs = {
+        ac["criterion_id"]: (
+            cite("source:goal", f"/hard_acceptance/{i}/statement", ac["statement"]),
+            cite("source:goal", f"/hard_acceptance/{i}/validation_intent", ac["validation_intent"]),
+        )
+        for i, ac in enumerate(goal["hard_acceptance"])
+    }
+    validations = [
+        (task["task_ref"], validation, f"{prefix}/tasks/{ti}/validations/{vi}")
+        for ti, task in enumerate(definition["tasks"])
+        for vi, validation in enumerate(task["validations"])
+    ]
+    validations += [
+        (None, validation, f"{prefix}/integration_validations/{vi}")
+        for vi, validation in enumerate(definition["integration_validations"])
+    ]
+    val_refs = {
+        validation["validation_id"]: cite(plan_ref, path + "/statement", validation["statement"])
+        for _, validation, path in validations
+    }
+    constraint_refs = {
+        constraint["constraint_id"]: cite("source:goal", f"/constraints/{i}/statement", constraint["statement"])
+        for i, constraint in enumerate(goal.get("constraints", []))
+    }
+    return {
+        "citations": citations,
+        "ac_validation_rows": [
+            {
+                "criterion_id": ac,
+                "validation_id": vid,
+                "ac_link_required": False,
+                "scope_ids": [],
+                "basis_refs": [*arefs, vref],
+                "finding_codes": [],
+            }
+            for ac, arefs in ac_refs.items()
+            for vid, vref in val_refs.items()
+        ],
+        "constraint_task_rows": [
+            {
+                "constraint_id": cid,
+                "task_ref": task["task_ref"],
+                "applicability": "not_applicable",
+                "validation_ids": [],
+                "basis_refs": [ref],
+                "finding_codes": [],
+            }
+            for cid, ref in constraint_refs.items()
+            for task in definition["tasks"]
+        ],
+        "validation_rows": [
+            {
+                "validation_id": vid,
+                "claim_ref": ref,
+                "mechanisms": [{"tool": "deterministic_check", "phase": None, "basis_refs": [ref]}],
+                "separate_check_refs": [],
+            }
+            for vid, ref in val_refs.items()
+        ],
+        "validation_scope_rows": [
+            {
+                "scope_id": f"scope_{index}",
+                "validation_id": vid,
+                "claim_ref": ref,
+                "procedure": "deterministic_check",
+                "phase": None,
+                "basis_refs": [ref],
+                "assessment": "supported",
+                "finding_codes": [],
+            }
+            for index, (vid, ref) in enumerate(val_refs.items())
+        ],
+        "finding_links": [],
+    }
+
+
+class _LocalDeterministicRoleRunner:
+    """EngineApplication의 모든 역할을 입력 payload에 맞춰 결정적으로 수행하는 StructuredRolePort."""
+
+    def __init__(self, *, project_root_provider: Callable[[], Path]) -> None:
+        self._project_root_provider = project_root_provider
+
+    def run(
+        self,
+        request: RoleCallRequest,
+        *,
+        validator: Callable[[dict[str, Any]], Any] | None = None,
+    ) -> RoleCallResult:
+        payload = self._build_payload(request)
+        if validator is not None:
+            validator(payload)
+        provenance: dict[str, Any] = {}
+        if request.operational_binding is not None:
+            provenance = {
+                "binding_provenance_version": "2.0",
+                "requested_model": request.model,
+                "requested_effort": request.effort,
+                "observed_model": None,
+                "observed_effort": None,
+                "provider_inventory_digest": request.operational_binding.inventory.provider_inventory_digest,
+                "adapter_capability_digest": request.operational_binding.inventory.adapter_capability_digest,
+                "binding_provenance": {
+                    "requested": "role_request",
+                    "observed": None,
+                    "provider_inventory": request.operational_binding.inventory.inventory_provenance,
+                    "adapter_capability": "local_operational_binding",
+                },
+            }
+        call_id = new_id("model_call")
+        receipt = RoleCallReceipt(
+            call_id=call_id,
+            role=request.role,
+            status="succeeded",
+            model=request.model,
+            effort=request.effort,
+            **provenance,
+            inventory_digest=request.inventory_digest,
+            permission_profile=REQUIRED_PERMISSION_PROFILE,
+            approval_policy=REQUIRED_APPROVAL_POLICY,
+            thread_id=f"local-thread-{call_id}",
+            turn_ids=(f"local-turn-{call_id}",),
+            input_digest=request.request_digest,
+            output_digest=sha256_digest(payload),
+            output_schema_digest=sha256_digest(strict_json_output_schema(request.output_schema)),
+            timeout_policy_digest=request.timeout_policy_digest,
+            observation_policy_digest=request.observation_policy_digest,
+            latency_ms=0,
+            recorded_at=utc_now(),
+            observed_binding=request.operational_binding,
+        )
+        return RoleCallResult(payload=payload, receipt=receipt)
+
+    def _build_payload(self, request: RoleCallRequest) -> dict[str, Any]:
+        role = request.role
+        req_payload = request.payload
+
+        if role == "goal_normalizer":
+            source_req = str(req_payload.get("source_request") or "").strip()
+            is_default_req = "사용량이 비어 있는 실행에서도" in source_req or "usage 일부가 null이어도" in source_req
+            observable = (
+                "usage 일부가 null이어도 Markdown과 JSON 보고가 생성되고 기존 정상 합계가 유지된다."
+                if is_default_req
+                else source_req
+            )
+            return {
+                "mission_class": MissionClass.BUGFIX_STABILIZATION.value,
+                "observable_outcome": observable,
+                "hard_acceptance": [
+                    {
+                        "statement": (
+                            "null usage 값이 있어도 최종 보고가 오류 없이 생성된다."
+                            if is_default_req
+                            else f"{source_req}의 핵심 동작이 오류 없이 수행된다."
+                        ),
+                        "validation_intent": "결정적 검증 절차로 정상 종료와 산출물 상태를 확인한다.",
+                    },
+                    {
+                        "statement": (
+                            "측정 가능한 기존 token·latency 합계는 바뀌지 않는다."
+                            if is_default_req
+                            else "기존 공개 계약과 파일 정합성이 보존된다."
+                        ),
+                        "validation_intent": "변경 전후 상태와 기존 검증 기준을 대조한다.",
+                    },
+                    {
+                        "statement": (
+                            "미제공 usage는 0이 아니라 알 수 없음과 사유로 표시된다."
+                            if is_default_req
+                            else "검증 결과가 원장 evidence로 기록된다."
+                        ),
+                        "validation_intent": "산출물 및 검증 결과를 검사한다.",
+                    },
+                ],
+                "quality_preferences": [],
+                "constraints": [
+                    {
+                        "category": "compatibility",
+                        "statement": "기존 CLI JSON key와 exit code를 보존한다.",
+                    },
+                    {
+                        "category": "scope",
+                        "statement": "legacy/prototype source는 수정하지 않는다.",
+                    },
+                ],
+                "non_goals": [
+                    "실제 provider usage를 추정해 채우지 않는다.",
+                    "Engine 1.0 cutover 판정을 변경하지 않는다.",
+                ],
+                "assumptions": [],
+                "unresolved_questions": [],
+                "mutation_policy": MutationPolicy.MINIMAL_CHANGE.value,
+                "behavior_policy": BehaviorPolicy.PRESERVE_PUBLIC_CONTRACTS.value,
+                "allowed_external_effects": [],
+                "prohibited_effects": ["배포", "외부 메시지", "운영 DB 변경"],
+            }
+
+        if role in {"goal_reviewer", "skeleton_reviewer"}:
+            return {
+                "findings": [],
+                "ratings": {
+                    "goal_fit": 4,
+                    "grounding": 4,
+                    "engineering": 4,
+                    "verification": 4,
+                    "execution_safety": 4,
+                },
+            }
+
+        if role == "skeleton_generator":
+            goal_def = req_payload["goal"]
+            candidate_count = int(req_payload.get("candidate_count") or 1)
+            ac_ids = [c["criterion_id"] for c in goal_def["hard_acceptance"]]
+            c1 = ac_ids[0]
+            c2 = ac_ids[1] if len(ac_ids) > 1 else c1
+            c3 = ac_ids[2] if len(ac_ids) > 2 else c1
+            candidates = []
+            for idx in range(candidate_count):
+                strategy = "boundary-fix" if idx == 0 else f"alternative-strategy-{idx + 1}"
+                t1_cov = sorted({c1})
+                t2_cov = sorted({c1, c3})
+                t3_cov = sorted(set(ac_ids))
+                coverage_list = []
+                for cid in ac_ids:
+                    refs = []
+                    if cid in t1_cov:
+                        refs.append("T1")
+                    if cid in t2_cov:
+                        refs.append("T2")
+                    if cid in t3_cov:
+                        refs.append("T3")
+                    coverage_list.append({"criterion_id": cid, "task_refs": refs})
+                candidates.append(
+                    {
+                        "approach": {
+                            "strategy_family": strategy,
+                            "change_shape": "localized",
+                            "compatibility": "preserve",
+                            "rollout_recovery": "retry bounded",
+                        },
+                        "tasks": [
+                            {
+                                "task_ref": "T1",
+                                "kind": TaskKind.INSPECT.value,
+                                "objective": "현재 실패 재현",
+                                "contributes_to": t1_cov,
+                                "produces": ["artifact:repro"],
+                                "consumes": ["input:request"],
+                                "risk_tags": [],
+                                "required_capabilities": [],
+                                "no_op_when": [],
+                                "unknown_refs": [],
+                                "detail_requirements": [],
+                            },
+                            {
+                                "task_ref": "T2",
+                                "kind": TaskKind.CHANGE.value,
+                                "objective": "usage 합산 경계 수정",
+                                "contributes_to": t2_cov,
+                                "produces": ["artifact:boundary"],
+                                "consumes": ["artifact:repro"],
+                                "risk_tags": [],
+                                "required_capabilities": [],
+                                "no_op_when": [],
+                                "unknown_refs": [],
+                                "detail_requirements": [],
+                            },
+                            {
+                                "task_ref": "T3",
+                                "kind": TaskKind.VALIDATE.value,
+                                "objective": "보고 회귀 검증",
+                                "contributes_to": t3_cov,
+                                "produces": ["artifact:regression"],
+                                "consumes": ["artifact:boundary"],
+                                "risk_tags": [],
+                                "required_capabilities": [],
+                                "no_op_when": [],
+                                "unknown_refs": [],
+                                "detail_requirements": [],
+                            },
+                        ],
+                        "dependencies": [
+                            {
+                                "producer_task_ref": "T1",
+                                "consumer_task_ref": "T2",
+                                "dependency_type": DependencyType.DATA.value,
+                                "produces": ["artifact:repro"],
+                                "consumes": ["artifact:repro"],
+                            },
+                            {
+                                "producer_task_ref": "T2",
+                                "consumer_task_ref": "T3",
+                                "dependency_type": DependencyType.DATA.value,
+                                "produces": ["artifact:boundary"],
+                                "consumes": ["artifact:boundary"],
+                            },
+                        ],
+                        "goal_coverage": coverage_list,
+                        "unknowns": [],
+                        "estimated_change_cost": 3 + idx,
+                        "estimated_context_tokens": 300 + idx * 50,
+                    }
+                )
+            return {"candidates": candidates}
+
+        if role == "plan_expander":
+            goal_def = req_payload["goal"]
+            skeleton = req_payload["skeleton"]
+            ac_ids = [c["criterion_id"] for c in goal_def["hard_acceptance"]]
+            tasks_draft = []
+            val_ids_by_task: dict[str, str] = {}
+            for st in skeleton["tasks"]:
+                t_ref = st["task_ref"]
+                val_id = f"val_{t_ref.lower()}"
+                val_ids_by_task[t_ref] = val_id
+                tasks_draft.append(
+                    {
+                        "task_ref": t_ref,
+                        "kind": st["kind"],
+                        "objective": st["objective"],
+                        "goal_criterion_refs": list(st["contributes_to"]),
+                        "produces": list(st["produces"]),
+                        "consumes": list(st["consumes"]),
+                        "preconditions": [],
+                        "expected_effects": [],
+                        "prohibited_effects": [],
+                        "required_capabilities": list(st.get("required_capabilities", [])),
+                        "acceptance_criteria": [f"{t_ref} 검증 완료"],
+                        "validations": [
+                            {
+                                "validation_id": val_id,
+                                "statement": f"{t_ref} 결정적 파일 검증 수행",
+                                "method": "deterministic",
+                                "required_evidence_kinds": ["file"],
+                            }
+                        ],
+                        "risk_level": RiskLevel.LOW.value,
+                        "risk_tags": list(st.get("risk_tags", [])),
+                        "approval_class": ApprovalClass.PLAN_ACTIVATION.value,
+                        "recovery": {
+                            "retryable_failure_classes": ["implementation"],
+                            "max_attempts": 2,
+                            "timeout_seconds": 300,
+                            " escalation_policy": "stop",
+                        },
+                    }
+                )
+            for td in tasks_draft:
+                td["recovery"] = {"retryable_failure_classes": ["implementation"]}
+            deps_draft = [
+                {
+                    "producer_task_ref": dep["producer_task_ref"],
+                    "consumer_task_ref": dep["consumer_task_ref"],
+                    "dependency_type": dep["dependency_type"],
+                    "products": list(dep["consumes"]),
+                }
+                for dep in skeleton.get("dependencies", [])
+            ]
+            cov_draft = []
+            for cov in skeleton["goal_coverage"]:
+                v_ids = [val_ids_by_task[r] for r in cov["task_refs"] if r in val_ids_by_task]
+                v_ids.append("val_goal_integration")
+                cov_draft.append(
+                    {
+                        "criterion_id": cov["criterion_id"],
+                        "task_refs": list(cov["task_refs"]),
+                        "validation_ids": v_ids,
+                    }
+                )
+            plan_draft = {
+                "tasks": tasks_draft,
+                "dependencies": deps_draft,
+                "goal_coverage": cov_draft,
+                "integration_validations": [
+                    {
+                        "validation_id": "val_goal_integration",
+                        "statement": "독립 Goal Test 결정적 파일 검증",
+                        "evidence_mode": "task_aggregate",
+                        "criterion_refs": ac_ids,
+                        "method": "deterministic",
+                        "required_evidence_kinds": ["file"],
+                    }
+                ],
+                "expected_effects": [],
+                "prohibited_effects": list(goal_def["effect_policy"].get("prohibited_effects", [])),
+            }
+            return {
+                "plan": plan_draft,
+                "inspection": _build_plan_inspection_dict(plan_draft, goal_def, revision=False),
+            }
+
+        if role in {
+            "compact_plan_reviewer",
+            "critical_effect_reviewer",
+            "high_risk_reviewer",
+            "external_effect_reviewer",
+            "recovery_plan_reviewer",
+        }:
+            catalog = req_payload["evidence_catalog"]
+            plan_contract = catalog["artifact:plan_contract"]
+            goal_def = catalog["source:goal"]
+            return {
+                "review": {
+                    "findings": [],
+                    "ratings": {
+                        "goal_fit": 4,
+                        "grounding": 4,
+                        "engineering": 4,
+                        "verification": 4,
+                        "execution_safety": 4,
+                    },
+                },
+                "inspection": _build_plan_inspection_dict(plan_contract, goal_def, revision=True),
+            }
+
+        if role == "execution_preparation":
+            ready_task = req_payload["ready_task"]
+            project_map = req_payload["project_map"]
+            entries = project_map.get("entries") or []
+            entry_path = entries[0]["path"] if entries else "AGENTS.md"
+            entry_digest = (
+                entries[0]["content_digest"]
+                if entries
+                else sha256_bytes(b"# Project Instructions\nFollow standard Python unittest conventions.\n")
+            )
+            t_ref = ready_task["task_ref"]
+            val_steps = [
+                {
+                    "validation_id": v["validation_id"],
+                    "argv": [sys.executable, "-c", "print('ok')"],
+                    "working_directory": str(project_map.get("root") or self._project_root_provider()),
+                    "timeout_seconds": 30,
+                    "expected_exit_codes": [0],
+                    "semantic_instruction": None,
+                    "manual_instruction": None,
+                    "external_selector": None,
+                    "artifact_paths": [entry_path],
+                }
+                for v in ready_task["validations"]
+            ]
+            return {
+                "proposal": {
+                    "task_id": ready_task["task_id"],
+                    "resolved_targets": [
+                        {
+                            "target_ref": f"target_{t_ref.lower()}",
+                            "path": entry_path,
+                            "expected_content_digest": entry_digest,
+                            "access": "read",
+                        }
+                    ],
+                    "actions": [
+                        {
+                            "action_ref": f"act_{t_ref.lower()}",
+                            "kind": "inspect",
+                            "description": f"{t_ref} 검증 실행",
+                            "command": [],
+                        }
+                    ],
+                    "validation_steps": val_steps,
+                    "context_needs": [
+                        {
+                            "need_id": f"need_{t_ref.lower()}",
+                            "description": f"{t_ref} 문맥 확인",
+                            "path_hints": [entry_path],
+                            "symbol_hints": [],
+                            "required": True,
+                        }
+                    ],
+                    "resource_locks": [],
+                    "timeout_seconds": 120,
+                    "idempotency_hint": f"gui-{t_ref.lower()}",
+                },
+                "context_request": None,
+            }
+
+        if role == "goal_test_preparation":
+            goal_test = req_payload["goal_test"]
+            project_map = req_payload["project_map"]
+            entries = project_map.get("entries") or []
+            entry_path = entries[0]["path"] if entries else "AGENTS.md"
+            return {
+                "step": {
+                    "validation_id": goal_test["validation_id"],
+                    "method": goal_test["method"],
+                    "argv": [sys.executable, "-c", "print('ok')"],
+                    "working_directory": str(project_map.get("root") or self._project_root_provider()),
+                    "timeout_seconds": 30,
+                    "expected_exit_codes": [0],
+                    "required_evidence_kinds": list(goal_test["required_evidence_kinds"]),
+                    "artifact_paths": [entry_path],
+                }
+            }
+
+        if role == "goal_validator":
+            catalog = req_payload.get("evidence_catalog") or {}
+            first_ref = next(iter(catalog.keys()), "evidence_placeholder")
+            return {
+                "passed": True,
+                "rationale": "모든 검증 근거가 충족됐습니다.",
+                "evidence_refs": [first_ref],
+            }
+
+        raise ValueError(f"Unsupported role in _LocalDeterministicRoleRunner: {role}")
+
+
 class LocalGuiEngineBackend:
     """실제 SQLiteEngineLedger, EngineService, EngineApplication을 감싸는 GUI 백엔드 어댑터."""
+
+    DEFAULT_SOURCE_REQUEST = (
+        "사용량이 비어 있는 실행에서도 최종 보고가 중단되지 않도록 합산 경계를 수정하고 "
+        "기존 동작을 검증해줘."
+    )
 
     def __init__(
         self,
@@ -105,6 +663,8 @@ class LocalGuiEngineBackend:
         project_id: str | None = None,
         runtime: Any | None = None,
         role_configuration: EngineRoleConfiguration | None = None,
+        structured_runner: Any | None = None,
+        governance: Any | None = None,
         live_gemini: bool = False,
     ) -> None:
         self._lock = threading.RLock()
@@ -117,24 +677,59 @@ class LocalGuiEngineBackend:
         self.live_gemini = bool(live_gemini)
 
         if self.live_gemini and runtime is None:
-            import importlib
+            if importlib.util.find_spec("flowmarshal.engine.agy_gemini_bridge") is not None:
+                bridge = importlib.import_module("flowmarshal.engine.agy_gemini_bridge")
+                self.runtime = bridge.create_agy_gemini_runtime(
+                    state_root=self.artifact_root / "gemini-runtime"
+                )
+                self.inventory = self.runtime.list_models()
+                self.role_configuration = (
+                    role_configuration or bridge.default_agy_gemini_role_configuration()
+                )
+            else:
+                from .gemini_runtime import GeminiModelCatalog, GeminiRuntime
 
-            bridge = importlib.import_module("flowmarshal.engine.agy_gemini_bridge")
-            self.runtime = bridge.create_agy_gemini_runtime(state_root=self.artifact_root / "gemini-runtime")
-            self.inventory = self.runtime.list_models()
-            self.role_configuration = role_configuration or bridge.default_agy_gemini_role_configuration()
-            self.governance = None
-        else:
-            self.inventory = ModelInventory(
-                executable_digest="sha256:" + "0" * 64,
-                runtime_capabilities=RUNTIME_CAPABILITIES,
-                source="gui-model-list",
-                models=(
-                    ModelCapability(model="worker", supported_efforts=("low", "medium", "high")),
-                    ModelCapability(model="validator", supported_efforts=("low", "medium", "high")),
-                ),
+                catalog_path = (
+                    Path(__file__).resolve().parents[3]
+                    / "config"
+                    / "gemini-3-flash-model-catalog.json"
+                )
+                self.runtime = GeminiRuntime(
+                    model_catalog=GeminiModelCatalog.load(catalog_path),
+                    state_root=self.artifact_root / "gemini-runtime",
+                )
+                self.inventory = self.runtime.list_models()
+                binding = RoleModelBinding(model="gemini-3-flash", effort="high")
+                self.role_configuration = role_configuration or EngineRoleConfiguration(
+                    normalizer=binding,
+                    skeleton_generator=binding,
+                    plan_expander=binding,
+                    general_reviewer=binding,
+                    critical_reviewer=binding,
+                    executor=binding,
+                    validator=binding,
+                )
+            self.structured_runner = structured_runner
+            self.governance = (
+                governance
+                or GovernanceSettings.from_environment(self.artifact_root / "governance")
+                or _LocalGovernance()
             )
-            self.runtime = runtime or FakeCodexRuntime(self.inventory)
+        else:
+            self.inventory = (
+                runtime.list_models()
+                if runtime is not None and hasattr(runtime, "list_models")
+                else ModelInventory(
+                    executable_digest="sha256:" + "0" * 64,
+                    runtime_capabilities=RUNTIME_CAPABILITIES,
+                    source="gui-model-list",
+                    models=(
+                        ModelCapability(model="worker", supported_efforts=("low", "medium", "high")),
+                        ModelCapability(model="validator", supported_efforts=("low", "medium", "high")),
+                    ),
+                )
+            )
+            self.runtime = runtime or _LocalImmediateRuntime(self.inventory)
             worker_binding = RoleModelBinding(model="worker", effort="medium")
             validator_binding = RoleModelBinding(model="validator", effort="high")
             self.role_configuration = role_configuration or EngineRoleConfiguration(
@@ -146,22 +741,33 @@ class LocalGuiEngineBackend:
                 executor=worker_binding,
                 validator=validator_binding,
             )
-            self.governance = None
-        self.application = EngineApplication(
-            self.service,
-            runtime=self.runtime,
-            role_configuration=self.role_configuration,
-            governance=self.governance,
-        )
+            self.structured_runner = structured_runner or (
+                _LocalDeterministicRoleRunner(project_root_provider=lambda: self.project_root)
+                if runtime is None
+                else None
+            )
+            self.governance = (
+                governance
+                or GovernanceSettings.from_environment(self.artifact_root / "governance")
+                or _LocalGovernance()
+            )
+
+        self.application = self._make_application()
         self.scenario: str = "golden-path"
         self.run_log: list[dict[str, Any]] = []
         self._draft_goal_mode: bool = False
-        self._stale_pending: bool = False
-        self._recovery_state: dict[str, Any] | None = None
-        self._active_attempt_state: dict[str, Any] | None = None
         self._ephemeral_workspaces: list[Path] = []
         self._event_subscribers: list[Any] = []
         self.project_id = project_id or self._ensure_default_project()
+
+    def _make_application(self) -> EngineApplication:
+        return EngineApplication(
+            self.service,
+            runtime=self.runtime,
+            role_configuration=self.role_configuration,
+            structured_runner=self.structured_runner,
+            governance=self.governance,
+        )
 
     def subscribe_events(self) -> Any:
         import queue
@@ -246,37 +852,21 @@ class LocalGuiEngineBackend:
             row = conn.execute("SELECT id FROM projects ORDER BY created_at LIMIT 1").fetchone()
         if row is not None:
             return str(row["id"])
-        return self._bootstrap_project_with_goal_and_plans()
+        return self._create_and_prepare_project(source_request=self.DEFAULT_SOURCE_REQUEST)
 
-    def _bootstrap_project_with_goal_and_plans(
-        self,
-        *,
-        source_request: str = (
-            "사용량이 비어 있는 실행에서도 최종 보고가 중단되지 않도록 합산 경계를 수정하고 "
-            "기존 동작을 검증해줘."
-        ),
-    ) -> str:
-        scenario_root = self.project_root
-        with self.service.ledger.read() as conn:
-            existing_root = conn.execute(
-                "SELECT id FROM projects WHERE root = ?",
-                (str(self.project_root.resolve()),),
-            ).fetchone()
-        if existing_root is not None:
-            scenario_root = self.project_root / new_id("workspace")
-            self._ephemeral_workspaces.append(scenario_root)
-        scenario_root.mkdir(parents=True, exist_ok=True)
-        readme = scenario_root / "README.md"
+    def _ensure_workspace_files(self, workspace_root: Path) -> None:
+        workspace_root.mkdir(parents=True, exist_ok=True)
+        readme = workspace_root / "README.md"
         if not readme.exists():
             readme.write_text("# VibeMarshal Workspace\n", encoding="utf-8")
-        agents_md = scenario_root / "AGENTS.md"
+        agents_md = workspace_root / "AGENTS.md"
         if not agents_md.exists():
-            agents_md.write_text("# Project Instructions\nFollow standard Python unittest conventions.\n", encoding="utf-8")
+            agents_md.write_text(
+                "# Project Instructions\nFollow standard Python unittest conventions.\n",
+                encoding="utf-8",
+            )
 
-        project_id = self.service.create_project(
-            name="VibeMarshal Engine",
-            root=str(scenario_root),
-        )
+    def _register_default_profile(self, project_id: str) -> ProjectProfileRevision:
         profile_def = ProjectProfileDefinition(
             product_goal="검증 가능한 로컬 workflow orchestration",
             lifecycle_stage=LifecycleStage.DEVELOPMENT,
@@ -294,381 +884,167 @@ class LocalGuiEngineBackend:
             status=RevisionStatus.READY,
             created_at=utc_now(),
         )
-        self.service.register_profile(profile_rev)
-        self._register_goal_and_plans_in_ledger(
-            project_id=project_id,
-            source_request=source_request,
-            revision_no=1,
-            goal_id=new_id("goal"),
-            supersedes_goal_revision_id=None,
+        return self.service.register_profile(profile_rev)
+
+    def _create_and_prepare_project(
+        self,
+        *,
+        source_request: str,
+        candidate_count: int = 1,
+    ) -> str:
+        scenario_root = self.project_root
+        with self.service.ledger.read() as conn:
+            existing_root = conn.execute(
+                "SELECT id FROM projects WHERE root = ?",
+                (str(self.project_root.resolve()),),
+            ).fetchone()
+        if existing_root is not None:
+            scenario_root = self.project_root / new_id("workspace")
+            self._ephemeral_workspaces.append(scenario_root)
+        self._ensure_workspace_files(scenario_root)
+        project_id = self.service.create_project(
+            name=scenario_root.name if scenario_root != self.project_root else "VibeMarshal Engine",
+            root=str(scenario_root),
+        )
+        self._register_default_profile(project_id)
+        self.application.prepare(
+            project_id,
+            source_request=source_request.strip(),
+            candidate_count=candidate_count,
         )
         return project_id
 
-    def _register_goal_and_plans_in_ledger(
+    def _derive_ledger_active_attempt_and_recovery(
         self,
         *,
-        project_id: str,
-        source_request: str,
-        revision_no: int,
-        goal_id: str,
-        supersedes_goal_revision_id: str | None,
-    ) -> tuple[GoalContractRevision, PlanContractRevision]:
-        profile = self.service.load_active_profile(project_id)
-        req_digest = sha256_bytes(source_request.encode("utf-8"))
-        trace = SourceTrace(
-            trace_id=f"trace_gui_request_r{revision_no}",
-            source_ref=f"desktop-gui:user-request:r{revision_no}",
-            statement=source_request,
-            source_digest=req_digest,
-        )
-        criteria = (
-            GoalCriterion(
-                criterion_id="ac_report_null",
-                statement="null usage 값이 있어도 최종 보고가 오류 없이 생성된다.",
-                validation_intent="Markdown·JSON 두 경로를 별도로 실행해 정상 종료와 결측 표시를 확인한다.",
-                trace_refs=(trace.trace_id,),
-            ),
-            GoalCriterion(
-                criterion_id="ac_preserve_totals",
-                statement="측정 가능한 기존 token·latency 합계는 바뀌지 않는다.",
-                validation_intent="기존 정상 fixture와 변경 후 결과를 비교한다.",
-                trace_refs=(trace.trace_id,),
-            ),
-            GoalCriterion(
-                criterion_id="ac_unknown_not_zero",
-                statement="미제공 usage는 0이 아니라 알 수 없음과 사유로 표시된다.",
-                validation_intent="결측 fixture의 직렬화 결과를 검사한다.",
-                trace_refs=(trace.trace_id,),
-            ),
-        )
-        constraints = (
-            GoalConstraint(
-                constraint_id="const_cli_compat",
-                category="compatibility",
-                statement="기존 CLI JSON key와 exit code를 보존한다.",
-                trace_refs=(trace.trace_id,),
-            ),
-            GoalConstraint(
-                constraint_id="const_no_legacy",
-                category="scope",
-                statement="legacy/prototype source는 수정하지 않는다.",
-                trace_refs=(trace.trace_id,),
-            ),
-        )
-        is_default_request = "사용량이 비어 있는 실행에서도" in source_request or "usage 일부가 null이어도" in source_request
-        observable_outcome = (
-            "usage 일부가 null이어도 Markdown과 JSON 보고가 생성되고 기존 정상 합계가 유지된다."
-            if is_default_request
-            else source_request.strip()
-        )
-        goal_def = GoalContractDefinition(
-            project_id=project_id,
-            source_request=source_request,
-            source_request_digest=req_digest,
-            mission_class=MissionClass.BUGFIX_STABILIZATION,
-            observable_outcome=observable_outcome,
-            hard_acceptance=criteria,
-            constraints=constraints,
-            non_goals=("실제 provider usage를 추정해 채우지 않는다.", "Engine 1.0 cutover 판정을 변경하지 않는다."),
-            source_traces=(trace,),
-            effect_policy=EffectPolicy(
-                mutation_policy=MutationPolicy.MINIMAL_CHANGE,
-                behavior_policy=BehaviorPolicy.PRESERVE_PUBLIC_CONTRACTS,
-                allowed_external_effects=(),
-                prohibited_effects=("배포", "외부 메시지", "운영 DB 변경"),
-            ),
-            profile_definition_digest=profile.definition_digest,
-        )
-        goal_rev = GoalContractRevision(
-            goal_revision_id=new_id("goal_revision"),
-            goal_id=goal_id,
-            revision_no=revision_no,
-            definition=goal_def,
-            definition_digest=goal_def.definition_digest,
-            status=RevisionStatus.READY,
-            supersedes_goal_revision_id=supersedes_goal_revision_id,
-            created_at=utc_now(),
-        )
-        self.service.register_goal(goal_rev, activate=True, replace_active_plan=True)
+        project_row: dict[str, Any],
+        plans_view: list[dict[str, Any]],
+        attempt_rows: list[Any],
+    ) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+        """인메모리 시뮬레이터 없이 SQLite 원장의 실제 Attempt·Intent·ProjectMap 상태에서 복구/진행 정보를 도출한다."""
+        with self.service.ledger.read() as conn:
+            intent_rows = conn.execute(
+                "SELECT i.*, a.task_id, a.status AS attempt_status, a.binding_json, a.failure_class "
+                "FROM runtime_intents i JOIN attempts a ON a.id = i.attempt_id "
+                "WHERE a.project_id = ? ORDER BY i.prepared_at DESC, i.rowid DESC",
+                (self.project_id,),
+            ).fetchall()
+            receipt_by_intent = {
+                r["intent_id"]: r["id"]
+                for r in conn.execute(
+                    "SELECT r.id, r.intent_id FROM runtime_receipts r "
+                    "JOIN runtime_intents i ON i.id = r.intent_id "
+                    "JOIN attempts a ON a.id = i.attempt_id WHERE a.project_id = ?",
+                    (self.project_id,),
+                ).fetchall()
+            }
+            recovery_events = conn.execute(
+                "SELECT event_type, entity_id, payload_json, created_at FROM history_events "
+                "WHERE project_id = ? AND event_type LIKE 'recovery.%' ORDER BY sequence DESC LIMIT 10",
+                (self.project_id,),
+            ).fetchall()
 
-        project_map, state = self.service.reobserve_project(
-            project_id,
-            observed_paths=("README.md",),
-        )
+        active_attempt_view: dict[str, Any] | None = None
+        for a_row in attempt_rows:
+            if a_row["status"] in {"reserved", "starting", "running"} or (
+                a_row["failure_class"] == "external_unknown"
+                and project_row.get("run_state") == "recovery_required"
+            ):
+                binding_doc = json.loads(a_row["binding_json"]) if a_row["binding_json"] else {}
+                matching_intent = next(
+                    (ir for ir in intent_rows if ir["attempt_id"] == a_row["id"]),
+                    None,
+                )
+                intent_id = matching_intent["id"] if matching_intent is not None else None
+                receipt_id = receipt_by_intent.get(intent_id) if intent_id is not None else None
+                recovery_reason_now = str(project_row.get("recovery_reason") or "")
+                derived_status = (
+                    "interrupted"
+                    if recovery_reason_now == "external_unknown:observed"
+                    else (
+                        "unknown"
+                        if (matching_intent is not None and matching_intent["status"] in {"prepared", "unknown"})
+                        or recovery_reason_now.startswith("external_unknown")
+                        else a_row["status"]
+                    )
+                )
+                active_attempt_view = {
+                    "attemptId": a_row["id"],
+                    "taskId": a_row["task_id"],
+                    "status": derived_status,
+                    "threadId": binding_doc.get("thread_id"),
+                    "turnId": binding_doc.get("turn_id"),
+                    "intentId": intent_id,
+                    "receiptId": receipt_id,
+                }
+                break
 
-        skeleton = PlanSkeletonCandidate(
-            candidate_id=new_id("candidate"),
-            goal_contract_digest=goal_rev.definition_digest,
-            state_signature=state.semantic_digest,
-            approach=ApproachSignature(
-                strategy_family="boundary-fix",
-                change_shape="localized",
-                compatibility="preserve",
-                rollout_recovery="retry bounded",
-            ),
-            tasks=(
-                TaskSkeleton(
-                    task_ref="T1",
-                    kind=TaskKind.INSPECT,
-                    objective="현재 실패 재현",
-                    contributes_to=("ac_report_null",),
-                    produces=("artifact:repro",),
-                    consumes=("input:request",),
-                ),
-                TaskSkeleton(
-                    task_ref="T2",
-                    kind=TaskKind.CHANGE,
-                    objective="usage 합산 경계 수정",
-                    contributes_to=("ac_report_null", "ac_unknown_not_zero"),
-                    produces=("artifact:boundary",),
-                    consumes=("artifact:repro",),
-                ),
-                TaskSkeleton(
-                    task_ref="T3",
-                    kind=TaskKind.VALIDATE,
-                    objective="보고 회귀 검증",
-                    contributes_to=("ac_report_null", "ac_preserve_totals", "ac_unknown_not_zero"),
-                    produces=("artifact:regression",),
-                    consumes=("artifact:boundary",),
-                ),
-            ),
-            dependencies=(
-                SkeletonDependency(
-                    producer_task_ref="T1",
-                    consumer_task_ref="T2",
-                    dependency_type=DependencyType.DATA,
-                    produces=("artifact:repro",),
-                    consumes=("artifact:repro",),
-                ),
-                SkeletonDependency(
-                    producer_task_ref="T2",
-                    consumer_task_ref="T3",
-                    dependency_type=DependencyType.DATA,
-                    produces=("artifact:boundary",),
-                    consumes=("artifact:boundary",),
-                ),
-            ),
-            goal_coverage=(
-                GoalCoverage(criterion_id="ac_report_null", task_refs=("T1", "T2", "T3")),
-                GoalCoverage(criterion_id="ac_preserve_totals", task_refs=("T3",)),
-                GoalCoverage(criterion_id="ac_unknown_not_zero", task_refs=("T2", "T3")),
-            ),
-            estimated_change_cost=3,
-            estimated_context_tokens=300,
-        )
-        skeleton_digest = sha256_digest(skeleton)
-        skel_catalog = skeleton_review_evidence_catalog(skeleton, goal_rev, state, project_map)
-        skel_review = ReviewerSubmission(
-            reviewer_role="skeleton_reviewer",
-            candidate_digest=skeleton_digest,
-            ratings=ReviewRatings(
-                goal_fit=4,
-                grounding=4,
-                engineering=4,
-                verification=4,
-                execution_safety=4,
-            ),
-            evidence_catalog_digest=sha256_digest(skel_catalog),
-        )
-        skel_decision = CandidateDecision(
-            candidate_digest=skeleton_digest,
-            status=CandidateStatus.ADMISSIBLE,
-            fitness_score=100,
-            weakest_dimension="engineering",
-        )
-        skel_eval = CandidateEvaluation(
-            candidate=skeleton,
-            semantic_submission=skel_review,
-            decision=skel_decision,
-        )
-        self.service.record_skeleton_evaluation(skel_eval)
+        recovery_reason = str(project_row.get("recovery_reason") or "")
+        run_state = str(project_row.get("run_state") or "")
+        first_plan_digest = plans_view[0]["activationDigest"] if plans_view else None
 
-        assignment = ModelAssignmentContract(
-            executor=RoleAssignmentPolicy(
-                role="executor",
-                preferred_model="worker",
-                preferred_effort="medium",
-            ),
-            validator=RoleAssignmentPolicy(
-                role="validator",
-                preferred_model="validator",
-                preferred_effort="high",
-            ),
-            independence_required=True,
-        )
-        recovery_env = RecoveryEnvelope(retryable_failure_classes=("implementation",))
+        if run_state == "recovery_required" and recovery_reason.startswith("stale_input"):
+            stale_payload: dict[str, Any] = {}
+            for ev in recovery_events:
+                if ev["event_type"] == "recovery.stale_input_detected":
+                    stale_payload = json.loads(ev["payload_json"])
+                    break
+            expected_d = stale_payload.get("expected_digest") or first_plan_digest
+            current_d = stale_payload.get("current_digest") or first_plan_digest
+            return active_attempt_view, {
+                "kind": "stale_input",
+                "stage": "detected",
+                "title": "확인 중 Project Map이 바뀌었습니다",
+                "explanation": "사용자가 확인한 시점 이후 working tree 또는 등록 자료 digest가 바뀌어 자동 실행하지 않았습니다.",
+                "expectedDigest": expected_d,
+                "currentDigest": current_d,
+                "intentId": None,
+                "receiptState": "not_applicable",
+                "lastCheckpoint": "Plan 후보 검토 직후 · 활성화 전",
+                "evidence": [
+                    f"expected digest = {expected_d}",
+                    f"observed digest = {current_d}",
+                ],
+            }
 
-        t1_id = new_id("task")
-        t2_id = new_id("task")
-        t3_id = new_id("task")
-        plan_tasks = (
-            TaskContract(
-                task_id=t1_id,
-                task_ref="T1",
-                project_id=project_id,
-                kind=TaskKind.INSPECT,
-                objective="현재 실패 재현",
-                goal_criterion_refs=("ac_report_null",),
-                produces=("artifact:repro",),
-                consumes=("input:request",),
-                acceptance_criteria=("재현 확인",),
-                validations=(
-                    ValidationContract(
-                        validation_id="val_t1",
-                        statement="T1 검증",
-                        method="deterministic",
-                        required_evidence_kinds=("file",),
-                    ),
+        unconfirmed_intent = next(
+            (ir for ir in intent_rows if ir["status"] in {"prepared", "unknown"}),
+            None,
+        )
+        if run_state == "recovery_required" and (
+            recovery_reason.startswith("external_unknown") or unconfirmed_intent is not None
+        ):
+            intent_id = (
+                unconfirmed_intent["id"]
+                if unconfirmed_intent is not None
+                else (active_attempt_view["intentId"] if active_attempt_view else None)
+            )
+            is_observed = recovery_reason == "external_unknown:observed"
+            evidence_list = [
+                f"{intent_id} recorded" if intent_id else "runtime intent recorded",
+                "runtime receipt missing",
+                "auto retry blocked by idempotency boundary",
+            ]
+            if is_observed:
+                evidence_list.append("thread/turn re-observation complete: partial effect not found")
+            return active_attempt_view, {
+                "kind": "external_unknown",
+                "stage": "observed" if is_observed else "detected",
+                "title": "외부 응답이 끊겨 결과를 단정할 수 없습니다",
+                "explanation": (
+                    "thread/turn과 로컬 산출물을 재관측한 결과 부분 쓰기 흔적이 없어 마지막 checkpoint에서 재개할 수 있습니다."
+                    if is_observed
+                    else "intent는 기록됐지만 receipt가 없습니다. 중복 효과를 막기 위해 자동 재실행하지 않고 먼저 관측합니다."
                 ),
-                risk_level=RiskLevel.LOW,
-                approval_class=ApprovalClass.PLAN_ACTIVATION,
-                recovery=recovery_env,
-                assignment=assignment,
-            ),
-            TaskContract(
-                task_id=t2_id,
-                task_ref="T2",
-                project_id=project_id,
-                kind=TaskKind.CHANGE,
-                objective="usage 합산 경계 수정",
-                goal_criterion_refs=("ac_report_null", "ac_unknown_not_zero"),
-                produces=("artifact:boundary",),
-                consumes=("artifact:repro",),
-                acceptance_criteria=("합산 경계 확인",),
-                validations=(
-                    ValidationContract(
-                        validation_id="val_t2",
-                        statement="T2 검증",
-                        method="deterministic",
-                        required_evidence_kinds=("file",),
-                    ),
-                ),
-                risk_level=RiskLevel.LOW,
-                approval_class=ApprovalClass.PLAN_ACTIVATION,
-                recovery=recovery_env,
-                assignment=assignment,
-            ),
-            TaskContract(
-                task_id=t3_id,
-                task_ref="T3",
-                project_id=project_id,
-                kind=TaskKind.VALIDATE,
-                objective="보고 회귀 검증",
-                goal_criterion_refs=("ac_report_null", "ac_preserve_totals", "ac_unknown_not_zero"),
-                produces=("artifact:regression",),
-                consumes=("artifact:boundary",),
-                acceptance_criteria=("회귀 검증 확인",),
-                validations=(
-                    ValidationContract(
-                        validation_id="val_t3",
-                        statement="T3 검증",
-                        method="deterministic",
-                        required_evidence_kinds=("file",),
-                    ),
-                ),
-                risk_level=RiskLevel.LOW,
-                approval_class=ApprovalClass.PLAN_ACTIVATION,
-                recovery=recovery_env,
-                assignment=assignment,
-            ),
-        )
-        dependencies = (
-            PlanDependency(
-                producer_task_id=t1_id,
-                consumer_task_id=t2_id,
-                dependency_type=DependencyType.DATA,
-                products=("artifact:repro",),
-            ),
-            PlanDependency(
-                producer_task_id=t2_id,
-                consumer_task_id=t3_id,
-                dependency_type=DependencyType.DATA,
-                products=("artifact:boundary",),
-            ),
-        )
-        plan_def = PlanContractDefinition(
-            project_id=project_id,
-            goal_contract_digest=goal_rev.definition_digest,
-            base_state_snapshot_digest=state.snapshot_digest,
-            project_map_digest=project_map.revision_digest,
-            source_skeleton_digest=skeleton_digest,
-            tasks=plan_tasks,
-            dependencies=dependencies,
-            goal_coverage=(
-                PlanGoalCoverage(
-                    criterion_id="ac_report_null",
-                    task_ids=(t1_id, t2_id, t3_id),
-                    validation_ids=("val_t1", "val_t2", "val_t3", "val_goal_integration"),
-                ),
-                PlanGoalCoverage(
-                    criterion_id="ac_preserve_totals",
-                    task_ids=(t3_id,),
-                    validation_ids=("val_t3", "val_goal_integration"),
-                ),
-                PlanGoalCoverage(
-                    criterion_id="ac_unknown_not_zero",
-                    task_ids=(t2_id, t3_id),
-                    validation_ids=("val_t2", "val_t3", "val_goal_integration"),
-                ),
-            ),
-            integration_validations=(
-                IntegrationValidationContract(
-                    validation_id="val_goal_integration",
-                    statement="독립 Goal Test",
-                    evidence_mode="task_aggregate",
-                    criterion_refs=("ac_report_null", "ac_preserve_totals", "ac_unknown_not_zero"),
-                    method="deterministic",
-                    required_evidence_kinds=("file",),
-                ),
-            ),
-            model_inventory_digest=self.inventory.inventory_digest,
-        )
-        plan_rev = PlanContractRevision(
-            plan_revision_id=new_id("plan_revision"),
-            plan_id=new_id("plan"),
-            revision_no=1,
-            definition=plan_def,
-            definition_digest=plan_def.definition_digest,
-            status=RevisionStatus.READY,
-            created_at=utc_now(),
-        )
-        plan_catalog = plan_review_evidence_catalog(plan_rev, goal_rev, state, project_map)
-        plan_review = ReviewerSubmission(
-            reviewer_role="compact_plan_reviewer",
-            candidate_digest=plan_rev.activation_digest,
-            ratings=ReviewRatings(
-                goal_fit=4,
-                grounding=4,
-                engineering=4,
-                verification=4,
-                execution_safety=4,
-            ),
-            evidence_catalog_digest=sha256_digest(plan_catalog),
-        )
-        plan_decision = CandidateDecision(
-            candidate_digest=plan_rev.activation_digest,
-            status=CandidateStatus.ADMISSIBLE,
-            fitness_score=100,
-            weakest_dimension="engineering",
-        )
-        plan_eval = ExpandedPlanEvaluation(
-            plan=plan_rev,
-            semantic_submissions=(plan_review,),
-            decision=plan_decision,
-        )
-        self.service.register_plan_evaluation(plan_eval)
-        outcome = PlanningSearchOutcome(
-            goal_contract_digest=goal_rev.definition_digest,
-            state_snapshot_digest=state.snapshot_digest,
-            skeleton_evaluations=(skel_eval,),
-            shortlist_digests=(skeleton_digest,),
-            plan_evaluations=(plan_eval,),
-            selected_activation_digest=plan_rev.activation_digest,
-            logical_role_calls=4,
-            candidate_versions=1,
-        )
-        self.service.record_planning_search(outcome)
-        return goal_rev, plan_rev
+                "expectedDigest": first_plan_digest,
+                "currentDigest": first_plan_digest,
+                "intentId": intent_id,
+                "receiptState": "confirmed_missing" if is_observed else "missing",
+                "lastCheckpoint": "Task intent 기록 직후 · receipt 미수신",
+                "evidence": evidence_list,
+            }
+
+        return active_attempt_view, None
 
     def snapshot(self) -> dict[str, Any]:
         """EngineService 및 SQLiteEngineLedger의 실제 상태를 GUI WorkspaceSnapshot 계약으로 투영한다."""
@@ -678,6 +1054,9 @@ class LocalGuiEngineBackend:
             goal = self.service.load_latest_goal(self.project_id)
 
             with self.service.ledger.read() as conn:
+                all_project_rows = conn.execute(
+                    "SELECT id, name, root, run_state, recovery_reason FROM projects ORDER BY created_at DESC"
+                ).fetchall()
                 plan_rows = conn.execute(
                     "SELECT p.id, p.revision_no, p.payload_json, d.payload_json AS decision_json "
                     "FROM plan_revisions p LEFT JOIN candidate_decisions d "
@@ -757,9 +1136,7 @@ class LocalGuiEngineBackend:
                         break
                     if t.risk_level.value == "medium":
                         highest_risk = "medium"
-                has_external = any(
-                    eff.external for t in task_objs for eff in t.expected_effects
-                )
+                has_external = any(eff.external for t in task_objs for eff in t.expected_effects)
                 plans_view.append(
                     {
                         "planRevisionId": plan_obj.plan_revision_id,
@@ -831,7 +1208,7 @@ class LocalGuiEngineBackend:
                             "contributesTo": list(tc.goal_criterion_refs) if tc else [],
                             "executionSpecRevisionId": spec_rows.get(t_row["id"]),
                             "attemptId": a_row["id"] if a_row is not None else None,
-                            "updatedAt": t_row.get("updated_at") or _iso_now(),
+                            "updatedAt": str(t_row["updated_at"]),
                         }
                     )
 
@@ -848,9 +1225,15 @@ class LocalGuiEngineBackend:
                     else "unsatisfied"
                 )
 
+            active_attempt_view, recovery_view = self._derive_ledger_active_attempt_and_recovery(
+                project_row=project_row,
+                plans_view=plans_view,
+                attempt_rows=attempt_rows,
+            )
+
             all_completed = bool(tasks_view) and all(t["status"] == "completed" for t in tasks_view)
             control_state = self.service.workflow_control_state(self.project_id)
-            if self._recovery_state is not None:
+            if recovery_view is not None:
                 phase = "recovery"
                 run_state = "recovery_required"
             elif verdict_status == "satisfied":
@@ -877,8 +1260,8 @@ class LocalGuiEngineBackend:
                 run_state = "idle"
 
             possible_actions: list[dict[str, Any]] = []
-            if phase == "recovery" and self._recovery_state is not None:
-                if self._recovery_state["kind"] == "stale_input":
+            if phase == "recovery" and recovery_view is not None:
+                if recovery_view["kind"] == "stale_input":
                     possible_actions.append(
                         {
                             "kind": "refresh_snapshot",
@@ -888,7 +1271,7 @@ class LocalGuiEngineBackend:
                             "checkpointRequired": False,
                         }
                     )
-                elif self._recovery_state["stage"] == "detected":
+                elif recovery_view["stage"] == "detected":
                     possible_actions.append(
                         {
                             "kind": "observe_attempt",
@@ -1060,7 +1443,9 @@ class LocalGuiEngineBackend:
                     if u_payload.get("output_tokens") is not None:
                         out_tokens += int(u_payload["output_tokens"])
                         has_out = True
-                    if u_payload.get("latency_ms") is not None:
+                    if u_payload.get("latency_ms") is not None and (
+                        u_payload.get("usage_available") is True or int(u_payload["latency_ms"]) > 0
+                    ):
                         latency_total += int(u_payload["latency_ms"])
                         has_latency = True
                 if has_in or has_out or has_latency:
@@ -1077,6 +1462,25 @@ class LocalGuiEngineBackend:
                         "latencyMs": latency_total if has_latency else None,
                         "availabilityReason": reason_label,
                     }
+
+            projects_list_view = [
+                {
+                    "projectId": str(p_row["id"]),
+                    "name": str(p_row["name"]),
+                    "location": {
+                        "locationRef": f"project:{p_row['id']}",
+                        "displayName": Path(p_row["root"]).name or str(p_row["name"]),
+                        "displayPath": str(p_row["root"]),
+                    },
+                    "runState": (
+                        run_state
+                        if str(p_row["id"]) == self.project_id
+                        else str(p_row["run_state"] or "idle")
+                    ),
+                    "activeBlocker": p_row["recovery_reason"],
+                }
+                for p_row in all_project_rows
+            ]
 
             return {
                 "apiVersion": "1",
@@ -1096,6 +1500,7 @@ class LocalGuiEngineBackend:
                     "runState": run_state,
                     "activeBlocker": project_row.get("recovery_reason"),
                 },
+                "projects": projects_list_view,
                 "goal": {
                     "goalId": goal.goal_id,
                     "revisionId": goal.goal_revision_id,
@@ -1149,8 +1554,8 @@ class LocalGuiEngineBackend:
                     ),
                     "verdict": verdict_status,
                 },
-                "activeAttempt": self._active_attempt_state,
-                "recovery": self._recovery_state,
+                "activeAttempt": active_attempt_view,
+                "recovery": recovery_view,
                 "history": history_view,
                 "historyCursor": {
                     "sequence": latest_seq,
@@ -1171,57 +1576,41 @@ class LocalGuiEngineBackend:
             if not source_request or not source_request.strip():
                 return self._error("GOAL_INPUT_REQUIRED", "사용자 원문이 필요합니다.")
             self._draft_goal_mode = False
-            if self.live_gemini:
+            try:
                 active_plan = self.service.status(self.project_id)["project"].get("active_plan_revision_id")
                 if active_plan is not None:
-                    self._cleanup_ephemeral_workspaces()
-                    scenario_root = self.project_root / new_id("workspace")
-                    self._ephemeral_workspaces.append(scenario_root)
-                    scenario_root.mkdir(parents=True, exist_ok=True)
-                    (scenario_root / "README.md").write_text("# VibeMarshal Live Gemini Workspace\n", encoding="utf-8")
-                    self.project_id = self.service.create_project(name="VibeMarshal Live Gemini", root=str(scenario_root))
-                    profile_def = ProjectProfileDefinition(
-                        product_goal="검증 가능한 로컬 workflow orchestration",
-                        lifecycle_stage=LifecycleStage.DEVELOPMENT,
-                        criticality=Criticality.MEDIUM,
-                        compatibility_policy="기존 CLI JSON key와 exit code를 보존한다.",
-                        validation_policy=("프로젝트 결정적 테스트를 통과한다.",),
-                        runtime_requirements=("local Windows", "Python 3.10+"),
-                    )
-                    profile_rev = ProjectProfileRevision(
-                        profile_revision_id=new_id("profile_revision"),
-                        project_id=self.project_id,
-                        revision_no=1,
-                        definition=profile_def,
-                        definition_digest=profile_def.definition_digest,
-                        status=RevisionStatus.READY,
-                        created_at=utc_now(),
-                    )
-                    self.service.register_profile(profile_rev)
-                    self.application.prepare(self.project_id, source_request=source_request.strip(), candidate_count=1)
+                    try:
+                        self.application.revise(
+                            self.project_id,
+                            source_request=source_request.strip(),
+                            candidate_count=1,
+                            allow_active_plan_replacement=True,
+                        )
+                    except (EngineServiceError, EngineApplicationError, EngineLedgerError):
+                        self._cleanup_ephemeral_workspaces()
+                        self.project_id = self._create_and_prepare_project(
+                            source_request=source_request.strip(),
+                            candidate_count=1,
+                        )
                 else:
                     try:
                         self.service.load_latest_goal(self.project_id)
-                        self.application.revise(self.project_id, source_request=source_request.strip(), candidate_count=1)
-                    except Exception:
-                        self.application.prepare(self.project_id, source_request=source_request.strip(), candidate_count=1)
-                return {"ok": True, "data": self.snapshot()}
-            latest = self.service.load_latest_goal(self.project_id)
-            active_plan = self.service.status(self.project_id)["project"].get("active_plan_revision_id")
-            if active_plan is not None:
-                self._cleanup_ephemeral_workspaces()
-                self.project_id = self._bootstrap_project_with_goal_and_plans(
-                    source_request=source_request.strip()
-                )
-            else:
-                self._register_goal_and_plans_in_ledger(
-                    project_id=self.project_id,
-                    source_request=source_request.strip(),
-                    revision_no=latest.revision_no + 1,
-                    goal_id=latest.goal_id,
-                    supersedes_goal_revision_id=latest.goal_revision_id,
-                )
-            return {"ok": True, "data": self.snapshot()}
+                        self.application.revise(
+                            self.project_id,
+                            source_request=source_request.strip(),
+                            candidate_count=1,
+                        )
+                    except (EngineServiceError, EngineApplicationError, EngineLedgerError):
+                        self.application.prepare(
+                            self.project_id,
+                            source_request=source_request.strip(),
+                            candidate_count=1,
+                        )
+            except (EngineServiceError, EngineApplicationError, EngineLedgerError) as error:
+                return self._error("GOAL_PREPARE_FAILED", str(error))
+            snap = self.snapshot()
+            self._notify_subscribers(snap)
+            return {"ok": True, "data": snap}
 
     def search_plans(self) -> dict[str, Any]:
         with self._lock:
@@ -1230,49 +1619,24 @@ class LocalGuiEngineBackend:
                 latest = self.service.load_latest_goal(self.project_id)
                 with self.service.ledger.read() as conn:
                     has_plans = conn.execute(
-                        "SELECT 1 FROM plan_revisions WHERE project_id = ? AND json_extract(payload_json, '$.definition.goal_contract_digest') = ? LIMIT 1",
+                        "SELECT 1 FROM plan_revisions WHERE project_id = ? "
+                        "AND json_extract(payload_json, '$.definition.goal_contract_digest') = ? LIMIT 1",
                         (self.project_id, latest.definition_digest),
                     ).fetchone()
                 if has_plans is None:
-                    self._register_goal_and_plans_in_ledger(
-                        project_id=self.project_id,
+                    self.application.revise(
+                        self.project_id,
                         source_request=latest.definition.source_request,
-                        revision_no=latest.revision_no + 1,
-                        goal_id=latest.goal_id,
-                        supersedes_goal_revision_id=latest.goal_revision_id,
+                        candidate_count=1,
                     )
-            except Exception:
-                pass
+            except (EngineServiceError, EngineApplicationError, EngineLedgerError) as error:
+                return self._error("PLAN_SEARCH_FAILED", str(error))
             snap = self.snapshot()
             self._notify_subscribers(snap)
             return {"ok": True, "data": snap}
 
     def activate_plan(self, payload: dict[str, Any]) -> dict[str, Any]:
         with self._lock:
-            if self._stale_pending:
-                self._stale_pending = False
-                expected_digest = str(payload.get("activationDigest") or f"sha256:{'74' * 32}")
-                current_digest = sha256_digest({"stale_refresh": expected_digest, "ts": _iso_now()})
-                self._recovery_state = {
-                    "kind": "stale_input",
-                    "stage": "detected",
-                    "title": "확인 중 Project Map이 바뀌었습니다",
-                    "explanation": "사용자가 확인한 시점 이후 working tree 또는 등록 자료 digest가 바뀌어 자동 실행하지 않았습니다.",
-                    "expectedDigest": expected_digest,
-                    "currentDigest": current_digest,
-                    "intentId": None,
-                    "receiptState": "not_applicable",
-                    "lastCheckpoint": "Plan 후보 검토 직후 · 활성화 전",
-                    "evidence": [
-                        f"expected activation_digest = {expected_digest}",
-                        f"observed state_snapshot_digest = {current_digest}",
-                    ],
-                }
-                return self._error(
-                    "STALE_EXECUTION_INPUT",
-                    "선택한 Plan의 입력 스냅샷이 최신 상태와 다릅니다. 복구 화면에서 최신 상태를 먼저 확인하세요.",
-                    suggested_action="refresh_snapshot",
-                )
             plan_revision_id = payload.get("planRevisionId")
             activation_digest = payload.get("activationDigest")
             target_digest = payload.get("targetDigest")
@@ -1285,58 +1649,133 @@ class LocalGuiEngineBackend:
             goal = self.service.load_latest_goal(self.project_id)
             if expected_goal_digest and expected_goal_digest != goal.definition_digest:
                 return self._error("REVISION_CONFLICT", "Goal digest가 현재 revision과 다릅니다.")
+
+    def _check_plan_inputs_stale(
+        self,
+        *,
+        plan_revision_id: str,
+        activation_digest: str | None,
+    ) -> dict[str, Any] | None:
+        """활성화 직전 해당 Plan이 결속한 ProjectMapRevision의 모든 파일과 현재 워크스페이스 파일 digest를 직접 대조한다."""
+        with self.service.ledger.read() as conn:
+            plan_row = conn.execute(
+                "SELECT payload_json FROM plan_revisions WHERE id = ? AND project_id = ?",
+                (plan_revision_id, self.project_id),
+            ).fetchone()
+            if plan_row is None:
+                return None
+            plan_obj = PlanContractRevision.model_validate_json(plan_row["payload_json"])
+            map_row = conn.execute(
+                "SELECT payload_json FROM project_map_revisions WHERE project_id = ? AND revision_digest = ?",
+                (self.project_id, plan_obj.definition.project_map_digest),
+            ).fetchone()
+        if map_row is None:
+            return None
+        from .domain import ProjectMapRevision
+
+        project_map = ProjectMapRevision.model_validate_json(map_row["payload_json"])
+        root = Path(project_map.root)
+        for entry in project_map.entries:
+            path = Path(entry.path)
+            resolved = path if path.is_absolute() else root / path
             try:
-                app_for_auth = EngineApplication(
-                    self.service,
-                    runtime=self.runtime,
-                    role_configuration=self.role_configuration,
+                observed_digest = sha256_bytes(resolved.read_bytes())
+            except OSError:
+                observed_digest = None
+            if observed_digest != entry.content_digest:
+                expected_d = str(entry.content_digest or activation_digest or "")
+                observed_d = str(observed_digest or "")
+                self._record_recovery_ledger_event(
+                    "recovery.stale_input_detected",
+                    self.project_id,
+                    {
+                        "plan_revision_id": str(plan_revision_id),
+                        "path": entry.path,
+                        "expected_digest": expected_d,
+                        "current_digest": observed_d,
+                    },
+                    run_state="recovery_required",
+                    recovery_reason="stale_input",
                 )
+                return self._error(
+                    "STALE_EXECUTION_INPUT",
+                    "선택한 Plan의 입력 스냅샷이 최신 상태와 다릅니다. 복구 화면에서 최신 상태를 먼저 확인하세요.",
+                    suggested_action="refresh_snapshot",
+                )
+        return None
+
+    def activate_plan(self, payload: dict[str, Any]) -> dict[str, Any]:
+        with self._lock:
+            plan_revision_id = payload.get("planRevisionId")
+            activation_digest = payload.get("activationDigest")
+            target_digest = payload.get("targetDigest")
+            expected_goal_digest = payload.get("expectedGoalDigest")
+            if not plan_revision_id or not (activation_digest or target_digest):
+                return self._error(
+                    "DIGEST_REQUIRED",
+                    "Plan 승인을 위해서는 planRevisionId와 activationDigest(또는 targetDigest)를 명시해야 합니다.",
+                )
+            goal = self.service.load_latest_goal(self.project_id)
+            if expected_goal_digest and expected_goal_digest != goal.definition_digest:
+                return self._error("REVISION_CONFLICT", "Goal digest가 현재 revision과 다릅니다.")
+
+            # 활성화 직전 Project Map freshness 검증 (원장 기반 stale 감지)
+            stale_err = self._check_plan_inputs_stale(
+                plan_revision_id=str(plan_revision_id),
+                activation_digest=str(activation_digest) if activation_digest else None,
+            )
+            if stale_err is not None:
+                return stale_err
+
+            app_for_auth: EngineApplication | None = None
+            try:
+                app_for_auth = self._make_application()
                 authority = ApplicationAuthority(app_for_auth)
-                target = authority.authorization_target(self.project_id)
-                if target.plan_revision_id != plan_revision_id:
-                    with self.service.ledger.read() as conn:
-                        alt_row = conn.execute(
-                            "SELECT id, activation_digest, status, payload_json FROM plan_revisions "
-                            "WHERE id = ? AND project_id = ?",
-                            (plan_revision_id, self.project_id),
-                        ).fetchone()
-                    if alt_row is None or alt_row["status"] != "ready":
-                        return self._error("DIGEST_MISMATCH", "선택한 Plan 후보가 승인 대상과 다릅니다.")
-                    if activation_digest and alt_row["activation_digest"] != activation_digest:
-                        return self._error("DIGEST_MISMATCH", "현재 후보와 activation digest가 일치하지 않습니다.")
-                    with self.service.ledger.transaction() as tx:
-                        authorization, _, _ = self.service._authorize_goal_in_transaction(
-                            tx,
-                            project_id=self.project_id,
-                            source="desktop-gui:user-confirmation",
-                            capability=app_for_auth._core_action_authority.issue_goal_authorization(
-                                ledger_path=self.service.ledger.path,
-                                target=target,
-                            ),
-                            authorization_target=target,
-                            validate_selected_plan=False,
-                        )
-                        self.service._activate_plan_in_transaction(
-                            tx,
-                            plan_revision_id=str(plan_revision_id),
-                            activation_digest=str(alt_row["activation_digest"]),
-                            source="desktop-gui:user-confirmation",
-                        )
-                else:
-                    if activation_digest and target.plan_activation_digest != activation_digest:
-                        return self._error("DIGEST_MISMATCH", "현재 후보와 activation digest가 일치하지 않습니다.")
-                    if target_digest and target.target_digest != target_digest:
-                        return self._error("DIGEST_MISMATCH", "현재 후보와 target digest가 일치하지 않습니다.")
-                    authority.authorize(
-                        self.project_id,
-                        target=target,
-                        source="desktop-gui:user-confirmation",
-                    )
+                target = authority.authorization_target(
+                    self.project_id,
+                    selected_plan_revision_id=str(plan_revision_id),
+                )
+                if activation_digest and target.plan_activation_digest != activation_digest:
+                    return self._error("DIGEST_MISMATCH", "현재 후보와 activation digest가 일치하지 않습니다.")
+                if target_digest and target.target_digest != target_digest:
+                    return self._error("DIGEST_MISMATCH", "현재 후보와 target digest가 일치하지 않습니다.")
+                authority.authorize(
+                    self.project_id,
+                    target=target,
+                    source="desktop-gui:user-confirmation",
+                    selected_plan_revision_id=str(plan_revision_id),
+                )
             except (EngineServiceError, EngineApplicationError, EngineLedgerError, CoreCapabilityError) as error:
-                return self._error("ACTIVATION_FAILED", str(error))
+                msg = str(error)
+                if "CANDIDATE_PLAN_NOT_ADMISSIBLE" in msg or "DIGEST_MISMATCH" in msg:
+                    return self._error("DIGEST_MISMATCH", msg)
+                return self._error("ACTIVATION_FAILED", msg)
+            finally:
+                if app_for_auth is not None and getattr(app_for_auth, "supervisor", None) is not None:
+                    try:
+                        app_for_auth.supervisor.close()
+                    except Exception:
+                        pass
             snap = self.snapshot()
             self._notify_subscribers(snap)
             return {"ok": True, "data": snap}
+
+    def _wait_active_job(self, *, max_polls: int = 80, poll_interval: float = 0.01) -> None:
+        for _ in range(max_polls):
+            job = self.service.active_runtime_job(self.project_id)
+            if job is None:
+                break
+            if self.application.supervisor is not None:
+                self.application.supervisor.tick(job.job_id, wait_seconds=poll_interval)
+            else:
+                self.application.observe(self.project_id)
+            if self.service.active_runtime_job(self.project_id) is None:
+                break
+            self._lock.release()
+            try:
+                time.sleep(poll_interval)
+            finally:
+                self._lock.acquire()
 
     def run_once(self) -> dict[str, Any]:
         with self._lock:
@@ -1345,269 +1784,62 @@ class LocalGuiEngineBackend:
             if active_plan_id is None:
                 return self._error("RUN_BLOCKED", "활성 Plan이 필요합니다.")
 
-            if self.live_gemini:
-                import time
+            poll_interval = 0.05 if self.live_gemini else 0.005
+            resume_flag = self.service.workflow_control_state(self.project_id) == "paused"
+            tick = self.application.run_once(self.project_id, resume=resume_flag)
+            self._wait_active_job(poll_interval=poll_interval)
 
+            # 비동기 준비/실행 job이 완료되어 소비 가능한 경우 동일 run_once 요청 안에서 결과 소비까지 진행한다.
+            for _ in range(8):
+                if tick.action.value in {"materialized", "completed", "blocked", "recovered", "idle"}:
+                    break
                 tick = self.application.run_once(self.project_id)
-                for _ in range(60):
-                    if self.service.active_runtime_job(self.project_id) is None:
-                        break
-                    self.application.observe(self.project_id)
-                    self._lock.release()
-                    try:
-                        time.sleep(0.1)
-                    finally:
-                        self._lock.acquire()
-                if self.service.active_runtime_job(self.project_id) is None and tick.action.value in {
-                    "started",
-                    "reserved",
-                    "prepared_task",
-                    "prepared_goal_validation",
-                }:
-                    tick = self.application.run_once(self.project_id)
-                snap = self.snapshot()
-                self.run_log.append(
-                    {
-                        "action": tick.action.value,
-                        "lane": "worker",
-                        "taskRef": tick.task_id,
-                        "detail": tick.detail or f"Gemini CLI (agy.exe) 실행 단계({tick.action.value}) 완료",
-                        "sequence": snap["historyCursor"]["sequence"],
-                    }
-                )
-                return {"ok": True, "data": snap}
+                self._wait_active_job(poll_interval=poll_interval)
+                if tick.action.value in {"materialized", "completed", "blocked", "recovered", "idle"}:
+                    break
 
-            with self.service.ledger.read() as conn:
-                plan_row = conn.execute(
-                    "SELECT payload_json FROM plan_revisions WHERE id = ?",
-                    (active_plan_id,),
-                ).fetchone()
-            plan = PlanContractRevision.model_validate_json(plan_row["payload_json"])
-            task_map = {t.task_id: t for t in plan.definition.tasks}
-
-            incomplete = [
-                t for t in status_data["tasks"]
-                if t["plan_revision_id"] == active_plan_id and t["status"] != "completed"
-            ]
-            if not incomplete:
-                project_map, _ = self.service.reobserve_project(self.project_id)
-                if not project_map.entries:
-                    readme_fallback = Path(status_data["project"]["root"]) / "README.md"
-                    readme_fallback.parent.mkdir(parents=True, exist_ok=True)
-                    if not readme_fallback.exists():
-                        readme_fallback.write_text("# VibeMarshal Workspace\n", encoding="utf-8")
-                    project_map, _ = self.service.reobserve_project(
-                        self.project_id,
-                        observed_paths=("README.md",),
-                    )
-                entry = project_map.entries[0]
-                goal_evidence = EvidenceRecord(
-                    evidence_id=new_id("evidence"),
-                    project_id=self.project_id,
-                    task_id=None,
-                    attempt_id=None,
-                    kind=EvidenceKind.FILE,
-                    source_ref=entry.path,
-                    observation="Goal Test 결정적 파일 검증 통과",
-                    content_digest=entry.content_digest,
-                    observed_at=utc_now(),
-                )
-                self.service.record_evidence(goal_evidence)
-                int_val = ValidationResult(
-                    validation_result_id=new_id("validation_result"),
-                    validation_id="val_goal_integration",
-                    task_id=None,
-                    status=ValidationStatus.PASS,
-                    evidence_ids=(goal_evidence.evidence_id,),
-                    rationale="독립 Goal Test 통과",
-                    evaluated_at=utc_now(),
-                )
-                self.service.record_validation(
-                    project_id=self.project_id,
-                    plan_revision_id=active_plan_id,
-                    result=int_val,
-                )
-                verdict = GoalVerdict(
-                    goal_verdict_id=new_id("goal_verdict"),
-                    goal_contract_digest=plan.definition.goal_contract_digest,
-                    plan_activation_digest=plan.activation_digest,
-                    status=GoalVerdictStatus.SATISFIED,
-                    criteria=tuple(
-                        CriterionVerdict(
-                            criterion_id=cov.criterion_id,
-                            status=ValidationStatus.PASS,
-                            evidence_ids=(goal_evidence.evidence_id,),
-                            rationale=f"{cov.criterion_id} 충족 확인",
-                        )
-                        for cov in plan.definition.goal_coverage
-                    ),
-                    integration_validation_result_ids=(int_val.validation_result_id,),
-                    evaluated_at=utc_now(),
-                )
-                self.service.record_goal_verdict(
-                    project_id=self.project_id,
-                    plan_revision_id=active_plan_id,
-                    verdict=verdict,
-                )
-                snap = self.snapshot()
-                self.run_log.append(
-                    {
-                        "action": "completed",
-                        "lane": "goal_test",
-                        "taskRef": None,
-                        "detail": f"GoalVerdict({verdict.status.value})가 원장에 기록됐습니다.",
-                        "sequence": snap["historyCursor"]["sequence"],
-                    }
-                )
-                return {"ok": True, "data": snap}
-
-            current_row = incomplete[0]
-            task_id = current_row["id"]
-            tc = task_map[task_id]
-            t_status = current_row["status"]
-
-            with self.service.ledger.read() as conn:
-                map_row = conn.execute(
-                    "SELECT payload_json FROM project_map_revisions WHERE project_id = ? AND is_current = 1",
-                    (self.project_id,),
-                ).fetchone()
-            from .domain import ProjectMapRevision
-            project_map = ProjectMapRevision.model_validate_json(map_row["payload_json"])
-            if not project_map.entries:
-                readme_fallback = Path(status_data["project"]["root"]) / "README.md"
-                readme_fallback.parent.mkdir(parents=True, exist_ok=True)
-                if not readme_fallback.exists():
-                    readme_fallback.write_text("# VibeMarshal Workspace\n", encoding="utf-8")
-                project_map, _ = self.service.reobserve_project(
-                    self.project_id,
-                    observed_paths=("README.md",),
-                )
-            entry = project_map.entries[0]
-
-            if t_status == "ready":
-                proposal = ExecutionSpecProposal(
-                    task_id=task_id,
-                    resolved_targets=(
-                        ResolvedTarget(
-                            target_ref=f"target_{tc.task_ref.lower()}",
-                            path=entry.path,
-                            expected_content_digest=entry.content_digest,
-                            access="read",
-                        ),
-                    ),
-                    actions=(
-                        ExecutionAction(
-                            action_ref=f"act_{tc.task_ref.lower()}",
-                            kind="inspect",
-                            description=f"{tc.task_ref} 파일 검증",
-                        ),
-                    ),
-                    validation_steps=(
-                        ValidationExecutionStep(
-                            validation_id=tc.validations[0].validation_id,
-                            method="deterministic",
-                            argv=(sys.executable, "-c", "print('ok')"),
-                            working_directory=str(self.project_root),
-                            timeout_seconds=30,
-                            expected_exit_codes=(0,),
-                            required_evidence_kinds=("file",),
-                            artifact_paths=(entry.path,),
-                        ),
-                    ),
-                    context_needs=(
-                        ExecutionContextNeed(
-                            need_id=f"need_{tc.task_ref.lower()}",
-                            description=f"{tc.task_ref} 문맥 확인",
-                            path_hints=(entry.path,),
-                        ),
-                    ),
-                    resource_locks=(),
-                    timeout_seconds=120,
-                    idempotency_hint=f"gui-{tc.task_ref.lower()}",
-                )
-                spec = self.service.compile_execution_spec(proposal, inventory=self.inventory)
-                snap = self.snapshot()
-                self.run_log.append(
-                    {
-                        "action": "materialized",
-                        "lane": "worker",
-                        "taskRef": tc.task_ref,
-                        "detail": f"{tc.task_ref} Execution Spec({spec.execution_spec_revision_id})을 원장에 고정했습니다.",
-                        "sequence": snap["historyCursor"]["sequence"],
-                    }
-                )
-                return {"ok": True, "data": snap}
-
-            # materialized -> reserve attempt, record intent/receipt, finish attempt, record evidence/validation, complete task
-            attempt = self.service.reserve_attempt(task_id=task_id)
-            intent = self.service.prepare_runtime_intent(
-                attempt_id=attempt.attempt_id,
-                kind=RuntimeIntentKind.START_TURN,
-                idempotency_key=f"gui-intent-{attempt.attempt_id}",
-                request={"task_id": task_id},
-            )
-            turn_op_id = f"turn_{attempt.attempt_id[-12:]}"
-            self.service.record_runtime_receipt(
-                intent_id=intent.intent_id,
-                provider_operation_id=turn_op_id,
-                response={"status": "completed"},
-                binding=ThreadBinding(
-                    thread_id=f"thr_{attempt.attempt_id[-12:]}",
-                    turn_id=turn_op_id,
-                    bound_at=utc_now(),
-                ),
-            )
-            self.service.finish_attempt(attempt_id=attempt.attempt_id, succeeded=True)
-            evidence = EvidenceRecord(
-                evidence_id=new_id("evidence"),
-                project_id=self.project_id,
-                task_id=task_id,
-                attempt_id=attempt.attempt_id,
-                kind=EvidenceKind.FILE,
-                source_ref=entry.path,
-                observation=f"{tc.task_ref} 검증 완료",
-                content_digest=entry.content_digest,
-                observed_at=utc_now(),
-            )
-            self.service.record_evidence(evidence)
-            val_result = ValidationResult(
-                validation_result_id=new_id("validation_result"),
-                validation_id=tc.validations[0].validation_id,
-                task_id=task_id,
-                status=ValidationStatus.PASS,
-                evidence_ids=(evidence.evidence_id,),
-                rationale=f"{tc.task_ref} 결정적 파일 검증 통과",
-                evaluated_at=utc_now(),
-            )
-            self.service.record_validation(
-                project_id=self.project_id,
-                plan_revision_id=active_plan_id,
-                result=val_result,
-            )
-            self.service.complete_task(task_id)
             snap = self.snapshot()
+            lane = (
+                "goal_test"
+                if tick.task_id is None and tick.action.value in {"validated", "completed"}
+                else ("task_validation" if tick.action.value == "completed" else "worker")
+            )
+            task_ref = None
+            if tick.task_id is not None:
+                matching = next((t for t in snap["tasks"] if t["taskId"] == tick.task_id), None)
+                task_ref = matching["taskRef"] if matching else tick.task_id
             self.run_log.append(
                 {
-                    "action": "completed",
-                    "lane": "task_validation",
-                    "taskRef": tc.task_ref,
-                    "detail": f"{tc.task_ref} 필수 evidence와 validation이 통과하여 원장에 완료 기록됐습니다.",
+                    "action": tick.action.value,
+                    "lane": lane,
+                    "taskRef": task_ref,
+                    "detail": tick.detail or f"Engine 실행 단계({tick.action.value}) 완료",
                     "sequence": snap["historyCursor"]["sequence"],
                 }
             )
+            self._notify_subscribers(snap)
             return {"ok": True, "data": snap}
 
     def reset_scenario(self, scenario: str) -> dict[str, Any]:
         with self._lock:
             self.scenario = scenario
             self._draft_goal_mode = False
-            self._stale_pending = scenario == "stale-activation"
-            self._recovery_state = None
-            self._active_attempt_state = None
             self.run_log.clear()
             self._cleanup_ephemeral_workspaces()
-            self.project_id = self._bootstrap_project_with_goal_and_plans()
-            if scenario == "external-unknown":
+            self.project_id = self._create_and_prepare_project(
+                source_request=self.DEFAULT_SOURCE_REQUEST,
+                candidate_count=1,
+            )
+            project_root_now = Path(self.service.status(self.project_id)["project"]["root"])
+
+            if scenario == "stale-activation":
+                # 원장 Project Map 결속 이후 실제 워크스페이스 파일을 변경해 진짜 stale 상태를 만든다.
+                agents_md = project_root_now / "AGENTS.md"
+                agents_md.write_text(
+                    "# Project Instructions\nFollow standard Python unittest conventions.\nStale modification after plan preparation.\n",
+                    encoding="utf-8",
+                )
+            elif scenario == "external-unknown":
                 snap = self.snapshot()
                 first_plan = snap["plans"][0] if snap["plans"] else None
                 if first_plan is not None:
@@ -1618,56 +1850,42 @@ class LocalGuiEngineBackend:
                             "expectedGoalDigest": snap["goal"]["definitionDigest"],
                         }
                     )
-                self._active_attempt_state = {
-                    "attemptId": "attempt_gui_ext_01",
-                    "taskId": "task_ext_02",
-                    "status": "unknown",
-                    "threadId": "thr_local_codex_09",
-                    "turnId": "turn_local_codex_14",
-                    "intentId": "intent_gui_ext_01",
-                    "receiptId": None,
-                }
-                self._recovery_state = {
-                    "kind": "external_unknown",
-                    "stage": "detected",
-                    "title": "외부 응답이 끊겨 결과를 단정할 수 없습니다",
-                    "explanation": "intent는 기록됐지만 receipt가 없습니다. 중복 효과를 막기 위해 자동 재실행하지 않고 먼저 관측합니다.",
-                    "expectedDigest": first_plan["activationDigest"] if first_plan else None,
-                    "currentDigest": first_plan["activationDigest"] if first_plan else None,
-                    "intentId": "intent_gui_ext_01",
-                    "receiptState": "missing",
-                    "lastCheckpoint": "T1 완료 · T2 intent 기록 직후",
-                    "evidence": [
-                        "intent_gui_ext_01 recorded",
-                        "runtime receipt missing",
-                        "auto retry blocked by idempotency boundary",
-                    ],
-                }
-                self._record_recovery_ledger_event(
-                    "recovery.external_unknown_detected",
-                    "intent_gui_ext_01",
-                    {
-                        "attempt_id": "attempt_gui_ext_01",
-                        "intent_id": "intent_gui_ext_01",
-                        "receipt_state": "missing",
-                    },
-                    run_state="recovery_required",
-                    recovery_reason="external_unknown",
-                )
+                    # 첫 번째 Task를 materialize한 뒤 실제 원장 Attempt와 미확정(prepared) RuntimeIntent를 기록한다.
+                    self.run_once()
+                    status_after_mat = self.service.status(self.project_id)
+                    mat_task = next(
+                        (
+                            t
+                            for t in status_after_mat["tasks"]
+                            if t["plan_revision_id"] == first_plan["planRevisionId"]
+                            and t["status"] == "materialized"
+                        ),
+                        None,
+                    )
+                    if mat_task is not None:
+                        attempt = self.service.reserve_attempt(task_id=mat_task["id"])
+                        intent = self.service.prepare_runtime_intent(
+                            attempt_id=attempt.attempt_id,
+                            kind=RuntimeIntentKind.START_TURN,
+                            idempotency_key=f"gui-ext-unknown:{attempt.attempt_id}",
+                            request={"task_id": mat_task["id"]},
+                        )
+                        self._record_recovery_ledger_event(
+                            "recovery.external_unknown_detected",
+                            intent.intent_id,
+                            {
+                                "attempt_id": attempt.attempt_id,
+                                "intent_id": intent.intent_id,
+                                "receipt_state": "missing",
+                            },
+                            run_state="recovery_required",
+                            recovery_reason="external_unknown",
+                        )
             return self.snapshot()
 
     def refresh_stale(self) -> dict[str, Any]:
         with self._lock:
-            self._stale_pending = False
-            self._recovery_state = None
             latest = self.service.load_latest_goal(self.project_id)
-            self._register_goal_and_plans_in_ledger(
-                project_id=self.project_id,
-                source_request=latest.definition.source_request,
-                revision_no=latest.revision_no + 1,
-                goal_id=latest.goal_id,
-                supersedes_goal_revision_id=latest.goal_revision_id,
-            )
             self._record_recovery_ledger_event(
                 "recovery.stale_input_refreshed",
                 self.project_id,
@@ -1675,31 +1893,27 @@ class LocalGuiEngineBackend:
                 run_state="idle",
                 recovery_reason=None,
             )
-            return {"ok": True, "data": self.snapshot()}
+            self.application.revise(
+                self.project_id,
+                source_request=latest.definition.source_request,
+                candidate_count=1,
+                allow_active_plan_replacement=True,
+            )
+            snap = self.snapshot()
+            self._notify_subscribers(snap)
+            return {"ok": True, "data": snap}
 
     def observe_attempt(self) -> dict[str, Any]:
         with self._lock:
-            if self._recovery_state is None or self._recovery_state.get("kind") != "external_unknown":
+            snap_before = self.snapshot()
+            recovery = snap_before.get("recovery")
+            if recovery is None or recovery.get("kind") != "external_unknown":
                 return self._error("RECOVERY_NOT_OBSERVABLE", "관측할 external_unknown 복구 건이 없습니다.")
-            intent_id = str(self._recovery_state.get("intentId") or "intent_gui_ext_01")
-            self._recovery_state = {
-                **self._recovery_state,
-                "stage": "observed",
-                "receiptState": "confirmed_missing",
-                "explanation": "thread/turn과 로컬 산출물을 재관측한 결과 부분 쓰기 흔적이 없어 마지막 checkpoint에서 재개할 수 있습니다.",
-                "evidence": [
-                    *self._recovery_state.get("evidence", []),
-                    "thread/turn re-observation complete: partial effect not found",
-                ],
-            }
-            if self._active_attempt_state is not None:
-                self._active_attempt_state = {
-                    **self._active_attempt_state,
-                    "status": "interrupted",
-                }
+            intent_id = str(recovery.get("intentId") or "")
+            self.service.recover_inspect(self.project_id)
             self._record_recovery_ledger_event(
                 "recovery.attempt_observed",
-                intent_id,
+                intent_id or self.project_id,
                 {
                     "intent_id": intent_id,
                     "stage": "observed",
@@ -1708,43 +1922,80 @@ class LocalGuiEngineBackend:
                 run_state="recovery_required",
                 recovery_reason="external_unknown:observed",
             )
-            return {"ok": True, "data": self.snapshot()}
+            snap = self.snapshot()
+            self._notify_subscribers(snap)
+            return {"ok": True, "data": snap}
 
     def resume_attempt(self) -> dict[str, Any]:
         with self._lock:
+            snap_before = self.snapshot()
+            recovery = snap_before.get("recovery")
             if (
-                self._recovery_state is None
-                or self._recovery_state.get("kind") != "external_unknown"
-                or self._recovery_state.get("stage") != "observed"
+                recovery is None
+                or recovery.get("kind") != "external_unknown"
+                or recovery.get("stage") != "observed"
             ):
                 return self._error("OBSERVATION_REQUIRED", "재개 전에 먼저 기존 시도를 관측해야 합니다.")
-            intent_id = str(self._recovery_state.get("intentId") or "intent_gui_ext_01")
-            self._recovery_state = None
-            self._active_attempt_state = None
+            intent_id = str(recovery.get("intentId") or "")
+            if intent_id:
+                with self.service.ledger.transaction() as tx:
+                    intent_row = tx.connection.execute(
+                        "SELECT attempt_id FROM runtime_intents WHERE id = ?",
+                        (intent_id,),
+                    ).fetchone()
+                    tx.connection.execute(
+                        "UPDATE runtime_intents SET status = 'abandoned' WHERE id = ?",
+                        (intent_id,),
+                    )
+                    if intent_row is not None:
+                        attempt_id = str(intent_row["attempt_id"])
+                        a_row = tx.connection.execute(
+                            "SELECT task_id FROM attempts WHERE id = ?",
+                            (attempt_id,),
+                        ).fetchone()
+                        tx.connection.execute(
+                            "UPDATE attempts SET status = 'failed', failure_class = NULL, ended_at = ?, updated_at = ? WHERE id = ?",
+                            (tx.now, tx.now, attempt_id),
+                        )
+                        if a_row is not None:
+                            tx.connection.execute(
+                                "UPDATE task_contracts SET status = 'materialized', updated_at = ? WHERE id = ?",
+                                (tx.now, a_row["task_id"]),
+                            )
             self._record_recovery_ledger_event(
                 "recovery.attempt_resumed",
-                intent_id,
+                intent_id or self.project_id,
                 {"intent_id": intent_id, "resumed": True},
                 run_state="active",
                 recovery_reason=None,
             )
-            return {"ok": True, "data": self.snapshot()}
+            snap = self.snapshot()
+            self._notify_subscribers(snap)
+            return {"ok": True, "data": snap}
 
     def abandon_intent(self, rationale: str) -> dict[str, Any]:
         with self._lock:
             if not rationale or not rationale.strip():
                 return self._error("RATIONALE_REQUIRED", "포기 사유를 입력해야 원장에 기록할 수 있습니다.")
-            intent_id = (
-                str(self._recovery_state.get("intentId"))
-                if self._recovery_state and self._recovery_state.get("intentId")
-                else "intent_gui_ext_01"
-            )
-            self._recovery_state = None
-            self._active_attempt_state = None
+            snap_before = self.snapshot()
+            recovery = snap_before.get("recovery")
+            intent_id = str(recovery.get("intentId") or "") if recovery else ""
+            if intent_id:
+                try:
+                    self.service.abandon_unknown_intent(
+                        intent_id=intent_id,
+                        rationale=rationale.strip(),
+                    )
+                except (EngineServiceError, EngineLedgerError):
+                    with self.service.ledger.transaction() as tx:
+                        tx.connection.execute(
+                            "UPDATE runtime_intents SET status = 'abandoned', updated_at = ? WHERE id = ?",
+                            (tx.now, intent_id),
+                        )
             self._draft_goal_mode = True
             self._record_recovery_ledger_event(
                 "recovery.intent_abandoned",
-                intent_id,
+                intent_id or self.project_id,
                 {"intent_id": intent_id, "rationale": rationale.strip()},
                 run_state="idle",
                 recovery_reason=None,
@@ -1780,12 +2031,7 @@ class LocalGuiEngineBackend:
             try:
                 self.application.replan(self.project_id, rationale=rationale.strip())
             except (EngineServiceError, EngineApplicationError, EngineLedgerError) as error:
-                if self.live_gemini:
-                    return self._error("REPLAN_FAILED", str(error))
-                self.service.set_workflow_control(
-                    self.project_id, state="running", reason=rationale.strip()
-                )
-                self._recovery_state = None
+                return self._error("REPLAN_FAILED", str(error))
             snap = self.snapshot()
             self._notify_subscribers(snap)
             return {"ok": True, "data": snap}
@@ -1815,6 +2061,7 @@ class LocalGuiEngineBackend:
                     "data": {
                         "report": report.model_dump(mode="json"),
                         "markdown": markdown,
+                        "snapshot": self.snapshot(),
                     },
                 }
             except (EngineServiceError, EngineApplicationError, EngineLedgerError) as error:
@@ -1835,11 +2082,12 @@ class LocalGuiEngineBackend:
             if existing is not None:
                 self.project_id = str(existing["id"])
                 self._draft_goal_mode = False
-                self._recovery_state = None
             else:
-                self.project_id = self._bootstrap_project_with_goal_and_plans()
+                self.project_id = self._create_and_prepare_project(
+                    source_request=self.DEFAULT_SOURCE_REQUEST,
+                    candidate_count=1,
+                )
                 self._draft_goal_mode = False
-                self._recovery_state = None
             snap = self.snapshot()
             self._notify_subscribers(snap)
             return {"ok": True, "data": snap}
