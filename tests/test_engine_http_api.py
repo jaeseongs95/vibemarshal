@@ -434,6 +434,151 @@ class EngineHttpApiTests(unittest.TestCase):
         status_after = self.backend.service.status(self.backend.project_id)
         self.assertIsNone(status_after["project"]["active_plan_revision_id"])
 
+    def test_remaining_8_reviewer_findings_regressions(self) -> None:
+        from unittest.mock import patch
+        from flowmarshal.engine import cli, release_freeze
+        from flowmarshal.engine.application import ApplicationAuthority
+        from flowmarshal.engine.service import EngineServiceError
+
+        # 1. VM-D-0015 / VM-D-0031 / VM-D-0032 / VM-T-0008 / VM-T-0009:
+        # http_api.py source must not contain _LocalTaskGate, _LocalGovernance, _LocalDeterministicRoleRunner,
+        # or duplicate def activate_plan.
+        http_api_src = (
+            Path(__file__).resolve().parents[1] / "src" / "flowmarshal" / "engine" / "http_api.py"
+        ).read_text(encoding="utf-8")
+        for forbidden in (
+            "_LocalTaskGate",
+            "_LocalGovernance",
+            "_LocalDeterministicRoleRunner",
+            "_LocalImmediateRuntime",
+        ):
+            self.assertNotIn(forbidden, http_api_src)
+        self.assertEqual(http_api_src.count("def activate_plan("), 1)
+
+        # Wheel-like fallback path (when agy_gemini_bridge is absent) initializes live_gemini=True cleanly
+        with patch("importlib.util.find_spec", return_value=None):
+            wheel_live_backend = LocalGuiEngineBackend(
+                db_path=self.root / "wheel_live.sqlite3",
+                artifact_root=self.root / "wheel_live_artifacts",
+                project_root=self.root / "wheel_live_ws",
+                live_gemini=True,
+            )
+            try:
+                snap = wheel_live_backend.snapshot()
+                self.assertEqual(snap["phase"], "goal_draft")
+                self.assertTrue((self.root / "wheel_live_artifacts" / "gemini-model-catalog.json").is_file())
+            finally:
+                wheel_live_backend.close()
+
+        # 2. VM-D-0036: reobserve_project atomicity in single transaction when StateSnapshot fails
+        reobs_backend = LocalGuiEngineBackend(
+            db_path=self.root / "reobs.sqlite3",
+            artifact_root=self.root / "reobs_artifacts",
+            project_root=self.root / "reobs_ws",
+        )
+        try:
+            pid = reobs_backend.project_id
+            ws_root = Path(reobs_backend.service.status(pid)["project"]["root"])
+            map_before = reobs_backend.service.load_current_project_map(pid)
+            (ws_root / "AGENTS.md").write_text("# Modified for atomic rollback test\n", encoding="utf-8")
+            with patch.object(
+                reobs_backend.service,
+                "_record_state_snapshot_in_transaction",
+                side_effect=EngineServiceError("STATE_SNAPSHOT_WRITE_ABORTED"),
+            ):
+                with self.assertRaises(EngineServiceError):
+                    reobs_backend.service.reobserve_project(pid)
+            map_after = reobs_backend.service.load_current_project_map(pid)
+            self.assertEqual(map_before.project_map_revision_id, map_after.project_map_revision_id)
+        finally:
+            reobs_backend.close()
+
+        # 3. VM-T-0014: CLI goal authorize --confirm-digest and plan activate --confirm-digest
+        cli_backend = LocalGuiEngineBackend(
+            db_path=self.root / "cli_auth.sqlite3",
+            artifact_root=self.root / "cli_auth_artifacts",
+            project_root=self.root / "cli_auth_ws",
+        )
+        try:
+            cli_pid = cli_backend.project_id
+            auth_target = ApplicationAuthority(cli_backend.application).authorization_target(cli_pid)
+            out_buf = io.StringIO()
+            with redirect_stdout(out_buf):
+                rc = cli.main(
+                    [
+                        "--db",
+                        str(self.root / "cli_auth.sqlite3"),
+                        "--artifacts",
+                        str(self.root / "cli_auth_artifacts"),
+                        "goal",
+                        "authorize",
+                        "--project-id",
+                        cli_pid,
+                        "--confirm-digest",
+                        auth_target.target_digest,
+                    ]
+                )
+            self.assertEqual(rc, 0)
+            auth_out = json.loads(out_buf.getvalue())
+            self.assertIn("activation_id", auth_out)
+        finally:
+            cli_backend.close()
+
+        cli_plan_backend = LocalGuiEngineBackend(
+            db_path=self.root / "cli_plan.sqlite3",
+            artifact_root=self.root / "cli_plan_artifacts",
+            project_root=self.root / "cli_plan_ws",
+        )
+        try:
+            plan_pid = cli_plan_backend.project_id
+            plan_snap = cli_plan_backend.snapshot()
+            first_plan_id = plan_snap["plans"][0]["planRevisionId"]
+            plan_target = ApplicationAuthority(cli_plan_backend.application).authorization_target(
+                plan_pid, selected_plan_revision_id=first_plan_id
+            )
+            out_buf2 = io.StringIO()
+            with redirect_stdout(out_buf2):
+                rc2 = cli.main(
+                    [
+                        "--db",
+                        str(self.root / "cli_plan.sqlite3"),
+                        "--artifacts",
+                        str(self.root / "cli_plan_artifacts"),
+                        "plan",
+                        "activate",
+                        "--plan-revision-id",
+                        first_plan_id,
+                        "--confirm-digest",
+                        plan_target.target_digest,
+                    ]
+                )
+            self.assertEqual(rc2, 0)
+            plan_out = json.loads(out_buf2.getvalue())
+            self.assertIn("activation_id", plan_out)
+        finally:
+            cli_plan_backend.close()
+
+        # 4. VM-T-0015: no hardcoded 'codex-validator' in runtime.py / validation_execution.py / service.py
+        # and release_freeze._package_identity supports multi-script vibemarshal wheel
+        engine_dir = Path(__file__).resolve().parents[1] / "src" / "flowmarshal" / "engine"
+        for fname in ("runtime.py", "validation_execution.py", "service.py"):
+            content = (engine_dir / fname).read_text(encoding="utf-8")
+            self.assertNotIn("codex-validator", content, f"Hardcoded codex-validator remained in {fname}")
+
+        repo_root = Path(__file__).resolve().parents[1]
+        entry_points_txt = (
+            "[console_scripts]\n"
+            "flowmarshal-engine = flowmarshal.engine.console_host:main\n"
+            "flowmarshal-gui = flowmarshal.engine.http_api:main\n"
+            "vibemarshal = flowmarshal.engine.console_host:main\n"
+            "vibemarshal-gui = flowmarshal.engine.http_api:main\n"
+        )
+        pkg_id = release_freeze._package_identity(
+            repo_root, "vibemarshal", "1.1.0", entry_points_txt
+        )
+        self.assertEqual(pkg_id.distribution_name, "vibemarshal")
+        self.assertEqual(pkg_id.console_entrypoint, "vibemarshal = flowmarshal.engine.console_host:main")
+
 
 if __name__ == "__main__":
     unittest.main()

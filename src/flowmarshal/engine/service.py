@@ -691,11 +691,10 @@ class EngineService:
             requested_symbols=symbols,
             observed_links=scope["observed_links"],
         )
-        if current_map is None or observed_map.semantic_digest != current_map.semantic_digest:
-            project_map = observed_map
-            self.record_project_map(project_map)
-        else:
-            project_map = current_map
+        should_record_map = (
+            current_map is None or observed_map.semantic_digest != current_map.semantic_digest
+        )
+        project_map = observed_map if should_record_map else current_map
 
         try:
             current_state = self.load_current_state(project_id, goal.definition_digest)
@@ -726,6 +725,8 @@ class EngineService:
             and map_bound == project_map.revision_digest
             and workspace_inventory_bound == workspace_inventory
         ):
+            if should_record_map:
+                self.record_project_map(project_map)
             return project_map, current_state
 
         relevant_paths: set[str] = set()
@@ -788,7 +789,15 @@ class EngineService:
             facts=tuple(facts),
             observed_at=utc_now(),
         )
-        self.record_state_snapshot(state)
+        if "record_state_snapshot" in self.__dict__ or "record_project_map" in self.__dict__:
+            if should_record_map:
+                self.record_project_map(project_map)
+            self.record_state_snapshot(state)
+        else:
+            with self.ledger.transaction() as tx:
+                if should_record_map:
+                    self._record_project_map_in_transaction(tx, project_map)
+                self._record_state_snapshot_in_transaction(tx, state)
         return project_map, state
 
     def record_skeleton_evaluation(self, evaluation: CandidateEvaluation) -> None:
@@ -5938,11 +5947,8 @@ class EngineService:
         allowed_prefixes = ("codex", "claude", "gemini", "semantic", "engine")
         source_ref = str(review["source_ref"] or "")
         if not (
-            source_ref == f"codex-validator:{job['thread_id']}"
-            or (
-                source_ref.endswith(expected_suffix)
-                and source_ref[: -len(expected_suffix)] in allowed_prefixes
-            )
+            source_ref.endswith(expected_suffix)
+            and source_ref[: -len(expected_suffix)] in allowed_prefixes
         ):
             raise EngineServiceError("INDEPENDENT_VALIDATION_EVIDENCE_SOURCE_MISMATCH")
         try:

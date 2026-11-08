@@ -194,9 +194,15 @@ def candidate_python_path(venv_root: Path) -> Path:
 
 
 def _user_cli_path(venv_root: Path) -> Path:
-    return _scripts_directory(venv_root) / (
-        "flowmarshal-engine.exe" if os.name == "nt" else "flowmarshal-engine"
-    )
+    scripts_dir = _scripts_directory(venv_root)
+    suffix = ".exe" if os.name == "nt" else ""
+    primary = scripts_dir / f"vibemarshal{suffix}"
+    if primary.is_file():
+        return primary
+    fallback = scripts_dir / f"flowmarshal-engine{suffix}"
+    if fallback.is_file():
+        return fallback
+    return primary
 
 
 def _run(command: Sequence[str], *, cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -427,7 +433,10 @@ def run_clean_install(
                 passed = (
                     helped.returncode == 0
                     and config_help.returncode == 0
-                    and "flowmarshal" in helped.stdout.casefold()
+                    and any(
+                        token in helped.stdout.casefold()
+                        for token in ("vibemarshal", "flowmarshal")
+                    )
                 )
                 detail = helped.stderr + config_help.stderr
             stage_ok = _record(

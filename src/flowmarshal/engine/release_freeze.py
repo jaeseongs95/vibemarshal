@@ -499,30 +499,51 @@ def _parser_surface(parser: argparse.ArgumentParser) -> dict[str, Any]:
     return {"options": options, "subcommands": subcommands}
 
 
+def _parse_console_scripts(entry_points_text: str) -> dict[str, str]:
+    normalized = entry_points_text.replace("\r\n", "\n").strip()
+    lines = [line.strip() for line in normalized.splitlines() if line.strip()]
+    if not lines or lines[0] != "[console_scripts]":
+        raise ReleaseFreezeError("RELEASE_FREEZE_ENTRY_POINTS_MISMATCH")
+    parsed: dict[str, str] = {}
+    for line in lines[1:]:
+        if line.startswith("["):
+            break
+        if "=" not in line:
+            raise ReleaseFreezeError("RELEASE_FREEZE_ENTRY_POINTS_MISMATCH")
+        key, val = line.split("=", 1)
+        parsed[key.strip()] = val.strip()
+    return parsed
+
+
 def _package_identity(root: Path, distribution_name: str, distribution_version: str, entry_points_text: str) -> PackageIdentityFreeze:
     pyproject = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
     project = pyproject["project"]
     expected_name = str(project["name"])
     expected_version = str(project["version"])
-    scripts = project["scripts"]
+    scripts = {str(k): str(v) for k, v in project["scripts"].items()}
     if (
         _normalize_distribution_name(distribution_name) != _normalize_distribution_name(expected_name)
         or distribution_version != expected_version
     ):
         raise ReleaseFreezeError("RELEASE_FREEZE_PACKAGE_METADATA_MISMATCH")
-    if len(scripts) != 1:
+    if not scripts:
         raise ReleaseFreezeError("RELEASE_FREEZE_ENTRY_POINT_COUNT_UNSUPPORTED")
-    (script_name, script_target), = scripts.items()
-    expected_entry_points = "[console_scripts]\n" + f"{script_name} = {script_target}\n"
-    if entry_points_text.replace("\r\n", "\n") != expected_entry_points:
+    actual_scripts = _parse_console_scripts(entry_points_text)
+    if actual_scripts != scripts:
         raise ReleaseFreezeError("RELEASE_FREEZE_ENTRY_POINTS_MISMATCH")
+    primary_name = (
+        "vibemarshal"
+        if "vibemarshal" in scripts
+        else ("flowmarshal-engine" if "flowmarshal-engine" in scripts else next(iter(scripts)))
+    )
+    primary_target = scripts[primary_name]
     from .cli import build_parser
 
     surface = _parser_surface(build_parser())
     return PackageIdentityFreeze(
         distribution_name=expected_name,
         distribution_version=expected_version,
-        console_entrypoint=f"{script_name} = {script_target}",
+        console_entrypoint=f"{primary_name} = {primary_target}",
         parser_surface=surface,
         parser_surface_digest=sha256_digest(surface),
     )

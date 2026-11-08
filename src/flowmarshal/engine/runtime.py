@@ -6763,13 +6763,16 @@ class EngineDispatcher:
         self._check_semantic_evidence_fresh(
             self._semantic_evidence_catalog(row, spec, validation_id), Path(row["root"])
         )
+        provider_prefix = str(getattr(self.runtime, "provider", "codex") or "codex").split("-", 1)[0]
+        if provider_prefix not in ("codex", "claude", "gemini", "semantic", "engine"):
+            provider_prefix = "codex"
         evidence = EvidenceRecord(
             evidence_id=new_id("evidence"),
             project_id=row["project_id"],
             task_id=row["task_id"],
             attempt_id=row["id"],
             kind=EvidenceKind.MODEL_REVIEW,
-            source_ref=f"codex-validator:{observation.thread_id}",
+            source_ref=f"{provider_prefix}-validator:{observation.thread_id}",
             observation=semantic.model_dump_json()[:10_000],
             content_digest=sha256_digest(semantic),
             observed_at=semantic.observed_at,

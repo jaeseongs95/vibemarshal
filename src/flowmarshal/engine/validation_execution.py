@@ -867,10 +867,13 @@ def advance_independent_goal_test(
             model=receipt["model"], effort=receipt["effort"],
             observed_at=receipt["recorded_at"], **result["payload"],
         )
+        provider_prefix = str(getattr(runtime, "provider", "codex") or "codex").split("-", 1)[0]
+        if provider_prefix not in ("codex", "claude", "gemini", "semantic", "engine"):
+            provider_prefix = "codex"
         evidence = EvidenceRecord(
             evidence_id=new_id("evidence"), project_id=project_id, kind=EvidenceKind.MODEL_REVIEW,
             attempt_id=attempt_id,
-            source_ref=f"codex-validator:{receipt['thread_id']}", observation=observed.model_dump_json()[:10_000],
+            source_ref=f"{provider_prefix}-validator:{receipt['thread_id']}", observation=observed.model_dump_json()[:10_000],
             content_digest=sha256_digest(observed),
             observed_at=observed.observed_at,
         )

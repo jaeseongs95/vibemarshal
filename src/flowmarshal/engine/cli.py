@@ -798,6 +798,45 @@ def _cmd_plan_compare(arguments: argparse.Namespace) -> None:
 
 
 def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
+    confirm_digest = getattr(arguments, "confirm_digest", None)
+    if confirm_digest is not None:
+        app = _application(arguments)
+        authority = ApplicationAuthority(app)
+        project_id = arguments.project_id
+        if not project_id:
+            with app.service.ledger.read() as connection:
+                row = connection.execute(
+                    "SELECT project_id FROM plan_revisions WHERE id = ?",
+                    (arguments.plan_revision_id,),
+                ).fetchone()
+            if row is None:
+                raise EngineServiceError(f"Plan revision {arguments.plan_revision_id}을(를) 찾을 수 없습니다.")
+            project_id = str(row["project_id"])
+        target = authority.authorization_target(
+            project_id,
+            selected_plan_revision_id=arguments.plan_revision_id,
+        )
+        if confirm_digest != target.target_digest:
+            raise EngineServiceError(
+                "AUTHORIZATION_DECLINED: confirm_digest가 현재 승인 대상 target_digest와 일치하지 않습니다."
+            )
+        if arguments.digest and arguments.digest != target.plan_activation_digest:
+            raise EngineServiceError(
+                "PLAN_ACTIVATION_DIGEST_MISMATCH: 요청한 digest가 선택된 계획의 activation_digest와 일치하지 않습니다."
+            )
+        res = authority.authorize(
+            project_id,
+            target=target,
+            source=arguments.source,
+            selected_plan_revision_id=arguments.plan_revision_id,
+        )
+        _emit(
+            {
+                "activation_id": res.activation_id,
+                "authorization": res.authorization.model_dump(mode="json"),
+            }
+        )
+        return
     service = _service(arguments)
     if arguments.project_id:
         activation_id = service.activate_selected_plan(project_id=arguments.project_id)
@@ -817,6 +856,26 @@ def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
 def _cmd_goal_authorize(arguments: argparse.Namespace) -> None:
     policy = _goal_authorization_policy(arguments)
     app = _application(arguments)
+    confirm_digest = getattr(arguments, "confirm_digest", None)
+    if confirm_digest is not None:
+        authority = ApplicationAuthority(app)
+        target = authority.authorization_target(
+            arguments.project_id,
+            operating_policy=policy,
+        )
+        if confirm_digest != target.target_digest:
+            raise EngineServiceError(
+                "AUTHORIZATION_DECLINED: confirm_digest가 현재 승인 대상 target_digest와 일치하지 않습니다."
+            )
+        _emit(
+            authority.authorize(
+                arguments.project_id,
+                target=target,
+                source=arguments.source,
+                operating_policy=policy,
+            )
+        )
+        return
     _emit(
         app.authorize(
             arguments.project_id,

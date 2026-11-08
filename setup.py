@@ -26,6 +26,7 @@ ENGINE_DEVELOPER_MODULES = {
     "evaluation",
     "evaluation_budget",
     "freeze",
+    "gui_dev_support",
     "inspection_diagnostic_budget",
     "performance",
     "performance_assessment",
