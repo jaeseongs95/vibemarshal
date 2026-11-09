@@ -205,6 +205,7 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
     if (busy) return;
     setBusy(true);
     setCommandError(null);
+    setFinalReportMarkdown(null);
     try {
       const nextSnapshot = await engine.resetScenario(scenario);
       setSelectedPlanId(nextSnapshot.plans[0]?.planRevisionId ?? null);
@@ -331,6 +332,8 @@ export function App({ client, defaultRuntimeMode, apiBaseUrl }: AppProps = {}) {
 
   const handleRuntimeModeSwitch = useCallback((nextMode: RuntimeMode) => {
     setCommandError(null);
+    setFinalReportMarkdown(null);
+    setSnapshot(null);
     setRuntimeMode(nextMode);
   }, []);
 

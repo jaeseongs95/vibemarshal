@@ -577,6 +577,7 @@ def _command_observation(root: Path, name: str, argv: tuple[str, ...]) -> dict[s
         encoding="utf-8",
         errors="replace",
         check=False,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     return {
         "name": name,

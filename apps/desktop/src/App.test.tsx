@@ -192,6 +192,8 @@ describe("VibeMarshal GUI prototype", () => {
     const pauseBtn = await screen.findByRole("button", { name: "일시정지" });
     fireEvent.click(pauseBtn);
 
+    expect(screen.getByRole("button", { name: "재계획" })).toBeVisible();
+
     const runAllBtn = await screen.findByRole("button", { name: /완료까지 연속 실행/ });
     fireEvent.click(runAllBtn);
     await waitFor(() => expect(screen.getAllByText("충족").length).toBeGreaterThanOrEqual(1));
@@ -199,5 +201,9 @@ describe("VibeMarshal GUI prototype", () => {
     const reportBtn = await screen.findByRole("button", { name: "최종 보고서 조회" });
     fireEvent.click(reportBtn);
     expect(await screen.findByText(/Governance A2 서명 프로파일 및 보안 한계/)).toBeVisible();
+
+    const scenarioSelect = screen.getByLabelText("데모 시나리오");
+    fireEvent.change(scenarioSelect, { target: { value: "stale-activation" } });
+    await waitFor(() => expect(screen.queryByText(/Governance A2 서명 프로파일 및 보안 한계/)).toBeNull());
   });
 });

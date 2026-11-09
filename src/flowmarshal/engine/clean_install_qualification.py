@@ -214,6 +214,7 @@ def _run(command: Sequence[str], *, cwd: Path) -> subprocess.CompletedProcess[st
         encoding="utf-8",
         errors="replace",
         timeout=_COMMAND_TIMEOUT_SECONDS,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
 
 

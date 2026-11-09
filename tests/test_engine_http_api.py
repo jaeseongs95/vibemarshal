@@ -441,8 +441,11 @@ class EngineHttpApiTests(unittest.TestCase):
         from flowmarshal.engine.service import EngineServiceError
 
         # 1. VM-D-0015 / VM-D-0031 / VM-D-0032 / VM-T-0008 / VM-T-0009:
-        # http_api.py source must not contain _LocalTaskGate, _LocalGovernance, _LocalDeterministicRoleRunner,
-        # or duplicate def activate_plan.
+        # http_api.py must use genuine GovernanceSettings + GovernanceTaskGate + AGSObservationProducer,
+        # without LocalDevTaskGate / LocalDevGovernance or gui_dev_support.py.
+        from flowmarshal.engine.ags_observation_producer import AGSObservationProducer
+        from flowmarshal.engine.governance_gate import GovernanceSettings, GovernanceTaskGate
+
         http_api_src = (
             Path(__file__).resolve().parents[1] / "src" / "flowmarshal" / "engine" / "http_api.py"
         ).read_text(encoding="utf-8")
@@ -451,11 +454,21 @@ class EngineHttpApiTests(unittest.TestCase):
             "_LocalGovernance",
             "_LocalDeterministicRoleRunner",
             "_LocalImmediateRuntime",
+            "LocalDevTaskGate",
+            "LocalDevGovernance",
+            "gui_dev_support",
         ):
             self.assertNotIn(forbidden, http_api_src)
+        self.assertFalse(
+            (Path(__file__).resolve().parents[1] / "src" / "flowmarshal" / "engine" / "gui_dev_support.py").exists()
+        )
         self.assertEqual(http_api_src.count("def activate_plan("), 1)
+        self.assertIsInstance(self.backend.governance, GovernanceSettings)
+        self.assertIsInstance(self.backend.governance.observation_producer, AGSObservationProducer)
+        self.assertEqual(self.backend.governance.observation_producer.profile_id, "flowmarshal-same-user-v1")
+        self.assertIsInstance(self.backend.application.task_gate(), GovernanceTaskGate)
 
-        # Wheel-like fallback path (when agy_gemini_bridge is absent) initializes live_gemini=True cleanly
+        # Wheel-like fallback path initializes live_gemini=True with embedded agy bridge and GovernanceTaskGate
         with patch("importlib.util.find_spec", return_value=None):
             wheel_live_backend = LocalGuiEngineBackend(
                 db_path=self.root / "wheel_live.sqlite3",
@@ -467,10 +480,15 @@ class EngineHttpApiTests(unittest.TestCase):
                 snap = wheel_live_backend.snapshot()
                 self.assertEqual(snap["phase"], "goal_draft")
                 self.assertTrue((self.root / "wheel_live_artifacts" / "gemini-model-catalog.json").is_file())
+                self.assertIsInstance(wheel_live_backend.governance, GovernanceSettings)
+                self.assertIsInstance(
+                    wheel_live_backend.governance.observation_producer, AGSObservationProducer
+                )
             finally:
                 wheel_live_backend.close()
 
         # 2. VM-D-0036: reobserve_project atomicity in single transaction when StateSnapshot fails
+        # (including instance-level attribute patch: service.record_state_snapshot = boom_instance)
         reobs_backend = LocalGuiEngineBackend(
             db_path=self.root / "reobs.sqlite3",
             artifact_root=self.root / "reobs_artifacts",
@@ -481,13 +499,13 @@ class EngineHttpApiTests(unittest.TestCase):
             ws_root = Path(reobs_backend.service.status(pid)["project"]["root"])
             map_before = reobs_backend.service.load_current_project_map(pid)
             (ws_root / "AGENTS.md").write_text("# Modified for atomic rollback test\n", encoding="utf-8")
-            with patch.object(
-                reobs_backend.service,
-                "_record_state_snapshot_in_transaction",
-                side_effect=EngineServiceError("STATE_SNAPSHOT_WRITE_ABORTED"),
-            ):
-                with self.assertRaises(EngineServiceError):
-                    reobs_backend.service.reobserve_project(pid)
+
+            def boom_instance(*_args: Any, **_kwargs: Any) -> Any:
+                raise EngineServiceError("STATE_SNAPSHOT_WRITE_ABORTED")
+
+            reobs_backend.service.record_state_snapshot = boom_instance  # type: ignore[method-assign]
+            with self.assertRaises(EngineServiceError):
+                reobs_backend.service.reobserve_project(pid)
             map_after = reobs_backend.service.load_current_project_map(pid)
             self.assertEqual(map_before.project_map_revision_id, map_after.project_map_revision_id)
         finally:
@@ -578,6 +596,132 @@ class EngineHttpApiTests(unittest.TestCase):
         )
         self.assertEqual(pkg_id.distribution_name, "vibemarshal")
         self.assertEqual(pkg_id.console_entrypoint, "vibemarshal = flowmarshal.engine.console_host:main")
+
+    def test_audit_defects_51_to_56_regressions(self) -> None:
+        from unittest.mock import patch
+        from flowmarshal.engine import console_host
+        from flowmarshal.engine.application import ApplicationAuthority
+
+        # VM-D-0051: TrustedConsoleHost.run supports --confirm-digest without TTY
+        host_backend = LocalGuiEngineBackend(
+            db_path=self.root / "host_auth.sqlite3",
+            artifact_root=self.root / "host_auth_artifacts",
+            project_root=self.root / "host_auth_ws",
+        )
+        try:
+            host_pid = host_backend.project_id
+            host_target = ApplicationAuthority(host_backend.application).authorization_target(host_pid)
+            non_tty_in = io.StringIO("")
+            err_buf = io.StringIO()
+            out_buf = io.StringIO()
+            host = console_host.TrustedConsoleHost(input_stream=non_tty_in, approval_stream=err_buf)
+
+            # Wrong digest -> declined (exit 1)
+            with redirect_stdout(out_buf):
+                rc_declined = host.run(
+                    [
+                        "--db",
+                        str(self.root / "host_auth.sqlite3"),
+                        "--artifacts",
+                        str(self.root / "host_auth_artifacts"),
+                        "goal",
+                        "authorize",
+                        "--project-id",
+                        host_pid,
+                        "--confirm-digest",
+                        "sha256:" + ("0" * 64),
+                    ]
+                )
+            self.assertEqual(rc_declined, 1)
+            self.assertEqual(json.loads(out_buf.getvalue())["error_code"], "AUTHORIZATION_DECLINED")
+
+            # Correct digest -> authorized (exit 0)
+            out_buf2 = io.StringIO()
+            with redirect_stdout(out_buf2):
+                rc_ok = host.run(
+                    [
+                        "--db",
+                        str(self.root / "host_auth.sqlite3"),
+                        "--artifacts",
+                        str(self.root / "host_auth_artifacts"),
+                        "goal",
+                        "authorize",
+                        "--project-id",
+                        host_pid,
+                        "--confirm-digest",
+                        host_target.target_digest,
+                    ]
+                )
+            self.assertEqual(rc_ok, 0)
+            self.assertIn("activation_id", json.loads(out_buf2.getvalue()))
+        finally:
+            host_backend.close()
+
+        # VM-D-0052: All subprocess.run calls in release_freeze, clean_install_qualification,
+        # qualification, and e2e_qualification include CREATE_NO_WINDOW
+        engine_dir = Path(__file__).resolve().parents[1] / "src" / "flowmarshal" / "engine"
+        for fname in (
+            "release_freeze.py",
+            "clean_install_qualification.py",
+            "qualification.py",
+            "e2e_qualification.py",
+        ):
+            src = (engine_dir / fname).read_text(encoding="utf-8")
+            self.assertIn("CREATE_NO_WINDOW", src, f"Missing CREATE_NO_WINDOW in {fname}")
+
+        # VM-D-0053: select_project on live_gemini / uninitialized Goal project stays in goal_draft
+        with patch("importlib.util.find_spec", return_value=None):
+            live_b = LocalGuiEngineBackend(
+                db_path=self.root / "live_sel.sqlite3",
+                artifact_root=self.root / "live_sel_artifacts",
+                project_root=self.root / "live_sel_ws1",
+                live_gemini=True,
+            )
+            try:
+                sel_res = live_b.select_project(str(self.root / "live_sel_ws2"))
+                self.assertTrue(sel_res["ok"])
+                self.assertEqual(sel_res["data"]["phase"], "goal_draft")
+                action_kinds = [a["kind"] for a in sel_res["data"]["possibleActions"]]
+                self.assertIn("prepare_goal", action_kinds)
+                # Switching back to existing uninitialized project also stays in goal_draft
+                sel_back = live_b.select_project(str(self.root / "live_sel_ws1"))
+                self.assertEqual(sel_back["data"]["phase"], "goal_draft")
+            finally:
+                live_b.close()
+
+        # VM-D-0054 & VM-D-0055: SSE notifications on start_goal_revision/reset_scenario,
+        # replan action when plan_active, and non-empty recovery actions after cancel_workflow
+        sub_q = self.backend.subscribe_events()
+        try:
+            draft_snap = self.backend.start_goal_revision()
+            self.assertEqual(draft_snap["phase"], "goal_draft")
+            notified_draft = sub_q.get(timeout=1.0)
+            self.assertEqual(notified_draft["phase"], "goal_draft")
+
+            reset_snap = self.backend.reset_scenario("golden-path")
+            self.assertEqual(reset_snap["phase"], "plan_ready")
+            notified_reset = sub_q.get(timeout=1.0)
+            self.assertEqual(notified_reset["phase"], "plan_ready")
+
+            first_plan = reset_snap["plans"][0]
+            act_res = self.backend.activate_plan(
+                {
+                    "planRevisionId": first_plan["planRevisionId"],
+                    "activationDigest": first_plan["activationDigest"],
+                    "expectedGoalDigest": reset_snap["goal"]["definitionDigest"],
+                }
+            )
+            self.assertTrue(act_res["ok"])
+            active_actions = [a["kind"] for a in act_res["data"]["possibleActions"] if a["enabled"]]
+            self.assertIn("replan", active_actions)
+
+            cancel_res = self.backend.cancel_workflow("테스트 취소")
+            self.assertTrue(cancel_res["ok"])
+            cancelled_actions = [a["kind"] for a in cancel_res["data"]["possibleActions"] if a["enabled"]]
+            self.assertIn("edit_goal", cancelled_actions)
+            self.assertIn("search_plans", cancelled_actions)
+        finally:
+            self.backend.unsubscribe_events(sub_q)
 
 
 if __name__ == "__main__":

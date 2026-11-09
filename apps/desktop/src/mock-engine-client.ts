@@ -237,7 +237,7 @@ function possibleActionsFor(snapshot: WorkspaceSnapshot): PossibleAction[] {
       return [action("activate_plan", "plan_activation"), action("edit_goal")];
     case "plan_active":
     case "running":
-      return [action("run_once"), action("pause"), action("cancel")];
+      return [action("run_once"), action("pause"), action("cancel"), action("replan")];
     case "completed":
       return [action("edit_goal")];
   }

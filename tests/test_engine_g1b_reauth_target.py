@@ -623,7 +623,9 @@ class CoStaleProductPathTests(_ConsoleHarness, unittest.TestCase):
 
         real = self.service.record_state_snapshot
 
-        def crash(_snapshot):
+        def crash(_snapshot, *, _tx=None):
+            if _tx is not None:
+                _tx.connection.commit()
             raise _ObservationCrash("새 Map 기록 뒤 State 기록 전 중단")
 
         self.service.record_state_snapshot = crash

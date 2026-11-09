@@ -1471,6 +1471,7 @@ def _initialize_workspace_git(workspace: Path) -> dict[str, str]:
             errors="replace",
             timeout=120,
             check=False,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
         if result.returncode != 0:
             raise QualificationRunError(

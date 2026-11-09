@@ -58,6 +58,23 @@ class TrustedConsoleHost:
             arguments.project_id,
             operating_policy=policy,
         )
+        confirm_digest = getattr(arguments, "confirm_digest", None)
+        if confirm_digest is not None:
+            if confirm_digest != target.target_digest:
+                cli._emit({
+                    "status": "declined",
+                    "error_code": "AUTHORIZATION_DECLINED",
+                    "target_digest": target.target_digest,
+                })
+                return 1
+            result = application_authority.authorize(
+                arguments.project_id,
+                target=target,
+                source=arguments.source,
+                operating_policy=policy,
+            )
+            cli._emit(result)
+            return 0
         self._show_target(target, audit_source=arguments.source)
         if not self._is_interactive():
             cli._emit({

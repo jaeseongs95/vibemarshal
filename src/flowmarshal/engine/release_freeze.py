@@ -355,6 +355,7 @@ def _git(root: Path, *args: str) -> str:
     result = subprocess.run(
         ["git", *args], cwd=root, capture_output=True, text=True,
         encoding="utf-8", errors="replace", check=False,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     if result.returncode != 0:
         raise ReleaseFreezeError(
@@ -367,6 +368,7 @@ def _is_ancestor(root: Path, ancestor: str, descendant: str) -> bool:
     result = subprocess.run(
         ["git", "merge-base", "--is-ancestor", ancestor, descendant],
         cwd=root, capture_output=True, text=True, encoding="utf-8", errors="replace", check=False,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     if result.returncode not in (0, 1):
         raise ReleaseFreezeError(

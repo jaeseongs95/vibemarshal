@@ -510,7 +510,12 @@ class EngineService:
                 history_payload,
             )
 
-    def record_state_snapshot(self, snapshot: StateSnapshot) -> None:
+    def record_state_snapshot(
+        self, snapshot: StateSnapshot, *, _tx: EngineTransaction | None = None
+    ) -> None:
+        if _tx is not None:
+            self._record_state_snapshot_in_transaction(_tx, snapshot)
+            return
         with self.ledger.transaction() as tx:
             self._record_state_snapshot_in_transaction(tx, snapshot)
 
@@ -554,7 +559,12 @@ class EngineService:
             {"snapshot_digest": snapshot.snapshot_digest, "scope_fingerprint": snapshot.scope_fingerprint},
         )
 
-    def record_project_map(self, project_map: ProjectMapRevision) -> None:
+    def record_project_map(
+        self, project_map: ProjectMapRevision, *, _tx: EngineTransaction | None = None
+    ) -> None:
+        if _tx is not None:
+            self._record_project_map_in_transaction(_tx, project_map)
+            return
         with self.ledger.transaction() as tx:
             self._record_project_map_in_transaction(tx, project_map)
 
@@ -789,15 +799,10 @@ class EngineService:
             facts=tuple(facts),
             observed_at=utc_now(),
         )
-        if "record_state_snapshot" in self.__dict__ or "record_project_map" in self.__dict__:
+        with self.ledger.transaction() as tx:
             if should_record_map:
-                self.record_project_map(project_map)
-            self.record_state_snapshot(state)
-        else:
-            with self.ledger.transaction() as tx:
-                if should_record_map:
-                    self._record_project_map_in_transaction(tx, project_map)
-                self._record_state_snapshot_in_transaction(tx, state)
+                self.record_project_map(project_map, _tx=tx)
+            self.record_state_snapshot(state, _tx=tx)
         return project_map, state
 
     def record_skeleton_evaluation(self, evaluation: CandidateEvaluation) -> None:
