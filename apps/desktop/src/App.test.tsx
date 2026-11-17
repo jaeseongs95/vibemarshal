@@ -61,20 +61,17 @@ describe("VibeMarshal GUI prototype", () => {
     await waitFor(() => expect(screen.getAllByText("충족").length).toBeGreaterThanOrEqual(1));
   });
 
-  it("HttpEngineClient가 /api/v1/health의 session_token을 조회해 GET/POST X-FlowMarshal-Token 헤더로 전송한다", async () => {
+  it("HttpEngineClient가 부트스트랩된 sessionToken으로 GET/POST X-FlowMarshal-Token 헤더를 전송하고 /api/v1/health에 의존하지 않는다", async () => {
     const mock = new MockEngineClient("golden-path");
     const snapshot = await mock.getSnapshot();
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/api/v1/health")) {
-        return new Response(JSON.stringify({ session_token: "tok_test_session_123" }), {
-          status: 200,
-          headers: { "Content-Type": "application/json" },
-        });
+        throw new Error("/api/v1/health must not be called for session token bootstrap");
       }
       if (url.endsWith("/api/v1/snapshot")) {
         const headers = (init?.headers ?? {}) as Record<string, string>;
-        expect(headers["X-FlowMarshal-Token"]).toBe("tok_test_session_123");
+        expect(headers["X-FlowMarshal-Token"]).toBe("tok_bootstrapped_123");
         return new Response(JSON.stringify(snapshot), {
           status: 200,
           headers: { "Content-Type": "application/json" },
@@ -82,7 +79,7 @@ describe("VibeMarshal GUI prototype", () => {
       }
       if (url.endsWith("/api/v1/run-once")) {
         const headers = (init?.headers ?? {}) as Record<string, string>;
-        expect(headers["X-FlowMarshal-Token"]).toBe("tok_test_session_123");
+        expect(headers["X-FlowMarshal-Token"]).toBe("tok_bootstrapped_123");
         return new Response(
           JSON.stringify({
             ok: true,
@@ -100,6 +97,7 @@ describe("VibeMarshal GUI prototype", () => {
 
     const client = new HttpEngineClient({
       baseUrl: "http://127.0.0.1:8765",
+      sessionToken: "tok_bootstrapped_123",
       fetchImpl: fetchMock as unknown as typeof fetch,
     });
     const fetchedSnap = await client.getSnapshot();
@@ -111,28 +109,23 @@ describe("VibeMarshal GUI prototype", () => {
       idempotencyKey: "idem_1",
     });
     expect(res.ok).toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
-  it("HttpEngineClient가 403 SESSION_TOKEN_REQUIRED 응답 시 토큰을 재발급받아 1회 재시도한다", async () => {
+  it("HttpEngineClient가 403 응답 시 window.__FLOWMARSHAL_SESSION_TOKEN__이 갱신되었으면 1회 재시도하고 subscribe-해제-재구독 시 EventSource 누수를 막는다", async () => {
     const mock = new MockEngineClient("golden-path");
     const snapshot = await mock.getSnapshot();
-    let healthCount = 0;
+    const win = window as unknown as { __FLOWMARSHAL_SESSION_TOKEN__?: string };
+    win.__FLOWMARSHAL_SESSION_TOKEN__ = "tok_stale";
     let runOnceCount = 0;
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
-      if (url.endsWith("/api/v1/health")) {
-        healthCount += 1;
-        return new Response(
-          JSON.stringify({ session_token: healthCount === 1 ? "tok_stale" : "tok_fresh" }),
-          { status: 200, headers: { "Content-Type": "application/json" } },
-        );
-      }
       if (url.endsWith("/api/v1/run-once")) {
         runOnceCount += 1;
         const headers = (init?.headers ?? {}) as Record<string, string>;
         if (runOnceCount === 1) {
           expect(headers["X-FlowMarshal-Token"]).toBe("tok_stale");
+          win.__FLOWMARSHAL_SESSION_TOKEN__ = "tok_fresh";
           return new Response(
             JSON.stringify({
               ok: false,
@@ -160,19 +153,47 @@ describe("VibeMarshal GUI prototype", () => {
       throw new Error(`Unexpected URL: ${url}`);
     });
 
+    const createdSources: Array<{ url: string; closed: boolean; close: () => void; addEventListener: () => void }> = [];
     const client = new HttpEngineClient({
       baseUrl: "http://127.0.0.1:8765",
       fetchImpl: fetchMock as unknown as typeof fetch,
+      eventSourceFactory: (url: string) => {
+        const fakeEs = {
+          url,
+          closed: false,
+          close() {
+            this.closed = true;
+          },
+          addEventListener() {
+            // no-op
+          },
+        };
+        createdSources.push(fakeEs);
+        return fakeEs as unknown as EventSource;
+      },
     });
-    const res = await client.runOnce({
-      actorRef: "local:test-user",
-      clientInstanceId: "vitest:http-client",
-      requestId: "req_retry",
-      idempotencyKey: "idem_retry",
-    });
-    expect(res.ok).toBe(true);
-    expect(healthCount).toBe(2);
-    expect(runOnceCount).toBe(2);
+    try {
+      const res = await client.runOnce({
+        actorRef: "local:test-user",
+        clientInstanceId: "vitest:http-client",
+        requestId: "req_retry",
+        idempotencyKey: "idem_retry",
+      });
+      expect(res.ok).toBe(true);
+      expect(runOnceCount).toBe(2);
+
+      // 구독 -> 즉시 해제 -> 재구독 경합 시 이전 비동기 연결 시도는 무효화되어 EventSource가 단 1개만 열려야 함
+      const unsub1 = client.subscribe(() => undefined);
+      unsub1();
+      const unsub2 = client.subscribe(() => undefined);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+      expect(createdSources.length).toBe(1);
+      expect(createdSources[0].closed).toBe(false);
+      unsub2();
+      expect(createdSources[0].closed).toBe(true);
+    } finally {
+      delete win.__FLOWMARSHAL_SESSION_TOKEN__;
+    }
   });
 
   it("MockEngineClient는 engineSchemaVersion 4를 반환하고 TaskDag는 곡선 path와 다중 행/열로 간선을 렌더링한다", async () => {

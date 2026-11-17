@@ -7,7 +7,12 @@ import io
 import os
 import shutil
 import tarfile
+import threading
+import time
+import uuid
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 AGS_EMBEDDED_PIN = '0e88cb6039e143e79dd8c68c7aecc3e45da41d43'
 AGS_EMBEDDED_ARCHIVE_SHA256 = '4789b8dcaf1124def18427b2332df6406c56a2aa72cb90795183b78a9c34191e'
@@ -10371,19 +10376,106 @@ def resolve_local_governance_plugin_root(fallback_extract_dir: Path) -> Path:
     return extract_embedded_ags_plugin(fallback_extract_dir)
 
 
+_EXTRACT_PROCESS_LOCK = threading.RLock()
+
+
+@contextmanager
+def _exclusive_bundle_lock(lock_path: Path, *, timeout_sec: float = 30.0) -> Iterator[None]:
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    with _EXTRACT_PROCESS_LOCK:
+        fd = os.open(str(lock_path), os.O_CREAT | os.O_RDWR)
+        try:
+            deadline = time.monotonic() + timeout_sec
+            if os.name == "nt":
+                import msvcrt
+
+                while True:
+                    try:
+                        os.lseek(fd, 0, os.SEEK_SET)
+                        msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+                        break
+                    except OSError:
+                        if time.monotonic() >= deadline:
+                            raise TimeoutError(f"AGS_EMBEDDED_LOCK_TIMEOUT: {lock_path}")
+                        time.sleep(0.05)
+                try:
+                    yield
+                finally:
+                    try:
+                        os.lseek(fd, 0, os.SEEK_SET)
+                        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+                    except OSError:
+                        pass
+            else:
+                import fcntl
+
+                while True:
+                    try:
+                        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except OSError:
+                        if time.monotonic() >= deadline:
+                            raise TimeoutError(f"AGS_EMBEDDED_LOCK_TIMEOUT: {lock_path}")
+                        time.sleep(0.05)
+                try:
+                    yield
+                finally:
+                    try:
+                        fcntl.flock(fd, fcntl.LOCK_UN)
+                    except OSError:
+                        pass
+        finally:
+            os.close(fd)
+
+
 def extract_embedded_ags_plugin(target_dir: Path) -> Path:
     resolved = Path(target_dir).resolve()
     expected_digests = expected_embedded_file_digests()
     if _verify_extracted_bundle(resolved, expected_digests):
         return resolved
-    if resolved.exists():
-        shutil.rmtree(resolved, ignore_errors=True)
-    resolved.mkdir(parents=True, exist_ok=True)
-    raw = gzip.decompress(base64.b64decode(_BUNDLE_TAR_GZ_B64))
-    with tarfile.open(fileobj=io.BytesIO(raw), mode="r:") as tar:
-        tar.extractall(resolved, filter="data")
-    pin_file = resolved / ".embedded-ags-pin"
-    pin_file.write_text(f"{AGS_EMBEDDED_PIN}:{AGS_EMBEDDED_ARCHIVE_SHA256}\n", encoding="utf-8")
-    if not _verify_extracted_bundle(resolved, expected_digests):
-        raise RuntimeError(f"AGS_EMBEDDED_EXTRACTION_INTEGRITY_FAILED: {resolved}")
-    return resolved
+
+    lock_file = resolved.parent / f".{resolved.name}.extract.lock"
+    with _exclusive_bundle_lock(lock_file):
+        if _verify_extracted_bundle(resolved, expected_digests):
+            return resolved
+
+        staging_dir = resolved.parent / f".{resolved.name}.staging-{os.getpid()}-{uuid.uuid4().hex[:12]}"
+        backup_dir = resolved.parent / f".{resolved.name}.backup-{os.getpid()}-{uuid.uuid4().hex[:12]}"
+        try:
+            staging_dir.mkdir(parents=True, exist_ok=True)
+            raw = gzip.decompress(base64.b64decode(_BUNDLE_TAR_GZ_B64))
+            with tarfile.open(fileobj=io.BytesIO(raw), mode="r:") as tar:
+                tar.extractall(staging_dir, filter="data")
+            pin_file = staging_dir / ".embedded-ags-pin"
+            pin_file.write_text(f"{AGS_EMBEDDED_PIN}:{AGS_EMBEDDED_ARCHIVE_SHA256}\n", encoding="utf-8")
+            if not _verify_extracted_bundle(staging_dir, expected_digests):
+                raise RuntimeError(f"AGS_EMBEDDED_EXTRACTION_INTEGRITY_FAILED: {staging_dir}")
+
+            if resolved.exists():
+                try:
+                    os.replace(str(resolved), str(backup_dir))
+                except OSError:
+                    # Windows에서 하위 핸들이 열려 있어 디렉터리 통째 이동이 거부될 경우 스테이징에서 파일별로 원자적 교체
+                    for rel_str in expected_digests:
+                        src_file = staging_dir / rel_str
+                        dst_file = resolved / rel_str
+                        dst_file.parent.mkdir(parents=True, exist_ok=True)
+                        tmp_dst = dst_file.parent / f".{dst_file.name}.tmp-{uuid.uuid4().hex[:8]}"
+                        shutil.copy2(src_file, tmp_dst)
+                        os.replace(str(tmp_dst), str(dst_file))
+                    tmp_pin = resolved / f".embedded-ags-pin.tmp-{uuid.uuid4().hex[:8]}"
+                    shutil.copy2(pin_file, tmp_pin)
+                    os.replace(str(tmp_pin), str(resolved / ".embedded-ags-pin"))
+                else:
+                    os.replace(str(staging_dir), str(resolved))
+            else:
+                os.replace(str(staging_dir), str(resolved))
+        finally:
+            if staging_dir.exists():
+                shutil.rmtree(staging_dir, ignore_errors=True)
+            if backup_dir.exists():
+                shutil.rmtree(backup_dir, ignore_errors=True)
+
+        if not _verify_extracted_bundle(resolved, expected_digests):
+            raise RuntimeError(f"AGS_EMBEDDED_EXTRACTION_INTEGRITY_FAILED: {resolved}")
+        return resolved

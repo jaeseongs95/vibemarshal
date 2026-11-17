@@ -15,15 +15,44 @@ export interface HttpEngineClientOptions {
   eventSourceFactory?: (url: string) => EventSource;
 }
 
+function resolveBootstrappedSessionToken(explicitToken?: string): string | null {
+  if (typeof explicitToken === "string" && explicitToken.trim().length > 0) {
+    return explicitToken.trim();
+  }
+  const envObj =
+    typeof import.meta !== "undefined"
+      ? (import.meta as { env?: Record<string, string | undefined> }).env
+      : undefined;
+  const envToken = envObj?.VITE_FLOWMARSHAL_SESSION_TOKEN;
+  if (typeof envToken === "string" && envToken.trim().length > 0) {
+    return envToken.trim();
+  }
+  if (typeof window !== "undefined") {
+    const winToken = (window as unknown as { __FLOWMARSHAL_SESSION_TOKEN__?: unknown })
+      .__FLOWMARSHAL_SESSION_TOKEN__;
+    if (typeof winToken === "string" && winToken.trim().length > 0) {
+      return winToken.trim();
+    }
+    const meta = window.document?.querySelector('meta[name="flowmarshal-session-token"]');
+    const metaContent = meta?.getAttribute("content");
+    if (typeof metaContent === "string" && metaContent.trim().length > 0) {
+      return metaContent.trim();
+    }
+  }
+  return null;
+}
+
 export class HttpEngineClient implements EngineClient {
   private readonly baseUrl: string;
   private readonly fetchImpl: typeof fetch;
   private readonly eventSourceFactory?: (url: string) => EventSource;
+  private readonly explicitSessionToken?: string;
   private sessionToken: string | null;
-  private tokenPromise: Promise<string | null> | null = null;
   private readonly listeners = new Set<(snapshot: WorkspaceSnapshot) => void>();
   private latestSnapshot: WorkspaceSnapshot | null = null;
   private eventSource: EventSource | null = null;
+  private subscribeGeneration = 0;
+  private connectingGeneration: number | null = null;
 
   constructor(options: HttpEngineClientOptions = {}) {
     const envBase =
@@ -32,7 +61,8 @@ export class HttpEngineClient implements EngineClient {
         ? (import.meta as { env: Record<string, string> }).env.VITE_ENGINE_API_URL
         : "";
     this.baseUrl = (options.baseUrl ?? envBase).replace(/\/+$/, "");
-    this.sessionToken = options.sessionToken ?? null;
+    this.explicitSessionToken = options.sessionToken;
+    this.sessionToken = resolveBootstrappedSessionToken(options.sessionToken);
     this.fetchImpl = options.fetchImpl ?? ((input, init) => fetch(input, init));
     this.eventSourceFactory =
       options.eventSourceFactory ??
@@ -52,34 +82,10 @@ export class HttpEngineClient implements EngineClient {
   }
 
   private async ensureSessionToken(): Promise<string | null> {
-    if (this.sessionToken) {
-      return this.sessionToken;
+    if (!this.sessionToken) {
+      this.sessionToken = resolveBootstrappedSessionToken(this.explicitSessionToken);
     }
-    if (!this.tokenPromise) {
-      this.tokenPromise = (async () => {
-        try {
-          const response = await this.fetchImpl(this.url("/api/v1/health"), {
-            method: "GET",
-            headers: { "Content-Type": "application/json" },
-          });
-          if (response.ok) {
-            const payload = (await response.json()) as { session_token?: string };
-            if (typeof payload.session_token === "string" && payload.session_token.length > 0) {
-              this.sessionToken = payload.session_token;
-              return this.sessionToken;
-            }
-          }
-        } catch {
-          // Ignore and let subsequent POST surface the HTTP error if unreachable
-        }
-        return null;
-      })();
-    }
-    const token = await this.tokenPromise;
-    if (!token) {
-      this.tokenPromise = null;
-    }
-    return token;
+    return this.sessionToken;
   }
 
   private async requestJson<T>(path: string, init?: RequestInit, retriedToken = false): Promise<T> {
@@ -99,9 +105,11 @@ export class HttpEngineClient implements EngineClient {
       },
     });
     if (response.status === 403 && path !== "/api/v1/health" && !retriedToken) {
-      this.sessionToken = null;
-      this.tokenPromise = null;
-      return this.requestJson<T>(path, init, true);
+      const prevToken = this.sessionToken;
+      this.sessionToken = resolveBootstrappedSessionToken(this.explicitSessionToken);
+      if (this.sessionToken && this.sessionToken !== prevToken) {
+        return this.requestJson<T>(path, init, true);
+      }
     }
     if (!response.ok) {
       let detail = "";
@@ -145,17 +153,31 @@ export class HttpEngineClient implements EngineClient {
     if (this.latestSnapshot) {
       listener(this.latestSnapshot);
     }
-    if (this.listeners.size === 1 && this.eventSourceFactory && !this.eventSource) {
+    if (this.eventSourceFactory && !this.eventSource && this.connectingGeneration === null) {
+      const myGeneration = ++this.subscribeGeneration;
+      this.connectingGeneration = myGeneration;
       void (async () => {
         try {
           const token = await this.ensureSessionToken();
-          if (this.listeners.size === 0 || this.eventSource) {
+          if (
+            this.connectingGeneration !== myGeneration ||
+            this.listeners.size === 0 ||
+            this.eventSource
+          ) {
             return;
           }
           const query = token
             ? `/api/v1/events?stream=1&token=${encodeURIComponent(token)}`
             : "/api/v1/events?stream=1";
           const es = this.eventSourceFactory!(this.url(query));
+          if (
+            this.connectingGeneration !== myGeneration ||
+            this.listeners.size === 0 ||
+            this.eventSource
+          ) {
+            es.close();
+            return;
+          }
           es.addEventListener("snapshot", (event: MessageEvent) => {
             try {
               const parsed = JSON.parse(String(event.data)) as WorkspaceSnapshot;
@@ -189,15 +211,25 @@ export class HttpEngineClient implements EngineClient {
           }
           this.eventSource = es;
         } catch {
-          this.eventSource = null;
+          if (this.connectingGeneration === myGeneration) {
+            this.eventSource = null;
+          }
+        } finally {
+          if (this.connectingGeneration === myGeneration) {
+            this.connectingGeneration = null;
+          }
         }
       })();
     }
     return () => {
       this.listeners.delete(listener);
-      if (this.listeners.size === 0 && this.eventSource) {
-        this.eventSource.close();
-        this.eventSource = null;
+      if (this.listeners.size === 0) {
+        this.subscribeGeneration += 1;
+        this.connectingGeneration = null;
+        if (this.eventSource) {
+          this.eventSource.close();
+          this.eventSource = null;
+        }
       }
     };
   }

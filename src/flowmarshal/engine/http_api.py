@@ -104,15 +104,17 @@ def _apply_windows_same_user_acl(target_path: Path, *, set_owner_recursive: bool
         ).stdout.strip()
         _WINDOWS_CURRENT_SID = whoami.split(",")[-1].strip().strip('"')
     if not set_owner_recursive:
+        is_dir = target_path.is_dir()
+        perm = "(OI)(CI)F" if is_dir else "F"
         subprocess.run(
             [
                 "icacls",
                 str(target_path),
                 "/inheritance:r",
                 "/grant:r",
-                f"*{_WINDOWS_CURRENT_SID}:(OI)(CI)F",
-                "*S-1-5-18:(OI)(CI)F",
-                "*S-1-5-32-544:(OI)(CI)F",
+                f"*{_WINDOWS_CURRENT_SID}:{perm}",
+                f"*S-1-5-18:{perm}",
+                f"*S-1-5-32-544:{perm}",
             ],
             capture_output=True,
             text=True,
@@ -1968,16 +1970,44 @@ class LocalGuiEngineBackend:
         }
 
 
-def _is_loopback_origin(origin: str) -> bool:
+_ALLOWED_DEV_FRONTEND_PORTS: frozenset[int] = frozenset({4173, 4174, 5173, 5174})
+
+
+def _is_loopback_origin(origin: str, *, server_port: int | None = None) -> bool:
     try:
         parsed = urlparse(origin)
     except ValueError:
         return False
-    return parsed.scheme in {"http", "https"} and parsed.hostname in {
+    if parsed.scheme not in {"http", "https"} or parsed.hostname not in {
         "127.0.0.1",
         "localhost",
         "::1",
-    }
+    }:
+        return False
+    port = parsed.port
+    if port is None:
+        return True
+    allowed_ports = set(_ALLOWED_DEV_FRONTEND_PORTS)
+    if server_port and server_port > 0:
+        allowed_ports.add(int(server_port))
+    return port in allowed_ports
+
+
+def _write_same_user_session_token_file(artifact_root: Path, token: str) -> Path:
+    artifact_root.mkdir(parents=True, exist_ok=True)
+    token_file = (artifact_root / "gui-session.token").resolve()
+    tmp_file = artifact_root / f".gui-session.token.tmp-{os.getpid()}-{secrets.token_hex(4)}"
+    tmp_file.write_text(token + "\n", encoding="utf-8")
+    if os.name == "nt":
+        _apply_windows_same_user_acl(tmp_file)
+    else:
+        os.chmod(tmp_file, 0o600)
+    os.replace(str(tmp_file), str(token_file))
+    if os.name == "nt":
+        _apply_windows_same_user_acl(token_file)
+    else:
+        os.chmod(token_file, 0o600)
+    return token_file
 
 
 def create_http_handler(
@@ -1985,7 +2015,12 @@ def create_http_handler(
     *,
     session_token: str | None = None,
 ) -> type[BaseHTTPRequestHandler]:
-    active_token = session_token or secrets.token_urlsafe(32)
+    env_token = os.environ.get("FLOWMARSHAL_GUI_SESSION_TOKEN", "").strip()
+    active_token = session_token or env_token or secrets.token_urlsafe(32)
+    try:
+        _write_same_user_session_token_file(backend.artifact_root, active_token)
+    except OSError:
+        pass
 
     class GuiApiHandler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -1993,16 +2028,35 @@ def create_http_handler(
         def log_message(self, format: str, *args: Any) -> None:
             return
 
-        def _check_origin(self) -> bool:
+        def _server_port(self) -> int | None:
+            addr = getattr(self.server, "server_address", None)
+            if isinstance(addr, tuple) and len(addr) >= 2 and isinstance(addr[1], int):
+                return addr[1]
+            return None
+
+        def _has_valid_session_token(self, *, allow_query_token: bool = False) -> bool:
+            provided = (self.headers.get("X-FlowMarshal-Token") or "").strip()
+            if not provided and allow_query_token:
+                parsed_q = parse_qs(urlparse(self.path).query)
+                token_vals = parsed_q.get("token") or []
+                if token_vals:
+                    provided = (token_vals[0] or "").strip()
+            return bool(provided and hmac.compare_digest(provided, active_token))
+
+        def _check_origin(self, *, require_origin_or_token: bool = False) -> bool:
             origin = self.headers.get("Origin")
-            if origin is None or _is_loopback_origin(origin):
+            srv_port = self._server_port()
+            if origin is not None:
+                if _is_loopback_origin(origin, server_port=srv_port):
+                    return True
+            elif not require_origin_or_token or self._has_valid_session_token(allow_query_token=True):
                 return True
             body = json.dumps(
                 {
                     "ok": False,
                     "error": {
                         "code": "CROSS_ORIGIN_FORBIDDEN",
-                        "message": "외부 Origin에서의 로컬 GUI API 호출은 허용되지 않습니다.",
+                        "message": "허용되지 않은 Origin이거나 비인증 요청이므로 로컬 GUI API 호출이 거부되었습니다.",
                     },
                 },
                 ensure_ascii=False,
@@ -2015,13 +2069,7 @@ def create_http_handler(
             return False
 
         def _check_session_token(self, *, allow_query_token: bool = False) -> bool:
-            provided = (self.headers.get("X-FlowMarshal-Token") or "").strip()
-            if not provided and allow_query_token:
-                parsed_q = parse_qs(urlparse(self.path).query)
-                token_vals = parsed_q.get("token") or []
-                if token_vals:
-                    provided = (token_vals[0] or "").strip()
-            if provided and hmac.compare_digest(provided, active_token):
+            if self._has_valid_session_token(allow_query_token=allow_query_token):
                 return True
             self._send_json(
                 HTTPStatus.FORBIDDEN,
@@ -2037,14 +2085,15 @@ def create_http_handler(
 
         def _send_cors_headers(self) -> None:
             origin = self.headers.get("Origin")
-            allowed_origin = origin if (origin and _is_loopback_origin(origin)) else "http://127.0.0.1"
-            self.send_header("Access-Control-Allow-Origin", allowed_origin)
-            self.send_header("Vary", "Origin")
-            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-            self.send_header(
-                "Access-Control-Allow-Headers",
-                "Content-Type, Authorization, Idempotency-Key, X-Request-Id, X-FlowMarshal-Token",
-            )
+            srv_port = self._server_port()
+            if origin and _is_loopback_origin(origin, server_port=srv_port):
+                self.send_header("Access-Control-Allow-Origin", origin)
+                self.send_header("Vary", "Origin")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+                self.send_header(
+                    "Access-Control-Allow-Headers",
+                    "Content-Type, Authorization, Idempotency-Key, X-Request-Id, X-FlowMarshal-Token",
+                )
 
         def _send_json(self, status: int, payload: Any) -> None:
             body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -2086,7 +2135,7 @@ def create_http_handler(
             return parsed
 
         def do_OPTIONS(self) -> None:
-            if not self._check_origin():
+            if not self._check_origin(require_origin_or_token=True):
                 return
             self.send_response(HTTPStatus.NO_CONTENT)
             self._send_cors_headers()
@@ -2094,9 +2143,10 @@ def create_http_handler(
             self.end_headers()
 
         def do_GET(self) -> None:
-            if not self._check_origin():
-                return
             parsed = urlparse(self.path)
+            is_protected_api = parsed.path in {"/api/v1/snapshot", "/api/v1/final-report", "/api/v1/events"}
+            if not self._check_origin(require_origin_or_token=is_protected_api):
+                return
             if parsed.path == "/api/v1/health":
                 snap = backend.snapshot()
                 self._send_json(
@@ -2111,7 +2161,6 @@ def create_http_handler(
                         "product_status": "NO-GO",
                         "project_id": backend.project_id,
                         "history_cursor": snap["historyCursor"],
-                        "session_token": active_token,
                     },
                 )
                 return
@@ -2191,6 +2240,16 @@ def create_http_handler(
                 if candidate.is_file():
                     content = candidate.read_bytes()
                     ctype, _ = mimetypes.guess_type(str(candidate))
+                    if candidate.name == "index.html":
+                        html_text = content.decode("utf-8", errors="replace")
+                        bootstrap_script = (
+                            f"<script>window.__FLOWMARSHAL_SESSION_TOKEN__={json.dumps(active_token)};</script>"
+                        )
+                        if "</head>" in html_text:
+                            html_text = html_text.replace("</head>", f"{bootstrap_script}</head>", 1)
+                        else:
+                            html_text = bootstrap_script + html_text
+                        content = html_text.encode("utf-8")
                     self.send_response(HTTPStatus.OK)
                     self._send_cors_headers()
                     self.send_header("Content-Type", ctype or "application/octet-stream")
@@ -2201,7 +2260,7 @@ def create_http_handler(
             self._send_json(HTTPStatus.NOT_FOUND, {"error": "NOT_FOUND", "path": parsed.path})
 
         def do_POST(self) -> None:
-            if not self._check_origin():
+            if not self._check_origin(require_origin_or_token=True):
                 return
             if not self._check_session_token():
                 return
@@ -2297,7 +2356,12 @@ class LocalGuiServer:
                 "LOCAL_LOOPBACK_ONLY: GUI HTTP 서버는 로컬 루프백 주소(127.0.0.1, localhost, ::1)에만 바인딩할 수 있습니다."
             )
         self.backend = backend
-        self.session_token = session_token or secrets.token_urlsafe(32)
+        env_token = os.environ.get("FLOWMARSHAL_GUI_SESSION_TOKEN", "").strip()
+        self.session_token = session_token or env_token or secrets.token_urlsafe(32)
+        self.session_token_path = _write_same_user_session_token_file(
+            backend.artifact_root,
+            self.session_token,
+        )
         self.httpd = ThreadingHTTPServer(
             (host, port),
             create_http_handler(backend, session_token=self.session_token),
@@ -2377,6 +2441,7 @@ def main(argv: list[str] | None = None) -> int:
                         "project_id": backend.project_id,
                         "phase": snap["phase"],
                         "history_cursor": snap["historyCursor"],
+                        "session_token_path": str(server.session_token_path),
                     },
                     ensure_ascii=False,
                     indent=2,
@@ -2392,6 +2457,7 @@ def main(argv: list[str] | None = None) -> int:
                 "status": "serving",
                 "base_url": server.base_url,
                 "project_id": backend.project_id,
+                "session_token_path": str(server.session_token_path),
             },
             ensure_ascii=False,
             indent=2,

@@ -82,9 +82,22 @@ class EnginePlanCompletionReuseTests(EngineServiceFixture):
         self.assertEqual("completed", outcome.action.value)
 
     def test_cli_goal_authorization_activates_without_plan_id_or_digest(self):
-        args = build_parser().parse_args(["goal", "authorize", "--project-id", self.project_id])
+        from flowmarshal.engine.service import EngineService
+
+        target = self.service.goal_authorization_target(project_id=self.project_id)
+        args = build_parser().parse_args(
+            [
+                "goal",
+                "authorize",
+                "--project-id",
+                self.project_id,
+                "--confirm-digest",
+                target.target_digest,
+            ]
+        )
         output = io.StringIO()
-        with patch("flowmarshal.engine.cli._service", return_value=self.service), redirect_stdout(output):
+        production_service = EngineService(self.ledger)
+        with patch("flowmarshal.engine.cli._service", return_value=production_service), redirect_stdout(output):
             _cmd_goal_authorize(args)
         result = json.loads(output.getvalue())
         self.assertTrue(result["activation_id"])

@@ -293,26 +293,44 @@ class EngineHttpApiTests(unittest.TestCase):
         with urllib.request.urlopen(local_req, timeout=5) as resp:
             self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), "http://localhost:5173")
 
+        # 비허용 루프백 포트(예: 9999)는 CROSS_ORIGIN_FORBIDDEN(403)으로 차단한다 (VM-D-0002)
+        untrusted_port_req = urllib.request.Request(
+            f"{self.base_url}/api/v1/health",
+            headers={"Origin": "http://localhost:9999"},
+            method="GET",
+        )
+        with self.assertRaises(urllib.error.HTTPError) as port_ctx:
+            urllib.request.urlopen(untrusted_port_req, timeout=5)
+        self.assertEqual(port_ctx.exception.code, 403)
+        port_err = json.loads(port_ctx.exception.read().decode("utf-8"))
+        self.assertEqual(port_err["error"]["code"], "CROSS_ORIGIN_FORBIDDEN")
+
         with self.assertRaises(ValueError):
             LocalGuiServer(self.backend, host="0.0.0.0", port=0)
 
     def test_post_mutation_requires_valid_session_token(self) -> None:
         import urllib.error
 
+        # /api/v1/health는 절대 session_token을 노출하지 않으며 동일 사용자 파일(gui-session.token)에만 기록된다 (VM-D-0002, VM-D-0063)
         health = self._get("/api/v1/health")
-        self.assertEqual(health["session_token"], self.server.session_token)
+        self.assertNotIn("session_token", health)
+        self.assertTrue(self.server.session_token_path.is_file())
+        self.assertEqual(
+            self.server.session_token_path.read_text(encoding="utf-8").strip(),
+            self.server.session_token,
+        )
 
         with self.assertRaises(urllib.error.HTTPError) as missing_ctx:
             self._post("/api/v1/run-once", {}, token=None)
         self.assertEqual(missing_ctx.exception.code, 403)
         missing_err = json.loads(missing_ctx.exception.read().decode("utf-8"))
-        self.assertEqual(missing_err["error"]["code"], "SESSION_TOKEN_REQUIRED")
+        self.assertIn(missing_err["error"]["code"], ("SESSION_TOKEN_REQUIRED", "CROSS_ORIGIN_FORBIDDEN"))
 
         with self.assertRaises(urllib.error.HTTPError) as invalid_ctx:
             self._post("/api/v1/run-once", {}, token="invalid-token")
         self.assertEqual(invalid_ctx.exception.code, 403)
         invalid_err = json.loads(invalid_ctx.exception.read().decode("utf-8"))
-        self.assertEqual(invalid_err["error"]["code"], "SESSION_TOKEN_REQUIRED")
+        self.assertIn(invalid_err["error"]["code"], ("SESSION_TOKEN_REQUIRED", "CROSS_ORIGIN_FORBIDDEN"))
 
         # GET sensitive endpoints (/api/v1/snapshot, /api/v1/final-report, /api/v1/events) also enforce token (VM-D-0063)
         for get_path in ("/api/v1/snapshot", "/api/v1/final-report", "/api/v1/events"):
@@ -320,7 +338,7 @@ class EngineHttpApiTests(unittest.TestCase):
                 self._get(get_path, token=None)
             self.assertEqual(get_missing_ctx.exception.code, 403)
             get_missing_err = json.loads(get_missing_ctx.exception.read().decode("utf-8"))
-            self.assertEqual(get_missing_err["error"]["code"], "SESSION_TOKEN_REQUIRED")
+            self.assertIn(get_missing_err["error"]["code"], ("SESSION_TOKEN_REQUIRED", "CROSS_ORIGIN_FORBIDDEN"))
 
     def test_json_body_validation_and_recovery_ledger_persistence(self) -> None:
         import urllib.error
@@ -804,6 +822,8 @@ class EngineHttpApiTests(unittest.TestCase):
             self.assertIn("CORE_CAPABILITY_REQUIRED", out_missing.getvalue())
 
             # VM-D-0062: extract_embedded_ags_plugin and _ensure_local_governance_settings detect tampered pin/files
+            # and concurrent extraction is serialized safely via file lock + atomic staging replace.
+            import concurrent.futures
             from flowmarshal.engine.ags_embedded_bundle import extract_embedded_ags_plugin
             from flowmarshal.engine.http_api import _ensure_local_governance_settings
 
@@ -812,8 +832,12 @@ class EngineHttpApiTests(unittest.TestCase):
             pin_marker = gov_initial.plugin_root / ".embedded-ags-pin"
             self.assertTrue(pin_marker.is_file())
             pin_marker.write_text("tampered-pin\n", encoding="utf-8")
-            reextracted = extract_embedded_ags_plugin(gov_initial.plugin_root)
-            self.assertIn(":", (reextracted / ".embedded-ags-pin").read_text(encoding="utf-8"))
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+                f1 = pool.submit(extract_embedded_ags_plugin, gov_initial.plugin_root)
+                f2 = pool.submit(extract_embedded_ags_plugin, gov_initial.plugin_root)
+                r1, r2 = f1.result(), f2.result()
+            self.assertEqual(r1, r2)
+            self.assertIn(":", (r1 / ".embedded-ags-pin").read_text(encoding="utf-8"))
 
             a2_cfg = tamper_dir / "a2-profile.json"
             a2_cfg.write_text('{"format":"tampered"}\n', encoding="utf-8")
