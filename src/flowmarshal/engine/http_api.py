@@ -231,6 +231,32 @@ def _ensure_local_governance_settings(state_dir: Path) -> GovernanceSettings:
     server_profile_path = profile_dir / "server-profile.json"
     config_path = resolved_dir / "a2-profile.json"
 
+    if (
+        not config_path.is_file()
+        and key_path.is_file()
+        and pin_path.is_file()
+        and server_profile_path.is_file()
+        and ags_state_path.is_file()
+    ):
+        try:
+            srv_doc = json.loads(server_profile_path.read_text(encoding="utf-8"))
+            if isinstance(srv_doc, dict) and "selection" in srv_doc and "resources" in srv_doc:
+                config_path.write_text(
+                    json.dumps(
+                        {
+                            "format": A2_CONFIG_FORMAT,
+                            "selection": srv_doc["selection"],
+                            "resources": srv_doc["resources"],
+                        },
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+        except (OSError, ValueError):
+            pass
+
     if not _verify_local_a2_governance_artifacts(
         key_path=key_path,
         pin_path=pin_path,
@@ -1970,43 +1996,91 @@ class LocalGuiEngineBackend:
         }
 
 
-_ALLOWED_DEV_FRONTEND_PORTS: frozenset[int] = frozenset({4173, 4174, 5173, 5174})
+def _parse_explicit_loopback_origins(
+    explicit_origins: tuple[str, ...] | list[str] | set[str] | frozenset[str] = (),
+) -> set[tuple[str, str, int]]:
+    raw_items: list[str] = list(explicit_origins)
+    env_raw = os.environ.get("FLOWMARSHAL_GUI_ALLOWED_ORIGINS", "").strip()
+    if env_raw:
+        raw_items.extend(part.strip() for part in env_raw.split(",") if part.strip())
+    allowed: set[tuple[str, str, int]] = set()
+    for item in raw_items:
+        try:
+            parsed = urlparse(item)
+        except ValueError:
+            continue
+        if (
+            parsed.scheme in {"http", "https"}
+            and parsed.hostname in {"127.0.0.1", "localhost", "::1"}
+            and parsed.port is not None
+            and parsed.port > 0
+            and not parsed.path.strip("/")
+            and not parsed.query
+            and not parsed.fragment
+        ):
+            allowed.add((parsed.scheme, parsed.hostname, int(parsed.port)))
+    return allowed
 
 
-def _is_loopback_origin(origin: str, *, server_port: int | None = None) -> bool:
+def _is_loopback_origin(
+    origin: str,
+    *,
+    server_port: int | None = None,
+    allowed_origins: tuple[str, ...] | list[str] | set[str] | frozenset[str] = (),
+    same_origin_only: bool = False,
+) -> bool:
     try:
         parsed = urlparse(origin)
     except ValueError:
         return False
-    if parsed.scheme not in {"http", "https"} or parsed.hostname not in {
-        "127.0.0.1",
-        "localhost",
-        "::1",
-    }:
+    if (
+        parsed.scheme not in {"http", "https"}
+        or parsed.hostname not in {"127.0.0.1", "localhost", "::1"}
+        or parsed.port is None
+        or parsed.port <= 0
+        or bool(parsed.path.strip("/"))
+        or bool(parsed.query)
+        or bool(parsed.fragment)
+    ):
         return False
-    port = parsed.port
-    if port is None:
+    port = int(parsed.port)
+    if server_port is not None and server_port > 0 and port == int(server_port):
         return True
-    allowed_ports = set(_ALLOWED_DEV_FRONTEND_PORTS)
-    if server_port and server_port > 0:
-        allowed_ports.add(int(server_port))
-    return port in allowed_ports
+    if same_origin_only:
+        return False
+    explicit = _parse_explicit_loopback_origins(allowed_origins)
+    return (parsed.scheme, parsed.hostname, port) in explicit
 
 
 def _write_same_user_session_token_file(artifact_root: Path, token: str) -> Path:
     artifact_root.mkdir(parents=True, exist_ok=True)
     token_file = (artifact_root / "gui-session.token").resolve()
-    tmp_file = artifact_root / f".gui-session.token.tmp-{os.getpid()}-{secrets.token_hex(4)}"
-    tmp_file.write_text(token + "\n", encoding="utf-8")
-    if os.name == "nt":
-        _apply_windows_same_user_acl(tmp_file)
-    else:
-        os.chmod(tmp_file, 0o600)
-    os.replace(str(tmp_file), str(token_file))
-    if os.name == "nt":
-        _apply_windows_same_user_acl(token_file)
-    else:
-        os.chmod(token_file, 0o600)
+    tmp_file = (artifact_root / f".gui-session.token.tmp-{os.getpid()}-{secrets.token_hex(6)}").resolve()
+    flags = os.O_CREAT | os.O_EXCL | os.O_WRONLY
+    fd = os.open(str(tmp_file), flags, 0o600)
+    try:
+        try:
+            if os.name == "nt":
+                _apply_windows_same_user_acl(tmp_file)
+            elif hasattr(os, "fchmod"):
+                os.fchmod(fd, 0o600)
+            else:
+                os.chmod(tmp_file, 0o600)
+            payload_bytes = (token + "\n").encode("utf-8")
+            written = 0
+            while written < len(payload_bytes):
+                written += os.write(fd, payload_bytes[written:])
+            os.fsync(fd)
+        finally:
+            os.close(fd)
+        os.replace(str(tmp_file), str(token_file))
+    except BaseException:
+        if tmp_file.exists():
+            try:
+                tmp_file.unlink()
+            except OSError:
+                pass
+        raise
     return token_file
 
 
@@ -2014,13 +2088,14 @@ def create_http_handler(
     backend: LocalGuiEngineBackend,
     *,
     session_token: str | None = None,
+    allowed_origins: tuple[str, ...] = (),
+    write_token_file: bool = True,
 ) -> type[BaseHTTPRequestHandler]:
     env_token = os.environ.get("FLOWMARSHAL_GUI_SESSION_TOKEN", "").strip()
     active_token = session_token or env_token or secrets.token_urlsafe(32)
-    try:
+    if write_token_file:
         _write_same_user_session_token_file(backend.artifact_root, active_token)
-    except OSError:
-        pass
+    configured_origins = tuple(allowed_origins)
 
     class GuiApiHandler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -2043,11 +2118,21 @@ def create_http_handler(
                     provided = (token_vals[0] or "").strip()
             return bool(provided and hmac.compare_digest(provided, active_token))
 
-        def _check_origin(self, *, require_origin_or_token: bool = False) -> bool:
+        def _check_origin(
+            self,
+            *,
+            require_origin_or_token: bool = False,
+            same_origin_only: bool = False,
+        ) -> bool:
             origin = self.headers.get("Origin")
             srv_port = self._server_port()
             if origin is not None:
-                if _is_loopback_origin(origin, server_port=srv_port):
+                if _is_loopback_origin(
+                    origin,
+                    server_port=srv_port,
+                    allowed_origins=configured_origins,
+                    same_origin_only=same_origin_only,
+                ):
                     return True
             elif not require_origin_or_token or self._has_valid_session_token(allow_query_token=True):
                 return True
@@ -2086,7 +2171,11 @@ def create_http_handler(
         def _send_cors_headers(self) -> None:
             origin = self.headers.get("Origin")
             srv_port = self._server_port()
-            if origin and _is_loopback_origin(origin, server_port=srv_port):
+            if origin and _is_loopback_origin(
+                origin,
+                server_port=srv_port,
+                allowed_origins=configured_origins,
+            ):
                 self.send_header("Access-Control-Allow-Origin", origin)
                 self.send_header("Vary", "Origin")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -2144,8 +2233,12 @@ def create_http_handler(
 
         def do_GET(self) -> None:
             parsed = urlparse(self.path)
+            is_api_path = parsed.path.startswith("/api/")
             is_protected_api = parsed.path in {"/api/v1/snapshot", "/api/v1/final-report", "/api/v1/events"}
-            if not self._check_origin(require_origin_or_token=is_protected_api):
+            if not self._check_origin(
+                require_origin_or_token=is_protected_api,
+                same_origin_only=not is_api_path,
+            ):
                 return
             if parsed.path == "/api/v1/health":
                 snap = backend.snapshot()
@@ -2230,7 +2323,7 @@ def create_http_handler(
                 self.wfile.write(initial_body)
                 return
             dist_dir = Path(__file__).resolve().parents[3] / "apps" / "desktop" / "dist"
-            if dist_dir.is_dir() and not parsed.path.startswith("/api/"):
+            if dist_dir.is_dir() and not is_api_path:
                 import mimetypes
 
                 rel_path = parsed.path.lstrip("/") or "index.html"
@@ -2251,7 +2344,9 @@ def create_http_handler(
                             html_text = bootstrap_script + html_text
                         content = html_text.encode("utf-8")
                     self.send_response(HTTPStatus.OK)
-                    self._send_cors_headers()
+                    self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+                    self.send_header("X-Frame-Options", "DENY")
+                    self.send_header("Cache-Control", "no-store")
                     self.send_header("Content-Type", ctype or "application/octet-stream")
                     self.send_header("Content-Length", str(len(content)))
                     self.end_headers()
@@ -2350,6 +2445,7 @@ class LocalGuiServer:
         host: str = "127.0.0.1",
         port: int = 0,
         session_token: str | None = None,
+        allowed_origins: tuple[str, ...] | list[str] = (),
     ) -> None:
         if host not in {"127.0.0.1", "localhost", "::1"}:
             raise ValueError(
@@ -2362,9 +2458,15 @@ class LocalGuiServer:
             backend.artifact_root,
             self.session_token,
         )
+        self.allowed_origins = tuple(allowed_origins)
         self.httpd = ThreadingHTTPServer(
             (host, port),
-            create_http_handler(backend, session_token=self.session_token),
+            create_http_handler(
+                backend,
+                session_token=self.session_token,
+                allowed_origins=self.allowed_origins,
+                write_token_file=False,
+            ),
         )
         self.host = str(self.httpd.server_address[0])
         self.port = int(self.httpd.server_address[1])
@@ -2413,6 +2515,12 @@ def build_parser() -> Any:
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--project-root")
     parser.add_argument("--project-id")
+    parser.add_argument(
+        "--allow-origin",
+        action="append",
+        default=[],
+        help="명시적으로 허용할 추가 로컬 루프백 개발 서버 Origin (예: http://localhost:5173)",
+    )
     parser.add_argument("--live-gemini", action="store_true", help="실제 Antigravity Gemini CLI (agy.exe) 런타임 사용")
     parser.add_argument("--once", action="store_true", help="기동 검증 후 즉시 상태 출력 및 종료")
     return parser
@@ -2428,7 +2536,12 @@ def main(argv: list[str] | None = None) -> int:
         project_id=arguments.project_id,
         live_gemini=arguments.live_gemini,
     )
-    server = LocalGuiServer(backend, host=arguments.host, port=arguments.port)
+    server = LocalGuiServer(
+        backend,
+        host=arguments.host,
+        port=arguments.port,
+        allowed_origins=tuple(arguments.allow_origin or ()),
+    )
     if arguments.once:
         try:
             url = server.start_background()

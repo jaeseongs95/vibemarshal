@@ -272,7 +272,9 @@ class EngineHttpApiTests(unittest.TestCase):
         self.assertEqual(wrong_digest_res["error"]["code"], "DIGEST_MISMATCH")
 
     def test_cors_origin_restriction_and_loopback_host_enforcement(self) -> None:
+        import os
         import urllib.error
+        from unittest.mock import patch
 
         req = urllib.request.Request(
             f"{self.base_url}/api/v1/snapshot",
@@ -285,25 +287,61 @@ class EngineHttpApiTests(unittest.TestCase):
         err_payload = json.loads(ctx.exception.read().decode("utf-8"))
         self.assertEqual(err_payload["error"]["code"], "CROSS_ORIGIN_FORBIDDEN")
 
+        # 서버 자신의 바인딩 포트(same-origin)는 허용된다
+        same_origin = f"http://127.0.0.1:{self.server.port}"
         local_req = urllib.request.Request(
             f"{self.base_url}/api/v1/health",
-            headers={"Origin": "http://localhost:5173"},
+            headers={"Origin": same_origin},
             method="GET",
         )
         with urllib.request.urlopen(local_req, timeout=5) as resp:
-            self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), "http://localhost:5173")
+            self.assertEqual(resp.headers.get("Access-Control-Allow-Origin"), same_origin)
 
-        # 비허용 루프백 포트(예: 9999)는 CROSS_ORIGIN_FORBIDDEN(403)으로 차단한다 (VM-D-0002)
-        untrusted_port_req = urllib.request.Request(
-            f"{self.base_url}/api/v1/health",
-            headers={"Origin": "http://localhost:9999"},
+        # port=None(예: http://127.0.0.1, http://localhost) 및 미설정 타 포트(5173, 9999)는 기본 차단된다 (VM-D-0002, VM-D-0063)
+        for forbidden_origin in ("http://127.0.0.1", "http://localhost", "http://localhost:5173", "http://localhost:9999"):
+            untrusted_req = urllib.request.Request(
+                f"{self.base_url}/api/v1/health",
+                headers={"Origin": forbidden_origin},
+                method="GET",
+            )
+            with self.assertRaises(urllib.error.HTTPError) as port_ctx:
+                urllib.request.urlopen(untrusted_req, timeout=5)
+            self.assertEqual(port_ctx.exception.code, 403, forbidden_origin)
+            port_err = json.loads(port_ctx.exception.read().decode("utf-8"))
+            self.assertEqual(port_err["error"]["code"], "CROSS_ORIGIN_FORBIDDEN")
+
+        # 명시적 환경변수(FLOWMARSHAL_GUI_ALLOWED_ORIGINS) 지정 시에만 API에 한해 추가 루프백 포트를 허용하고,
+        # 정적 문서(GET /)에는 교차 포트 Origin을 403으로 차단하며 Access-Control-Allow-Origin을 절대 내려주지 않는다.
+        with patch.dict(os.environ, {"FLOWMARSHAL_GUI_ALLOWED_ORIGINS": "http://localhost:5173"}):
+            dev_api_req = urllib.request.Request(
+                f"{self.base_url}/api/v1/health",
+                headers={"Origin": "http://localhost:5173"},
+                method="GET",
+            )
+            with urllib.request.urlopen(dev_api_req, timeout=5) as dev_resp:
+                self.assertEqual(dev_resp.headers.get("Access-Control-Allow-Origin"), "http://localhost:5173")
+
+            dev_html_req = urllib.request.Request(
+                f"{self.base_url}/",
+                headers={"Origin": "http://localhost:5173"},
+                method="GET",
+            )
+            with self.assertRaises(urllib.error.HTTPError) as html_cors_ctx:
+                urllib.request.urlopen(dev_html_req, timeout=5)
+            self.assertEqual(html_cors_ctx.exception.code, 403)
+
+        same_html_req = urllib.request.Request(
+            f"{self.base_url}/",
+            headers={"Origin": same_origin},
             method="GET",
         )
-        with self.assertRaises(urllib.error.HTTPError) as port_ctx:
-            urllib.request.urlopen(untrusted_port_req, timeout=5)
-        self.assertEqual(port_ctx.exception.code, 403)
-        port_err = json.loads(port_ctx.exception.read().decode("utf-8"))
-        self.assertEqual(port_err["error"]["code"], "CROSS_ORIGIN_FORBIDDEN")
+        try:
+            with urllib.request.urlopen(same_html_req, timeout=5) as html_resp:
+                self.assertIsNone(html_resp.headers.get("Access-Control-Allow-Origin"))
+                self.assertEqual(html_resp.headers.get("Cross-Origin-Resource-Policy"), "same-origin")
+        except urllib.error.HTTPError as exc:
+            # dist/index.html이 없는 환경에서는 404가 반환될 수 있음
+            self.assertEqual(exc.code, 404)
 
         with self.assertRaises(ValueError):
             LocalGuiServer(self.backend, host="0.0.0.0", port=0)
@@ -643,6 +681,29 @@ class EngineHttpApiTests(unittest.TestCase):
             self.assertEqual(rc2, 0)
             plan_out = json.loads(out_buf2.getvalue())
             self.assertIn("activation_id", plan_out)
+
+            # 과거 goal_authorizations 레코드가 있어도 새(비활성) 계획 리비전을 --confirm-digest 없이 활성화하려는 시도는 차단된다
+            second_plan_id = plan_snap["plans"][-1]["planRevisionId"]
+            if second_plan_id != first_plan_id:
+                out_unconfirmed = io.StringIO()
+                with redirect_stdout(out_unconfirmed):
+                    rc_unconfirmed = cli.main(
+                        [
+                            "--db",
+                            str(self.root / "cli_plan.sqlite3"),
+                            "--artifacts",
+                            str(self.root / "cli_plan_artifacts"),
+                            "plan",
+                            "activate",
+                            "--plan-revision-id",
+                            second_plan_id,
+                        ]
+                    )
+                self.assertEqual(rc_unconfirmed, 2)
+                self.assertEqual(
+                    json.loads(out_unconfirmed.getvalue())["error_code"],
+                    "GOAL_AUTHORIZATION_REQUIRED",
+                )
         finally:
             cli_plan_backend.close()
 
@@ -821,28 +882,48 @@ class EngineHttpApiTests(unittest.TestCase):
             self.assertNotEqual(rc_missing, 0)
             self.assertIn("CORE_CAPABILITY_REQUIRED", out_missing.getvalue())
 
-            # VM-D-0062: extract_embedded_ags_plugin and _ensure_local_governance_settings detect tampered pin/files
-            # and concurrent extraction is serialized safely via file lock + atomic staging replace.
+            # VM-D-0062: extract_embedded_ags_plugin and _ensure_local_governance_settings detect tampered pin/files,
+            # concurrent extraction is serialized safely via file lock + atomic staging replace,
+            # and staging->resolved replace failure rolls back backup_dir -> resolved without losing resolved.
             import concurrent.futures
+            import os
             from flowmarshal.engine.ags_embedded_bundle import extract_embedded_ags_plugin
             from flowmarshal.engine.http_api import _ensure_local_governance_settings
 
             tamper_dir = self.root / "tampered_gov"
-            gov_initial = _ensure_local_governance_settings(tamper_dir)
-            pin_marker = gov_initial.plugin_root / ".embedded-ags-pin"
-            self.assertTrue(pin_marker.is_file())
-            pin_marker.write_text("tampered-pin\n", encoding="utf-8")
-            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
-                f1 = pool.submit(extract_embedded_ags_plugin, gov_initial.plugin_root)
-                f2 = pool.submit(extract_embedded_ags_plugin, gov_initial.plugin_root)
-                r1, r2 = f1.result(), f2.result()
-            self.assertEqual(r1, r2)
-            self.assertIn(":", (r1 / ".embedded-ags-pin").read_text(encoding="utf-8"))
+            with patch.dict(os.environ, {"FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT": ""}):
+                gov_initial = _ensure_local_governance_settings(tamper_dir)
+                pin_marker = gov_initial.plugin_root / ".embedded-ags-pin"
+                self.assertTrue(pin_marker.is_file())
+                pin_marker.write_text("tampered-pin\n", encoding="utf-8")
 
-            a2_cfg = tamper_dir / "a2-profile.json"
-            a2_cfg.write_text('{"format":"tampered"}\n', encoding="utf-8")
-            gov_recovered = _ensure_local_governance_settings(tamper_dir)
-            self.assertIsNotNone(gov_recovered.observation_producer)
+                real_replace = os.replace
+                replace_calls = 0
+
+                def fail_on_staging_promote(src: str, dst: str) -> None:
+                    nonlocal replace_calls
+                    replace_calls += 1
+                    if ".staging-" in str(src) and str(dst) == str(gov_initial.plugin_root.resolve()):
+                        raise OSError("simulated staging promote failure")
+                    real_replace(src, dst)
+
+                with patch("flowmarshal.engine.ags_embedded_bundle.os.replace", side_effect=fail_on_staging_promote):
+                    with self.assertRaises(OSError):
+                        extract_embedded_ags_plugin(gov_initial.plugin_root)
+                self.assertTrue(gov_initial.plugin_root.is_dir())
+                self.assertTrue((gov_initial.plugin_root / "host-integration.json").is_file())
+
+                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
+                    f1 = pool.submit(extract_embedded_ags_plugin, gov_initial.plugin_root)
+                    f2 = pool.submit(extract_embedded_ags_plugin, gov_initial.plugin_root)
+                    r1, r2 = f1.result(), f2.result()
+                self.assertEqual(r1, r2)
+                self.assertIn(":", (r1 / ".embedded-ags-pin").read_text(encoding="utf-8"))
+
+                a2_cfg = tamper_dir / "a2-profile.json"
+                a2_cfg.write_text('{"format":"tampered"}\n', encoding="utf-8")
+                gov_recovered = _ensure_local_governance_settings(tamper_dir)
+                self.assertIsNotNone(gov_recovered.observation_producer)
         finally:
             self.backend.unsubscribe_events(sub_q)
 

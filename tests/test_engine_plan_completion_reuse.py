@@ -82,7 +82,8 @@ class EnginePlanCompletionReuseTests(EngineServiceFixture):
         self.assertEqual("completed", outcome.action.value)
 
     def test_cli_goal_authorization_activates_without_plan_id_or_digest(self):
-        from flowmarshal.engine.service import EngineService
+        from flowmarshal.engine.cli import _cmd_plan_activate
+        from flowmarshal.engine.service import EngineService, EngineServiceError
 
         target = self.service.goal_authorization_target(project_id=self.project_id)
         args = build_parser().parse_args(
@@ -103,6 +104,20 @@ class EnginePlanCompletionReuseTests(EngineServiceFixture):
         self.assertTrue(result["activation_id"])
         self.assertEqual(self.project_id, result["authorization"]["project_id"])
         self.assertEqual("ready", self.status_of(self.task.task_id))
+
+        # 이미 goal_authorizations 레코드가 존재하더라도 새 계획 리비전을 --confirm-digest 없이 CLI로 활성화할 수 없다
+        revision, _ = self.register_internal_revision()
+        unconfirmed_args = build_parser().parse_args(
+            [
+                "plan",
+                "activate",
+                "--plan-revision-id",
+                revision.plan_revision_id,
+            ]
+        )
+        with patch("flowmarshal.engine.cli._service", return_value=EngineService(self.ledger)):
+            with self.assertRaisesRegex(EngineServiceError, "GOAL_AUTHORIZATION_REQUIRED"):
+                _cmd_plan_activate(unconfirmed_args)
 
     def test_mutating_worker_completion_reused_after_normal_state_reobservation(self):
         self.finish_worker_and_validate(mutate=True)

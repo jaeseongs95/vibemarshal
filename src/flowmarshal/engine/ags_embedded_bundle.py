@@ -10452,8 +10452,10 @@ def extract_embedded_ags_plugin(target_dir: Path) -> Path:
                 raise RuntimeError(f"AGS_EMBEDDED_EXTRACTION_INTEGRITY_FAILED: {staging_dir}")
 
             if resolved.exists():
+                moved_to_backup = False
                 try:
                     os.replace(str(resolved), str(backup_dir))
+                    moved_to_backup = True
                 except OSError:
                     # Windows에서 하위 핸들이 열려 있어 디렉터리 통째 이동이 거부될 경우 스테이징에서 파일별로 원자적 교체
                     for rel_str in expected_digests:
@@ -10466,14 +10468,19 @@ def extract_embedded_ags_plugin(target_dir: Path) -> Path:
                     tmp_pin = resolved / f".embedded-ags-pin.tmp-{uuid.uuid4().hex[:8]}"
                     shutil.copy2(pin_file, tmp_pin)
                     os.replace(str(tmp_pin), str(resolved / ".embedded-ags-pin"))
-                else:
-                    os.replace(str(staging_dir), str(resolved))
+                if moved_to_backup:
+                    try:
+                        os.replace(str(staging_dir), str(resolved))
+                    except BaseException:
+                        if not resolved.exists() and backup_dir.exists():
+                            os.replace(str(backup_dir), str(resolved))
+                        raise
             else:
                 os.replace(str(staging_dir), str(resolved))
         finally:
             if staging_dir.exists():
                 shutil.rmtree(staging_dir, ignore_errors=True)
-            if backup_dir.exists():
+            if resolved.exists() and backup_dir.exists():
                 shutil.rmtree(backup_dir, ignore_errors=True)
 
         if not _verify_extracted_bundle(resolved, expected_digests):

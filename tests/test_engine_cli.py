@@ -477,6 +477,35 @@ class EngineCliTests(unittest.TestCase):
             self.assertEqual(3, shown["usage"]["output_tokens"]["total"])
             self.assertEqual(1, len(shown["usage"]["provider_receipt_usage"]))
 
+    def test_plan_activate_rejects_unconfirmed_new_revision_despite_prior_authorization(self) -> None:
+        from contextlib import nullcontext
+        from flowmarshal.engine.cli import _cmd_plan_activate
+        from flowmarshal.engine.service import EngineServiceError
+
+        def execute(sql: str, params: tuple = ()):
+            if "SELECT active_plan_revision_id FROM projects" in sql:
+                return SimpleNamespace(fetchone=lambda: {"active_plan_revision_id": "plan_rev_old"})
+            return SimpleNamespace(fetchone=lambda: {"project_id": "project_" + "a" * 32})
+
+        fake_conn = SimpleNamespace(execute=execute)
+        fake_app = SimpleNamespace(
+            service=SimpleNamespace(
+                _action_authority=None,
+                ledger=SimpleNamespace(read=lambda: nullcontext(fake_conn)),
+            ),
+            _install_core_action_authority=lambda: SimpleNamespace(),
+            authorization_target=lambda *_a, **_kw: SimpleNamespace(
+                target_digest="sha256:" + "f" * 64,
+                plan_activation_digest="sha256:" + "e" * 64,
+            ),
+        )
+        args = build_parser().parse_args(
+            ["plan", "activate", "--plan-revision-id", "plan_rev_new"]
+        )
+        with patch("flowmarshal.engine.cli._application", return_value=fake_app):
+            with self.assertRaisesRegex(EngineServiceError, "GOAL_AUTHORIZATION_REQUIRED"):
+                _cmd_plan_activate(args)
+
 
 if __name__ == "__main__":
     unittest.main()

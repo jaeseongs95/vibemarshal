@@ -837,38 +837,43 @@ def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
             }
         )
         return
+    # --confirm-digest가 없는 경우: 현재 활성화된(status='active') 선택 계획의 기존 activation_id 멱등 조회만 허용하고,
+    # 새 계획 리비전(status!='active') 활성화는 과거 goal_authorizations 레코드 유무와 무관하게 차단한다.
     with app.service.ledger.read() as connection:
-        existing_auth = connection.execute(
-            "SELECT id FROM goal_authorizations WHERE project_id = ? LIMIT 1",
+        project_row = connection.execute(
+            "SELECT active_plan_revision_id FROM projects WHERE id = ?",
             (project_id,),
         ).fetchone()
-    if existing_auth is None:
-        target = authority.authorization_target(
-            project_id,
-            selected_plan_revision_id=arguments.plan_revision_id,
-        )
-        raise EngineServiceError(
-            f"GOAL_AUTHORIZATION_REQUIRED: 미승인 프로젝트에서는 --confirm-digest {target.target_digest}로 승인을 확인해야 합니다."
-        )
-    if arguments.project_id:
-        activation_id = app.service.activate_selected_plan(
-            project_id=project_id,
-        )
-    else:
+        active_plan_id = project_row["active_plan_revision_id"] if project_row is not None else None
+        if arguments.plan_revision_id:
+            candidate_id = arguments.plan_revision_id
+        else:
+            selected = app.service._selected_plan_for_activation(connection, project_id)
+            candidate_id = selected.plan_revision_id
+        if active_plan_id is None or str(candidate_id) != str(active_plan_id):
+            target = authority.authorization_target(
+                project_id,
+                selected_plan_revision_id=arguments.plan_revision_id,
+            )
+            raise EngineServiceError(
+                f"GOAL_AUTHORIZATION_REQUIRED: 새 계획 리비전 활성화에는 --confirm-digest {target.target_digest}로 승인을 확인해야 합니다."
+            )
         if arguments.digest:
-            with app.service.ledger.read() as connection:
-                plan_row = connection.execute(
-                    "SELECT activation_digest FROM plan_revisions WHERE id = ?",
-                    (arguments.plan_revision_id,),
-                ).fetchone()
+            plan_row = connection.execute(
+                "SELECT activation_digest FROM plan_revisions WHERE id = ?",
+                (active_plan_id,),
+            ).fetchone()
             if plan_row is None or str(plan_row["activation_digest"]) != arguments.digest:
                 raise EngineServiceError(
                     "PLAN_ACTIVATION_DIGEST_MISMATCH: 요청한 digest가 선택된 계획의 activation_digest와 일치하지 않습니다."
                 )
-        activation_id = app.service.activate_authorized_plan(
-            plan_revision_id=arguments.plan_revision_id,
-            source=arguments.source,
-        )
+        activation = connection.execute(
+            "SELECT id FROM plan_activations WHERE plan_revision_id = ? ORDER BY activated_at DESC LIMIT 1",
+            (active_plan_id,),
+        ).fetchone()
+        if activation is None:
+            raise EngineServiceError("active Plan의 activation record를 찾을 수 없습니다.")
+        activation_id = str(activation["id"])
     _emit({"activation_id": activation_id})
 
 
