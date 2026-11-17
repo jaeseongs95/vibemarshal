@@ -5,7 +5,12 @@ import unittest
 from pathlib import Path
 from types import SimpleNamespace
 
-from openai_codex.types import TurnStatus
+try:
+    from openai_codex.types import TurnStatus
+    _HAS_OPENAI_CODEX = True
+except ModuleNotFoundError:
+    TurnStatus = None  # type: ignore[assignment,misc]
+    _HAS_OPENAI_CODEX = False
 
 from flowmarshal.canonical import sha256_digest
 from flowmarshal.planning.r31_models import (
@@ -104,6 +109,7 @@ class _FakeCodex:
         self.closed = True
 
 
+@unittest.skipUnless(_HAS_OPENAI_CODEX, "openai_codex package is not installed in this Python environment")
 class PlannerR31ModelTests(unittest.TestCase):
     def test_token_count_reads_nested_codex_total_usage(self) -> None:
         self.assertEqual(

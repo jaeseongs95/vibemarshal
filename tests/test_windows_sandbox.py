@@ -99,6 +99,10 @@ class HostContextTests(unittest.TestCase):
 
 class StatusQueryTests(unittest.TestCase):
     def test_readiness_query_never_calls_setup_start(self) -> None:
+        import importlib.util
+
+        if importlib.util.find_spec("openai_codex") is None:
+            self.skipTest("openai_codex package is not installed in this Python environment")
         context = SandboxHostContext(
             Path.cwd(),
             Path.cwd(),

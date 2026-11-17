@@ -6,7 +6,13 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from openai_codex import MethodNotFoundError
+try:
+    from openai_codex import MethodNotFoundError
+    _HAS_OPENAI_CODEX = True
+except ModuleNotFoundError:
+    class MethodNotFoundError(Exception):  # type: ignore[no-redef]
+        pass
+    _HAS_OPENAI_CODEX = False
 
 from flowmarshal.engine.runtime import (
     CodexAppServerRuntime,
@@ -31,6 +37,7 @@ def _policy(cwd: Path) -> ExecutionPolicyEvidence:
     )
 
 
+@unittest.skipUnless(_HAS_OPENAI_CODEX, "openai_codex package is not installed in this Python environment")
 class EngineRuntimeProjectBindingTests(unittest.TestCase):
     def _runtime(self, root: Path) -> CodexAppServerRuntime:
         runtime = CodexAppServerRuntime.__new__(CodexAppServerRuntime)

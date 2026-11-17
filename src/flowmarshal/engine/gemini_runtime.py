@@ -1587,7 +1587,7 @@ def _agy_parse_json_loose(text: str) -> dict[str, Any] | None:
         parsed = json.loads(stripped)
         if isinstance(parsed, dict):
             return parsed
-    except Exception:
+    except (json.JSONDecodeError, TypeError, ValueError):
         pass
     fenced = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", stripped, flags=re.DOTALL)
     if fenced:
@@ -1595,7 +1595,7 @@ def _agy_parse_json_loose(text: str) -> dict[str, Any] | None:
             parsed = json.loads(fenced.group(1))
             if isinstance(parsed, dict):
                 return parsed
-        except Exception:
+        except (json.JSONDecodeError, TypeError, ValueError):
             pass
     first_brace = stripped.find("{")
     last_brace = stripped.rfind("}")
@@ -1604,7 +1604,7 @@ def _agy_parse_json_loose(text: str) -> dict[str, Any] | None:
             parsed = json.loads(stripped[first_brace : last_brace + 1])
             if isinstance(parsed, dict):
                 return parsed
-        except Exception:
+        except (json.JSONDecodeError, TypeError, ValueError):
             pass
     return None
 
@@ -2233,7 +2233,7 @@ def _agy_invoke_cli(
             continue
         try:
             event = json.loads(line)
-        except Exception:
+        except (json.JSONDecodeError, TypeError, ValueError):
             continue
         if not isinstance(event, dict):
             continue
@@ -2282,7 +2282,7 @@ def _agy_invoke_cli(
                         ev = json.loads(line)
                         if isinstance(ev, dict) and ev.get("event") == "result":
                             retry_event = ev
-                    except Exception:
+                    except (json.JSONDecodeError, TypeError, ValueError):
                         pass
             if retry_event is not None:
                 retry_body = retry_event.get("result") if isinstance(retry_event.get("result"), dict) else {}
@@ -2436,7 +2436,7 @@ def agy_bridge_main(argv: list[str] | None = None) -> int:
             prompt_path = Path(parsed.append_system_prompt_file)
             if prompt_path.is_file():
                 developer_instructions = prompt_path.read_text(encoding="utf-8", errors="replace")
-        except Exception:
+        except OSError:
             developer_instructions = ""
 
     schema: dict[str, Any] | None = None
@@ -2445,7 +2445,7 @@ def agy_bridge_main(argv: list[str] | None = None) -> int:
             loaded_schema = json.loads(parsed.json_schema)
             if isinstance(loaded_schema, dict):
                 schema = loaded_schema
-        except Exception:
+        except (json.JSONDecodeError, TypeError, ValueError):
             schema = None
 
     while True:
@@ -2474,7 +2474,7 @@ def agy_bridge_main(argv: list[str] | None = None) -> int:
                 msg = stdin_obj.get("message")
                 if isinstance(msg, dict):
                     user_prompt = str(msg.get("content") or "")
-        except Exception:
+        except (json.JSONDecodeError, TypeError, ValueError):
             user_prompt = raw_stdin
 
         user_uuid = f"user-{uuid.uuid4().hex[:12]}"

@@ -83,9 +83,8 @@ export class HttpEngineClient implements EngineClient {
   }
 
   private async requestJson<T>(path: string, init?: RequestInit, retriedToken = false): Promise<T> {
-    const method = (init?.method ?? "GET").toUpperCase();
     const tokenHeaders: Record<string, string> = {};
-    if (method === "POST") {
+    if (path !== "/api/v1/health") {
       const token = await this.ensureSessionToken();
       if (token) {
         tokenHeaders["X-FlowMarshal-Token"] = token;
@@ -99,7 +98,7 @@ export class HttpEngineClient implements EngineClient {
         ...(init?.headers ?? {}),
       },
     });
-    if (response.status === 403 && method === "POST" && !retriedToken) {
+    if (response.status === 403 && path !== "/api/v1/health" && !retriedToken) {
       this.sessionToken = null;
       this.tokenPromise = null;
       return this.requestJson<T>(path, init, true);
@@ -147,43 +146,52 @@ export class HttpEngineClient implements EngineClient {
       listener(this.latestSnapshot);
     }
     if (this.listeners.size === 1 && this.eventSourceFactory && !this.eventSource) {
-      try {
-        const es = this.eventSourceFactory(this.url("/api/v1/events?stream=1"));
-        es.addEventListener("snapshot", (event: MessageEvent) => {
-          try {
-            const parsed = JSON.parse(String(event.data)) as WorkspaceSnapshot;
-            if (parsed && typeof parsed === "object" && "phase" in parsed) {
-              this.notify(parsed);
-            }
-          } catch {
-            // Ignore malformed SSE payload
+      void (async () => {
+        try {
+          const token = await this.ensureSessionToken();
+          if (this.listeners.size === 0 || this.eventSource) {
+            return;
           }
-        });
-        if (typeof es.addEventListener === "function") {
-          es.addEventListener("message", (event: MessageEvent) => {
+          const query = token
+            ? `/api/v1/events?stream=1&token=${encodeURIComponent(token)}`
+            : "/api/v1/events?stream=1";
+          const es = this.eventSourceFactory!(this.url(query));
+          es.addEventListener("snapshot", (event: MessageEvent) => {
             try {
-              const parsed = JSON.parse(String(event.data)) as {
-                event_type?: string;
-                sequence?: number;
-                phase?: string;
-              };
-              if (parsed && "phase" in parsed) {
-                this.notify(parsed as unknown as WorkspaceSnapshot);
-              } else if (
-                parsed?.event_type === "snapshot.ready" &&
-                (!this.latestSnapshot || parsed.sequence !== this.latestSnapshot.historyCursor.sequence)
-              ) {
-                void this.getSnapshot().catch(() => undefined);
+              const parsed = JSON.parse(String(event.data)) as WorkspaceSnapshot;
+              if (parsed && typeof parsed === "object" && "phase" in parsed) {
+                this.notify(parsed);
               }
             } catch {
-              // Ignore malformed default message
+              // Ignore malformed SSE payload
             }
           });
+          if (typeof es.addEventListener === "function") {
+            es.addEventListener("message", (event: MessageEvent) => {
+              try {
+                const parsed = JSON.parse(String(event.data)) as {
+                  event_type?: string;
+                  sequence?: number;
+                  phase?: string;
+                };
+                if (parsed && "phase" in parsed) {
+                  this.notify(parsed as unknown as WorkspaceSnapshot);
+                } else if (
+                  parsed?.event_type === "snapshot.ready" &&
+                  (!this.latestSnapshot || parsed.sequence !== this.latestSnapshot.historyCursor.sequence)
+                ) {
+                  void this.getSnapshot().catch(() => undefined);
+                }
+              } catch {
+                // Ignore malformed default message
+              }
+            });
+          }
+          this.eventSource = es;
+        } catch {
+          this.eventSource = null;
         }
-        this.eventSource = es;
-      } catch {
-        this.eventSource = null;
-      }
+      })();
     }
     return () => {
       this.listeners.delete(listener);

@@ -5,32 +5,45 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from flowmarshal_gate0a.probe import (
-    APPROVAL_METHODS,
-    DESKTOP_INTEROP_HARD_CHECKS,
-    PERMISSION_HARD_CHECKS,
-    RUNTIME_HARD_CHECKS,
-    SCHEMA_VERSION,
-    CanaryLayout,
-    FailClosedApprovalHandler,
-    archive_pre_migration_outputs,
-    build_mcp_disable_overrides,
-    build_config_overrides,
-    canary_layout,
-    check,
-    derive_gate_decision,
-    evaluate_allowed_read_check,
-    evaluate_desktop_interop_bundle,
-    evaluate_permission_configuration,
-    evaluate_read_check,
-    evaluate_undeclared_read_policy,
-    evaluate_windows_sandbox_readiness,
-    migrate_document,
-    redact_tokens,
-    sanitize_surface_observations,
-    toml_quote,
-    validate_fail_closed_handler,
-)
+try:
+    from flowmarshal_gate0a.probe import (
+        APPROVAL_METHODS,
+        DESKTOP_INTEROP_HARD_CHECKS,
+        PERMISSION_HARD_CHECKS,
+        RUNTIME_HARD_CHECKS,
+        SCHEMA_VERSION,
+        CanaryLayout,
+        FailClosedApprovalHandler,
+        archive_pre_migration_outputs,
+        build_mcp_disable_overrides,
+        build_config_overrides,
+        canary_layout,
+        check,
+        derive_gate_decision,
+        evaluate_allowed_read_check,
+        evaluate_desktop_interop_bundle,
+        evaluate_permission_configuration,
+        evaluate_read_check,
+        evaluate_undeclared_read_policy,
+        evaluate_windows_sandbox_readiness,
+        migrate_document,
+        redact_tokens,
+        sanitize_surface_observations,
+        toml_quote,
+        validate_fail_closed_handler,
+    )
+    _HAS_OPENAI_CODEX = True
+except ModuleNotFoundError:
+    _HAS_OPENAI_CODEX = False
+    RUNTIME_HARD_CHECKS = ()  # type: ignore[assignment]
+    PERMISSION_HARD_CHECKS = ()  # type: ignore[assignment]
+    DESKTOP_INTEROP_HARD_CHECKS = ()  # type: ignore[assignment]
+    check = lambda *_a, **_k: {}  # type: ignore[assignment]
+
+
+def setUpModule() -> None:
+    if not _HAS_OPENAI_CODEX:
+        raise unittest.SkipTest("openai_codex package is not installed in this Python environment")
 
 
 def passing_runtime(name: str, thread_id: str) -> dict:

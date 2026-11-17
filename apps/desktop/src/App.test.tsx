@@ -61,13 +61,21 @@ describe("VibeMarshal GUI prototype", () => {
     await waitFor(() => expect(screen.getAllByText("충족").length).toBeGreaterThanOrEqual(1));
   });
 
-  it("HttpEngineClient가 /api/v1/health의 session_token을 조회해 POST X-FlowMarshal-Token 헤더로 전송한다", async () => {
+  it("HttpEngineClient가 /api/v1/health의 session_token을 조회해 GET/POST X-FlowMarshal-Token 헤더로 전송한다", async () => {
     const mock = new MockEngineClient("golden-path");
     const snapshot = await mock.getSnapshot();
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       if (url.endsWith("/api/v1/health")) {
         return new Response(JSON.stringify({ session_token: "tok_test_session_123" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      if (url.endsWith("/api/v1/snapshot")) {
+        const headers = (init?.headers ?? {}) as Record<string, string>;
+        expect(headers["X-FlowMarshal-Token"]).toBe("tok_test_session_123");
+        return new Response(JSON.stringify(snapshot), {
           status: 200,
           headers: { "Content-Type": "application/json" },
         });
@@ -94,6 +102,8 @@ describe("VibeMarshal GUI prototype", () => {
       baseUrl: "http://127.0.0.1:8765",
       fetchImpl: fetchMock as unknown as typeof fetch,
     });
+    const fetchedSnap = await client.getSnapshot();
+    expect(fetchedSnap.phase).toBe(snapshot.phase);
     const res = await client.runOnce({
       actorRef: "local:test-user",
       clientInstanceId: "vitest:http-client",
@@ -101,7 +111,7 @@ describe("VibeMarshal GUI prototype", () => {
       idempotencyKey: "idem_1",
     });
     expect(res.ok).toBe(true);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 
   it("HttpEngineClient가 403 SESSION_TOKEN_REQUIRED 응답 시 토큰을 재발급받아 1회 재시도한다", async () => {

@@ -384,7 +384,7 @@ class A2ConformanceTransitionTests(unittest.TestCase):
 
 class A2DocumentTests(unittest.TestCase):
     def test_contract_documents_state_same_user_limits_and_r16_follow_up(self) -> None:
-        for relative in ("AGENTS.md", "README.md", "docs/redesign-1.0-contract.md"):
+        for relative in ("AGENTS.md", "README.md", "README.ko.md", "docs/redesign-1.0-contract.md"):
             with self.subTest(document=relative):
                 text = (ROOT / relative).read_text(encoding="utf-8")
                 self.assertIn(A2_PROFILE_ID, text)

@@ -9,11 +9,20 @@ from pathlib import Path
 from unittest.mock import patch
 
 from flowmarshal.windows_sandbox import SandboxFingerprint, SandboxHostContext
-from flowmarshal_gate0a.probe import (
-    run_probe,
-    setup_permission_sandbox,
-    verify_permission,
-)
+try:
+    from flowmarshal_gate0a.probe import (
+        run_probe,
+        setup_permission_sandbox,
+        verify_permission,
+    )
+    _HAS_OPENAI_CODEX = True
+except ModuleNotFoundError:
+    _HAS_OPENAI_CODEX = False
+
+
+def setUpModule() -> None:
+    if not _HAS_OPENAI_CODEX:
+        raise unittest.SkipTest("openai_codex package is not installed in this Python environment")
 
 
 def complete_fingerprint() -> SandboxFingerprint:

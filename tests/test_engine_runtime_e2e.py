@@ -104,6 +104,10 @@ class EngineRuntimeE2ETests(unittest.TestCase):
         self.assertEqual("local", evidence.environment)
 
     def test_new_thread_turn_starts_without_resume_roundtrip(self) -> None:
+        import importlib.util
+
+        if importlib.util.find_spec("openai_codex") is None:
+            self.skipTest("openai_codex package is not installed in this Python environment")
         class FakeClient:
             def __init__(self) -> None:
                 self.calls = []

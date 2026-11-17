@@ -10,6 +10,7 @@ import hashlib
 import hmac
 import json
 import os
+import queue
 import secrets
 import shutil
 import sqlite3
@@ -23,17 +24,18 @@ from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat, PublicFormat
 
 from ..canonical import sha256_bytes, sha256_digest
-from .ags_embedded_bundle import AGS_EMBEDDED_PIN, extract_embedded_ags_plugin
+from .ags_embedded_bundle import AGS_EMBEDDED_PIN, extract_embedded_ags_plugin, resolve_local_governance_plugin_root
 from .ags_observation_producer import (
     A2_CONFIG_FORMAT,
     A2_PROFILE,
     A2_PROFILE_ID,
+    ProducerUnavailable,
     _a2_digest,
     _load_a2_producer,
 )
@@ -133,6 +135,58 @@ def _apply_windows_same_user_acl(target_path: Path, *, set_owner_recursive: bool
     )
 
 
+def _verify_local_a2_governance_artifacts(
+    *,
+    key_path: Path,
+    pin_path: Path,
+    server_profile_path: Path,
+    ags_state_path: Path,
+    config_path: Path,
+) -> bool:
+    if not (
+        key_path.is_file()
+        and pin_path.is_file()
+        and server_profile_path.is_file()
+        and ags_state_path.is_file()
+        and config_path.is_file()
+    ):
+        return False
+    try:
+        producer = _load_a2_producer(config_path)
+        producer.check_installed_pin()
+        server_profile = json.loads(server_profile_path.read_text(encoding="utf-8"))
+        config_doc = json.loads(config_path.read_text(encoding="utf-8"))
+        if not isinstance(server_profile, dict) or not isinstance(config_doc, dict):
+            return False
+        if server_profile.get("selection") != config_doc.get("selection"):
+            return False
+        if server_profile.get("resources") != config_doc.get("resources"):
+            return False
+        expected_resources = {
+            "key": {"namespace": A2_PROFILE_ID, "location": str(key_path)},
+            "pin": {"namespace": A2_PROFILE_ID, "location": str(pin_path)},
+            "state": {"namespace": A2_PROFILE_ID, "location": str(ags_state_path)},
+        }
+        if config_doc.get("resources") != expected_resources:
+            return False
+        freeze_id = (config_doc.get("selection") or {}).get("freezeIdentity")
+        if not isinstance(freeze_id, str) or freeze_id != producer.freeze_identity:
+            return False
+        state_conn = sqlite3.connect(ags_state_path)
+        try:
+            row = state_conn.execute(
+                "SELECT freeze_identity FROM a2_profile_identity WHERE profile_id = ?",
+                (A2_PROFILE_ID,),
+            ).fetchone()
+        finally:
+            state_conn.close()
+        if row is None or row[0] != freeze_id:
+            return False
+    except (OSError, ValueError, KeyError, sqlite3.Error, ProducerUnavailable):
+        return False
+    return True
+
+
 def _ensure_local_governance_settings(state_dir: Path) -> GovernanceSettings:
     resolved_dir = state_dir.resolve()
     resolved_dir.mkdir(parents=True, exist_ok=True)
@@ -149,7 +203,15 @@ def _ensure_local_governance_settings(state_dir: Path) -> GovernanceSettings:
         if env_settings is not None and env_settings.model_classes is not None
         else resolved_dir / "model-classes.json"
     )
-    if not model_classes_path.is_file():
+    need_write_classes = not model_classes_path.is_file()
+    if not need_write_classes:
+        try:
+            loaded_classes = json.loads(model_classes_path.read_text(encoding="utf-8"))
+            if not isinstance(loaded_classes, dict) or loaded_classes.get("format") != MODEL_CLASSES_FORMAT:
+                need_write_classes = True
+        except (OSError, ValueError):
+            need_write_classes = True
+    if need_write_classes:
         model_classes_path.write_text(
             json.dumps(_DEFAULT_MODEL_CLASSES_PAYLOAD, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
@@ -158,7 +220,7 @@ def _ensure_local_governance_settings(state_dir: Path) -> GovernanceSettings:
     if env_settings is not None and (env_settings.plugin_root / "host-integration.json").is_file():
         plugin_root = env_settings.plugin_root.resolve()
     else:
-        plugin_root = extract_embedded_ags_plugin(resolved_dir / "embedded-ags-plugin")
+        plugin_root = resolve_local_governance_plugin_root(resolved_dir / "embedded-ags-plugin")
 
     profile_dir = plugin_root / A2_PROFILE_ID
     key_path = profile_dir / "producer-key.json"
@@ -167,12 +229,12 @@ def _ensure_local_governance_settings(state_dir: Path) -> GovernanceSettings:
     server_profile_path = profile_dir / "server-profile.json"
     config_path = resolved_dir / "a2-profile.json"
 
-    if not (
-        key_path.is_file()
-        and pin_path.is_file()
-        and server_profile_path.is_file()
-        and ags_state_path.is_file()
-        and config_path.is_file()
+    if not _verify_local_a2_governance_artifacts(
+        key_path=key_path,
+        pin_path=pin_path,
+        server_profile_path=server_profile_path,
+        ags_state_path=ags_state_path,
+        config_path=config_path,
     ):
         profile_dir.mkdir(parents=True, exist_ok=True)
         _apply_windows_same_user_acl(profile_dir)
@@ -457,7 +519,7 @@ class LocalGuiEngineBackend:
             for q in list(self._event_subscribers):
                 try:
                     q.put_nowait(payload)
-                except Exception:
+                except queue.Full:
                     pass
 
     def close(self) -> None:
@@ -465,22 +527,22 @@ class LocalGuiEngineBackend:
             for q in list(self._event_subscribers):
                 try:
                     q.put_nowait(None)
-                except Exception:
+                except queue.Full:
                     pass
             self._event_subscribers.clear()
             try:
                 self.application.close_task_gate()
-            except Exception:
+            except (OSError, RuntimeError, ValueError):
                 pass
             if getattr(self.application, "supervisor", None) is not None:
                 try:
                     self.application.supervisor.close()
-                except Exception:
+                except (OSError, RuntimeError, ValueError):
                     pass
             elif getattr(self, "runtime", None) is not None and hasattr(self.runtime, "close"):
                 try:
                     self.runtime.close()
-                except Exception:
+                except (OSError, RuntimeError, ValueError):
                     pass
             self._cleanup_ephemeral_workspaces()
 
@@ -1543,7 +1605,7 @@ class LocalGuiEngineBackend:
                 if app_for_auth is not None and getattr(app_for_auth, "supervisor", None) is not None:
                     try:
                         app_for_auth.supervisor.close()
-                    except Exception:
+                    except (OSError, RuntimeError, ValueError):
                         pass
             gate = self.application.task_gate()
             if hasattr(gate, "plugin") and hasattr(gate.plugin, "preflight"):
@@ -1952,8 +2014,13 @@ def create_http_handler(
             self.wfile.write(body)
             return False
 
-        def _check_session_token(self) -> bool:
+        def _check_session_token(self, *, allow_query_token: bool = False) -> bool:
             provided = (self.headers.get("X-FlowMarshal-Token") or "").strip()
+            if not provided and allow_query_token:
+                parsed_q = parse_qs(urlparse(self.path).query)
+                token_vals = parsed_q.get("token") or []
+                if token_vals:
+                    provided = (token_vals[0] or "").strip()
             if provided and hmac.compare_digest(provided, active_token):
                 return True
             self._send_json(
@@ -1962,7 +2029,7 @@ def create_http_handler(
                     "ok": False,
                     "error": {
                         "code": "SESSION_TOKEN_REQUIRED",
-                        "message": "로컬 GUI POST 변이 요청에는 유효한 X-FlowMarshal-Token 세션 토큰 헤더가 필요합니다.",
+                        "message": "로컬 GUI API 요청에는 유효한 X-FlowMarshal-Token 세션 토큰이 필요합니다.",
                     },
                 },
             )
@@ -2049,12 +2116,18 @@ def create_http_handler(
                 )
                 return
             if parsed.path == "/api/v1/snapshot":
+                if not self._check_session_token():
+                    return
                 self._send_json(HTTPStatus.OK, backend.snapshot())
                 return
             if parsed.path == "/api/v1/final-report":
+                if not self._check_session_token():
+                    return
                 self._send_json(HTTPStatus.OK, backend.final_report_view())
                 return
             if parsed.path == "/api/v1/events":
+                if not self._check_session_token(allow_query_token=True):
+                    return
                 snap = backend.snapshot()
                 ready_payload = json.dumps(
                     {
@@ -2070,12 +2143,8 @@ def create_http_handler(
                     f"data: {ready_payload}\n\n"
                     f"event: snapshot\ndata: {snap_payload}\n\n"
                 ).encode("utf-8")
-                from urllib.parse import parse_qs
-
                 query = parse_qs(parsed.query)
                 if query.get("stream") == ["1"]:
-                    import queue
-
                     self.send_response(HTTPStatus.OK)
                     self._send_cors_headers()
                     self.send_header("Content-Type", "text/event-stream; charset=utf-8")
@@ -2267,7 +2336,7 @@ def build_parser() -> Any:
         if callable(reconfigure):
             try:
                 reconfigure(encoding="utf-8", errors="replace")
-            except Exception:
+            except (OSError, ValueError, AttributeError):
                 pass
 
     parser = argparse.ArgumentParser(

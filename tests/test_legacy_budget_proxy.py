@@ -456,6 +456,10 @@ class LegacyBudgetProxyTests(unittest.TestCase):
         self.assertFalse(verify_operation_trace(tampered).valid)
 
     def test_project_binding_routes_stored_thread_and_checks_before_turn(self):
+        import importlib.util
+
+        if importlib.util.find_spec("openai_codex") is None:
+            self.skipTest("openai_codex package is not installed in this Python environment")
         project = CodexProjectBinding(
             project_id="project-server-test",
             expected_root=str(self.workspace),
@@ -534,6 +538,10 @@ class LegacyBudgetProxyTests(unittest.TestCase):
                     _verify_project_binding(wrapped, candidate)
 
     def test_project_or_thread_mismatch_blocks_before_corresponding_effect(self):
+        import importlib.util
+
+        if importlib.util.find_spec("openai_codex") is None:
+            self.skipTest("openai_codex package is not installed in this Python environment")
         project = CodexProjectBinding(
             project_id="project-server-test",
             expected_root=str(self.workspace),

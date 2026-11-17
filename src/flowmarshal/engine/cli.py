@@ -799,7 +799,7 @@ def _cmd_plan_compare(arguments: argparse.Namespace) -> None:
 
 def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
     app = _application(arguments)
-    authority = ApplicationAuthority(app)
+    authority = ApplicationAuthority(app) if app.service._action_authority is None else None
     project_id = arguments.project_id
     if not project_id:
         with app.service.ledger.read() as connection:
@@ -812,7 +812,7 @@ def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
         project_id = str(row["project_id"])
     confirm_digest = getattr(arguments, "confirm_digest", None)
     if confirm_digest is not None:
-        target = authority.authorization_target(
+        target = app.authorization_target(
             project_id,
             selected_plan_revision_id=arguments.plan_revision_id,
         )
@@ -824,12 +824,19 @@ def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
             raise EngineServiceError(
                 "AUTHORIZATION_DECLINED: confirm_digest가 현재 승인 대상 target_digest와 일치하지 않습니다."
             )
-        res = authority.authorize(
-            project_id,
-            target=target,
-            source=arguments.source,
-            selected_plan_revision_id=arguments.plan_revision_id,
-        )
+        if authority is not None:
+            res = authority.authorize(
+                project_id,
+                target=target,
+                source=arguments.source,
+                selected_plan_revision_id=arguments.plan_revision_id,
+            )
+        else:
+            res = app.authorize(
+                project_id,
+                source=arguments.source,
+                selected_plan_revision_id=arguments.plan_revision_id,
+            )
         _emit(
             {
                 "activation_id": res.activation_id,
@@ -843,6 +850,14 @@ def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
             (project_id,),
         ).fetchone()
     if existing_auth is None:
+        if authority is None:
+            res = app.authorize(
+                project_id,
+                source=arguments.source,
+                selected_plan_revision_id=arguments.plan_revision_id,
+            )
+            _emit({"activation_id": res.activation_id})
+            return
         target = authority.authorization_target(
             project_id,
             selected_plan_revision_id=arguments.plan_revision_id,
@@ -875,13 +890,22 @@ def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
 def _cmd_goal_authorize(arguments: argparse.Namespace) -> None:
     policy = _goal_authorization_policy(arguments)
     app = _application(arguments)
-    authority = ApplicationAuthority(app)
-    target = authority.authorization_target(
+    authority = ApplicationAuthority(app) if app.service._action_authority is None else None
+    target = app.authorization_target(
         arguments.project_id,
         operating_policy=policy,
     )
     confirm_digest = getattr(arguments, "confirm_digest", None)
     if confirm_digest is None:
+        if authority is None:
+            _emit(
+                app.authorize(
+                    arguments.project_id,
+                    source=arguments.source,
+                    operating_policy=policy,
+                )
+            )
+            return
         raise EngineServiceError(
             f"CORE_CAPABILITY_REQUIRED: 직접 CLI 승인에는 --confirm-digest {target.target_digest} 확인이 필요합니다."
         )
@@ -889,14 +913,23 @@ def _cmd_goal_authorize(arguments: argparse.Namespace) -> None:
         raise EngineServiceError(
             "AUTHORIZATION_DECLINED: confirm_digest가 현재 승인 대상 target_digest와 일치하지 않습니다."
         )
-    _emit(
-        authority.authorize(
-            arguments.project_id,
-            target=target,
-            source=arguments.source,
-            operating_policy=policy,
+    if authority is not None:
+        _emit(
+            authority.authorize(
+                arguments.project_id,
+                target=target,
+                source=arguments.source,
+                operating_policy=policy,
+            )
         )
-    )
+    else:
+        _emit(
+            app.authorize(
+                arguments.project_id,
+                source=arguments.source,
+                operating_policy=policy,
+            )
+        )
 
 
 def _goal_authorization_policy(arguments: argparse.Namespace) -> GoalOperatingPolicy | None:

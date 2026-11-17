@@ -846,8 +846,9 @@ def _preparation_provenance(
     """역할이 scripted runner나 결정적 테스트 runtime으로 돌았으면 준비 출처를 LIVE로 적지 않는다."""
 
     unwrapped = getattr(runtime, "runtime", runtime)
+    codex_cls = CodexAppServerRuntime if isinstance(CodexAppServerRuntime, type) else ()
     is_live_provider = getattr(unwrapped, "provider", None) in {"codex-app-server", "claude-code", "gemini-cli"} or isinstance(
-        unwrapped, CodexAppServerRuntime
+        unwrapped, codex_cls
     )
     return (
         EvidenceProvenance.LIVE

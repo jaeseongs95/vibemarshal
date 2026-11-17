@@ -30,6 +30,10 @@ from flowmarshal.engine.service import EngineService
 
 
 class EngineAgyGeminiE2ETests(unittest.TestCase):
+    @unittest.skipUnless(
+        __import__("os").environ.get("FLOWMARSHAL_LIVE_AGY_E2E") == "1",
+        "Live Antigravity CLI (agy.exe) E2E test requires FLOWMARSHAL_LIVE_AGY_E2E=1",
+    )
     def test_live_agy_gemini_full_workflow_and_gui_snapshot(self) -> None:
         agy_exe = resolve_agy_exe()
         self.assertTrue(agy_exe.exists(), f"Antigravity CLI not found at {agy_exe}")

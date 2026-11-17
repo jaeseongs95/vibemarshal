@@ -7,11 +7,18 @@ from concurrent.futures import Future
 from pathlib import Path
 from types import SimpleNamespace
 
-from openai_codex.generated.v2_all import (
-    ThreadTokenUsageUpdatedNotification,
-    TurnCompletedNotification,
-)
-from openai_codex.models import Notification
+try:
+    from openai_codex.generated.v2_all import (
+        ThreadTokenUsageUpdatedNotification,
+        TurnCompletedNotification,
+    )
+    from openai_codex.models import Notification
+    _HAS_OPENAI_CODEX = True
+except ModuleNotFoundError:
+    ThreadTokenUsageUpdatedNotification = None  # type: ignore[assignment,misc]
+    TurnCompletedNotification = None  # type: ignore[assignment,misc]
+    Notification = None  # type: ignore[assignment,misc]
+    _HAS_OPENAI_CODEX = False
 
 from flowmarshal.engine.runtime import CodexAppServerRuntime, RuntimePolicyError
 
@@ -29,6 +36,7 @@ def _turn(turn_id: str, *, status: str = "completed", text: str | None = None) -
     }
 
 
+@unittest.skipUnless(_HAS_OPENAI_CODEX, "openai_codex package is not installed in this Python environment")
 class RuntimeObservationTests(unittest.TestCase):
     def _stored_runtime(self, pages: dict[str | None, dict]) -> tuple[CodexAppServerRuntime, list[dict]]:
         runtime = CodexAppServerRuntime.__new__(CodexAppServerRuntime)

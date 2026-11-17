@@ -1,15 +1,13 @@
 # VibeMarshal
 
-[한국어](README.md) | **[English](README.en.md)**
+**[English](README.md)** | [한국어](README.ko.md)
 
-**VibeMarshal** is a local **Workflow Orchestrator** that normalizes large software engineering requests into verifiable Goal Contracts (`GoalContractRevision`) and dependency-aware Task DAGs, tracking planning, execution, observation, validation, and recovery across AI agent runtimes in a single authoritative SQLite ledger (schema 4).
-
-The product name is **VibeMarshal**, while the technical identifiers for the Python package and CLI entrypoint are `FlowMarshal` and `flowmarshal-engine`.
+The product name is **VibeMarshal**, while the technical identifiers for the Python package and CLI entrypoint are `vibemarshal`, `FlowMarshal`, and `flowmarshal-engine`.
 
 > [!NOTE]
-> **Release & Qualification Status (`v1.0.0` Package Release / Full Live Qualification Campaign Notes)**
-> - **Implemented Scope:** The user CLI façade (`flowmarshal-engine 1.0.0`), SQLite schema 4 single ledger, `RuntimeJob` lifecycle supervisor, three runtime providers (`codex`, `claude`, `gemini` including the Antigravity `agy_gemini_bridge.py` adapter), the `agent-governance-suite` workflow gate, and the local HTTP/SSE Engine API (`http_api.py`) for the desktop GUI (`apps/desktop`) are implemented and verified.
-> - **1.0 Qualification Boundary:** The deterministic test suite (138 test modules), Synthetic Smoke lifecycle, Wheel packaging isolation, Desktop GUI tests & build, and live Antigravity Gemini CLI (`agy.exe`) end-to-end verification have all passed. Full multi-seed live evaluation campaigns (48 role evaluations, 18 planning evaluations, 16 project E2E cells) remain reproducible via the dedicated evaluation harness (`eval_cli.py`), and `apps/desktop` supports both synthetic Mock mode and live Local HTTP Engine mode.
+> **Release & Qualification Status (`v1.1.0` Package Release / Full Live Qualification Campaign Notes)**
+> - **Implemented Scope:** The user CLI façade (`vibemarshal` / `flowmarshal-engine 1.1.0`), SQLite schema 4 single ledger, `RuntimeJob` lifecycle supervisor, three runtime providers (`codex`, `claude`, `gemini` including the Antigravity `agy_gemini_bridge.py` adapter), the `agent-governance-suite` workflow gate, and the local HTTP/SSE Engine API (`http_api.py`) for the desktop GUI (`apps/desktop`) are implemented and verified.
+> - **1.0 Qualification Boundary:** The deterministic test suite (176 test modules), Synthetic Smoke lifecycle, Wheel packaging isolation, Desktop GUI tests & build, and live Antigravity Gemini CLI (`agy.exe`) end-to-end verification have all passed. Full multi-seed live evaluation campaigns (48 role evaluations, 18 planning evaluations, 16 project E2E cells) remain reproducible via the dedicated evaluation harness (`eval_cli.py`), and `apps/desktop` supports both synthetic Mock mode and live Local HTTP Engine mode.
 
 ---
 

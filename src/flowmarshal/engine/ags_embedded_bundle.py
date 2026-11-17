@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import base64
 import gzip
+import hashlib
 import io
+import os
+import shutil
 import tarfile
 from pathlib import Path
 
 AGS_EMBEDDED_PIN = '0e88cb6039e143e79dd8c68c7aecc3e45da41d43'
+AGS_EMBEDDED_ARCHIVE_SHA256 = '4789b8dcaf1124def18427b2332df6406c56a2aa72cb90795183b78a9c34191e'
 _BUNDLE_TAR_GZ_B64 = (
     'H4sIAAAAAAAC/+y9a28jS3Yg2J/rV3DlxsLdLVbxJUqqxsLDUqnqcq5eTUq33X2vLKTIJJUtkklnklWle7sag0EPMDueD/PB3vUu'
     '7Fkv4JnFAF7A41ns+sP8ou7b/2FPvDLjmRlJZlIqVt4Zd4mZGREnIk6cOO8zdz7cjCf+rTO5uXOdoRv8IP//avBfu93G/8J/8r/w'
@@ -10309,12 +10313,77 @@ _BUNDLE_TAR_GZ_B64 = (
 )
 
 
+_EXPECTED_FILE_DIGESTS_CACHE: dict[str, str] | None = None
+
+
+def expected_embedded_file_digests() -> dict[str, str]:
+    global _EXPECTED_FILE_DIGESTS_CACHE
+    if _EXPECTED_FILE_DIGESTS_CACHE is not None:
+        return dict(_EXPECTED_FILE_DIGESTS_CACHE)
+    raw = gzip.decompress(base64.b64decode(_BUNDLE_TAR_GZ_B64))
+    actual_archive_sha = hashlib.sha256(raw).hexdigest()
+    if actual_archive_sha != AGS_EMBEDDED_ARCHIVE_SHA256:
+        raise ValueError(
+            f"AGS_EMBEDDED_BUNDLE_CORRUPTED: expected archive sha256={AGS_EMBEDDED_ARCHIVE_SHA256}, "
+            f"observed={actual_archive_sha}"
+        )
+    digests: dict[str, str] = {}
+    with tarfile.open(fileobj=io.BytesIO(raw), mode="r:") as tar:
+        for member in tar.getmembers():
+            if not member.isfile():
+                continue
+            rel = member.name.removeprefix("./").lstrip("/")
+            extracted = tar.extractfile(member)
+            if extracted is None:
+                continue
+            digests[rel] = hashlib.sha256(extracted.read()).hexdigest()
+    _EXPECTED_FILE_DIGESTS_CACHE = digests
+    return dict(digests)
+
+
+def _verify_extracted_bundle(resolved: Path, expected_digests: dict[str, str]) -> bool:
+    pin_file = resolved / ".embedded-ags-pin"
+    try:
+        if not pin_file.is_file():
+            return False
+        pin_content = pin_file.read_text(encoding="utf-8").strip()
+        if pin_content != f"{AGS_EMBEDDED_PIN}:{AGS_EMBEDDED_ARCHIVE_SHA256}":
+            return False
+        for rel, expected_sha in expected_digests.items():
+            candidate = resolved / rel
+            if not candidate.is_file() or candidate.is_symlink():
+                return False
+            if hashlib.sha256(candidate.read_bytes()).hexdigest() != expected_sha:
+                return False
+    except OSError:
+        return False
+    return True
+
+
+def resolve_local_governance_plugin_root(fallback_extract_dir: Path) -> Path:
+    env_root = os.environ.get("FLOWMARSHAL_GOVERNANCE_PLUGIN_ROOT", "").strip()
+    if env_root:
+        candidate = Path(env_root).resolve()
+        if (candidate / "host-integration.json").is_file() and (
+            candidate / "mcp-server" / "dist" / "server.mjs"
+        ).is_file():
+            return candidate
+    return extract_embedded_ags_plugin(fallback_extract_dir)
+
+
 def extract_embedded_ags_plugin(target_dir: Path) -> Path:
     resolved = Path(target_dir).resolve()
-    if (resolved / "host-integration.json").is_file() and (resolved / "mcp-server" / "dist" / "server.mjs").is_file():
+    expected_digests = expected_embedded_file_digests()
+    if _verify_extracted_bundle(resolved, expected_digests):
         return resolved
+    if resolved.exists():
+        shutil.rmtree(resolved, ignore_errors=True)
     resolved.mkdir(parents=True, exist_ok=True)
     raw = gzip.decompress(base64.b64decode(_BUNDLE_TAR_GZ_B64))
     with tarfile.open(fileobj=io.BytesIO(raw), mode="r:") as tar:
         tar.extractall(resolved, filter="data")
+    pin_file = resolved / ".embedded-ags-pin"
+    pin_file.write_text(f"{AGS_EMBEDDED_PIN}:{AGS_EMBEDDED_ARCHIVE_SHA256}\n", encoding="utf-8")
+    if not _verify_extracted_bundle(resolved, expected_digests):
+        raise RuntimeError(f"AGS_EMBEDDED_EXTRACTION_INTEGRITY_FAILED: {resolved}")
     return resolved

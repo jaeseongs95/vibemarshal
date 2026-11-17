@@ -12,6 +12,24 @@ from flowmarshal.engine.http_api import LocalGuiEngineBackend, LocalGuiServer, m
 
 
 class EngineHttpApiTests(unittest.TestCase):
+    _shared_gov_tmp: tempfile.TemporaryDirectory[str] | None = None
+    _shared_governance: Any = None
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        from flowmarshal.engine.http_api import _ensure_local_governance_settings
+
+        cls._shared_gov_tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+        cls._shared_governance = _ensure_local_governance_settings(
+            Path(cls._shared_gov_tmp.name) / "governance"
+        )
+
+    @classmethod
+    def tearDownClass(cls) -> None:
+        if cls._shared_gov_tmp is not None:
+            cls._shared_gov_tmp.cleanup()
+            cls._shared_gov_tmp = None
+
     def setUp(self) -> None:
         self._tmp = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         self.root = Path(self._tmp.name)
@@ -22,6 +40,7 @@ class EngineHttpApiTests(unittest.TestCase):
             db_path=self.db_path,
             artifact_root=self.artifact_root,
             project_root=self.project_root,
+            governance=self._shared_governance,
         )
         self.server = LocalGuiServer(self.backend, host="127.0.0.1", port=0)
         self.base_url = self.server.start_background()
@@ -30,8 +49,19 @@ class EngineHttpApiTests(unittest.TestCase):
         self.server.close()
         self._tmp.cleanup()
 
-    def _get(self, path: str) -> dict:
-        with urllib.request.urlopen(f"{self.base_url}{path}", timeout=60) as resp:
+    def _get(self, path: str, *, token: str | None = "default") -> dict:
+        headers: dict[str, str] = {}
+        if path != "/api/v1/health":
+            if token == "default":
+                headers["X-FlowMarshal-Token"] = self.server.session_token
+            elif token is not None:
+                headers["X-FlowMarshal-Token"] = token
+        req = urllib.request.Request(
+            f"{self.base_url}{path}",
+            headers=headers,
+            method="GET",
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
     def _post(self, path: str, payload: dict | None = None, *, token: str | None = "default") -> dict:
@@ -61,7 +91,9 @@ class EngineHttpApiTests(unittest.TestCase):
         self.assertEqual(snapshot["phase"], "plan_ready")
         self.assertGreaterEqual(len(snapshot["plans"]), 1)
 
-        with urllib.request.urlopen(f"{self.base_url}/api/v1/events", timeout=5) as resp:
+        with urllib.request.urlopen(
+            f"{self.base_url}/api/v1/events?token={self.server.session_token}", timeout=5
+        ) as resp:
             sse_text = resp.read().decode("utf-8")
         self.assertIn("data: ", sse_text)
         self.assertIn("snapshot.ready", sse_text)
@@ -282,6 +314,14 @@ class EngineHttpApiTests(unittest.TestCase):
         invalid_err = json.loads(invalid_ctx.exception.read().decode("utf-8"))
         self.assertEqual(invalid_err["error"]["code"], "SESSION_TOKEN_REQUIRED")
 
+        # GET sensitive endpoints (/api/v1/snapshot, /api/v1/final-report, /api/v1/events) also enforce token (VM-D-0063)
+        for get_path in ("/api/v1/snapshot", "/api/v1/final-report", "/api/v1/events"):
+            with self.assertRaises(urllib.error.HTTPError) as get_missing_ctx:
+                self._get(get_path, token=None)
+            self.assertEqual(get_missing_ctx.exception.code, 403)
+            get_missing_err = json.loads(get_missing_ctx.exception.read().decode("utf-8"))
+            self.assertEqual(get_missing_err["error"]["code"], "SESSION_TOKEN_REQUIRED")
+
     def test_json_body_validation_and_recovery_ledger_persistence(self) -> None:
         import urllib.error
 
@@ -319,7 +359,9 @@ class EngineHttpApiTests(unittest.TestCase):
         self.assertEqual(huge_err["error"]["code"], "PAYLOAD_TOO_LARGE")
 
         # 3. SSE emits event: snapshot and engineSchemaVersion == 4
-        with urllib.request.urlopen(f"{self.base_url}/api/v1/events", timeout=5) as resp:
+        with urllib.request.urlopen(
+            f"{self.base_url}/api/v1/events?token={self.server.session_token}", timeout=5
+        ) as resp:
             sse_text = resp.read().decode("utf-8")
         self.assertIn("event: snapshot", sse_text)
 
@@ -481,6 +523,7 @@ class EngineHttpApiTests(unittest.TestCase):
                 artifact_root=self.root / "wheel_live_artifacts",
                 project_root=self.root / "wheel_live_ws",
                 live_gemini=True,
+                governance=self._shared_governance,
             )
             try:
                 snap = wheel_live_backend.snapshot()
@@ -499,6 +542,7 @@ class EngineHttpApiTests(unittest.TestCase):
             db_path=self.root / "reobs.sqlite3",
             artifact_root=self.root / "reobs_artifacts",
             project_root=self.root / "reobs_ws",
+            governance=self._shared_governance,
         )
         try:
             pid = reobs_backend.project_id
@@ -522,6 +566,7 @@ class EngineHttpApiTests(unittest.TestCase):
             db_path=self.root / "cli_auth.sqlite3",
             artifact_root=self.root / "cli_auth_artifacts",
             project_root=self.root / "cli_auth_ws",
+            governance=self._shared_governance,
         )
         try:
             cli_pid = cli_backend.project_id
@@ -552,6 +597,7 @@ class EngineHttpApiTests(unittest.TestCase):
             db_path=self.root / "cli_plan.sqlite3",
             artifact_root=self.root / "cli_plan_artifacts",
             project_root=self.root / "cli_plan_ws",
+            governance=self._shared_governance,
         )
         try:
             plan_pid = cli_plan_backend.project_id
@@ -613,6 +659,7 @@ class EngineHttpApiTests(unittest.TestCase):
             db_path=self.root / "host_auth.sqlite3",
             artifact_root=self.root / "host_auth_artifacts",
             project_root=self.root / "host_auth_ws",
+            governance=self._shared_governance,
         )
         try:
             host_pid = host_backend.project_id
@@ -682,6 +729,7 @@ class EngineHttpApiTests(unittest.TestCase):
                 artifact_root=self.root / "live_sel_artifacts",
                 project_root=self.root / "live_sel_ws1",
                 live_gemini=True,
+                governance=self._shared_governance,
             )
             try:
                 sel_res = live_b.select_project(str(self.root / "live_sel_ws2"))
@@ -754,6 +802,23 @@ class EngineHttpApiTests(unittest.TestCase):
                 )
             self.assertNotEqual(rc_missing, 0)
             self.assertIn("CORE_CAPABILITY_REQUIRED", out_missing.getvalue())
+
+            # VM-D-0062: extract_embedded_ags_plugin and _ensure_local_governance_settings detect tampered pin/files
+            from flowmarshal.engine.ags_embedded_bundle import extract_embedded_ags_plugin
+            from flowmarshal.engine.http_api import _ensure_local_governance_settings
+
+            tamper_dir = self.root / "tampered_gov"
+            gov_initial = _ensure_local_governance_settings(tamper_dir)
+            pin_marker = gov_initial.plugin_root / ".embedded-ags-pin"
+            self.assertTrue(pin_marker.is_file())
+            pin_marker.write_text("tampered-pin\n", encoding="utf-8")
+            reextracted = extract_embedded_ags_plugin(gov_initial.plugin_root)
+            self.assertIn(":", (reextracted / ".embedded-ags-pin").read_text(encoding="utf-8"))
+
+            a2_cfg = tamper_dir / "a2-profile.json"
+            a2_cfg.write_text('{"format":"tampered"}\n', encoding="utf-8")
+            gov_recovered = _ensure_local_governance_settings(tamper_dir)
+            self.assertIsNotNone(gov_recovered.observation_producer)
         finally:
             self.backend.unsubscribe_events(sub_q)
 

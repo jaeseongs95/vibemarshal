@@ -28,15 +28,15 @@ jobs:
       - name: Install Python dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install "setuptools>=77" wheel cryptography pydantic
+          pip install "setuptools>=77" wheel cryptography==50.0.1 openai-codex==0.147.0 pydantic==2.13.5
 
-      - name: Run Engine regression tests
+      - name: Run full Engine and repository unit test suite
         env:
           PYTHONPATH: src
           PYTHONUTF8: "1"
         run: |
           C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command '[Security.Principal.WindowsIdentity]::GetCurrent().User.Value | Out-Null'
-          python -m unittest tests.test_engine_g1b_reauth_target tests.test_engine_ags_a2_f06 tests.test_engine_http_api tests.test_engine_packaging
+          python -m unittest discover -s tests -p "test_*.py"
 
   desktop-tests:
     name: Desktop Vitest and Build
