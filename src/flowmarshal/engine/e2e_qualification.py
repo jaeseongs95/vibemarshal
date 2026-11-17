@@ -1713,7 +1713,7 @@ def _drive_normal_completion(
                 "actions": actions,
                 "failure": f"{outcome.blocker_code}: {outcome.detail}",
             }
-        time.sleep(0.5)
+        time.sleep(0.01)
     return {
         "passed": False,
         "source_fixture_digest": source_digest,

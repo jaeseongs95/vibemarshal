@@ -36,7 +36,7 @@ jobs:
           PYTHONUTF8: "1"
         run: |
           C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command '[Security.Principal.WindowsIdentity]::GetCurrent().User.Value | Out-Null'
-          python -m unittest tests/test_engine_cli.py tests/test_engine_console_authority.py tests/test_engine_core_capabilities.py tests/test_engine_plan_completion_reuse.py tests/test_engine_ags_a2_f06.py tests/test_engine_agy_gemini_e2e.py tests/test_engine_gemini_runtime.py tests/test_engine_claude_runtime.py tests/test_engine_runtime_e2e.py tests/test_engine_runtime_observation.py tests/test_engine_runtime_project_binding.py tests/test_legacy_budget_proxy.py tests/test_planner_r31_models.py tests/test_probe.py tests/test_sandbox_cli.py tests/test_windows_sandbox.py tests/test_engine_http_api.py
+          python -m unittest discover -s tests -p "test_*.py"
 
   desktop-tests:
     name: Desktop Vitest and Build

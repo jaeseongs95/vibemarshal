@@ -266,6 +266,12 @@ class CoreR2Tests(unittest.TestCase):
         self.assertIn(draft.canonical_digest, events[0]["payload_json"])
 
     def test_core_import_is_clean_and_legacy_api_has_explicit_compat_boundary(self) -> None:
+        import os
+
+        env = dict(os.environ)
+        src_dir = str(Path(__file__).resolve().parents[1] / "src")
+        existing_py = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = f"{src_dir}{os.pathsep}{existing_py}" if existing_py else src_dir
         probe = subprocess.run(
             [
                 sys.executable,
@@ -276,6 +282,7 @@ class CoreR2Tests(unittest.TestCase):
                 "seen=sorted(blocked.intersection(sys.modules)); "
                 "raise SystemExit('legacy-loaded:'+','.join(seen) if seen else 0)",
             ],
+            env=env,
             capture_output=True,
             text=True,
             encoding="utf-8",
