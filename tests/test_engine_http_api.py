@@ -171,6 +171,12 @@ class EngineHttpApiTests(unittest.TestCase):
         from flowmarshal.canonical import sha256_digest
         from flowmarshal.engine.domain import BudgetStage, BudgetUsageRecord, new_id, utc_now
 
+        before_snap = self._get("/api/v1/snapshot")
+        before_in = before_snap["budget"]["inputTokens"] or 0
+        before_cached = before_snap["budget"]["cachedInputTokens"] or 0
+        before_out = before_snap["budget"]["outputTokens"] or 0
+        before_lat = before_snap["budget"]["latencyMs"] or 0
+
         goal = self.backend.service.load_latest_goal(self.backend.project_id)
         self.backend.service.record_budget_usage(
             BudgetUsageRecord(
@@ -202,10 +208,10 @@ class EngineHttpApiTests(unittest.TestCase):
             )
         )
         snap = self._get("/api/v1/snapshot")
-        self.assertEqual(snap["budget"]["inputTokens"], 120)
-        self.assertEqual(snap["budget"]["cachedInputTokens"], 30)
-        self.assertEqual(snap["budget"]["outputTokens"], 45)
-        self.assertEqual(snap["budget"]["latencyMs"], 850)
+        self.assertEqual(snap["budget"]["inputTokens"], before_in + 120)
+        self.assertEqual(snap["budget"]["cachedInputTokens"], before_cached + 30)
+        self.assertEqual(snap["budget"]["outputTokens"], before_out + 45)
+        self.assertEqual(snap["budget"]["latencyMs"], before_lat + 850)
         self.assertIn("Gemini CLI (agy.exe)", snap["budget"]["availabilityReason"])
 
     def test_activate_plan_rejects_empty_or_mismatched_digest(self) -> None:
@@ -720,6 +726,34 @@ class EngineHttpApiTests(unittest.TestCase):
             cancelled_actions = [a["kind"] for a in cancel_res["data"]["possibleActions"] if a["enabled"]]
             self.assertIn("edit_goal", cancelled_actions)
             self.assertIn("search_plans", cancelled_actions)
+
+            # VM-D-0015 / VM-D-0032 / VM-D-0036 / VM-D-0051~0058:
+            # Verify genuine GovernanceSettings + GovernancePlugin, absence of FakeCodexRuntime in production runtime,
+            # and CLI --confirm-digest enforcement.
+            from flowmarshal.engine import cli, http_api, runtime
+            from flowmarshal.engine.governance_gate import GovernancePlugin, GovernanceSettings
+
+            self.assertIs(type(self.backend.governance), GovernanceSettings)
+            self.assertIs(type(self.backend.application.task_gate().plugin), GovernancePlugin)
+            self.assertNotIn("FakeCodexRuntime", Path(runtime.__file__).read_text(encoding="utf-8"))
+            self.assertFalse(hasattr(http_api, "_InProcessGovernancePlugin"))
+            self.assertFalse(hasattr(http_api, "_StructuredScenarioRoleRunner"))
+            out_missing = io.StringIO()
+            with redirect_stdout(out_missing):
+                rc_missing = cli.main(
+                    [
+                        "--db",
+                        str(self.db_path),
+                        "--artifacts",
+                        str(self.artifact_root),
+                        "goal",
+                        "authorize",
+                        "--project-id",
+                        self.backend.project_id,
+                    ]
+                )
+            self.assertNotEqual(rc_missing, 0)
+            self.assertIn("CORE_CAPABILITY_REQUIRED", out_missing.getvalue())
         finally:
             self.backend.unsubscribe_events(sub_q)
 

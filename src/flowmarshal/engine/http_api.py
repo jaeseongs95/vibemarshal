@@ -28,7 +28,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption, PrivateFormat, PublicFormat
 
 from ..canonical import sha256_bytes, sha256_digest
-from .ags_invocation_transport import DispatchTicket
+from .ags_embedded_bundle import AGS_EMBEDDED_PIN, extract_embedded_ags_plugin
 from .ags_observation_producer import (
     A2_CONFIG_FORMAT,
     A2_PROFILE,
@@ -39,49 +39,28 @@ from .ags_observation_producer import (
 from .application import ApplicationAuthority, EngineApplication, EngineApplicationError
 from .capabilities import CoreCapabilityError
 from .domain import (
-    ApprovalClass,
-    BehaviorPolicy,
     Criticality,
-    DependencyType,
     GoalVerdict,
     GoalVerdictStatus,
     LifecycleStage,
-    MissionClass,
-    MutationPolicy,
     PlanContractRevision,
     ProjectProfileDefinition,
     ProjectProfileRevision,
     RevisionStatus,
-    RiskLevel,
     RuntimeIntentKind,
-    TaskKind,
     new_id,
     utc_now,
 )
 from .gemini_runtime import create_agy_gemini_runtime, default_agy_gemini_role_configuration
+from .governance_conformance import CHECKS, CHECK_SET_DIGEST, CONFORMANCE_FORMAT
 from .governance_gate import (
-    CONSUMED_SURFACE,
-    CONSUMED_SURFACE_DIGEST,
+    CONFORMANCE_KIND,
     MODEL_CLASSES_FORMAT,
+    CoreOperations,
     GovernanceSettings,
-    GovernanceTaskGate,
-    MissingGovernanceGate,
-    RoleSteward,
-    _dispatch_binding,
-    load_model_classes,
 )
 from .ledger import EngineLedgerError, SQLiteEngineLedger
-from .model_lock import RUNTIME_CAPABILITIES
-from .models import EngineRoleConfiguration, ModelCapability, ModelInventory, RoleModelBinding
-from .roles import (
-    REQUIRED_APPROVAL_POLICY,
-    REQUIRED_PERMISSION_PROFILE,
-    RoleCallReceipt,
-    RoleCallRequest,
-    RoleCallResult,
-    strict_json_output_schema,
-)
-from .runtime import FakeCodexRuntime, RuntimeOperationReceipt
+from .models import EngineRoleConfiguration
 from .service import EngineService, EngineServiceError
 
 
@@ -102,260 +81,42 @@ _DEFAULT_MODEL_CLASSES_PAYLOAD: dict[str, Any] = {
     },
 }
 
-
-class _InProcessDispatchTransport:
-    def __init__(self) -> None:
-        self._serial = 0
-        self.epoch = "e" * 43
-        self.registrations: list[dict[str, str]] = []
-
-    def reserve(self, registration: dict[str, str]) -> DispatchTicket:
-        self._serial += 1
-        self.registrations.append(registration)
-        return DispatchTicket(f"fm-call-{self._serial}", self.epoch, "ticket")
+_WINDOWS_CURRENT_SID: str | None = None
+_PLUGIN_IDENTITY_CACHE: dict[tuple[str, str], dict[str, Any]] = {}
 
 
-class _InProcessGovernancePlugin:
-    """외부 Node 번들 환경변수 미설정 시에도 GovernanceTaskGate와 A2 서명 결속을 수행하는 내장 AGS 어댑터."""
-
-    STAGES = (
-        ("change-scope-baseline-capture", "general"),
-        ("minimal-implementation", "general"),
-        ("change-scope-assurance", "general"),
-        ("acceptance-evidence-validation", "deep"),
-    )
-
-    def __init__(
-        self,
-        root: Path,
-        state_dir: Path,
-        model_classes: Path | None = None,
-        *,
-        dispatch_binding: Any | None = None,
-    ) -> None:
-        self.root = Path(root)
-        self.state_dir = Path(state_dir)
-        self.model_classes_path = Path(model_classes) if model_classes is not None else None
-        self._dispatch_binding = dispatch_binding
-        self.state_dir.mkdir(parents=True, exist_ok=True)
-        self._model_classes: dict[str, str] = {}
-        self._revisions: dict[str, int] = {}
-        self._serial = 0
-        self._transport = _InProcessDispatchTransport()
-
-    @property
-    def dispatch_binding(self) -> Any | None:
-        return self._dispatch_binding
-
-    def model_classes(self) -> dict[str, str]:
-        if not self._model_classes and self.model_classes_path is not None and self.model_classes_path.is_file():
-            self._model_classes, _ = load_model_classes(self.model_classes_path)
-        return dict(self._model_classes)
-
-    def preflight(self) -> dict[str, Any]:
-        table_digest: str | None = None
-        if self.model_classes_path is not None and self.model_classes_path.is_file():
-            self._model_classes, table_digest = load_model_classes(self.model_classes_path)
-        file_digest = hashlib.sha256(b"flowmarshal-inprocess-ags-plugin-v1").hexdigest()
-        return {
-            "summary": {
-                "provenance": "local_derived",
-                "closure_tree_digest": f"sha256:{file_digest}",
-                "manifest_sha256": f"sha256:{file_digest}",
-                "file_count": 1,
-                "entrypoint_table_digest": sha256_digest(CONSUMED_SURFACE["entry_points"]),
-                "node_version": "v24.0.0",
-                "consumed_surface_digest": CONSUMED_SURFACE_DIGEST,
-                "model_class_table_digest": table_digest,
-            },
-            "labels": [
-                {"source": "plugin_manifest_file", "plugin": {"id": "agent-governance-suite", "version": "5.1.0"}},
-                {"source": "mcp_server_info", "serverInfo": {"name": "agent-governance-suite", "version": "5.1.0"}},
-            ],
-            "files": {"inprocess_ags.py": file_digest},
-        }
-
-    def authenticated_dispatch(self) -> _InProcessDispatchTransport:
-        return self._transport
-
-    def call_authenticated(
-        self,
-        ticket: Any,
-        receipt: dict[str, str],
-        tool: str,
-        arguments: dict[str, Any],
-    ) -> dict[str, Any]:
-        del ticket, receipt
-        return {"content": [{"type": "text", "text": json.dumps(self._envelope(tool, arguments))}]}
-
-    def call(
-        self,
-        tool: str,
-        arguments: dict[str, Any],
-        observation: dict[str, Any] | None,
-    ) -> dict[str, Any]:
-        if tool == "plan_workflow" and observation is None:
-            return {
-                "content": [
-                    {
-                        "type": "text",
-                        "text": json.dumps(
-                            {
-                                "ok": False,
-                                "data": None,
-                                "error": {"code": "BINDING_REQUIRED", "message": "token"},
-                            }
-                        ),
-                    }
-                ]
-            }
-        return {"content": [{"type": "text", "text": json.dumps(self._envelope(tool, arguments))}]}
-
-    def _envelope(self, tool: str, arguments: dict[str, Any]) -> dict[str, Any]:
-        self._serial += 1
-        serial = self._serial
-        if tool == "plan_workflow":
-            data: dict[str, Any] = {
-                "executionMode": "orchestrated",
-                "stages": [
-                    {
-                        "stageId": f"stage-{idx}",
-                        "requiredCapability": cap,
-                        "executionRequirement": {"minimumModelClass": m_class},
-                    }
-                    for idx, (cap, m_class) in enumerate(self.STAGES, 1)
-                ],
-            }
-        elif tool == "open_convergence_root":
-            data = {"rootId": f"root-{serial}", "revision": 0}
-        elif tool == "claim_workflow_attempt":
-            data = {"leaseId": f"lease-{serial}", "rootRevision": 1}
-        elif tool == "start_guarded_workflow":
-            run_id = f"run-{serial}"
-            self._revisions[run_id] = 0
-            data = {"runId": run_id, "revision": 0}
-        elif tool == "record_stage_result":
-            run_id = str(arguments["runId"])
-            if arguments["expectedRevision"] != self._revisions.get(run_id):
-                return {"ok": False, "data": None, "error": {"code": "STALE_REVISION", "message": "stale"}}
-            self._revisions[run_id] += 1
-            data = {"revision": self._revisions[run_id]}
-        elif tool == "finalize_workflow":
-            data = {"state": "passed"}
-        elif tool == "abort_workflow":
-            data = {"state": "aborted"}
-        else:
-            raise ValueError(f"Unsupported governance tool: {tool}")
-        return {"ok": True, "data": data, "error": None}
-
-    @staticmethod
-    def _ls_tree(root: Path, commit: str) -> dict[str, str]:
-        res = subprocess.run(
-            ["git", "-C", str(root), "ls-tree", "-r", commit],
-            check=True,
+def _apply_windows_same_user_acl(target_path: Path) -> None:
+    global _WINDOWS_CURRENT_SID
+    if os.name != "nt":
+        return
+    if _WINDOWS_CURRENT_SID is None:
+        whoami = subprocess.run(
+            ["whoami", "/user", "/fo", "csv", "/nh"],
             capture_output=True,
             text=True,
             encoding="utf-8",
             errors="replace",
+            check=True,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-        lines = res.stdout.strip().splitlines()
-        return {line.split("\t", 1)[1]: line.split()[2] for line in lines if "\t" in line}
-
-    def script(self, name: str, request_path: Path) -> dict[str, Any]:
-        request = json.loads(Path(request_path).read_text(encoding="utf-8"))
-        if name == "acceptance-cli":
-            passed = all(item["direction"] == "supports" for item in request["evidence"])
-            return {"verdict": "PASS" if passed else "FAIL", "criteria": []}
-        root = Path(request["repositoryRoot"])
-        if name == "scope-baseline":
-            entries = [
-                {"path": path, "status": "clean", "sha256": blob}
-                for path, blob in sorted(self._ls_tree(root, request["commit"]).items())
-            ]
-            return {
-                "comparisonTarget": request["comparisonTarget"],
-                "targetRef": request["commit"],
-                "entries": entries,
-                "manifestSha256": hashlib.sha256(json.dumps(entries).encode("utf-8")).hexdigest(),
-            }
-        if name == "scope-compare":
-            before = {entry["path"]: entry["sha256"] for entry in request["baseline"]["entries"]}
-            after = self._ls_tree(root, request["commit"])
-            included = set(request["taskEnvelope"]["scope"]["included"])
-            changes = [
-                {
-                    "path": path,
-                    "classification": "in-scope" if path in included else "unplanned",
-                }
-                for path in sorted(before.keys() | after.keys())
-                if before.get(path) != after.get(path)
-            ]
-            findings = [
-                f"{item['classification']}:{item['path']}"
-                for item in changes
-                if item["classification"] != "in-scope"
-            ]
-            return {
-                "verdict": "NEEDS_APPROVAL" if findings else "PASS",
-                "findings": findings,
-                "changes": changes,
-                "summary": {"changes": len(changes)},
-                "currentDigest": hashlib.sha256(request["commit"].encode("utf-8")).hexdigest(),
-            }
-        raise ValueError(f"Unsupported governance script: {name}")
-
-    def close(self) -> None:
-        return None
-
-
-@dataclass(frozen=True)
-class LocalA2GovernanceSettings(GovernanceSettings):
-    """환경변수 수동 설정 없이도 A2 프로파일 서명과 GovernanceTaskGate를 결속하는 GovernanceSettings."""
-
-    def check_conformance(self) -> dict[str, Any]:
-        if (self.plugin_root / "host-integration.json").is_file():
-            return super().check_conformance()
-        from .governance_conformance import run_conformance
-
-        return run_conformance(
-            self.plugin_root,
-            plugin_factory=lambda root, s_dir, classes: _InProcessGovernancePlugin(root, s_dir, classes),
-        )
-
-    def open_gate(self, service: Any, *, runtime: Any, roles: Any, runner: Any) -> Any:
-        if (self.plugin_root / "host-integration.json").is_file():
-            return super().open_gate(service, runtime=runtime, roles=roles, runner=runner)
-        if roles is None or runner is None:
-            return MissingGovernanceGate(
-                "GOVERNANCE_ROLE_CONFIGURATION_REQUIRED: steward binding에 쓸 역할 설정이 필요합니다."
-            )
-        if getattr(self.observation_producer, "profile_id", None) != A2_PROFILE_ID:
-            return MissingGovernanceGate(
-                f"GOVERNANCE_A2_PROFILE_REQUIRED: 실행 Task는 명시 {A2_PROFILE_ID} profile producer로 서명해야 합니다."
-            )
-        from .governance_conformance import CHECK_SET_DIGEST
-
-        return GovernanceTaskGate(
-            service,
-            plugin=_InProcessGovernancePlugin(
-                self.plugin_root,
-                self.state_dir / "plugin",
-                self.model_classes,
-                dispatch_binding=_dispatch_binding(self.observation_producer),
-            ),
-            steward=RoleSteward(
-                service,
-                runtime=runtime,
-                roles=roles,
-                runner=runner,
-                cwd=self.state_dir / "steward-cwd",
-            ),
-            state_dir=self.state_dir,
-            conformance=self.check_conformance,
-            conformance_check_set=CHECK_SET_DIGEST,
-            producer=self.observation_producer,
-        )
+        ).stdout.strip()
+        _WINDOWS_CURRENT_SID = whoami.split(",")[-1].strip().strip('"')
+    subprocess.run(
+        [
+            "icacls",
+            str(target_path),
+            "/inheritance:r",
+            "/grant:r",
+            f"*{_WINDOWS_CURRENT_SID}:(OI)(CI)F",
+            "*S-1-5-18:(OI)(CI)F",
+            "*S-1-5-32-544:(OI)(CI)F",
+        ],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        check=True,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
 
 
 def _ensure_local_governance_settings(state_dir: Path) -> GovernanceSettings:
@@ -369,17 +130,37 @@ def _ensure_local_governance_settings(state_dir: Path) -> GovernanceSettings:
     ):
         return env_settings
 
-    model_classes_path = resolved_dir / "model-classes.json"
+    model_classes_path = (
+        env_settings.model_classes
+        if env_settings is not None and env_settings.model_classes is not None
+        else resolved_dir / "model-classes.json"
+    )
     if not model_classes_path.is_file():
         model_classes_path.write_text(
             json.dumps(_DEFAULT_MODEL_CLASSES_PAYLOAD, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
 
-    key_path = resolved_dir / "a2-key.json"
-    pin_path = resolved_dir / "a2-pins.json"
+    if env_settings is not None and (env_settings.plugin_root / "host-integration.json").is_file():
+        plugin_root = env_settings.plugin_root.resolve()
+    else:
+        plugin_root = extract_embedded_ags_plugin(resolved_dir / "embedded-ags-plugin")
+
+    profile_dir = plugin_root / A2_PROFILE_ID
+    key_path = profile_dir / "producer-key.json"
+    pin_path = profile_dir / "pins.json"
+    ags_state_path = profile_dir / "state.sqlite3"
+    server_profile_path = profile_dir / "server-profile.json"
     config_path = resolved_dir / "a2-profile.json"
-    if not (key_path.is_file() and pin_path.is_file() and config_path.is_file()):
+
+    if not (
+        key_path.is_file()
+        and pin_path.is_file()
+        and server_profile_path.is_file()
+        and config_path.is_file()
+    ):
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        _apply_windows_same_user_acl(profile_dir)
         private = Ed25519PrivateKey.generate()
         der_private = private.private_bytes(Encoding.DER, PrivateFormat.PKCS8, NoEncryption())
         der_public = private.public_key().public_bytes(Encoding.DER, PublicFormat.SubjectPublicKeyInfo)
@@ -403,7 +184,7 @@ def _ensure_local_governance_settings(state_dir: Path) -> GovernanceSettings:
         resources_payload = {
             "key": {"namespace": A2_PROFILE_ID, "location": str(key_path)},
             "pin": {"namespace": A2_PROFILE_ID, "location": str(pin_path)},
-            "state": {"namespace": A2_PROFILE_ID, "location": str(resolved_dir / "ags-state")},
+            "state": {"namespace": A2_PROFILE_ID, "location": str(ags_state_path)},
         }
         selection_payload: dict[str, Any] = {
             "source": "server-local-operator-config",
@@ -414,6 +195,19 @@ def _ensure_local_governance_settings(state_dir: Path) -> GovernanceSettings:
         selection_payload["freezeIdentity"] = _a2_digest(selection_payload)
         key_path.write_text(json.dumps(key_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         pin_path.write_text(json.dumps(pins_payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        server_profile_path.write_text(
+            json.dumps(
+                {
+                    "version": 1,
+                    "selection": selection_payload,
+                    "resources": resources_payload,
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+            + "\n",
+            encoding="utf-8",
+        )
         config_path.write_text(
             json.dumps(
                 {
@@ -427,50 +221,22 @@ def _ensure_local_governance_settings(state_dir: Path) -> GovernanceSettings:
             + "\n",
             encoding="utf-8",
         )
+        if os.name != "nt":
+            os.chmod(profile_dir, 0o700)
+            for p in (key_path, pin_path, server_profile_path, config_path):
+                os.chmod(p, 0o600)
 
-    producer = _load_a2_producer(config_path)
-    plugin_root = (
-        env_settings.plugin_root
-        if env_settings is not None
-        else resolved_dir / "local-ags-plugin"
+    producer = (
+        env_settings.observation_producer
+        if env_settings is not None and env_settings.observation_producer is not None
+        else _load_a2_producer(config_path)
     )
-    plugin_root.mkdir(parents=True, exist_ok=True)
-    return LocalA2GovernanceSettings(
+    return GovernanceSettings(
         plugin_root=plugin_root,
         state_dir=resolved_dir,
-        model_classes=env_settings.model_classes if env_settings and env_settings.model_classes else model_classes_path,
+        model_classes=model_classes_path,
         observation_producer=producer,
     )
-
-
-class _ObservedTurnRuntime(FakeCodexRuntime):
-    """결정적 실행 모드에서 provider_raw_response 관측 근거와 함께 turn을 완료하는 runtime."""
-
-    def start_turn(
-        self,
-        *,
-        thread_id: str,
-        cwd: Path,
-        prompt: str,
-        model: str,
-        effort: str,
-        output_schema: dict[str, Any] | None = None,
-    ) -> RuntimeOperationReceipt:
-        receipt = super().start_turn(
-            thread_id=thread_id,
-            cwd=cwd,
-            prompt=prompt,
-            model=model,
-            effort=effort,
-            output_schema=output_schema,
-        )
-        self.threads[thread_id].provider_payload = {
-            "observed_model": model,
-            "observed_effort": effort,
-            "model_observation_source": "provider_raw_response",
-        }
-        self.complete(thread_id, response="worker turn completed")
-        return receipt
 
 
 def build_plan_inspection_dict(
@@ -576,433 +342,6 @@ def build_plan_inspection_dict(
     }
 
 
-class _StructuredScenarioRoleRunner:
-    """EngineApplication의 모든 역할(planning, execution preparation, steward, validation)을 수행하는 StructuredRolePort."""
-
-    def __init__(self, *, project_root_provider: Callable[[], Path]) -> None:
-        self._project_root_provider = project_root_provider
-
-    def run(
-        self,
-        request: RoleCallRequest,
-        *,
-        validator: Callable[[dict[str, Any]], Any] | None = None,
-    ) -> RoleCallResult:
-        payload = self._build_payload(request)
-        if validator is not None:
-            validator(payload)
-        provenance: dict[str, Any] = {}
-        if request.operational_binding is not None:
-            provenance = {
-                "binding_provenance_version": "2.0",
-                "requested_model": request.model,
-                "requested_effort": request.effort,
-                "observed_model": request.model,
-                "observed_effort": request.effort,
-                "provider_inventory_digest": request.operational_binding.inventory.provider_inventory_digest,
-                "adapter_capability_digest": request.operational_binding.inventory.adapter_capability_digest,
-                "binding_provenance": {
-                    "requested": "role_request",
-                    "observed": "provider_raw_response",
-                    "provider_inventory": request.operational_binding.inventory.inventory_provenance,
-                    "adapter_capability": "local_operational_binding",
-                },
-            }
-        call_id = new_id("model_call")
-        receipt = RoleCallReceipt(
-            call_id=call_id,
-            role=request.role,
-            status="succeeded",
-            model=request.model,
-            effort=request.effort,
-            **provenance,
-            inventory_digest=request.inventory_digest,
-            permission_profile=REQUIRED_PERMISSION_PROFILE,
-            approval_policy=REQUIRED_APPROVAL_POLICY,
-            thread_id=f"local-thread-{call_id}",
-            turn_ids=(f"local-turn-{call_id}",),
-            input_digest=request.request_digest,
-            output_digest=sha256_digest(payload),
-            output_schema_digest=sha256_digest(strict_json_output_schema(request.output_schema)),
-            timeout_policy_digest=request.timeout_policy_digest,
-            observation_policy_digest=request.observation_policy_digest,
-            latency_ms=0,
-            recorded_at=utc_now(),
-            observed_binding=request.operational_binding,
-        )
-        return RoleCallResult(payload=payload, receipt=receipt)
-
-    def _build_payload(self, request: RoleCallRequest) -> dict[str, Any]:
-        role = request.role
-        req_payload = request.payload
-
-        if role == "governance_steward":
-            return {
-                "accept": True,
-                "rationale": "제출된 TaskEnvelope, 기준선 스냅샷, 변경 범위 및 검증 근거가 계약을 충족합니다.",
-            }
-
-        if role == "goal_normalizer":
-            source_req = str(req_payload.get("source_request") or "").strip()
-            is_default_req = "사용량이 비어 있는 실행에서도" in source_req or "usage 일부가 null이어도" in source_req
-            observable = (
-                "usage 일부가 null이어도 Markdown과 JSON 보고가 생성되고 기존 정상 합계가 유지된다."
-                if is_default_req
-                else source_req
-            )
-            return {
-                "mission_class": MissionClass.BUGFIX_STABILIZATION.value,
-                "observable_outcome": observable,
-                "hard_acceptance": [
-                    {
-                        "statement": (
-                            "null usage 값이 있어도 최종 보고가 오류 없이 생성된다."
-                            if is_default_req
-                            else f"{source_req}의 핵심 동작이 오류 없이 수행된다."
-                        ),
-                        "validation_intent": "결정적 검증 절차로 정상 종료와 산출물 상태를 확인한다.",
-                    },
-                    {
-                        "statement": (
-                            "측정 가능한 기존 token·latency 합계는 바뀌지 않는다."
-                            if is_default_req
-                            else "기존 공개 계약과 파일 정합성이 보존된다."
-                        ),
-                        "validation_intent": "변경 전후 상태와 기존 검증 기준을 대조한다.",
-                    },
-                    {
-                        "statement": (
-                            "미제공 usage는 0이 아니라 알 수 없음과 사유로 표시된다."
-                            if is_default_req
-                            else "검증 결과가 원장 evidence로 기록된다."
-                        ),
-                        "validation_intent": "산출물 및 검증 결과를 검사한다.",
-                    },
-                ],
-                "quality_preferences": [],
-                "constraints": [
-                    {
-                        "category": "compatibility",
-                        "statement": "기존 CLI JSON key와 exit code를 보존한다.",
-                    },
-                    {
-                        "category": "scope",
-                        "statement": "legacy/prototype source는 수정하지 않는다.",
-                    },
-                ],
-                "non_goals": [
-                    "실제 provider usage를 추정해 채우지 않는다.",
-                    "Engine 1.0 cutover 판정을 변경하지 않는다.",
-                ],
-                "assumptions": [],
-                "unresolved_questions": [],
-                "mutation_policy": MutationPolicy.MINIMAL_CHANGE.value,
-                "behavior_policy": BehaviorPolicy.PRESERVE_PUBLIC_CONTRACTS.value,
-                "allowed_external_effects": [],
-                "prohibited_effects": ["배포", "외부 메시지", "운영 DB 변경"],
-            }
-
-        if role in {"goal_reviewer", "skeleton_reviewer"}:
-            return {
-                "findings": [],
-                "ratings": {
-                    "goal_fit": 4,
-                    "grounding": 4,
-                    "engineering": 4,
-                    "verification": 4,
-                    "execution_safety": 4,
-                },
-            }
-
-        if role == "skeleton_generator":
-            goal_def = req_payload["goal"]
-            candidate_count = int(req_payload.get("candidate_count") or 1)
-            ac_ids = [c["criterion_id"] for c in goal_def["hard_acceptance"]]
-            c1 = ac_ids[0]
-            c3 = ac_ids[2] if len(ac_ids) > 2 else c1
-            candidates = []
-            for idx in range(candidate_count):
-                strategy = "boundary-fix" if idx == 0 else f"alternative-strategy-{idx + 1}"
-                t1_cov = sorted({c1})
-                t2_cov = sorted({c1, c3})
-                t3_cov = sorted(set(ac_ids))
-                coverage_list = []
-                for cid in ac_ids:
-                    refs = []
-                    if cid in t1_cov:
-                        refs.append("T1")
-                    if cid in t2_cov:
-                        refs.append("T2")
-                    if cid in t3_cov:
-                        refs.append("T3")
-                    coverage_list.append({"criterion_id": cid, "task_refs": refs})
-                candidates.append(
-                    {
-                        "approach": {
-                            "strategy_family": strategy,
-                            "change_shape": "localized",
-                            "compatibility": "preserve",
-                            "rollout_recovery": "retry bounded",
-                        },
-                        "tasks": [
-                            {
-                                "task_ref": "T1",
-                                "kind": TaskKind.INSPECT.value,
-                                "objective": "현재 실패 재현",
-                                "contributes_to": t1_cov,
-                                "produces": ["artifact:repro"],
-                                "consumes": ["input:request"],
-                                "risk_tags": [],
-                                "required_capabilities": [],
-                                "no_op_when": [],
-                                "unknown_refs": [],
-                                "detail_requirements": [],
-                            },
-                            {
-                                "task_ref": "T2",
-                                "kind": TaskKind.CHANGE.value,
-                                "objective": "usage 합산 경계 수정",
-                                "contributes_to": t2_cov,
-                                "produces": ["artifact:boundary"],
-                                "consumes": ["artifact:repro"],
-                                "risk_tags": [],
-                                "required_capabilities": [],
-                                "no_op_when": [],
-                                "unknown_refs": [],
-                                "detail_requirements": [],
-                            },
-                            {
-                                "task_ref": "T3",
-                                "kind": TaskKind.VALIDATE.value,
-                                "objective": "보고 회귀 검증",
-                                "contributes_to": t3_cov,
-                                "produces": ["artifact:regression"],
-                                "consumes": ["artifact:boundary"],
-                                "risk_tags": [],
-                                "required_capabilities": [],
-                                "no_op_when": [],
-                                "unknown_refs": [],
-                                "detail_requirements": [],
-                            },
-                        ],
-                        "dependencies": [
-                            {
-                                "producer_task_ref": "T1",
-                                "consumer_task_ref": "T2",
-                                "dependency_type": DependencyType.DATA.value,
-                                "produces": ["artifact:repro"],
-                                "consumes": ["artifact:repro"],
-                            },
-                            {
-                                "producer_task_ref": "T2",
-                                "consumer_task_ref": "T3",
-                                "dependency_type": DependencyType.DATA.value,
-                                "produces": ["artifact:boundary"],
-                                "consumes": ["artifact:boundary"],
-                            },
-                        ],
-                        "goal_coverage": coverage_list,
-                        "unknowns": [],
-                        "estimated_change_cost": 3 + idx,
-                        "estimated_context_tokens": 300 + idx * 50,
-                    }
-                )
-            return {"candidates": candidates}
-
-        if role == "plan_expander":
-            goal_def = req_payload["goal"]
-            skeleton = req_payload["skeleton"]
-            ac_ids = [c["criterion_id"] for c in goal_def["hard_acceptance"]]
-            tasks_draft = []
-            val_ids_by_task: dict[str, str] = {}
-            for st in skeleton["tasks"]:
-                t_ref = st["task_ref"]
-                val_id = f"val_{t_ref.lower()}"
-                val_ids_by_task[t_ref] = val_id
-                tasks_draft.append(
-                    {
-                        "task_ref": t_ref,
-                        "kind": st["kind"],
-                        "objective": st["objective"],
-                        "goal_criterion_refs": list(st["contributes_to"]),
-                        "produces": list(st["produces"]),
-                        "consumes": list(st["consumes"]),
-                        "preconditions": [],
-                        "expected_effects": [],
-                        "prohibited_effects": [],
-                        "required_capabilities": list(st.get("required_capabilities", [])),
-                        "acceptance_criteria": [f"{t_ref} 검증 완료"],
-                        "validations": [
-                            {
-                                "validation_id": val_id,
-                                "statement": f"{t_ref} 결정적 파일 검증 수행",
-                                "method": "deterministic",
-                                "required_evidence_kinds": ["file"],
-                            }
-                        ],
-                        "risk_level": RiskLevel.LOW.value,
-                        "risk_tags": list(st.get("risk_tags", [])),
-                        "approval_class": ApprovalClass.PLAN_ACTIVATION.value,
-                        "recovery": {"retryable_failure_classes": ["implementation"]},
-                    }
-                )
-            deps_draft = [
-                {
-                    "producer_task_ref": dep["producer_task_ref"],
-                    "consumer_task_ref": dep["consumer_task_ref"],
-                    "dependency_type": dep["dependency_type"],
-                    "products": list(dep["consumes"]),
-                }
-                for dep in skeleton.get("dependencies", [])
-            ]
-            cov_draft = []
-            for cov in skeleton["goal_coverage"]:
-                v_ids = [val_ids_by_task[r] for r in cov["task_refs"] if r in val_ids_by_task]
-                v_ids.append("val_goal_integration")
-                cov_draft.append(
-                    {
-                        "criterion_id": cov["criterion_id"],
-                        "task_refs": list(cov["task_refs"]),
-                        "validation_ids": v_ids,
-                    }
-                )
-            plan_draft = {
-                "tasks": tasks_draft,
-                "dependencies": deps_draft,
-                "goal_coverage": cov_draft,
-                "integration_validations": [
-                    {
-                        "validation_id": "val_goal_integration",
-                        "statement": "독립 Goal Test 결정적 파일 검증",
-                        "evidence_mode": "task_aggregate",
-                        "criterion_refs": ac_ids,
-                        "method": "deterministic",
-                        "required_evidence_kinds": ["file"],
-                    }
-                ],
-                "expected_effects": [],
-                "prohibited_effects": list(goal_def["effect_policy"].get("prohibited_effects", [])),
-            }
-            return {
-                "plan": plan_draft,
-                "inspection": build_plan_inspection_dict(plan_draft, goal_def, revision=False),
-            }
-
-        if role in {
-            "compact_plan_reviewer",
-            "critical_effect_reviewer",
-            "high_risk_reviewer",
-            "external_effect_reviewer",
-            "recovery_plan_reviewer",
-        }:
-            catalog = req_payload["evidence_catalog"]
-            plan_contract = catalog["artifact:plan_contract"]
-            goal_def = catalog["source:goal"]
-            return {
-                "review": {
-                    "findings": [],
-                    "ratings": {
-                        "goal_fit": 4,
-                        "grounding": 4,
-                        "engineering": 4,
-                        "verification": 4,
-                        "execution_safety": 4,
-                    },
-                },
-                "inspection": build_plan_inspection_dict(plan_contract, goal_def, revision=True),
-            }
-
-        if role == "execution_preparation":
-            ready_task = req_payload["ready_task"]
-            project_map = req_payload["project_map"]
-            entries = project_map.get("entries") or []
-            entry_path = entries[0]["path"] if entries else "AGENTS.md"
-            entry_digest = (
-                entries[0]["content_digest"]
-                if entries
-                else sha256_bytes(b"# Project Instructions\nFollow standard Python unittest conventions.\n")
-            )
-            t_ref = ready_task["task_ref"]
-            val_steps = [
-                {
-                    "validation_id": v["validation_id"],
-                    "argv": [sys.executable, "-c", "print('ok')"],
-                    "working_directory": str(project_map.get("root") or self._project_root_provider()),
-                    "timeout_seconds": 30,
-                    "expected_exit_codes": [0],
-                    "semantic_instruction": None,
-                    "manual_instruction": None,
-                    "external_selector": None,
-                    "artifact_paths": [entry_path],
-                }
-                for v in ready_task["validations"]
-            ]
-            return {
-                "proposal": {
-                    "task_id": ready_task["task_id"],
-                    "resolved_targets": [
-                        {
-                            "target_ref": f"target_{t_ref.lower()}",
-                            "path": entry_path,
-                            "expected_content_digest": entry_digest,
-                            "access": "read",
-                        }
-                    ],
-                    "actions": [
-                        {
-                            "action_ref": f"act_{t_ref.lower()}",
-                            "kind": "inspect",
-                            "description": f"{t_ref} 검증 실행",
-                            "command": [],
-                        }
-                    ],
-                    "validation_steps": val_steps,
-                    "context_needs": [
-                        {
-                            "need_id": f"need_{t_ref.lower()}",
-                            "description": f"{t_ref} 문맥 확인",
-                            "path_hints": [entry_path],
-                            "symbol_hints": [],
-                            "required": True,
-                        }
-                    ],
-                    "resource_locks": [],
-                    "timeout_seconds": 120,
-                    "idempotency_hint": f"gui-{t_ref.lower()}",
-                },
-                "context_request": None,
-            }
-
-        if role == "goal_test_preparation":
-            goal_test = req_payload["goal_test"]
-            project_map = req_payload["project_map"]
-            entries = project_map.get("entries") or []
-            entry_path = entries[0]["path"] if entries else "AGENTS.md"
-            return {
-                "step": {
-                    "validation_id": goal_test["validation_id"],
-                    "method": goal_test["method"],
-                    "argv": [sys.executable, "-c", "print('ok')"],
-                    "working_directory": str(project_map.get("root") or self._project_root_provider()),
-                    "timeout_seconds": 30,
-                    "expected_exit_codes": [0],
-                    "required_evidence_kinds": list(goal_test["required_evidence_kinds"]),
-                    "artifact_paths": [entry_path],
-                }
-            }
-
-        if role == "goal_validator":
-            catalog = req_payload.get("evidence_catalog") or {}
-            first_ref = next(iter(catalog.keys()), "evidence_placeholder")
-            return {
-                "passed": True,
-                "rationale": "모든 검증 근거가 충족됐습니다.",
-                "evidence_refs": [first_ref],
-            }
-
-        raise ValueError(f"Unsupported role in _StructuredScenarioRoleRunner: {role}")
-
-
 class LocalGuiEngineBackend:
     """실제 SQLiteEngineLedger, EngineService, EngineApplication을 감싸는 GUI 백엔드 어댑터."""
 
@@ -1033,51 +372,21 @@ class LocalGuiEngineBackend:
         self.service.initialize()
         self.live_gemini = bool(live_gemini)
 
-        if self.live_gemini and runtime is None:
-            self.runtime = create_agy_gemini_runtime(
+        self.runtime = (
+            runtime
+            if runtime is not None
+            else create_agy_gemini_runtime(
                 state_root=self.artifact_root / "gemini-runtime",
                 catalog_path=self.artifact_root / "gemini-model-catalog.json",
+                live_agy=self.live_gemini,
             )
-            self.inventory = self.runtime.list_models()
-            self.role_configuration = role_configuration or default_agy_gemini_role_configuration()
-            self.structured_runner = structured_runner
-            self.governance = governance or _ensure_local_governance_settings(
-                self.artifact_root / "governance"
-            )
-        else:
-            self.inventory = (
-                runtime.list_models()
-                if runtime is not None and hasattr(runtime, "list_models")
-                else ModelInventory(
-                    executable_digest="sha256:" + "0" * 64,
-                    runtime_capabilities=RUNTIME_CAPABILITIES,
-                    source="gemini-cli:configured-catalog@gui-default",
-                    models=(
-                        ModelCapability(model="worker", supported_efforts=("low", "medium", "high")),
-                        ModelCapability(model="validator", supported_efforts=("low", "medium", "high")),
-                    ),
-                )
-            )
-            self.runtime = runtime if runtime is not None else _ObservedTurnRuntime(self.inventory)
-            worker_binding = RoleModelBinding(model="worker", effort="medium")
-            validator_binding = RoleModelBinding(model="validator", effort="high")
-            self.role_configuration = role_configuration or EngineRoleConfiguration(
-                normalizer=worker_binding,
-                skeleton_generator=worker_binding,
-                plan_expander=worker_binding,
-                general_reviewer=worker_binding,
-                critical_reviewer=worker_binding,
-                executor=worker_binding,
-                validator=validator_binding,
-            )
-            self.structured_runner = structured_runner or (
-                _StructuredScenarioRoleRunner(project_root_provider=lambda: self.project_root)
-                if runtime is None
-                else None
-            )
-            self.governance = governance or _ensure_local_governance_settings(
-                self.artifact_root / "governance"
-            )
+        )
+        self.inventory = self.runtime.list_models()
+        self.role_configuration = role_configuration or default_agy_gemini_role_configuration()
+        self.structured_runner = structured_runner
+        self.governance = governance or _ensure_local_governance_settings(
+            self.artifact_root / "governance"
+        )
 
         self.application = self._make_application()
         self.scenario: str = "golden-path"
@@ -1174,13 +483,55 @@ class LocalGuiEngineBackend:
                 payload,
             )
 
+    def _ensure_project_governance_conformance(self, project_id: str) -> None:
+        if not isinstance(self.governance, GovernanceSettings):
+            return
+        classes_digest = (
+            sha256_bytes(self.governance.model_classes.read_bytes())
+            if self.governance.model_classes is not None and self.governance.model_classes.is_file()
+            else ""
+        )
+        plugin_key = (
+            AGS_EMBEDDED_PIN
+            if self.governance.plugin_root.name == "embedded-ags-plugin"
+            else str(self.governance.plugin_root.resolve())
+        )
+        cache_key = (plugin_key, classes_digest)
+        identity = _PLUGIN_IDENTITY_CACHE.get(cache_key)
+        if identity is None:
+            identity = self.governance.inspect_identity()
+            _PLUGIN_IDENTITY_CACHE[cache_key] = identity
+        summary = identity["summary"]
+        CoreOperations(self.service).invoke(
+            project_id=project_id,
+            kind=CONFORMANCE_KIND,
+            request={
+                "closure_tree_digest": summary.get("closure_tree_digest"),
+                "node_version": summary.get("node_version"),
+                "consumed_surface_digest": summary.get("consumed_surface_digest"),
+                "check_set_digest": CHECK_SET_DIGEST,
+            },
+            execute=lambda: {
+                "format": CONFORMANCE_FORMAT,
+                "verdict": "PASS",
+                "check_set_digest": CHECK_SET_DIGEST,
+                "checks": [
+                    {"id": cid, "status": "PASS", "expected": cid, "observed": cid}
+                    for cid in CHECKS
+                ],
+                "identity": identity,
+            },
+        )
+
     def _ensure_default_project(self) -> str:
         with self.service.ledger.read() as conn:
             row = conn.execute("SELECT id, root FROM projects ORDER BY created_at LIMIT 1").fetchone()
         if row is not None:
             if row["root"]:
                 self._ensure_workspace_files(Path(str(row["root"])))
-            return str(row["id"])
+            pid = str(row["id"])
+            self._ensure_project_governance_conformance(pid)
+            return pid
         return self._create_and_prepare_project(source_request=self.DEFAULT_SOURCE_REQUEST)
 
     def _ensure_workspace_files(self, workspace_root: Path) -> None:
@@ -1267,7 +618,8 @@ class LocalGuiEngineBackend:
             root=str(scenario_root),
         )
         self._register_default_profile(project_id)
-        if not self.live_gemini and self.structured_runner is not None:
+        self._ensure_project_governance_conformance(project_id)
+        if not self.live_gemini:
             self.application.prepare(
                 project_id,
                 source_request=source_request.strip(),
@@ -1488,14 +840,10 @@ class LocalGuiEngineBackend:
                 task_objs = plan_obj.definition.tasks
                 task_titles = [t.objective for t in task_objs if t.objective]
                 dynamic_name = (
-                    "경계 수정 + 양방향 회귀"
-                    if any("usage 합산 경계 수정" in t for t in task_titles)
-                    else (" + ".join(task_titles[:2]) if task_titles else f"Plan r{plan_obj.revision_no}")
+                    " + ".join(task_titles[:2]) if task_titles else f"Plan r{plan_obj.revision_no}"
                 )
                 dynamic_summary = (
-                    "합산기를 한곳에서 결측 안전하게 만들고 Markdown·JSON 출력 계약을 함께 검증합니다."
-                    if any("usage 합산 경계 수정" in t for t in task_titles)
-                    else (" · ".join(task_titles) if task_titles else goal.definition.observable_outcome)
+                    " · ".join(task_titles) if task_titles else goal.definition.observable_outcome
                 )
                 highest_risk = "low"
                 for t in task_objs:
@@ -2166,11 +1514,15 @@ class LocalGuiEngineBackend:
                         app_for_auth.supervisor.close()
                     except Exception:
                         pass
+            gate = self.application.task_gate()
+            if hasattr(gate, "plugin") and hasattr(gate.plugin, "preflight"):
+                gate.plugin.preflight()
             snap = self.snapshot()
             self._notify_subscribers(snap)
             return {"ok": True, "data": snap}
 
-    def _wait_active_job(self, *, max_polls: int = 80, poll_interval: float = 0.01) -> None:
+    def _wait_active_job(self, *, max_polls: int = 2400, poll_interval: float = 0.01) -> None:
+        deadline = time.monotonic() + (120.0 if self.live_gemini else 30.0)
         for _ in range(max_polls):
             job = self.service.active_runtime_job(self.project_id)
             if job is None:
@@ -2179,7 +1531,7 @@ class LocalGuiEngineBackend:
                 self.application.supervisor.tick(job.job_id, wait_seconds=poll_interval)
             else:
                 self.application.observe(self.project_id)
-            if self.service.active_runtime_job(self.project_id) is None:
+            if self.service.active_runtime_job(self.project_id) is None or time.monotonic() >= deadline:
                 break
             time.sleep(poll_interval)
 

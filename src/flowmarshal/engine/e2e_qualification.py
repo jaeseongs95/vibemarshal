@@ -132,7 +132,6 @@ from .runtime import (
     CodexProjectBinding,
     CodexRuntimePort,
     EngineDispatcher,
-    FakeCodexRuntime,
     RuntimeJobSupervisor,
     RuntimeOperationReceipt,
 )
@@ -844,12 +843,17 @@ def _assignment(roles: EngineRoleConfiguration) -> ModelAssignmentContract:
 def _preparation_provenance(
     runtime: CodexRuntimePort, structured_runner: Any | None
 ) -> EvidenceProvenance:
-    """역할이 scripted runner나 fake runtime으로 돌았으면 준비 출처를 LIVE로 적지 않는다."""
+    """역할이 scripted runner나 결정적 테스트 runtime으로 돌았으면 준비 출처를 LIVE로 적지 않는다."""
 
+    unwrapped = getattr(runtime, "runtime", runtime)
+    is_live_provider = getattr(unwrapped, "provider", None) in {"codex-app-server", "claude-code", "gemini-cli"} or isinstance(
+        unwrapped, CodexAppServerRuntime
+    )
     return (
         EvidenceProvenance.LIVE
         if structured_runner is None
-        and not isinstance(getattr(runtime, "runtime", runtime), FakeCodexRuntime)
+        and is_live_provider
+        and not getattr(unwrapped, "is_deterministic_test_runtime", False)
         else EvidenceProvenance.FAKE
     )
 
@@ -1806,7 +1810,7 @@ def _stale_after_materialization(
 
 def _restart_resume(
     prepared: PreparedE2E,
-    runtime: FakeCodexRuntime,
+    runtime: CodexRuntimePort,
     source_digest: str,
     *,
     roles: EngineRoleConfiguration | None = None,

@@ -4,6 +4,7 @@ from flowmarshal.engine.model_lock import RUNTIME_CAPABILITIES
 
 import json
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -70,9 +71,161 @@ from .planning import (
     plan_review_evidence_catalog,
     skeleton_review_evidence_catalog,
 )
-from .runtime import EngineDispatcher, FakeCodexRuntime
+from .runtime import (
+    REQUIRED_APPROVAL_POLICY,
+    REQUIRED_PERMISSION_PROFILE,
+    EngineDispatcher,
+    ExecutionPolicyEvidence,
+    RuntimeObservation,
+    RuntimeOperationReceipt,
+    RuntimePolicyError,
+)
 from .service import EngineService
 from .capabilities import CoreActionAuthority
+
+
+@dataclass
+class _SmokeTurnThread:
+    thread_id: str
+    cwd: Path
+    turn_id: str | None = None
+    terminal_status: str | None = None
+    final_response: str | None = None
+    provider_payload: dict[str, Any] = field(default_factory=dict)
+
+
+class _SmokeDeterminismRuntime:
+    """결정적 상태 머신 스모크를 위한 내부 runtime."""
+
+    def __init__(self, inventory: ModelInventory) -> None:
+        self.inventory = inventory
+        self.threads: dict[str, _SmokeTurnThread] = {}
+
+    def close(self, *, timeout_seconds: float = 5.0) -> None:
+        del timeout_seconds
+        return None
+
+    def verify_execution_policy(self, cwd: Path | str) -> ExecutionPolicyEvidence:
+        workspace = Path(cwd).resolve()
+        return ExecutionPolicyEvidence(
+            permission_profile=REQUIRED_PERMISSION_PROFILE,
+            approval_policy=REQUIRED_APPROVAL_POLICY,
+            config_digest=sha256_digest({"permission": REQUIRED_PERMISSION_PROFILE, "approval": REQUIRED_APPROVAL_POLICY}),
+            profile_catalog_digest=sha256_digest([REQUIRED_PERMISSION_PROFILE]),
+            cwd=str(workspace),
+        )
+
+    def list_models(self) -> ModelInventory:
+        return self.inventory
+
+    def create_thread(
+        self,
+        *,
+        cwd: Path,
+        title: str,
+        model: str,
+        developer_instructions: str,
+        ephemeral: bool = False,
+    ) -> RuntimeOperationReceipt:
+        del title, model, developer_instructions, ephemeral
+        from .domain import ThreadBinding
+
+        self.verify_execution_policy(cwd)
+        thread_id = new_id("runtime_thread")
+        self.threads[thread_id] = _SmokeTurnThread(thread_id=thread_id, cwd=cwd.resolve())
+        binding = ThreadBinding(thread_id=thread_id, bound_at=utc_now())
+        return RuntimeOperationReceipt(
+            operation_id=thread_id,
+            payload={"thread_id": thread_id, "thread": {"id": thread_id, "turns": []}},
+            binding=binding,
+        )
+
+    def start_turn(
+        self,
+        *,
+        thread_id: str,
+        cwd: Path,
+        prompt: str,
+        model: str,
+        effort: str,
+        output_schema: dict[str, Any] | None = None,
+    ) -> RuntimeOperationReceipt:
+        del model, effort, output_schema
+        from .domain import ThreadBinding
+
+        self.verify_execution_policy(cwd)
+        thread = self.threads[thread_id]
+        first_empty_thread = thread.turn_id is None
+        turn_id = new_id("runtime_turn")
+        thread.turn_id = turn_id
+        thread.terminal_status = None
+        thread.final_response = None
+        thread.provider_payload = {}
+        binding = ThreadBinding(thread_id=thread_id, turn_id=turn_id, bound_at=utc_now())
+        return RuntimeOperationReceipt(
+            operation_id=turn_id,
+            payload={
+                "thread_id": thread_id,
+                "turn_id": turn_id,
+                "prompt_digest": sha256_digest(prompt),
+                "first_empty_thread": first_empty_thread,
+                "permission_profile": REQUIRED_PERMISSION_PROFILE,
+                "approval_policy": REQUIRED_APPROVAL_POLICY,
+            },
+            binding=binding,
+        )
+
+    def complete(self, thread_id: str, *, response: str = "완료") -> None:
+        self.threads[thread_id].terminal_status = "completed"
+        self.threads[thread_id].final_response = response
+
+    def read(self, *, thread_id: str) -> RuntimeObservation:
+        thread = self.threads[thread_id]
+        return RuntimeObservation(
+            thread_id=thread_id,
+            turn_id=thread.turn_id,
+            active=thread.turn_id is not None and thread.terminal_status is None,
+            terminal_status=thread.terminal_status,
+            final_response=thread.final_response,
+            payload={
+                "thread_id": thread_id,
+                "turn_id": thread.turn_id,
+                **thread.provider_payload,
+            },
+        )
+
+    def operation_kind_for_read(self, thread_id: str) -> str:
+        del thread_id
+        return "read"
+
+    def read_stored(
+        self, *, thread_id: str, turn_id: str | None = None, timeout_seconds: float = 5.0,
+    ) -> RuntimeObservation:
+        del timeout_seconds
+        thread = self.threads[thread_id]
+        if turn_id is not None and thread.turn_id != turn_id:
+            raise RuntimePolicyError(
+                "RUNTIME_OBSERVATION_BINDING_MISMATCH: 요청한 exact turn을 찾지 못했습니다."
+            )
+        return RuntimeObservation(
+            thread_id=thread_id,
+            turn_id=thread.turn_id,
+            active=thread.turn_id is not None and thread.terminal_status is None,
+            terminal_status=thread.terminal_status,
+            final_response=thread.final_response,
+            payload={
+                "thread_id": thread_id,
+                "requested_turn_id": turn_id,
+                "turn_count": 0 if thread.turn_id is None else 1,
+                "turn_status": thread.terminal_status,
+                "usage": None,
+                "usage_scope": "unavailable",
+                **thread.provider_payload,
+                "usage_source": "thread/read",
+                "turn_history_available": True,
+                "turn_history_source": "thread/read(includeTurns=true)",
+            },
+        )
 
 
 def run_synthetic_lifecycle(
@@ -428,7 +581,7 @@ def run_synthetic_lifecycle(
     )
     service.materialize_execution_spec(spec, inventory=inventory)
 
-    runtime = FakeCodexRuntime(inventory)
+    runtime = _SmokeDeterminismRuntime(inventory)
     dispatcher = EngineDispatcher(service, runtime)
     dispatch = dispatcher.run_once(project_id)
     attempt_id = dispatch.attempt_id

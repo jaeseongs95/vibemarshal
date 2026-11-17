@@ -875,29 +875,24 @@ def _cmd_plan_activate(arguments: argparse.Namespace) -> None:
 def _cmd_goal_authorize(arguments: argparse.Namespace) -> None:
     policy = _goal_authorization_policy(arguments)
     app = _application(arguments)
+    authority = ApplicationAuthority(app)
+    target = authority.authorization_target(
+        arguments.project_id,
+        operating_policy=policy,
+    )
     confirm_digest = getattr(arguments, "confirm_digest", None)
-    if confirm_digest is not None:
-        authority = ApplicationAuthority(app)
-        target = authority.authorization_target(
-            arguments.project_id,
-            operating_policy=policy,
+    if confirm_digest is None:
+        raise EngineServiceError(
+            f"CORE_CAPABILITY_REQUIRED: 직접 CLI 승인에는 --confirm-digest {target.target_digest} 확인이 필요합니다."
         )
-        if confirm_digest != target.target_digest:
-            raise EngineServiceError(
-                "AUTHORIZATION_DECLINED: confirm_digest가 현재 승인 대상 target_digest와 일치하지 않습니다."
-            )
-        _emit(
-            authority.authorize(
-                arguments.project_id,
-                target=target,
-                source=arguments.source,
-                operating_policy=policy,
-            )
+    if confirm_digest != target.target_digest:
+        raise EngineServiceError(
+            "AUTHORIZATION_DECLINED: confirm_digest가 현재 승인 대상 target_digest와 일치하지 않습니다."
         )
-        return
     _emit(
-        app.authorize(
+        authority.authorize(
             arguments.project_id,
+            target=target,
             source=arguments.source,
             operating_policy=policy,
         )
