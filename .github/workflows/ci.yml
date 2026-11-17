@@ -35,7 +35,7 @@ jobs:
           PYTHONPATH: src
           PYTHONUTF8: "1"
         run: |
-          C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command "$null = [Security.Principal.WindowsIdentity]::GetCurrent()"
+          C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command '[Security.Principal.WindowsIdentity]::GetCurrent().User.Value | Out-Null'
           python -m unittest tests.test_engine_g1b_reauth_target tests.test_engine_ags_a2_f06 tests.test_engine_http_api tests.test_engine_packaging
 
   desktop-tests:
@@ -51,12 +51,14 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "24"
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          npm install -g pnpm
+          pnpm install --no-frozen-lockfile
 
       - name: Run Vitest and Build
         run: |
-          npm test
-          npm run build
+          pnpm test
+          pnpm run build

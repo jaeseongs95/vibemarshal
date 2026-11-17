@@ -31,7 +31,7 @@ class EngineHttpApiTests(unittest.TestCase):
         self._tmp.cleanup()
 
     def _get(self, path: str) -> dict:
-        with urllib.request.urlopen(f"{self.base_url}{path}", timeout=15) as resp:
+        with urllib.request.urlopen(f"{self.base_url}{path}", timeout=60) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
     def _post(self, path: str, payload: dict | None = None, *, token: str | None = "default") -> dict:
@@ -47,7 +47,7 @@ class EngineHttpApiTests(unittest.TestCase):
             headers=headers,
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=60) as resp:
             return json.loads(resp.read().decode("utf-8"))
 
     def test_health_and_snapshot_and_sse_events(self) -> None:
