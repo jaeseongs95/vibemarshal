@@ -342,6 +342,20 @@ def _ensure_local_governance_settings(state_dir: Path) -> GovernanceSettings:
         finally:
             state_conn.close()
         _apply_windows_same_user_acl(profile_dir, set_owner_recursive=True)
+        if os.name == "nt":
+            subprocess.run(
+                [
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-NonInteractive",
+                    "-Command",
+                    f"Get-Acl -LiteralPath '{profile_dir}' | Out-Null",
+                ],
+                capture_output=True,
+                timeout=30,
+                check=False,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
         if os.name != "nt":
             os.chmod(profile_dir, 0o700)
             for p in (key_path, pin_path, server_profile_path, ags_state_path, config_path):
@@ -620,7 +634,14 @@ class LocalGuiEngineBackend:
         cache_key = (plugin_key, classes_digest)
         identity = _PLUGIN_IDENTITY_CACHE.get(cache_key)
         if identity is None:
-            identity = self.governance.inspect_identity()
+            for attempt in range(3):
+                try:
+                    identity = self.governance.inspect_identity()
+                    break
+                except Exception as exc:
+                    if attempt == 2 or "MCP_SERVER_EXITED" not in str(exc):
+                        raise
+                    time.sleep(0.2)
             _PLUGIN_IDENTITY_CACHE[cache_key] = identity
         summary = identity["summary"]
         CoreOperations(self.service).invoke(
