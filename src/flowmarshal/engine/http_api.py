@@ -12,6 +12,7 @@ import json
 import os
 import secrets
 import shutil
+import sqlite3
 import subprocess
 import sys
 import threading
@@ -85,7 +86,7 @@ _WINDOWS_CURRENT_SID: str | None = None
 _PLUGIN_IDENTITY_CACHE: dict[tuple[str, str], dict[str, Any]] = {}
 
 
-def _apply_windows_same_user_acl(target_path: Path) -> None:
+def _apply_windows_same_user_acl(target_path: Path, *, set_owner_recursive: bool = False) -> None:
     global _WINDOWS_CURRENT_SID
     if os.name != "nt":
         return
@@ -100,16 +101,29 @@ def _apply_windows_same_user_acl(target_path: Path) -> None:
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         ).stdout.strip()
         _WINDOWS_CURRENT_SID = whoami.split(",")[-1].strip().strip('"')
+    if not set_owner_recursive:
+        subprocess.run(
+            [
+                "icacls",
+                str(target_path),
+                "/inheritance:r",
+                "/grant:r",
+                f"*{_WINDOWS_CURRENT_SID}:(OI)(CI)F",
+                "*S-1-5-18:(OI)(CI)F",
+                "*S-1-5-32-544:(OI)(CI)F",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            check=True,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    owner_cmd = ["icacls", str(target_path), "/setowner", f"*{_WINDOWS_CURRENT_SID}"]
+    if set_owner_recursive:
+        owner_cmd.append("/T")
     subprocess.run(
-        [
-            "icacls",
-            str(target_path),
-            "/inheritance:r",
-            "/grant:r",
-            f"*{_WINDOWS_CURRENT_SID}:(OI)(CI)F",
-            "*S-1-5-18:(OI)(CI)F",
-            "*S-1-5-32-544:(OI)(CI)F",
-        ],
+        owner_cmd,
         capture_output=True,
         text=True,
         encoding="utf-8",
@@ -157,6 +171,7 @@ def _ensure_local_governance_settings(state_dir: Path) -> GovernanceSettings:
         key_path.is_file()
         and pin_path.is_file()
         and server_profile_path.is_file()
+        and ags_state_path.is_file()
         and config_path.is_file()
     ):
         profile_dir.mkdir(parents=True, exist_ok=True)
@@ -221,9 +236,25 @@ def _ensure_local_governance_settings(state_dir: Path) -> GovernanceSettings:
             + "\n",
             encoding="utf-8",
         )
+        state_conn = sqlite3.connect(ags_state_path)
+        try:
+            state_conn.execute(
+                "CREATE TABLE IF NOT EXISTS a2_profile_identity ("
+                "profile_id TEXT PRIMARY KEY CHECK (profile_id = 'flowmarshal-same-user-v1'), "
+                "freeze_identity TEXT NOT NULL) STRICT"
+            )
+            state_conn.execute("DELETE FROM a2_profile_identity")
+            state_conn.execute(
+                "INSERT INTO a2_profile_identity VALUES (?, ?)",
+                (A2_PROFILE_ID, selection_payload["freezeIdentity"]),
+            )
+            state_conn.commit()
+        finally:
+            state_conn.close()
+        _apply_windows_same_user_acl(profile_dir, set_owner_recursive=True)
         if os.name != "nt":
             os.chmod(profile_dir, 0o700)
-            for p in (key_path, pin_path, server_profile_path, config_path):
+            for p in (key_path, pin_path, server_profile_path, ags_state_path, config_path):
                 os.chmod(p, 0o600)
 
     producer = (
@@ -2230,6 +2261,14 @@ class LocalGuiServer:
 
 def build_parser() -> Any:
     import argparse
+
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
 
     parser = argparse.ArgumentParser(
         prog="flowmarshal-gui",

@@ -1481,6 +1481,13 @@ def _add_goal_arguments(parser: argparse.ArgumentParser, *, revise: bool = False
 
 
 def build_parser() -> argparse.ArgumentParser:
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if callable(reconfigure):
+            try:
+                reconfigure(encoding="utf-8", errors="replace")
+            except Exception:
+                pass
     parser = argparse.ArgumentParser(prog="flowmarshal-engine", description="VibeMarshal 새 authority engine")
     parser.add_argument("--role-timeout-policy", help="역할별 timeout 운영 설정 JSON")
     parser.add_argument("--codex-project-binding", help="새 역할·Worker thread의 App Server 프로젝트 결속 JSON")

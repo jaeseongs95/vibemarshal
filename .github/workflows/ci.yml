@@ -33,7 +33,9 @@ jobs:
       - name: Run Engine regression tests
         env:
           PYTHONPATH: src
+          PYTHONUTF8: "1"
         run: |
+          C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -NoProfile -NonInteractive -Command "$null = [Security.Principal.WindowsIdentity]::GetCurrent()"
           python -m unittest tests.test_engine_g1b_reauth_target tests.test_engine_ags_a2_f06 tests.test_engine_http_api tests.test_engine_packaging
 
   desktop-tests:
@@ -52,7 +54,7 @@ jobs:
           node-version: "22"
 
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Run Vitest and Build
         run: |
